@@ -5,7 +5,7 @@ import 'seed_data.dart';
 
 class DatabaseHelper {
   static const _dbName = 'life_notes_workout.db';
-  static const _dbVersion = 1;
+  static const _dbVersion = 2;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -87,6 +87,7 @@ class DatabaseHelper {
         order_index INTEGER NOT NULL DEFAULT 0,
         superset_group_id TEXT,
         notes TEXT,
+        rest_time_seconds INTEGER,
         FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE,
         FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
       )
@@ -139,6 +140,7 @@ class DatabaseHelper {
         exercise_id TEXT NOT NULL,
         order_index INTEGER NOT NULL DEFAULT 0,
         superset_group_id TEXT,
+        rest_time_seconds INTEGER,
         FOREIGN KEY (routine_day_id) REFERENCES routine_days(id) ON DELETE CASCADE,
         FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
       )
@@ -192,7 +194,14 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Handle migrations in future versions
+    if (oldVersion < 2) {
+      try {
+        await db.execute('ALTER TABLE exercise_entries ADD COLUMN rest_time_seconds INTEGER');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE routine_exercises ADD COLUMN rest_time_seconds INTEGER');
+      } catch (_) {}
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -430,6 +439,7 @@ class DatabaseHelper {
           'exercise_id': exercises[i]['exercise_id'],
           'order_index': i,
           'notes': exercises[i]['notes'],
+          'rest_time_seconds': exercises[i]['rest_time_seconds'],
         });
 
         final sets = exercises[i]['sets'] as List<Map<String, dynamic>>? ?? [];
@@ -470,6 +480,7 @@ class DatabaseHelper {
         'workout_id': workoutId,
         'exercise_id': re['exercise_id'],
         'order_index': count,
+        'rest_time_seconds': re['rest_time_seconds'],
       });
 
       final sets = await getPredefinedSets(re['id'] as String);
@@ -673,6 +684,13 @@ class DatabaseHelper {
     }
   }
 
+  Future<void> updateExerciseEntryRestTime(String exerciseEntryId, int restTimeSeconds) async {
+    final db = await database;
+    await db.update('exercise_entries',
+      {'rest_time_seconds': restTimeSeconds},
+      where: 'id = ?', whereArgs: [exerciseEntryId]);
+  }
+
   Future<List<Map<String, dynamic>>> getLastWorkoutSets(String exerciseId) async {
     final db = await database;
     return db.rawQuery('''
@@ -770,7 +788,7 @@ class DatabaseHelper {
     ''', [routineDayId]);
   }
 
-  Future<String> addRoutineExercise(String routineDayId, String exerciseId) async {
+  Future<String> addRoutineExercise(String routineDayId, String exerciseId, {int? restTimeSeconds}) async {
     final db = await database;
     final id = const Uuid().v4();
     final count = Sqflite.firstIntValue(
@@ -781,6 +799,7 @@ class DatabaseHelper {
       'routine_day_id': routineDayId,
       'exercise_id': exerciseId,
       'order_index': count,
+      if (restTimeSeconds != null) 'rest_time_seconds': restTimeSeconds,
     });
     return id;
   }
@@ -788,6 +807,13 @@ class DatabaseHelper {
   Future<void> removeRoutineExercise(String id) async {
     final db = await database;
     await db.delete('routine_exercises', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> updateRoutineExerciseRestTime(String routineExerciseId, int restTimeSeconds) async {
+    final db = await database;
+    await db.update('routine_exercises',
+      {'rest_time_seconds': restTimeSeconds},
+      where: 'id = ?', whereArgs: [routineExerciseId]);
   }
 
   Future<List<Map<String, dynamic>>> getPredefinedSets(String routineExerciseId) async {

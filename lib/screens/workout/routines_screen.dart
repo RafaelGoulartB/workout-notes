@@ -342,6 +342,50 @@ class _DayCardState extends State<_DayCard> {
     if (mounted) setState(() => _isLoading = false);
   }
 
+  void _changeRestTime(Map<String, dynamic> exercise) {
+    final currentRest = (exercise['rest_time_seconds'] as int?) ?? 90;
+    final exId = exercise['id'] as String;
+    final presets = [30, 60, 90, 120, 180];
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(80),
+              borderRadius: BorderRadius.circular(2),
+            ))),
+            const SizedBox(height: 16),
+            Text('Tempo de Descanso', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ...presets.map((sec) => ChoiceChip(
+                  label: Text(sec >= 60 ? '${sec ~/ 60}min${sec % 60}s' : '${sec}s'),
+                  selected: currentRest == sec,
+                  onSelected: (_) {
+                    widget.db.updateRoutineExerciseRestTime(exId, sec);
+                    _load();
+                    Navigator.pop(ctx);
+                  },
+                )),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _openExercisePicker() async {
     final currentExerciseIds = _exercises.map((e) => e['exercise_id'] as String).toSet();
 
@@ -354,7 +398,11 @@ class _DayCardState extends State<_DayCard> {
       builder: (_) => ExercisePickerSheet(
         currentExerciseIds: currentExerciseIds,
         onExerciseAdded: (exercise) async {
-          await widget.db.addRoutineExercise(widget.day['id'] as String, exercise['id'] as String);
+          await widget.db.addRoutineExercise(
+            widget.day['id'] as String,
+            exercise['id'] as String,
+            restTimeSeconds: (exercise['default_rest_time'] as int?),
+          );
           _load();
         },
         onExerciseRemoved: (exercise) async {
@@ -441,6 +489,26 @@ class _DayCardState extends State<_DayCard> {
                     )),
                     const SizedBox(width: 8),
                     Expanded(child: Text(ex['exercise_name'] as String? ?? '', style: theme.textTheme.bodyMedium)),
+                    GestureDetector(
+                      onTap: () => _changeRestTime(ex),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.timer_outlined, size: 12, color: theme.colorScheme.primary),
+                            const SizedBox(width: 2),
+                            Text('${ex['rest_time_seconds'] ?? 90}s',
+                                style: theme.textTheme.bodySmall?.copyWith(fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                    ),
                     GestureDetector(
                       onTap: () async {
                         await widget.db.removeRoutineExercise(ex['id'] as String);

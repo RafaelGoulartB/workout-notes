@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../database/database_helper.dart';
+import '../../services/rest_timer_service.dart';
 import '../../widgets/exercise_picker_sheet.dart';
 import 'rest_timer_screen.dart';
 
@@ -24,6 +25,7 @@ class ActiveWorkoutScreen extends StatefulWidget {
 
 class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   final _db = DatabaseHelper.instance;
+  final _timerService = RestTimerService.instance;
   final _uuid = const Uuid();
   bool _isLoading = true;
   String? _workoutId;
@@ -33,7 +35,18 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   @override
   void initState() {
     super.initState();
+    _timerService.addListener(_onTimerTick);
     _initialize();
+  }
+
+  @override
+  void dispose() {
+    _timerService.removeListener(_onTimerTick);
+    super.dispose();
+  }
+
+  void _onTimerTick() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _initialize() async {
@@ -105,19 +118,22 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         categoryName: entry['category_name'] as String? ?? '',
         categoryColor: Color(entry['category_color'] as int? ?? 0xFF757575),
         sets: sets,
+        restTimeSeconds: (entry['rest_time_seconds'] as int?) ?? 90,
       ));
     }
   }
 
-  Future<void> _addExercise(String exerciseId, String name, String catName, Color catColor) async {
+  Future<void> _addExercise(String exerciseId, String name, String catName, Color catColor, {int? restTimeSeconds}) async {
     if (_workoutId == null) return;
     final entryId = _uuid.v4();
     final db = await _db.database;
+    final rt = restTimeSeconds ?? 90;
     await db.insert('exercise_entries', {
       'id': entryId,
       'workout_id': _workoutId,
       'exercise_id': exerciseId,
       'order_index': _exercises.length,
+      'rest_time_seconds': rt,
     });
 
     // Auto-populate from last workout
@@ -141,6 +157,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         categoryName: catName,
         categoryColor: catColor,
         sets: [],
+        restTimeSeconds: rt,
       ));
     });
   }
@@ -168,9 +185,29 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   Future<void> _toggleSet(String setId) async {
+    // Find which exercise this set belongs to
+    _ExerciseWithSets? parentExercise;
+    Map<String, dynamic>? theSet;
+    for (final ex in _exercises) {
+      for (final s in ex.sets) {
+        if (s['id'] == setId) {
+          parentExercise = ex;
+          theSet = s;
+          break;
+        }
+      }
+      if (parentExercise != null) break;
+    }
+
+    final wasComplete = (theSet?['is_complete'] as int?) == 1;
     await _db.toggleSetComplete(setId);
     await _loadExercises();
     setState(() {});
+
+    // Auto-start timer when set is marked complete
+    if (!wasComplete && parentExercise != null && mounted) {
+      _timerService.start(parentExercise.restTimeSeconds);
+    }
   }
 
   Future<void> _editSetDialog(String setId, Map<String, dynamic> setData, String exerciseName) async {
@@ -304,6 +341,49 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             : 'Novo Treino'),
         centerTitle: true,
         actions: [
+          if (_timerService.isActive)
+            GestureDetector(
+              onTap: _openRestTimer,
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _timerService.remainingSeconds <= 5 && _timerService.isRunning
+                      ? Colors.red.withAlpha(40)
+                      : Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _timerService.isPaused ? Icons.pause : Icons.timer,
+                      size: 18,
+                      color: _timerService.remainingSeconds <= 5 && _timerService.isRunning
+                          ? Colors.red
+                          : Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _timerService.shortTime,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: _timerService.remainingSeconds <= 5 && _timerService.isRunning
+                            ? Colors.red
+                            : Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.timer_outlined),
+              onPressed: _openRestTimer,
+              tooltip: 'Temporizador',
+            ),
           IconButton(
             icon: const Icon(Icons.repeat_outlined),
             onPressed: _importFromRoutine,
@@ -409,6 +489,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               onToggleSet: _toggleSet,
               onEditSet: (setId, data) => _editSetDialog(setId, data, _exercises[index].name),
               onDeleteSet: _deleteSet,
+              onChangeRestTime: (currentRest) => _changeExerciseRestTime(_exercises[index], currentRest),
               theme: theme,
             ),
           ),
@@ -566,6 +647,103 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
   }
 
+  void _changeExerciseRestTime(_ExerciseWithSets exercise, int currentRest) {
+    final presets = [30, 60, 90, 120, 180];
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(80),
+              borderRadius: BorderRadius.circular(2),
+            ))),
+            const SizedBox(height: 16),
+            Text('Tempo de Descanso', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(exercise.name, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ...presets.map((sec) => ChoiceChip(
+                  label: Text(sec >= 60 ? '${sec ~/ 60}min${sec % 60}s' : '${sec}s'),
+                  selected: currentRest == sec,
+                  onSelected: (_) {
+                    _updateRestTimeAndClose(exercise, sec);
+                    Navigator.pop(ctx);
+                  },
+                )),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _showCustomRestTimeDialog(exercise);
+                },
+                icon: const Icon(Icons.edit),
+                label: const Text('Personalizado'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCustomRestTimeDialog(_ExerciseWithSets exercise) {
+    final ctl = TextEditingController(text: exercise.restTimeSeconds.toString());
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tempo Personalizado'),
+        content: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: ctl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Segundos',
+                  border: OutlineInputBorder(),
+                ),
+                autofocus: true,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text('s'),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(onPressed: () {
+            final v = int.tryParse(ctl.text);
+            if (v != null && v > 0) {
+              _updateRestTimeAndClose(exercise, v);
+              Navigator.pop(ctx);
+            }
+          }, child: const Text('Definir')),
+        ],
+      ),
+    );
+  }
+
+  void _updateRestTimeAndClose(_ExerciseWithSets exercise, int seconds) async {
+    await _db.updateExerciseEntryRestTime(exercise.entryId, seconds);
+    await _loadExercises();
+    setState(() {});
+  }
+
   Future<void> _pickExercise() async {
     final currentExerciseIds = _exercises.map((e) => e.exerciseId).toSet();
 
@@ -583,6 +761,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             exercise['name'] as String,
             exercise['category_name'] as String? ?? '',
             Color(exercise['category_color'] as int? ?? 0xFF757575),
+            restTimeSeconds: (exercise['default_rest_time'] as int?),
           );
         },
         onExerciseRemoved: (exercise) async {
@@ -606,6 +785,7 @@ class _ExerciseWithSets {
   final String categoryName;
   final Color categoryColor;
   final List<Map<String, dynamic>> sets;
+  final int restTimeSeconds;
 
   _ExerciseWithSets({
     required this.entryId,
@@ -614,6 +794,7 @@ class _ExerciseWithSets {
     required this.categoryName,
     required this.categoryColor,
     List<Map<String, dynamic>>? sets,
+    this.restTimeSeconds = 90,
   }) : sets = sets ?? [];
 
   int get completedSets => sets.where((s) => (s['is_complete'] as int?) == 1).length;
@@ -630,14 +811,22 @@ class _ExerciseCard extends StatelessWidget {
   final Function(String, Map<String, dynamic>) onEditSet;
   final Function(String) onDeleteSet;
   final ThemeData theme;
+  final VoidCallback? onStartRestTimer;
+  final ValueChanged<int> onChangeRestTime;
 
   const _ExerciseCard({
     required this.exercise, required this.onAddSet, required this.onToggleSet,
     required this.onEditSet, required this.onDeleteSet, required this.theme,
+    this.onStartRestTimer,
+    required this.onChangeRestTime,
   });
 
   @override
   Widget build(BuildContext context) {
+    final restMin = exercise.restTimeSeconds ~/ 60;
+    final restSec = exercise.restTimeSeconds % 60;
+    final restStr = restMin > 0 ? '${restMin}min$restSec' : '${restSec}s';
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       elevation: 0,
@@ -663,6 +852,26 @@ class _ExerciseCard extends StatelessWidget {
                 Expanded(
                   child: Text(exercise.name, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                 ),
+                // Rest time chip
+                GestureDetector(
+                  onTap: () => onChangeRestTime(exercise.restTimeSeconds),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.timer_outlined, size: 14, color: theme.colorScheme.primary),
+                        const SizedBox(width: 4),
+                        Text(restStr, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
                 Text(exercise.categoryName, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               ],
             ),
