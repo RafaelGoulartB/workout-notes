@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../database/database_helper.dart';
 import '../../widgets/exercise_picker_sheet.dart';
-import 'exercise_library_screen.dart';
 import 'rest_timer_screen.dart';
 
 class ActiveWorkoutScreen extends StatefulWidget {
@@ -30,7 +29,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   String? _workoutId;
   DateTime? _startTime;
   List<_ExerciseWithSets> _exercises = [];
-  String _comment = '';
 
   @override
   void initState() {
@@ -60,7 +58,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final workout = await _db.getWorkout(id);
     if (workout != null) {
       _startTime = DateTime.parse(workout['start_time'] as String);
-      _comment = (workout['comment'] as String?) ?? '';
       await _loadExercises();
     }
   }
@@ -148,7 +145,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   Future<void> _addSet(_ExerciseWithSets exercise) async {
-    final setData = await _db.addSet(exerciseEntryId: exercise.entryId);
+    await _db.addSet(exerciseEntryId: exercise.entryId);
     final newSet = await _db.getExerciseSets(exercise.entryId);
     final lastSet = newSet.isNotEmpty ? newSet.last : null;
     if (lastSet == null) return;
@@ -294,6 +291,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         centerTitle: true,
         actions: [
           IconButton(
+            icon: const Icon(Icons.repeat_outlined),
+            onPressed: _importFromRoutine,
+            tooltip: 'Importar de Rotina',
+          ),
+          IconButton(
             icon: const Icon(Icons.timer_outlined),
             onPressed: _openRestTimer,
             tooltip: 'Temporizador',
@@ -336,6 +338,12 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               onPressed: _pickExercise,
               icon: const Icon(Icons.add),
               label: const Text('Adicionar Exercício'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _importFromRoutine,
+              icon: const Icon(Icons.repeat),
+              label: const Text('Importar de Rotina'),
             ),
           ],
         ),
@@ -395,21 +403,185 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
   }
 
-  Future<void> _pickExercise() async {
-    final result = await showModalBottomSheet<Map<String, dynamic>>(
+  Future<void> _importFromRoutine() async {
+    final routines = await _db.getRoutines();
+    if (routines.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Nenhuma rotina encontrada. Crie uma primeiro!'), behavior: SnackBarBehavior.floating),
+        );
+      }
+      return;
+    }
+
+    // Step 1: Pick a routine
+    final routineId = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => const ExercisePickerSheet(),
+      builder: (ctx) => _buildRoutinePicker(routines),
     );
-    if (result != null) {
-      await _addExercise(
-        result['id'] as String,
-        result['name'] as String,
-        result['category_name'] as String? ?? '',
-        Color(result['category_color'] as int? ?? 0xFF757575),
+    if (routineId == null || !mounted) return;
+
+    // Step 2: Pick a day
+    final days = await _db.getRoutineDays(routineId);
+    if (days.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Esta rotina não tem dias.'), behavior: SnackBarBehavior.floating),
+        );
+      }
+      return;
+    }
+
+    final routineName = routines.firstWhere((r) => r['id'] == routineId)['name'] as String;
+    final dayId = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => _buildDayPicker(ctx, days, routineName),
+    );
+    if (dayId == null || !mounted) return;
+
+    // Step 3: Import
+    if (_workoutId == null) return;
+    await _db.importRoutineDayToWorkout(_workoutId!, dayId);
+    await _loadExercises();
+    setState(() {});
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Exercícios importados da rotina!'), behavior: SnackBarBehavior.floating),
       );
     }
+  }
+
+  Widget _buildRoutinePicker(List<Map<String, dynamic>> routines) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(
+            color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+            borderRadius: BorderRadius.circular(2),
+          ))),
+          const SizedBox(height: 16),
+          Text('Selecione a Rotina', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 300,
+            child: ListView.separated(
+              itemCount: routines.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (ctx, i) {
+                final routine = routines[i];
+                return ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.repeat, color: theme.colorScheme.onSecondaryContainer, size: 20),
+                  ),
+                  title: Text(routine['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.pop(ctx, routine['id'] as String),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDayPicker(BuildContext sheetContext, List<Map<String, dynamic>> days, String routineName) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(
+            color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+            borderRadius: BorderRadius.circular(2),
+          ))),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              TextButton.icon(
+                onPressed: () => Navigator.pop(sheetContext),
+                icon: const Icon(Icons.arrow_back, size: 18),
+                label: const Text('Voltar'),
+              ),
+            ],
+          ),
+          Text(routineName, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text('Selecione o dia para importar', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 300,
+            child: ListView.separated(
+              itemCount: days.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (ctx, i) {
+                final day = days[i];
+                return ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.today, color: theme.colorScheme.onPrimaryContainer, size: 20),
+                  ),
+                  title: Text(day['name'] as String? ?? 'Dia ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                  trailing: const Icon(Icons.download),
+                  onTap: () => Navigator.pop(ctx, day['id'] as String),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickExercise() async {
+    final currentExerciseIds = _exercises.map((e) => e.exerciseId).toSet();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
+      useSafeArea: true,
+      builder: (_) => ExercisePickerSheet(
+        currentExerciseIds: currentExerciseIds,
+        onExerciseAdded: (exercise) async {
+          await _addExercise(
+            exercise['id'] as String,
+            exercise['name'] as String,
+            exercise['category_name'] as String? ?? '',
+            Color(exercise['category_color'] as int? ?? 0xFF757575),
+          );
+        },
+        onExerciseRemoved: (exercise) async {
+          final exerciseId = exercise['id'] as String;
+          await _db.removeExerciseEntryFromWorkout(_workoutId!, exerciseId);
+          if (mounted) {
+            setState(() {
+              _exercises.removeWhere((e) => e.exerciseId == exerciseId);
+            });
+          }
+        },
+      ),
+    );
   }
 }
 

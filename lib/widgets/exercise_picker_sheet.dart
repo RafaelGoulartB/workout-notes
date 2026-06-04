@@ -1,8 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 
+/// A bottom sheet that lets the user add/remove exercises to a workout or routine.
+/// Keeps open and calls [onExerciseAdded] / [onExerciseRemoved] in real-time.
+/// [currentExerciseIds] is the set of exercise IDs already present, shown with a check.
 class ExercisePickerSheet extends StatefulWidget {
-  const ExercisePickerSheet({super.key});
+  final Set<String> currentExerciseIds;
+  final void Function(Map<String, dynamic> exercise) onExerciseAdded;
+  final void Function(Map<String, dynamic> exercise) onExerciseRemoved;
+
+  const ExercisePickerSheet({
+    super.key,
+    required this.currentExerciseIds,
+    required this.onExerciseAdded,
+    required this.onExerciseRemoved,
+  });
 
   @override
   State<ExercisePickerSheet> createState() => _ExercisePickerSheetState();
@@ -15,10 +27,12 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
   String? _selectedCategoryId;
   String _search = '';
   bool _isLoading = true;
+  late Set<String> _selectedIds;
 
   @override
   void initState() {
     super.initState();
+    _selectedIds = Set.from(widget.currentExerciseIds);
     _load();
   }
 
@@ -49,14 +63,29 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
     }).toList();
   }
 
+  void _toggleExercise(Map<String, dynamic> exercise) {
+    final id = exercise['id'] as String;
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+        widget.onExerciseRemoved(exercise);
+      } else {
+        _selectedIds.add(id);
+        widget.onExerciseAdded(exercise);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final filtered = _filteredExercises;
-    final selectedCategory = _categories.firstWhere(
-      (c) => c['id'] == _selectedCategoryId,
-      orElse: () => {},
-    );
+    final selectedCategory = _selectedCategoryId != null
+        ? _categories.firstWhere(
+            (c) => c['id'] == _selectedCategoryId,
+            orElse: () => <String, dynamic>{},
+          )
+        : <String, dynamic>{};
 
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
@@ -81,14 +110,15 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Title
+            // Title row
             Row(
               children: [
-                Text(
-                  'Adicionar Exercício',
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Text(
+                    'Adicionar Exercício',
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
                 ),
-                const Spacer(),
                 if (_selectedCategoryId != null)
                   TextButton.icon(
                     onPressed: () => setState(() {
@@ -115,6 +145,9 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                     final catId = cat['id'] as String;
                     final exercises = _exercisesByCategory[catId] ?? [];
                     final color = Color(cat['color'] as int? ?? 0xFF757575);
+                    final selectedCount = exercises
+                        .where((e) => _selectedIds.contains(e['id']))
+                        .length;
 
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -161,9 +194,12 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      '${exercises.length} exercícios',
+                                      '${exercises.length} exercícios${selectedCount > 0 ? ' · $selectedCount adicionado(s)' : ''}',
                                       style: theme.textTheme.bodySmall?.copyWith(
-                                        color: theme.colorScheme.onSurfaceVariant,
+                                        color: selectedCount > 0
+                                            ? theme.colorScheme.primary
+                                            : theme.colorScheme.onSurfaceVariant,
+                                        fontWeight: selectedCount > 0 ? FontWeight.w600 : null,
                                       ),
                                     ),
                                   ],
@@ -235,7 +271,10 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                               itemCount: filtered.length,
                               itemBuilder: (ctx, i) {
                                 final ex = filtered[i];
+                                final exId = ex['id'] as String;
+                                final isSelected = _selectedIds.contains(exId);
                                 final catColor = Color(selectedCategory['color'] as int? ?? 0xFF757575);
+                                
                                 return ListTile(
                                   leading: Container(
                                     width: 8,
@@ -245,15 +284,40 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                   ),
-                                  title: Text(ex['name'] as String),
+                                  title: Text(
+                                    ex['name'] as String,
+                                    style: TextStyle(
+                                      fontWeight: isSelected ? FontWeight.w600 : null,
+                                      color: isSelected ? theme.colorScheme.primary : null,
+                                    ),
+                                  ),
                                   subtitle: ex['equipment'] != null && (ex['equipment'] as String).isNotEmpty
                                       ? Text(ex['equipment'] as String)
                                       : null,
-                                  trailing: Icon(
-                                    Icons.add_circle_outline,
-                                    color: theme.colorScheme.primary,
+                                  trailing: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 200),
+                                    child: isSelected
+                                        ? Container(
+                                            key: const ValueKey('check'),
+                                            width: 32,
+                                            height: 32,
+                                            decoration: BoxDecoration(
+                                              color: theme.colorScheme.primary,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Icon(
+                                              Icons.check,
+                                              color: theme.colorScheme.onPrimary,
+                                              size: 20,
+                                            ),
+                                          )
+                                        : Icon(
+                                            Icons.add_circle_outline,
+                                            key: const ValueKey('add'),
+                                            color: theme.colorScheme.primary,
+                                          ),
                                   ),
-                                  onTap: () => Navigator.pop(context, ex),
+                                  onTap: () => _toggleExercise(ex),
                                 );
                               },
                             ),

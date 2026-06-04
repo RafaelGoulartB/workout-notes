@@ -216,19 +216,6 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
     );
   }
 
-  void _addExerciseToDay(String dayId) async {
-    final selected = await showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => const ExercisePickerSheet(),
-    );
-    if (selected != null) {
-      await _db.addRoutineExercise(dayId, selected['id'] as String);
-      _load();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -312,7 +299,6 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                       key: ValueKey('day_${_days[i]['id']}_$_refreshKey'),
                       day: _days[i],
                       db: _db,
-                      onAddExercise: () => _addExerciseToDay(_days[i]['id'] as String),
                       onChanged: _load,
                     ),
                   ),
@@ -329,13 +315,12 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
 class _DayCard extends StatefulWidget {
   final Map<String, dynamic> day;
   final DatabaseHelper db;
-  final VoidCallback onAddExercise;
   final VoidCallback onChanged;
 
   const _DayCard({
     super.key,
     required this.day, required this.db,
-    required this.onAddExercise, required this.onChanged,
+    required this.onChanged,
   });
 
   @override
@@ -355,6 +340,37 @@ class _DayCardState extends State<_DayCard> {
   Future<void> _load() async {
     _exercises = await widget.db.getRoutineExercises(widget.day['id'] as String);
     if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _openExercisePicker() async {
+    final currentExerciseIds = _exercises.map((e) => e['exercise_id'] as String).toSet();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
+      useSafeArea: true,
+      builder: (_) => ExercisePickerSheet(
+        currentExerciseIds: currentExerciseIds,
+        onExerciseAdded: (exercise) async {
+          await widget.db.addRoutineExercise(widget.day['id'] as String, exercise['id'] as String);
+          _load();
+        },
+        onExerciseRemoved: (exercise) async {
+          final exerciseId = exercise['id'] as String;
+          // Find the routine exercise entry and remove it
+          final routineExercise = _exercises.firstWhere(
+            (e) => e['exercise_id'] == exerciseId,
+            orElse: () => <String, dynamic>{},
+          );
+          if (routineExercise.isNotEmpty) {
+            await widget.db.removeRoutineExercise(routineExercise['id'] as String);
+            _load();
+          }
+        },
+      ),
+    );
   }
 
   @override
@@ -437,7 +453,7 @@ class _DayCardState extends State<_DayCard> {
               )),
             ],
             TextButton.icon(
-              onPressed: widget.onAddExercise,
+              onPressed: _openExercisePicker,
               icon: const Icon(Icons.add, size: 18),
               label: const Text('Adicionar Exercício'),
               style: TextButton.styleFrom(visualDensity: VisualDensity.compact),

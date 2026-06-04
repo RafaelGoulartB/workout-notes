@@ -455,6 +455,41 @@ class DatabaseHelper {
     return id;
   }
 
+  Future<void> importRoutineDayToWorkout(String workoutId, String routineDayId) async {
+    final db = await database;
+    final routineExercises = await getRoutineExercises(routineDayId);
+
+    for (final re in routineExercises) {
+      final entryId = const Uuid().v4();
+      final count = Sqflite.firstIntValue(
+        await db.rawQuery('SELECT COUNT(*) FROM exercise_entries WHERE workout_id = ?', [workoutId])
+      ) ?? 0;
+
+      await db.insert('exercise_entries', {
+        'id': entryId,
+        'workout_id': workoutId,
+        'exercise_id': re['exercise_id'],
+        'order_index': count,
+      });
+
+      final sets = await getPredefinedSets(re['id'] as String);
+      for (int j = 0; j < sets.length; j++) {
+        final s = sets[j];
+        await db.insert('sets', {
+          'id': const Uuid().v4(),
+          'exercise_entry_id': entryId,
+          'weight': s['weight'],
+          'reps': s['reps'],
+          'distance': s['distance'],
+          'time_seconds': s['time_seconds'],
+          'is_complete': 0,
+          'is_warmup': s['is_warmup'] ?? 0,
+          'order_index': j,
+        });
+      }
+    }
+  }
+
   Future<Map<String, dynamic>?> getWorkout(String id) async {
     final db = await database;
     final results = await db.query('workouts', where: 'id = ?', whereArgs: [id]);
@@ -621,6 +656,21 @@ class DatabaseHelper {
   Future<void> deleteSet(String setId) async {
     final db = await database;
     await db.delete('sets', where: 'id = ?', whereArgs: [setId]);
+  }
+
+  Future<void> removeExerciseEntryFromWorkout(String workoutId, String exerciseId) async {
+    final db = await database;
+    // Find the entry
+    final entries = await db.query('exercise_entries',
+        where: 'workout_id = ? AND exercise_id = ?',
+        whereArgs: [workoutId, exerciseId]);
+    for (final entry in entries) {
+      final entryId = entry['id'] as String;
+      // Delete all sets for this entry
+      await db.delete('sets', where: 'exercise_entry_id = ?', whereArgs: [entryId]);
+      // Delete the entry
+      await db.delete('exercise_entries', where: 'id = ?', whereArgs: [entryId]);
+    }
   }
 
   Future<List<Map<String, dynamic>>> getLastWorkoutSets(String exerciseId) async {
