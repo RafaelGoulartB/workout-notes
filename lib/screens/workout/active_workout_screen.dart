@@ -390,11 +390,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             tooltip: 'Importar de Rotina',
           ),
           IconButton(
-            icon: const Icon(Icons.timer_outlined),
-            onPressed: _openRestTimer,
-            tooltip: 'Temporizador',
-          ),
-          IconButton(
             icon: const Icon(Icons.check_circle_outline),
             onPressed: _exercises.isNotEmpty ? _finishWorkout : null,
             tooltip: 'Finalizar Treino',
