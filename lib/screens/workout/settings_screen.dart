@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../database/database_helper.dart';
+import '../../services/export_service.dart';
 
 class WorkoutSettingsScreen extends StatefulWidget {
   const WorkoutSettingsScreen({super.key});
@@ -28,6 +30,52 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     await _db.setSetting(key, value);
     _settings[key] = value;
     setState(() {});
+  }
+
+  Future<void> _exportBackup() async {
+    final exportService = ExportService();
+    try {
+      await exportService.shareJsonBackup();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Backup exportado!'), behavior: SnackBarBehavior.floating),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e'), behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
+  }
+
+  Future<void> _importBackup() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final filePath = result.files.first.path;
+      if (filePath == null) return;
+
+      final exportService = ExportService();
+      final count = await exportService.importFromJson(filePath);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('✅ $count registros importados!'), behavior: SnackBarBehavior.floating),
+        );
+        _load();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao importar: $e'), behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
   }
 
   Future<void> _deleteAllHistory() async {
@@ -174,6 +222,22 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                         child: Text('Dados', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                       ),
+                      ListTile(
+                        leading: Icon(Icons.download, color: theme.colorScheme.primary),
+                        title: const Text('Exportar Backup'),
+                        subtitle: const Text('JSON completo para salvar ou transferir'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _exportBackup(),
+                      ),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      ListTile(
+                        leading: Icon(Icons.upload, color: theme.colorScheme.secondary),
+                        title: const Text('Importar Backup'),
+                        subtitle: const Text('Restaurar dados de um arquivo JSON'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _importBackup(),
+                      ),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
                       ListTile(
                         leading: Icon(Icons.info_outline, color: theme.colorScheme.onSurfaceVariant),
                         title: const Text('Sobre'),

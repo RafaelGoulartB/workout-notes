@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import '../../database/database_helper.dart';
+import '../../services/rest_timer_service.dart';
 import 'active_workout_screen.dart';
 import 'quick_add_screen.dart';
 import 'calendar_screen.dart';
@@ -10,7 +11,6 @@ import 'routines_screen.dart';
 import 'progress_screen.dart';
 import 'body_tracker_screen.dart';
 import 'settings_screen.dart';
-import 'export_screen.dart';
 import 'rest_timer_screen.dart';
 import 'workout_detail_screen.dart';
 
@@ -23,31 +23,49 @@ class WorkoutHomeScreen extends StatefulWidget {
 
 class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   final _db = DatabaseHelper.instance;
+  final _timerService = RestTimerService.instance;
   bool _isLoading = true;
   List<Map<String, dynamic>> _activeWorkouts = [];
+  List<Map<String, dynamic>> _upcomingWorkouts = [];
   List<Map<String, dynamic>> _completedWorkouts = [];
-  List<Map<String, dynamic>> _routines = [];
   bool _showCompleted = true;
   bool _showUpcoming = true;
 
   @override
   void initState() {
     super.initState();
+    _timerService.addListener(_onTimerTick);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _timerService.removeListener(_onTimerTick);
+    super.dispose();
+  }
+
+  void _onTimerTick() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
+      final now = DateTime.now();
+      final tomorrow = DateTime(now.year, now.month, now.day + 1);
+
       final allWorkouts = await _db.getWorkouts(limit: 50);
-      _routines = await _db.getRoutines();
+      final futureWorkouts = await _db.getWorkouts(startDate: tomorrow, limit: 20);
 
       final active = <Map<String, dynamic>>[];
       final completed = <Map<String, dynamic>>[];
+      final todayStr = now.toIso8601String().substring(0, 10);
       for (final w in allWorkouts) {
-        if ((w['end_time'] as String?) == null) {
+        final wDate = w['date'] as String? ?? '';
+        final isToday = wDate == todayStr;
+        if ((w['end_time'] as String?) == null && isToday) {
           active.add(w);
-        } else {
+        } else if ((w['end_time'] as String?) != null) {
           completed.add(w);
         }
       }
@@ -55,6 +73,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       if (mounted) {
         setState(() {
           _activeWorkouts = active;
+          _upcomingWorkouts = futureWorkouts;
           _completedWorkouts = completed;
           _isLoading = false;
         });
@@ -98,12 +117,51 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         title: const Text('Treino'),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_month_outlined),
-            onPressed: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const CalendarScreen())),
-            tooltip: 'Histórico',
-          ),
+          if (_timerService.isActive)
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const RestTimerScreen())),
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _timerService.remainingSeconds <= 5 && _timerService.isRunning
+                      ? Colors.red.withAlpha(40)
+                      : Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _timerService.isPaused ? Icons.pause : Icons.timer,
+                      size: 18,
+                      color: _timerService.remainingSeconds <= 5 && _timerService.isRunning
+                          ? Colors.red
+                          : Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _timerService.shortTime,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: _timerService.remainingSeconds <= 5 && _timerService.isRunning
+                            ? Colors.red
+                            : Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.calendar_month_outlined),
+              onPressed: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const CalendarScreen())),
+              tooltip: 'Histórico',
+            ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => Navigator.push(
@@ -123,8 +181,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                   SliverToBoxAdapter(child: _buildNavGrid(theme)),
                   // Active workout section (always visible, non-collapsible)
                   SliverToBoxAdapter(child: _buildActiveSection(theme)),
-                  // Upcoming / Routines section (collapsible)
-                  if (_routines.isNotEmpty)
+                  // Upcoming workouts section (collapsible)
+                  if (_upcomingWorkouts.isNotEmpty)
                     SliverToBoxAdapter(child: _buildUpcomingSection(theme)),
                   // Completed workouts section (collapsible)
                   if (_completedWorkouts.isNotEmpty)
@@ -188,8 +246,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       _NavItemData(Icons.repeat, 'Rotinas', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RoutinesScreen()))),
       _NavItemData(Icons.bar_chart, 'Progresso', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProgressScreen()))),
       _NavItemData(Icons.monitor_weight_outlined, 'Medidas', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BodyTrackerScreen()))),
-      _NavItemData(Icons.download, 'Exportar', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExportScreen()))),
-      _NavItemData(Icons.timer_outlined, 'Timer', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RestTimerScreen()))),
     ];
 
     return Padding(
@@ -257,6 +313,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   }
 
   // === PRÓXIMOS TREINOS (collapsible) ===
+  // === PRÓXIMOS TREINOS (collapsible) ===
   Widget _buildUpcomingSection(ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -278,6 +335,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 const SizedBox(width: 8),
                 Text('Próximos Treinos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                 const Spacer(),
+                Text('${_upcomingWorkouts.length}', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                const SizedBox(width: 4),
                 Icon(
                   _showUpcoming ? Icons.expand_less : Icons.expand_more,
                   color: theme.colorScheme.onSurfaceVariant,
@@ -287,7 +346,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           ),
           if (_showUpcoming) ...[
             const SizedBox(height: 8),
-            ...(_routines.map((r) => _buildRoutineCard(r, theme))),
+            ...(_upcomingWorkouts.map((w) => _buildWorkoutCard(w, theme, isActive: false))),
           ],
         ],
       ),
@@ -344,49 +403,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           const SizedBox(width: 8),
           Text(text, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(180))),
         ],
-      ),
-    );
-  }
-
-  Widget _buildRoutineCard(Map<String, dynamic> routine, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () async {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const RoutinesScreen()),
-            );
-            if (result == true) _loadData();
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.secondaryContainer,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.repeat, color: theme.colorScheme.onSecondaryContainer, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(routine['name'] as String? ?? '', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                ),
-                Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant, size: 20),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
