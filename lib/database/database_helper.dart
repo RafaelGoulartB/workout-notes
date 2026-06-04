@@ -424,7 +424,7 @@ class DatabaseHelper {
     await db.insert('workouts', {
       'id': id,
       'date': (date ?? now).toIso8601String().substring(0, 10),
-      'start_time': now.toIso8601String(),
+      // start_time is set when user clicks "Iniciar" on the timer card
       'is_from_routine': routineId != null ? 1 : 0,
       'routine_id': routineId,
       'created_at': now.toIso8601String(),
@@ -604,14 +604,57 @@ class DatabaseHelper {
     final workout = await getWorkout(id);
     if (workout == null) return;
 
-    final startTime = DateTime.parse(workout['start_time'] as String);
-    final duration = now.difference(startTime).inSeconds;
+    int duration = 0;
+    final startTimeStr = workout['start_time'] as String?;
+    if (startTimeStr != null) {
+      final startTime = DateTime.parse(startTimeStr);
+      duration = now.difference(startTime).inSeconds;
+    }
 
     await db.update('workouts', {
       'end_time': now.toIso8601String(),
       'duration_seconds': duration,
+      'start_time': startTimeStr ?? now.toIso8601String(),
       if (comment != null) 'comment': comment,
       if (feelingRating != null) 'feeling_rating': feelingRating,
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Sets the start_time of a workout (timer start).
+  Future<void> startWorkoutTimer(String id) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    await db.update('workouts', {
+      'start_time': now,
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Sets the end_time of a workout (timer stop) and calculates duration.
+  Future<void> stopWorkoutTimer(String id) async {
+    final db = await database;
+    final now = DateTime.now();
+    final workout = await getWorkout(id);
+    if (workout == null) return;
+    final startTimeStr = workout['start_time'] as String?;
+    int duration = 0;
+    if (startTimeStr != null) {
+      final startTime = DateTime.parse(startTimeStr);
+      duration = now.difference(startTime).inSeconds;
+    }
+    await db.update('workouts', {
+      'end_time': now.toIso8601String(),
+      'duration_seconds': duration,
+      'start_time': startTimeStr ?? now.toIso8601String(),
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Clears both start_time and end_time of a workout (reset timer).
+  Future<void> resetWorkoutTimer(String id) async {
+    final db = await database;
+    await db.update('workouts', {
+      'start_time': null,
+      'end_time': null,
+      'duration_seconds': null,
     }, where: 'id = ?', whereArgs: [id]);
   }
 

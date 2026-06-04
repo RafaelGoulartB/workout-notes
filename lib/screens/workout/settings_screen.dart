@@ -236,6 +236,12 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         value: _settings['auto_start_rest_timer'] == 'true',
                         onChanged: (v) => _update('auto_start_rest_timer', v.toString()),
                       ),
+                      SwitchListTile(
+                        title: const Text('Timer de Treino Automático'),
+                        subtitle: const Text('Iniciar timer ao completar a 1ª série, parar ao finalizar a última'),
+                        value: _settings['auto_start_workout_timer'] == 'true',
+                        onChanged: (v) => _update('auto_start_workout_timer', v.toString()),
+                      ),
                     ],
                   ),
                 ),

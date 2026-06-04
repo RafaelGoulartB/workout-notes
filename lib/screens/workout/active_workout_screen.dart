@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -29,7 +30,16 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   final _uuid = const Uuid();
   bool _isLoading = true;
   String? _workoutId;
-  DateTime? _startTime;
+  
+  // Timer tracking
+  DateTime? _timerStart;
+  DateTime? _timerEnd;
+  Timer? _elapsedTimer; // periodic tick for live elapsed time
+  String _elapsedStr = '00:00';
+  
+  // Settings
+  bool _autoStartTimer = false;
+
   List<_ExerciseWithSets> _exercises = [];
 
   @override
@@ -42,6 +52,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   @override
   void dispose() {
     _timerService.removeListener(_onTimerTick);
+    _elapsedTimer?.cancel();
     super.dispose();
   }
 
@@ -49,7 +60,28 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     if (mounted) setState(() {});
   }
 
+  void _startElapsedTimer() {
+    _elapsedTimer?.cancel();
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _timerStart != null && _timerEnd == null) {
+        final elapsed = DateTime.now().difference(_timerStart!);
+        final hours = elapsed.inHours;
+        final minutes = elapsed.inMinutes.remainder(60);
+        final seconds = elapsed.inSeconds.remainder(60);
+        setState(() {
+          _elapsedStr = hours > 0
+              ? '${hours}h${minutes.toString().padLeft(2, '0')}min'
+              : '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+        });
+      }
+    });
+  }
+
   Future<void> _initialize() async {
+    // Load settings
+    final settings = await _db.getAllSettings();
+    _autoStartTimer = settings['auto_start_workout_timer'] == 'true';
+
     if (widget.workoutId != null) {
       await _loadExistingWorkout(widget.workoutId!);
     } else if (widget.routineDayId != null) {
@@ -63,16 +95,46 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   Future<void> _createNewWorkout() async {
     final id = await _db.createWorkout();
     _workoutId = id;
-    _startTime = DateTime.now();
+    // start_time is NOT set until user clicks "Iniciar"
   }
 
   Future<void> _loadExistingWorkout(String id) async {
     _workoutId = id;
     final workout = await _db.getWorkout(id);
     if (workout != null) {
-      _startTime = DateTime.parse(workout['start_time'] as String);
+      final startStr = workout['start_time'] as String?;
+      if (startStr != null) _timerStart = DateTime.parse(startStr);
+      final endStr = workout['end_time'] as String?;
+      if (endStr != null) _timerEnd = DateTime.parse(endStr);
+      
+      if (_timerStart != null && _timerEnd == null) {
+        _startElapsedTimer();
+      }
+      if (_timerStart != null && _timerEnd != null) {
+        _updateElapsedStr();
+      }
+      
       await _loadExercises();
     }
+  }
+
+  void _updateElapsedStr() {
+    if (_timerStart == null) {
+      _elapsedStr = '00:00';
+      return;
+    }
+    final end = _timerEnd ?? DateTime.now();
+    final elapsed = end.difference(_timerStart!);
+    _elapsedStr = _formatDuration(elapsed);
+  }
+
+  String _formatDuration(Duration d) {
+    if (d.inHours > 0) {
+      return '${d.inHours}h${d.inMinutes.remainder(60).toString().padLeft(2, '0')}min';
+    }
+    final minutes = d.inMinutes.remainder(60);
+    final seconds = d.inSeconds.remainder(60);
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   Future<void> _createFromRoutine() async {
@@ -100,7 +162,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       exercises: exercises,
     );
     _workoutId = id;
-    _startTime = DateTime.now();
     await _loadExercises();
   }
 
@@ -122,6 +183,52 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       ));
     }
   }
+
+  // ===================== TIMER CARD ACTIONS =====================
+
+  Future<void> _startTimer() async {
+    if (_workoutId == null) return;
+    final now = DateTime.now();
+    _timerStart = now;
+    _timerEnd = null;
+    await _db.startWorkoutTimer(_workoutId!);
+    _startElapsedTimer();
+    setState(() => _elapsedStr = '00:00');
+  }
+
+  Future<void> _stopTimer() async {
+    if (_workoutId == null) return;
+    final now = DateTime.now();
+    _timerEnd = now;
+    _elapsedTimer?.cancel();
+    await _db.stopWorkoutTimer(_workoutId!);
+    _updateElapsedStr();
+    setState(() {});
+  }
+
+  Future<void> _resetTimer() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Resetar Timer?'),
+        content: const Text('Isso vai limpar o tempo de início e fim do treino.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Resetar', style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+    if (confirm == true && _workoutId != null) {
+      _timerStart = null;
+      _timerEnd = null;
+      _elapsedTimer?.cancel();
+      _elapsedStr = '00:00';
+      await _db.resetWorkoutTimer(_workoutId!);
+      setState(() {});
+    }
+  }
+
+  // ===================== EXERCISE ACTIONS =====================
 
   Future<void> _addExercise(String exerciseId, String name, String catName, Color catColor, {int? restTimeSeconds}) async {
     if (_workoutId == null) return;
@@ -163,7 +270,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   Future<void> _addSet(_ExerciseWithSets exercise) async {
-    // Copy data from previous set if available
     double? lastWeight;
     int? lastReps;
     bool lastWarmup = false;
@@ -185,7 +291,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   Future<void> _toggleSet(String setId) async {
-    // Find which exercise this set belongs to
     _ExerciseWithSets? parentExercise;
     Map<String, dynamic>? theSet;
     for (final ex in _exercises) {
@@ -204,9 +309,31 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     await _loadExercises();
     setState(() {});
 
-    // Auto-start timer when set is marked complete
     if (!wasComplete && parentExercise != null && mounted) {
+      // Auto-start rest timer
       _timerService.start(parentExercise.restTimeSeconds);
+
+      // Auto-start workout timer if enabled and not started
+      if (_autoStartTimer && _timerStart == null && _timerEnd == null) {
+        await _startTimer();
+      }
+
+      // Auto-stop workout timer if all sets are now complete
+      if (_autoStartTimer) {
+        bool allComplete = true;
+        for (final ex in _exercises) {
+          for (final s in ex.sets) {
+            if ((s['is_complete'] as int?) != 1) {
+              allComplete = false;
+              break;
+            }
+          }
+          if (!allComplete) break;
+        }
+        if (allComplete && _timerStart != null && _timerEnd == null) {
+          await _stopTimer();
+        }
+      }
     }
   }
 
@@ -311,6 +438,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       ),
     );
 
+    // If timer is still running, stop it first
+    if (_timerStart != null && _timerEnd == null) {
+      await _stopTimer();
+    }
+
     await _db.finishWorkout(_workoutId!, comment: comment ?? '', feelingRating: feeling);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -336,9 +468,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_startTime != null
-            ? DateFormat('HH:mm').format(_startTime!)
-            : 'Novo Treino'),
+        title: Text('Treino'),
         centerTitle: true,
         actions: [
           if (_timerService.isActive)
@@ -398,7 +528,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _exercises.isEmpty
+          : _exercises.isEmpty && _timerStart == null
               ? _buildEmptyState(theme)
               : _buildWorkoutView(theme),
       floatingActionButton: FloatingActionButton.extended(
@@ -441,7 +571,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   Widget _buildWorkoutView(ThemeData theme) {
-    // Calculate totals
     int totalSets = 0;
     int completedSets = 0;
     for (final ex in _exercises) {
@@ -453,6 +582,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     return Column(
       children: [
+        // Timer Card (top)
+        _buildTimerCard(theme),
+
         // Progress bar
         if (totalSets > 0)
           Container(
@@ -493,6 +625,131 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
   }
 
+  // ===================== TIMER CARD =====================
+  Widget _buildTimerCard(ThemeData theme) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primaryContainer.withAlpha(200),
+            theme.colorScheme.surfaceContainerHighest.withAlpha(180),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            _timerEnd != null
+                ? Icons.check_circle
+                : _timerStart != null
+                    ? Icons.timer_outlined
+                    : Icons.play_circle_outline,
+            color: _timerEnd != null
+                ? Colors.green
+                : _timerStart != null
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_timerStart != null && _timerEnd == null) ...[
+                  // Running
+                  Text(
+                    _elapsedStr,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Início ${DateFormat('HH:mm').format(_timerStart!)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ] else if (_timerStart != null && _timerEnd != null) ...[
+                  // Finished
+                  Text(
+                    'Duração $_elapsedStr',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${DateFormat('HH:mm').format(_timerStart!)} → ${DateFormat('HH:mm').format(_timerEnd!)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ] else ...[
+                  // Not started
+                  Text(
+                    'Temporizador de Treino',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Iniciar cronômetro do treino',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (_timerStart == null || (_timerStart != null && _timerEnd == null))
+            SizedBox(
+              height: 36,
+              child: FilledButton(
+                onPressed: _timerStart == null ? _startTimer : _stopTimer,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  backgroundColor: _timerStart == null
+                      ? theme.colorScheme.primary
+                      : Colors.red.withAlpha(200),
+                  foregroundColor: _timerStart == null
+                      ? theme.colorScheme.onPrimary
+                      : Colors.white,
+                ),
+                child: Text(
+                  _timerStart == null ? 'Iniciar' : 'Finalizar',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ),
+          if (_timerStart != null)
+            IconButton(
+              onPressed: _resetTimer,
+              icon: Icon(Icons.delete_outline, size: 20, color: theme.colorScheme.onSurfaceVariant.withAlpha(180)),
+              tooltip: 'Resetar Timer',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ===================== REST =====================
+
   Future<void> _importFromRoutine() async {
     final routines = await _db.getRoutines();
     if (routines.isEmpty) {
@@ -504,7 +761,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       return;
     }
 
-    // Step 1: Pick a routine
     final routineId = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -513,7 +769,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
     if (routineId == null || !mounted) return;
 
-    // Step 2: Pick a day
     final days = await _db.getRoutineDays(routineId);
     if (days.isEmpty) {
       if (mounted) {
@@ -533,7 +788,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
     if (dayId == null || !mounted) return;
 
-    // Step 3: Import
     if (_workoutId == null) return;
     await _db.importRoutineDayToWorkout(_workoutId!, dayId);
     await _loadExercises();
@@ -806,13 +1060,11 @@ class _ExerciseCard extends StatelessWidget {
   final Function(String, Map<String, dynamic>) onEditSet;
   final Function(String) onDeleteSet;
   final ThemeData theme;
-  final VoidCallback? onStartRestTimer;
   final ValueChanged<int> onChangeRestTime;
 
   const _ExerciseCard({
     required this.exercise, required this.onAddSet, required this.onToggleSet,
     required this.onEditSet, required this.onDeleteSet, required this.theme,
-    this.onStartRestTimer,
     required this.onChangeRestTime,
   });
 
@@ -847,7 +1099,6 @@ class _ExerciseCard extends StatelessWidget {
                 Expanded(
                   child: Text(exercise.name, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                 ),
-                // Rest time chip
                 GestureDetector(
                   onTap: () => onChangeRestTime(exercise.restTimeSeconds),
                   child: Container(
@@ -871,7 +1122,6 @@ class _ExerciseCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            // Header row
             Row(
               children: [
                 const SizedBox(width: 24),
@@ -884,7 +1134,6 @@ class _ExerciseCard extends StatelessWidget {
               ],
             ),
             const Divider(height: 4),
-            // Sets
             ...List.generate(exercise.sets.length, (i) {
               final set = exercise.sets[i];
               final isComplete = (set['is_complete'] as int?) == 1;
