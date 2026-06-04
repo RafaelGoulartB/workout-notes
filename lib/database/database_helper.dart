@@ -1219,6 +1219,37 @@ class DatabaseHelper {
     });
   }
 
+  /// Counts consecutive workout days ending at today (or most recent day ≤ today).
+  /// Does NOT count future dates.
+  Future<int> _calculateStreak() async {
+    final db = await database;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+
+    final rows = await db.rawQuery(
+      'SELECT DISTINCT date FROM workouts WHERE date <= ? ORDER BY date DESC',
+      [today],
+    );
+
+    if (rows.isEmpty) return 0;
+
+    int streak = 1;
+    // Parse the first (most recent) date as the starting point
+    DateTime prev = DateTime.parse(rows[0]['date'] as String);
+
+    for (int i = 1; i < rows.length; i++) {
+      final curr = DateTime.parse(rows[i]['date'] as String);
+      // Check if curr is exactly one day before prev
+      if (prev.difference(curr).inDays == 1) {
+        streak++;
+        prev = curr;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }
+
   /// Returns overall workout stats for the progress overview.
   Future<Map<String, dynamic>> getWorkoutOverviewStats() async {
     final db = await database;
@@ -1235,19 +1266,7 @@ class DatabaseHelper {
       'SELECT COALESCE(SUM(weight * reps), 0) FROM sets WHERE is_warmup = 0',
     )) ?? 0;
 
-    final currentStreak = Sqflite.firstIntValue(await db.rawQuery('''
-      WITH dates AS (
-        SELECT DISTINCT date FROM workouts ORDER BY date DESC
-      )
-      SELECT COUNT(*) FROM dates d1
-      WHERE d1.date >= (
-        SELECT MAX(d2.date) FROM dates d2
-        WHERE NOT EXISTS (
-          SELECT 1 FROM dates d3
-          WHERE d3.date = date(d2.date, '-1 day')
-        )
-      )
-    ''')) ?? 0;
+    final currentStreak = await _calculateStreak();
 
     return {
       'total_workouts': totalWorkouts,

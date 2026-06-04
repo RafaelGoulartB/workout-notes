@@ -31,6 +31,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   bool _showCompleted = true;
   bool _showUpcoming = true;
 
+  // Stats for header card
+  int _monthWorkouts = 0;
+  double _monthVolume = 0;
+  int _currentStreak = 0;
+
   @override
   void initState() {
     super.initState();
@@ -53,9 +58,37 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     try {
       final now = DateTime.now();
       final tomorrow = DateTime(now.year, now.month, now.day + 1);
+      final monthStart = DateTime(now.year, now.month, 1);
 
       final allWorkouts = await _db.getWorkouts(limit: 50);
       final futureWorkouts = await _db.getWorkouts(startDate: tomorrow, limit: 20);
+
+      // Load stats
+      final overview = await _db.getWorkoutOverviewStats();
+      _currentStreak = (overview['current_streak'] as int?) ?? 0;
+
+      // Calculate month stats
+      final monthStr = monthStart.toIso8601String().substring(0, 7);
+      double monthVol = 0;
+      int monthCount = 0;
+      for (final w in allWorkouts) {
+        final wDate = w['date'] as String? ?? '';
+        if (wDate.startsWith(monthStr)) {
+          monthCount++;
+          // Get volume for this workout
+          final exercises = await _db.getWorkoutExercises(w['id'] as String);
+          for (final ee in exercises) {
+            final sets = await _db.getExerciseSets(ee['id'] as String);
+            for (final s in sets) {
+              if ((s['is_warmup'] as int? ?? 0) == 0) {
+                monthVol += ((s['weight'] as num?)?.toDouble() ?? 0) * ((s['reps'] as int?) ?? 0);
+              }
+            }
+          }
+        }
+      }
+      _monthWorkouts = monthCount;
+      _monthVolume = monthVol;
 
       final active = <Map<String, dynamic>>[];
       final completed = <Map<String, dynamic>>[];
@@ -99,13 +132,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     _loadData();
   }
 
-  void _continueActiveWorkout(String id) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ActiveWorkoutScreen(workoutId: id)),
-    );
-    _loadData();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,8 +140,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Treino'),
-        centerTitle: true,
+        title: null,
+        centerTitle: false,
+        automaticallyImplyLeading: false,
         actions: [
           if (_timerService.isActive)
             GestureDetector(
@@ -127,7 +154,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 decoration: BoxDecoration(
                   color: _timerService.remainingSeconds <= 5 && _timerService.isRunning
                       ? Colors.red.withAlpha(40)
-                      : Theme.of(context).colorScheme.primaryContainer,
+                      : theme.colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Row(
@@ -138,7 +165,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                       size: 18,
                       color: _timerService.remainingSeconds <= 5 && _timerService.isRunning
                           ? Colors.red
-                          : Theme.of(context).colorScheme.onPrimaryContainer,
+                          : theme.colorScheme.onPrimaryContainer,
                     ),
                     const SizedBox(width: 4),
                     Text(
@@ -148,7 +175,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                         fontSize: 14,
                         color: _timerService.remainingSeconds <= 5 && _timerService.isRunning
                             ? Colors.red
-                            : Theme.of(context).colorScheme.onPrimaryContainer,
+                            : theme.colorScheme.onPrimaryContainer,
                       ),
                     ),
                   ],
@@ -176,10 +203,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
               onRefresh: _loadData,
               child: CustomScrollView(
                 slivers: [
-                  SliverToBoxAdapter(child: _buildHeader(theme, today)),
+                  SliverToBoxAdapter(child: _buildHeaderStats(theme, today)),
                   SliverToBoxAdapter(child: _buildQuickActions(theme)),
                   SliverToBoxAdapter(child: _buildNavGrid(theme)),
-                  // Active workout section (always visible, non-collapsible)
+                  // Active workout section (non-collapsible)
                   SliverToBoxAdapter(child: _buildActiveSection(theme)),
                   // Upcoming workouts section (collapsible)
                   if (_upcomingWorkouts.isNotEmpty)
@@ -194,26 +221,93 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     );
   }
 
-  Widget _buildHeader(ThemeData theme, String todayStr) {
+  // ===================== HEADER STATS =====================
+  Widget _buildHeaderStats(ThemeData theme, String todayStr) {
     final todayFormatted = todayStr[0].toUpperCase() + todayStr.substring(1);
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('🏋️', style: theme.textTheme.displaySmall),
-          const SizedBox(height: 4),
-          Text('Hora de Treinar!', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 2),
-          Text(todayFormatted, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(
+            todayFormatted,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.surfaceContainerHighest.withAlpha(200),
+                  theme.colorScheme.surfaceContainerLow,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _StatItem(
+                    label: 'Treinos no Mês',
+                    value: '${_monthWorkouts}',
+                    icon: Icons.fitness_center,
+                    color: theme.colorScheme.primary,
+                    theme: theme,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 48,
+                  color: theme.colorScheme.outlineVariant.withAlpha(80),
+                ),
+                Expanded(
+                  child: _StatItem(
+                    label: 'Volume',
+                    value: _formatVolume(_monthVolume),
+                    icon: Icons.auto_graph,
+                    color: theme.colorScheme.secondary,
+                    theme: theme,
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 48,
+                  color: theme.colorScheme.outlineVariant.withAlpha(80),
+                ),
+                Expanded(
+                  child: _StatItem(
+                    label: 'Sequência',
+                    value: '$_currentStreak ${_currentStreak == 1 ? 'dia' : 'dias'}',
+                    icon: Icons.local_fire_department,
+                    color: Colors.orange,
+                    theme: theme,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
-    ).animate().fadeIn(duration: 300.ms).slideX(begin: -0.05);
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.05);
   }
 
+  String _formatVolume(double v) {
+    if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M kg';
+    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k kg';
+    return '${v.toStringAsFixed(0)} kg';
+  }
+
+  // ===================== QUICK ACTIONS =====================
   Widget _buildQuickActions(ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Row(
         children: [
           Expanded(
@@ -237,9 +331,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.05);
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.05);
   }
 
+  // ===================== NAV GRID =====================
   Widget _buildNavGrid(ThemeData theme) {
     final items = [
       _NavItemData(Icons.fitness_center, 'Exercícios', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExerciseLibraryScreen()))),
@@ -249,33 +344,34 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     ];
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Card(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                child: Text('Navegação', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-              ),
-              const Divider(),
-              ...items.map((item) => ListTile(
-                leading: Icon(item.icon, color: theme.colorScheme.primary),
-                title: Text(item.label, style: theme.textTheme.bodyMedium),
-                trailing: Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
-                onTap: item.onTap,
-                dense: true,
-                visualDensity: VisualDensity.compact,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Text('NAVEGAÇÃO', style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.5,
+                color: theme.colorScheme.onSurfaceVariant,
               )),
-            ],
-          ),
+            ),
+            const Divider(height: 1),
+            ...items.map((item) => ListTile(
+              leading: Icon(item.icon, color: theme.colorScheme.primary),
+              title: Text(item.label, style: theme.textTheme.bodyMedium),
+              trailing: Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
+              onTap: item.onTap,
+              dense: true,
+              visualDensity: VisualDensity.compact,
+            )),
+          ],
         ),
       ),
     ).animate().fadeIn(duration: 500.ms);
@@ -284,7 +380,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   // === EM ANDAMENTO (non-collapsible) ===
   Widget _buildActiveSection(ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -299,7 +395,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 child: Icon(Icons.play_circle_fill, size: 18, color: Colors.green),
               ),
               const SizedBox(width: 8),
-              Text('Em Andamento', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              Text('EM ANDAMENTO', style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.5,
+                color: theme.colorScheme.onSurface,
+              )),
             ],
           ),
           const SizedBox(height: 8),
@@ -312,7 +412,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     );
   }
 
-  // === PRÓXIMOS TREINOS (collapsible) ===
   // === PRÓXIMOS TREINOS (collapsible) ===
   Widget _buildUpcomingSection(ThemeData theme) {
     return Padding(
@@ -333,7 +432,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                   child: Icon(Icons.schedule, size: 18, color: theme.colorScheme.onSecondaryContainer),
                 ),
                 const SizedBox(width: 8),
-                Text('Próximos Treinos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text('PRÓXIMOS TREINOS', style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.5,
+                  color: theme.colorScheme.onSurface,
+                )),
                 const Spacer(),
                 Text('${_upcomingWorkouts.length}', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                 const SizedBox(width: 4),
@@ -373,7 +476,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                   child: Icon(Icons.fitness_center, size: 18, color: theme.colorScheme.onPrimaryContainer),
                 ),
                 const SizedBox(width: 8),
-                Text('Treinos Concluídos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                Text('TREINOS CONCLUÍDOS', style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.5,
+                  color: theme.colorScheme.onSurface,
+                )),
                 const Spacer(),
                 Text('${_completedWorkouts.length}', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                 const SizedBox(width: 4),
@@ -486,6 +593,53 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ===================== SHARED WIDGETS =====================
+
+class _StatItem extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final ThemeData theme;
+
+  const _StatItem({
+    required this.label, required this.value, required this.icon,
+    required this.color, required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(
+              value,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontSize: 10,
+          ),
+        ),
+      ],
     );
   }
 }

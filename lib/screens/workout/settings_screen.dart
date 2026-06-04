@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/database_helper.dart';
 import '../../services/export_service.dart';
+import '../../main.dart';
 
 class WorkoutSettingsScreen extends StatefulWidget {
   const WorkoutSettingsScreen({super.key});
@@ -13,10 +15,14 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   final _db = DatabaseHelper.instance;
   Map<String, String> _settings = {};
   bool _isLoading = true;
+  int _selectedAccentIndex = AccentColors.indexOf(AccentColors.defaultColor);
 
   @override
   void initState() {
     super.initState();
+    _selectedAccentIndex = AccentColors.indexOf(
+      LifeNotesApp.themeNotifier.seedColor,
+    );
     _load();
   }
 
@@ -29,6 +35,14 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     await _db.setSetting(key, value);
     _settings[key] = value;
     setState(() {});
+  }
+
+  Future<void> _changeAccentColor(int index) async {
+    final color = AccentColors.options[index];
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('accent_color', color.value);
+    setState(() => _selectedAccentIndex = index);
+    LifeNotesApp.themeNotifier.setSeedColor(color);
   }
 
   Future<void> _exportBackup() async {
@@ -48,34 +62,6 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       }
     }
   }
-
-  // Future<void> _importBackup() async {
-  //   try {
-  //     final result = await FilePicker.platform.pickFiles(
-  //       type: FileType.custom,
-  //       allowedExtensions: ['json'],
-  //     );
-  //     if (result == null || result.files.isEmpty) return;
-
-  //     final filePath = result.files.first.path;
-  //     if (filePath == null) return;
-
-  //     final exportService = ExportService();
-  //     final count = await exportService.importFromJson(filePath);
-  //     if (mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         SnackBar(content: Text('✅ $count registros importados!'), behavior: SnackBarBehavior.floating),
-  //       );
-  //       _load();
-  //     }
-  //   } catch (e) {
-  //     if (mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         SnackBar(content: Text('Erro ao importar: $e'), behavior: SnackBarBehavior.floating),
-  //       );
-  //     }
-  //   }
-  // }
 
   Future<void> _deleteAllHistory() async {
     final confirm = await showDialog<bool>(
@@ -117,6 +103,67 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // Accent Color
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.palette, size: 18, color: theme.colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text('Cor do Tema', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: List.generate(AccentColors.options.length, (i) {
+                            final isSelected = _selectedAccentIndex == i;
+                            final color = AccentColors.options[i];
+                            return GestureDetector(
+                              onTap: () => _changeAccentColor(i),
+                              child: Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: isSelected
+                                      ? Border.all(color: theme.colorScheme.onSurface, width: 2.5)
+                                      : Border.all(color: color.withAlpha(120), width: 1),
+                                  boxShadow: isSelected
+                                      ? [BoxShadow(color: color.withAlpha(100), blurRadius: 8, spreadRadius: 1)]
+                                      : null,
+                                ),
+                                child: isSelected
+                                    ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                    : null,
+                              ),
+                            );
+                          }),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          AccentColors.labels[_selectedAccentIndex],
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
                 // Unit system
                 Card(
                   elevation: 0,
@@ -129,7 +176,13 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Text('Unidades', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                        child: Row(
+                          children: [
+                            Icon(Icons.straighten, size: 18, color: theme.colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text('Unidades', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
                       ),
                       SwitchListTile(
                         title: const Text('Sistema de Unidades'),
@@ -154,7 +207,13 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Text('Temporizador', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                        child: Row(
+                          children: [
+                            Icon(Icons.timer, size: 18, color: theme.colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text('Temporizador', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
                       ),
                       ListTile(
                         title: const Text('Descanso Padrão'),
@@ -194,7 +253,13 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Text('Tela', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                        child: Row(
+                          children: [
+                            Icon(Icons.visibility, size: 18, color: theme.colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text('Tela', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
                       ),
                       SwitchListTile(
                         title: const Text('Manter Tela Ligada'),
@@ -219,7 +284,13 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Text('Dados', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                        child: Row(
+                          children: [
+                            Icon(Icons.storage, size: 18, color: theme.colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text('Dados', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
                       ),
                       ListTile(
                         leading: Icon(Icons.download, color: theme.colorScheme.primary),
@@ -228,14 +299,6 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => _exportBackup(),
                       ),
-                      // const Divider(height: 1, indent: 16, endIndent: 16),
-                      // ListTile(
-                      //   leading: Icon(Icons.upload, color: theme.colorScheme.secondary),
-                      //   title: const Text('Importar Backup'),
-                      //   subtitle: const Text('Restaurar dados de um arquivo JSON'),
-                      //   trailing: const Icon(Icons.chevron_right),
-                      //   onTap: () => _importBackup(),
-                      // ),
                       const Divider(height: 1, indent: 16, endIndent: 16),
                       ListTile(
                         leading: Icon(Icons.info_outline, color: theme.colorScheme.onSurfaceVariant),
