@@ -73,6 +73,24 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
             : 'Detalhes'),
         centerTitle: true,
         actions: [
+          PopupMenuButton(
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(value: 'continue', child: Row(
+                children: [Icon(Icons.play_arrow, size: 18, color: Colors.green), SizedBox(width: 8), Text('Continuar Treino', style: TextStyle(color: Colors.green))],
+              )),
+              const PopupMenuItem(value: 'edit_date', child: Row(
+                children: [Icon(Icons.calendar_today, size: 18), SizedBox(width: 8), Text('Alterar Data')],
+              )),
+              const PopupMenuItem(value: 'delete', child: Row(
+                children: [Icon(Icons.delete_outline, size: 18, color: Colors.red), SizedBox(width: 8), Text('Excluir', style: TextStyle(color: Colors.red))],
+              )),
+            ],
+            onSelected: (v) {
+              if (v == 'continue') _continueWorkout();
+              if (v == 'edit_date') _editDate();
+              if (v == 'delete') _deleteWorkout();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.share_outlined),
             onPressed: () => ExportService().shareWorkoutSummary(widget.workoutId),
@@ -269,6 +287,39 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _editDate() async {
+    final currentDate = DateTime.parse(_workout!['date'] as String);
+    final newDate = await showDatePicker(
+      context: context,
+      initialDate: currentDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      helpText: 'Selecione a nova data',
+    );
+    if (newDate != null && mounted) {
+      await DatabaseHelper.instance.updateWorkoutDate(widget.workoutId, newDate);
+      _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Data alterada!'), behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
+  }
+
+  Future<void> _continueWorkout() async {
+    await DatabaseHelper.instance.resetWorkoutToInProgress(widget.workoutId);
+    if (mounted) {
+      final result = await Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ActiveWorkoutScreen(workoutId: widget.workoutId),
+        ),
+      );
+      if (mounted) Navigator.pop(context, result ?? true);
+    }
   }
 
   Future<void> _deleteWorkout() async {

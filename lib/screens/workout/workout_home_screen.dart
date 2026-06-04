@@ -24,7 +24,11 @@ class WorkoutHomeScreen extends StatefulWidget {
 class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   final _db = DatabaseHelper.instance;
   bool _isLoading = true;
-  List<Map<String, dynamic>> _recentWorkouts = [];
+  List<Map<String, dynamic>> _activeWorkouts = [];
+  List<Map<String, dynamic>> _completedWorkouts = [];
+  List<Map<String, dynamic>> _routines = [];
+  bool _showCompleted = true;
+  bool _showUpcoming = true;
 
   @override
   void initState() {
@@ -35,10 +39,23 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final workouts = await _db.getWorkouts(limit: 5);
+      final allWorkouts = await _db.getWorkouts(limit: 50);
+      _routines = await _db.getRoutines();
+
+      final active = <Map<String, dynamic>>[];
+      final completed = <Map<String, dynamic>>[];
+      for (final w in allWorkouts) {
+        if ((w['end_time'] as String?) == null) {
+          active.add(w);
+        } else {
+          completed.add(w);
+        }
+      }
+
       if (mounted) {
         setState(() {
-          _recentWorkouts = workouts;
+          _activeWorkouts = active;
+          _completedWorkouts = completed;
           _isLoading = false;
         });
       }
@@ -48,19 +65,27 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   }
 
   Future<void> _startWorkout() async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const ActiveWorkoutScreen()),
     );
-    if (result == true) _loadData();
+    _loadData();
   }
 
   Future<void> _quickAdd() async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const QuickAddScreen()),
     );
-    if (result == true) _loadData();
+    _loadData();
+  }
+
+  void _continueActiveWorkout(String id) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ActiveWorkoutScreen(workoutId: id)),
+    );
+    _loadData();
   }
 
   @override
@@ -96,20 +121,14 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                   SliverToBoxAdapter(child: _buildHeader(theme, today)),
                   SliverToBoxAdapter(child: _buildQuickActions(theme)),
                   SliverToBoxAdapter(child: _buildNavGrid(theme)),
-                  if (_recentWorkouts.isNotEmpty) ...[
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
-                        child: Text('Últimos Treinos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) => _buildWorkoutCard(_recentWorkouts[index], theme),
-                        childCount: _recentWorkouts.length,
-                      ),
-                    ),
-                  ],
+                  // Active workout section (always visible, non-collapsible)
+                  SliverToBoxAdapter(child: _buildActiveSection(theme)),
+                  // Upcoming / Routines section (collapsible)
+                  if (_routines.isNotEmpty)
+                    SliverToBoxAdapter(child: _buildUpcomingSection(theme)),
+                  // Completed workouts section (collapsible)
+                  if (_completedWorkouts.isNotEmpty)
+                    SliverToBoxAdapter(child: _buildCompletedSection(theme)),
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
               ),
@@ -206,13 +225,178 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     ).animate().fadeIn(duration: 500.ms);
   }
 
-  Widget _buildWorkoutCard(Map<String, dynamic> workout, ThemeData theme) {
+  // === EM ANDAMENTO (non-collapsible) ===
+  Widget _buildActiveSection(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withAlpha(30),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(Icons.play_circle_fill, size: 18, color: Colors.green),
+              ),
+              const SizedBox(width: 8),
+              Text('Em Andamento', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_activeWorkouts.isEmpty)
+            _buildEmptyHint('Nenhum treino em andamento', Icons.play_circle_outline, theme)
+          else
+            ...(_activeWorkouts.map((w) => _buildWorkoutCard(w, theme, isActive: true))),
+        ],
+      ),
+    );
+  }
+
+  // === PRÓXIMOS TREINOS (collapsible) ===
+  Widget _buildUpcomingSection(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _showUpcoming = !_showUpcoming),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(Icons.schedule, size: 18, color: theme.colorScheme.onSecondaryContainer),
+                ),
+                const SizedBox(width: 8),
+                Text('Próximos Treinos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                Icon(
+                  _showUpcoming ? Icons.expand_less : Icons.expand_more,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+          if (_showUpcoming) ...[
+            const SizedBox(height: 8),
+            ...(_routines.map((r) => _buildRoutineCard(r, theme))),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // === TREINOS CONCLUÍDOS (collapsible) ===
+  Widget _buildCompletedSection(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _showCompleted = !_showCompleted),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(Icons.fitness_center, size: 18, color: theme.colorScheme.onPrimaryContainer),
+                ),
+                const SizedBox(width: 8),
+                Text('Treinos Concluídos', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                Text('${_completedWorkouts.length}', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                const SizedBox(width: 4),
+                Icon(
+                  _showCompleted ? Icons.expand_less : Icons.expand_more,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+          if (_showCompleted) ...[
+            const SizedBox(height: 8),
+            ...(_completedWorkouts.map((w) => _buildWorkoutCard(w, theme, isActive: false))),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyHint(String text, IconData icon, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant.withAlpha(120)),
+          const SizedBox(width: 8),
+          Text(text, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(180))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoutineCard(Map<String, dynamic> routine, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const RoutinesScreen()),
+            );
+            if (result == true) _loadData();
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.repeat, color: theme.colorScheme.onSecondaryContainer, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(routine['name'] as String? ?? '', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                ),
+                Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWorkoutCard(Map<String, dynamic> workout, ThemeData theme, {required bool isActive}) {
     final date = (workout['date'] as String?) ?? '';
     final formatted = date.isNotEmpty
         ? DateFormat('d \'de\' MMMM yyyy', 'pt_BR').format(DateTime.parse(date))
         : '';
     final duration = (workout['duration_seconds'] as int?) ?? 0;
-    final isActive = (workout['end_time'] as String?) == null;
     final durStr = isActive
         ? 'Em andamento'
         : duration > 0
@@ -221,45 +405,41 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     final feeling = (workout['feeling_rating'] as int?) ?? 0;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Card(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(
             color: isActive
-                ? theme.colorScheme.primary.withAlpha(100)
+                ? Colors.green.withAlpha(100)
                 : theme.colorScheme.outlineVariant.withAlpha(80),
           ),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () async {
-            final result = await Navigator.push(
+            await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => WorkoutDetailScreen(workoutId: workout['id'] as String),
               ),
             );
-            if (result == true) _loadData();
+            _loadData();
           },
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: isActive
-                        ? theme.colorScheme.primaryContainer
-                        : theme.colorScheme.surfaceContainerHighest,
+                    color: isActive ? Colors.green.withAlpha(25) : theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     isActive ? Icons.play_circle_fill : Icons.fitness_center,
-                    color: isActive
-                        ? theme.colorScheme.onPrimaryContainer
-                        : theme.colorScheme.onSurfaceVariant,
+                    color: isActive ? Colors.green : theme.colorScheme.onSurfaceVariant,
                     size: 22,
                   ),
                 ),

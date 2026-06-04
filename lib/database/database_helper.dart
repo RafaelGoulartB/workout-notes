@@ -588,6 +588,21 @@ class DatabaseHelper {
     }, where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<void> updateWorkoutDate(String id, DateTime newDate) async {
+    final db = await database;
+    await db.update('workouts', {
+      'date': newDate.toIso8601String().substring(0, 10),
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> resetWorkoutToInProgress(String id) async {
+    final db = await database;
+    await db.update('workouts', {
+      'end_time': null,
+      'duration_seconds': null,
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
   Future<void> deleteWorkout(String id) async {
     final db = await database;
     await db.delete('workouts', where: 'id = ?', whereArgs: [id]);

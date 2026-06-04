@@ -123,9 +123,25 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 Expanded(
                   child: _selectedDayWorkouts.isEmpty
                       ? Center(
-                          child: Text(
-                            'Nenhum treino em ${DateFormat('d/M').format(_selectedDate)}',
-                            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.fitness_center_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Nenhum treino em ${DateFormat('d/M').format(_selectedDate)}',
+                                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                ),
+                                const SizedBox(height: 16),
+                                FilledButton.icon(
+                                  onPressed: _createWorkoutForSelectedDate,
+                                  icon: const Icon(Icons.add, size: 18),
+                                  label: const Text('Criar Treino'),
+                                ),
+                              ],
+                            ),
                           ),
                         )
                       : ListView.builder(
@@ -244,5 +260,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
       childAspectRatio: 1.1,
       children: cells,
     );
+  }
+
+  Future<void> _createWorkoutForSelectedDate() async {
+    await _db.createWorkout(date: _selectedDate);
+    _loadMonth();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Treino criado para este dia!'), behavior: SnackBarBehavior.floating),
+      );
+    }
   }
 }
