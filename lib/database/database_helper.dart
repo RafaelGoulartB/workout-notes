@@ -986,14 +986,19 @@ class DatabaseHelper {
     }
 
     // Best records
-    final allMaxWeight = history
-        .map((h) => (h['max_weight'] as double))
-        .fold<double>(0, (a, b) => a > b ? a : b);
-    final allMaxVolume = history
-        .map((h) => (h['total_volume'] as double))
-        .fold<double>(0, (a, b) => a > b ? a : b);
+    double allMaxWeight = 0;
+    double allMaxVolume = 0;
+    if (history.isNotEmpty) {
+      allMaxWeight = history
+          .map((h) => (h['max_weight'] as num).toDouble())
+          .reduce((a, b) => a > b ? a : b);
+      allMaxVolume = history
+          .map((h) => (h['total_volume'] as num).toDouble())
+          .reduce((a, b) => a > b ? a : b);
+    }
 
     return {
+      'exercise_id': exerciseId,
       'history': history,
       'best_weight': allMaxWeight,
       'best_volume': allMaxVolume,
