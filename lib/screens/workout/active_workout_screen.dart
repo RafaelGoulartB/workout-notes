@@ -96,7 +96,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final entries = await _db.getWorkoutExercises(_workoutId!);
     _exercises = [];
     for (final entry in entries) {
-      final sets = await _db.getExerciseSets(entry['id'] as String);
+      final sets = List<Map<String, dynamic>>.from(
+        await _db.getExerciseSets(entry['id'] as String));
       _exercises.add(_ExerciseWithSets(
         entryId: entry['id'] as String,
         exerciseId: entry['exercise_id'] as String,
@@ -145,14 +146,25 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   Future<void> _addSet(_ExerciseWithSets exercise) async {
-    await _db.addSet(exerciseEntryId: exercise.entryId);
-    final newSet = await _db.getExerciseSets(exercise.entryId);
-    final lastSet = newSet.isNotEmpty ? newSet.last : null;
-    if (lastSet == null) return;
+    // Copy data from previous set if available
+    double? lastWeight;
+    int? lastReps;
+    bool lastWarmup = false;
+    if (exercise.sets.isNotEmpty) {
+      final last = exercise.sets.last;
+      lastWeight = (last['weight'] as num?)?.toDouble();
+      lastReps = (last['reps'] as int?);
+      lastWarmup = (last['is_warmup'] as int?) == 1;
+    }
 
-    setState(() {
-      exercise.sets.add(lastSet);
-    });
+    await _db.addSet(
+      exerciseEntryId: exercise.entryId,
+      weight: lastWeight,
+      reps: lastReps,
+      isWarmup: lastWarmup,
+    );
+    await _loadExercises();
+    setState(() {});
   }
 
   Future<void> _toggleSet(String setId) async {
@@ -174,41 +186,43 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Editar Série - $exerciseName'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: weightCtl, keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Peso (kg)', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextField(controller: repsCtl, keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Repetições', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextField(controller: rpeCtl, keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'RPE (1-10)', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextField(controller: commentCtl,
-                decoration: const InputDecoration(labelText: 'Observação', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile(
-                title: const Text('Aquecimento'),
-                value: isWarmup,
-                onChanged: (v) => isWarmup = v,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Editar Série - $exerciseName'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: weightCtl, keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Peso (kg)', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                TextField(controller: repsCtl, keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Repetições', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                TextField(controller: rpeCtl, keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'RPE (1-10)', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                TextField(controller: commentCtl,
+                  decoration: const InputDecoration(labelText: 'Observação', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 12),
+                SwitchListTile(
+                  title: const Text('Aquecimento'),
+                  value: isWarmup,
+                  onChanged: (v) => setDialogState(() => isWarmup = v),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Salvar')),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Salvar')),
-        ],
       ),
     );
 

@@ -609,7 +609,7 @@ class DatabaseHelper {
       'reps': reps,
       'distance': distance,
       'time_seconds': timeSeconds,
-      'is_complete': 1,
+      'is_complete': 0,
       'is_warmup': isWarmup ? 1 : 0,
       'rpe': rpe,
       'comment': comment,
