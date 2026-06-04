@@ -549,6 +549,33 @@ class DatabaseHelper {
     );
   }
 
+  /// Returns the distinct categories with their colors for each date in a month.
+  /// Used by the calendar to show colored dots per category.
+  Future<Map<String, List<Map<String, dynamic>>>> getWorkoutCategoriesByDate(int year, int month) async {
+    final db = await database;
+    final monthStr = month.toString().padLeft(2, '0');
+    final rows = await db.rawQuery('''
+      SELECT DISTINCT w.date, ec.id as category_id, ec.name as category_name, ec.color as category_color
+      FROM workouts w
+      JOIN exercise_entries ee ON w.id = ee.workout_id
+      JOIN exercises e ON ee.exercise_id = e.id
+      JOIN exercise_categories ec ON e.category_id = ec.id
+      WHERE w.date LIKE ?
+      ORDER BY w.date, ec.name
+    ''', ['$year-$monthStr%']);
+    
+    final Map<String, List<Map<String, dynamic>>> result = {};
+    for (final row in rows) {
+      final date = row['date'] as String;
+      result.putIfAbsent(date, () => []).add({
+        'id': row['category_id'],
+        'name': row['category_name'],
+        'color': row['category_color'],
+      });
+    }
+    return result;
+  }
+
   Future<List<Map<String, dynamic>>> getWorkoutExercises(String workoutId) async {
     final db = await database;
     return db.rawQuery(
@@ -1190,5 +1217,74 @@ class DatabaseHelper {
       await txn.delete('exercise_entries');
       await txn.delete('workouts');
     });
+  }
+
+  /// Returns overall workout stats for the progress overview.
+  Future<Map<String, dynamic>> getWorkoutOverviewStats() async {
+    final db = await database;
+
+    final totalWorkouts = Sqflite.firstIntValue(await db.rawQuery(
+      'SELECT COUNT(*) FROM workouts',
+    )) ?? 0;
+
+    final totalSets = Sqflite.firstIntValue(await db.rawQuery(
+      'SELECT COUNT(*) FROM sets WHERE is_warmup = 0',
+    )) ?? 0;
+
+    final totalVolume = Sqflite.firstIntValue(await db.rawQuery(
+      'SELECT COALESCE(SUM(weight * reps), 0) FROM sets WHERE is_warmup = 0',
+    )) ?? 0;
+
+    final currentStreak = Sqflite.firstIntValue(await db.rawQuery('''
+      WITH dates AS (
+        SELECT DISTINCT date FROM workouts ORDER BY date DESC
+      )
+      SELECT COUNT(*) FROM dates d1
+      WHERE d1.date >= (
+        SELECT MAX(d2.date) FROM dates d2
+        WHERE NOT EXISTS (
+          SELECT 1 FROM dates d3
+          WHERE d3.date = date(d2.date, '-1 day')
+        )
+      )
+    ''')) ?? 0;
+
+    return {
+      'total_workouts': totalWorkouts,
+      'total_sets': totalSets,
+      'total_volume': totalVolume,
+      'current_streak': currentStreak,
+    };
+  }
+
+  /// Returns monthly volume data for the overview chart.
+  Future<List<Map<String, dynamic>>> getMonthlyVolume({int months = 6}) async {
+    final db = await database;
+    final now = DateTime.now();
+    final results = <Map<String, dynamic>>[];
+
+    for (int m = months - 1; m >= 0; m--) {
+      final monthDate = DateTime(now.year, now.month - m, 1);
+      final monthStr = '${monthDate.year}-${monthDate.month.toString().padLeft(2, '0')}';
+
+      final row = await db.rawQuery('''
+        SELECT COALESCE(SUM(s.weight * s.reps), 0) as volume,
+          COUNT(DISTINCT w.id) as workouts
+        FROM sets s
+        JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+        JOIN workouts w ON ee.workout_id = w.id
+        WHERE w.date LIKE ? AND s.is_warmup = 0
+      ''', ['$monthStr%']);
+
+      if (row.isNotEmpty) {
+        results.add({
+          'month': '$monthStr-01',
+          'volume': (row.first['volume'] as num?)?.toDouble() ?? 0,
+          'workouts': row.first['workouts'] as int? ?? 0,
+        });
+      }
+    }
+
+    return results;
   }
 }

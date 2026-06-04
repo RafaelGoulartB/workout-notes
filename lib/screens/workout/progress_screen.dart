@@ -15,10 +15,18 @@ class _ProgressScreenState extends State<ProgressScreen> {
   final _searchCtl = TextEditingController();
   
   bool _isLoading = true;
+  
+  // Overview data
+  Map<String, dynamic>? _overviewStats;
+  List<Map<String, dynamic>> _monthlyVolume = [];
+  
+  // Exercise detail data
   List<Map<String, dynamic>> _allExercises = [];
   List<Map<String, dynamic>> _exercisesWithData = [];
   Map<String, dynamic>? _selectedHistory;
   int _selectedChartType = 0;
+
+  bool _showingOverview = true;
 
   static const _chartTypes = ['1RM', 'Peso Máx.', 'Volume', 'Total Reps'];
 
@@ -36,22 +44,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   Future<void> _load() async {
     setState(() => _isLoading = true);
+    
     _allExercises = await _db.getExercises();
+    _overviewStats = await _db.getWorkoutOverviewStats();
+    _monthlyVolume = await _db.getMonthlyVolume();
+    _exercisesWithData = [];
 
     // Find exercises that have recorded data
-    final withData = <Map<String, dynamic>>[];
     for (final ex in _allExercises) {
       final data = await _db.getExerciseHistory(ex['id'] as String, limit: 1);
       final history = data['history'] as List? ?? [];
       if (history.isNotEmpty) {
-        withData.add(ex);
+        _exercisesWithData.add(ex);
       }
-    }
-    _exercisesWithData = withData;
-
-    // Auto-select first exercise with data
-    if (withData.isNotEmpty) {
-      await _loadHistory(withData.first['id'] as String);
     }
 
     setState(() => _isLoading = false);
@@ -59,19 +64,20 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   Future<void> _loadHistory(String exerciseId) async {
     final data = await _db.getExerciseHistory(exerciseId, limit: 30);
-    setState(() => _selectedHistory = data);
+    setState(() {
+      _selectedHistory = data;
+      _showingOverview = false;
+    });
   }
 
   /// Calculates a "nice" interval for chart grid lines.
-  /// Produces clean intervals like 1, 2, 5, 10, 20, 50, 100, 250, 500, 1000...
   double _niceInterval(double range) {
     if (range <= 0) return 1;
-    final rough = range / 5; // We want ~5 grid lines
+    final rough = range / 5;
     double magnitude = 1;
     double temp = rough;
     while (temp >= 10) { temp /= 10; magnitude *= 10; }
     while (temp < 1) { temp *= 10; magnitude /= 10; }
-    // Round up to nearest nice number: 1, 2, 5, 10
     if (temp <= 1) temp = 1;
     else if (temp <= 2) temp = 2;
     else if (temp <= 5) temp = 5;
@@ -93,80 +99,335 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Progresso'),
+        title: Text(_showingOverview ? 'Progresso' : (_selectedHistory?['exercise_name'] as String? ?? 'Progresso')),
         centerTitle: true,
+        leading: _showingOverview
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => setState(() => _showingOverview = true),
+              ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _exercisesWithData.isEmpty
-              ? _buildNoDataState(theme)
-              : Column(
-                  children: [
-                    // Exercise search
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                      child: TextField(
-                        controller: _searchCtl,
-                        decoration: InputDecoration(
-                          hintText: 'Buscar exercício...',
-                          prefixIcon: const Icon(Icons.search),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          filled: true,
-                          fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
-                        ),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                    ),
-
-                    // Selected exercise + chart type
-                    if (_selectedHistory != null) ...[
-                      _buildExerciseSelector(theme),
-                      const SizedBox(height: 4),
-                      _buildChartTypeSelector(theme),
-                    ],
-
-                    // Content
-                    Expanded(
-                      child: _selectedHistory == null
-                          ? _buildExerciseList(theme)
-                          : SingleChildScrollView(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildRecords(theme),
-                                  const SizedBox(height: 16),
-                                  _buildChart(theme),
-                                  const SizedBox(height: 16),
-                                  _buildHistorySection(theme),
-                                ],
-                              ),
-                            ),
-                    ),
-                  ],
-                ),
+          : _showingOverview
+              ? _buildOverview(theme)
+              : _buildExerciseDetail(theme),
     );
   }
 
-  Widget _buildNoDataState(ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.trending_up, size: 80, color: theme.colorScheme.primary.withAlpha(80)),
-            const SizedBox(height: 24),
-            Text('Nenhum dado ainda', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            Text(
-              'Registre alguns treinos para ver\ngráficos de progresso e estatísticas',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
+  // ======================= OVERVIEW =======================
+
+  Widget _buildOverview(ThemeData theme) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Stats cards
+          _buildStatsRow(theme),
+          const SizedBox(height: 16),
+
+          // Monthly volume chart
+          if (_monthlyVolume.isNotEmpty) ...[
+            Text('Volume por Mês', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            _buildMonthlyVolumeChart(theme),
+            const SizedBox(height: 20),
           ],
+
+          // Exercises section header
+          Row(
+            children: [
+              Text('Exercícios', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${_exercisesWithData.length}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+
+          // Search
+          TextField(
+            controller: _searchCtl,
+            decoration: InputDecoration(
+              hintText: 'Buscar exercício...',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 8),
+
+          // Exercise list
+          if (_exercisesWithData.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Icon(Icons.fitness_center_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
+                    const SizedBox(height: 12),
+                    Text('Nenhum exercício com dados registrados',
+                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+            )
+          else
+            ..._buildExerciseCards(theme),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsRow(ThemeData theme) {
+    final stats = _overviewStats;
+    final totalWorkouts = (stats?['total_workouts'] as int?) ?? 0;
+    final totalSets = (stats?['total_sets'] as int?) ?? 0;
+    final totalVolume = (stats?['total_volume'] as int?) ?? 0;
+    final streak = (stats?['current_streak'] as int?) ?? 0;
+
+    return Row(
+      children: [
+        Expanded(child: _StatCard(
+          label: 'Treinos', value: '$totalWorkouts',
+          icon: Icons.fitness_center, color: theme.colorScheme.primary,
+        )),
+        const SizedBox(width: 8),
+        Expanded(child: _StatCard(
+          label: 'Séries', value: '$totalSets',
+          icon: Icons.repeat, color: theme.colorScheme.secondary,
+        )),
+        const SizedBox(width: 8),
+        Expanded(child: _StatCard(
+          label: 'Volume', value: totalVolume >= 1000
+              ? '${(totalVolume / 1000).toStringAsFixed(1)}k'
+              : '$totalVolume',
+          icon: Icons.auto_graph, color: Colors.teal,
+        )),
+        const SizedBox(width: 8),
+        Expanded(child: _StatCard(
+          label: 'Sequência', value: '$streak ${streak == 1 ? 'dia' : 'dias'}',
+          icon: Icons.local_fire_department, color: Colors.orange,
+        )),
+      ],
+    );
+  }
+
+  Widget _buildMonthlyVolumeChart(ThemeData theme) {
+    final volumes = _monthlyVolume.map((m) => (m['volume'] as double?) ?? 0).toList();
+    final maxVol = volumes.fold<double>(0, (a, b) => a > b ? a : b);
+    if (maxVol <= 0) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: SizedBox(
+          height: 180,
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: maxVol * 1.15,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final m = _monthlyVolume[groupIndex];
+                    final month = m['month'] as String? ?? '';
+                    final vol = (m['volume'] as double?) ?? 0;
+                    final wo = (m['workouts'] as int?) ?? 0;
+                    return BarTooltipItem(
+                      '${_monthLabel(month)}\n${_formatVolume(vol)}\n${wo} treinos',
+                      TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 12),
+                    );
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                show: true,
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (v, _) {
+                      final idx = v.toInt();
+                      if (idx < 0 || idx >= _monthlyVolume.length) return const SizedBox.shrink();
+                      final month = _monthlyVolume[idx]['month'] as String? ?? '';
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          month.length >= 7 ? month.substring(5, 7) : '',
+                          style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 36,
+                    getTitlesWidget: (v, _) {
+                      if (v == 0) return const SizedBox.shrink();
+                      return Text(
+                        _formatVolume(v),
+                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 9),
+                      );
+                    },
+                  ),
+                ),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: maxVol > 0 ? _niceInterval(maxVol / 4) : 1,
+              ),
+              barGroups: _monthlyVolume.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final vol = (entry.value['volume'] as double?) ?? 0;
+                return BarChartGroupData(
+                  x: idx,
+                  barRods: [
+                    BarChartRodData(
+                      toY: vol,
+                      color: theme.colorScheme.primary,
+                      width: 20,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(4),
+                        topRight: Radius.circular(4),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
         ),
       ),
+    );
+  }
+
+  String _monthLabel(String isoMonth) {
+    try {
+      return DateFormat('MMM', 'pt_BR').format(DateTime.parse(isoMonth));
+    } catch (_) {
+      return isoMonth.length >= 7 ? isoMonth.substring(5) : isoMonth;
+    }
+  }
+
+  String _formatVolume(double v) {
+    if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
+    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
+    return v.toStringAsFixed(0);
+  }
+
+  List<Widget> _buildExerciseCards(ThemeData theme) {
+    final filtered = _filteredExercises;
+    if (filtered.isEmpty) {
+      return [
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text('Nenhum exercício encontrado',
+                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          ),
+        ),
+      ];
+    }
+
+    return filtered.map((ex) {
+      final catColor = Color(ex['category_color'] as int? ?? 0xFF757575);
+      return Card(
+        margin: const EdgeInsets.symmetric(vertical: 3),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _loadHistory(ex['id'] as String),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(width: 6, height: 40, decoration: BoxDecoration(
+                  color: catColor, borderRadius: BorderRadius.circular(3),
+                )),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(ex['name'] as String, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                      Text(ex['category_name'] as String? ?? '', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+              ],
+            ),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  // ======================= EXERCISE DETAIL =======================
+
+  Widget _buildExerciseDetail(ThemeData theme) {
+    if (_selectedHistory == null) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Row(
+            children: [
+              Expanded(child: _buildExerciseSelector(theme)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        _buildChartTypeSelector(theme),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildRecords(theme),
+                const SizedBox(height: 16),
+                _buildChart(theme),
+                const SizedBox(height: 16),
+                _buildHistorySection(theme),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -175,60 +436,39 @@ class _ProgressScreenState extends State<ProgressScreen> {
       (e) => e['id'] == (_selectedHistory?['exercise_id']),
       orElse: () => <String, dynamic>{},
     );
-    final currName = selectedEx['name'] as String? ?? '';
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: DropdownButtonFormField<String>(
-              value: selectedEx['id'] as String?,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-              isExpanded: true,
-              items: _allExercises.map((ex) => DropdownMenuItem(
-                value: ex['id'] as String,
-                child: Row(
-                  children: [
-                    Container(width: 8, height: 8, decoration: BoxDecoration(
-                      color: Color(ex['category_color'] as int? ?? 0xFF757575),
-                      shape: BoxShape.circle,
-                    )),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        ex['name'] as String? ?? '',
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: _exercisesWithData.any((d) => d['id'] == ex['id'])
-                              ? FontWeight.w600 : FontWeight.normal,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )).toList(),
-              onChanged: (id) {
-                if (id != null) _loadHistory(id);
-              },
-            ),
-          ),
-          if (_selectedHistory != null) ...[
+    return DropdownButtonFormField<String>(
+      value: selectedEx['id'] as String?,
+      decoration: InputDecoration(
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      isExpanded: true,
+      items: _allExercises.map((ex) => DropdownMenuItem(
+        value: ex['id'] as String,
+        child: Row(
+          children: [
+            Container(width: 8, height: 8, decoration: BoxDecoration(
+              color: Color(ex['category_color'] as int? ?? 0xFF757575),
+              shape: BoxShape.circle,
+            )),
             const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, size: 20),
-              onPressed: () {
-                setState(() => _selectedHistory = null);
-                _searchCtl.clear();
-              },
-              tooltip: 'Voltar para lista',
+            Expanded(
+              child: Text(
+                ex['name'] as String? ?? '',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: _exercisesWithData.any((d) => d['id'] == ex['id'])
+                      ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
             ),
           ],
-        ],
-      ),
+        ),
+      )).toList(),
+      onChanged: (id) {
+        if (id != null) _loadHistory(id);
+      },
     );
   }
 
@@ -255,59 +495,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  Widget _buildExerciseList(ThemeData theme) {
-    final filtered = _filteredExercises;
-
-    if (filtered.isEmpty) {
-      return Center(
-        child: Text('Nenhum exercício encontrado',
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 80),
-      itemCount: filtered.length,
-      itemBuilder: (ctx, i) {
-        final ex = filtered[i];
-        final catColor = Color(ex['category_color'] as int? ?? 0xFF757575);
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 3),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => _loadHistory(ex['id'] as String),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  Container(width: 6, height: 40, decoration: BoxDecoration(
-                    color: catColor, borderRadius: BorderRadius.circular(3),
-                  )),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(ex['name'] as String, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                        Text(ex['category_name'] as String? ?? '', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                      ],
-                    ),
-                  ),
-                  Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildRecords(ThemeData theme) {
     final bestWeight = (_selectedHistory!['best_weight'] as double?) ?? 0;
     final bestVolume = (_selectedHistory!['best_volume'] as double?) ?? 0;
@@ -315,26 +502,20 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     return Row(
       children: [
-        Expanded(
-          child: _RecordCard(
-            label: 'Peso Máx', value: bestWeight > 0 ? '${bestWeight.toStringAsFixed(1)} kg' : '--',
-            icon: Icons.monitor_weight, color: theme.colorScheme.primary,
-          ),
-        ),
+        Expanded(child: _StatCard(
+          label: 'Peso Máx', value: bestWeight > 0 ? '${bestWeight.toStringAsFixed(1)}' : '--',
+          icon: Icons.monitor_weight, color: theme.colorScheme.primary,
+        )),
         const SizedBox(width: 8),
-        Expanded(
-          child: _RecordCard(
-            label: 'Volume', value: bestVolume > 0 ? '${bestVolume.toStringAsFixed(0)} kg' : '--',
-            icon: Icons.auto_graph, color: theme.colorScheme.secondary,
-          ),
-        ),
+        Expanded(child: _StatCard(
+          label: 'Volume', value: bestVolume > 0 ? '${_formatVolume(bestVolume)}' : '--',
+          icon: Icons.auto_graph, color: theme.colorScheme.secondary,
+        )),
         const SizedBox(width: 8),
-        Expanded(
-          child: _RecordCard(
-            label: '1RM', value: best1RM > 0 ? '${best1RM.toStringAsFixed(1)} kg' : '--',
-            icon: Icons.emoji_events, color: Colors.amber,
-          ),
-        ),
+        Expanded(child: _StatCard(
+          label: '1RM', value: best1RM > 0 ? '${best1RM.toStringAsFixed(1)}' : '--',
+          icon: Icons.emoji_events, color: Colors.amber,
+        )),
       ],
     );
   }
@@ -370,8 +551,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final minVal = values.isNotEmpty
         ? values.fold<double>(values.first, (a, b) => a < b ? a : b)
         : 0;
-    final range = maxVal - minVal;
-    final interval = _niceInterval(range);
 
     if (history.isEmpty || maxVal <= 0) {
       return Card(
@@ -393,6 +572,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
         ),
       );
     }
+
+    final range = maxVal - minVal;
+    final interval = _niceInterval(range);
 
     return Card(
       elevation: 0,
@@ -435,11 +617,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         reservedSize: 44,
                         interval: interval,
                         getTitlesWidget: (v, _) {
-                          final numVal = v is double ? v : v.toDouble();
                           return Padding(
                             padding: const EdgeInsets.only(right: 4),
                             child: Text(
-                              _selectedChartType == 3 ? '${numVal.toInt()}' : '${numVal.toStringAsFixed(1)}',
+                              _selectedChartType == 3 ? '${v.toInt()}' : '${v.toStringAsFixed(1)}',
                               style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
                             ),
                           );
@@ -534,8 +715,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
       children: [
         Text('Histórico de Treinos', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-
-        // Table header
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
@@ -552,8 +731,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ],
           ),
         ),
-
-        // History rows (most recent first)
         ...history.reversed.map((h) {
           final date = h['date'] as String? ?? '';
           final maxW = (h['max_weight'] as double?) ?? 0;
@@ -591,13 +768,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 }
 
-class _RecordCard extends StatelessWidget {
+class _StatCard extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
   final Color color;
 
-  const _RecordCard({required this.label, required this.value, required this.icon, required this.color});
+  const _StatCard({required this.label, required this.value, required this.icon, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -607,12 +784,12 @@ class _RecordCard extends StatelessWidget {
       color: color.withAlpha(15),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 6),
-            Text(value, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: 13)),
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 4),
+            Text(value, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: 12)),
             Text(label, style: theme.textTheme.bodySmall?.copyWith(fontSize: 10, color: theme.colorScheme.onSurfaceVariant)),
           ],
         ),

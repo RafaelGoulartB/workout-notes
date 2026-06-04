@@ -16,6 +16,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   int _currentMonth = DateTime.now().month;
   int _currentYear = DateTime.now().year;
   Map<String, List<Map<String, dynamic>>> _workoutsByDate = {};
+  Map<String, List<Map<String, dynamic>>> _categoriesByDate = {};
   List<Map<String, dynamic>> _selectedDayWorkouts = [];
   bool _isLoading = true;
 
@@ -35,11 +36,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
       grouped.putIfAbsent(date, () => []).add(w);
     }
 
+    final categories = await _db.getWorkoutCategoriesByDate(_currentYear, _currentMonth);
+
     _selectedDayWorkouts = grouped[_selectedDate.toIso8601String().substring(0, 10)] ?? [];
 
     if (mounted) {
       setState(() {
         _workoutsByDate = grouped;
+        _categoriesByDate = categories;
         _isLoading = false;
       });
     }
@@ -206,7 +210,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
     // Day cells
     for (int day = 1; day <= daysInMonth; day++) {
       final dateStr = '${_currentYear}-${_currentMonth.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
-      final hasWorkout = _workoutsByDate.containsKey(dateStr);
+      final cats = _categoriesByDate[dateStr] ?? [];
+      final hasWorkout = cats.isNotEmpty;
       final isToday = dateStr == today;
       final isSelected = dateStr == selectedStr;
 
@@ -219,7 +224,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             });
           },
           child: Container(
-            margin: const EdgeInsets.all(2),
+            margin: const EdgeInsets.all(1),
             decoration: BoxDecoration(
               color: isSelected ? theme.colorScheme.primaryContainer : null,
               borderRadius: BorderRadius.circular(8),
@@ -239,12 +244,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                 ),
                 if (hasWorkout)
-                  Container(
-                    width: 6, height: 6,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      shape: BoxShape.circle,
-                    ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: _buildCategoryDots(cats),
                   ),
               ],
             ),
@@ -257,8 +259,48 @@ class _CalendarScreenState extends State<CalendarScreen> {
       crossAxisCount: 7,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.1,
+      childAspectRatio: 1.0,
       children: cells,
+    );
+  }
+
+  /// Builds up to 4 small colored dots representing exercise categories.
+  /// If more than 4 categories, shows 3 dots + a "+N" indicator.
+  Widget _buildCategoryDots(List<Map<String, dynamic>> categories) {
+    final maxDots = 4;
+    final displayCats = categories.take(maxDots).toList();
+    final overflow = categories.length - maxDots;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        ...displayCats.map((cat) {
+          final color = Color(cat['color'] as int? ?? 0xFF757575);
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 1),
+            child: Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+          );
+        }),
+        if (overflow > 0)
+          Padding(
+            padding: const EdgeInsets.only(left: 1),
+            child: Text(
+              '+$overflow',
+              style: TextStyle(
+                fontSize: 6,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+      ],
     );
   }
 
