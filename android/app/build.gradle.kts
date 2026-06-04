@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.lifenotes.life_notes"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

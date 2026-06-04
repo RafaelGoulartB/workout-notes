@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import '../../database/database_helper.dart';
 import '../../services/export_service.dart';
 
@@ -50,33 +49,33 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     }
   }
 
-  Future<void> _importBackup() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-      );
-      if (result == null || result.files.isEmpty) return;
+  // Future<void> _importBackup() async {
+  //   try {
+  //     final result = await FilePicker.platform.pickFiles(
+  //       type: FileType.custom,
+  //       allowedExtensions: ['json'],
+  //     );
+  //     if (result == null || result.files.isEmpty) return;
 
-      final filePath = result.files.first.path;
-      if (filePath == null) return;
+  //     final filePath = result.files.first.path;
+  //     if (filePath == null) return;
 
-      final exportService = ExportService();
-      final count = await exportService.importFromJson(filePath);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ $count registros importados!'), behavior: SnackBarBehavior.floating),
-        );
-        _load();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao importar: $e'), behavior: SnackBarBehavior.floating),
-        );
-      }
-    }
-  }
+  //     final exportService = ExportService();
+  //     final count = await exportService.importFromJson(filePath);
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('✅ $count registros importados!'), behavior: SnackBarBehavior.floating),
+  //       );
+  //       _load();
+  //     }
+  //   } catch (e) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(content: Text('Erro ao importar: $e'), behavior: SnackBarBehavior.floating),
+  //       );
+  //     }
+  //   }
+  // }
 
   Future<void> _deleteAllHistory() async {
     final confirm = await showDialog<bool>(
@@ -229,14 +228,14 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => _exportBackup(),
                       ),
-                      const Divider(height: 1, indent: 16, endIndent: 16),
-                      ListTile(
-                        leading: Icon(Icons.upload, color: theme.colorScheme.secondary),
-                        title: const Text('Importar Backup'),
-                        subtitle: const Text('Restaurar dados de um arquivo JSON'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _importBackup(),
-                      ),
+                      // const Divider(height: 1, indent: 16, endIndent: 16),
+                      // ListTile(
+                      //   leading: Icon(Icons.upload, color: theme.colorScheme.secondary),
+                      //   title: const Text('Importar Backup'),
+                      //   subtitle: const Text('Restaurar dados de um arquivo JSON'),
+                      //   trailing: const Icon(Icons.chevron_right),
+                      //   onTap: () => _importBackup(),
+                      // ),
                       const Divider(height: 1, indent: 16, endIndent: 16),
                       ListTile(
                         leading: Icon(Icons.info_outline, color: theme.colorScheme.onSurfaceVariant),
