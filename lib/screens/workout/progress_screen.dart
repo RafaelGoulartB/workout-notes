@@ -62,6 +62,24 @@ class _ProgressScreenState extends State<ProgressScreen> {
     setState(() => _selectedHistory = data);
   }
 
+  /// Calculates a "nice" interval for chart grid lines.
+  /// Produces clean intervals like 1, 2, 5, 10, 20, 50, 100, 250, 500, 1000...
+  double _niceInterval(double range) {
+    if (range <= 0) return 1;
+    final rough = range / 5; // We want ~5 grid lines
+    double magnitude = 1;
+    double temp = rough;
+    while (temp >= 10) { temp /= 10; magnitude *= 10; }
+    while (temp < 1) { temp *= 10; magnitude /= 10; }
+    // Round up to nearest nice number: 1, 2, 5, 10
+    if (temp <= 1) temp = 1;
+    else if (temp <= 2) temp = 2;
+    else if (temp <= 5) temp = 5;
+    else temp = 10;
+    final result = temp * magnitude;
+    return result < 0.5 ? 0.5 : result;
+  }
+
   List<Map<String, dynamic>> get _filteredExercises {
     final query = _searchCtl.text.toLowerCase();
     if (query.isEmpty) return _exercisesWithData;
@@ -323,26 +341,24 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   Widget _buildChart(ThemeData theme) {
     final history = _selectedHistory!['history'] as List? ?? [];
-    if (history.length < 2) return const SizedBox.shrink();
 
     String title;
-    String Function(int idx) tooltipFn;
     List<double> values;
 
     switch (_selectedChartType) {
-      case 0: // 1RM
+      case 0:
         title = 'Evolução do 1RM Estimado';
         values = history.map((h) => (h['estimated_1rm'] as double?) ?? 0).toList();
         break;
-      case 1: // Max Weight
+      case 1:
         title = 'Evolução do Peso Máximo';
         values = history.map((h) => (h['max_weight'] as double?) ?? 0).toList();
         break;
-      case 2: // Volume
+      case 2:
         title = 'Volume por Treino';
         values = history.map((h) => (h['total_volume'] as double?) ?? 0).toList();
         break;
-      case 3: // Total Reps
+      case 3:
         title = 'Repetições por Treino';
         values = history.map((h) => (h['total_reps'] as int?)?.toDouble() ?? 0).toList();
         break;
@@ -351,9 +367,32 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
 
     final maxVal = values.fold<double>(0, (a, b) => a > b ? a : b);
-    final minVal = values.fold<double>(values.isNotEmpty ? values.first : 0, (a, b) => a < b ? a : b);
+    final minVal = values.isNotEmpty
+        ? values.fold<double>(values.first, (a, b) => a < b ? a : b)
+        : 0;
     final range = maxVal - minVal;
-    final interval = range > 0 ? (range / 5).ceilToDouble().clamp(0.5, double.infinity) : 1.0;
+    final interval = _niceInterval(range);
+
+    if (history.isEmpty || maxVal <= 0) {
+      return Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            children: [
+              Icon(Icons.bar_chart_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
+              const SizedBox(height: 12),
+              Text('Nenhum dado disponível para este tipo de gráfico',
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Card(
       elevation: 0,
