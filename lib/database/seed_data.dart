@@ -1,14 +1,14 @@
 class SeedData {
   static const categories = [
-    {'id': 'chest', 'name': 'Peito', 'color': 0xFFE53935, 'order_index': 0},
-    {'id': 'back', 'name': 'Costas', 'color': 0xFF43A047, 'order_index': 1},
-    {'id': 'shoulders', 'name': 'Ombros', 'color': 0xFFFB8C00, 'order_index': 2},
-    {'id': 'biceps', 'name': 'Bíceps', 'color': 0xFF8E24AA, 'order_index': 3},
-    {'id': 'triceps', 'name': 'Tríceps', 'color': 0xFF00ACC1, 'order_index': 4},
-    {'id': 'legs', 'name': 'Pernas', 'color': 0xFF3949AB, 'order_index': 5},
-    {'id': 'core', 'name': 'Abdômen', 'color': 0xFFFDD835, 'order_index': 6},
-    {'id': 'cardio', 'name': 'Cardio', 'color': 0xFF6D4C41, 'order_index': 7},
-    {'id': 'fullbody', 'name': 'Corpo Inteiro', 'color': 0xFF546E7A, 'order_index': 8},
+    {'id': 'chest', 'name': 'Peito', 'color': 0xFFE53935, 'order_index': 0, 'energy_system': 'anaerobic'},
+    {'id': 'back', 'name': 'Costas', 'color': 0xFF43A047, 'order_index': 1, 'energy_system': 'anaerobic'},
+    {'id': 'shoulders', 'name': 'Ombros', 'color': 0xFFFB8C00, 'order_index': 2, 'energy_system': 'anaerobic'},
+    {'id': 'biceps', 'name': 'Bíceps', 'color': 0xFF8E24AA, 'order_index': 3, 'energy_system': 'anaerobic'},
+    {'id': 'triceps', 'name': 'Tríceps', 'color': 0xFF00ACC1, 'order_index': 4, 'energy_system': 'anaerobic'},
+    {'id': 'legs', 'name': 'Pernas', 'color': 0xFF3949AB, 'order_index': 5, 'energy_system': 'anaerobic'},
+    {'id': 'core', 'name': 'Abdômen', 'color': 0xFFFDD835, 'order_index': 6, 'energy_system': 'anaerobic'},
+    {'id': 'cardio', 'name': 'Cardio', 'color': 0xFF6D4C41, 'order_index': 7, 'energy_system': 'aerobic'},
+    {'id': 'fullbody', 'name': 'Corpo Inteiro', 'color': 0xFF546E7A, 'order_index': 8, 'energy_system': 'anaerobic'},
   ];
 
   static const exercises = [

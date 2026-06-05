@@ -228,6 +228,36 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }
   }
 
+  void _quickEditNumber(BuildContext sheetContext, double current, bool isInt, void Function(double) onSet) {
+    final ctl = TextEditingController(
+      text: isInt ? current.round().toString() : current.toStringAsFixed(1));
+    showDialog(
+      context: sheetContext,
+      builder: (ctx) => AlertDialog(
+        title: Text(isInt ? 'Digite as repetições' : 'Digite o peso'),
+        content: TextField(
+          controller: ctl,
+          keyboardType: TextInputType.numberWithOptions(decimal: !isInt),
+          autofocus: true,
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            suffixText: isInt ? ' reps' : ' kg',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(onPressed: () {
+            final parsed = double.tryParse(ctl.text.replaceAll(',', '.'));
+            if (parsed != null && parsed >= 0) {
+              onSet(isInt ? parsed.roundToDouble() : parsed);
+            }
+            Navigator.pop(ctx);
+          }, child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
   // ===================== EXERCISE ACTIONS =====================
 
   Future<void> _addExercise(String exerciseId, String name, String catName, Color catColor, {int? restTimeSeconds}) async {
@@ -337,64 +367,269 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }
   }
 
-  Future<void> _editSetDialog(String setId, Map<String, dynamic> setData, String exerciseName) async {
-    final weightCtl = TextEditingController(
-      text: (setData['weight'] as num?)?.toStringAsFixed(1) ?? '');
-    final repsCtl = TextEditingController(
-      text: (setData['reps'] as int?)?.toString() ?? '');
-    final rpeCtl = TextEditingController(
-      text: (setData['rpe'] as num?)?.toStringAsFixed(1) ?? '');
-    final commentCtl = TextEditingController(
-      text: (setData['comment'] as String?) ?? '');
+  Future<void> _editSetDialog(String setId, Map<String, dynamic> setData, String exerciseName, int setNumber) async {
+    double weight = (setData['weight'] as num?)?.toDouble() ?? 0;
+    int reps = (setData['reps'] as int?) ?? 0;
+    double? rpe = (setData['rpe'] as num?)?.toDouble();
+    final commentCtl = TextEditingController(text: (setData['comment'] as String?) ?? '');
     bool isWarmup = (setData['is_warmup'] as int?) == 1;
 
-    final result = await showDialog<bool>(
+    final result = await showModalBottomSheet<bool>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text('Editar Série - $exerciseName'),
-          content: SingleChildScrollView(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            left: 16, right: 16, top: 8,
+          ),
+          child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextField(controller: weightCtl, keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Peso (kg)', border: OutlineInputBorder()),
+                // Handle
+                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(
+                  color: Theme.of(ctx).colorScheme.onSurfaceVariant.withAlpha(80),
+                  borderRadius: BorderRadius.circular(2),
+                ))),
+                const SizedBox(height: 12),
+                // Title
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Editar Série', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    ),
+                    Text('$exerciseName • Série $setNumber', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    )),
+                  ],
                 ),
                 const SizedBox(height: 12),
-                TextField(controller: repsCtl, keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Repetições', border: OutlineInputBorder()),
+
+                // Comment (top)
+                TextField(
+                  controller: commentCtl,
+                  decoration: const InputDecoration(
+                    labelText: 'Observação',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  maxLines: 1,
                 ),
-                const SizedBox(height: 12),
-                TextField(controller: rpeCtl, keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'RPE (1-10)', border: OutlineInputBorder()),
+                const SizedBox(height: 8),
+
+                // Warmup toggle
+                Row(
+                  children: [
+                    Icon(Icons.whatshot, size: 16, color: isWarmup ? Colors.orange : Theme.of(ctx).colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 6),
+                    Text('Aquecimento', style: Theme.of(ctx).textTheme.bodyMedium),
+                    const Spacer(),
+                    SizedBox(
+                      height: 28,
+                      child: Switch.adaptive(
+                        value: isWarmup,
+                        onChanged: (v) => setSheetState(() => isWarmup = v),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                TextField(controller: commentCtl,
-                  decoration: const InputDecoration(labelText: 'Observação', border: OutlineInputBorder()),
+                const SizedBox(height: 16),
+
+                // WEIGHT row
+                Text('Peso (kg)', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    _StepperButton(
+                      icon: Icons.remove,
+                      onTap: () => setSheetState(() {
+                        weight = (weight - 2.5).clamp(0, 999);
+                      }),
+                    ),
+                    const SizedBox(width: 6),
+                    _StepperButton(
+                      icon: Icons.remove, small: true,
+                      onTap: () => setSheetState(() {
+                        weight = (weight - 0.5).clamp(0, 999);
+                      }),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _quickEditNumber(ctx, weight, false, (v) {
+                          setSheetState(() => weight = v);
+                        }),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withAlpha(120),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(child: Text(
+                            weight.toStringAsFixed(1),
+                            style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                          )),
+                        ),
+                      ),
+                    ),
+                    _StepperButton(
+                      icon: Icons.add, small: true,
+                      onTap: () => setSheetState(() {
+                        weight = (weight + 0.5).clamp(0, 999);
+                      }),
+                    ),
+                    const SizedBox(width: 6),
+                    _StepperButton(
+                      icon: Icons.add,
+                      onTap: () => setSheetState(() {
+                        weight = (weight + 2.5).clamp(0, 999);
+                      }),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  title: const Text('Aquecimento'),
-                  value: isWarmup,
-                  onChanged: (v) => setDialogState(() => isWarmup = v),
-                  contentPadding: EdgeInsets.zero,
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [20, 30, 40, 50, 60, 80, 100, 120].map((v) => ActionChip(
+                    label: Text('$v', style: const TextStyle(fontSize: 10)),
+                    onPressed: () => setSheetState(() => weight = v.toDouble()),
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  )).toList(),
                 ),
+                const SizedBox(height: 14),
+
+                // REPS row
+                Text('Repetições', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    _StepperButton(
+                      icon: Icons.remove,
+                      onTap: () => setSheetState(() {
+                        reps = (reps - 1).clamp(0, 999);
+                      }),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => _quickEditNumber(ctx, reps.toDouble(), true, (v) {
+                          setSheetState(() => reps = v.round());
+                        }),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withAlpha(120),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Center(child: Text(
+                            '$reps',
+                            style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                          )),
+                        ),
+                      ),
+                    ),
+                    _StepperButton(
+                      icon: Icons.add,
+                      onTap: () => setSheetState(() {
+                        reps = (reps + 1).clamp(0, 999);
+                      }),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [1, 3, 5, 8, 10, 12, 15, 20].map((v) => ActionChip(
+                    label: Text('$v', style: const TextStyle(fontSize: 10)),
+                    onPressed: () => setSheetState(() => reps = v),
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  )).toList(),
+                ),
+                const SizedBox(height: 14),
+
+                // RPE
+                Row(
+                  children: [
+                    Text('RPE', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 8),
+                    ...List.generate(11, (i) {
+                      final val = i.toDouble();
+                      final isSet = rpe != null && rpe!.round() == i;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 2),
+                        child: GestureDetector(
+                          onTap: () => setSheetState(() {
+                            rpe = (rpe == val) ? null : val;
+                          }),
+                          child: Container(
+                            width: 26, height: 26,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isSet ? Theme.of(ctx).colorScheme.primary : null,
+                              border: Border.all(color: isSet ? Theme.of(ctx).colorScheme.primary : Theme.of(ctx).colorScheme.outlineVariant),
+                            ),
+                            child: Center(child: Text(
+                              i == 0 ? '-' : '$i',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: isSet ? Theme.of(ctx).colorScheme.onPrimary : Theme.of(ctx).colorScheme.onSurface,
+                              ),
+                            )),
+                          ),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Salvar'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const SizedBox(height: 24),
               ],
             ),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Salvar')),
-          ],
         ),
       ),
     );
 
-    if (result == true) {
+    if (result == true && _workoutId != null) {
       await _db.updateSet(setId,
-        weight: double.tryParse(weightCtl.text.replaceAll(',', '.')),
-        reps: int.tryParse(repsCtl.text),
-        rpe: double.tryParse(rpeCtl.text.replaceAll(',', '.')),
+        weight: weight,
+        reps: reps,
+        rpe: rpe,
         comment: commentCtl.text,
         isWarmup: isWarmup,
       );
@@ -614,7 +849,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               exercise: _exercises[index],
               onAddSet: () => _addSet(_exercises[index]),
               onToggleSet: _toggleSet,
-              onEditSet: (setId, data) => _editSetDialog(setId, data, _exercises[index].name),
+              onEditSet: (setId, data, setIdx) => _editSetDialog(setId, data, _exercises[index].name, setIdx),
               onDeleteSet: _deleteSet,
               onChangeRestTime: (currentRest) => _changeExerciseRestTime(_exercises[index], currentRest),
               theme: theme,
@@ -1057,7 +1292,7 @@ class _ExerciseCard extends StatelessWidget {
   final _ExerciseWithSets exercise;
   final VoidCallback onAddSet;
   final Function(String) onToggleSet;
-  final Function(String, Map<String, dynamic>) onEditSet;
+  final void Function(String, Map<String, dynamic>, int) onEditSet;
   final Function(String) onDeleteSet;
   final ThemeData theme;
   final ValueChanged<int> onChangeRestTime;
@@ -1139,7 +1374,7 @@ class _ExerciseCard extends StatelessWidget {
               final isComplete = (set['is_complete'] as int?) == 1;
               final isWarmup = (set['is_warmup'] as int?) == 1;
               return InkWell(
-                onTap: () => onEditSet(set['id'] as String, set),
+                onTap: () => onEditSet(set['id'] as String, set, i + 1),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
@@ -1246,6 +1481,37 @@ class _FeelingDialogState extends State<_FeelingDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         FilledButton(onPressed: () => Navigator.pop(context, _rating), child: const Text('Confirmar')),
       ],
+    );
+  }
+}
+
+class _StepperButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool small;
+
+  const _StepperButton({
+    required this.icon,
+    required this.onTap,
+    this.small = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final size = small ? 36.0 : 48.0;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(120)),
+        ),
+        child: Icon(icon, size: small ? 18 : 24, color: theme.colorScheme.onSurface),
+      ),
     );
   }
 }

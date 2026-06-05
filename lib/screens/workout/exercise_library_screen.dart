@@ -179,6 +179,8 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                                             Row(
                                               children: [
                                                 Text(ex['category_name'] as String? ?? '', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                                                const SizedBox(width: 6),
+                                                _buildEnergyChip(ex['category_energy'] as String? ?? 'anaerobic', theme),
                                                 if (equipment != null && equipment.isNotEmpty) ...[
                                                   const SizedBox(width: 8),
                                                   Container(
@@ -227,6 +229,35 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
         },
         icon: const Icon(Icons.add),
         label: const Text('Novo Exercício'),
+      ),
+    );
+  }
+
+  Widget _buildEnergyChip(String energy, ThemeData theme) {
+    final isAerobic = energy == 'aerobic';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: (isAerobic ? Colors.red : Colors.blue).withAlpha(30),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isAerobic ? Icons.favorite : Icons.fitness_center,
+            size: 10,
+            color: isAerobic ? Colors.red[400] : Colors.blue[400],
+          ),
+          const SizedBox(width: 2),
+          Text(
+            isAerobic ? 'Aeróbico' : 'Anaeróbico',
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 9,
+              color: isAerobic ? Colors.red[400] : Colors.blue[400],
+            ),
+          ),
+        ],
       ),
     );
   }

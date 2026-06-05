@@ -5,7 +5,7 @@ import 'seed_data.dart';
 
 class DatabaseHelper {
   static const _dbName = 'life_notes_workout.db';
-  static const _dbVersion = 2;
+  static const _dbVersion = 3;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -41,7 +41,8 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         color INTEGER NOT NULL,
-        order_index INTEGER NOT NULL DEFAULT 0
+        order_index INTEGER NOT NULL DEFAULT 0,
+        energy_system TEXT NOT NULL DEFAULT 'anaerobic'
       )
     ''');
 
@@ -202,6 +203,11 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE routine_exercises ADD COLUMN rest_time_seconds INTEGER');
       } catch (_) {}
     }
+    if (oldVersion < 3) {
+      try {
+        await db.execute('ALTER TABLE exercise_categories ADD COLUMN energy_system TEXT NOT NULL DEFAULT \'anaerobic\'');
+      } catch (_) {}
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -214,6 +220,7 @@ class DatabaseHelper {
         'name': cat['name'],
         'color': cat['color'],
         'order_index': cat['order_index'],
+        'energy_system': cat['energy_system'],
       });
     }
 
@@ -311,7 +318,7 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getExercises({String? categoryId, String? search, bool? favorites}) async {
     final db = await database;
-    var query = 'SELECT e.*, ec.name as category_name, ec.color as category_color '
+    var query = 'SELECT e.*, ec.name as category_name, ec.color as category_color, ec.energy_system as category_energy '
         'FROM exercises e '
         'JOIN exercise_categories ec ON e.category_id = ec.id '
         'WHERE 1=1';
@@ -336,7 +343,7 @@ class DatabaseHelper {
   Future<Map<String, dynamic>?> getExercise(String id) async {
     final db = await database;
     final result = await db.rawQuery(
-      'SELECT e.*, ec.name as category_name, ec.color as category_color '
+      'SELECT e.*, ec.name as category_name, ec.color as category_color, ec.energy_system as category_energy '
       'FROM exercises e '
       'JOIN exercise_categories ec ON e.category_id = ec.id '
       'WHERE e.id = ?',
@@ -580,7 +587,7 @@ class DatabaseHelper {
     final db = await database;
     return db.rawQuery(
       'SELECT ee.*, e.name as exercise_name, e.category_id, '
-      'ec.name as category_name, ec.color as category_color, e.type as exercise_type '
+      'ec.name as category_name, ec.color as category_color, ec.energy_system as category_energy, e.type as exercise_type '
       'FROM exercise_entries ee '
       'JOIN exercises e ON ee.exercise_id = e.id '
       'LEFT JOIN exercise_categories ec ON e.category_id = ec.id '
