@@ -635,6 +635,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                     }
                   });
                 }),
+                const SizedBox(height: 16),
 
                 // RPE
                 Row(
