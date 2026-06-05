@@ -803,6 +803,12 @@ class DatabaseHelper {
     }
   }
 
+  Future<void> deleteExerciseEntry(String entryId) async {
+    final db = await database;
+    await db.delete('sets', where: 'exercise_entry_id = ?', whereArgs: [entryId]);
+    await db.delete('exercise_entries', where: 'id = ?', whereArgs: [entryId]);
+  }
+
   Future<void> updateExerciseEntryRestTime(String exerciseEntryId, int restTimeSeconds) async {
     final db = await database;
     await db.update('exercise_entries',

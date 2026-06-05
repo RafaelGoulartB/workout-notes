@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../database/database_helper.dart';
 
@@ -186,6 +187,7 @@ class NotificationService {
           onlyAlertOnce: false, // alert on this specific show
           showWhen: false,
           usesChronometer: false,
+          vibrationPattern: Int64List.fromList([0, 3000]), // vibrate for 3 seconds
         ),
       ),
     );

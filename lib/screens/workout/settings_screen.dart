@@ -18,6 +18,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   Map<String, String> _settings = {};
   bool _isLoading = true;
   int _selectedAccentIndex = AccentColors.indexOf(AccentColors.defaultColor);
+  ThemeMode _selectedThemeMode = ThemeMode.system;
 
   @override
   void initState() {
@@ -25,6 +26,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     _selectedAccentIndex = AccentColors.indexOf(
       LifeNotesApp.themeNotifier.seedColor,
     );
+    _selectedThemeMode = LifeNotesApp.themeNotifier.themeMode;
     _load();
   }
 
@@ -45,6 +47,87 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     await prefs.setInt('accent_color', color.value);
     setState(() => _selectedAccentIndex = index);
     LifeNotesApp.themeNotifier.setSeedColor(color);
+  }
+
+  Future<void> _changeThemeMode(ThemeMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    String value;
+    switch (mode) {
+      case ThemeMode.light:
+        value = 'light';
+        break;
+      case ThemeMode.dark:
+        value = 'dark';
+        break;
+      default:
+        value = 'system';
+    }
+    await prefs.setString('theme_mode', value);
+    await _update('theme_mode', value);
+    setState(() => _selectedThemeMode = mode);
+    LifeNotesApp.themeNotifier.setThemeMode(mode);
+  }
+
+  Widget _buildThemeModeOption({
+    required ThemeData theme,
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required ThemeMode mode,
+  }) {
+    final isSelected = _selectedThemeMode == mode;
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => _changeThemeMode(mode),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? theme.colorScheme.primaryContainer
+                    : theme.colorScheme.surfaceContainerHighest.withAlpha(120),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: isSelected
+                    ? theme.colorScheme.onPrimaryContainer
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_circle, size: 20, color: theme.colorScheme.primary)
+            else
+              Icon(Icons.circle_outlined, size: 20, color: theme.colorScheme.outlineVariant),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _exportBackup() async {
@@ -190,6 +273,55 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Theme Mode
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.dark_mode, size: 18, color: theme.colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text('Modo do Tema', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildThemeModeOption(
+                          theme: theme,
+                          icon: Icons.brightness_auto,
+                          label: 'Sistema',
+                          subtitle: 'Usar modo do dispositivo',
+                          mode: ThemeMode.system,
+                        ),
+                        const Divider(height: 1, indent: 8, endIndent: 8),
+                        _buildThemeModeOption(
+                          theme: theme,
+                          icon: Icons.light_mode,
+                          label: 'Claro',
+                          subtitle: 'Forçar modo claro',
+                          mode: ThemeMode.light,
+                        ),
+                        const Divider(height: 1, indent: 8, endIndent: 8),
+                        _buildThemeModeOption(
+                          theme: theme,
+                          icon: Icons.dark_mode,
+                          label: 'Escuro',
+                          subtitle: 'Forçar modo escuro',
+                          mode: ThemeMode.dark,
                         ),
                       ],
                     ),

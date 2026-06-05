@@ -51,16 +51,23 @@ class AccentColors {
   }
 }
 
-/// Simple notifier for accent color changes.
+/// Simple notifier for accent color and theme mode changes.
 class ThemeNotifier extends ChangeNotifier {
   Color _seedColor;
+  ThemeMode _themeMode;
 
-  ThemeNotifier(this._seedColor);
+  ThemeNotifier(this._seedColor, this._themeMode);
 
   Color get seedColor => _seedColor;
+  ThemeMode get themeMode => _themeMode;
 
   void setSeedColor(Color color) {
     _seedColor = color;
+    notifyListeners();
+  }
+
+  void setThemeMode(ThemeMode mode) {
+    _themeMode = mode;
     notifyListeners();
   }
 }
@@ -75,20 +82,38 @@ void main() async {
   await notif.loadSettings();
   await notif.requestPermission();
 
-  // Load saved accent color
+  // Load saved settings
   final prefs = await SharedPreferences.getInstance();
   final savedColor = prefs.getInt('accent_color') ?? AccentColors.defaultColor.value;
   final initialColor = Color(savedColor);
 
-  runApp(LifeNotesApp(initialColor: initialColor));
+  final themeModeStr = prefs.getString('theme_mode') ?? 'system';
+  final initialThemeMode = _parseThemeMode(themeModeStr);
+
+  // Initialize the theme notifier with the loaded values
+  LifeNotesApp.themeNotifier = ThemeNotifier(initialColor, initialThemeMode);
+
+  runApp(LifeNotesApp(initialColor: initialColor, initialThemeMode: initialThemeMode));
+}
+
+ThemeMode _parseThemeMode(String value) {
+  switch (value) {
+    case 'light':
+      return ThemeMode.light;
+    case 'dark':
+      return ThemeMode.dark;
+    default:
+      return ThemeMode.system;
+  }
 }
 
 class LifeNotesApp extends StatefulWidget {
   final Color initialColor;
+  final ThemeMode initialThemeMode;
   
-  const LifeNotesApp({super.key, required this.initialColor});
+  const LifeNotesApp({super.key, required this.initialColor, required this.initialThemeMode});
 
-  static final ThemeNotifier themeNotifier = ThemeNotifier(AccentColors.defaultColor);
+  static late ThemeNotifier themeNotifier;
 
   @override
   State<LifeNotesApp> createState() => _LifeNotesAppState();
@@ -96,14 +121,17 @@ class LifeNotesApp extends StatefulWidget {
 
 class _LifeNotesAppState extends State<LifeNotesApp> {
   late Color _seedColor;
+  late ThemeMode _themeMode;
 
   @override
   void initState() {
     super.initState();
     _seedColor = widget.initialColor;
+    _themeMode = widget.initialThemeMode;
     LifeNotesApp.themeNotifier.addListener(_onThemeChanged);
     // Sync the notifier's initial value
     LifeNotesApp.themeNotifier.setSeedColor(_seedColor);
+    LifeNotesApp.themeNotifier.setThemeMode(_themeMode);
   }
 
   @override
@@ -115,6 +143,7 @@ class _LifeNotesAppState extends State<LifeNotesApp> {
   void _onThemeChanged() {
     setState(() {
       _seedColor = LifeNotesApp.themeNotifier.seedColor;
+      _themeMode = LifeNotesApp.themeNotifier.themeMode;
     });
   }
 
@@ -168,7 +197,7 @@ class _LifeNotesAppState extends State<LifeNotesApp> {
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(_seedColor, Brightness.light),
       darkTheme: _buildTheme(_seedColor, Brightness.dark),
-      themeMode: ThemeMode.system,
+      themeMode: _themeMode,
       home: const MainShell(),
     );
   }

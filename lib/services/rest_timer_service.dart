@@ -51,7 +51,7 @@ class RestTimerService extends ChangeNotifier {
         _isRunning = false;
         _isPaused = false;
         notifyListeners();
-        HapticFeedback.heavyImpact();
+        _longVibrate();
         _showCompleteNotification();
         return;
       }
@@ -78,7 +78,7 @@ class RestTimerService extends ChangeNotifier {
         _isRunning = false;
         _isPaused = false;
         notifyListeners();
-        HapticFeedback.heavyImpact();
+        _longVibrate();
         _showCompleteNotification();
         return;
       }
@@ -116,5 +116,20 @@ class RestTimerService extends ChangeNotifier {
 
   void _showCompleteNotification() {
     NotificationService.instance.showRestTimerComplete();
+  }
+
+  /// Vibrate for ~3 seconds using repeated haptic feedback.
+  void _longVibrate() {
+    // Immediate strong buzz
+    HapticFeedback.heavyImpact();
+
+    // Schedule additional vibrations to create ~3 seconds of feedback
+    for (int i = 1; i <= 5; i++) {
+      Future.delayed(Duration(milliseconds: 500 * i), () {
+        try {
+          HapticFeedback.heavyImpact();
+        } catch (_) {}
+      });
+    }
   }
 }

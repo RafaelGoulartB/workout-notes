@@ -733,6 +733,34 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }
   }
 
+  Future<void> _removeExercise(_ExerciseWithSets exercise) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remover Exercício?'),
+        content: Text('Remover "${exercise.name}" do treino? Todas as séries registradas serão perdidas.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remover', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && _workoutId != null) {
+      await _db.deleteExerciseEntry(exercise.entryId);
+      await _loadExercises();
+      if (mounted) setState(() {});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${exercise.name} removido do treino'), behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
+  }
+
   Future<void> _deleteSet(String setId) async {
     await _db.deleteSet(setId);
     await _loadExercises();
@@ -1050,6 +1078,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               onToggleSet: _toggleSet,
               onEditSet: (setId, data, setIdx) => _editSetDialog(setId, data, _exercises[index].name, setIdx, _exercises[index].exerciseType),
               onDeleteSet: _deleteSet,
+              onRemoveExercise: () => _removeExercise(_exercises[index]),
               onChangeRestTime: (currentRest) => _changeExerciseRestTime(_exercises[index], currentRest),
               theme: theme,
             ),
@@ -1535,11 +1564,13 @@ class _ExerciseCard extends StatelessWidget {
   final Function(String) onDeleteSet;
   final ThemeData theme;
   final ValueChanged<int> onChangeRestTime;
+  final VoidCallback? onRemoveExercise;
 
   const _ExerciseCard({
     required this.exercise, required this.onAddSet, required this.onToggleSet,
     required this.onEditSet, required this.onDeleteSet, required this.theme,
     required this.onChangeRestTime,
+    this.onRemoveExercise,
   });
 
   @override
@@ -1593,6 +1624,19 @@ class _ExerciseCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(exercise.categoryName, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                if (onRemoveExercise != null) ...[                  const SizedBox(width: 2),
+                  GestureDetector(
+                    onTap: () => onRemoveExercise!(),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.error.withAlpha(20),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.close, size: 16, color: theme.colorScheme.error),
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 8),
