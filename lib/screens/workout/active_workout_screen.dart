@@ -741,48 +741,152 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
   Future<void> _finishWorkout() async {
     if (_workoutId == null) return;
+    if (_exercises.isEmpty) return;
 
-    final feeling = await showDialog<int>(
-      context: context,
-      builder: (ctx) => _FeelingDialog(),
-    );
-    if (feeling == null) return;
-
-    final commentCtl = TextEditingController();
-    final comment = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Observação do Treino'),
-        content: TextField(
-          controller: commentCtl,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'Como foi o treino?',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Pular')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, commentCtl.text), child: const Text('Finalizar')),
-        ],
-      ),
-    );
-
-    // If timer is still running, stop it first
+    // Stop timer if still running
     if (_timerStart != null && _timerEnd == null) {
       await _stopTimer();
     }
 
-    await _db.finishWorkout(_workoutId!, comment: comment ?? '', feelingRating: feeling);
+    // Compute workout summary with PR detection
+    final summary = await _computeSummary();
+
+    if (!mounted) return;
+
+    // Unified finish sheet
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) => _FinishWorkoutSheet(summary: summary),
+    );
+
+    if (result == null || !mounted) return;
+
+    final feeling = result['feeling'] as int;
+    final comment = result['comment'] as String? ?? '';
+
+    await _db.finishWorkout(_workoutId!, comment: comment, feelingRating: feeling);
+
     if (mounted) {
+      final msg = summary.prs.isNotEmpty
+          ? '🎉 Treino finalizado! ${summary.prs.length} recorde(s) pessoal(is)!'
+          : '💪 Treino finalizado!';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('💪 Treino finalizado!'),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
       );
       Navigator.pop(context, true);
     }
+  }
+
+  /// Compute workout summary: duration, volume, sets, and personal records.
+  Future<_WorkoutSummary> _computeSummary() async {
+    int durationSeconds = 0;
+    double totalVolume = 0;
+    int totalSets = 0;
+    int completedSets = 0;
+    final List<_PR> prs = [];
+
+    if (_timerStart != null) {
+      final end = _timerEnd ?? DateTime.now();
+      durationSeconds = end.difference(_timerStart!).inSeconds;
+    }
+
+    // Collect bests from THIS workout per exercise
+    final Map<String, _ExerciseBests> thisWorkoutBests = {};
+
+    for (final ex in _exercises) {
+      double maxWeight = 0;
+      int bestReps = 0;
+      double exerciseVolume = 0;
+      int exCompletedSets = 0;
+
+      for (final s in ex.sets) {
+        totalSets++;
+        final isComplete = (s['is_complete'] as int?) == 1;
+        final isWarmup = (s['is_warmup'] as int?) == 1;
+
+        if (isComplete) completedSets++;
+        if (!isWarmup && isComplete) {
+          final weight = (s['weight'] as num?)?.toDouble() ?? 0;
+          final reps = (s['reps'] as int?) ?? 0;
+          final setVolume = weight * reps;
+          exerciseVolume += setVolume;
+          totalVolume += setVolume;
+          if (weight > maxWeight) {
+            maxWeight = weight;
+            bestReps = reps;
+          }
+          exCompletedSets++;
+        }
+      }
+
+      if (maxWeight > 0) {
+        thisWorkoutBests[ex.exerciseId] = _ExerciseBests(
+          name: ex.name,
+          maxWeight: maxWeight,
+          bestReps: bestReps,
+          volume: exerciseVolume,
+          completedSets: exCompletedSets,
+        );
+      }
+    }
+
+    // Detect PRs by comparing against historical data (excluding this workout)
+    if (_workoutId != null && thisWorkoutBests.isNotEmpty) {
+      final db = await _db.database;
+      for (final entry in thisWorkoutBests.entries) {
+        final exId = entry.key;
+        final current = entry.value;
+
+        final rows = await db.rawQuery('''
+          SELECT
+            COALESCE(MAX(s.weight), 0) as best_weight,
+            COALESCE(SUM(s.weight * s.reps), 0) as best_volume
+          FROM sets s
+          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+          WHERE ee.exercise_id = ? AND ee.workout_id != ?
+            AND s.is_warmup = 0 AND s.is_complete = 1
+        ''', [exId, _workoutId]);
+
+        if (rows.isNotEmpty) {
+          final bestWeight =
+              (rows.first['best_weight'] as num?)?.toDouble() ?? 0;
+          final bestVolume =
+              (rows.first['best_volume'] as num?)?.toDouble() ?? 0;
+
+          if (bestWeight > 0 && current.maxWeight >= bestWeight) {
+            prs.add(_PR(
+              exerciseName: current.name,
+              type: 'weight',
+              value:
+                  '${current.maxWeight.toStringAsFixed(1)}kg × ${current.bestReps}',
+              previous:
+                  '${bestWeight.toStringAsFixed(1)}kg',
+            ));
+          }
+          if (bestVolume > 0 && current.volume > bestVolume) {
+            prs.add(_PR(
+              exerciseName: current.name,
+              type: 'volume',
+              value: '${current.volume.toStringAsFixed(0)} kg',
+              previous: '${bestVolume.toStringAsFixed(0)} kg',
+            ));
+          }
+        }
+      }
+    }
+
+    return _WorkoutSummary(
+      durationSeconds: durationSeconds,
+      totalVolume: totalVolume,
+      totalSets: totalSets,
+      completedSets: completedSets,
+      prs: prs,
+    );
   }
 
   Future<void> _openRestTimer() async {
@@ -1588,50 +1692,497 @@ class _ExerciseCard extends StatelessWidget {
   }
 }
 
-class _FeelingDialog extends StatefulWidget {
-  @override
-  State<_FeelingDialog> createState() => _FeelingDialogState();
+// ── Data classes for workout summary ──
+
+class _WorkoutSummary {
+  final int durationSeconds;
+  final double totalVolume;
+  final int totalSets;
+  final int completedSets;
+  final List<_PR> prs;
+
+  const _WorkoutSummary({
+    required this.durationSeconds,
+    required this.totalVolume,
+    required this.totalSets,
+    required this.completedSets,
+    required this.prs,
+  });
+
+  String get formattedDuration {
+    if (durationSeconds <= 0) return '--';
+    final h = durationSeconds ~/ 3600;
+    final m = (durationSeconds % 3600) ~/ 60;
+    final s = durationSeconds % 60;
+    if (h > 0) {
+      return '${h}h${m.toString().padLeft(2, '0')}min';
+    }
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  String get formattedVolume {
+    if (totalVolume >= 1000000) {
+      return '${(totalVolume / 1000000).toStringAsFixed(1)}M';
+    }
+    if (totalVolume >= 1000) {
+      return '${(totalVolume / 1000).toStringAsFixed(1)}k';
+    }
+    return totalVolume.toStringAsFixed(0);
+  }
 }
 
-class _FeelingDialogState extends State<_FeelingDialog> {
+class _PR {
+  final String exerciseName;
+  final String type; // 'weight' or 'volume'
+  final String value;
+  final String previous;
+
+  const _PR({
+    required this.exerciseName,
+    required this.type,
+    required this.value,
+    required this.previous,
+  });
+
+  String get label {
+    return type == 'weight' ? '🏋️ Peso Máximo' : '📦 Volume';
+  }
+
+  IconData get icon => type == 'weight' ? Icons.emoji_events : Icons.inventory_2;
+}
+
+class _ExerciseBests {
+  final String name;
+  final double maxWeight;
+  final int bestReps;
+  final double volume;
+  final int completedSets;
+
+  const _ExerciseBests({
+    required this.name,
+    required this.maxWeight,
+    required this.bestReps,
+    required this.volume,
+    required this.completedSets,
+  });
+}
+
+// ── Unified Finish Workout Sheet ──
+
+class _FinishWorkoutSheet extends StatefulWidget {
+  final _WorkoutSummary summary;
+
+  const _FinishWorkoutSheet({required this.summary});
+
+  @override
+  State<_FinishWorkoutSheet> createState() => _FinishWorkoutSheetState();
+}
+
+class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
   int _rating = 3;
+  final _commentCtl = TextEditingController();
+
+  @override
+  void dispose() {
+    _commentCtl.dispose();
+    super.dispose();
+  }
+
+  String get _feelingLabel {
+    switch (_rating) {
+      case 1: return 'Ruim';
+      case 2: return 'Ok';
+      case 3: return 'Bom';
+      case 4: return 'Ótimo';
+      case 5: return 'Excelente!';
+      default: return '';
+    }
+  }
+
+  IconData get _feelingIcon {
+    switch (_rating) {
+      case 1: return Icons.sentiment_very_dissatisfied;
+      case 2: return Icons.sentiment_dissatisfied;
+      case 3: return Icons.sentiment_neutral;
+      case 4: return Icons.sentiment_satisfied;
+      case 5: return Icons.sentiment_very_satisfied;
+      default: return Icons.sentiment_neutral;
+    }
+  }
+
+  Color _feelingColor(ThemeData theme) {
+    if (_rating <= 2) return Colors.red;
+    if (_rating == 3) return Colors.orange;
+    return Colors.green;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return AlertDialog(
-      title: const Text('Como foi o treino?'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(5, (i) {
-              final star = i + 1;
-              return IconButton(
-                icon: Icon(
-                  star <= _rating ? Icons.star : Icons.star_border,
-                  color: Colors.amber,
-                  size: 40,
-                ),
-                onPressed: () => setState(() => _rating = star),
-              );
-            }),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _rating <= 1 ? 'Ruim' :
-            _rating == 2 ? 'Ok' :
-            _rating == 3 ? 'Bom' :
-            _rating == 4 ? 'Ótimo' : 'Excelente!',
-            style: theme.textTheme.titleMedium,
-          ),
-        ],
+    final s = widget.summary;
+    final completedPct =
+        s.totalSets > 0 ? s.completedSets / s.totalSets : 0.0;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        FilledButton(onPressed: () => Navigator.pop(context, _rating), child: const Text('Confirmar')),
-      ],
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Handle ──
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 4),
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // ── Header ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.celebration,
+                      size: 36,
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Treino Concluído!',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ótimo trabalho! Aqui está o resumo:',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // ── Stats Grid ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  _StatTile(
+                    icon: Icons.timer,
+                    label: 'Duração',
+                    value: s.formattedDuration,
+                    color: theme.colorScheme.primary,
+                    theme: theme,
+                  ),
+                  const SizedBox(width: 8),
+                  _StatTile(
+                    icon: Icons.auto_graph,
+                    label: 'Volume',
+                    value: '${s.formattedVolume} kg',
+                    color: theme.colorScheme.secondary,
+                    theme: theme,
+                  ),
+                  const SizedBox(width: 8),
+                  _StatTile(
+                    icon: Icons.fitness_center,
+                    label: 'Sets',
+                    value: '${s.completedSets}/${s.totalSets}',
+                    color: Colors.orange,
+                    theme: theme,
+                  ),
+                ],
+              ),
+            ),
+
+            // Progress bar
+            if (s.totalSets > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: completedPct,
+                    minHeight: 8,
+                    backgroundColor:
+                        theme.colorScheme.surfaceContainerHighest,
+                    color: completedPct >= 1.0
+                        ? Colors.green
+                        : theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+
+            // ── PRs Section ──
+            if (s.prs.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.emoji_events, size: 20, color: Colors.amber.shade700),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Novos Recordes Pessoais',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ...s.prs.map((pr) => Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withAlpha(20),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.amber.withAlpha(60),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.emoji_events,
+                              size: 18, color: Colors.amber.shade700),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  pr.exerciseName,
+                                  style: theme.textTheme.bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  '${pr.value}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '🎉',
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        ],
+                      ),
+                    )),
+                  ],
+                ),
+              ),
+            ],
+
+            // ── Feeling Rating ──
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.favorite, size: 18, color: Colors.red.shade300),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Como foi o treino?',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (i) {
+                      final star = i + 1;
+                      final isFilled = star <= _rating;
+                      return GestureDetector(
+                        onTap: () => setState(() => _rating = star),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.all(6),
+                          child: Icon(
+                            isFilled ? Icons.star : Icons.star_outline,
+                            color: isFilled ? Colors.amber : theme.colorScheme.outlineVariant,
+                            size: 36,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(_feelingIcon,
+                          size: 16, color: _feelingColor(theme)),
+                      const SizedBox(width: 6),
+                      Text(
+                        _feelingLabel,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: _feelingColor(theme),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Comment ──
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: TextField(
+                controller: _commentCtl,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  hintText: 'Observação do treino (opcional)...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor:
+                      theme.colorScheme.surfaceContainerHighest.withAlpha(80),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: Icon(
+                      Icons.edit_note,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // ── Buttons ──
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text('Cancelar'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(context, {
+                        'feeling': _rating,
+                        'comment': _commentCtl.text,
+                      }),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Finalizar',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Bottom padding for safe area
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Stat Tile widget for the summary grid ──
+
+class _StatTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final ThemeData theme;
+
+  const _StatTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.theme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color.withAlpha(15),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withAlpha(40)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
