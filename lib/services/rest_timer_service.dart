@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'notification_service.dart';
 
 class RestTimerService extends ChangeNotifier {
   static final RestTimerService _instance = RestTimerService._();
@@ -42,6 +43,7 @@ class RestTimerService extends ChangeNotifier {
     _isRunning = true;
     _isPaused = false;
     notifyListeners();
+    _showInitialNotification();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingSeconds <= 0) {
@@ -50,10 +52,12 @@ class RestTimerService extends ChangeNotifier {
         _isPaused = false;
         notifyListeners();
         HapticFeedback.heavyImpact();
+        _showCompleteNotification();
         return;
       }
       _remainingSeconds--;
       notifyListeners();
+      _updateNotification();
     });
   }
 
@@ -61,11 +65,13 @@ class RestTimerService extends ChangeNotifier {
     _timer?.cancel();
     _isPaused = true;
     notifyListeners();
+    NotificationService.instance.cancelRestTimer();
   }
 
   void resume() {
     _isPaused = false;
     notifyListeners();
+    _updateNotification();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingSeconds <= 0) {
         timer.cancel();
@@ -73,10 +79,12 @@ class RestTimerService extends ChangeNotifier {
         _isPaused = false;
         notifyListeners();
         HapticFeedback.heavyImpact();
+        _showCompleteNotification();
         return;
       }
       _remainingSeconds--;
       notifyListeners();
+      _updateNotification();
     });
   }
 
@@ -87,11 +95,26 @@ class RestTimerService extends ChangeNotifier {
     _isRunning = false;
     _isPaused = false;
     notifyListeners();
+    NotificationService.instance.cancelRestTimer();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  // ── Notification helpers ──
+
+  void _showInitialNotification() {
+    NotificationService.instance.showRestTimer(_remainingSeconds);
+  }
+
+  void _updateNotification() {
+    NotificationService.instance.showRestTimer(_remainingSeconds);
+  }
+
+  void _showCompleteNotification() {
+    NotificationService.instance.showRestTimerComplete();
   }
 }

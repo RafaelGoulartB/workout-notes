@@ -5,7 +5,7 @@ import 'seed_data.dart';
 
 class DatabaseHelper {
   static const _dbName = 'life_notes_workout.db';
-  static const _dbVersion = 3;
+  static const _dbVersion = 4;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -208,6 +208,24 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE exercise_categories ADD COLUMN energy_system TEXT NOT NULL DEFAULT \'anaerobic\'');
       } catch (_) {}
     }
+    if (oldVersion < 4) {
+      // Add notification settings defaults for existing users
+      final defaults = <String, String>{
+        'notification_rest_timer_enabled': 'true',
+        'notification_rest_timer_sound': 'true',
+        'notification_rest_timer_vibration': 'true',
+        'notification_workout_timer_enabled': 'true',
+        'notification_workout_timer_sound': 'false',
+        'notification_workout_timer_vibration': 'false',
+      };
+      for (final entry in defaults.entries) {
+        try {
+          await db.insert('app_settings',
+              {'key': entry.key, 'value': entry.value},
+              conflictAlgorithm: ConflictAlgorithm.ignore);
+        } catch (_) {}
+      }
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -246,6 +264,15 @@ class DatabaseHelper {
     batch.insert('app_settings', {'key': 'keep_screen_on', 'value': 'false'});
     batch.insert('app_settings', {'key': 'default_rest_time', 'value': '90'});
     batch.insert('app_settings', {'key': 'auto_start_rest_timer', 'value': 'true'});
+    batch.insert('app_settings', {'key': 'auto_start_workout_timer', 'value': 'false'});
+
+    // Notification settings defaults
+    batch.insert('app_settings', {'key': 'notification_rest_timer_enabled', 'value': 'true'});
+    batch.insert('app_settings', {'key': 'notification_rest_timer_sound', 'value': 'true'});
+    batch.insert('app_settings', {'key': 'notification_rest_timer_vibration', 'value': 'true'});
+    batch.insert('app_settings', {'key': 'notification_workout_timer_enabled', 'value': 'true'});
+    batch.insert('app_settings', {'key': 'notification_workout_timer_sound', 'value': 'false'});
+    batch.insert('app_settings', {'key': 'notification_workout_timer_vibration', 'value': 'false'});
 
     await batch.commit(noResult: true);
   }

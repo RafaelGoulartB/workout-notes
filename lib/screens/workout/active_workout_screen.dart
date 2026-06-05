@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../database/database_helper.dart';
 import '../../services/rest_timer_service.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/exercise_picker_sheet.dart';
 import 'rest_timer_screen.dart';
 
@@ -73,6 +74,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ? '${hours}h${minutes.toString().padLeft(2, '0')}min'
               : '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
         });
+        // Update workout timer notification
+        NotificationService.instance.showWorkoutTimer(_elapsedStr);
       }
     });
   }
@@ -195,6 +198,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     await _db.startWorkoutTimer(_workoutId!);
     _startElapsedTimer();
     setState(() => _elapsedStr = '00:00');
+    NotificationService.instance.showWorkoutTimer('00:00');
   }
 
   Future<void> _stopTimer() async {
@@ -205,6 +209,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     await _db.stopWorkoutTimer(_workoutId!);
     _updateElapsedStr();
     setState(() {});
+    NotificationService.instance.cancelWorkoutTimer();
   }
 
   Future<void> _resetTimer() async {
@@ -226,6 +231,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       _elapsedStr = '00:00';
       await _db.resetWorkoutTimer(_workoutId!);
       setState(() {});
+      NotificationService.instance.cancelWorkoutTimer();
     }
   }
 

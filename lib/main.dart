@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'services/notification_service.dart';
 import 'screens/workout/workout_home_screen.dart';
 import 'screens/home_screen.dart';
 
@@ -67,12 +68,18 @@ class ThemeNotifier extends ChangeNotifier {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('pt_BR', null);
-  
+
+  // Initialize notification service
+  final notif = NotificationService.instance;
+  await notif.init();
+  await notif.loadSettings();
+  await notif.requestPermission();
+
   // Load saved accent color
   final prefs = await SharedPreferences.getInstance();
   final savedColor = prefs.getInt('accent_color') ?? AccentColors.defaultColor.value;
   final initialColor = Color(savedColor);
-  
+
   runApp(LifeNotesApp(initialColor: initialColor));
 }
 

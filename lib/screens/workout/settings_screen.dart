@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/database_helper.dart';
 import '../../database/test_seed_data.dart';
 import '../../services/export_service.dart';
+import '../../services/notification_service.dart';
 import '../../main.dart';
 
 class WorkoutSettingsScreen extends StatefulWidget {
@@ -274,6 +275,116 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         value: _settings['auto_start_workout_timer'] == 'true',
                         onChanged: (v) => _update('auto_start_workout_timer', v.toString()),
                       ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Notifications
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: Row(
+                          children: [
+                            Icon(Icons.notifications, size: 18, color: theme.colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text('Notificações', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+
+                      // ── Rest Timer Notification ──
+                      SwitchListTile(
+                        title: const Text('Timer de Descanso'),
+                        subtitle: const Text('Notificação do temporizador entre séries'),
+                        value: _settings['notification_rest_timer_enabled'] != 'false',
+                        onChanged: (v) {
+                          _update('notification_rest_timer_enabled', v.toString());
+                          NotificationService.instance.loadSettings();
+                        },
+                      ),
+                      if (_settings['notification_rest_timer_enabled'] != 'false') ...[
+                        const SizedBox(height: 4),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 16),
+                          child: Row(
+                            children: [
+                              Icon(Icons.notifications_active, size: 16, color: theme.colorScheme.onSurfaceVariant.withAlpha(120)),
+                              const SizedBox(width: 8),
+                              Text('Opções de alerta', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
+                        SwitchListTile(
+                          title: const Text('Som'),
+                          subtitle: const Text('Tocar som ao iniciar e finalizar o descanso'),
+                          value: _settings['notification_rest_timer_sound'] != 'false',
+                          onChanged: (v) {
+                            _update('notification_rest_timer_sound', v.toString());
+                            NotificationService.instance.loadSettings();
+                          },
+                        ),
+                        SwitchListTile(
+                          title: const Text('Vibração'),
+                          subtitle: const Text('Vibrar ao iniciar e finalizar o descanso'),
+                          value: _settings['notification_rest_timer_vibration'] != 'false',
+                          onChanged: (v) {
+                            _update('notification_rest_timer_vibration', v.toString());
+                            NotificationService.instance.loadSettings();
+                          },
+                        ),
+                      ],
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+
+                      // ── Workout Timer Notification ──
+                      SwitchListTile(
+                        title: const Text('Timer de Treino'),
+                        subtitle: const Text('Notificação do cronômetro do treino ativo'),
+                        value: _settings['notification_workout_timer_enabled'] != 'false',
+                        onChanged: (v) {
+                          _update('notification_workout_timer_enabled', v.toString());
+                          NotificationService.instance.loadSettings();
+                        },
+                      ),
+                      if (_settings['notification_workout_timer_enabled'] != 'false') ...[
+                        const SizedBox(height: 4),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 16),
+                          child: Row(
+                            children: [
+                              Icon(Icons.notifications_active, size: 16, color: theme.colorScheme.onSurfaceVariant.withAlpha(120)),
+                              const SizedBox(width: 8),
+                              Text('Opções de alerta', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
+                        SwitchListTile(
+                          title: const Text('Som'),
+                          subtitle: const Text('Tocar som ao iniciar o treino'),
+                          value: _settings['notification_workout_timer_sound'] == 'true',
+                          onChanged: (v) {
+                            _update('notification_workout_timer_sound', v.toString());
+                            NotificationService.instance.loadSettings();
+                          },
+                        ),
+                        SwitchListTile(
+                          title: const Text('Vibração'),
+                          subtitle: const Text('Vibrar ao iniciar o treino'),
+                          value: _settings['notification_workout_timer_vibration'] == 'true',
+                          onChanged: (v) {
+                            _update('notification_workout_timer_vibration', v.toString());
+                            NotificationService.instance.loadSettings();
+                          },
+                        ),
+                      ],
                     ],
                   ),
                 ),
