@@ -1154,6 +1154,84 @@ abstract class AppLocalizations {
   /// **'Body Weight'**
   String get progressBodyWeight;
 
+  /// No description provided for @progressNoChartData.
+  ///
+  /// In en, this message translates to:
+  /// **'No data available for this chart'**
+  String get progressNoChartData;
+
+  /// No description provided for @progressHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workout History'**
+  String get progressHistoryTitle;
+
+  /// No description provided for @progressHistoryDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get progressHistoryDate;
+
+  /// No description provided for @progressHistorySetsReps.
+  ///
+  /// In en, this message translates to:
+  /// **'Sets × Reps'**
+  String get progressHistorySetsReps;
+
+  /// No description provided for @progressLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading data'**
+  String get progressLoadError;
+
+  /// No description provided for @progressHeatmapNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No data for {year}'**
+  String progressHeatmapNoData(Object year);
+
+  /// No description provided for @progressChartTitleProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress'**
+  String get progressChartTitleProgress;
+
+  /// No description provided for @progressChartTitleVolumePerWorkout.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume per Workout'**
+  String get progressChartTitleVolumePerWorkout;
+
+  /// No description provided for @progressChartTitleRepsPerWorkout.
+  ///
+  /// In en, this message translates to:
+  /// **'Reps per Workout'**
+  String get progressChartTitleRepsPerWorkout;
+
+  /// No description provided for @progressRecoveryFeeling.
+  ///
+  /// In en, this message translates to:
+  /// **'Feeling Over Time'**
+  String get progressRecoveryFeeling;
+
+  /// No description provided for @progressRecoveryFeelingVsVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Feeling vs Average Volume'**
+  String get progressRecoveryFeelingVsVolume;
+
+  /// No description provided for @progressBodyWeightVsVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Body Weight vs Workout Volume'**
+  String get progressBodyWeightVsVolume;
+
+  /// No description provided for @progressVolumeByMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume by Month'**
+  String get progressVolumeByMonth;
+
   /// No description provided for @bodyTrackerTitle.
   ///
   /// In en, this message translates to:
@@ -1825,6 +1903,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'✅ Date changed!'**
   String get workoutDetailDateChanged;
+
+  /// No description provided for @workoutDetailKg.
+  ///
+  /// In en, this message translates to:
+  /// **'kg'**
+  String get workoutDetailKg;
+
+  /// No description provided for @workoutDetailViewExercise.
+  ///
+  /// In en, this message translates to:
+  /// **'View exercise'**
+  String get workoutDetailViewExercise;
+
+  /// No description provided for @workoutDetailSelectDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the new date'**
+  String get workoutDetailSelectDate;
+
+  /// No description provided for @workoutDetailDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'{min}min {sec}s'**
+  String workoutDetailDuration(Object min, Object sec);
+
+  /// No description provided for @activeWorkoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workout'**
+  String get activeWorkoutTitle;
+
+  /// No description provided for @activeWorkoutFinishWorkout.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get activeWorkoutFinishWorkout;
+
+  /// No description provided for @activeWorkoutAddExercise.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Exercise'**
+  String get activeWorkoutAddExercise;
+
+  /// No description provided for @activeWorkoutEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No exercises yet'**
+  String get activeWorkoutEmptyTitle;
+
+  /// No description provided for @activeWorkoutEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add exercises to start your workout'**
+  String get activeWorkoutEmptySubtitle;
+
+  /// No description provided for @activeWorkoutImportRoutine.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from Routine'**
+  String get activeWorkoutImportRoutine;
+
+  /// No description provided for @activeWorkoutEditSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Set'**
+  String get activeWorkoutEditSet;
+
+  /// No description provided for @activeWorkoutWarmup.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm-up'**
+  String get activeWorkoutWarmup;
+
+  /// No description provided for @activeWorkoutRemoveExercise.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Exercise?'**
+  String get activeWorkoutRemoveExercise;
+
+  /// No description provided for @activeWorkoutRemoveExerciseContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove \"{name}\" from the workout?'**
+  String activeWorkoutRemoveExerciseContent(Object name);
+
+  /// No description provided for @activeWorkoutRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} removed from workout'**
+  String activeWorkoutRemoved(Object name);
+
+  /// No description provided for @activeWorkoutResetTimer.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Timer?'**
+  String get activeWorkoutResetTimer;
+
+  /// No description provided for @activeWorkoutResetTimerContent.
+  ///
+  /// In en, this message translates to:
+  /// **'This will clear the start and end time of the workout.'**
+  String get activeWorkoutResetTimerContent;
+
+  /// No description provided for @activeWorkoutReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get activeWorkoutReset;
+
+  /// No description provided for @activeWorkoutWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight (kg)'**
+  String get activeWorkoutWeight;
+
+  /// No description provided for @activeWorkoutReps.
+  ///
+  /// In en, this message translates to:
+  /// **'Reps'**
+  String get activeWorkoutReps;
+
+  /// No description provided for @activeWorkoutDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance (km)'**
+  String get activeWorkoutDistance;
+
+  /// No description provided for @activeWorkoutTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get activeWorkoutTime;
+
+  /// No description provided for @activeWorkoutTimerDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get activeWorkoutTimerDuration;
+
+  /// No description provided for @activeWorkoutTimerStartLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Started at'**
+  String get activeWorkoutTimerStartLabel;
+
+  /// No description provided for @activeWorkoutTimerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Timer'**
+  String get activeWorkoutTimerTitle;
+
+  /// No description provided for @activeWorkoutNoRoutineFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No routine found. Create one first!'**
+  String get activeWorkoutNoRoutineFound;
+
+  /// No description provided for @activeWorkoutNoRoutineDays.
+  ///
+  /// In en, this message translates to:
+  /// **'This routine has no days.'**
+  String get activeWorkoutNoRoutineDays;
+
+  /// No description provided for @activeWorkoutRoutineImported.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ Exercises imported from routine!'**
+  String get activeWorkoutRoutineImported;
+
+  /// No description provided for @activeWorkoutSelectRoutine.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Routine'**
+  String get activeWorkoutSelectRoutine;
+
+  /// No description provided for @activeWorkoutBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get activeWorkoutBack;
+
+  /// No description provided for @activeWorkoutStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get activeWorkoutStart;
+
+  /// No description provided for @activeWorkoutStartTimerTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Start workout timer'**
+  String get activeWorkoutStartTimerTooltip;
+
+  /// No description provided for @activeWorkoutSetsSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{completed}/{total} sets'**
+  String activeWorkoutSetsSummary(Object completed, Object total);
+
+  /// No description provided for @activeWorkoutOK.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get activeWorkoutOK;
+
+  /// No description provided for @activeWorkoutRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get activeWorkoutRemove;
+
+  /// No description provided for @activeWorkoutCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get activeWorkoutCustom;
+
+  /// No description provided for @activeWorkoutCustomTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Time'**
+  String get activeWorkoutCustomTime;
+
+  /// No description provided for @activeWorkoutSelectDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the day to import'**
+  String get activeWorkoutSelectDay;
+
+  /// No description provided for @activeWorkoutAddSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Set'**
+  String get activeWorkoutAddSet;
+
+  /// No description provided for @workoutDetailSetNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'#'**
+  String get workoutDetailSetNumber;
+
+  /// No description provided for @workoutDetailRpe.
+  ///
+  /// In en, this message translates to:
+  /// **'RPE'**
+  String get workoutDetailRpe;
 
   /// No description provided for @notificationRestChannelName.
   ///

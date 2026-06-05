@@ -68,7 +68,12 @@ class _ProgressScreenState extends State<ProgressScreen> {
   int _selectedChartType = 0;
   bool _showingOverview = true;
 
-  static const _chartTypes = ['1RM', 'Max Weight', 'Volume', 'Total Reps'];
+  List<String> _chartTypes(AppLocalizations loc) => [
+    AppLocalizations.of(context)!.exerciseDetailChart1RM,
+    AppLocalizations.of(context)!.exerciseDetailChartMaxWeight,
+    AppLocalizations.of(context)!.exerciseDetailChartVolume,
+    AppLocalizations.of(context)!.exerciseDetailChartTotalReps,
+  ];
 
   @override
   void initState() {
@@ -249,14 +254,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   String _monthLabel(String isoMonth) {
     try {
-      return DateFormat('MMM', 'pt_BR').format(DateTime.parse(isoMonth));
+      return DateFormat('MMM', Intl.defaultLocale).format(DateTime.parse(isoMonth));
     } catch (_) {
       return isoMonth.length >= 7 ? isoMonth.substring(5) : isoMonth;
     }
   }
 
   String _weekLabel(DateTime date) {
-    final week = DateFormat('w', 'pt_BR').format(date);
+    final week = DateFormat('w', Intl.defaultLocale).format(date);
     return 'S$week';
   }
 
@@ -293,7 +298,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_showingOverview ? loc.progressTitle : (_selectedHistory?['exercise_name'] as String? ?? loc.progressTitle)),
+        title: Text(_showingOverview ? AppLocalizations.of(context)!.progressTitle : (_selectedHistory?['exercise_name'] as String? ?? AppLocalizations.of(context)!.progressTitle)),
         centerTitle: true,
         leading: _showingOverview
             ? null
@@ -417,7 +422,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final deltaV = (comp?['delta_volume'] as double?) ?? 0;
 
     final now = DateTime.now();
-    final monthName = DateFormat('MMMM', 'pt_BR').format(now);
+    final monthName = DateFormat('MMMM', Intl.defaultLocale).format(now);
 
     return Card(
       elevation: 0,
@@ -565,7 +570,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Heatmap
-        Text('Mapa de calor anual', style: theme.textTheme.bodySmall?.copyWith(
+        Text(AppLocalizations.of(context)!.progressYearHeatmap, style: theme.textTheme.bodySmall?.copyWith(
           fontWeight: FontWeight.w600, color: theme.colorScheme.onSurfaceVariant,
         )),
         const SizedBox(height: 4),
@@ -584,7 +589,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
         // Weekly frequency chart
         if (_workoutDates.isNotEmpty) ...[
-          Text('Frequência semanal (últimas 12 semanas)',
+          Text(AppLocalizations.of(context)!.progressWeeklyFrequency,
               style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           _buildWeeklyFrequencyChart(theme),
@@ -831,11 +836,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
           padding: const EdgeInsets.all(10),
           child: Column(
             children: [
-              Text('Horário', style: theme.textTheme.bodySmall?.copyWith(
+              Text(AppLocalizations.of(context)!.progressTimeOfDay, style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w600, fontSize: 10)),
               const SizedBox(height: 20),
               Icon(Icons.access_time, size: 24, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
-              Text('Sem dados', style: theme.textTheme.bodySmall?.copyWith(fontSize: 9)),
+              Text(AppLocalizations.of(context)!.progressNoData, style: theme.textTheme.bodySmall?.copyWith(fontSize: 9)),
             ],
           ),
         ),
@@ -843,7 +848,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
 
     final colors = [Colors.orange, Colors.amber, Colors.indigo, Colors.deepPurple];
-    final labels = ['Manhã', 'Tarde', 'Noite', 'Madrugada'];
+    final labels = [AppLocalizations.of(context)!.progressMorning, AppLocalizations.of(context)!.progressAfternoon, AppLocalizations.of(context)!.progressEvening, AppLocalizations.of(context)!.progressDawn];
     final values = [periods['manhã']!, periods['tarde']!, periods['noite']!, periods['madrugada']!];
 
     return Card(
@@ -1942,7 +1947,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ),
         ),
         const SizedBox(height: 4),
-        _buildChartTypeSelector(theme),
+        _buildChartTypeSelector(theme, AppLocalizations.of(context)!),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
@@ -2001,19 +2006,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  Widget _buildChartTypeSelector(ThemeData theme) {
+  Widget _buildChartTypeSelector(ThemeData theme, AppLocalizations loc) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: SizedBox(
         height: 36,
         child: ListView(
           scrollDirection: Axis.horizontal,
-          children: List.generate(_chartTypes.length, (i) {
+          children: List.generate(_chartTypes(AppLocalizations.of(context)!).length, (i) {
             final isSelected = _selectedChartType == i;
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: ChoiceChip(
-                label: Text(_chartTypes[i], style: TextStyle(fontSize: 12)),
+                label: Text(_chartTypes(AppLocalizations.of(context)!)[i], style: TextStyle(fontSize: 12)),
                 selected: isSelected,
                 onSelected: (_) => setState(() => _selectedChartType = i),
               ),
@@ -2032,17 +2037,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Row(
       children: [
         Expanded(child: _StatCard(
-          label: 'Peso Máx', value: bestWeight > 0 ? '${bestWeight.toStringAsFixed(1)}' : '--',
+          label: AppLocalizations.of(context)!.exerciseDetailChartMaxWeight, value: bestWeight > 0 ? '${bestWeight.toStringAsFixed(1)}' : '--',
           icon: Icons.monitor_weight, color: theme.colorScheme.primary,
         )),
         const SizedBox(width: 8),
         Expanded(child: _StatCard(
-          label: 'Volume', value: bestVolume > 0 ? '${_formatVolume(bestVolume)}' : '--',
+          label: AppLocalizations.of(context)!.commonVolume, value: bestVolume > 0 ? '${_formatVolume(bestVolume)}' : '--',
           icon: Icons.auto_graph, color: theme.colorScheme.secondary,
         )),
         const SizedBox(width: 8),
         Expanded(child: _StatCard(
-          label: '1RM', value: best1RM > 0 ? '${best1RM.toStringAsFixed(1)}' : '--',
+          label: AppLocalizations.of(context)!.exerciseDetailChart1RM, value: best1RM > 0 ? '${best1RM.toStringAsFixed(1)}' : '--',
           icon: Icons.emoji_events, color: Colors.amber,
         )),
       ],
@@ -2057,19 +2062,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     switch (_selectedChartType) {
       case 0:
-        title = 'Evolução do 1RM Estimado';
+        title = '${AppLocalizations.of(context)!.exerciseDetailChart1RM} ${AppLocalizations.of(context)!.progressChartTitleProgress}';
         values = history.map((h) => (h['estimated_1rm'] as double?) ?? 0).toList();
         break;
       case 1:
-        title = 'Evolução do Peso Máximo';
+        title = AppLocalizations.of(context)!.exerciseDetailChartMaxWeight;
         values = history.map((h) => (h['max_weight'] as double?) ?? 0).toList();
         break;
       case 2:
-        title = 'Volume por Treino';
+        title = AppLocalizations.of(context)!.progressChartTitleVolumePerWorkout;
         values = history.map((h) => (h['total_volume'] as double?) ?? 0).toList();
         break;
       case 3:
-        title = 'Repetições por Treino';
+        title = AppLocalizations.of(context)!.progressChartTitleRepsPerWorkout;
         values = history.map((h) => (h['total_reps'] as int?)?.toDouble() ?? 0).toList();
         break;
       default:
@@ -2094,7 +2099,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             children: [
               Icon(Icons.bar_chart_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
               const SizedBox(height: 12),
-              Text('Nenhum dado disponível para este tipo de gráfico',
+              Text(AppLocalizations.of(context)!.progressNoChartData,
                   style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             ],
           ),
@@ -2120,7 +2125,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
               children: [
                 Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                 const Spacer(),
-                Text('${history.length} treinos', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                Text('${history.length} ${AppLocalizations.of(context)!.progressWorkouts.toLowerCase()}', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               ],
             ),
             const SizedBox(height: 16),
@@ -2242,7 +2247,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Histórico de Treinos', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+        Text(AppLocalizations.of(context)!.progressHistoryTitle, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -2252,11 +2257,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ),
           child: Row(
             children: [
-              Expanded(flex: 2, child: Text('Data', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-              Expanded(flex: 2, child: Text('Peso', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-              Expanded(flex: 2, child: Text('Volume', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-              Expanded(flex: 2, child: Text('Sets×Reps', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-              Expanded(flex: 2, child: Text('1RM', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text(AppLocalizations.of(context)!.progressHistoryDate, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text(AppLocalizations.of(context)!.workoutDetailWeight, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text(AppLocalizations.of(context)!.commonVolume, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text(AppLocalizations.of(context)!.progressHistorySetsReps, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text(AppLocalizations.of(context)!.exerciseDetailChart1RM, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
             ],
           ),
         ),
@@ -2420,7 +2425,13 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
   Map<String, dynamic>? _history;
   bool _isLoading = true;
   int _chartType = 0;
-  static const _chartTypes = ['1RM', 'Max Weight', 'Volume', 'Total Reps'];
+
+  List<String> _chartTypes(AppLocalizations loc) => [
+    AppLocalizations.of(context)!.exerciseDetailChart1RM,
+    AppLocalizations.of(context)!.exerciseDetailChartMaxWeight,
+    AppLocalizations.of(context)!.exerciseDetailChartVolume,
+    AppLocalizations.of(context)!.exerciseDetailChartTotalReps,
+  ];
 
   @override
   void initState() {
@@ -2446,6 +2457,7 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
     final bottom = MediaQuery.of(context).viewInsets.bottom;
 
     return DraggableScrollableSheet(
@@ -2490,15 +2502,15 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
                   child: Center(child: CircularProgressIndicator()),
                 )
               else if (_history == null)
-                const Expanded(
-                  child: Center(child: Text('Erro ao carregar dados')),
+                Expanded(
+                  child: Center(child: Text(AppLocalizations.of(context)!.progressLoadError)),
                 )
               else
                 Expanded(
                   child: SingleChildScrollView(
                     controller: scrollController,
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    child: _buildDetailContent(theme),
+                    child: _buildDetailContent(theme, loc),
                   ),
                 ),
             ],
@@ -2508,7 +2520,7 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
     );
   }
 
-  Widget _buildDetailContent(ThemeData theme) {
+  Widget _buildDetailContent(ThemeData theme, AppLocalizations loc) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2517,12 +2529,12 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
           height: 36,
           child: ListView(
             scrollDirection: Axis.horizontal,
-            children: List.generate(_chartTypes.length, (i) {
+            children: List.generate(_chartTypes(loc).length, (i) {
               final isSelected = _chartType == i;
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
-                  label: Text(_chartTypes[i], style: TextStyle(fontSize: 12)),
+                  label: Text(_chartTypes(loc)[i], style: TextStyle(fontSize: 12)),
                   selected: isSelected,
                   onSelected: (_) => setState(() => _chartType = i),
                 ),
@@ -2554,17 +2566,17 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
     return Row(
       children: [
         Expanded(child: _StatCard(
-          label: 'Peso Máx', value: bestWeight > 0 ? '${bestWeight.toStringAsFixed(1)}' : '--',
+          label: AppLocalizations.of(context)!.exerciseDetailChartMaxWeight, value: bestWeight > 0 ? '${bestWeight.toStringAsFixed(1)}' : '--',
           icon: Icons.monitor_weight, color: theme.colorScheme.primary,
         )),
         const SizedBox(width: 8),
         Expanded(child: _StatCard(
-          label: 'Volume', value: bestVolume > 0 ? '${_formatVolume(bestVolume)}' : '--',
+          label: AppLocalizations.of(context)!.commonVolume, value: bestVolume > 0 ? '${_formatVolume(bestVolume)}' : '--',
           icon: Icons.auto_graph, color: theme.colorScheme.secondary,
         )),
         const SizedBox(width: 8),
         Expanded(child: _StatCard(
-          label: '1RM', value: best1RM > 0 ? '${best1RM.toStringAsFixed(1)}' : '--',
+          label: AppLocalizations.of(context)!.exerciseDetailChart1RM, value: best1RM > 0 ? '${best1RM.toStringAsFixed(1)}' : '--',
           icon: Icons.emoji_events, color: Colors.amber,
         )),
       ],
@@ -2594,19 +2606,19 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
 
     switch (_chartType) {
       case 0:
-        title = 'Evolução do 1RM Estimado';
+        title = '${AppLocalizations.of(context)!.exerciseDetailChart1RM} ${AppLocalizations.of(context)!.progressChartTitleProgress}';
         values = history.map((h) => (h['estimated_1rm'] as double?) ?? 0).toList();
         break;
       case 1:
-        title = 'Evolução do Peso Máximo';
+        title = AppLocalizations.of(context)!.exerciseDetailChartMaxWeight;
         values = history.map((h) => (h['max_weight'] as double?) ?? 0).toList();
         break;
       case 2:
-        title = 'Volume por Treino';
+        title = AppLocalizations.of(context)!.progressChartTitleVolumePerWorkout;
         values = history.map((h) => (h['total_volume'] as double?) ?? 0).toList();
         break;
       case 3:
-        title = 'Repetições por Treino';
+        title = AppLocalizations.of(context)!.progressChartTitleRepsPerWorkout;
         values = history.map((h) => (h['total_reps'] as int?)?.toDouble() ?? 0).toList();
         break;
       default:
@@ -2631,7 +2643,7 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
             children: [
               Icon(Icons.bar_chart_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
               const SizedBox(height: 12),
-              Text('Nenhum dado disponível para este tipo de gráfico',
+              Text(AppLocalizations.of(context)!.progressNoChartData,
                   style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             ],
           ),
@@ -2657,7 +2669,7 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
               children: [
                 Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                 const Spacer(),
-                Text('${history.length} treinos', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                Text('${history.length} ${AppLocalizations.of(context)!.progressWorkouts.toLowerCase()}', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               ],
             ),
             const SizedBox(height: 16),
@@ -2779,7 +2791,7 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Histórico de Treinos', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+        Text(AppLocalizations.of(context)!.progressHistoryTitle, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -2789,11 +2801,11 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
           ),
           child: Row(
             children: [
-              Expanded(flex: 2, child: Text('Data', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-              Expanded(flex: 2, child: Text('Peso', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-              Expanded(flex: 2, child: Text('Volume', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-              Expanded(flex: 2, child: Text('Sets×Reps', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-              Expanded(flex: 2, child: Text('1RM', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text(AppLocalizations.of(context)!.progressHistoryDate, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text(AppLocalizations.of(context)!.workoutDetailWeight, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text(AppLocalizations.of(context)!.commonVolume, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text(AppLocalizations.of(context)!.progressHistorySetsReps, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text(AppLocalizations.of(context)!.exerciseDetailChart1RM, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
             ],
           ),
         ),

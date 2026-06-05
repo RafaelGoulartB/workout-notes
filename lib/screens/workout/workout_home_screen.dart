@@ -137,7 +137,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final today = DateFormat('EEEE, d \'de\' MMMM', 'pt_BR').format(DateTime.now());
+    final today = DateFormat('EEEE, d MMMM', Intl.defaultLocale).format(DateTime.now());
 
     return Scaffold(
       appBar: AppBar(
@@ -517,13 +517,13 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   Widget _buildWorkoutCard(Map<String, dynamic> workout, ThemeData theme, {required bool isActive}) {
     final date = (workout['date'] as String?) ?? '';
     final formatted = date.isNotEmpty
-        ? DateFormat('d \'de\' MMMM yyyy', 'pt_BR').format(DateTime.parse(date))
+        ? DateFormat(Intl.defaultLocale?.startsWith('pt') == true ? "d 'de' MMMM yyyy" : 'MMMM d, yyyy', Intl.defaultLocale).format(DateTime.parse(date))
         : '';
     final duration = (workout['duration_seconds'] as int?) ?? 0;
     final durStr = isActive
         ? AppLocalizations.of(context)!.workoutHomeOngoing
         : duration > 0
-            ? '${duration ~/ 60}min ${duration % 60}s'
+            ? AppLocalizations.of(context)!.workoutDetailDuration(duration ~/ 60, duration % 60)
             : '--';
     final feeling = (workout['feeling_rating'] as int?) ?? 0;
 

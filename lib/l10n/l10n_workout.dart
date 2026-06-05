@@ -103,6 +103,19 @@ mixin WorkoutLocale {
   String progressAverage(Object avg);
   String get progressDensity;
   String get progressBodyWeight;
+  String get progressNoChartData;
+  String get progressHistoryTitle;
+  String get progressHistoryDate;
+  String get progressHistorySetsReps;
+  String get progressLoadError;
+  String progressHeatmapNoData(Object year);
+  String get progressChartTitleProgress;
+  String get progressChartTitleVolumePerWorkout;
+  String get progressChartTitleRepsPerWorkout;
+  String get progressRecoveryFeeling;
+  String get progressRecoveryFeelingVsVolume;
+  String get progressBodyWeightVsVolume;
+  String get progressVolumeByMonth;
 
   // Body Tracker
   String get bodyTrackerTitle;
@@ -207,6 +220,44 @@ mixin WorkoutLocale {
   String get workoutDetailNoSets;
   String get workoutDetailWeight;
   String get workoutDetailDateChanged;
+  String get workoutDetailKg;
+  String get workoutDetailViewExercise;
+  String get workoutDetailSelectDate;
+  String workoutDetailDuration(int min, int sec);
+  String get activeWorkoutTitle;
+  String get activeWorkoutFinishWorkout;
+  String get activeWorkoutAddExercise;
+  String get activeWorkoutEmptyTitle;
+  String get activeWorkoutEmptySubtitle;
+  String get activeWorkoutImportRoutine;
+  String get activeWorkoutEditSet;
+  String get activeWorkoutWarmup;
+  String get activeWorkoutRemoveExercise;
+  String activeWorkoutRemoveExerciseContent(Object name);
+  String activeWorkoutRemoved(Object name);
+  String get activeWorkoutResetTimer;
+  String get activeWorkoutResetTimerContent;
+  String get activeWorkoutReset;
+  String get activeWorkoutWeight;
+  String get activeWorkoutReps;
+  String get activeWorkoutDistance;
+  String get activeWorkoutTime;
+  String get activeWorkoutNoRoutineFound;
+  String get activeWorkoutNoRoutineDays;
+  String get activeWorkoutRoutineImported;
+  String get activeWorkoutSelectRoutine;
+  String get activeWorkoutBack;
+  String get activeWorkoutStart;
+  String get activeWorkoutStartTimerTooltip;
+  String activeWorkoutSetsSummary(int completed, int total);
+  String get activeWorkoutOK;
+  String get activeWorkoutRemove;
+  String get activeWorkoutCustom;
+  String get activeWorkoutCustomTime;
+  String get activeWorkoutSelectDay;
+  String get activeWorkoutAddSet;
+  String get workoutDetailSetNumber;
+  String get workoutDetailRpe;
 
   // Notifications
   String get notificationRestChannelName;
@@ -532,6 +583,47 @@ mixin WorkoutLocaleEn on WorkoutLocale {
   String get progressBodyWeight => 'Body Weight';
 
   @override
+  String get progressNoChartData => 'No data available for this chart';
+
+  @override
+  String get progressHistoryTitle => 'Workout History';
+
+  @override
+  String get progressHistoryDate => 'Date';
+
+  @override
+  String get progressHistorySetsReps => 'Sets × Reps';
+
+  @override
+  String get progressLoadError => 'Error loading data';
+
+  @override
+  String progressHeatmapNoData(Object year) {
+    return 'No data for $year';
+  }
+
+  @override
+  String get progressChartTitleProgress => 'Progress';
+
+  @override
+  String get progressChartTitleVolumePerWorkout => 'Volume per Workout';
+
+  @override
+  String get progressChartTitleRepsPerWorkout => 'Reps per Workout';
+
+  @override
+  String get progressRecoveryFeeling => 'Feeling Over Time';
+
+  @override
+  String get progressRecoveryFeelingVsVolume => 'Feeling vs Average Volume';
+
+  @override
+  String get progressBodyWeightVsVolume => 'Body Weight vs Workout Volume';
+
+  @override
+  String get progressVolumeByMonth => 'Volume by Month';
+
+  @override
   String get bodyTrackerTitle => 'Body Measurements';
 
   @override
@@ -814,6 +906,131 @@ mixin WorkoutLocaleEn on WorkoutLocale {
 
   @override
   String get workoutDetailDateChanged => '✅ Date changed!';
+
+  @override
+  String get workoutDetailKg => 'kg';
+
+  @override
+  String get workoutDetailViewExercise => 'View exercise';
+
+  @override
+  String get workoutDetailSelectDate => 'Select the new date';
+
+  @override
+  String workoutDetailDuration(int min, int sec) {
+    return '$min' + 'min ' + '$sec' + 's';
+  }
+
+  @override
+  String get activeWorkoutTitle => 'Workout';
+
+  @override
+  String get activeWorkoutFinishWorkout => 'Finish';
+
+  @override
+  String get activeWorkoutAddExercise => 'Add Exercise';
+
+  @override
+  String get activeWorkoutEmptyTitle => 'No exercises yet';
+
+  @override
+  String get activeWorkoutEmptySubtitle => 'Add exercises to start your workout';
+
+  @override
+  String get activeWorkoutImportRoutine => 'Import from Routine';
+
+  @override
+  String get activeWorkoutEditSet => 'Edit Set';
+
+  @override
+  String get activeWorkoutWarmup => 'Warm-up';
+
+  @override
+  String get activeWorkoutRemoveExercise => 'Remove Exercise?';
+
+  @override
+  String activeWorkoutRemoveExerciseContent(Object name) {
+    return 'Remove "$name" from the workout?';
+  }
+
+  @override
+  String activeWorkoutRemoved(Object name) {
+    return '$name removed from workout';
+  }
+
+  @override
+  String get activeWorkoutResetTimer => 'Reset Timer?';
+
+  @override
+  String get activeWorkoutResetTimerContent =>
+      'This will clear the start and end time of the workout.';
+
+  @override
+  String get activeWorkoutReset => 'Reset';
+
+  @override
+  String get activeWorkoutWeight => 'Weight (kg)';
+
+  @override
+  String get activeWorkoutReps => 'Reps';
+
+  @override
+  String get activeWorkoutDistance => 'Distance (km)';
+
+  @override
+  String get activeWorkoutTime => 'Time';
+
+  @override
+  String get activeWorkoutNoRoutineFound =>
+      'No routine found. Create one first!';
+
+  @override
+  String get activeWorkoutNoRoutineDays => 'This routine has no days.';
+
+  @override
+  String get activeWorkoutRoutineImported =>
+      '✅ Exercises imported from routine!';
+
+  @override
+  String get activeWorkoutSelectRoutine => 'Select Routine';
+
+  @override
+  String get activeWorkoutBack => 'Back';
+
+  @override
+  String get activeWorkoutStart => 'Start';
+
+  @override
+  String get activeWorkoutStartTimerTooltip => 'Start workout timer';
+
+  @override
+  String activeWorkoutSetsSummary(int completed, int total) {
+    return '$completed/$total sets';
+  }
+
+  @override
+  String get activeWorkoutOK => 'OK';
+
+  @override
+  String get activeWorkoutRemove => 'Remove';
+
+  @override
+  String get activeWorkoutCustom => 'Custom';
+
+  @override
+  String get activeWorkoutCustomTime => 'Custom Time';
+
+  @override
+  String get activeWorkoutSelectDay => 'Select the day to import';
+
+  @override
+  String get activeWorkoutAddSet => 'Add Set';
+
+  @override
+  String get workoutDetailSetNumber => '#';
+
+  @override
+  String get workoutDetailRpe => 'RPE';
 
   @override
   String get notificationRestChannelName => 'Rest Timer';
@@ -1185,6 +1402,47 @@ mixin WorkoutLocalePt on WorkoutLocale {
   String get progressBodyWeight => 'Peso Corporal';
 
   @override
+  String get progressNoChartData => 'Nenhum dado disponível para este gráfico';
+
+  @override
+  String get progressHistoryTitle => 'Histórico de Treinos';
+
+  @override
+  String get progressHistoryDate => 'Data';
+
+  @override
+  String get progressHistorySetsReps => 'Séries × Reps';
+
+  @override
+  String get progressLoadError => 'Erro ao carregar dados';
+
+  @override
+  String progressHeatmapNoData(Object year) {
+    return 'Nenhum dado para $year';
+  }
+
+  @override
+  String get progressChartTitleProgress => 'Progresso';
+
+  @override
+  String get progressChartTitleVolumePerWorkout => 'Volume por Treino';
+
+  @override
+  String get progressChartTitleRepsPerWorkout => 'Repetições por Treino';
+
+  @override
+  String get progressRecoveryFeeling => 'Sentimento ao Longo do Tempo';
+
+  @override
+  String get progressRecoveryFeelingVsVolume => 'Sentimento vs Volume Médio';
+
+  @override
+  String get progressBodyWeightVsVolume => 'Peso Corporal vs Volume de Treino';
+
+  @override
+  String get progressVolumeByMonth => 'Volume por Mês';
+
+  @override
   String get bodyTrackerTitle => 'Medidas Corporais';
 
   @override
@@ -1468,6 +1726,133 @@ mixin WorkoutLocalePt on WorkoutLocale {
 
   @override
   String get workoutDetailDateChanged => '✅ Data alterada!';
+
+  @override
+  String get workoutDetailKg => 'kg';
+
+  @override
+  String get workoutDetailViewExercise => 'Ver exercício';
+
+  @override
+  String get workoutDetailSelectDate => 'Selecione a nova data';
+
+  @override
+  String workoutDetailDuration(int min, int sec) {
+    return '$min' + 'min ' + '$sec' + 's';
+  }
+
+  @override
+  String get activeWorkoutTitle => 'Treino';
+
+  @override
+  String get activeWorkoutFinishWorkout => 'Finalizar';
+
+  @override
+  String get activeWorkoutAddExercise => 'Adicionar Exercício';
+
+  @override
+  String get activeWorkoutEmptyTitle => 'Nenhum exercício ainda';
+
+  @override
+  String get activeWorkoutEmptySubtitle =>
+      'Adicione exercícios para começar seu treino';
+
+  @override
+  String get activeWorkoutImportRoutine => 'Importar de Rotina';
+
+  @override
+  String get activeWorkoutEditSet => 'Editar Série';
+
+  @override
+  String get activeWorkoutWarmup => 'Aquecimento';
+
+  @override
+  String get activeWorkoutRemoveExercise => 'Remover Exercício?';
+
+  @override
+  String activeWorkoutRemoveExerciseContent(Object name) {
+    return 'Remover "$name" do treino?';
+  }
+
+  @override
+  String activeWorkoutRemoved(Object name) {
+    return '$name removido do treino';
+  }
+
+  @override
+  String get activeWorkoutResetTimer => 'Resetar Timer?';
+
+  @override
+  String get activeWorkoutResetTimerContent =>
+      'Isso vai limpar o tempo de início e fim do treino.';
+
+  @override
+  String get activeWorkoutReset => 'Resetar';
+
+  @override
+  String get activeWorkoutWeight => 'Peso (kg)';
+
+  @override
+  String get activeWorkoutReps => 'Repetições';
+
+  @override
+  String get activeWorkoutDistance => 'Distância (km)';
+
+  @override
+  String get activeWorkoutTime => 'Tempo';
+
+  @override
+  String get activeWorkoutNoRoutineFound =>
+      'Nenhuma rotina encontrada. Crie uma primeiro!';
+
+  @override
+  String get activeWorkoutNoRoutineDays => 'Esta rotina não tem dias.';
+
+  @override
+  String get activeWorkoutRoutineImported =>
+      '✅ Exercícios importados da rotina!';
+
+  @override
+  String get activeWorkoutSelectRoutine => 'Selecione a Rotina';
+
+  @override
+  String get activeWorkoutBack => 'Voltar';
+
+  @override
+  String get activeWorkoutStart => 'Iniciar';
+
+  @override
+  String get activeWorkoutStartTimerTooltip =>
+      'Iniciar cronômetro do treino';
+
+  @override
+  String activeWorkoutSetsSummary(int completed, int total) {
+    return '$completed/$total séries';
+  }
+
+  @override
+  String get activeWorkoutOK => 'OK';
+
+  @override
+  String get activeWorkoutRemove => 'Remover';
+
+  @override
+  String get activeWorkoutCustom => 'Personalizado';
+
+  @override
+  String get activeWorkoutCustomTime => 'Tempo Personalizado';
+
+  @override
+  String get activeWorkoutSelectDay => 'Selecione o dia para importar';
+
+  @override
+  String get activeWorkoutAddSet => 'Adicionar Série';
+
+  @override
+  String get workoutDetailSetNumber => '#';
+
+  @override
+  String get workoutDetailRpe => 'RPE';
 
   @override
   String get notificationRestChannelName => 'Timer de Descanso';

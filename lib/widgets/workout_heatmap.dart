@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 
 /// A GitHub-style contribution heatmap showing workout intensity.
 /// Renders 7 rows (days of week) × ~53 columns (weeks).
@@ -46,13 +47,23 @@ class WorkoutHeatmap extends StatelessWidget {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Text('Nenhum dado para $year',
+          child: Text(AppLocalizations.of(context)!.progressHeatmapNoData(year),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   )),
         ),
       );
     }
+
+    final dayLabels = [
+      AppLocalizations.of(context)!.calendarSun,
+      AppLocalizations.of(context)!.calendarMon,
+      AppLocalizations.of(context)!.calendarTue,
+      AppLocalizations.of(context)!.calendarWed,
+      AppLocalizations.of(context)!.calendarThu,
+      AppLocalizations.of(context)!.calendarFri,
+      AppLocalizations.of(context)!.calendarSat,
+    ];
 
     return SizedBox(
       height: 7 * (_cellSize + _cellGap) + 4,
@@ -65,13 +76,13 @@ class WorkoutHeatmap extends StatelessWidget {
             // Day labels column
             return Column(
               mainAxisAlignment: MainAxisAlignment.start,
-              children: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].asMap().entries.map((e) {
+              children: dayLabels.asMap().entries.map((e) {
                 return Container(
                   width: 14,
                   height: _cellSize + _cellGap,
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'][e.key],
+                    dayLabels[e.key].substring(0, 1),
                     style: TextStyle(fontSize: 8, color: theme.colorScheme.onSurfaceVariant.withAlpha(150)),
                   ),
                 );

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:uuid/uuid.dart';
 import '../../database/database_helper.dart';
 import '../../services/rest_timer_service.dart';
@@ -217,11 +218,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Resetar Timer?'),
-        content: const Text('Isso vai limpar o tempo de início e fim do treino.'),
+        title: Text(AppLocalizations.of(context)!.activeWorkoutResetTimer),
+        content: Text(AppLocalizations.of(context)!.activeWorkoutResetTimerContent),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Resetar', style: TextStyle(color: Colors.red))),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context)!.commonCancel)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(AppLocalizations.of(context)!.activeWorkoutReset, style: TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -253,14 +254,14 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
           FilledButton(onPressed: () {
             final parsed = double.tryParse(ctl.text.replaceAll(',', '.'));
             if (parsed != null && parsed >= 0) {
               onSet(isInt ? parsed.roundToDouble() : parsed);
             }
             Navigator.pop(ctx);
-          }, child: const Text('OK')),
+          }, child: Text(AppLocalizations.of(context)!.activeWorkoutOK)),
         ],
       ),
     );
@@ -296,7 +297,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text('Peso (kg)', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        Text(AppLocalizations.of(context)!.activeWorkoutWeight, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Row(children: [
           _StepperButton(icon: Icons.remove, onTap: () => onChanged(weight - 2.5)),
@@ -333,7 +334,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 14),
-        Text('Repetições', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        Text(AppLocalizations.of(context)!.activeWorkoutReps, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Row(children: [
           _StepperButton(icon: Icons.remove, onTap: () => onChanged(reps - 1)),
@@ -366,7 +367,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text('Distância (km)', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        Text(AppLocalizations.of(context)!.activeWorkoutDistance, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Row(children: [
           _StepperButton(icon: Icons.remove, small: true, onTap: () => onChanged((distance - 0.1).clamp(0, 999))),
@@ -403,7 +404,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text('Tempo', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        Text(AppLocalizations.of(context)!.activeWorkoutTime, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Row(children: [
           _StepperButton(icon: Icons.remove, onTap: () => onChanged((timeSeconds - 30).clamp(0, 99999))),
@@ -601,7 +602,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: Text('Editar Série', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                      child: Text(AppLocalizations.of(context)!.activeWorkoutEditSet, style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                     ),
                     Text('$exerciseName • Série $setNumber', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
                       color: Theme.of(ctx).colorScheme.onSurfaceVariant,
@@ -628,7 +629,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   children: [
                     Icon(Icons.whatshot, size: 16, color: isWarmup ? Colors.orange : Theme.of(ctx).colorScheme.onSurfaceVariant),
                     const SizedBox(width: 6),
-                    Text('Aquecimento', style: Theme.of(ctx).textTheme.bodyMedium),
+                    Text(AppLocalizations.of(context)!.activeWorkoutWarmup, style: Theme.of(ctx).textTheme.bodyMedium),
                     const Spacer(),
                     SizedBox(
                       height: 28,
@@ -697,7 +698,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Cancelar'),
+                        child: Text(AppLocalizations.of(context)!.commonCancel),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -705,7 +706,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       flex: 2,
                       child: FilledButton(
                         onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Salvar'),
+                        child: Text(AppLocalizations.of(context)!.commonSave),
                       ),
                     ),
                   ],
@@ -738,13 +739,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remover Exercício?'),
+        title: Text(AppLocalizations.of(context)!.activeWorkoutRemoveExercise),
         content: Text('Remover "${exercise.name}" do treino? Todas as séries registradas serão perdidas.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context)!.commonCancel)),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Remover', style: TextStyle(color: Colors.red)),
+            child: Text(AppLocalizations.of(context)!.activeWorkoutRemove, style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -756,7 +757,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       if (mounted) setState(() {});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${exercise.name} removido do treino'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.activeWorkoutRemoved(exercise.name)), behavior: SnackBarBehavior.floating),
         );
       }
     }
@@ -931,7 +932,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Treino'),
+        title: Text(AppLocalizations.of(context)!.activeWorkoutTitle),
         centerTitle: true,
         actions: [
           if (_timerService.isActive)
@@ -985,7 +986,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           IconButton(
             icon: const Icon(Icons.check_circle_outline),
             onPressed: _exercises.isNotEmpty ? _finishWorkout : null,
-            tooltip: 'Finalizar Treino',
+            tooltip: AppLocalizations.of(context)!.activeWorkoutFinishWorkout,
           ),
         ],
       ),
@@ -997,7 +998,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _pickExercise,
         icon: const Icon(Icons.add),
-        label: const Text('Adicionar Exercício'),
+        label: Text(AppLocalizations.of(context)!.activeWorkoutAddExercise),
       ),
     );
   }
@@ -1011,21 +1012,20 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           children: [
             Icon(Icons.fitness_center, size: 80, color: theme.colorScheme.primary.withAlpha(80)),
             const SizedBox(height: 24),
-            Text('Nenhum exercício ainda', style: theme.textTheme.titleLarge),
+            Text(AppLocalizations.of(context)!.activeWorkoutEmptyTitle, style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
-            Text('Adicione exercícios para começar seu treino',
-                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text(AppLocalizations.of(context)!.activeWorkoutEmptySubtitle, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: _pickExercise,
               icon: const Icon(Icons.add),
-              label: const Text('Adicionar Exercício'),
+              label: Text(AppLocalizations.of(context)!.activeWorkoutAddExercise),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _importFromRoutine,
               icon: const Icon(Icons.repeat),
-              label: const Text('Importar de Rotina'),
+              label: Text(AppLocalizations.of(context)!.activeWorkoutImportRoutine),
             ),
           ],
         ),
@@ -1055,7 +1055,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             color: theme.colorScheme.surfaceContainerLow,
             child: Row(
               children: [
-                Text('$completedSets/$totalSets sets', style: theme.textTheme.bodySmall),
+                Text(AppLocalizations.of(context)!.activeWorkoutSetsSummary(completedSets, totalSets), style: theme.textTheme.bodySmall),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ClipRRect(
@@ -1138,7 +1138,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Início ${DateFormat('HH:mm').format(_timerStart!)}',
+                    '${AppLocalizations.of(context)!.activeWorkoutTimerStartLabel} ${DateFormat('HH:mm').format(_timerStart!)}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1146,7 +1146,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 ] else if (_timerStart != null && _timerEnd != null) ...[
                   // Finished
                   Text(
-                    'Duração $_elapsedStr',
+                    '${AppLocalizations.of(context)!.activeWorkoutTimerDuration} $_elapsedStr',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -1162,14 +1162,14 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 ] else ...[
                   // Not started
                   Text(
-                    'Temporizador de Treino',
+                    AppLocalizations.of(context)!.activeWorkoutTimerTitle,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Iniciar cronômetro do treino',
+                    AppLocalizations.of(context)!.activeWorkoutStartTimerTooltip,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1193,7 +1193,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       : Colors.white,
                 ),
                 child: Text(
-                  _timerStart == null ? 'Iniciar' : 'Finalizar',
+                  _timerStart == null ? AppLocalizations.of(context)!.activeWorkoutStart : AppLocalizations.of(context)!.activeWorkoutFinishWorkout,
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
@@ -1219,7 +1219,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     if (routines.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nenhuma rotina encontrada. Crie uma primeiro!'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.activeWorkoutNoRoutineFound), behavior: SnackBarBehavior.floating),
         );
       }
       return;
@@ -1237,7 +1237,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     if (days.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Esta rotina não tem dias.'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.activeWorkoutNoRoutineDays), behavior: SnackBarBehavior.floating),
         );
       }
       return;
@@ -1258,7 +1258,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     setState(() {});
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Exercícios importados da rotina!'), behavior: SnackBarBehavior.floating),
+        SnackBar(content: Text(AppLocalizations.of(context)!.activeWorkoutRoutineImported), behavior: SnackBarBehavior.floating),
       );
     }
   }
@@ -1276,7 +1276,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             borderRadius: BorderRadius.circular(2),
           ))),
           const SizedBox(height: 16),
-          Text('Selecione a Rotina', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          Text(AppLocalizations.of(context)!.activeWorkoutSelectRoutine, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           SizedBox(
             height: 300,
@@ -1324,13 +1324,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               TextButton.icon(
                 onPressed: () => Navigator.pop(sheetContext),
                 icon: const Icon(Icons.arrow_back, size: 18),
-                label: const Text('Voltar'),
+                label: Text(AppLocalizations.of(context)!.activeWorkoutBack),
               ),
             ],
           ),
           Text(routineName, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text('Selecione o dia para importar', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(AppLocalizations.of(context)!.activeWorkoutSelectDay, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 16),
           SizedBox(
             height: 300,
@@ -1405,7 +1405,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   _showCustomRestTimeDialog(exercise);
                 },
                 icon: const Icon(Icons.edit),
-                label: const Text('Personalizado'),
+                label: Text(AppLocalizations.of(context)!.activeWorkoutCustom),
               ),
             ),
           ],
@@ -1419,7 +1419,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Tempo Personalizado'),
+        title: Text(AppLocalizations.of(context)!.activeWorkoutCustomTime),
         content: Row(
           children: [
             Expanded(
@@ -1438,7 +1438,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
           FilledButton(onPressed: () {
             final v = int.tryParse(ctl.text);
             if (v != null && v > 0) {
@@ -1599,7 +1599,7 @@ class _ExerciseCard extends StatelessWidget {
             const Divider(),
             ListTile(
               leading: const Icon(Icons.open_in_new),
-              title: const Text('Ver exercício'),
+              title: Text(AppLocalizations.of(context)!.workoutDetailViewExercise),
               subtitle: Text(exercise.name),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
@@ -1734,7 +1734,7 @@ class _ExerciseCard extends StatelessWidget {
             TextButton.icon(
               onPressed: onAddSet,
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('Adicionar Série'),
+              label: Text(AppLocalizations.of(context)!.activeWorkoutAddSet),
               style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
             ),
           ],
@@ -2194,7 +2194,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text('Cancelar'),
+                      child: Text(AppLocalizations.of(context)!.commonCancel),
                     ),
                   ),
                   const SizedBox(width: 12),

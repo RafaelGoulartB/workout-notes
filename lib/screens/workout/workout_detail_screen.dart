@@ -72,7 +72,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_workout != null
-            ? DateFormat("d 'de' MMMM", 'pt_BR').format(DateTime.parse(_workout!['date'] as String))
+            ? DateFormat(Intl.defaultLocale?.startsWith('pt') == true ? "d 'de' MMMM" : 'MMMM d', Intl.defaultLocale).format(DateTime.parse(_workout!['date'] as String))
             : AppLocalizations.of(context)!.workoutDetailContinue),
         centerTitle: true,
         actions: [
@@ -129,7 +129,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
 
   Widget _buildHeader(ThemeData theme) {
     if (_workout == null) return const SizedBox.shrink();
-    final date = DateFormat('EEEE, d \'de\' MMMM \'de\' yyyy', 'pt_BR').format(
+    final date = DateFormat(Intl.defaultLocale?.startsWith('pt') == true ? "EEEE, d 'de' MMMM 'de' yyyy" : 'EEEE, MMMM d, yyyy', Intl.defaultLocale).format(
       DateTime.parse(_workout!['date'] as String));
     final start = _workout!['start_time'] as String?;
     final end = _workout!['end_time'] as String?;
@@ -156,12 +156,12 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  _InfoChip(icon: Icons.schedule, label: isActive ? AppLocalizations.of(context)!.workoutHomeOngoing : '${duration ~/ 60}min ${duration % 60}s'),
+                  _InfoChip(icon: Icons.schedule, label: isActive ? AppLocalizations.of(context)!.workoutHomeOngoing : AppLocalizations.of(context)!.workoutDetailDuration(duration ~/ 60, duration % 60)),
                   const SizedBox(width: 8),
-                  _InfoChip(icon: Icons.repeat, label: '$_totalSets sets'),
+                  _InfoChip(icon: Icons.repeat, label: '$_totalSets ${AppLocalizations.of(context)!.commonSets.toLowerCase()}'),
                   const SizedBox(width: 8),
                   if (_totalVolume > 0)
-                    _InfoChip(icon: Icons.monitor_weight, label: '${_totalVolume.toStringAsFixed(0)} kg'),
+                    _InfoChip(icon: Icons.monitor_weight, label: '${_totalVolume.toStringAsFixed(0)} ${AppLocalizations.of(context)!.workoutDetailKg}'),
                 ],
               ),
               if (feeling > 0) ...[
@@ -212,7 +212,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.open_in_new),
-                title: const Text('Ver exercício'),
+                title: Text(AppLocalizations.of(context)!.workoutDetailViewExercise),
                 subtitle: Text(exercise.name),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
@@ -269,10 +269,10 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                 Row(
                   children: [
                     const SizedBox(width: 34),
-                    Expanded(flex: 2, child: Text('#', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
+                    Expanded(flex: 2, child: Text(AppLocalizations.of(context)!.workoutDetailSetNumber, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
                     Expanded(flex: 3, child: Text(AppLocalizations.of(context)!.workoutDetailWeight, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
                     Expanded(flex: 3, child: Text(AppLocalizations.of(context)!.commonReps, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                    Expanded(flex: 3, child: Text('RPE', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
+                    Expanded(flex: 3, child: Text(AppLocalizations.of(context)!.workoutDetailRpe, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
                   ],
                 ),
                 const Divider(height: 4),
@@ -352,7 +352,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       initialDate: currentDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
-      helpText: 'Selecione a nova data',
+      helpText: AppLocalizations.of(context)!.workoutDetailSelectDate,
     );
     if (newDate != null && mounted) {
       await DatabaseHelper.instance.updateWorkoutDate(widget.workoutId, newDate);
