@@ -404,6 +404,12 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get settingsTitle;
 
+  /// No description provided for @settingsAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Appearance'**
+  String get settingsAppearance;
+
   /// No description provided for @settingsThemeColor.
   ///
   /// In en, this message translates to:

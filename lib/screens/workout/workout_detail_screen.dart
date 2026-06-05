@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 import '../../services/export_service.dart';
+import 'exercise_detail_tabs_screen.dart';
 import 'active_workout_screen.dart';
 
 class WorkoutDetailScreen extends StatefulWidget {
@@ -37,6 +38,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     for (final entry in entries) {
       final sets = await _db.getExerciseSets(entry['id'] as String);
       exercises.add(_ExerciseWithSets(
+        exerciseId: entry['exercise_id'] as String? ?? '',
         name: entry['exercise_name'] as String? ?? '',
         categoryName: entry['category_name'] as String? ?? '',
         categoryColor: Color(entry['category_color'] as int? ?? 0xFF757575),
@@ -183,16 +185,68 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     );
   }
 
+  void _showExerciseModal(BuildContext context, _ExerciseWithSets exercise) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Row(
+                  children: [
+                    Icon(Icons.fitness_center, size: 18, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        exercise.name,
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.open_in_new),
+                title: const Text('Ver exercício'),
+                subtitle: Text(exercise.name),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ExerciseDetailTabsScreen(
+                        exerciseId: exercise.exerciseId,
+                        exerciseName: exercise.name,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildExerciseCard(_ExerciseWithSets exercise, ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-        ),
-        child: Padding(
+      child: GestureDetector(
+        onLongPress: () => _showExerciseModal(context, exercise),
+        child: Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+          ),
+          child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -252,6 +306,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -346,11 +401,13 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
 }
 
 class _ExerciseWithSets {
+  final String exerciseId;
   final String name;
   final String categoryName;
   final Color categoryColor;
   final List<Map<String, dynamic>> sets;
   _ExerciseWithSets({
+    required this.exerciseId,
     required this.name, required this.categoryName,
     required this.categoryColor, required this.sets,
   });

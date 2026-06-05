@@ -164,6 +164,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get settingsTitle => 'Configurações';
 
   @override
+  String get settingsAppearance => 'Aparência';
+
+  @override
   String get settingsThemeColor => 'Cor do Tema';
 
   @override

@@ -83,7 +83,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       borderRadius: BorderRadius.circular(8),
       onTap: () => _changeThemeMode(mode),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
         child: Row(
           children: [
             Container(
@@ -222,7 +222,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // Accent Color
+                // Theme (Color & Mode)
                 Card(
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -234,6 +234,53 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Global title
+                        Row(
+                          children: [
+                            Icon(Icons.palette_outlined, size: 18, color: theme.colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text(AppLocalizations.of(context)!.settingsAppearance, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        const Divider(),
+                        const SizedBox(height: 16),
+                        // Theme Mode section
+                        Row(
+                          children: [
+                            Icon(Icons.dark_mode, size: 18, color: theme.colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Text(AppLocalizations.of(context)!.settingsThemeMode, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildThemeModeOption(
+                          theme: theme,
+                          icon: Icons.brightness_auto,
+                          label: AppLocalizations.of(context)!.settingsSystem,
+                          subtitle: AppLocalizations.of(context)!.settingsSystemSubtitle,
+                          mode: ThemeMode.system,
+                        ),
+                        const Divider(height: 1, indent: 0, endIndent: 0),
+                        _buildThemeModeOption(
+                          theme: theme,
+                          icon: Icons.light_mode,
+                          label: AppLocalizations.of(context)!.settingsLight,
+                          subtitle: AppLocalizations.of(context)!.settingsLightSubtitle,
+                          mode: ThemeMode.light,
+                        ),
+                        const Divider(height: 1, indent: 0, endIndent: 0),
+                        _buildThemeModeOption(
+                          theme: theme,
+                          icon: Icons.dark_mode,
+                          label: AppLocalizations.of(context)!.settingsDark,
+                          subtitle: AppLocalizations.of(context)!.settingsDarkSubtitle,
+                          mode: ThemeMode.dark,
+                        ),
+                        const SizedBox(height: 16),
+                        const Divider(),
+                        const SizedBox(height: 16),
+                        // Accent Color section
                         Row(
                           children: [
                             Icon(Icons.palette, size: 18, color: theme.colorScheme.primary),
@@ -276,55 +323,6 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Theme Mode
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.dark_mode, size: 18, color: theme.colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(AppLocalizations.of(context)!.settingsThemeMode, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _buildThemeModeOption(
-                          theme: theme,
-                          icon: Icons.brightness_auto,
-                          label: AppLocalizations.of(context)!.settingsSystem,
-                          subtitle: AppLocalizations.of(context)!.settingsSystemSubtitle,
-                          mode: ThemeMode.system,
-                        ),
-                        const Divider(height: 1, indent: 8, endIndent: 8),
-                        _buildThemeModeOption(
-                          theme: theme,
-                          icon: Icons.light_mode,
-                          label: AppLocalizations.of(context)!.settingsLight,
-                          subtitle: AppLocalizations.of(context)!.settingsLightSubtitle,
-                          mode: ThemeMode.light,
-                        ),
-                        const Divider(height: 1, indent: 8, endIndent: 8),
-                        _buildThemeModeOption(
-                          theme: theme,
-                          icon: Icons.dark_mode,
-                          label: AppLocalizations.of(context)!.settingsDark,
-                          subtitle: AppLocalizations.of(context)!.settingsDarkSubtitle,
-                          mode: ThemeMode.dark,
                         ),
                       ],
                     ),
@@ -563,35 +561,36 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                     borderRadius: BorderRadius.circular(12),
                     side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Row(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
                             Icon(Icons.language, size: 18, color: theme.colorScheme.primary),
                             const SizedBox(width: 8),
                             Text(AppLocalizations.of(context)!.settingsLanguage, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                           ],
                         ),
-                      ),
-                      _buildLanguageOption(
-                        theme: theme,
-                        label: AppLocalizations.of(context)!.settingsPortuguese,
-                        subtitle: 'Português (Brasil)',
-                        icon: Icons.flag,
-                        locale: const Locale('pt', 'BR'),
-                      ),
-                      const Divider(height: 1, indent: 16, endIndent: 16),
-                      _buildLanguageOption(
-                        theme: theme,
-                        label: AppLocalizations.of(context)!.settingsEnglish,
-                        subtitle: 'English',
-                        icon: Icons.language,
-                        locale: const Locale('en'),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        _buildLanguageOption(
+                          theme: theme,
+                          label: AppLocalizations.of(context)!.settingsPortuguese,
+                          subtitle: 'Português (Brasil)',
+                          icon: Icons.flag,
+                          locale: const Locale('pt', 'BR'),
+                        ),
+                        const Divider(height: 1, indent: 0, endIndent: 0),
+                        _buildLanguageOption(
+                          theme: theme,
+                          label: AppLocalizations.of(context)!.settingsEnglish,
+                          subtitle: 'English',
+                          icon: Icons.language,
+                          locale: const Locale('en'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -682,7 +681,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       borderRadius: BorderRadius.circular(8),
       onTap: () => _changeLocale(locale),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
         child: Row(
           children: [
             Container(

@@ -7,6 +7,7 @@ import '../../database/database_helper.dart';
 import '../../services/rest_timer_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/exercise_picker_sheet.dart';
+import 'exercise_detail_tabs_screen.dart';
 import 'rest_timer_screen.dart';
 
 class ActiveWorkoutScreen extends StatefulWidget {
@@ -1573,20 +1574,69 @@ class _ExerciseCard extends StatelessWidget {
     this.onRemoveExercise,
   });
 
+  void _showExerciseModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(
+                children: [
+                  Icon(Icons.fitness_center, size: 18, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      exercise.name,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.open_in_new),
+              title: const Text('Ver exercício'),
+              subtitle: Text(exercise.name),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ExerciseDetailTabsScreen(
+                      exerciseId: exercise.exerciseId,
+                      exerciseName: exercise.name,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final restMin = exercise.restTimeSeconds ~/ 60;
     final restSec = exercise.restTimeSeconds % 60;
     final restStr = restMin > 0 ? '${restMin}min$restSec' : '${restSec}s';
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
+    return GestureDetector(
+      onLongPress: () => _showExerciseModal(context),
+      child: Card(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        ),
+        child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1690,7 +1740,8 @@ class _ExerciseCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildHeaderRow(ThemeData theme) {
