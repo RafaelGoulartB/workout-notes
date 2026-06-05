@@ -176,6 +176,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         entryId: entry['id'] as String,
         exerciseId: entry['exercise_id'] as String,
         name: entry['exercise_name'] as String? ?? '',
+        exerciseType: entry['exercise_type'] as String? ?? 'weightReps',
         categoryName: entry['category_name'] as String? ?? '',
         categoryColor: Color(entry['category_color'] as int? ?? 0xFF757575),
         sets: sets,
@@ -228,20 +229,20 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }
   }
 
-  void _quickEditNumber(BuildContext sheetContext, double current, bool isInt, void Function(double) onSet) {
+  void _quickEditNumber(BuildContext sheetContext, double current, bool isInt, void Function(double) onSet, {String? title, String? suffix}) {
     final ctl = TextEditingController(
       text: isInt ? current.round().toString() : current.toStringAsFixed(1));
     showDialog(
       context: sheetContext,
       builder: (ctx) => AlertDialog(
-        title: Text(isInt ? 'Digite as repetições' : 'Digite o peso'),
+        title: Text(title ?? (isInt ? 'Digite as repetições' : 'Digite o peso')),
         content: TextField(
           controller: ctl,
           keyboardType: TextInputType.numberWithOptions(decimal: !isInt),
           autofocus: true,
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
-            suffixText: isInt ? ' reps' : ' kg',
+            suffixText: suffix ?? (isInt ? ' reps' : ' kg'),
           ),
         ),
         actions: [
@@ -255,6 +256,178 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           }, child: const Text('OK')),
         ],
       ),
+    );
+  }
+
+  /// Builds dynamic field controls for the set editor based on exercise type.
+  List<Widget> _buildFieldControls(
+    String type, BuildContext ctx, StateSetter setSheetState,
+    double weight, int reps, double distance, int timeSeconds,
+    void Function(String key, dynamic value) onFieldChange,
+  ) {
+    final fields = getFieldsForType(type);
+    final keys = fields.keys.toList();
+    final widgets = <Widget>[];
+
+    for (final key in keys) {
+      final label = fields[key] ?? key;
+      if (key == 'weight') {
+        widgets.add(_buildWeightControl(ctx, setSheetState, weight, (v) => onFieldChange('weight', v)));
+      } else if (key == 'reps') {
+        widgets.add(_buildRepsControl(ctx, setSheetState, reps, (v) => onFieldChange('reps', v)));
+      } else if (key == 'distance') {
+        widgets.add(_buildDistanceControl(ctx, setSheetState, distance, (v) => onFieldChange('distance', v)));
+      } else if (key == 'time_seconds') {
+        widgets.add(_buildTimeControl(ctx, setSheetState, timeSeconds, (v) => onFieldChange('time_seconds', v)));
+      }
+    }
+    return widgets;
+  }
+
+  Widget _buildWeightControl(BuildContext ctx, StateSetter setSheetState, double weight, void Function(double) onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text('Peso (kg)', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        Row(children: [
+          _StepperButton(icon: Icons.remove, onTap: () => onChanged(weight - 2.5)),
+          const SizedBox(width: 6),
+          _StepperButton(icon: Icons.remove, small: true, onTap: () => onChanged(weight - 0.5)),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _quickEditNumber(ctx, weight, false, onChanged),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withAlpha(120), borderRadius: BorderRadius.circular(10)),
+                child: Center(child: Text(weight.toStringAsFixed(1), style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
+              ),
+            ),
+          ),
+          _StepperButton(icon: Icons.add, small: true, onTap: () => onChanged(weight + 0.5)),
+          const SizedBox(width: 6),
+          _StepperButton(icon: Icons.add, onTap: () => onChanged(weight + 2.5)),
+        ]),
+        const SizedBox(height: 4),
+        Wrap(spacing: 4, runSpacing: 4, children: [20, 30, 40, 50, 60, 80, 100, 120].map((v) => ActionChip(
+          label: Text('$v', style: const TextStyle(fontSize: 10)),
+          onPressed: () => onChanged(v.toDouble()),
+          visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 4),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        )).toList()),
+      ],
+    );
+  }
+
+  Widget _buildRepsControl(BuildContext ctx, StateSetter setSheetState, int reps, void Function(int) onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 14),
+        Text('Repetições', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        Row(children: [
+          _StepperButton(icon: Icons.remove, onTap: () => onChanged(reps - 1)),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _quickEditNumber(ctx, reps.toDouble(), true, (v) => onChanged(v.round())),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withAlpha(120), borderRadius: BorderRadius.circular(10)),
+                child: Center(child: Text('$reps', style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
+              ),
+            ),
+          ),
+          _StepperButton(icon: Icons.add, onTap: () => onChanged(reps + 1)),
+        ]),
+        const SizedBox(height: 4),
+        Wrap(spacing: 4, runSpacing: 4, children: [1, 3, 5, 8, 10, 12, 15, 20].map((v) => ActionChip(
+          label: Text('$v', style: const TextStyle(fontSize: 10)),
+          onPressed: () => onChanged(v),
+          visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 4),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        )).toList()),
+      ],
+    );
+  }
+
+  Widget _buildDistanceControl(BuildContext ctx, StateSetter setSheetState, double distance, void Function(double) onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text('Distância (km)', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        Row(children: [
+          _StepperButton(icon: Icons.remove, small: true, onTap: () => onChanged((distance - 0.1).clamp(0, 999))),
+          _StepperButton(icon: Icons.remove, onTap: () => onChanged((distance - 0.5).clamp(0, 999))),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _quickEditNumber(ctx, distance, false, onChanged, title: 'Digite a distância', suffix: ' km'),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withAlpha(120), borderRadius: BorderRadius.circular(10)),
+                child: Center(child: Text(distance.toStringAsFixed(1), style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold))),
+              ),
+            ),
+          ),
+          _StepperButton(icon: Icons.add, onTap: () => onChanged((distance + 0.5).clamp(0, 999))),
+          _StepperButton(icon: Icons.add, small: true, onTap: () => onChanged((distance + 0.1).clamp(0, 999))),
+        ]),
+        const SizedBox(height: 4),
+        Wrap(spacing: 4, runSpacing: 4, children: [1.0, 2.0, 3.0, 5.0, 10.0].map((v) => ActionChip(
+          label: Text('${v.toStringAsFixed(1)}', style: const TextStyle(fontSize: 10)),
+          onPressed: () => onChanged(v),
+          visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 4),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        )).toList()),
+      ],
+    );
+  }
+
+  Widget _buildTimeControl(BuildContext ctx, StateSetter setSheetState, int timeSeconds, void Function(int) onChanged) {
+    final minutes = timeSeconds ~/ 60;
+    final seconds = timeSeconds % 60;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text('Tempo', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        Row(children: [
+          _StepperButton(icon: Icons.remove, onTap: () => onChanged((timeSeconds - 30).clamp(0, 99999))),
+          _StepperButton(icon: Icons.remove, small: true, onTap: () => onChanged((timeSeconds - 5).clamp(0, 99999))),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _quickEditNumber(ctx, timeSeconds.toDouble(), true, (v) => onChanged(v.round()), title: 'Digite o tempo (segundos)', suffix: ' s'),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withAlpha(120), borderRadius: BorderRadius.circular(10)),
+                child: Center(
+                  child: Text(
+                    timeSeconds >= 60 ? '${minutes}:${seconds.toString().padLeft(2, '0')}' : '${timeSeconds}s',
+                    style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          _StepperButton(icon: Icons.add, small: true, onTap: () => onChanged((timeSeconds + 5).clamp(0, 99999))),
+          _StepperButton(icon: Icons.add, onTap: () => onChanged((timeSeconds + 30).clamp(0, 99999))),
+        ]),
+        const SizedBox(height: 4),
+        Wrap(spacing: 4, runSpacing: 4, children: [30, 60, 120, 180, 300, 600].map((v) => ActionChip(
+          label: Text(v >= 60 ? '${v ~/ 60}min' : '${v}s', style: const TextStyle(fontSize: 10)),
+          onPressed: () => onChanged(v),
+          visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 4),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        )).toList()),
+      ],
     );
   }
 
@@ -291,6 +464,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         entryId: entryId,
         exerciseId: exerciseId,
         name: name,
+        exerciseType: 'weightReps',
         categoryName: catName,
         categoryColor: catColor,
         sets: [],
@@ -302,11 +476,15 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   Future<void> _addSet(_ExerciseWithSets exercise) async {
     double? lastWeight;
     int? lastReps;
+    double? lastDistance;
+    int? lastTimeSeconds;
     bool lastWarmup = false;
     if (exercise.sets.isNotEmpty) {
       final last = exercise.sets.last;
       lastWeight = (last['weight'] as num?)?.toDouble();
       lastReps = (last['reps'] as int?);
+      lastDistance = (last['distance'] as num?)?.toDouble();
+      lastTimeSeconds = (last['time_seconds'] as int?);
       lastWarmup = (last['is_warmup'] as int?) == 1;
     }
 
@@ -314,6 +492,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       exerciseEntryId: exercise.entryId,
       weight: lastWeight,
       reps: lastReps,
+      distance: lastDistance,
+      timeSeconds: lastTimeSeconds,
       isWarmup: lastWarmup,
     );
     await _loadExercises();
@@ -367,9 +547,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }
   }
 
-  Future<void> _editSetDialog(String setId, Map<String, dynamic> setData, String exerciseName, int setNumber) async {
+  Future<void> _editSetDialog(String setId, Map<String, dynamic> setData, String exerciseName, int setNumber, String exerciseType) async {
     double weight = (setData['weight'] as num?)?.toDouble() ?? 0;
     int reps = (setData['reps'] as int?) ?? 0;
+    double distance = (setData['distance'] as num?)?.toDouble() ?? 0;
+    int timeSeconds = (setData['time_seconds'] as int?) ?? 0;
     double? rpe = (setData['rpe'] as num?)?.toDouble();
     final commentCtl = TextEditingController(text: (setData['comment'] as String?) ?? '');
     bool isWarmup = (setData['is_warmup'] as int?) == 1;
@@ -442,123 +624,17 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // WEIGHT row
-                Text('Peso (kg)', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    _StepperButton(
-                      icon: Icons.remove,
-                      onTap: () => setSheetState(() {
-                        weight = (weight - 2.5).clamp(0, 999);
-                      }),
-                    ),
-                    const SizedBox(width: 6),
-                    _StepperButton(
-                      icon: Icons.remove, small: true,
-                      onTap: () => setSheetState(() {
-                        weight = (weight - 0.5).clamp(0, 999);
-                      }),
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => _quickEditNumber(ctx, weight, false, (v) {
-                          setSheetState(() => weight = v);
-                        }),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withAlpha(120),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Center(child: Text(
-                            weight.toStringAsFixed(1),
-                            style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                          )),
-                        ),
-                      ),
-                    ),
-                    _StepperButton(
-                      icon: Icons.add, small: true,
-                      onTap: () => setSheetState(() {
-                        weight = (weight + 0.5).clamp(0, 999);
-                      }),
-                    ),
-                    const SizedBox(width: 6),
-                    _StepperButton(
-                      icon: Icons.add,
-                      onTap: () => setSheetState(() {
-                        weight = (weight + 2.5).clamp(0, 999);
-                      }),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: [20, 30, 40, 50, 60, 80, 100, 120].map((v) => ActionChip(
-                    label: Text('$v', style: const TextStyle(fontSize: 10)),
-                    onPressed: () => setSheetState(() => weight = v.toDouble()),
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  )).toList(),
-                ),
-                const SizedBox(height: 14),
-
-                // REPS row
-                Text('Repetições', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    _StepperButton(
-                      icon: Icons.remove,
-                      onTap: () => setSheetState(() {
-                        reps = (reps - 1).clamp(0, 999);
-                      }),
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => _quickEditNumber(ctx, reps.toDouble(), true, (v) {
-                          setSheetState(() => reps = v.round());
-                        }),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withAlpha(120),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Center(child: Text(
-                            '$reps',
-                            style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                          )),
-                        ),
-                      ),
-                    ),
-                    _StepperButton(
-                      icon: Icons.add,
-                      onTap: () => setSheetState(() {
-                        reps = (reps + 1).clamp(0, 999);
-                      }),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: [1, 3, 5, 8, 10, 12, 15, 20].map((v) => ActionChip(
-                    label: Text('$v', style: const TextStyle(fontSize: 10)),
-                    onPressed: () => setSheetState(() => reps = v),
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  )).toList(),
-                ),
-                const SizedBox(height: 14),
+                // Field controls based on exercise type
+                ..._buildFieldControls(exerciseType, ctx, setSheetState, weight, reps, distance, timeSeconds, (String key, dynamic value) {
+                  setSheetState(() {
+                    switch (key) {
+                      case 'weight': weight = (value as double).clamp(0, 999); break;
+                      case 'reps': reps = (value as int).clamp(0, 999); break;
+                      case 'distance': distance = (value as double).clamp(0, 999); break;
+                      case 'time_seconds': timeSeconds = (value as int).clamp(0, 99999); break;
+                    }
+                  });
+                }),
 
                 // RPE
                 Row(
@@ -629,6 +705,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       await _db.updateSet(setId,
         weight: weight,
         reps: reps,
+        distance: distance,
+        timeSeconds: timeSeconds,
         rpe: rpe,
         comment: commentCtl.text,
         isWarmup: isWarmup,
@@ -849,7 +927,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               exercise: _exercises[index],
               onAddSet: () => _addSet(_exercises[index]),
               onToggleSet: _toggleSet,
-              onEditSet: (setId, data, setIdx) => _editSetDialog(setId, data, _exercises[index].name, setIdx),
+              onEditSet: (setId, data, setIdx) => _editSetDialog(setId, data, _exercises[index].name, setIdx, _exercises[index].exerciseType),
               onDeleteSet: _deleteSet,
               onChangeRestTime: (currentRest) => _changeExerciseRestTime(_exercises[index], currentRest),
               theme: theme,
@@ -1262,10 +1340,49 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 }
 
+/// Returns the field labels and keys for a given exercise type.
+Map<String, String> getFieldsForType(String type) {
+  switch (type) {
+    case 'weightReps': return {'weight': 'Peso', 'reps': 'Reps'};
+    case 'distanceTime': return {'distance': 'Dist.', 'time_seconds': 'Tempo'};
+    case 'weightDistance': return {'weight': 'Peso', 'distance': 'Dist.'};
+    case 'weightTime': return {'weight': 'Peso', 'time_seconds': 'Tempo'};
+    case 'repsDistance': return {'reps': 'Reps', 'distance': 'Dist.'};
+    case 'repsTime': return {'reps': 'Reps', 'time_seconds': 'Tempo'};
+    case 'weightOnly': return {'weight': 'Peso'};
+    case 'repsOnly': return {'reps': 'Reps'};
+    case 'distanceOnly': return {'distance': 'Dist.'};
+    case 'timeOnly': return {'time_seconds': 'Tempo'};
+    default: return {'weight': 'Peso', 'reps': 'Reps'};
+  }
+}
+
+String formatFieldValue(Map<String, dynamic> set, String key) {
+  if (key == 'weight') {
+    final v = (set['weight'] as num?)?.toDouble();
+    return v != null ? v.toStringAsFixed(1) : '-';
+  }
+  if (key == 'distance') {
+    final v = (set['distance'] as num?)?.toDouble();
+    return v != null ? v.toStringAsFixed(1) : '-';
+  }
+  if (key == 'reps') {
+    return (set['reps'] as int?)?.toString() ?? '-';
+  }
+  if (key == 'time_seconds') {
+    final v = (set['time_seconds'] as int?);
+    if (v == null) return '-';
+    if (v >= 60) return '${v ~/ 60}:${(v % 60).toString().padLeft(2, '0')}';
+    return '${v}s';
+  }
+  return '-';
+}
+
 class _ExerciseWithSets {
   final String entryId;
   final String exerciseId;
   final String name;
+  final String exerciseType;
   final String categoryName;
   final Color categoryColor;
   final List<Map<String, dynamic>> sets;
@@ -1275,6 +1392,7 @@ class _ExerciseWithSets {
     required this.entryId,
     required this.exerciseId,
     required this.name,
+    required this.exerciseType,
     required this.categoryName,
     required this.categoryColor,
     List<Map<String, dynamic>>? sets,
@@ -1357,17 +1475,7 @@ class _ExerciseCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                const SizedBox(width: 24),
-                Expanded(flex: 2, child: Text('#', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                Expanded(flex: 3, child: Text('Peso', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                Expanded(flex: 2, child: Text('Reps', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                if (exercise.sets.any((s) => s['rpe'] != null))
-                  Expanded(flex: 2, child: Text('RPE', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                const SizedBox(width: 40),
-              ],
-            ),
+            _buildHeaderRow(theme),
             const Divider(height: 4),
             ...List.generate(exercise.sets.length, (i) {
               final set = exercise.sets[i];
@@ -1401,23 +1509,7 @@ class _ExerciseCard extends StatelessWidget {
                           color: isWarmup ? Colors.orange : null,
                         ),
                       )),
-                      Expanded(flex: 3, child: Text(
-                        (set['weight'] as num?)?.toStringAsFixed(1) ?? '-',
-                        style: theme.textTheme.bodyMedium),
-                      ),
-                      Expanded(flex: 2, child: Text(
-                        (set['reps'] as int?)?.toString() ?? '-',
-                        style: theme.textTheme.bodyMedium),
-                      ),
-                      if (exercise.sets.any((s) => s['rpe'] != null))
-                        Expanded(flex: 2, child: Text(
-                          (set['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
-                          style: theme.textTheme.bodyMedium),
-                        ),
-                      GestureDetector(
-                        onTap: () => onDeleteSet(set['id'] as String),
-                        child: Icon(Icons.close, size: 16, color: theme.colorScheme.error.withAlpha(180)),
-                      ),
+                      ..._buildSetColumns(exercise, set, theme),
                     ],
                   ),
                 ),
@@ -1434,6 +1526,48 @@ class _ExerciseCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildHeaderRow(ThemeData theme) {
+    final fields = getFieldsForType(exercise.exerciseType);
+    final keys = fields.keys.toList();
+    return Row(
+      children: [
+        const SizedBox(width: 24),
+        Expanded(flex: 2, child: Text('#', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
+        Expanded(flex: 3, child: Text(fields[keys[0]] ?? '', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
+        if (keys.length > 1)
+          Expanded(flex: 3, child: Text(fields[keys[1]] ?? '', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
+        if (exercise.sets.any((s) => s['rpe'] != null))
+          Expanded(flex: 2, child: Text('RPE', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
+        const SizedBox(width: 40),
+      ],
+    );
+  }
+
+  List<Widget> _buildSetColumns(_ExerciseWithSets ex, Map<String, dynamic> set, ThemeData theme) {
+    final fields = getFieldsForType(ex.exerciseType);
+    final keys = fields.keys.toList();
+    return [
+      Expanded(flex: 3, child: Text(
+        formatFieldValue(set, keys[0]),
+        style: theme.textTheme.bodyMedium),
+      ),
+      if (keys.length > 1)
+        Expanded(flex: 3, child: Text(
+          formatFieldValue(set, keys[1]),
+          style: theme.textTheme.bodyMedium),
+        ),
+      if (ex.sets.any((s) => s['rpe'] != null))
+        Expanded(flex: 2, child: Text(
+          (set['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
+          style: theme.textTheme.bodyMedium),
+        ),
+      GestureDetector(
+        onTap: () => onDeleteSet(set['id'] as String),
+        child: Icon(Icons.close, size: 16, color: theme.colorScheme.error.withAlpha(180)),
+      ),
+    ];
   }
 }
 

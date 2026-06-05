@@ -80,7 +80,7 @@ class SeedData {
     // === CORE ===
     {'id': 'crunch', 'name': 'Crunch', 'category_id': 'core', 'type': 'weightReps', 'notes': 'Básico, mãos na nuca', 'equipment': 'Bodyweight', 'default_rest_time': 45, 'weight_increment': 0},
     {'id': 'leg_raise', 'name': 'Elevação de Pernas', 'category_id': 'core', 'type': 'weightReps', 'notes': 'Deitado, pernas esticadas subindo', 'equipment': 'Bodyweight', 'default_rest_time': 45, 'weight_increment': 0},
-    {'id': 'plank', 'name': 'Prancha', 'category_id': 'core', 'type': 'timed', 'notes': 'Manter posição, corpo reto', 'equipment': 'Bodyweight', 'default_rest_time': 45, 'weight_increment': 0},
+    {'id': 'plank', 'name': 'Prancha', 'category_id': 'core', 'type': 'timeOnly', 'notes': 'Manter posição, corpo reto', 'equipment': 'Bodyweight', 'default_rest_time': 45, 'weight_increment': 0},
     {'id': 'russian_twist', 'name': 'Torção Russa', 'category_id': 'core', 'type': 'weightReps', 'notes': 'Sentado, girando tronco com peso', 'equipment': 'Dumbbell', 'default_rest_time': 45, 'weight_increment': 0},
     {'id': 'cable_crunch', 'name': 'Crunch na Polia', 'category_id': 'core', 'type': 'weightReps', 'notes': 'Polia alta, puxar em direção ao chão', 'equipment': 'Cable', 'default_rest_time': 45, 'weight_increment': 2.5},
     {'id': 'ab_roller', 'name': 'Roda de Abdômen', 'category_id': 'core', 'type': 'weightReps', 'notes': 'Joelhos ou em pé', 'equipment': 'Bodyweight', 'default_rest_time': 60, 'weight_increment': 0},
@@ -89,7 +89,7 @@ class SeedData {
     // === CARDIO ===
     {'id': 'treadmill', 'name': 'Esteira', 'category_id': 'cardio', 'type': 'distanceTime', 'notes': 'Caminhada ou corrida', 'equipment': 'Treadmill', 'default_rest_time': 0, 'weight_increment': 0},
     {'id': 'cycling', 'name': 'Bicicleta', 'category_id': 'cardio', 'type': 'distanceTime', 'notes': 'Ergométrica ou rua', 'equipment': 'Stationary', 'default_rest_time': 0, 'weight_increment': 0},
-    {'id': 'jump_rope', 'name': 'Pular Corda', 'category_id': 'cardio', 'type': 'timed', 'notes': '', 'equipment': 'Bodyweight', 'default_rest_time': 30, 'weight_increment': 0},
+    {'id': 'jump_rope', 'name': 'Pular Corda', 'category_id': 'cardio', 'type': 'timeOnly', 'notes': '', 'equipment': 'Bodyweight', 'default_rest_time': 30, 'weight_increment': 0},
     {'id': 'rowing', 'name': 'Remo', 'category_id': 'cardio', 'type': 'distanceTime', 'notes': 'Máquina de remo', 'equipment': 'Machine', 'default_rest_time': 0, 'weight_increment': 0},
     {'id': 'swimming', 'name': 'Natação', 'category_id': 'cardio', 'type': 'distanceTime', 'notes': '', 'equipment': 'Bodyweight', 'default_rest_time': 0, 'weight_increment': 0},
     {'id': 'walking', 'name': 'Caminhada', 'category_id': 'cardio', 'type': 'distanceTime', 'notes': '', 'equipment': 'Bodyweight', 'default_rest_time': 0, 'weight_increment': 0},

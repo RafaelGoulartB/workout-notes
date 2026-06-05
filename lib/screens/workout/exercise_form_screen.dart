@@ -24,11 +24,16 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
   bool get _isEditing => widget.exerciseId != null;
 
   final _types = [
-    {'id': 'weightReps', 'name': 'Peso × Repetições'},
-    {'id': 'distanceTime', 'name': 'Distância × Tempo'},
-    {'id': 'weightOnly', 'name': 'Apenas Peso'},
-    {'id': 'repsOnly', 'name': 'Apenas Repetições'},
-    {'id': 'timed', 'name': 'Cronometrado'},
+    {'id': 'weightReps', 'name': 'Peso × Repetições', 'icon': Icons.fitness_center},
+    {'id': 'distanceTime', 'name': 'Distância × Tempo', 'icon': Icons.straighten},
+    {'id': 'weightDistance', 'name': 'Peso × Distância', 'icon': Icons.monitor_weight},
+    {'id': 'weightTime', 'name': 'Peso × Tempo', 'icon': Icons.timer},
+    {'id': 'repsDistance', 'name': 'Repetições × Distância', 'icon': Icons.repeat},
+    {'id': 'repsTime', 'name': 'Repetições × Tempo', 'icon': Icons.repeat_one},
+    {'id': 'weightOnly', 'name': 'Apenas Peso', 'icon': Icons.monitor_weight_outlined},
+    {'id': 'repsOnly', 'name': 'Apenas Repetições', 'icon': Icons.repeat_one_on},
+    {'id': 'distanceOnly', 'name': 'Apenas Distância', 'icon': Icons.straighten},
+    {'id': 'timeOnly', 'name': 'Apenas Tempo', 'icon': Icons.timer_outlined},
   ];
 
   final _equipmentOptions = ['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight', 'Treadmill', 'Stationary', 'Kettlebell', 'Band'];
@@ -157,14 +162,20 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
 
                   // Type
                   DropdownButtonFormField<String>(
-                    value: _type,
+                    value: _types.any((t) => t['id'] == _type) ? _type : 'weightReps',
                     decoration: const InputDecoration(
                       labelText: 'Tipo',
                       border: OutlineInputBorder(),
                     ),
-                    items: _types.map((t) => DropdownMenuItem(
-                      value: t['id'],
-                      child: Text(t['name'] as String),
+                    items: _types.map((t) => DropdownMenuItem<String>(
+                      value: t['id'] as String,
+                      child: Row(
+                        children: [
+                          Icon(t['icon'] as IconData, size: 18, color: theme.colorScheme.primary),
+                          const SizedBox(width: 8),
+                          Text(t['name'] as String),
+                        ],
+                      ),
                     )).toList(),
                     onChanged: (v) => setState(() => _type = v ?? _type),
                   ),
