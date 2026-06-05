@@ -650,6 +650,45 @@ class AppLocalizationsEn extends AppLocalizations {
   String get routinesDeleteContent => 'All routine data will be lost.';
 
   @override
+  String get routinesEmptyTitle => 'No routines yet';
+
+  @override
+  String get routinesEmptySubtitle => 'Create a routine to train faster';
+
+  @override
+  String get routinesRename => 'Rename';
+
+  @override
+  String get routinesNewDay => 'New Day';
+
+  @override
+  String get routinesDayName => 'Day Name';
+
+  @override
+  String get routinesDayNameHint => 'Ex: Push Day, Monday';
+
+  @override
+  String get routinesAddDay => 'Add Day';
+
+  @override
+  String get routinesDeleteDay => 'Delete Day';
+
+  @override
+  String get routinesDayEmpty => 'No days yet';
+
+  @override
+  String get routinesDayEmptySubtitle => 'Add days to your routine';
+
+  @override
+  String get routinesNoExercises => 'No exercises added';
+
+  @override
+  String get routinesAddExercise => 'Add Exercise';
+
+  @override
+  String get routinesRestTimeTitle => 'Rest Time';
+
+  @override
   String get restTimerTitle => 'Rest Timer';
 
   @override

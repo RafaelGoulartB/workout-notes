@@ -655,6 +655,46 @@ class AppLocalizationsPt extends AppLocalizations {
       'Todos os dados da rotina serão perdidos.';
 
   @override
+  String get routinesEmptyTitle => 'Nenhuma rotina ainda';
+
+  @override
+  String get routinesEmptySubtitle =>
+      'Crie uma rotina para treinar mais rápido';
+
+  @override
+  String get routinesRename => 'Renomear';
+
+  @override
+  String get routinesNewDay => 'Novo Dia';
+
+  @override
+  String get routinesDayName => 'Nome do Dia';
+
+  @override
+  String get routinesDayNameHint => 'Ex: Push Day, Segunda-Feira';
+
+  @override
+  String get routinesAddDay => 'Adicionar Dia';
+
+  @override
+  String get routinesDeleteDay => 'Excluir Dia';
+
+  @override
+  String get routinesDayEmpty => 'Nenhum dia ainda';
+
+  @override
+  String get routinesDayEmptySubtitle => 'Adicione dias para sua rotina';
+
+  @override
+  String get routinesNoExercises => 'Nenhum exercício adicionado';
+
+  @override
+  String get routinesAddExercise => 'Adicionar Exercício';
+
+  @override
+  String get routinesRestTimeTitle => 'Tempo de Descanso';
+
+  @override
   String get restTimerTitle => 'Temporizador';
 
   @override

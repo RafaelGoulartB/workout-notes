@@ -1310,6 +1310,84 @@ abstract class AppLocalizations {
   /// **'All routine data will be lost.'**
   String get routinesDeleteContent;
 
+  /// No description provided for @routinesEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No routines yet'**
+  String get routinesEmptyTitle;
+
+  /// No description provided for @routinesEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a routine to train faster'**
+  String get routinesEmptySubtitle;
+
+  /// No description provided for @routinesRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get routinesRename;
+
+  /// No description provided for @routinesNewDay.
+  ///
+  /// In en, this message translates to:
+  /// **'New Day'**
+  String get routinesNewDay;
+
+  /// No description provided for @routinesDayName.
+  ///
+  /// In en, this message translates to:
+  /// **'Day Name'**
+  String get routinesDayName;
+
+  /// No description provided for @routinesDayNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ex: Push Day, Monday'**
+  String get routinesDayNameHint;
+
+  /// No description provided for @routinesAddDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Day'**
+  String get routinesAddDay;
+
+  /// No description provided for @routinesDeleteDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Day'**
+  String get routinesDeleteDay;
+
+  /// No description provided for @routinesDayEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No days yet'**
+  String get routinesDayEmpty;
+
+  /// No description provided for @routinesDayEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add days to your routine'**
+  String get routinesDayEmptySubtitle;
+
+  /// No description provided for @routinesNoExercises.
+  ///
+  /// In en, this message translates to:
+  /// **'No exercises added'**
+  String get routinesNoExercises;
+
+  /// No description provided for @routinesAddExercise.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Exercise'**
+  String get routinesAddExercise;
+
+  /// No description provided for @routinesRestTimeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest Time'**
+  String get routinesRestTimeTitle;
+
   /// No description provided for @restTimerTitle.
   ///
   /// In en, this message translates to:
