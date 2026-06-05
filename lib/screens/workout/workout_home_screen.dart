@@ -106,8 +106,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       if (mounted) {
         setState(() {
           _activeWorkouts = active;
-          _upcomingWorkouts = futureWorkouts;
-          _completedWorkouts = completed;
+          _upcomingWorkouts = futureWorkouts.take(5).toList();
+          _completedWorkouts = completed.take(5).toList();
           _isLoading = false;
         });
       }
