@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../database/database_helper.dart';
 import 'exercise_form_screen.dart';
+import 'exercise_detail_tabs_screen.dart';
 
 class ExerciseLibraryScreen extends StatefulWidget {
   const ExerciseLibraryScreen({super.key});
@@ -153,7 +154,10 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                                   final result = await Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => ExerciseFormScreen(exerciseId: ex['id'] as String),
+                                      builder: (_) => ExerciseDetailTabsScreen(
+                                        exerciseId: ex['id'] as String,
+                                        exerciseName: ex['name'] as String,
+                                      ),
                                     ),
                                   );
                                   if (result == true) _load();
