@@ -446,17 +446,20 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       'rest_time_seconds': rt,
     });
 
-    // Auto-populate from last workout
-    final lastSets = await _db.getLastWorkoutSets(exerciseId);
-    if (lastSets.isNotEmpty) {
-      for (int i = 0; i < lastSets.length; i++) {
+    // Auto-populate sets from last workout (excluding current workout)
+    List<Map<String, dynamic>> autoSets = [];
+    if (_workoutId != null) {
+      final lastSets = await _db.getLastWorkoutSets(exerciseId, excludeWorkoutId: _workoutId);
+      for (final s in lastSets) {
         await _db.addSet(
           exerciseEntryId: entryId,
-          weight: (lastSets[i]['weight'] as num?)?.toDouble(),
-          reps: (lastSets[i]['reps'] as int?),
-          isWarmup: (lastSets[i]['is_warmup'] as int?) == 1,
+          weight: (s['weight'] as num?)?.toDouble(),
+          reps: (s['reps'] as int?),
+          isWarmup: (s['is_warmup'] as int?) == 1,
         );
       }
+      // Reload the newly created sets to get their IDs
+      autoSets = await _db.getExerciseSets(entryId);
     }
 
     setState(() {
@@ -467,7 +470,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         exerciseType: 'weightReps',
         categoryName: catName,
         categoryColor: catColor,
-        sets: [],
+        sets: autoSets,
         restTimeSeconds: rt,
       ));
     });

@@ -783,18 +783,37 @@ class DatabaseHelper {
       where: 'id = ?', whereArgs: [exerciseEntryId]);
   }
 
-  Future<List<Map<String, dynamic>>> getLastWorkoutSets(String exerciseId) async {
+  /// Returns the sets from the **single most recent** workout that had this
+  /// exercise, excluding [excludeWorkoutId] (the current workout).
+  Future<List<Map<String, dynamic>>> getLastWorkoutSets(
+      String exerciseId, {String? excludeWorkoutId}) async {
     final db = await database;
+
+    // First, find the most recent workout ID that has this exercise
+    String where = 'ee.exercise_id = ?';
+    final args = <dynamic>[exerciseId];
+    if (excludeWorkoutId != null) {
+      where += ' AND w.id != ?';
+      args.add(excludeWorkoutId);
+    }
+    final lastWid = await db.rawQuery('''
+      SELECT ee.workout_id FROM exercise_entries ee
+      JOIN workouts w ON ee.workout_id = w.id
+      WHERE $where
+      ORDER BY w.date DESC, w.start_time DESC
+      LIMIT 1
+    ''', args);
+
+    if (lastWid.isEmpty) return [];
+    final workoutId = lastWid.first['workout_id'] as String;
+
+    // Then, get all sets from that single workout
     return db.rawQuery('''
       SELECT s.* FROM sets s
       JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
-      JOIN workouts w ON ee.workout_id = w.id
-      WHERE ee.exercise_id = ? AND w.id != (
-        SELECT id FROM workouts ORDER BY date DESC LIMIT 1
-      )
-      ORDER BY w.date DESC, s.order_index ASC
-      LIMIT 10
-    ''', [exerciseId]);
+      WHERE ee.exercise_id = ? AND ee.workout_id = ?
+      ORDER BY s.order_index ASC
+    ''', [exerciseId, workoutId]);
   }
 
   // ===================================================================
