@@ -129,7 +129,7 @@ class NotificationService {
         _workoutChannelId,
         _workoutChannelName,
         description: _workoutChannelDesc,
-        importance: Importance.low,
+        importance: Importance.defaultImportance,
         playSound: _workoutSound,
         enableVibration: _workoutVibration,
       ),
@@ -199,10 +199,9 @@ class NotificationService {
   // ── Workout Timer Notifications ──
 
   /// Show or update the workout timer notification.
+  /// The elapsed time is shown in the notification body only (no header timer).
   Future<void> showWorkoutTimer(String elapsedFormatted) async {
     if (!_initialized || !_workoutEnabled) return;
-
-    final durationParts = _parseDurationParts(elapsedFormatted);
 
     await _plugin.show(
       _workoutTimerId,
@@ -213,14 +212,12 @@ class NotificationService {
           _workoutChannelId,
           _workoutChannelName,
           channelDescription: _workoutChannelDesc,
-          importance: Importance.low,
-          priority: Priority.low,
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
           ongoing: true,
           autoCancel: false,
           onlyAlertOnce: true,
           showWhen: false,
-          usesChronometer: durationParts != null,
-          chronometerCountDown: false,
         ),
       ),
     );
@@ -245,27 +242,7 @@ class NotificationService {
     return '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
   }
 
-  /// Try to parse a formatted elapsed string into (hours, minutes, seconds).
-  /// Returns null if parsing fails (e.g. custom format).
-  (int hours, int minutes, int seconds)? _parseDurationParts(String formatted) {
-    // Formats: "MM:SS" or "XhXXmin"
-    try {
-      if (formatted.contains('h')) {
-        // e.g. "1h15min"
-        final parts = formatted.split('h');
-        final h = int.parse(parts[0]);
-        final minPart = parts[1].replaceAll('min', '');
-        final m = int.parse(minPart);
-        return (h, m, 0);
-      } else {
-        // e.g. "15:32"
-        final parts = formatted.split(':');
-        final m = int.parse(parts[0]);
-        final s = int.parse(parts[1]);
-        return (0, m, s);
-      }
-    } catch (_) {
-      return null;
-    }
-  }
+  @override
+  String toString() => 'NotificationService(initialized: $_initialized)';
+
 }

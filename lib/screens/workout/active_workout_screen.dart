@@ -529,8 +529,27 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     setState(() {});
 
     if (!wasComplete && parentExercise != null && mounted) {
-      // Auto-start rest timer
-      _timerService.start(parentExercise.restTimeSeconds);
+      // Check if all sets are now complete (this was the last one)
+      bool allComplete = true;
+      for (final ex in _exercises) {
+        for (final s in ex.sets) {
+          if ((s['is_complete'] as int?) != 1) {
+            allComplete = false;
+            break;
+          }
+        }
+        if (!allComplete) break;
+      }
+
+      // If this was the last set, cancel any active rest timer
+      if (allComplete) {
+        if (_timerService.isActive) {
+          _timerService.stop();
+        }
+      } else {
+        // Auto-start rest timer for next set
+        _timerService.start(parentExercise.restTimeSeconds);
+      }
 
       // Auto-start workout timer if enabled and not started
       if (_autoStartTimer && _timerStart == null && _timerEnd == null) {
@@ -538,20 +557,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       }
 
       // Auto-stop workout timer if all sets are now complete
-      if (_autoStartTimer) {
-        bool allComplete = true;
-        for (final ex in _exercises) {
-          for (final s in ex.sets) {
-            if ((s['is_complete'] as int?) != 1) {
-              allComplete = false;
-              break;
-            }
-          }
-          if (!allComplete) break;
-        }
-        if (allComplete && _timerStart != null && _timerEnd == null) {
-          await _stopTimer();
-        }
+      if (_autoStartTimer && allComplete && _timerStart != null && _timerEnd == null) {
+        await _stopTimer();
       }
     }
   }
