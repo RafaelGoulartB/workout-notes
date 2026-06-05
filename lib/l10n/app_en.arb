@@ -1,10 +1,9 @@
 {
   "@@locale": "en",
-  "@@info": "Life Notes - English translations",
+  "@@info": "Workout Notes - English translations",
 
-  "appTitle": "Life Notes",
+  "appTitle": "Workout Notes",
 
-  "tabNotes": "Notes",
   "tabWorkout": "Workout",
 
   "commonCancel": "Cancel",
@@ -32,28 +31,6 @@
   "accentColorDarkBlue": "Dark Blue",
   "accentColorGraphite": "Graphite",
   "accentColorForestGreen": "Forest Green",
-
-  "homeTitle": "Life Notes",
-  "homeWelcome": "Welcome to Life Notes",
-  "homeSubtitle": "Start capturing your thoughts, memories,\nand everyday moments.",
-  "homeNewNote": "New Note",
-  "homeWriteFirstNote": "Write your first note",
-  "homeEmptyTitle": "Untitled",
-  "homeDeleteConfirmTitle": "Delete Note",
-  "homeDeleteConfirmContent": "Are you sure you want to delete \"{title}\"?",
-  "homeDeleteSuccess": "\"{title}\" deleted",
-  "homeDeleteTooltip": "Delete",
-
-  "noteEditorTitleNew": "New Note",
-  "noteEditorTitleEdit": "Edit Note",
-  "noteEditorHintTitle": "Title",
-  "noteEditorHintContent": "What's on your mind?",
-  "noteEditorSave": "Save",
-  "noteEditorDiscardTitle": "Discard changes?",
-  "noteEditorDiscardContent": "You have unsaved changes.",
-  "noteEditorKeepEditing": "Keep editing",
-  "noteEditorDiscard": "Discard",
-  "noteEditorEmptyError": "Write something before saving",
 
   "workoutHomeTitle": "Workout",
   "workoutHomeHistoryTooltip": "History",
@@ -124,7 +101,7 @@
   "settingsGenerateContent": "This will add fictional workouts from recent months to test charts and features.\n\nUse \"Delete All History\" to remove them later.",
   "settingsGenerate": "Generate",
   "settingsAbout": "About",
-  "settingsAboutSubtitle": "Life Notes Workout v1.0",
+  "settingsAboutSubtitle": "Workout Notes v1.0",
   "settingsDeleteAllHistory": "Delete All Workout History",
   "settingsDeleteHistoryTitle": "Delete All History?",
   "settingsDeleteHistoryContent": "All workouts, sets and registered exercises will be deleted. This action cannot be undone.",
@@ -322,8 +299,8 @@
   "notificationWorkoutChannelName": "Workout Timer",
   "notificationWorkoutChannelDesc": "Active workout timer notifications",
 
-  "exportServiceBackupText": "Life Notes - Workout Backup",
-  "exportServiceCsvText": "Life Notes - Workout Export",
+  "exportServiceBackupText": "Workout Notes - Workout Backup",
+  "exportServiceCsvText": "Workout Notes - Workout Export",
   "exportServiceCsvHeaderDate": "Date",
   "exportServiceCsvHeaderExercise": "Exercise",
   "exportServiceCsvHeaderCategory": "Category",

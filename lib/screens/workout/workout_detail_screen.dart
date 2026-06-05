@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:life_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 import '../../services/export_service.dart';
 import 'active_workout_screen.dart';

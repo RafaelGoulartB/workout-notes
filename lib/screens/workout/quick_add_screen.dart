@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
-import 'package:life_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 
 class QuickAddScreen extends StatefulWidget {

@@ -101,14 +101,8 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'Life Notes'**
+  /// **'Workout Notes'**
   String get appTitle;
-
-  /// No description provided for @tabNotes.
-  ///
-  /// In en, this message translates to:
-  /// **'Notes'**
-  String get tabNotes;
 
   /// No description provided for @tabWorkout.
   ///
@@ -259,126 +253,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Forest Green'**
   String get accentColorForestGreen;
-
-  /// No description provided for @homeTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Life Notes'**
-  String get homeTitle;
-
-  /// No description provided for @homeWelcome.
-  ///
-  /// In en, this message translates to:
-  /// **'Welcome to Life Notes'**
-  String get homeWelcome;
-
-  /// No description provided for @homeSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Start capturing your thoughts, memories,\nand everyday moments.'**
-  String get homeSubtitle;
-
-  /// No description provided for @homeNewNote.
-  ///
-  /// In en, this message translates to:
-  /// **'New Note'**
-  String get homeNewNote;
-
-  /// No description provided for @homeWriteFirstNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Write your first note'**
-  String get homeWriteFirstNote;
-
-  /// No description provided for @homeEmptyTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Untitled'**
-  String get homeEmptyTitle;
-
-  /// No description provided for @homeDeleteConfirmTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete Note'**
-  String get homeDeleteConfirmTitle;
-
-  /// No description provided for @homeDeleteConfirmContent.
-  ///
-  /// In en, this message translates to:
-  /// **'Are you sure you want to delete \"{title}\"?'**
-  String homeDeleteConfirmContent(Object title);
-
-  /// No description provided for @homeDeleteSuccess.
-  ///
-  /// In en, this message translates to:
-  /// **'\"{title}\" deleted'**
-  String homeDeleteSuccess(Object title);
-
-  /// No description provided for @homeDeleteTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete'**
-  String get homeDeleteTooltip;
-
-  /// No description provided for @noteEditorTitleNew.
-  ///
-  /// In en, this message translates to:
-  /// **'New Note'**
-  String get noteEditorTitleNew;
-
-  /// No description provided for @noteEditorTitleEdit.
-  ///
-  /// In en, this message translates to:
-  /// **'Edit Note'**
-  String get noteEditorTitleEdit;
-
-  /// No description provided for @noteEditorHintTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Title'**
-  String get noteEditorHintTitle;
-
-  /// No description provided for @noteEditorHintContent.
-  ///
-  /// In en, this message translates to:
-  /// **'What\'s on your mind?'**
-  String get noteEditorHintContent;
-
-  /// No description provided for @noteEditorSave.
-  ///
-  /// In en, this message translates to:
-  /// **'Save'**
-  String get noteEditorSave;
-
-  /// No description provided for @noteEditorDiscardTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Discard changes?'**
-  String get noteEditorDiscardTitle;
-
-  /// No description provided for @noteEditorDiscardContent.
-  ///
-  /// In en, this message translates to:
-  /// **'You have unsaved changes.'**
-  String get noteEditorDiscardContent;
-
-  /// No description provided for @noteEditorKeepEditing.
-  ///
-  /// In en, this message translates to:
-  /// **'Keep editing'**
-  String get noteEditorKeepEditing;
-
-  /// No description provided for @noteEditorDiscard.
-  ///
-  /// In en, this message translates to:
-  /// **'Discard'**
-  String get noteEditorDiscard;
-
-  /// No description provided for @noteEditorEmptyError.
-  ///
-  /// In en, this message translates to:
-  /// **'Write something before saving'**
-  String get noteEditorEmptyError;
 
   /// No description provided for @workoutHomeTitle.
   ///
@@ -791,7 +665,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsAboutSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Life Notes Workout v1.0'**
+  /// **'Workout Notes v1.0'**
   String get settingsAboutSubtitle;
 
   /// No description provided for @settingsDeleteAllHistory.
@@ -1889,13 +1763,13 @@ abstract class AppLocalizations {
   /// No description provided for @exportServiceBackupText.
   ///
   /// In en, this message translates to:
-  /// **'Life Notes - Workout Backup'**
+  /// **'Workout Notes - Workout Backup'**
   String get exportServiceBackupText;
 
   /// No description provided for @exportServiceCsvText.
   ///
   /// In en, this message translates to:
-  /// **'Life Notes - Workout Export'**
+  /// **'Workout Notes - Workout Export'**
   String get exportServiceCsvText;
 
   /// No description provided for @exportServiceCsvHeaderDate.

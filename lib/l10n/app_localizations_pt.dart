@@ -9,10 +9,7 @@ class AppLocalizationsPt extends AppLocalizations {
   AppLocalizationsPt([String locale = 'pt']) : super(locale);
 
   @override
-  String get appTitle => 'Life Notes';
-
-  @override
-  String get tabNotes => 'Notas';
+  String get appTitle => 'Workout Notes';
 
   @override
   String get tabWorkout => 'Treino';
@@ -90,71 +87,6 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get accentColorForestGreen => 'Verde Musgo';
-
-  @override
-  String get homeTitle => 'Life Notes';
-
-  @override
-  String get homeWelcome => 'Bem-vindo ao Life Notes';
-
-  @override
-  String get homeSubtitle =>
-      'Comece a capturar seus pensamentos, memórias\ne momentos do dia a dia.';
-
-  @override
-  String get homeNewNote => 'Nova Nota';
-
-  @override
-  String get homeWriteFirstNote => 'Escreva sua primeira nota';
-
-  @override
-  String get homeEmptyTitle => 'Sem título';
-
-  @override
-  String get homeDeleteConfirmTitle => 'Excluir Nota';
-
-  @override
-  String homeDeleteConfirmContent(Object title) {
-    return 'Tem certeza que deseja excluir \"$title\"?';
-  }
-
-  @override
-  String homeDeleteSuccess(Object title) {
-    return '\"$title\" excluída';
-  }
-
-  @override
-  String get homeDeleteTooltip => 'Excluir';
-
-  @override
-  String get noteEditorTitleNew => 'Nova Nota';
-
-  @override
-  String get noteEditorTitleEdit => 'Editar Nota';
-
-  @override
-  String get noteEditorHintTitle => 'Título';
-
-  @override
-  String get noteEditorHintContent => 'O que você está pensando?';
-
-  @override
-  String get noteEditorSave => 'Salvar';
-
-  @override
-  String get noteEditorDiscardTitle => 'Descartar alterações?';
-
-  @override
-  String get noteEditorDiscardContent => 'Você tem alterações não salvas.';
-
-  @override
-  String get noteEditorKeepEditing => 'Continuar editando';
-
-  @override
-  String get noteEditorDiscard => 'Descartar';
-
-  @override
-  String get noteEditorEmptyError => 'Escreva algo antes de salvar';
 
   @override
   String get workoutHomeTitle => 'Treino';
@@ -370,7 +302,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get settingsAbout => 'Sobre';
 
   @override
-  String get settingsAboutSubtitle => 'Life Notes Workout v1.0';
+  String get settingsAboutSubtitle => 'Workout Notes v1.0';
 
   @override
   String get settingsDeleteAllHistory => 'Excluir Todo Histórico de Treinos';
@@ -960,10 +892,10 @@ class AppLocalizationsPt extends AppLocalizations {
       'Notificações do temporizador de treino ativo';
 
   @override
-  String get exportServiceBackupText => 'Life Notes - Backup de Treinos';
+  String get exportServiceBackupText => 'Workout Notes - Backup de Treinos';
 
   @override
-  String get exportServiceCsvText => 'Life Notes - Exportação de Treinos';
+  String get exportServiceCsvText => 'Workout Notes - Exportação de Treinos';
 
   @override
   String get exportServiceCsvHeaderDate => 'Data';

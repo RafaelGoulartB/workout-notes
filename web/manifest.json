@@ -1,6 +1,6 @@
 {
-    "name": "life_notes",
-    "short_name": "life_notes",
+    "name": "workout_notes",
+    "short_name": "workout_notes",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

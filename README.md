@@ -1,8 +1,8 @@
-# Life Notes 🏋️
+# Workout Notes 🏋️
 
 > A beautiful workout tracker built with Flutter.
 
-**Life Notes** helps you track your workouts, log sets, monitor progress, and stay motivated — all with a clean Material 3 design and automatic dark mode.
+**Workout Notes** helps you track your workouts, log sets, monitor progress, and stay motivated — all with a clean Material 3 design and automatic dark mode.
 
 ---
 
@@ -49,10 +49,10 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/life_notes.git
+git clone https://github.com/yourusername/workout_notes.git
 
 # Navigate to the project
-cd life_notes
+cd workout_notes
 
 # Get dependencies
 flutter pub get

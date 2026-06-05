@@ -1,10 +1,9 @@
 {
   "@@locale": "pt",
-  "@@info": "Life Notes - Traduções em Português (Brasil)",
+  "@@info": "Workout Notes - Traduções em Português (Brasil)",
 
-  "appTitle": "Life Notes",
+  "appTitle": "Workout Notes",
 
-  "tabNotes": "Notas",
   "tabWorkout": "Treino",
 
   "commonCancel": "Cancelar",
@@ -32,28 +31,6 @@
   "accentColorDarkBlue": "Azul Escuro",
   "accentColorGraphite": "Graphite",
   "accentColorForestGreen": "Verde Musgo",
-
-  "homeTitle": "Life Notes",
-  "homeWelcome": "Bem-vindo ao Life Notes",
-  "homeSubtitle": "Comece a capturar seus pensamentos, memórias\ne momentos do dia a dia.",
-  "homeNewNote": "Nova Nota",
-  "homeWriteFirstNote": "Escreva sua primeira nota",
-  "homeEmptyTitle": "Sem título",
-  "homeDeleteConfirmTitle": "Excluir Nota",
-  "homeDeleteConfirmContent": "Tem certeza que deseja excluir \"{title}\"?",
-  "homeDeleteSuccess": "\"{title}\" excluída",
-  "homeDeleteTooltip": "Excluir",
-
-  "noteEditorTitleNew": "Nova Nota",
-  "noteEditorTitleEdit": "Editar Nota",
-  "noteEditorHintTitle": "Título",
-  "noteEditorHintContent": "O que você está pensando?",
-  "noteEditorSave": "Salvar",
-  "noteEditorDiscardTitle": "Descartar alterações?",
-  "noteEditorDiscardContent": "Você tem alterações não salvas.",
-  "noteEditorKeepEditing": "Continuar editando",
-  "noteEditorDiscard": "Descartar",
-  "noteEditorEmptyError": "Escreva algo antes de salvar",
 
   "workoutHomeTitle": "Treino",
   "workoutHomeHistoryTooltip": "Histórico",
@@ -124,7 +101,7 @@
   "settingsGenerateContent": "Isso vai adicionar treinos fictícios nos últimos meses para testar gráficos e funcionalidades.\n\nUse \"Excluir Todo Histórico\" para remover depois.",
   "settingsGenerate": "Gerar",
   "settingsAbout": "Sobre",
-  "settingsAboutSubtitle": "Life Notes Workout v1.0",
+  "settingsAboutSubtitle": "Workout Notes v1.0",
   "settingsDeleteAllHistory": "Excluir Todo Histórico de Treinos",
   "settingsDeleteHistoryTitle": "Excluir Todo Histórico?",
   "settingsDeleteHistoryContent": "Todos os treinos, séries e exercícios registrados serão apagados. Esta ação não pode ser desfeita.",
@@ -322,8 +299,8 @@
   "notificationWorkoutChannelName": "Timer de Treino",
   "notificationWorkoutChannelDesc": "Notificações do temporizador de treino ativo",
 
-  "exportServiceBackupText": "Life Notes - Backup de Treinos",
-  "exportServiceCsvText": "Life Notes - Exportação de Treinos",
+  "exportServiceBackupText": "Workout Notes - Backup de Treinos",
+  "exportServiceCsvText": "Workout Notes - Exportação de Treinos",
   "exportServiceCsvHeaderDate": "Data",
   "exportServiceCsvHeaderExercise": "Exercício",
   "exportServiceCsvHeaderCategory": "Categoria",

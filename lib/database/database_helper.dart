@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'seed_data.dart';
 
 class DatabaseHelper {
-  static const _dbName = 'life_notes_workout.db';
+  static const _dbName = 'workout_notes.db';
   static const _dbVersion = 4;
 
   static DatabaseHelper? _instance;

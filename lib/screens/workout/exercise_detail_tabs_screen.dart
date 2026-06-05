@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:life_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 
 /// Tabbed detail screen for an exercise: Edit | History | Charts

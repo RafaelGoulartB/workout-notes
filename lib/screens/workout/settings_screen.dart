@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:life_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 import '../../database/test_seed_data.dart';
 import '../../services/export_service.dart';
@@ -27,9 +27,9 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   void initState() {
     super.initState();
     _selectedAccentIndex = AccentColors.indexOf(
-      LifeNotesApp.themeNotifier.seedColor,
+      WorkoutNotesApp.themeNotifier.seedColor,
     );
-    _selectedThemeMode = LifeNotesApp.themeNotifier.themeMode;
+    _selectedThemeMode = WorkoutNotesApp.themeNotifier.themeMode;
     _load();
   }
 
@@ -49,7 +49,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('accent_color', color.value);
     setState(() => _selectedAccentIndex = index);
-    LifeNotesApp.themeNotifier.setSeedColor(color);
+    WorkoutNotesApp.themeNotifier.setSeedColor(color);
   }
 
   Future<void> _changeThemeMode(ThemeMode mode) async {
@@ -68,7 +68,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     await prefs.setString('theme_mode', value);
     await _update('theme_mode', value);
     setState(() => _selectedThemeMode = mode);
-    LifeNotesApp.themeNotifier.setThemeMode(mode);
+    WorkoutNotesApp.themeNotifier.setThemeMode(mode);
   }
 
   Widget _buildThemeModeOption({
@@ -741,6 +741,6 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     await initializeDateFormatting(localeStr == 'pt' ? 'pt_BR' : 'en', null);
     Intl.defaultLocale = localeStr == 'pt' ? 'pt_BR' : 'en_US';
     
-    LifeNotesApp.localeNotifier.setLocale(newLocale);
+    WorkoutNotesApp.localeNotifier.setLocale(newLocale);
   }
 }

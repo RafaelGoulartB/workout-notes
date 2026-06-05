@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:life_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 import 'exercise_form_screen.dart';
 import 'exercise_detail_tabs_screen.dart';

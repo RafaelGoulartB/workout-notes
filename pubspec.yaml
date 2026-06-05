@@ -1,5 +1,5 @@
-name: life_notes
-description: "A personal journal app for capturing life's moments, thoughts, and memories."
+name: workout_notes
+description: "A workout tracker app for logging exercises, sets, and progress."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

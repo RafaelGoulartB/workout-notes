@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.lifenotes" "\0"
-            VALUE "FileDescription", "life_notes" "\0"
+            VALUE "CompanyName", "com.workoutnotes" "\0"
+            VALUE "FileDescription", "workout_notes" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "life_notes" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.lifenotes. All rights reserved." "\0"
-            VALUE "OriginalFilename", "life_notes.exe" "\0"
-            VALUE "ProductName", "life_notes" "\0"
+            VALUE "InternalName", "workout_notes" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.workoutnotes. All rights reserved." "\0"
+            VALUE "OriginalFilename", "workout_notes.exe" "\0"
+            VALUE "ProductName", "workout_notes" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

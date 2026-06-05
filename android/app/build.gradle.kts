@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.lifenotes.life_notes"
+    namespace = "com.workoutnotes.workout_notes"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -15,7 +15,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.lifenotes.life_notes"
+        applicationId = "com.workoutnotes.workout_notes"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
