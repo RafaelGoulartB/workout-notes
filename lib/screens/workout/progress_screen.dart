@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../database/database_helper.dart';
+import '../../widgets/collapsible_section.dart';
+import '../../widgets/workout_heatmap.dart';
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -13,19 +15,56 @@ class ProgressScreen extends StatefulWidget {
 class _ProgressScreenState extends State<ProgressScreen> {
   final _db = DatabaseHelper.instance;
   final _searchCtl = TextEditingController();
-  
   bool _isLoading = true;
-  
-  // Overview data
+
+  // === OVERVIEW DATA (loaded immediately) ===
   Map<String, dynamic>? _overviewStats;
   List<Map<String, dynamic>> _monthlyVolume = [];
-  
-  // Exercise detail data
+  Map<String, dynamic>? _monthReport;
+  Map<String, dynamic>? _monthComparison;
+
+  // === LAZY LOADING FLAGS ===
+  bool _isLoadingFrequency = false;
+  bool _isLoadingVolume = false;
+  bool _isLoadingPerformance = false;
+  bool _isLoadingDuration = false;
+  bool _isLoadingRecovery = false;
+  bool _isLoadingBody = false;
+  bool _loadedFrequency = false;
+  bool _loadedVolume = false;
+  bool _loadedPerformance = false;
+  bool _loadedDuration = false;
+  bool _loadedRecovery = false;
+  bool _loadedBody = false;
+
+  // === FREQUENCY DATA ===
+  Map<String, int> _heatmapData = {};
+  List<Map<String, dynamic>> _workoutDates = [];
+
+  // === VOLUME DATA ===
+  List<Map<String, dynamic>> _volumeByCategory = [];
+  List<Map<String, dynamic>> _topExercises = [];
+  List<Map<String, dynamic>> _energySystems = [];
+
+  // === PERFORMANCE DATA ===
   List<Map<String, dynamic>> _allExercises = [];
   List<Map<String, dynamic>> _exercisesWithData = [];
+  List<Map<String, dynamic>> _personalRecords = [];
+
+  // === DURATION / DENSITY ===
+  List<Map<String, dynamic>> _durationTrend = [];
+  List<Map<String, dynamic>> _densityData = [];
+
+  // === RECOVERY ===
+  List<Map<String, dynamic>> _feelingTrend = [];
+  List<Map<String, dynamic>> _feelingVsVolume = [];
+
+  // === BODY ===
+  List<Map<String, dynamic>> _bodyData = [];
+
+  // === EXERCISE DETAIL STATE ===
   Map<String, dynamic>? _selectedHistory;
   int _selectedChartType = 0;
-
   bool _showingOverview = true;
 
   static const _chartTypes = ['1RM', 'Peso Máx.', 'Volume', 'Total Reps'];
@@ -44,22 +83,149 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   Future<void> _load() async {
     setState(() => _isLoading = true);
-    
-    _allExercises = await _db.getExercises();
-    _overviewStats = await _db.getWorkoutOverviewStats();
-    _monthlyVolume = await _db.getMonthlyVolume();
-    _exercisesWithData = [];
+    final now = DateTime.now();
 
-    // Find exercises that have recorded data
-    for (final ex in _allExercises) {
-      final data = await _db.getExerciseHistory(ex['id'] as String, limit: 1);
-      final history = data['history'] as List? ?? [];
-      if (history.isNotEmpty) {
-        _exercisesWithData.add(ex);
-      }
+    try {
+      // Load only immediately visible data
+      final results = await Future.wait([
+        _db.getWorkoutOverviewStats(),
+        _db.getMonthlyVolume(),
+        _db.getMonthlyReport(now.year, now.month),
+        _db.getMonthComparison(now.year, now.month),
+      ]);
+
+      if (!mounted) return;
+
+      _overviewStats = results[0] as Map<String, dynamic>;
+      _monthlyVolume = results[1] as List<Map<String, dynamic>>;
+      _monthReport = results[2] as Map<String, dynamic>;
+      _monthComparison = results[3] as Map<String, dynamic>;
+
+      setState(() => _isLoading = false);
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
 
-    setState(() => _isLoading = false);
+  // ===================================================================
+  // LAZY LOADING METHODS (called when sections are expanded)
+  // ===================================================================
+
+  Future<void> _loadFrequency() async {
+    if (_loadedFrequency) return;
+    setState(() => _isLoadingFrequency = true);
+    final now = DateTime.now();
+    try {
+      final results = await Future.wait([
+        _db.getYearlyHeatmapData(now.year),
+        _db.getWorkoutDatesInRange(DateTime(now.year, 1, 1)),
+      ]);
+      if (!mounted) return;
+      _heatmapData = results[0] as Map<String, int>;
+      _workoutDates = results[1] as List<Map<String, dynamic>>;
+      _loadedFrequency = true;
+      setState(() => _isLoadingFrequency = false);
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingFrequency = false);
+    }
+  }
+
+  Future<void> _loadVolume() async {
+    if (_loadedVolume) return;
+    setState(() => _isLoadingVolume = true);
+    try {
+      final results = await Future.wait([
+        _db.getVolumeByCategory(),
+        _db.getTopExercisesByVolume(),
+        _db.getEnergySystemDistribution(),
+      ]);
+      if (!mounted) return;
+      _volumeByCategory = results[0] as List<Map<String, dynamic>>;
+      _topExercises = results[1] as List<Map<String, dynamic>>;
+      _energySystems = results[2] as List<Map<String, dynamic>>;
+      _loadedVolume = true;
+      setState(() => _isLoadingVolume = false);
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingVolume = false);
+    }
+  }
+
+  Future<void> _loadPerformance() async {
+    if (_loadedPerformance) return;
+    setState(() => _isLoadingPerformance = true);
+    try {
+      final results = await Future.wait([
+        _db.getPersonalRecords(),
+        _db.getExercises(),
+      ]);
+      if (!mounted) return;
+      _personalRecords = results[0] as List<Map<String, dynamic>>;
+      _allExercises = results[1] as List<Map<String, dynamic>>;
+      // Figure out which exercises have data
+      _exercisesWithData = [];
+      final exIdsWithData = <String>{};
+      for (final pr in _personalRecords) {
+        exIdsWithData.add(pr['exercise_id'] as String);
+      }
+      for (final ex in _allExercises) {
+        if (exIdsWithData.contains(ex['id'])) {
+          _exercisesWithData.add(ex);
+        }
+      }
+      _loadedPerformance = true;
+      setState(() => _isLoadingPerformance = false);
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingPerformance = false);
+    }
+  }
+
+  Future<void> _loadDuration() async {
+    if (_loadedDuration) return;
+    setState(() => _isLoadingDuration = true);
+    try {
+      final results = await Future.wait([
+        _db.getDurationTrend(),
+        _db.getWorkoutDensity(),
+      ]);
+      if (!mounted) return;
+      _durationTrend = results[0] as List<Map<String, dynamic>>;
+      _densityData = results[1] as List<Map<String, dynamic>>;
+      _loadedDuration = true;
+      setState(() => _isLoadingDuration = false);
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingDuration = false);
+    }
+  }
+
+  Future<void> _loadRecovery() async {
+    if (_loadedRecovery) return;
+    setState(() => _isLoadingRecovery = true);
+    try {
+      final results = await Future.wait([
+        _db.getFeelingTrend(),
+        _db.getFeelingVsVolume(),
+      ]);
+      if (!mounted) return;
+      _feelingTrend = results[0] as List<Map<String, dynamic>>;
+      _feelingVsVolume = results[1] as List<Map<String, dynamic>>;
+      _loadedRecovery = true;
+      setState(() => _isLoadingRecovery = false);
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingRecovery = false);
+    }
+  }
+
+  Future<void> _loadBody() async {
+    if (_loadedBody) return;
+    setState(() => _isLoadingBody = true);
+    try {
+      _bodyData = await _db.getBodyWeightWithVolume();
+      if (!mounted) return;
+      _loadedBody = true;
+      setState(() => _isLoadingBody = false);
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingBody = false);
+    }
   }
 
   Future<void> _loadHistory(String exerciseId) async {
@@ -70,7 +236,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
     });
   }
 
-  /// Calculates a "nice" interval for chart grid lines.
+  // =======================================================================
+  // HELPERS
+  // =======================================================================
+
   double _niceInterval(double range) {
     if (range <= 0) return 1;
     final rough = range / 5;
@@ -84,6 +253,34 @@ class _ProgressScreenState extends State<ProgressScreen> {
     else temp = 10;
     final result = temp * magnitude;
     return result < 0.5 ? 0.5 : result;
+  }
+
+  String _formatVolume(double v) {
+    if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
+    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
+    return v.toStringAsFixed(0);
+  }
+
+  String _monthLabel(String isoMonth) {
+    try {
+      return DateFormat('MMM', 'pt_BR').format(DateTime.parse(isoMonth));
+    } catch (_) {
+      return isoMonth.length >= 7 ? isoMonth.substring(5) : isoMonth;
+    }
+  }
+
+  String _weekLabel(DateTime date) {
+    final week = DateFormat('w', 'pt_BR').format(date);
+    return 'S$week';
+  }
+
+  Widget _sectionLoading(ThemeData theme) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(32),
+        child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+      ),
+    );
   }
 
   List<Map<String, dynamic>> get _filteredExercises {
@@ -116,85 +313,217 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  // ======================= OVERVIEW =======================
+  // =======================================================================
+  // OVERVIEW
+  // =======================================================================
 
   Widget _buildOverview(ThemeData theme) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Stats cards
+          // Monthly report card
+          _buildMonthlyReportCard(theme),
+          const SizedBox(height: 12),
+
+          // Enhanced stats row
           _buildStatsRow(theme),
-          const SizedBox(height: 16),
-
-          // Monthly volume chart
-          if (_monthlyVolume.isNotEmpty) ...[
-            Text('Volume por Mês', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            _buildMonthlyVolumeChart(theme),
-            const SizedBox(height: 20),
-          ],
-
-          // Exercises section header
-          Row(
-            children: [
-              Text('Exercícios', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '${_exercisesWithData.length}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onPrimaryContainer,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-
-          // Search
-          TextField(
-            controller: _searchCtl,
-            decoration: InputDecoration(
-              hintText: 'Buscar exercício...',
-              prefixIcon: const Icon(Icons.search, size: 20),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            ),
-            onChanged: (_) => setState(() {}),
-          ),
           const SizedBox(height: 8),
 
-          // Exercise list
-          if (_exercisesWithData.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    Icon(Icons.fitness_center_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
-                    const SizedBox(height: 12),
-                    Text('Nenhum exercício com dados registrados',
-                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                  ],
-                ),
-              ),
-            )
-          else
-            ..._buildExerciseCards(theme),
+          // Monthly volume chart (from existing)
+          if (_monthlyVolume.isNotEmpty) ...[
+            _buildMonthlyVolumeChart(theme),
+            const SizedBox(height: 4),
+          ],
+
+          // === Collapsible Sections (lazy loaded on expand) ===
+          _buildDivider(theme),
+          CollapsibleSection(
+            title: 'Frequência & Consistência',
+            icon: Icons.calendar_month,
+            iconColor: Colors.blue,
+            onExpanded: _loadFrequency,
+            child: _buildFrequencyContent(theme),
+          ),
+
+          _buildDivider(theme),
+          CollapsibleSection(
+            title: 'Volume & Grupos Musculares',
+            icon: Icons.pie_chart,
+            iconColor: Colors.teal,
+            onExpanded: _loadVolume,
+            child: _buildVolumeContent(theme),
+          ),
+
+          _buildDivider(theme),
+          CollapsibleSection(
+            title: 'Performance & Recordes',
+            icon: Icons.emoji_events,
+            iconColor: Colors.amber,
+            onExpanded: _loadPerformance,
+            child: _buildPerformanceContent(theme),
+          ),
+
+          _buildDivider(theme),
+          CollapsibleSection(
+            title: 'Duração & Eficiência',
+            icon: Icons.timer,
+            iconColor: Colors.purple,
+            onExpanded: _loadDuration,
+            child: _buildDurationContent(theme),
+          ),
+
+          _buildDivider(theme),
+          CollapsibleSection(
+            title: 'Recuperação & Bem-estar',
+            icon: Icons.favorite,
+            iconColor: Colors.red,
+            onExpanded: _loadRecovery,
+            child: _buildRecoveryContent(theme),
+          ),
+
+          _buildDivider(theme),
+          CollapsibleSection(
+            title: 'Medidas Corporais',
+            icon: Icons.monitor_weight,
+            iconColor: Colors.indigo,
+            onExpanded: _loadBody,
+            child: _buildBodyContent(theme),
+          ),
+
+          _buildDivider(theme),
+          const SizedBox(height: 16),
         ],
       ),
     );
   }
+
+  Widget _buildDivider(ThemeData theme) {
+    return Divider(height: 1, color: theme.colorScheme.outlineVariant.withAlpha(60));
+  }
+
+  // ===================== MONTHLY REPORT =====================
+
+  Widget _buildMonthlyReportCard(ThemeData theme) {
+    final report = _monthReport;
+    if (report == null) return const SizedBox.shrink();
+
+    final wc = report['workout_count'] as int? ?? 0;
+    final vol = (report['total_volume'] as double?) ?? 0;
+    final sets = report['total_sets'] as int? ?? 0;
+    final days = report['days_with_workouts'] as int? ?? 0;
+    final avgFeeling = report['avg_feeling'] as double?;
+
+    final comp = _monthComparison;
+    final deltaW = comp?['delta_workouts'] as int? ?? 0;
+    final deltaV = (comp?['delta_volume'] as double?) ?? 0;
+
+    final now = DateTime.now();
+    final monthName = DateFormat('MMMM', 'pt_BR').format(now);
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(100)),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            colors: [
+              theme.colorScheme.primaryContainer.withAlpha(120),
+              theme.colorScheme.surface,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.auto_graph, size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'RESUMO DE ${monthName.toUpperCase()}',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _MiniStat(icon: Icons.fitness_center, label: 'Treinos', value: '$wc',
+                    color: theme.colorScheme.primary, delta: deltaW, theme: theme),
+                const SizedBox(width: 8),
+                _MiniStat(icon: Icons.auto_graph, label: 'Volume', value: _formatVolume(vol),
+                    color: Colors.teal, delta: deltaV.toInt(), theme: theme),
+                const SizedBox(width: 8),
+                _MiniStat(icon: Icons.repeat, label: 'Séries', value: '$sets',
+                    color: theme.colorScheme.secondary, theme: theme),
+                const SizedBox(width: 8),
+                _MiniStat(icon: Icons.calendar_view_day, label: 'Dias', value: '$days',
+                    color: Colors.blue, theme: theme),
+              ],
+            ),
+            if (avgFeeling != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.star, size: 14, color: Colors.amber),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Sentimento médio: ${avgFeeling.toStringAsFixed(1)} ★',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (deltaW != 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: deltaW > 0 ? Colors.green.withAlpha(25) : Colors.red.withAlpha(25),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            deltaW > 0 ? Icons.trending_up : Icons.trending_down,
+                            size: 14,
+                            color: deltaW > 0 ? Colors.green : Colors.red,
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${deltaW > 0 ? '+' : ''}$deltaW vs mês ant.',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: deltaW > 0 ? Colors.green : Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===================== STATS ROW =====================
 
   Widget _buildStatsRow(ThemeData theme) {
     final stats = _overviewStats;
@@ -209,19 +538,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
           label: 'Treinos', value: '$totalWorkouts',
           icon: Icons.fitness_center, color: theme.colorScheme.primary,
         )),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         Expanded(child: _StatCard(
           label: 'Séries', value: '$totalSets',
           icon: Icons.repeat, color: theme.colorScheme.secondary,
         )),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         Expanded(child: _StatCard(
           label: 'Volume', value: totalVolume >= 1000
               ? '${(totalVolume / 1000).toStringAsFixed(1)}k'
               : '$totalVolume',
           icon: Icons.auto_graph, color: Colors.teal,
         )),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         Expanded(child: _StatCard(
           label: 'Sequência', value: '$streak ${streak == 1 ? 'dia' : 'dias'}',
           icon: Icons.local_fire_department, color: Colors.orange,
@@ -230,10 +559,97 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  Widget _buildMonthlyVolumeChart(ThemeData theme) {
-    final volumes = _monthlyVolume.map((m) => (m['volume'] as double?) ?? 0).toList();
-    final maxVol = volumes.fold<double>(0, (a, b) => a > b ? a : b);
-    if (maxVol <= 0) return const SizedBox.shrink();
+  // ===================== FREQUENCY CONTENT =====================
+
+  Widget _buildFrequencyContent(ThemeData theme) {
+    if (_isLoadingFrequency) return _sectionLoading(theme);
+    if (!_loadedFrequency) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Heatmap
+        Text('Mapa de calor anual', style: theme.textTheme.bodySmall?.copyWith(
+          fontWeight: FontWeight.w600, color: theme.colorScheme.onSurfaceVariant,
+        )),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: WorkoutHeatmap(dailyData: _heatmapData, year: DateTime.now().year),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            const Spacer(),
+            _buildLegend(),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Weekly frequency chart
+        if (_workoutDates.isNotEmpty) ...[
+          Text('Frequência semanal (últimas 12 semanas)',
+              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          _buildWeeklyFrequencyChart(theme),
+          const SizedBox(height: 16),
+        ],
+
+        // Day of week + Time of day side by side
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _buildDayOfWeekChart(theme)),
+            const SizedBox(width: 8),
+            Expanded(child: _buildTimeOfDayChart(theme)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLegend() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _legendDot(Colors.green.shade200),
+        _legendDot(Colors.green.shade400),
+        _legendDot(Colors.green.shade600),
+        _legendDot(Colors.green.shade800),
+        const SizedBox(width: 4),
+        Text('+ volume', style: TextStyle(fontSize: 9, color: Colors.grey)),
+      ],
+    );
+  }
+
+  Widget _legendDot(Color color) {
+    return Container(
+      width: 8, height: 8, margin: const EdgeInsets.symmetric(horizontal: 1),
+      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(1)),
+    );
+  }
+
+  Widget _buildWeeklyFrequencyChart(ThemeData theme) {
+    final now = DateTime.now();
+    final weeks = <_WeekBar>[];
+
+    // Build last 12 weeks
+    for (int i = 11; i >= 0; i--) {
+      final weekStart = now.subtract(Duration(days: now.weekday - 1 + (i * 7)));
+      final weekEnd = weekStart.add(const Duration(days: 6));
+      final startStr = weekStart.toIso8601String().substring(0, 10);
+      final endStr = weekEnd.toIso8601String().substring(0, 10);
+
+      int count = 0;
+      for (final wd in _workoutDates) {
+        final d = wd['date'] as String? ?? '';
+        if (d.compareTo(startStr) >= 0 && d.compareTo(endStr) <= 0) {
+          count++;
+        }
+      }
+      weeks.add(_WeekBar(_weekLabel(weekStart), count));
+    }
+
+    final maxCount = weeks.fold<int>(0, (a, b) => a > b.count ? a : b.count);
 
     return Card(
       elevation: 0,
@@ -242,56 +658,49 @@ class _ProgressScreenState extends State<ProgressScreen> {
         side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: SizedBox(
-          height: 180,
+          height: 140,
           child: BarChart(
             BarChartData(
               alignment: BarChartAlignment.spaceAround,
-              maxY: maxVol * 1.15,
+              maxY: maxCount < 5 ? 5 : maxCount * 1.2,
               barTouchData: BarTouchData(
                 touchTooltipData: BarTouchTooltipData(
-                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                    final m = _monthlyVolume[groupIndex];
-                    final month = m['month'] as String? ?? '';
-                    final vol = (m['volume'] as double?) ?? 0;
-                    final wo = (m['workouts'] as int?) ?? 0;
+                  getTooltipItem: (g, gi, r, ri) {
+                    final w = weeks[gi];
                     return BarTooltipItem(
-                      '${_monthLabel(month)}\n${_formatVolume(vol)}\n${wo} treinos',
+                      '${w.label}: ${w.count} treinos',
                       TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 12),
                     );
                   },
                 ),
               ),
               titlesData: FlTitlesData(
-                show: true,
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
                     getTitlesWidget: (v, _) {
                       final idx = v.toInt();
-                      if (idx < 0 || idx >= _monthlyVolume.length) return const SizedBox.shrink();
-                      final month = _monthlyVolume[idx]['month'] as String? ?? '';
+                      if (idx < 0 || idx >= weeks.length) return const SizedBox.shrink();
+                      // Show every other label
+                      if (weeks.length > 6 && idx % 2 != 0) return const SizedBox.shrink();
                       return Padding(
                         padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          month.length >= 7 ? month.substring(5, 7) : '',
-                          style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
-                        ),
+                        child: Text(weeks[idx].label,
+                            style: theme.textTheme.bodySmall?.copyWith(fontSize: 8)),
                       );
                     },
+                    reservedSize: 20,
                   ),
                 ),
                 leftTitles: AxisTitles(
                   sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 36,
+                    showTitles: true, reservedSize: 20,
                     getTitlesWidget: (v, _) {
                       if (v == 0) return const SizedBox.shrink();
-                      return Text(
-                        _formatVolume(v),
-                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 9),
-                      );
+                      return Text('${v.toInt()}',
+                          style: theme.textTheme.bodySmall?.copyWith(fontSize: 9));
                     },
                   ),
                 ),
@@ -300,28 +709,22 @@ class _ProgressScreenState extends State<ProgressScreen> {
               ),
               borderData: FlBorderData(show: false),
               gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                horizontalInterval: maxVol > 0 ? _niceInterval(maxVol / 4) : 1,
+                show: true, drawVerticalLine: false,
+                horizontalInterval: _niceInterval(maxCount > 0 ? maxCount / 4 : 1),
               ),
-              barGroups: _monthlyVolume.asMap().entries.map((entry) {
-                final idx = entry.key;
-                final vol = (entry.value['volume'] as double?) ?? 0;
-                return BarChartGroupData(
-                  x: idx,
-                  barRods: [
-                    BarChartRodData(
-                      toY: vol,
-                      color: theme.colorScheme.primary,
-                      width: 20,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(4),
-                        topRight: Radius.circular(4),
-                      ),
+              barGroups: weeks.asMap().entries.map((e) => BarChartGroupData(
+                x: e.key,
+                barRods: [
+                  BarChartRodData(
+                    toY: e.value.count.toDouble(),
+                    color: theme.colorScheme.primary,
+                    width: 16,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(4), topRight: Radius.circular(4),
                     ),
-                  ],
-                );
-              }).toList(),
+                  ),
+                ],
+              )).toList(),
             ),
           ),
         ),
@@ -329,35 +732,494 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  String _monthLabel(String isoMonth) {
-    try {
-      return DateFormat('MMM', 'pt_BR').format(DateTime.parse(isoMonth));
-    } catch (_) {
-      return isoMonth.length >= 7 ? isoMonth.substring(5) : isoMonth;
+  Widget _buildDayOfWeekChart(ThemeData theme) {
+    final dowCount = <int, int>{0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0};
+    for (final wd in _workoutDates) {
+      final dow = wd['day_of_week'] as int? ?? 0;
+      dowCount[dow] = (dowCount[dow] ?? 0) + 1;
     }
+
+    final labels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    final maxVal = dowCount.values.fold<int>(0, (a, b) => a > b ? a : b);
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Dia da semana', style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600, fontSize: 10)),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 120,
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: maxVal < 3 ? 3 : maxVal * 1.2,
+                  barTouchData: BarTouchData(enabled: false),
+                  titlesData: FlTitlesData(
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true, reservedSize: 16,
+                        getTitlesWidget: (v, _) {
+                          final idx = v.toInt();
+                          if (idx < 0 || idx >= 7) return const SizedBox.shrink();
+                          return Text(labels[idx],
+                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 8));
+                        },
+                      ),
+                    ),
+                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  gridData: FlGridData(show: false),
+                  barGroups: List.generate(7, (i) => BarChartGroupData(
+                    x: i,
+                    barRods: [
+                      BarChartRodData(
+                        toY: (dowCount[i] ?? 0).toDouble(),
+                        color: _dowColor(i, theme),
+                        width: 10,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(3), topRight: Radius.circular(3),
+                        ),
+                      ),
+                    ],
+                  )),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  String _formatVolume(double v) {
-    if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
-    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
-    return v.toStringAsFixed(0);
+  Color _dowColor(int dow, ThemeData theme) {
+    if (dow == 0 || dow == 6) return Colors.orange.withAlpha(180);
+    return theme.colorScheme.primary;
+  }
+
+  Widget _buildTimeOfDayChart(ThemeData theme) {
+    final periods = {'manhã': 0, 'tarde': 0, 'noite': 0, 'madrugada': 0};
+    for (final wd in _workoutDates) {
+      final startTime = wd['start_time'] as String?;
+      if (startTime == null) continue;
+      try {
+        final hour = DateTime.parse(startTime).hour;
+        if (hour < 6) periods['madrugada'] = periods['madrugada']! + 1;
+        else if (hour < 12) periods['manhã'] = periods['manhã']! + 1;
+        else if (hour < 18) periods['tarde'] = periods['tarde']! + 1;
+        else periods['noite'] = periods['noite']! + 1;
+      } catch (_) {}
+    }
+
+    final total = periods.values.fold<int>(0, (a, b) => a + b);
+    if (total == 0) {
+      return Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            children: [
+              Text('Horário', style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600, fontSize: 10)),
+              const SizedBox(height: 20),
+              Icon(Icons.access_time, size: 24, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
+              Text('Sem dados', style: theme.textTheme.bodySmall?.copyWith(fontSize: 9)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final colors = [Colors.orange, Colors.amber, Colors.indigo, Colors.deepPurple];
+    final labels = ['Manhã', 'Tarde', 'Noite', 'Madrugada'];
+    final values = [periods['manhã']!, periods['tarde']!, periods['noite']!, periods['madrugada']!];
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Horário', style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600, fontSize: 10)),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 120,
+              child: PieChart(
+                PieChartData(
+                  sectionsSpace: 1,
+                  centerSpaceRadius: 20,
+                  sections: List.generate(4, (i) {
+                    if (values[i] == 0) return PieChartSectionData(color: Colors.transparent, value: 0, showTitle: false);
+                    return PieChartSectionData(
+                      color: colors[i],
+                      value: values[i].toDouble(),
+                      title: '${(values[i] / total * 100).toStringAsFixed(0)}%',
+                      titleStyle: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
+                      radius: 28,
+                    );
+                  }).where((s) => s.value > 0).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            ...List.generate(4, (i) {
+              if (values[i] == 0) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 1),
+                child: Row(
+                  children: [
+                    Container(width: 6, height: 6, decoration: BoxDecoration(
+                      color: colors[i], shape: BoxShape.circle,
+                    )),
+                    const SizedBox(width: 4),
+                    Text('${labels[i]}: ${values[i]}', style: TextStyle(fontSize: 8)),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===================== VOLUME CONTENT =====================
+
+  Widget _buildVolumeContent(ThemeData theme) {
+    if (_isLoadingVolume) return _sectionLoading(theme);
+    if (!_loadedVolume) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Volume by category (pie) + Energy system (mini) side by side
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 3, child: _buildVolumeByCategoryPie(theme)),
+            const SizedBox(width: 8),
+            Expanded(flex: 2, child: _buildEnergySystemMini(theme)),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Top exercises
+        if (_topExercises.isNotEmpty) ...[
+          Text('Top Exercícios por Volume',
+              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          _buildTopExercisesChart(theme),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildVolumeByCategoryPie(ThemeData theme) {
+    if (_volumeByCategory.isEmpty) {
+      return Card(
+        elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Center(child: Text('Sem dados', style: theme.textTheme.bodySmall)),
+        ),
+      );
+    }
+
+    final total = _volumeByCategory.fold<double>(0, (a, b) => a + ((b['volume'] as num?)?.toDouble() ?? 0));
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Volume por Grupo', style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600, fontSize: 10)),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 150,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: PieChart(
+                      PieChartData(
+                        sectionsSpace: 1,
+                        centerSpaceRadius: 20,
+                        sections: _volumeByCategory.asMap().entries.map((e) {
+                          final vol = (e.value['volume'] as num?)?.toDouble() ?? 0;
+                          final pct = total > 0 ? vol / total * 100 : 0.0;
+                          return PieChartSectionData(
+                            color: Color(e.value['color'] as int? ?? 0xFF757575),
+                            value: vol,
+                            title: pct >= 8 ? '${pct.toStringAsFixed(0)}%' : '',
+                            titleStyle: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
+                            radius: pct >= 15 ? 32 : 26,
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: _volumeByCategory.take(5).map((cat) {
+                      final vol = (cat['volume'] as num?)?.toDouble() ?? 0;
+                      final pct = total > 0 ? vol / total * 100 : 0.0;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(width: 8, height: 8, decoration: BoxDecoration(
+                              color: Color(cat['color'] as int? ?? 0xFF757575),
+                              borderRadius: BorderRadius.circular(2),
+                            )),
+                            const SizedBox(width: 4),
+                            Text('${cat['name']} ${pct.toStringAsFixed(0)}%',
+                                style: TextStyle(fontSize: 8)),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEnergySystemMini(ThemeData theme) {
+    if (_energySystems.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final total = _energySystems.fold<double>(0, (a, b) => a + ((b['volume'] as num?)?.toDouble() ?? 0));
+    final colors = {'aerobic': Colors.green, 'anaerobic': Colors.red};
+    final labels = {'aerobic': 'Aeróbico', 'anaerobic': 'Anaeróbico'};
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          children: [
+            Text('Sistema Energético', style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600, fontSize: 10)),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 80,
+              child: PieChart(
+                PieChartData(
+                  sectionsSpace: 1,
+                  centerSpaceRadius: 12,
+                  sections: _energySystems.map((es) {
+                    final system = es['energy_system'] as String? ?? 'anaerobic';
+                    final vol = (es['volume'] as num?)?.toDouble() ?? 0;
+                    final pct = total > 0 ? vol / total * 100 : 0.0;
+                    return PieChartSectionData(
+                      color: colors[system] ?? Colors.grey,
+                      value: vol,
+                      title: pct > 0 ? '${pct.toStringAsFixed(0)}%' : '',
+                      titleStyle: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.white),
+                      radius: 28,
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            ..._energySystems.map((es) {
+              final system = es['energy_system'] as String? ?? '';
+              final vol = (es['volume'] as num?)?.toDouble() ?? 0;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 1),
+                child: Row(
+                  children: [
+                    Container(width: 6, height: 6, decoration: BoxDecoration(
+                      color: colors[system] ?? Colors.grey, shape: BoxShape.circle,
+                    )),
+                    const SizedBox(width: 4),
+                    Text('${labels[system] ?? system}: ${_formatVolume(vol)}',
+                        style: TextStyle(fontSize: 7)),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopExercisesChart(ThemeData theme) {
+    final maxVol = _topExercises.fold<double>(0, (a, b) {
+      final v = (b['volume'] as num?)?.toDouble() ?? 0;
+      return a > v ? a : v;
+    });
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: _topExercises.take(5).map((ex) {
+            final vol = (ex['volume'] as num?)?.toDouble() ?? 0;
+            final pct = maxVol > 0 ? vol / maxVol : 0.0;
+            final catColor = Color(ex['category_color'] as int? ?? 0xFF757575);
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 4, height: 28,
+                    decoration: BoxDecoration(
+                      color: catColor, borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 100,
+                    child: Text(ex['name'] as String? ?? '',
+                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: pct,
+                        backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                        color: catColor,
+                        minHeight: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 48,
+                    child: Text(_formatVolume(vol),
+                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.right),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  // ===================== PERFORMANCE CONTENT =====================
+
+  Widget _buildPerformanceContent(ThemeData theme) {
+    if (_isLoadingPerformance) return _sectionLoading(theme);
+    if (!_loadedPerformance) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Exercise list (existing)
+        Text('Exercícios', style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w600, color: theme.colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 4),
+
+        // Search
+        TextField(
+          controller: _searchCtl,
+          decoration: InputDecoration(
+            hintText: 'Buscar exercício...',
+            prefixIcon: const Icon(Icons.search, size: 20),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 8),
+
+        if (_exercisesWithData.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Icon(Icons.fitness_center_outlined, size: 32,
+                      color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
+                  const SizedBox(height: 8),
+                  Text('Nenhum exercício com dados registrados',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+          )
+        else
+          ..._buildExerciseCards(theme),
+
+        // PR Timeline
+        if (_personalRecords.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text('Recordes Pessoais (PRs)',
+              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          _buildPRTimeline(theme),
+        ],
+      ],
+    );
   }
 
   List<Widget> _buildExerciseCards(ThemeData theme) {
     final filtered = _filteredExercises;
     if (filtered.isEmpty) {
       return [
-        Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('Nenhum exercício encontrado',
-                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-          ),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text('Nenhum exercício encontrado',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant)),
         ),
       ];
     }
 
-    return filtered.map((ex) {
+    return filtered.map<Widget>((ex) {
       final catColor = Color(ex['category_color'] as int? ?? 0xFF757575);
       return Card(
         margin: const EdgeInsets.symmetric(vertical: 3),
@@ -381,8 +1243,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(ex['name'] as String, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                      Text(ex['category_name'] as String? ?? '', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                      Text(ex['name'] as String,
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                      Text(ex['category_name'] as String? ?? '',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant)),
                     ],
                   ),
                 ),
@@ -395,7 +1260,729 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }).toList();
   }
 
-  // ======================= EXERCISE DETAIL =======================
+  Widget _buildPRTimeline(ThemeData theme) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Column(
+        children: _personalRecords.take(10).toList().asMap().entries.map((entry) {
+          final i = entry.key;
+          final pr = entry.value;
+          final weight = (pr['best_weight'] as num?)?.toDouble() ?? 0;
+          final reps = (pr['best_reps'] as int?) ?? 0;
+          final date = pr['date'] as String? ?? '';
+          final catColor = Color(pr['category_color'] as int? ?? 0xFF757575);
+          final dateStr = date.length >= 10 ? date.substring(5) : date;
+          final medal = i == 0 ? '🥇' : i == 1 ? '🥈' : i == 2 ? '🥉' : null;
+
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              border: i < _personalRecords.length - 1
+                  ? Border(bottom: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(60)))
+                  : null,
+            ),
+            child: InkWell(
+              onTap: () => _loadHistory(pr['exercise_id'] as String),
+              child: Row(
+                children: [
+                  if (medal != null)
+                    Text(medal, style: const TextStyle(fontSize: 18))
+                  else
+                    Container(
+                      width: 24, height: 24,
+                      decoration: BoxDecoration(
+                        color: catColor.withAlpha(30),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(Icons.fitness_center, size: 14, color: catColor),
+                    ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(pr['exercise_name'] as String? ?? '',
+                            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                        Text('${pr['category_name']} • $dateStr',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    '${weight.toStringAsFixed(1)}kg × $reps',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber[700],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.chevron_right, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  // ===================== DURATION CONTENT =====================
+
+  Widget _buildDurationContent(ThemeData theme) {
+    if (_isLoadingDuration) return _sectionLoading(theme);
+    if (!_loadedDuration) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_durationTrend.isNotEmpty) ...[
+          Text('Duração dos Treinos',
+              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          _buildDurationChart(theme),
+          const SizedBox(height: 16),
+        ],
+        if (_densityData.isNotEmpty) ...[
+          Text('Densidade (Volume por Minuto)',
+              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          _buildDensityChart(theme),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDurationChart(ThemeData theme) {
+    final data = _durationTrend.reversed.toList();
+    final values = data.map((d) => ((d['duration_seconds'] as int?) ?? 0) / 60.0).toList();
+    final maxVal = values.fold<double>(0, (a, b) => a > b ? a : b);
+    if (maxVal <= 0) return const SizedBox.shrink();
+
+    final avg = values.fold<double>(0, (a, b) => a + b) / values.length;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('Média: ${avg.toStringAsFixed(0)}min',
+                    style: theme.textTheme.bodySmall?.copyWith(fontSize: 11)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 140,
+              child: LineChart(
+                LineChartData(
+                  minY: 0,
+                  maxY: maxVal * 1.15,
+                  gridData: FlGridData(show: true, drawVerticalLine: false,
+                    horizontalInterval: _niceInterval(maxVal / 4),
+                  ),
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true, reservedSize: 32,
+                        getTitlesWidget: (v, _) => Text('${v.toInt()}min',
+                            style: theme.textTheme.bodySmall?.copyWith(fontSize: 8)),
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true, reservedSize: 20,
+                        interval: data.length > 10 ? 2 : 1,
+                        getTitlesWidget: (v, _) {
+                          final idx = v.toInt();
+                          if (idx < 0 || idx >= data.length) return const SizedBox.shrink();
+                          final d = data[idx]['date'] as String? ?? '';
+                          return Text(d.length >= 10 ? d.substring(5) : d,
+                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 7));
+                        },
+                      ),
+                    ),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: values.asMap().entries.map((e) =>
+                        FlSpot(e.key.toDouble(), e.value)).toList(),
+                      isCurved: true,
+                      color: Colors.purple,
+                      barWidth: 2.5,
+                      dotData: FlDotData(show: values.length <= 20),
+                      belowBarData: BarAreaData(show: true, color: Colors.purple.withAlpha(25)),
+                    ),
+                  ],
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipItems: (spots) => spots.map((s) {
+                        final idx = s.spotIndex;
+                        final d = idx < data.length ? (data[idx]['date'] as String? ?? '') : '';
+                        return LineTooltipItem(
+                          '$d\n${s.y.toStringAsFixed(0)}min',
+                          TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDensityChart(ThemeData theme) {
+    final data = _densityData.reversed.toList();
+    final densities = data.map((d) {
+      final vol = (d['volume'] as num?)?.toDouble() ?? 0;
+      final dur = (d['duration_seconds'] as int?) ?? 1;
+      return dur > 0 ? vol / dur : 0.0;
+    }).toList();
+
+    if (densities.isEmpty) return const SizedBox.shrink();
+    final maxVal = densities.fold<double>(0, (a, b) => a > b ? a : b);
+    final avg = densities.fold<double>(0, (a, b) => a + b) / densities.length;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('Média: ${avg.toStringAsFixed(1)} kg/min',
+                    style: theme.textTheme.bodySmall?.copyWith(fontSize: 11)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 120,
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: maxVal * 1.2,
+                  barTouchData: BarTouchData(enabled: false),
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true, reservedSize: 32,
+                        getTitlesWidget: (v, _) => Text('${v.toStringAsFixed(0)}',
+                            style: theme.textTheme.bodySmall?.copyWith(fontSize: 8)),
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true, reservedSize: 16,
+                        interval: data.length > 10 ? 2 : 1,
+                        getTitlesWidget: (v, _) {
+                          final idx = v.toInt();
+                          if (idx < 0 || idx >= data.length) return const SizedBox.shrink();
+                          final d = data[idx]['date'] as String? ?? '';
+                          return Text(d.length >= 10 ? d.substring(5) : d,
+                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 7));
+                        },
+                      ),
+                    ),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  gridData: FlGridData(show: true, drawVerticalLine: false,
+                    horizontalInterval: _niceInterval(maxVal / 4),
+                  ),
+                  barGroups: densities.asMap().entries.map((e) => BarChartGroupData(
+                    x: e.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: e.value,
+                        color: Colors.purple.shade300,
+                        width: 10,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(3), topRight: Radius.circular(3),
+                        ),
+                      ),
+                    ],
+                  )).toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===================== RECOVERY CONTENT =====================
+
+  Widget _buildRecoveryContent(ThemeData theme) {
+    if (_isLoadingRecovery) return _sectionLoading(theme);
+    if (!_loadedRecovery) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_feelingTrend.isNotEmpty) ...[
+          Text('Sentimento ao Longo do Tempo',
+              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          _buildFeelingChart(theme),
+          const SizedBox(height: 16),
+        ],
+        if (_feelingVsVolume.isNotEmpty) ...[
+          Text('Sentimento vs Volume Médio',
+              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          _buildFeelingVsVolumeChart(theme),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildFeelingChart(ThemeData theme) {
+    final data = _feelingTrend.reversed.toList();
+    final values = data.map((d) => (d['feeling_rating'] as int?)?.toDouble() ?? 0).toList();
+
+    if (values.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: SizedBox(
+          height: 130,
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: 5.5,
+              minY: 0.5,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipItem: (g, gi, r, ri) {
+                    final d = data[gi];
+                    final date = d['date'] as String? ?? '';
+                    final feeling = d['feeling_rating'] as int? ?? 0;
+                    return BarTooltipItem(
+                      '$date\n${'★' * feeling}',
+                      TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 12),
+                    );
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true, reservedSize: 24,
+                    getTitlesWidget: (v, _) {
+                      if (v < 1) return const SizedBox.shrink();
+                      return Text('${'★' * v.toInt()}',
+                          style: TextStyle(fontSize: 9, color: Colors.amber));
+                    },
+                  ),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true, reservedSize: 16,
+                    interval: data.length > 12 ? 2 : 1,
+                    getTitlesWidget: (v, _) {
+                      final idx = v.toInt();
+                      if (idx < 0 || idx >= data.length) return const SizedBox.shrink();
+                      final d = data[idx]['date'] as String? ?? '';
+                      return Text(d.length >= 10 ? d.substring(5) : d,
+                          style: theme.textTheme.bodySmall?.copyWith(fontSize: 7));
+                    },
+                  ),
+                ),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              gridData: FlGridData(
+                show: true, drawVerticalLine: false,
+                horizontalInterval: 1,
+              ),
+              barGroups: values.asMap().entries.map((e) => BarChartGroupData(
+                x: e.key,
+                barRods: [
+                  BarChartRodData(
+                    toY: e.value,
+                    color: e.value >= 4 ? Colors.green : e.value >= 3 ? Colors.amber : Colors.red.shade300,
+                    width: 10,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(3), topRight: Radius.circular(3),
+                    ),
+                  ),
+                ],
+              )).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeelingVsVolumeChart(ThemeData theme) {
+    final maxVol = _feelingVsVolume.fold<double>(0, (a, b) {
+      final v = (b['avg_volume'] as num?)?.toDouble() ?? 0;
+      return a > v ? a : v;
+    });
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: SizedBox(
+          height: 140,
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: maxVol * 1.2,
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  getTooltipItem: (g, gi, r, ri) {
+                    final d = _feelingVsVolume[gi];
+                    final feeling = d['feeling_rating'] as int? ?? 0;
+                    final vol = (d['avg_volume'] as num?)?.toDouble() ?? 0;
+                    final count = d['workout_count'] as int? ?? 0;
+                    return BarTooltipItem(
+                      '${'★' * feeling}\nVolume: ${_formatVolume(vol)}\n$count treinos',
+                      TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 11),
+                    );
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true, reservedSize: 20,
+                    getTitlesWidget: (v, _) {
+                      final idx = v.toInt();
+                      if (idx < 0 || idx >= _feelingVsVolume.length) return const SizedBox.shrink();
+                      final feeling = _feelingVsVolume[idx]['feeling_rating'] as int? ?? 0;
+                      return Text('${'★' * feeling}',
+                          style: TextStyle(fontSize: 10, color: Colors.amber));
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true, reservedSize: 32,
+                    getTitlesWidget: (v, _) => Text(_formatVolume(v),
+                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 8)),
+                  ),
+                ),
+                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              ),
+              borderData: FlBorderData(show: false),
+              gridData: FlGridData(
+                show: true, drawVerticalLine: false,
+                horizontalInterval: _niceInterval(maxVol / 4),
+              ),
+              barGroups: _feelingVsVolume.asMap().entries.map((e) {
+                final vol = (e.value['avg_volume'] as num?)?.toDouble() ?? 0;
+                return BarChartGroupData(
+                  x: e.key,
+                  barRods: [
+                    BarChartRodData(
+                      toY: vol,
+                      color: Colors.red.shade300,
+                      width: 24,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(4), topRight: Radius.circular(4),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===================== BODY CONTENT =====================
+
+  Widget _buildBodyContent(ThemeData theme) {
+    if (_isLoadingBody) return _sectionLoading(theme);
+    if (!_loadedBody) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Peso Corporal vs Volume de Treino',
+            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        _buildBodyWeightChart(theme),
+      ],
+    );
+  }
+
+  Widget _buildBodyWeightChart(ThemeData theme) {
+    if (_bodyData.isEmpty) return const SizedBox.shrink();
+
+    final weights = _bodyData.map((d) => (d['weight'] as num?)?.toDouble() ?? 0).toList();
+    final volumes = _bodyData.map((d) => (d['volume'] as num?)?.toDouble() ?? 0).toList();
+    final maxWeight = weights.fold<double>(0, (a, b) => a > b ? a : b);
+    final maxVolume = volumes.fold<double>(0, (a, b) => a > b ? a : b);
+
+    if (maxWeight <= 0) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _legendDotWeight(Colors.indigo, 'Peso'),
+                const SizedBox(width: 16),
+                _legendDotWeight(Colors.teal, 'Volume'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 180,
+              child: LineChart(
+                LineChartData(
+                  minY: 0,
+                  maxY: maxWeight > maxVolume ? maxWeight * 1.15 : maxVolume * 1.15,
+                  gridData: FlGridData(
+                    show: true, drawVerticalLine: false,
+                    horizontalInterval: _niceInterval((maxWeight > maxVolume ? maxWeight : maxVolume) / 4),
+                  ),
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true, reservedSize: 36,
+                        getTitlesWidget: (v, _) => Text(v > 100 ? '${(v / 1000).toStringAsFixed(0)}k' : v.toStringAsFixed(0),
+                            style: theme.textTheme.bodySmall?.copyWith(fontSize: 8)),
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true, reservedSize: 20,
+                        interval: _bodyData.length > 8 ? 2 : 1,
+                        getTitlesWidget: (v, _) {
+                          final idx = v.toInt();
+                          if (idx < 0 || idx >= _bodyData.length) return const SizedBox.shrink();
+                          final d = _bodyData[idx]['date'] as String? ?? '';
+                          return Text(d.length >= 10 ? d.substring(5) : d,
+                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 7));
+                        },
+                      ),
+                    ),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    // Weight line
+                    LineChartBarData(
+                      spots: weights.asMap().entries.map((e) =>
+                        FlSpot(e.key.toDouble(), e.value)).toList(),
+                      isCurved: true,
+                      color: Colors.indigo,
+                      barWidth: 3,
+                      dotData: FlDotData(show: true, getDotPainter: (s, p, b, i) =>
+                        FlDotCirclePainter(radius: 4, color: Colors.indigo)),
+                      belowBarData: BarAreaData(show: false),
+                    ),
+                    // Volume line
+                    if (maxVolume > 0)
+                      LineChartBarData(
+                        spots: volumes.asMap().entries.map((e) =>
+                          FlSpot(e.key.toDouble(), e.value)).toList(),
+                        isCurved: true,
+                        color: Colors.teal,
+                        barWidth: 2,
+                        dashArray: [6, 3],
+                        dotData: FlDotData(show: true, getDotPainter: (s, p, b, i) =>
+                          FlDotCirclePainter(radius: 3, color: Colors.teal)),
+                        belowBarData: BarAreaData(show: false),
+                      ),
+                  ],
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipItems: (spots) => spots.map((s) {
+                        final idx = s.spotIndex;
+                        final d = idx < _bodyData.length ? (_bodyData[idx]['date'] as String? ?? '') : '';
+                        final isWeight = s.barIndex == 0;
+                        return LineTooltipItem(
+                          '$d\n${isWeight ? 'Peso: ${s.y.toStringAsFixed(1)}kg' : 'Volume: ${_formatVolume(s.y)}'}',
+                          TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 11),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _legendDotWeight(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(
+          color: color, shape: BoxShape.circle,
+        )),
+        const SizedBox(width: 4),
+        Text(label, style: TextStyle(fontSize: 10)),
+      ],
+    );
+  }
+
+  // ===================== MONTHLY VOLUME CHART (existing) =====================
+
+  Widget _buildMonthlyVolumeChart(ThemeData theme) {
+    final volumes = _monthlyVolume.map((m) => (m['volume'] as double?) ?? 0).toList();
+    final maxVol = volumes.fold<double>(0, (a, b) => a > b ? a : b);
+    if (maxVol <= 0) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Volume por Mês', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 180,
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: maxVol * 1.15,
+                  barTouchData: BarTouchData(
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        final m = _monthlyVolume[groupIndex];
+                        final month = m['month'] as String? ?? '';
+                        final vol = (m['volume'] as double?) ?? 0;
+                        final wo = (m['workouts'] as int?) ?? 0;
+                        return BarTooltipItem(
+                          '${_monthLabel(month)}\n${_formatVolume(vol)}\n${wo} treinos',
+                          TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 12),
+                        );
+                      },
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (v, _) {
+                          final idx = v.toInt();
+                          if (idx < 0 || idx >= _monthlyVolume.length) return const SizedBox.shrink();
+                          final month = _monthlyVolume[idx]['month'] as String? ?? '';
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              month.length >= 7 ? month.substring(5, 7) : '',
+                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 36,
+                        getTitlesWidget: (v, _) {
+                          if (v == 0) return const SizedBox.shrink();
+                          return Text(
+                            _formatVolume(v),
+                            style: theme.textTheme.bodySmall?.copyWith(fontSize: 9),
+                          );
+                        },
+                      ),
+                    ),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: maxVol > 0 ? _niceInterval(maxVol / 4) : 1,
+                  ),
+                  barGroups: _monthlyVolume.asMap().entries.map((entry) {
+                    final idx = entry.key;
+                    final vol = (entry.value['volume'] as double?) ?? 0;
+                    return BarChartGroupData(
+                      x: idx,
+                      barRods: [
+                        BarChartRodData(
+                          toY: vol,
+                          color: theme.colorScheme.primary,
+                          width: 20,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(4),
+                            topRight: Radius.circular(4),
+                          ),
+                        ),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // =======================================================================
+  // EXERCISE DETAIL VIEW (enhanced)
+  // =======================================================================
 
   Widget _buildExerciseDetail(ThemeData theme) {
     if (_selectedHistory == null) return const SizedBox.shrink();
@@ -768,6 +2355,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 }
 
+// =======================================================================
+// STATIC WIDGETS
+// =======================================================================
+
 class _StatCard extends StatelessWidget {
   final String label;
   final String value;
@@ -796,4 +2387,58 @@ class _StatCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MiniStat extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final ThemeData theme;
+  final int? delta;
+
+  const _MiniStat({
+    required this.icon, required this.label, required this.value,
+    required this.color, required this.theme, this.delta,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 3),
+              Text(value, style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.bold, fontSize: 13,
+              )),
+            ],
+          ),
+          const SizedBox(height: 1),
+          Text(label, style: theme.textTheme.bodySmall?.copyWith(
+            fontSize: 9, color: theme.colorScheme.onSurfaceVariant,
+          )),
+          if (delta != null && delta != 0)
+            Text(
+              '${delta! > 0 ? '+' : ''}$delta',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: delta! > 0 ? Colors.green : Colors.red,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeekBar {
+  final String label;
+  final int count;
+  _WeekBar(this.label, this.count);
 }
