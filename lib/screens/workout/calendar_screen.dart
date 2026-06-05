@@ -170,7 +170,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   ),
                                   child: Icon(Icons.fitness_center, color: theme.colorScheme.onPrimaryContainer, size: 20),
                                 ),
-                                title: Text(DateFormat('HH:mm').format(DateTime.parse(w['start_time'] as String))),
+                                title: Text(w['start_time'] != null
+                                    ? DateFormat('HH:mm').format(DateTime.parse(w['start_time'] as String))
+                                    : 'Sem horário'),
                                 subtitle: Text(durStr),
                                 trailing: const Icon(Icons.chevron_right),
                                 onTap: () async {

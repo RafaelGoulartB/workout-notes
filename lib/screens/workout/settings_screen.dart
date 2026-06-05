@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../database/database_helper.dart';
+import '../../database/test_seed_data.dart';
 import '../../services/export_service.dart';
 import '../../main.dart';
 
@@ -52,6 +53,37 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('✅ Backup exportado!'), behavior: SnackBarBehavior.floating),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e'), behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
+  }
+
+  Future<void> _generateTestData() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Gerar Dados de Teste?'),
+        content: const Text('Isso vai adicionar treinos fictícios nos últimos meses para testar gráficos e funcionalidades.\n\nUse "Excluir Todo Histórico" para remover depois.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Gerar')),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+
+    try {
+      final generator = TestDataGenerator();
+      final count = await generator.generate();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('✅ $count treinos gerados!'), behavior: SnackBarBehavior.floating),
         );
       }
     } catch (e) {
@@ -304,6 +336,14 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         subtitle: const Text('JSON completo para salvar ou transferir'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => _exportBackup(),
+                      ),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      ListTile(
+                        leading: Icon(Icons.bug_report, color: theme.colorScheme.secondary),
+                        title: const Text('Gerar Dados de Teste'),
+                        subtitle: const Text('Adiciona treinos fictícios para testar o app'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _generateTestData(),
                       ),
                       const Divider(height: 1, indent: 16, endIndent: 16),
                       ListTile(
