@@ -1091,7 +1091,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   // ===================== TIMER CARD =====================
   Widget _buildTimerCard(ThemeData theme) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         gradient: LinearGradient(

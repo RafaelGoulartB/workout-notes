@@ -1062,7 +1062,7 @@ class DatabaseHelper {
   Future<Map<String, dynamic>> getExerciseHistory(String exerciseId, {int? limit}) async {
     final db = await database;
     final query = '''
-      SELECT s.*, w.date, ee.exercise_id
+      SELECT s.*, w.date, w.id as workout_id, ee.exercise_id
       FROM sets s
       JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
       JOIN workouts w ON ee.workout_id = w.id
@@ -1100,6 +1100,7 @@ class DatabaseHelper {
         estimated1RM = maxWeight * (1 + (reps[bestSetIndex] / 30));
       }
 
+      final firstSet = entry.value.first;
       history.add({
         'date': entry.key,
         'max_weight': maxWeight,
@@ -1107,6 +1108,7 @@ class DatabaseHelper {
         'total_sets': sets.length,
         'total_reps': reps.fold<int>(0, (a, b) => a + b),
         'estimated_1rm': estimated1RM,
+        'workout_id': firstSet['workout_id'],
         'best_set': {
           'weight': maxWeight,
           'reps': reps[bestSetIndex],
