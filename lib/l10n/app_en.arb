@@ -101,6 +101,7 @@
   "settingsGenerateTitle": "Generate Test Data?",
   "settingsGenerateContent": "This will add fictional workouts from recent months to test charts and features.\n\nUse \"Delete All History\" to remove them later.",
   "settingsGenerate": "Generate",
+  "settingsGenerateSuccess": "✅ {count} workouts generated!",
   "settingsAbout": "About",
   "settingsAboutSubtitle": "Workout Notes v1.0",
   "settingsDeleteAllHistory": "Delete All Workout History",

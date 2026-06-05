@@ -139,13 +139,13 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       await exportService.shareJsonBackup();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Backup exportado!'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.settingsExportSuccess), behavior: SnackBarBehavior.floating),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.settingsExportError(e.toString())), behavior: SnackBarBehavior.floating),
         );
       }
     }
@@ -170,7 +170,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       final count = await generator.generate();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('✅ $count ${AppLocalizations.of(context)!.progressWorkouts.toLowerCase()} gerados!'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.settingsGenerateSuccess(count)), behavior: SnackBarBehavior.floating),
         );
       }
     } catch (e) {
@@ -202,7 +202,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       await _db.deleteAllWorkoutData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Histórico excluído'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.settingsDeleteHistorySuccess), behavior: SnackBarBehavior.floating),
         );
       }
     }
@@ -214,7 +214,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configurações'),
+        title: Text(AppLocalizations.of(context)!.settingsTitle),
         centerTitle: true,
       ),
       body: _isLoading
@@ -436,8 +436,8 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
 
                       // ── Rest Timer Notification ──
                       SwitchListTile(
-                        title: const Text('Timer de Descanso'),
-                        subtitle: const Text('Notificação do temporizador entre séries'),
+                        title: Text(AppLocalizations.of(context)!.settingsRestTimerNotif),
+                        subtitle: Text(AppLocalizations.of(context)!.settingsRestTimerNotifSubtitle),
                         value: _settings['notification_rest_timer_enabled'] != 'false',
                         onChanged: (v) {
                           _update('notification_rest_timer_enabled', v.toString());
@@ -479,8 +479,8 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
 
                       // ── Workout Timer Notification ──
                       SwitchListTile(
-                        title: const Text('Timer de Treino'),
-                        subtitle: const Text('Notificação do cronômetro do treino ativo'),
+                        title: Text(AppLocalizations.of(context)!.settingsWorkoutTimerNotif),
+                        subtitle: Text(AppLocalizations.of(context)!.settingsWorkoutTimerNotifSubtitle),
                         value: _settings['notification_workout_timer_enabled'] != 'false',
                         onChanged: (v) {
                           _update('notification_workout_timer_enabled', v.toString());
@@ -539,13 +539,13 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                           children: [
                             Icon(Icons.visibility, size: 18, color: theme.colorScheme.primary),
                             const SizedBox(width: 8),
-                            Text('Tela', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                            Text(AppLocalizations.of(context)!.settingsDisplay, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
                       SwitchListTile(
-                        title: const Text('Manter Tela Ligada'),
-                        subtitle: const Text('Durante o treino'),
+                        title: Text(AppLocalizations.of(context)!.settingsKeepScreenOn),
+                        subtitle: Text(AppLocalizations.of(context)!.settingsKeepScreenOnSubtitle),
                         value: _settings['keep_screen_on'] == 'true',
                         onChanged: (v) => _update('keep_screen_on', v.toString()),
                       ),
@@ -577,7 +577,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         _buildLanguageOption(
                           theme: theme,
                           label: AppLocalizations.of(context)!.settingsPortuguese,
-                          subtitle: 'Português (Brasil)',
+                          subtitle: AppLocalizations.of(context)!.settingsPortuguese,
                           icon: Icons.flag,
                           locale: const Locale('pt', 'BR'),
                         ),
@@ -585,7 +585,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         _buildLanguageOption(
                           theme: theme,
                           label: AppLocalizations.of(context)!.settingsEnglish,
-                          subtitle: 'English',
+                          subtitle: AppLocalizations.of(context)!.settingsEnglish,
                           icon: Icons.language,
                           locale: const Locale('en'),
                         ),

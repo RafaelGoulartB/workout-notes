@@ -300,6 +300,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsGenerate => 'Generate';
 
   @override
+  String settingsGenerateSuccess(Object count) {
+    return '✅ $count workouts generated!';
+  }
+
+  @override
   String get settingsAbout => 'About';
 
   @override

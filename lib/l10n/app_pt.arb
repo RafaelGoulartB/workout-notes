@@ -101,6 +101,7 @@
   "settingsGenerateTitle": "Gerar Dados de Teste?",
   "settingsGenerateContent": "Isso vai adicionar treinos fictícios nos últimos meses para testar gráficos e funcionalidades.\n\nUse \"Excluir Todo Histórico\" para remover depois.",
   "settingsGenerate": "Gerar",
+  "settingsGenerateSuccess": "✅ {count} treinos gerados!",
   "settingsAbout": "Sobre",
   "settingsAboutSubtitle": "Workout Notes v1.0",
   "settingsDeleteAllHistory": "Excluir Todo Histórico de Treinos",

@@ -662,6 +662,12 @@ abstract class AppLocalizations {
   /// **'Generate'**
   String get settingsGenerate;
 
+  /// No description provided for @settingsGenerateSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ {count} workouts generated!'**
+  String settingsGenerateSuccess(Object count);
+
   /// No description provided for @settingsAbout.
   ///
   /// In en, this message translates to:
