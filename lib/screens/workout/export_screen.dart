@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:life_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 import '../../services/export_service.dart';
 
@@ -12,7 +13,7 @@ class ExportScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Exportar Dados'),
+        title: Text(AppLocalizations.of(context)!.exportTitle),
         centerTitle: true,
       ),
       body: ListView(
@@ -21,8 +22,8 @@ class ExportScreen extends StatelessWidget {
           // JSON Backup
           _ExportCard(
             icon: Icons.backup,
-            title: 'Backup Completo (JSON)',
-            subtitle: 'Exporta todos os dados: treinos, exercícios, rotinas, medidas e configurações',
+            title: AppLocalizations.of(context)!.exportJsonBackup,
+            subtitle: AppLocalizations.of(context)!.exportJsonBackupSubtitle,
             color: theme.colorScheme.primary,
             onTap: () async {
               try {
@@ -46,8 +47,8 @@ class ExportScreen extends StatelessWidget {
           // CSV Export
           _ExportCard(
             icon: Icons.table_chart,
-            title: 'Exportar CSV',
-            subtitle: 'Exporta histórico de treinos (data, exercício, peso, reps) - filtrável por exercício e data',
+            title: AppLocalizations.of(context)!.exportCsv,
+            subtitle: AppLocalizations.of(context)!.exportCsvSubtitle,
             color: theme.colorScheme.secondary,
             onTap: () => _showCsvExportDialog(context, exportService),
           ),
@@ -56,8 +57,8 @@ class ExportScreen extends StatelessWidget {
           // Share workout summary
           _ExportCard(
             icon: Icons.share,
-            title: 'Compartilhar Resumo',
-            subtitle: 'Gera um resumo de texto de um treino específico para compartilhar',
+            title: AppLocalizations.of(context)!.exportShareSummary,
+            subtitle: AppLocalizations.of(context)!.exportShareSummarySubtitle,
             color: theme.colorScheme.tertiary,
             onTap: () => _pickAndShareWorkout(context, exportService),
           ),
@@ -81,12 +82,10 @@ class ExportScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Dicas', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                        Text(AppLocalizations.of(context)!.exportTips, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
                         Text(
-                          '• O backup JSON contém todos os dados do app\n'
-                          '• CSV é ideal para análise em Excel/Google Sheets\n'
-                          '• Os arquivos são salvos temporariamente e compartilhados via share sheet nativo',
+                          AppLocalizations.of(context)!.exportTipsContent,
                           style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onTertiaryContainer),
                         ),
                       ],

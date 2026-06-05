@@ -20,7 +20,7 @@ class ExportService {
   Future<void> shareJsonBackup() async {
     final path = await exportToJson();
     final file = XFile(path, mimeType: 'application/json');
-    await Share.shareXFiles([file], text: 'Life Notes - Backup de Treinos');
+    await Share.shareXFiles([file], text: 'Life Notes - Workout Backup');
   }
 
   Future<String> exportToCsv({
@@ -75,7 +75,7 @@ class ExportService {
       endDate: endDate,
     );
     final file = XFile(path, mimeType: 'text/csv');
-    await Share.shareXFiles([file], text: 'Life Notes - Exportação de Treinos');
+    await Share.shareXFiles([file], text: 'Life Notes - Workout Export');
   }
 
   Future<int> importFromJson(String filePath) async {

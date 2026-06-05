@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:life_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 
 class BodyTrackerScreen extends StatefulWidget {
@@ -17,13 +18,13 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   bool _isLoading = true;
 
   final _types = [
-    {'id': 'weight', 'name': 'Peso Corporal', 'unit': 'kg', 'icon': Icons.monitor_weight},
-    {'id': 'bodyFat', 'name': '% Gordura', 'unit': '%', 'icon': Icons.water_drop},
-    {'id': 'waist', 'name': 'Cintura', 'unit': 'cm', 'icon': Icons.straighten},
-    {'id': 'chest', 'name': 'Peito', 'unit': 'cm', 'icon': Icons.straighten},
-    {'id': 'arm', 'name': 'Braço', 'unit': 'cm', 'icon': Icons.straighten},
-    {'id': 'thigh', 'name': 'Coxa', 'unit': 'cm', 'icon': Icons.straighten},
-    {'id': 'hip', 'name': 'Quadril', 'unit': 'cm', 'icon': Icons.straighten},
+    {'id': 'weight', 'name': 'bodyTrackerWeight', 'unit': 'kg', 'icon': Icons.monitor_weight},
+    {'id': 'bodyFat', 'name': 'bodyTrackerBodyFat', 'unit': '%', 'icon': Icons.water_drop},
+    {'id': 'waist', 'name': 'bodyTrackerWaist', 'unit': 'cm', 'icon': Icons.straighten},
+    {'id': 'chest', 'name': 'bodyTrackerChest', 'unit': 'cm', 'icon': Icons.straighten},
+    {'id': 'arm', 'name': 'bodyTrackerArm', 'unit': 'cm', 'icon': Icons.straighten},
+    {'id': 'thigh', 'name': 'bodyTrackerThigh', 'unit': 'cm', 'icon': Icons.straighten},
+    {'id': 'hip', 'name': 'bodyTrackerHip', 'unit': 'cm', 'icon': Icons.straighten},
   ];
 
   @override
@@ -47,7 +48,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Adicionar ${_types.firstWhere((t) => t['id'] == _selectedType)['name']}'),
+        title: Text(AppLocalizations.of(context)!.bodyTrackerAddTitle(_typeName(_selectedType))),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -131,7 +132,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
                     avatar: Icon(t['icon'] as IconData, size: 18),
-                    label: Text(t['name'] as String),
+                    label: Text(_typeName(t['id'] as String)),
                     selected: _selectedType == t['id'],
                     onSelected: (_) {
                       setState(() => _selectedType = t['id'] as String);
@@ -155,7 +156,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                     children: [
                       Icon(currentType['icon'] as IconData, size: 64, color: theme.colorScheme.primary.withAlpha(80)),
                       const SizedBox(height: 16),
-                      Text('Nenhuma medida de ${currentType['name']}', style: theme.textTheme.titleMedium),
+                      Text('${AppLocalizations.of(context)!.progressNoData}: ${_typeName(currentType['id'] as String)}', style: theme.textTheme.titleMedium),
                       const SizedBox(height: 8),
                       Text('Adicione sua primeira medida', style: theme.textTheme.bodySmall),
                     ],
@@ -284,8 +285,21 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addMeasurement,
         icon: const Icon(Icons.add),
-        label: Text('Adicionar ${currentType['name']}'),
+        label: Text(AppLocalizations.of(context)!.bodyTrackerAddTitle(_typeName(currentType['id'] as String))),
       ),
     );
+  }
+
+  String _typeName(String typeId) {
+    switch (typeId) {
+      case 'weight': return AppLocalizations.of(context)!.bodyTrackerWeight;
+      case 'bodyFat': return AppLocalizations.of(context)!.bodyTrackerBodyFat;
+      case 'waist': return AppLocalizations.of(context)!.bodyTrackerWaist;
+      case 'chest': return AppLocalizations.of(context)!.bodyTrackerChest;
+      case 'arm': return AppLocalizations.of(context)!.bodyTrackerArm;
+      case 'thigh': return AppLocalizations.of(context)!.bodyTrackerThigh;
+      case 'hip': return AppLocalizations.of(context)!.bodyTrackerHip;
+      default: return typeId;
+    }
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:life_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 import 'exercise_form_screen.dart';
 import 'exercise_detail_tabs_screen.dart';
@@ -52,7 +53,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Exercícios'),
+        title: Text(AppLocalizations.of(context)!.exerciseLibraryTitle),
         centerTitle: true,
         actions: [
           IconButton(
@@ -61,7 +62,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
               setState(() => _showFavorites = !_showFavorites);
               _load();
             },
-            tooltip: 'Favoritos',
+            tooltip: AppLocalizations.of(context)!.exerciseLibraryFavorites,
           ),
         ],
       ),
@@ -72,7 +73,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: TextField(
               decoration: InputDecoration(
-                hintText: 'Buscar exercício...',
+                hintText: AppLocalizations.of(context)!.exerciseLibrarySearch,
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 filled: true,
@@ -90,7 +91,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               children: [
                 FilterChip(
-                  label: const Text('Todos'),
+                  label: Text(AppLocalizations.of(context)!.exerciseLibraryAll),
                   selected: _selectedCategoryId == null,
                   onSelected: (_) => setState(() => _selectedCategoryId = null),
                 ),
@@ -123,9 +124,9 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                             children: [
                               Icon(Icons.search_off, size: 64, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
                               const SizedBox(height: 16),
-                              Text('Nenhum exercício encontrado', style: theme.textTheme.titleMedium),
+                              Text(AppLocalizations.of(context)!.exerciseLibraryNoResults, style: theme.textTheme.titleMedium),
                               const SizedBox(height: 8),
-                              Text('Tente alterar a busca ou adicione um novo', style: theme.textTheme.bodySmall),
+                              Text(AppLocalizations.of(context)!.exerciseLibraryNoResultsHint, style: theme.textTheme.bodySmall),
                             ],
                           ),
                         ),
@@ -232,7 +233,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
           if (result == true) _load();
         },
         icon: const Icon(Icons.add),
-        label: const Text('Novo Exercício'),
+        label: Text(AppLocalizations.of(context)!.exerciseLibraryNew),
       ),
     );
   }
@@ -255,7 +256,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
           ),
           const SizedBox(width: 2),
           Text(
-            isAerobic ? 'Aeróbico' : 'Anaeróbico',
+            isAerobic ? AppLocalizations.of(context)!.exerciseLibraryAerobic : AppLocalizations.of(context)!.exerciseLibraryAnaerobic,
             style: theme.textTheme.bodySmall?.copyWith(
               fontSize: 9,
               color: isAerobic ? Colors.red[400] : Colors.blue[400],

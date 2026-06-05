@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:life_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 import 'workout_detail_screen.dart';
 
@@ -76,11 +77,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final monthName = DateFormat('MMMM yyyy', 'pt_BR').format(DateTime(_currentYear, _currentMonth));
+    final dateLocale = Localizations.localeOf(context).toString().startsWith('pt') ? 'pt_BR' : 'en_US';
+    final monthName = DateFormat('MMMM yyyy', dateLocale).format(DateTime(_currentYear, _currentMonth));
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Histórico'),
+        title: Text(AppLocalizations.of(context)!.calendarTitle),
         centerTitle: true,
       ),
       body: _isLoading
@@ -104,8 +106,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Row(
-                    children: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-                        .map((d) => Expanded(
+                    children: [
+                        AppLocalizations.of(context)!.calendarSun,
+                        AppLocalizations.of(context)!.calendarMon,
+                        AppLocalizations.of(context)!.calendarTue,
+                        AppLocalizations.of(context)!.calendarWed,
+                        AppLocalizations.of(context)!.calendarThu,
+                        AppLocalizations.of(context)!.calendarFri,
+                        AppLocalizations.of(context)!.calendarSat,
+                      ].map((d) => Expanded(
                               child: Center(
                                 child: Text(d, style: theme.textTheme.bodySmall?.copyWith(
                                   fontWeight: FontWeight.w600, color: theme.colorScheme.onSurfaceVariant)),
@@ -135,14 +144,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 Icon(Icons.fitness_center_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'Nenhum treino em ${DateFormat('d/M').format(_selectedDate)}',
+                                  AppLocalizations.of(context)!.calendarNoWorkouts(DateFormat('d/M').format(_selectedDate)),
                                   style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                                 ),
                                 const SizedBox(height: 16),
                                 FilledButton.icon(
                                   onPressed: _createWorkoutForSelectedDate,
                                   icon: const Icon(Icons.add, size: 18),
-                                  label: const Text('Criar Treino'),
+                                  label: Text(AppLocalizations.of(context)!.calendarCreateWorkout),
                                 ),
                               ],
                             ),
@@ -154,7 +163,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           itemBuilder: (ctx, i) {
                             final w = _selectedDayWorkouts[i];
                             final duration = (w['duration_seconds'] as int?) ?? 0;
-                            final durStr = duration > 0 ? '${duration ~/ 60}min' : 'Em andamento';
+                            final durStr = duration > 0 ? '${duration ~/ 60}min' : AppLocalizations.of(context)!.calendarInProgress;
                             return Card(
                               elevation: 0,
                               shape: RoundedRectangleBorder(
@@ -172,7 +181,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 ),
                                 title: Text(w['start_time'] != null
                                     ? DateFormat('HH:mm').format(DateTime.parse(w['start_time'] as String))
-                                    : 'Sem horário'),
+                                    : AppLocalizations.of(context)!.calendarNoTime),
                                 subtitle: Text(durStr),
                                 trailing: const Icon(Icons.chevron_right),
                                 onTap: () async {
@@ -311,7 +320,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     _loadMonth();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Treino criado para este dia!'), behavior: SnackBarBehavior.floating),
+        SnackBar(content: Text(AppLocalizations.of(context)!.calendarWorkoutCreated), behavior: SnackBarBehavior.floating),
       );
     }
   }

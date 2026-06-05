@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:life_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 
 /// Tabbed detail screen for an exercise: Edit | History | Charts
@@ -38,7 +39,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   Map<String, dynamic>? _history;
   bool _historyLoading = true;
   int _chartType = 0;
-  static const _chartTypes = ['1RM', 'Peso Máx.', 'Volume', 'Total Reps'];
+  static const _chartTypes = ['1RM', 'Max Weight', 'Volume', 'Total Reps'];
 
   final _types = [
     {'id': 'weightReps', 'name': 'Peso × Repetições', 'icon': Icons.fitness_center},

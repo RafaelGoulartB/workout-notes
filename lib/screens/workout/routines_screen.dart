@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:life_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 import '../../widgets/exercise_picker_sheet.dart';
 
@@ -31,18 +32,18 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Nova Rotina'),
+        title: Text(AppLocalizations.of(context)!.routinesNew),
         content: TextField(
           controller: ctl,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Nome da Rotina',
+          decoration: InputDecoration(
+            labelText: AppLocalizations.of(context)!.routinesName,
             border: OutlineInputBorder(),
-            hintText: 'Ex: Push Pull Legs',
+            hintText: AppLocalizations.of(context)!.routinesNameHint,
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
           FilledButton(onPressed: () async {
             if (ctl.text.trim().isNotEmpty) {
               await _db.createRoutine(ctl.text.trim());

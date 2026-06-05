@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:life_notes/l10n/app_localizations.dart';
 import '../models/note.dart';
 import '../services/storage_service.dart';
 import 'note_editor_screen.dart';
@@ -53,17 +54,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Note'),
-        content: Text('Are you sure you want to delete "${note.title}"?'),
+        title: Text(AppLocalizations.of(context)!.homeDeleteConfirmTitle),
+        content: Text(AppLocalizations.of(context)!.homeDeleteConfirmContent(note.title)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.commonCancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
+            child: Text(AppLocalizations.of(context)!.commonDelete),
           ),
         ],
       ),
@@ -74,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadNotes();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('"${note.title}" deleted')),
+          SnackBar(content: Text(AppLocalizations.of(context)!.homeDeleteSuccess(note.title))),
         );
       }
     }
@@ -84,7 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Life Notes'),
+        title: Text(AppLocalizations.of(context)!.homeTitle),
         centerTitle: true,
         elevation: 0,
       ),
@@ -96,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openNoteEditor(),
         icon: const Icon(Icons.add),
-        label: const Text('New Note'),
+        label: Text(AppLocalizations.of(context)!.homeNewNote),
       ),
     );
   }
@@ -115,14 +116,14 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Welcome to Life Notes',
+              AppLocalizations.of(context)!.homeWelcome,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
             const SizedBox(height: 12),
             Text(
-              'Start capturing your thoughts, memories,\nand everyday moments.',
+              AppLocalizations.of(context)!.homeSubtitle,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -132,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
             FilledButton.icon(
               onPressed: () => _openNoteEditor(),
               icon: const Icon(Icons.edit),
-              label: const Text('Write your first note'),
+              label: Text(AppLocalizations.of(context)!.homeWriteFirstNote),
             ),
           ],
         ),
@@ -197,7 +198,7 @@ class _NoteCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      note.title.isEmpty ? 'Untitled' : note.title,
+                      note.title.isEmpty ? AppLocalizations.of(context)!.homeEmptyTitle : note.title,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -214,7 +215,7 @@ class _NoteCard extends StatelessWidget {
                     ),
                     onPressed: onDelete,
                     visualDensity: VisualDensity.compact,
-                    tooltip: 'Delete',
+                    tooltip: AppLocalizations.of(context)!.homeDeleteTooltip,
                   ),
                 ],
               ),

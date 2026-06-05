@@ -1,0 +1,1018 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
+import 'app_localizations.dart';
+
+// ignore_for_file: type=lint
+
+/// The translations for English (`en`).
+class AppLocalizationsEn extends AppLocalizations {
+  AppLocalizationsEn([String locale = 'en']) : super(locale);
+
+  @override
+  String get appTitle => 'Life Notes';
+
+  @override
+  String get tabNotes => 'Notes';
+
+  @override
+  String get tabWorkout => 'Workout';
+
+  @override
+  String get commonCancel => 'Cancel';
+
+  @override
+  String get commonDelete => 'Delete';
+
+  @override
+  String get commonSave => 'Save';
+
+  @override
+  String get commonDiscard => 'Discard';
+
+  @override
+  String get commonKeepEditing => 'Keep editing';
+
+  @override
+  String commonError(Object error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get commonSearch => 'Search';
+
+  @override
+  String get commonAll => 'All';
+
+  @override
+  String get commonExercises => 'Exercises';
+
+  @override
+  String get commonVolume => 'Volume';
+
+  @override
+  String get commonSets => 'Sets';
+
+  @override
+  String get commonReps => 'Reps';
+
+  @override
+  String get commonCompleted => 'Completed';
+
+  @override
+  String get commonInProgress => 'In progress';
+
+  @override
+  String get commonConfirmDelete => 'Are you sure?';
+
+  @override
+  String get commonActionCannotBeUndone => 'This action cannot be undone.';
+
+  @override
+  String get accentColorRed => 'Deep Red';
+
+  @override
+  String get accentColorDarkOrange => 'Dark Orange';
+
+  @override
+  String get accentColorOrange => 'Orange';
+
+  @override
+  String get accentColorAmber => 'Amber';
+
+  @override
+  String get accentColorDeepPurple => 'Deep Purple';
+
+  @override
+  String get accentColorDarkBlue => 'Dark Blue';
+
+  @override
+  String get accentColorGraphite => 'Graphite';
+
+  @override
+  String get accentColorForestGreen => 'Forest Green';
+
+  @override
+  String get homeTitle => 'Life Notes';
+
+  @override
+  String get homeWelcome => 'Welcome to Life Notes';
+
+  @override
+  String get homeSubtitle =>
+      'Start capturing your thoughts, memories,\nand everyday moments.';
+
+  @override
+  String get homeNewNote => 'New Note';
+
+  @override
+  String get homeWriteFirstNote => 'Write your first note';
+
+  @override
+  String get homeEmptyTitle => 'Untitled';
+
+  @override
+  String get homeDeleteConfirmTitle => 'Delete Note';
+
+  @override
+  String homeDeleteConfirmContent(Object title) {
+    return 'Are you sure you want to delete \"$title\"?';
+  }
+
+  @override
+  String homeDeleteSuccess(Object title) {
+    return '\"$title\" deleted';
+  }
+
+  @override
+  String get homeDeleteTooltip => 'Delete';
+
+  @override
+  String get noteEditorTitleNew => 'New Note';
+
+  @override
+  String get noteEditorTitleEdit => 'Edit Note';
+
+  @override
+  String get noteEditorHintTitle => 'Title';
+
+  @override
+  String get noteEditorHintContent => 'What\'s on your mind?';
+
+  @override
+  String get noteEditorSave => 'Save';
+
+  @override
+  String get noteEditorDiscardTitle => 'Discard changes?';
+
+  @override
+  String get noteEditorDiscardContent => 'You have unsaved changes.';
+
+  @override
+  String get noteEditorKeepEditing => 'Keep editing';
+
+  @override
+  String get noteEditorDiscard => 'Discard';
+
+  @override
+  String get noteEditorEmptyError => 'Write something before saving';
+
+  @override
+  String get workoutHomeTitle => 'Workout';
+
+  @override
+  String get workoutHomeHistoryTooltip => 'History';
+
+  @override
+  String get workoutHomeSettingsTooltip => 'Settings';
+
+  @override
+  String get workoutHomeMonthWorkouts => 'Workouts this Month';
+
+  @override
+  String get workoutHomeVolume => 'Volume';
+
+  @override
+  String get workoutHomeStreak => 'Streak';
+
+  @override
+  String get workoutHomeDay => 'day';
+
+  @override
+  String get workoutHomeDays => 'days';
+
+  @override
+  String get workoutHomeNewWorkout => 'New Workout';
+
+  @override
+  String get workoutHomeStartNow => 'Start now';
+
+  @override
+  String get workoutHomeQuickAdd => 'Quick Add';
+
+  @override
+  String get workoutHomeQuickAddSubtitle => 'Quick add';
+
+  @override
+  String get workoutHomeNavigation => 'NAVIGATION';
+
+  @override
+  String get workoutHomeExercises => 'Exercises';
+
+  @override
+  String get workoutHomeRoutines => 'Routines';
+
+  @override
+  String get workoutHomeProgress => 'Progress';
+
+  @override
+  String get workoutHomeBodyMeasurements => 'Measurements';
+
+  @override
+  String get workoutHomeInProgress => 'IN PROGRESS';
+
+  @override
+  String get workoutHomeNoActiveWorkout => 'No workout in progress';
+
+  @override
+  String get workoutHomeUpcoming => 'UPCOMING WORKOUTS';
+
+  @override
+  String get workoutHomeCompleted => 'COMPLETED WORKOUTS';
+
+  @override
+  String get workoutHomeOngoing => 'In progress';
+
+  @override
+  String get workoutHomeContinueWorkout => 'Continue Workout';
+
+  @override
+  String get workoutHomeDeleteWorkout => 'Delete Workout';
+
+  @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get settingsThemeColor => 'Theme Color';
+
+  @override
+  String get settingsThemeMode => 'Theme Mode';
+
+  @override
+  String get settingsSystem => 'System';
+
+  @override
+  String get settingsSystemSubtitle => 'Follow device setting';
+
+  @override
+  String get settingsLight => 'Light';
+
+  @override
+  String get settingsLightSubtitle => 'Force light mode';
+
+  @override
+  String get settingsDark => 'Dark';
+
+  @override
+  String get settingsDarkSubtitle => 'Force dark mode';
+
+  @override
+  String get settingsUnits => 'Units';
+
+  @override
+  String get settingsUnitSystem => 'Unit System';
+
+  @override
+  String get settingsUnitKgCm => 'kg / cm';
+
+  @override
+  String get settingsUnitLbsIn => 'lbs / in';
+
+  @override
+  String get settingsTimer => 'Timer';
+
+  @override
+  String get settingsDefaultRest => 'Default Rest';
+
+  @override
+  String get settingsSeconds => 'seconds';
+
+  @override
+  String get settingsAutoStartRest => 'Auto-start Rest Timer';
+
+  @override
+  String get settingsAutoStartRestSubtitle =>
+      'Start automatically after each set';
+
+  @override
+  String get settingsAutoStartWorkoutTimer => 'Auto-start Workout Timer';
+
+  @override
+  String get settingsAutoStartWorkoutTimerSubtitle =>
+      'Start timer after 1st set, stop after last set';
+
+  @override
+  String get settingsNotifications => 'Notifications';
+
+  @override
+  String get settingsRestTimerNotif => 'Rest Timer';
+
+  @override
+  String get settingsRestTimerNotifSubtitle => 'Notification between sets';
+
+  @override
+  String get settingsWorkoutTimerNotif => 'Workout Timer';
+
+  @override
+  String get settingsWorkoutTimerNotifSubtitle => 'Active workout notification';
+
+  @override
+  String get settingsAlertOptions => 'Alert options';
+
+  @override
+  String get settingsSound => 'Sound';
+
+  @override
+  String get settingsRestSoundSubtitle =>
+      'Play sound when rest starts and ends';
+
+  @override
+  String get settingsWorkoutSoundSubtitle => 'Play sound when workout starts';
+
+  @override
+  String get settingsVibration => 'Vibration';
+
+  @override
+  String get settingsRestVibrationSubtitle =>
+      'Vibrate when rest starts and ends';
+
+  @override
+  String get settingsWorkoutVibrationSubtitle => 'Vibrate when workout starts';
+
+  @override
+  String get settingsDisplay => 'Display';
+
+  @override
+  String get settingsKeepScreenOn => 'Keep Screen On';
+
+  @override
+  String get settingsKeepScreenOnSubtitle => 'During workout';
+
+  @override
+  String get settingsData => 'Data';
+
+  @override
+  String get settingsExportBackup => 'Export Backup';
+
+  @override
+  String get settingsExportBackupSubtitle =>
+      'Full JSON backup to save or transfer';
+
+  @override
+  String get settingsGenerateTestData => 'Generate Test Data';
+
+  @override
+  String get settingsGenerateTestDataSubtitle =>
+      'Adds fictional workouts to test the app';
+
+  @override
+  String get settingsGenerateTitle => 'Generate Test Data?';
+
+  @override
+  String get settingsGenerateContent =>
+      'This will add fictional workouts from recent months to test charts and features.\n\nUse \"Delete All History\" to remove them later.';
+
+  @override
+  String get settingsGenerate => 'Generate';
+
+  @override
+  String get settingsAbout => 'About';
+
+  @override
+  String get settingsAboutSubtitle => 'Life Notes Workout v1.0';
+
+  @override
+  String get settingsDeleteAllHistory => 'Delete All Workout History';
+
+  @override
+  String get settingsDeleteHistoryTitle => 'Delete All History?';
+
+  @override
+  String get settingsDeleteHistoryContent =>
+      'All workouts, sets and registered exercises will be deleted. This action cannot be undone.';
+
+  @override
+  String get settingsDeleteEverything => 'Delete Everything';
+
+  @override
+  String get settingsDeleteHistorySuccess => 'History deleted';
+
+  @override
+  String get settingsExportSuccess => '✅ Backup exported!';
+
+  @override
+  String settingsExportError(Object error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get settingsLanguage => 'Language';
+
+  @override
+  String get settingsEnglish => 'English';
+
+  @override
+  String get settingsPortuguese => 'Português (Brasil)';
+
+  @override
+  String get settingsLanguageSubtitle => 'App interface language';
+
+  @override
+  String get calendarTitle => 'History';
+
+  @override
+  String get calendarSun => 'Sun';
+
+  @override
+  String get calendarMon => 'Mon';
+
+  @override
+  String get calendarTue => 'Tue';
+
+  @override
+  String get calendarWed => 'Wed';
+
+  @override
+  String get calendarThu => 'Thu';
+
+  @override
+  String get calendarFri => 'Fri';
+
+  @override
+  String get calendarSat => 'Sat';
+
+  @override
+  String calendarNoWorkouts(Object date) {
+    return 'No workouts on $date';
+  }
+
+  @override
+  String get calendarCreateWorkout => 'Create Workout';
+
+  @override
+  String get calendarNoTime => 'No time';
+
+  @override
+  String get calendarInProgress => 'In progress';
+
+  @override
+  String get calendarWorkoutCreated => '✅ Workout created for this day!';
+
+  @override
+  String get calendarSelectNewDate => 'Select the new date';
+
+  @override
+  String get exportTitle => 'Export Data';
+
+  @override
+  String get exportJsonBackup => 'Full Backup (JSON)';
+
+  @override
+  String get exportJsonBackupSubtitle =>
+      'Exports all data: workouts, exercises, routines, measurements and settings';
+
+  @override
+  String get exportCsv => 'Export CSV';
+
+  @override
+  String get exportCsvSubtitle =>
+      'Exports workout history (date, exercise, weight, reps) - filterable by exercise and date';
+
+  @override
+  String get exportShareSummary => 'Share Summary';
+
+  @override
+  String get exportShareSummarySubtitle =>
+      'Generates a text summary of a specific workout to share';
+
+  @override
+  String get exportTips => 'Tips';
+
+  @override
+  String get exportTipsContent =>
+      '• JSON backup contains all app data\n• CSV is ideal for analysis in Excel/Google Sheets\n• Files are saved temporarily and shared via native share sheet';
+
+  @override
+  String get exportCsvDialogTitle => 'Export CSV';
+
+  @override
+  String get exportCsvExerciseLabel =>
+      'Exercise (optional - empty exports all)';
+
+  @override
+  String get exportCsvExerciseHint => 'Leave empty for all';
+
+  @override
+  String get exportCsvStartDate => 'Start date';
+
+  @override
+  String get exportCsvEndDate => 'End date';
+
+  @override
+  String get exportCsvButton => 'Export CSV';
+
+  @override
+  String get exportShareWorkoutTitle => 'Share Workout';
+
+  @override
+  String get exportNoWorkouts => 'No workouts to share';
+
+  @override
+  String get exportSuccess => 'Backup exported successfully!';
+
+  @override
+  String get exportCsvSuccess => 'CSV exported successfully!';
+
+  @override
+  String exportError(Object error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get progressTitle => 'Progress';
+
+  @override
+  String progressMonthlyReport(Object month) {
+    return 'MONTHLY REPORT OF $month';
+  }
+
+  @override
+  String get progressWorkouts => 'Workouts';
+
+  @override
+  String get progressSets => 'Sets';
+
+  @override
+  String get progressDays => 'Days';
+
+  @override
+  String progressAverageFeeling(Object rating) {
+    return 'Average feeling: $rating ★';
+  }
+
+  @override
+  String progressVsLastMonth(Object delta) {
+    return '$delta vs last month';
+  }
+
+  @override
+  String get progressStreak => 'Streak';
+
+  @override
+  String get progressFrequency => 'Frequency & Consistency';
+
+  @override
+  String get progressVolumeGroups => 'Volume & Muscle Groups';
+
+  @override
+  String get progressExerciseHistory => 'Exercise History';
+
+  @override
+  String get progressDurationEfficiency => 'Duration & Efficiency';
+
+  @override
+  String get progressRecovery => 'Recovery & Well-being';
+
+  @override
+  String get progressBodyMeasurements => 'Body Measurements';
+
+  @override
+  String get progressYearHeatmap => 'Annual heatmap';
+
+  @override
+  String get progressWeeklyFrequency => 'Weekly frequency (last 12 weeks)';
+
+  @override
+  String get progressDayOfWeek => 'Day of week';
+
+  @override
+  String get progressTimeOfDay => 'Time of day';
+
+  @override
+  String get progressMorning => 'Morning';
+
+  @override
+  String get progressAfternoon => 'Afternoon';
+
+  @override
+  String get progressEvening => 'Evening';
+
+  @override
+  String get progressDawn => 'Dawn';
+
+  @override
+  String get progressNoData => 'No data';
+
+  @override
+  String get progressVolumeByGroup => 'Volume by Group';
+
+  @override
+  String get progressEnergySystem => 'Energy System';
+
+  @override
+  String get progressAerobic => 'Aerobic';
+
+  @override
+  String get progressAnaerobic => 'Anaerobic';
+
+  @override
+  String get progressTopExercises => 'Top Exercises by Volume';
+
+  @override
+  String get progressNoExercises => 'No exercises registered';
+
+  @override
+  String get progressTapForHistory => 'Tap an exercise to view full history';
+
+  @override
+  String get progressDuration => 'Workout Duration';
+
+  @override
+  String progressAverage(Object avg) {
+    return 'Average: ${avg}min';
+  }
+
+  @override
+  String get progressDensity => 'Density (Volume per Minute)';
+
+  @override
+  String get progressBodyWeight => 'Body Weight';
+
+  @override
+  String get bodyTrackerTitle => 'Body Measurements';
+
+  @override
+  String get bodyTrackerWeight => 'Body Weight';
+
+  @override
+  String get bodyTrackerBodyFat => '% Body Fat';
+
+  @override
+  String get bodyTrackerWaist => 'Waist';
+
+  @override
+  String get bodyTrackerChest => 'Chest';
+
+  @override
+  String get bodyTrackerArm => 'Arm';
+
+  @override
+  String get bodyTrackerThigh => 'Thigh';
+
+  @override
+  String get bodyTrackerHip => 'Hip';
+
+  @override
+  String get bodyTrackerAdd => 'Add Measurement';
+
+  @override
+  String bodyTrackerAddTitle(Object type) {
+    return 'Add $type';
+  }
+
+  @override
+  String get bodyTrackerValue => 'Value';
+
+  @override
+  String get bodyTrackerDate => 'Date';
+
+  @override
+  String get bodyTrackerComment => 'Comment';
+
+  @override
+  String get bodyTrackerSave => 'Save';
+
+  @override
+  String get bodyTrackerSaved => '✅ Measurement saved!';
+
+  @override
+  String get bodyTrackerDeleted => 'Measurement deleted';
+
+  @override
+  String get bodyTrackerDeleteConfirm => 'Delete this measurement?';
+
+  @override
+  String get routinesTitle => 'Routines';
+
+  @override
+  String get routinesNew => 'New Routine';
+
+  @override
+  String get routinesName => 'Routine Name';
+
+  @override
+  String get routinesNameHint => 'Ex: Push Pull Legs';
+
+  @override
+  String get routinesCreate => 'Create';
+
+  @override
+  String get routinesEdit => 'Edit Routine';
+
+  @override
+  String get routinesDelete => 'Delete Routine';
+
+  @override
+  String routinesDeleteConfirm(Object name) {
+    return 'Delete \"$name\"?';
+  }
+
+  @override
+  String get routinesDeleteContent => 'All routine data will be lost.';
+
+  @override
+  String get restTimerTitle => 'Rest Timer';
+
+  @override
+  String get restTimerStop => 'Stop';
+
+  @override
+  String get restTimerComplete => 'COMPLETED';
+
+  @override
+  String get restTimerPaused => 'PAUSED';
+
+  @override
+  String get restTimerResting => 'RESTING';
+
+  @override
+  String get restTimerReady => 'READY';
+
+  @override
+  String get restTimerResume => 'Resume';
+
+  @override
+  String get restTimerPause => 'Pause';
+
+  @override
+  String get restTimerStartRest => 'Start rest';
+
+  @override
+  String get exerciseLibraryTitle => 'Exercises';
+
+  @override
+  String get exerciseLibraryFavorites => 'Favorites';
+
+  @override
+  String get exerciseLibrarySearch => 'Search exercise...';
+
+  @override
+  String get exerciseLibraryAll => 'All';
+
+  @override
+  String get exerciseLibraryNoResults => 'No exercises found';
+
+  @override
+  String get exerciseLibraryNoResultsHint =>
+      'Try a different search or add a new one';
+
+  @override
+  String get exerciseLibraryNew => 'New Exercise';
+
+  @override
+  String get exerciseLibraryAerobic => 'Aerobic';
+
+  @override
+  String get exerciseLibraryAnaerobic => 'Anaerobic';
+
+  @override
+  String get exerciseFormTitleNew => 'New Exercise';
+
+  @override
+  String get exerciseFormTitleEdit => 'Edit Exercise';
+
+  @override
+  String get exerciseFormName => 'Exercise Name';
+
+  @override
+  String get exerciseFormNameHint => 'Ex: Incline Bench Press';
+
+  @override
+  String get exerciseFormCategory => 'Muscle Group';
+
+  @override
+  String get exerciseFormType => 'Type';
+
+  @override
+  String get exerciseFormEquipment => 'Equipment (optional)';
+
+  @override
+  String get exerciseFormEquipmentHint => 'Barbell, Dumbbell, Machine...';
+
+  @override
+  String get exerciseFormWeightIncrement => 'Weight Increment (kg)';
+
+  @override
+  String get exerciseFormWeightIncrementHint => 'Ex: 2.5';
+
+  @override
+  String get exerciseFormDefaultRest => 'Default Rest (seconds)';
+
+  @override
+  String get exerciseFormDefaultRestHint => 'Ex: 90';
+
+  @override
+  String get exerciseFormNotes => 'Instructions / Tips (optional)';
+
+  @override
+  String get exerciseFormNotesHint => 'Execution tips, proper form...';
+
+  @override
+  String get exerciseFormNameRequired => 'Name is required';
+
+  @override
+  String get exerciseFormSave => 'Save';
+
+  @override
+  String exerciseFormError(Object error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get exerciseFormTypeWeightReps => 'Weight × Reps';
+
+  @override
+  String get exerciseFormTypeDistanceTime => 'Distance × Time';
+
+  @override
+  String get exerciseFormTypeWeightDistance => 'Weight × Distance';
+
+  @override
+  String get exerciseFormTypeWeightTime => 'Weight × Time';
+
+  @override
+  String get exerciseFormTypeRepsDistance => 'Reps × Distance';
+
+  @override
+  String get exerciseFormTypeRepsTime => 'Reps × Time';
+
+  @override
+  String get exerciseFormTypeWeightOnly => 'Weight Only';
+
+  @override
+  String get exerciseFormTypeRepsOnly => 'Reps Only';
+
+  @override
+  String get exerciseFormTypeDistanceOnly => 'Distance Only';
+
+  @override
+  String get exerciseFormTypeTimeOnly => 'Time Only';
+
+  @override
+  String get quickAddTitle => 'Quick Add';
+
+  @override
+  String get quickAddHint => 'Ex: Bench Press 80kg 3x10';
+
+  @override
+  String get quickAddSave => 'Save';
+
+  @override
+  String get quickAddAcceptedFormats => 'Accepted formats:';
+
+  @override
+  String quickAddSetsIdentified(Object count) {
+    return '$count set(s) identified';
+  }
+
+  @override
+  String get quickAddRecentExercises => 'Recent Exercises';
+
+  @override
+  String quickAddExerciseNotFound(Object name) {
+    return 'Exercise \"$name\" not found';
+  }
+
+  @override
+  String get quickAddCreate => 'Create';
+
+  @override
+  String quickAddSaved(Object count, Object name) {
+    return '✅ $name • $count sets registered';
+  }
+
+  @override
+  String quickAddCreatedAndSaved(Object name) {
+    return '✅ $name created and registered!';
+  }
+
+  @override
+  String get quickAddFormatError => 'Format: ExerciseName Weight [SetsxReps]';
+
+  @override
+  String get quickAddWeightNotFound =>
+      'Weight not found. Use: Name Weight [SetsxReps]';
+
+  @override
+  String get quickAddNoSets => 'No sets identified';
+
+  @override
+  String get exerciseDetailEdit => 'Edit';
+
+  @override
+  String get exerciseDetailHistory => 'History';
+
+  @override
+  String get exerciseDetailCharts => 'Charts';
+
+  @override
+  String get exerciseDetailChart1RM => '1RM';
+
+  @override
+  String get exerciseDetailChartMaxWeight => 'Max Weight';
+
+  @override
+  String get exerciseDetailChartVolume => 'Volume';
+
+  @override
+  String get exerciseDetailChartTotalReps => 'Total Reps';
+
+  @override
+  String get workoutDetailContinue => 'Continue Workout';
+
+  @override
+  String get workoutDetailDelete => 'Delete Workout';
+
+  @override
+  String get workoutDetailDeleteConfirm => 'Delete Workout?';
+
+  @override
+  String get workoutDetailEditDate => 'Change Date';
+
+  @override
+  String get workoutDetailShare => 'Share';
+
+  @override
+  String get workoutDetailNoSets => 'No sets';
+
+  @override
+  String get workoutDetailWeight => 'Weight';
+
+  @override
+  String get workoutDetailDateChanged => '✅ Date changed!';
+
+  @override
+  String get notificationRestChannelName => 'Rest Timer';
+
+  @override
+  String get notificationRestChannelDesc =>
+      'Rest timer notifications between sets';
+
+  @override
+  String get notificationWorkoutChannelName => 'Workout Timer';
+
+  @override
+  String get notificationWorkoutChannelDesc =>
+      'Active workout timer notifications';
+
+  @override
+  String get exportServiceBackupText => 'Life Notes - Workout Backup';
+
+  @override
+  String get exportServiceCsvText => 'Life Notes - Workout Export';
+
+  @override
+  String get exportServiceCsvHeaderDate => 'Date';
+
+  @override
+  String get exportServiceCsvHeaderExercise => 'Exercise';
+
+  @override
+  String get exportServiceCsvHeaderCategory => 'Category';
+
+  @override
+  String get exportServiceCsvHeaderWeight => 'Weight';
+
+  @override
+  String get exportServiceCsvHeaderReps => 'Reps';
+
+  @override
+  String get exportServiceCsvHeaderDistance => 'Distance';
+
+  @override
+  String get exportServiceCsvHeaderTime => 'Time (s)';
+
+  @override
+  String get exportServiceCsvHeaderWarmup => 'Warm-up';
+
+  @override
+  String get exportServiceCsvHeaderRpe => 'RPE';
+
+  @override
+  String get exportServiceCsvHeaderSetNote => 'Set Note';
+
+  @override
+  String get exportServiceCsvHeaderWorkoutNote => 'Workout Note';
+
+  @override
+  String get exportServiceCsvYes => 'Yes';
+
+  @override
+  String get exportServiceCsvNo => 'No';
+
+  @override
+  String exportServiceWorkoutSummary(Object date) {
+    return '🏋️ Workout - $date\n';
+  }
+
+  @override
+  String exportServiceWorkoutNote(Object note) {
+    return '📝 $note\n';
+  }
+
+  @override
+  String get noticePermissionTitle => 'Rest Timer Permission';
+
+  @override
+  String get noticePermissionBody =>
+      'This app needs notification permission to alert you when rest time is over during workouts.';
+}

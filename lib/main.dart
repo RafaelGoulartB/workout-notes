@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
+import 'l10n/app_localizations.dart';
 import 'services/notification_service.dart';
 import 'screens/workout/workout_home_screen.dart';
 import 'screens/home_screen.dart';
@@ -72,9 +75,22 @@ class ThemeNotifier extends ChangeNotifier {
   }
 }
 
+/// Notifier for locale/language changes.
+class LocaleNotifier extends ChangeNotifier {
+  Locale _locale;
+
+  LocaleNotifier(this._locale);
+
+  Locale get locale => _locale;
+
+  void setLocale(Locale locale) {
+    _locale = locale;
+    notifyListeners();
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('pt_BR', null);
 
   // Initialize notification service
   final notif = NotificationService.instance;
@@ -90,10 +106,31 @@ void main() async {
   final themeModeStr = prefs.getString('theme_mode') ?? 'system';
   final initialThemeMode = _parseThemeMode(themeModeStr);
 
+  // Load saved locale
+  final localeStr = prefs.getString('app_locale') ?? 'en';
+  final initialLocale = _parseLocale(localeStr);
+
+  // Initialize date formatting based on locale
+  final localeForDateFormat = localeStr == 'pt' ? 'pt_BR' : 'en';
+  await initializeDateFormatting(localeForDateFormat, null);
+  Intl.defaultLocale = localeForDateFormat;
+
   // Initialize the theme notifier with the loaded values
   LifeNotesApp.themeNotifier = ThemeNotifier(initialColor, initialThemeMode);
+  LifeNotesApp.localeNotifier = LocaleNotifier(initialLocale);
 
-  runApp(LifeNotesApp(initialColor: initialColor, initialThemeMode: initialThemeMode));
+  runApp(LifeNotesApp(
+    initialColor: initialColor,
+    initialThemeMode: initialThemeMode,
+    initialLocale: initialLocale,
+  ));
+}
+
+Locale _parseLocale(String value) {
+  if (value == 'pt' || value == 'pt_BR') {
+    return const Locale('pt', 'BR');
+  }
+  return const Locale('en');
 }
 
 ThemeMode _parseThemeMode(String value) {
@@ -110,10 +147,17 @@ ThemeMode _parseThemeMode(String value) {
 class LifeNotesApp extends StatefulWidget {
   final Color initialColor;
   final ThemeMode initialThemeMode;
+  final Locale initialLocale;
   
-  const LifeNotesApp({super.key, required this.initialColor, required this.initialThemeMode});
+  const LifeNotesApp({
+    super.key,
+    required this.initialColor,
+    required this.initialThemeMode,
+    required this.initialLocale,
+  });
 
   static late ThemeNotifier themeNotifier;
+  static late LocaleNotifier localeNotifier;
 
   @override
   State<LifeNotesApp> createState() => _LifeNotesAppState();
@@ -122,21 +166,26 @@ class LifeNotesApp extends StatefulWidget {
 class _LifeNotesAppState extends State<LifeNotesApp> {
   late Color _seedColor;
   late ThemeMode _themeMode;
+  late Locale _locale;
 
   @override
   void initState() {
     super.initState();
     _seedColor = widget.initialColor;
     _themeMode = widget.initialThemeMode;
+    _locale = widget.initialLocale;
     LifeNotesApp.themeNotifier.addListener(_onThemeChanged);
-    // Sync the notifier's initial value
+    LifeNotesApp.localeNotifier.addListener(_onLocaleChanged);
+    // Sync the notifier's initial values
     LifeNotesApp.themeNotifier.setSeedColor(_seedColor);
     LifeNotesApp.themeNotifier.setThemeMode(_themeMode);
+    LifeNotesApp.localeNotifier.setLocale(_locale);
   }
 
   @override
   void dispose() {
     LifeNotesApp.themeNotifier.removeListener(_onThemeChanged);
+    LifeNotesApp.localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
   }
 
@@ -144,6 +193,12 @@ class _LifeNotesAppState extends State<LifeNotesApp> {
     setState(() {
       _seedColor = LifeNotesApp.themeNotifier.seedColor;
       _themeMode = LifeNotesApp.themeNotifier.themeMode;
+    });
+  }
+
+  void _onLocaleChanged() {
+    setState(() {
+      _locale = LifeNotesApp.localeNotifier.locale;
     });
   }
 
@@ -195,6 +250,14 @@ class _LifeNotesAppState extends State<LifeNotesApp> {
     return MaterialApp(
       title: 'Life Notes',
       debugShowCheckedModeBanner: false,
+      locale: _locale,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: _buildTheme(_seedColor, Brightness.light),
       darkTheme: _buildTheme(_seedColor, Brightness.dark),
       themeMode: _themeMode,
@@ -229,16 +292,16 @@ class _MainShellState extends State<MainShell> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: (i) => setState(() => _selectedIndex = i),
         backgroundColor: theme.colorScheme.surface,
-        destinations: const [
+        destinations: [
           NavigationDestination(
             icon: Icon(Icons.auto_stories_outlined),
             selectedIcon: Icon(Icons.auto_stories),
-            label: 'Notas',
+            label: AppLocalizations.of(context)!.tabNotes,
           ),
           NavigationDestination(
             icon: Icon(Icons.fitness_center_outlined),
             selectedIcon: Icon(Icons.fitness_center),
-            label: 'Treino',
+            label: AppLocalizations.of(context)!.tabWorkout,
           ),
         ],
       ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:life_notes/l10n/app_localizations.dart';
 import '../models/note.dart';
 
 class NoteEditorScreen extends StatefulWidget {
@@ -49,7 +50,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
 
     if (title.isEmpty && content.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Write something before saving')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.noteEditorEmptyError)),
       );
       return;
     }
@@ -71,12 +72,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Discard changes?'),
-          content: const Text('You have unsaved changes.'),
+          title: Text(AppLocalizations.of(context)!.noteEditorDiscardTitle),
+          content: Text(AppLocalizations.of(context)!.noteEditorDiscardContent),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Keep editing'),
+              child: Text(AppLocalizations.of(context)!.noteEditorKeepEditing),
             ),
             TextButton(
               onPressed: () {
@@ -84,7 +85,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 Navigator.pop(context);
               },
               style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Discard'),
+              child: Text(AppLocalizations.of(context)!.noteEditorDiscard),
             ),
           ],
         ),
@@ -105,7 +106,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(_isEditing ? 'Edit Note' : 'New Note'),
+          title: Text(_isEditing ? AppLocalizations.of(context)!.noteEditorTitleEdit : AppLocalizations.of(context)!.noteEditorTitleNew),
           leading: IconButton(
             icon: const Icon(Icons.close),
             onPressed: _discard,
@@ -114,7 +115,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             TextButton.icon(
               onPressed: _save,
               icon: const Icon(Icons.check),
-              label: const Text('Save'),
+              label: Text(AppLocalizations.of(context)!.noteEditorSave),
             ),
           ],
         ),
@@ -127,8 +128,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
-                decoration: const InputDecoration(
-                  hintText: 'Title',
+                decoration: InputDecoration(
+                  hintText: AppLocalizations.of(context)!.noteEditorHintTitle,
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.zero,
                   isDense: true,
@@ -141,8 +142,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
                 child: TextField(
                   controller: _contentController,
                   style: Theme.of(context).textTheme.bodyLarge,
-                  decoration: const InputDecoration(
-                    hintText: 'What\'s on your mind?',
+                  decoration: InputDecoration(
+                    hintText: AppLocalizations.of(context)!.noteEditorHintContent,
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.zero,
                     isDense: true,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:life_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 import '../../widgets/collapsible_section.dart';
 import '../../widgets/workout_heatmap.dart';
@@ -66,7 +67,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   int _selectedChartType = 0;
   bool _showingOverview = true;
 
-  static const _chartTypes = ['1RM', 'Peso Máx.', 'Volume', 'Total Reps'];
+  static const _chartTypes = ['1RM', 'Max Weight', 'Volume', 'Total Reps'];
 
   @override
   void initState() {
@@ -287,10 +288,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_showingOverview ? 'Progresso' : (_selectedHistory?['exercise_name'] as String? ?? 'Progresso')),
+        title: Text(_showingOverview ? loc.progressTitle : (_selectedHistory?['exercise_name'] as String? ?? loc.progressTitle)),
         centerTitle: true,
         leading: _showingOverview
             ? null
@@ -334,7 +336,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           // === Collapsible Sections (lazy loaded on expand) ===
           _buildDivider(theme),
           CollapsibleSection(
-            title: 'Frequência & Consistência',
+            title: AppLocalizations.of(context)!.progressFrequency,
             icon: Icons.calendar_month,
             iconColor: Colors.blue,
             onExpanded: _loadFrequency,
@@ -343,7 +345,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
           _buildDivider(theme),
           CollapsibleSection(
-            title: 'Volume & Grupos Musculares',
+            title: AppLocalizations.of(context)!.progressVolumeGroups,
             icon: Icons.pie_chart,
             iconColor: Colors.teal,
             onExpanded: _loadVolume,
@@ -352,7 +354,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
           _buildDivider(theme),
           CollapsibleSection(
-            title: 'Histórico dos Exercícios',
+            title: AppLocalizations.of(context)!.progressExerciseHistory,
             icon: Icons.emoji_events,
             iconColor: Colors.amber,
             onExpanded: _loadPerformance,
@@ -361,7 +363,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
           _buildDivider(theme),
           CollapsibleSection(
-            title: 'Duração & Eficiência',
+            title: AppLocalizations.of(context)!.progressDurationEfficiency,
             icon: Icons.timer,
             iconColor: Colors.purple,
             onExpanded: _loadDuration,
@@ -370,7 +372,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
           _buildDivider(theme),
           CollapsibleSection(
-            title: 'Recuperação & Bem-estar',
+            title: AppLocalizations.of(context)!.progressRecovery,
             icon: Icons.favorite,
             iconColor: Colors.red,
             onExpanded: _loadRecovery,
@@ -379,7 +381,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
           _buildDivider(theme),
           CollapsibleSection(
-            title: 'Medidas Corporais',
+            title: AppLocalizations.of(context)!.progressBodyMeasurements,
             icon: Icons.monitor_weight,
             iconColor: Colors.indigo,
             onExpanded: _loadBody,
@@ -443,7 +445,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 Icon(Icons.auto_graph, size: 20, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
-                  'RESUMO DE ${monthName.toUpperCase()}',
+                  AppLocalizations.of(context)!.progressMonthlyReport(monthName.toUpperCase()),
                   style: theme.textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.2,
@@ -455,16 +457,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
             const SizedBox(height: 12),
             Row(
               children: [
-                _MiniStat(icon: Icons.fitness_center, label: 'Treinos', value: '$wc',
+                _MiniStat(icon: Icons.fitness_center, label: AppLocalizations.of(context)!.progressWorkouts, value: '$wc',
                     color: theme.colorScheme.primary, delta: deltaW, theme: theme),
                 const SizedBox(width: 8),
-                _MiniStat(icon: Icons.auto_graph, label: 'Volume', value: _formatVolume(vol),
+                _MiniStat(icon: Icons.auto_graph, label: AppLocalizations.of(context)!.commonVolume, value: _formatVolume(vol),
                     color: Colors.teal, delta: deltaV.toInt(), theme: theme),
                 const SizedBox(width: 8),
-                _MiniStat(icon: Icons.repeat, label: 'Séries', value: '$sets',
+                _MiniStat(icon: Icons.repeat, label: AppLocalizations.of(context)!.progressSets, value: '$sets',
                     color: theme.colorScheme.secondary, theme: theme),
                 const SizedBox(width: 8),
-                _MiniStat(icon: Icons.calendar_view_day, label: 'Dias', value: '$days',
+                _MiniStat(icon: Icons.calendar_view_day, label: AppLocalizations.of(context)!.progressDays, value: '$days',
                     color: Colors.blue, theme: theme),
               ],
             ),
@@ -475,7 +477,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   Icon(Icons.star, size: 14, color: Colors.amber),
                   const SizedBox(width: 4),
                   Text(
-                    'Sentimento médio: ${avgFeeling.toStringAsFixed(1)} ★',
+                    AppLocalizations.of(context)!.progressAverageFeeling(avgFeeling.toStringAsFixed(1)),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -529,24 +531,24 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Row(
       children: [
         Expanded(child: _StatCard(
-          label: 'Treinos', value: '$totalWorkouts',
+          label: AppLocalizations.of(context)!.progressWorkouts, value: '$totalWorkouts',
           icon: Icons.fitness_center, color: theme.colorScheme.primary,
         )),
         const SizedBox(width: 6),
         Expanded(child: _StatCard(
-          label: 'Séries', value: '$totalSets',
+          label: AppLocalizations.of(context)!.progressSets, value: '$totalSets',
           icon: Icons.repeat, color: theme.colorScheme.secondary,
         )),
         const SizedBox(width: 6),
         Expanded(child: _StatCard(
-          label: 'Volume', value: totalVolume >= 1000
+          label: AppLocalizations.of(context)!.commonVolume, value: totalVolume >= 1000
               ? '${(totalVolume / 1000).toStringAsFixed(1)}k'
               : '$totalVolume',
           icon: Icons.auto_graph, color: Colors.teal,
         )),
         const SizedBox(width: 6),
         Expanded(child: _StatCard(
-          label: 'Sequência', value: '$streak ${streak == 1 ? 'dia' : 'dias'}',
+          label: AppLocalizations.of(context)!.progressStreak, value: '$streak ${streak == 1 ? AppLocalizations.of(context)!.workoutHomeDay : AppLocalizations.of(context)!.workoutHomeDays}',
           icon: Icons.local_fire_department, color: Colors.orange,
         )),
       ],
@@ -2405,7 +2407,7 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
   Map<String, dynamic>? _history;
   bool _isLoading = true;
   int _chartType = 0;
-  static const _chartTypes = ['1RM', 'Peso Máx.', 'Volume', 'Total Reps'];
+  static const _chartTypes = ['1RM', 'Max Weight', 'Volume', 'Total Reps'];
 
   @override
   void initState() {

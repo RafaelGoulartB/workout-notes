@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
+import 'package:life_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 import '../../services/rest_timer_service.dart';
 import 'active_workout_screen.dart';
@@ -187,13 +188,13 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
               icon: const Icon(Icons.calendar_month_outlined),
               onPressed: () => Navigator.push(
                 context, MaterialPageRoute(builder: (_) => const CalendarScreen())),
-              tooltip: 'Histórico',
+              tooltip: AppLocalizations.of(context)!.workoutHomeHistoryTooltip,
             ),
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () => Navigator.push(
               context, MaterialPageRoute(builder: (_) => const WorkoutSettingsScreen())),
-            tooltip: 'Configurações',
+            tooltip: AppLocalizations.of(context)!.workoutHomeSettingsTooltip,
           ),
         ],
       ),
@@ -255,7 +256,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
               children: [
                 Expanded(
                   child: _StatItem(
-                    label: 'Treinos no Mês',
+                    label: AppLocalizations.of(context)!.workoutHomeMonthWorkouts,
                     value: '${_monthWorkouts}',
                     icon: Icons.fitness_center,
                     color: theme.colorScheme.primary,
@@ -269,7 +270,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 ),
                 Expanded(
                   child: _StatItem(
-                    label: 'Volume',
+                    label: AppLocalizations.of(context)!.workoutHomeVolume,
                     value: _formatVolume(_monthVolume),
                     icon: Icons.auto_graph,
                     color: theme.colorScheme.secondary,
@@ -283,8 +284,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 ),
                 Expanded(
                   child: _StatItem(
-                    label: 'Sequência',
-                    value: '$_currentStreak ${_currentStreak == 1 ? 'dia' : 'dias'}',
+                    label: AppLocalizations.of(context)!.workoutHomeStreak,
+                    value: '$_currentStreak ${_currentStreak == 1 ? AppLocalizations.of(context)!.workoutHomeDay : AppLocalizations.of(context)!.workoutHomeDays}',
                     icon: Icons.local_fire_department,
                     color: Colors.orange,
                     theme: theme,
@@ -313,8 +314,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           Expanded(
             child: _ActionCard(
               icon: Icons.fitness_center,
-              label: 'Novo Treino',
-              subtitle: 'Começar agora',
+              label: AppLocalizations.of(context)!.workoutHomeNewWorkout,
+              subtitle: AppLocalizations.of(context)!.workoutHomeStartNow,
               color: theme.colorScheme.primary,
               onTap: _startWorkout,
             ),
@@ -323,8 +324,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           Expanded(
             child: _ActionCard(
               icon: Icons.bolt,
-              label: 'Quick Add',
-              subtitle: 'Adicionar rápido',
+              label: AppLocalizations.of(context)!.workoutHomeQuickAdd,
+              subtitle: AppLocalizations.of(context)!.workoutHomeQuickAddSubtitle,
               color: theme.colorScheme.secondary,
               onTap: _quickAdd,
             ),
@@ -337,10 +338,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   // ===================== NAV GRID =====================
   Widget _buildNavGrid(ThemeData theme) {
     final items = [
-      _NavItemData(Icons.fitness_center, 'Exercícios', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExerciseLibraryScreen()))),
-      _NavItemData(Icons.repeat, 'Rotinas', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RoutinesScreen()))),
-      _NavItemData(Icons.bar_chart, 'Progresso', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProgressScreen()))),
-      _NavItemData(Icons.monitor_weight_outlined, 'Medidas', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BodyTrackerScreen()))),
+      _NavItemData(Icons.fitness_center, AppLocalizations.of(context)!.workoutHomeExercises, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExerciseLibraryScreen()))),
+      _NavItemData(Icons.repeat, AppLocalizations.of(context)!.workoutHomeRoutines, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RoutinesScreen()))),
+      _NavItemData(Icons.bar_chart, AppLocalizations.of(context)!.workoutHomeProgress, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProgressScreen()))),
+      _NavItemData(Icons.monitor_weight_outlined, AppLocalizations.of(context)!.workoutHomeBodyMeasurements, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BodyTrackerScreen()))),
     ];
 
     return Padding(
@@ -356,7 +357,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Text('NAVEGAÇÃO', style: theme.textTheme.labelSmall?.copyWith(
+              child: Text(AppLocalizations.of(context)!.workoutHomeNavigation, style: theme.textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.5,
                 color: theme.colorScheme.onSurfaceVariant,
@@ -395,7 +396,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 child: Icon(Icons.play_circle_fill, size: 18, color: Colors.green),
               ),
               const SizedBox(width: 8),
-              Text('EM ANDAMENTO', style: theme.textTheme.labelSmall?.copyWith(
+              Text(AppLocalizations.of(context)!.workoutHomeInProgress, style: theme.textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.5,
                 color: theme.colorScheme.onSurface,
@@ -404,7 +405,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           ),
           const SizedBox(height: 8),
           if (_activeWorkouts.isEmpty)
-            _buildEmptyHint('Nenhum treino em andamento', Icons.play_circle_outline, theme)
+            _buildEmptyHint(AppLocalizations.of(context)!.workoutHomeNoActiveWorkout, Icons.play_circle_outline, theme)
           else
             ...(_activeWorkouts.map((w) => _buildWorkoutCard(w, theme, isActive: true))),
         ],
@@ -432,7 +433,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                   child: Icon(Icons.schedule, size: 18, color: theme.colorScheme.onSecondaryContainer),
                 ),
                 const SizedBox(width: 8),
-                Text('PRÓXIMOS TREINOS', style: theme.textTheme.labelSmall?.copyWith(
+                Text(AppLocalizations.of(context)!.workoutHomeUpcoming, style: theme.textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.5,
                   color: theme.colorScheme.onSurface,
@@ -476,7 +477,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                   child: Icon(Icons.fitness_center, size: 18, color: theme.colorScheme.onPrimaryContainer),
                 ),
                 const SizedBox(width: 8),
-                Text('TREINOS CONCLUÍDOS', style: theme.textTheme.labelSmall?.copyWith(
+                Text(AppLocalizations.of(context)!.workoutHomeCompleted, style: theme.textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.5,
                   color: theme.colorScheme.onSurface,
@@ -521,7 +522,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         : '';
     final duration = (workout['duration_seconds'] as int?) ?? 0;
     final durStr = isActive
-        ? 'Em andamento'
+        ? AppLocalizations.of(context)!.workoutHomeOngoing
         : duration > 0
             ? '${duration ~/ 60}min ${duration % 60}s'
             : '--';

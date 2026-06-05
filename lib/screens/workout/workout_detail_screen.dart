@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:life_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 import '../../services/export_service.dart';
 import 'active_workout_screen.dart';
@@ -70,19 +71,19 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       appBar: AppBar(
         title: Text(_workout != null
             ? DateFormat("d 'de' MMMM", 'pt_BR').format(DateTime.parse(_workout!['date'] as String))
-            : 'Detalhes'),
+            : AppLocalizations.of(context)!.workoutDetailContinue),
         centerTitle: true,
         actions: [
           PopupMenuButton(
             itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'continue', child: Row(
-                children: [Icon(Icons.play_arrow, size: 18, color: Colors.green), SizedBox(width: 8), Text('Continuar Treino', style: TextStyle(color: Colors.green))],
+              PopupMenuItem(value: 'continue', child: Row(
+                children: [Icon(Icons.play_arrow, size: 18, color: Colors.green), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailContinue, style: TextStyle(color: Colors.green))],
               )),
-              const PopupMenuItem(value: 'edit_date', child: Row(
-                children: [Icon(Icons.calendar_today, size: 18), SizedBox(width: 8), Text('Alterar Data')],
+              PopupMenuItem(value: 'edit_date', child: Row(
+                children: [Icon(Icons.calendar_today, size: 18), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailEditDate)],
               )),
-              const PopupMenuItem(value: 'delete', child: Row(
-                children: [Icon(Icons.delete_outline, size: 18, color: Colors.red), SizedBox(width: 8), Text('Excluir', style: TextStyle(color: Colors.red))],
+              PopupMenuItem(value: 'delete', child: Row(
+                children: [Icon(Icons.delete_outline, size: 18, color: Colors.red), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailDelete, style: TextStyle(color: Colors.red))],
               )),
             ],
             onSelected: (v) {
@@ -94,7 +95,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
           IconButton(
             icon: const Icon(Icons.share_outlined),
             onPressed: () => ExportService().shareWorkoutSummary(widget.workoutId),
-            tooltip: 'Compartilhar',
+            tooltip: AppLocalizations.of(context)!.workoutDetailShare,
           ),
         ],
       ),
@@ -153,7 +154,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  _InfoChip(icon: Icons.schedule, label: isActive ? 'Em andamento' : '${duration ~/ 60}min ${duration % 60}s'),
+                  _InfoChip(icon: Icons.schedule, label: isActive ? AppLocalizations.of(context)!.workoutHomeOngoing : '${duration ~/ 60}min ${duration % 60}s'),
                   const SizedBox(width: 8),
                   _InfoChip(icon: Icons.repeat, label: '$_totalSets sets'),
                   const SizedBox(width: 8),
@@ -209,14 +210,14 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
               ),
               const SizedBox(height: 8),
               if (exercise.sets.isEmpty)
-                Text('Nenhuma série', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))
+                Text(AppLocalizations.of(context)!.workoutDetailNoSets, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))
               else ...[
                 Row(
                   children: [
                     const SizedBox(width: 34),
                     Expanded(flex: 2, child: Text('#', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                    Expanded(flex: 3, child: Text('Peso', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                    Expanded(flex: 3, child: Text('Reps', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
+                    Expanded(flex: 3, child: Text(AppLocalizations.of(context)!.workoutDetailWeight, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
+                    Expanded(flex: 3, child: Text(AppLocalizations.of(context)!.commonReps, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
                     Expanded(flex: 3, child: Text('RPE', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
                   ],
                 ),
@@ -273,7 +274,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
               if (result == true) _load();
             },
             icon: const Icon(Icons.play_arrow),
-            label: const Text('Continuar Treino'),
+            label: Text(AppLocalizations.of(context)!.workoutDetailContinue),
             style: FilledButton.styleFrom(
               minimumSize: const Size(double.infinity, 48),
             ),
@@ -282,7 +283,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
           TextButton.icon(
             onPressed: () => _deleteWorkout(),
             icon: const Icon(Icons.delete_outline, color: Colors.red),
-            label: const Text('Excluir Treino', style: TextStyle(color: Colors.red)),
+            label: Text(AppLocalizations.of(context)!.workoutDetailDelete, style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -303,7 +304,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Data alterada!'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.workoutDetailDateChanged), behavior: SnackBarBehavior.floating),
         );
       }
     }
@@ -326,13 +327,13 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Excluir Treino?'),
-        content: const Text('Esta ação não pode ser desfeita.'),
+        title: Text(AppLocalizations.of(context)!.workoutDetailDeleteConfirm),
+        content: Text(AppLocalizations.of(context)!.commonActionCannotBeUndone),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context)!.commonCancel)),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+            child: Text(AppLocalizations.of(context)!.commonDelete, style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
