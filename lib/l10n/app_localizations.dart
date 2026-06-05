@@ -2138,6 +2138,66 @@ abstract class AppLocalizations {
   /// **'Add Set'**
   String get activeWorkoutAddSet;
 
+  /// No description provided for @activeWorkoutCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Workout Completed!'**
+  String get activeWorkoutCompleted;
+
+  /// No description provided for @activeWorkoutSummarySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Great job! Here\'s the summary:'**
+  String get activeWorkoutSummarySubtitle;
+
+  /// No description provided for @activeWorkoutPersonalRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'New Personal Records'**
+  String get activeWorkoutPersonalRecords;
+
+  /// No description provided for @activeWorkoutHowWasWorkout.
+  ///
+  /// In en, this message translates to:
+  /// **'How was the workout?'**
+  String get activeWorkoutHowWasWorkout;
+
+  /// No description provided for @activeWorkoutCommentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Workout note (optional)...'**
+  String get activeWorkoutCommentHint;
+
+  /// No description provided for @activeWorkoutFeeling1.
+  ///
+  /// In en, this message translates to:
+  /// **'Bad'**
+  String get activeWorkoutFeeling1;
+
+  /// No description provided for @activeWorkoutFeeling2.
+  ///
+  /// In en, this message translates to:
+  /// **'Ok'**
+  String get activeWorkoutFeeling2;
+
+  /// No description provided for @activeWorkoutFeeling3.
+  ///
+  /// In en, this message translates to:
+  /// **'Good'**
+  String get activeWorkoutFeeling3;
+
+  /// No description provided for @activeWorkoutFeeling4.
+  ///
+  /// In en, this message translates to:
+  /// **'Great'**
+  String get activeWorkoutFeeling4;
+
+  /// No description provided for @activeWorkoutFeeling5.
+  ///
+  /// In en, this message translates to:
+  /// **'Excellent!'**
+  String get activeWorkoutFeeling5;
+
   /// No description provided for @workoutDetailSetNumber.
   ///
   /// In en, this message translates to:

@@ -1090,6 +1090,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get activeWorkoutAddSet => 'Add Set';
 
   @override
+  String get activeWorkoutCompleted => 'Workout Completed!';
+
+  @override
+  String get activeWorkoutSummarySubtitle => 'Great job! Here\'s the summary:';
+
+  @override
+  String get activeWorkoutPersonalRecords => 'New Personal Records';
+
+  @override
+  String get activeWorkoutHowWasWorkout => 'How was the workout?';
+
+  @override
+  String get activeWorkoutCommentHint => 'Workout note (optional)...';
+
+  @override
+  String get activeWorkoutFeeling1 => 'Bad';
+
+  @override
+  String get activeWorkoutFeeling2 => 'Ok';
+
+  @override
+  String get activeWorkoutFeeling3 => 'Good';
+
+  @override
+  String get activeWorkoutFeeling4 => 'Great';
+
+  @override
+  String get activeWorkoutFeeling5 => 'Excellent!';
+
+  @override
   String get workoutDetailSetNumber => '#';
 
   @override

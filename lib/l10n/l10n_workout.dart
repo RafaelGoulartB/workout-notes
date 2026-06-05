@@ -256,6 +256,16 @@ mixin WorkoutLocale {
   String get activeWorkoutCustomTime;
   String get activeWorkoutSelectDay;
   String get activeWorkoutAddSet;
+  String get activeWorkoutCompleted;
+  String get activeWorkoutSummarySubtitle;
+  String get activeWorkoutPersonalRecords;
+  String get activeWorkoutHowWasWorkout;
+  String get activeWorkoutCommentHint;
+  String get activeWorkoutFeeling1;
+  String get activeWorkoutFeeling2;
+  String get activeWorkoutFeeling3;
+  String get activeWorkoutFeeling4;
+  String get activeWorkoutFeeling5;
   String get workoutDetailSetNumber;
   String get workoutDetailRpe;
 
@@ -1025,6 +1035,36 @@ mixin WorkoutLocaleEn on WorkoutLocale {
 
   @override
   String get activeWorkoutAddSet => 'Add Set';
+
+  @override
+  String get activeWorkoutCompleted => 'Workout Completed!';
+
+  @override
+  String get activeWorkoutSummarySubtitle => "Great job! Here's the summary:";
+
+  @override
+  String get activeWorkoutPersonalRecords => 'New Personal Records';
+
+  @override
+  String get activeWorkoutHowWasWorkout => 'How was the workout?';
+
+  @override
+  String get activeWorkoutCommentHint => 'Workout note (optional)...';
+
+  @override
+  String get activeWorkoutFeeling1 => 'Bad';
+
+  @override
+  String get activeWorkoutFeeling2 => 'Ok';
+
+  @override
+  String get activeWorkoutFeeling3 => 'Good';
+
+  @override
+  String get activeWorkoutFeeling4 => 'Great';
+
+  @override
+  String get activeWorkoutFeeling5 => 'Excellent!';
 
   @override
   String get workoutDetailSetNumber => '#';
@@ -1847,6 +1887,36 @@ mixin WorkoutLocalePt on WorkoutLocale {
 
   @override
   String get activeWorkoutAddSet => 'Adicionar Série';
+
+  @override
+  String get activeWorkoutCompleted => 'Treino Concluído!';
+
+  @override
+  String get activeWorkoutSummarySubtitle => 'Ótimo trabalho! Aqui está o resumo:';
+
+  @override
+  String get activeWorkoutPersonalRecords => 'Novos Recordes Pessoais';
+
+  @override
+  String get activeWorkoutHowWasWorkout => 'Como foi o treino?';
+
+  @override
+  String get activeWorkoutCommentHint => 'Observação do treino (opcional)...';
+
+  @override
+  String get activeWorkoutFeeling1 => 'Ruim';
+
+  @override
+  String get activeWorkoutFeeling2 => 'Ok';
+
+  @override
+  String get activeWorkoutFeeling3 => 'Bom';
+
+  @override
+  String get activeWorkoutFeeling4 => 'Ótimo';
+
+  @override
+  String get activeWorkoutFeeling5 => 'Excelente!';
 
   @override
   String get workoutDetailSetNumber => '#';

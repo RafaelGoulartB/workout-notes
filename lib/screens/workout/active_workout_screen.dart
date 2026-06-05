@@ -1884,12 +1884,13 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
   }
 
   String get _feelingLabel {
+    final loc = AppLocalizations.of(context)!;
     switch (_rating) {
-      case 1: return 'Ruim';
-      case 2: return 'Ok';
-      case 3: return 'Bom';
-      case 4: return 'Ótimo';
-      case 5: return 'Excelente!';
+      case 1: return loc.activeWorkoutFeeling1;
+      case 2: return loc.activeWorkoutFeeling2;
+      case 3: return loc.activeWorkoutFeeling3;
+      case 4: return loc.activeWorkoutFeeling4;
+      case 5: return loc.activeWorkoutFeeling5;
       default: return '';
     }
   }
@@ -1958,14 +1959,14 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Treino Concluído!',
+                    AppLocalizations.of(context)!.activeWorkoutCompleted,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Ótimo trabalho! Aqui está o resumo:',
+                    AppLocalizations.of(context)!.activeWorkoutSummarySubtitle,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1983,7 +1984,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                 children: [
                   _StatTile(
                     icon: Icons.timer,
-                    label: 'Duração',
+                    label: AppLocalizations.of(context)!.activeWorkoutTimerDuration,
                     value: s.formattedDuration,
                     color: theme.colorScheme.primary,
                     theme: theme,
@@ -1991,7 +1992,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                   const SizedBox(width: 8),
                   _StatTile(
                     icon: Icons.auto_graph,
-                    label: 'Volume',
+                    label: AppLocalizations.of(context)!.commonVolume,
                     value: '${s.formattedVolume} kg',
                     color: theme.colorScheme.secondary,
                     theme: theme,
@@ -1999,7 +2000,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                   const SizedBox(width: 8),
                   _StatTile(
                     icon: Icons.fitness_center,
-                    label: 'Sets',
+                    label: AppLocalizations.of(context)!.commonSets,
                     value: '${s.completedSets}/${s.totalSets}',
                     color: Colors.orange,
                     theme: theme,
@@ -2039,7 +2040,8 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                         Icon(Icons.emoji_events, size: 20, color: Colors.amber.shade700),
                         const SizedBox(width: 8),
                         Text(
-                          'Novos Recordes Pessoais',
+                          AppLocalizations.of(context)!
+                              .activeWorkoutPersonalRecords,
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -2106,7 +2108,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                       Icon(Icons.favorite, size: 18, color: Colors.red.shade300),
                       const SizedBox(width: 8),
                       Text(
-                        'Como foi o treino?',
+                        AppLocalizations.of(context)!.activeWorkoutHowWasWorkout,
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -2161,7 +2163,8 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                 controller: _commentCtl,
                 maxLines: 2,
                 decoration: InputDecoration(
-                  hintText: 'Observação do treino (opcional)...',
+                  hintText: AppLocalizations.of(context)!
+                      .activeWorkoutCommentHint,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -2211,9 +2214,10 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text(
-                        'Finalizar',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      child: Text(
+                        AppLocalizations.of(context)!
+                            .activeWorkoutFinishWorkout,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
