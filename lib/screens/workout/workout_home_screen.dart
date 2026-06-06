@@ -389,10 +389,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: Colors.green.withAlpha(30),
+                  color: theme.colorScheme.primary.withAlpha(30),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Icon(Icons.play_circle_fill, size: 18, color: Colors.green),
+                child: Icon(Icons.play_circle_fill, size: 18, color: theme.colorScheme.primary),
               ),
               const SizedBox(width: 8),
               Text(AppLocalizations.of(context)!.workoutHomeInProgress, style: theme.textTheme.labelSmall?.copyWith(
@@ -535,7 +535,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(
             color: isActive
-                ? Colors.green.withAlpha(100)
+                ? theme.colorScheme.primary.withAlpha(100)
                 : theme.colorScheme.outlineVariant.withAlpha(80),
           ),
         ),
@@ -557,12 +557,12 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: isActive ? Colors.green.withAlpha(25) : theme.colorScheme.surfaceContainerHighest,
+                    color: isActive ? theme.colorScheme.primary.withAlpha(25) : theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
                     isActive ? Icons.play_circle_fill : Icons.fitness_center,
-                    color: isActive ? Colors.green : theme.colorScheme.onSurfaceVariant,
+                    color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
                     size: 22,
                   ),
                 ),

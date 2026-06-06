@@ -42,8 +42,8 @@ class AccentColors {
     Icons.circle,
   ];
 
-  static const defaultColor = Color(0xFF4A6741);
-  static const defaultIndex = 7;
+  static const defaultColor = Color(0xFF37474F);
+  static const defaultIndex = 6;
 
   static int indexOf(Color color) {
     for (int i = 0; i < options.length; i++) {

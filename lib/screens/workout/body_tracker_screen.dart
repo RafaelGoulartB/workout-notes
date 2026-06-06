@@ -351,9 +351,13 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
         children: [
           _isLoading
               ? const Center(child: CircularProgressIndicator())
-              : _allMeasurements.isEmpty
-                  ? _buildEmptyState(theme, loc)
-                  : _buildContent(theme, loc),
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  displacement: 40,
+                  child: _allMeasurements.isEmpty
+                      ? _buildEmptyState(theme, loc)
+                      : _buildContent(theme, loc),
+                ),
           if (_fabOpen)
             GestureDetector(
               onTap: () => setState(() => _fabOpen = false),
@@ -367,20 +371,27 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   }
 
   Widget _buildEmptyState(ThemeData theme, AppLocalizations loc) {
-    return EmptyStatePlaceholder(
-      icon: Icons.accessibility_new,
-      title: loc.bodyTrackerEmptyTitle,
-      subtitle: loc.bodyTrackerEmptySubtitle,
-      actionLabel: loc.bodyTrackerQuickMeasure,
-      onAction: () {
-        showQuickMeasureSheet(
-          context,
-          db: _db,
-          types: _activeTypes,
-          latestByType: _latestByType,
-          onSaved: _load,
-        );
-      },
+    // Wrapped in scrollable so RefreshIndicator works on empty state
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.6,
+        child: EmptyStatePlaceholder(
+          icon: Icons.accessibility_new,
+          title: loc.bodyTrackerEmptyTitle,
+          subtitle: loc.bodyTrackerEmptySubtitle,
+          actionLabel: loc.bodyTrackerQuickMeasure,
+          onAction: () {
+            showQuickMeasureSheet(
+              context,
+              db: _db,
+              types: _activeTypes,
+              latestByType: _latestByType,
+              onSaved: _load,
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -439,6 +450,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
 
         Expanded(
           child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               // ── Chart ──────────────────────────────────────────────
               if (_measurements.length >= 2) ...[
