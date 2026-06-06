@@ -11,9 +11,11 @@ import '../../repositories/settings_repository.dart';
 import '../../services/rest_timer_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/exercise_picker_sheet.dart';
-import '../../widgets/workout/stat_tile.dart';
 import '../../widgets/workout/stepper_button.dart';
-import 'exercise_detail_tabs_screen.dart';
+import '../../widgets/workout/exercise_card.dart';
+import '../../widgets/workout/finish_workout_sheet.dart';
+import '../../models/exercise_with_sets.dart';
+import '../../utils/workout_card_helpers.dart';
 import 'rest_timer_screen.dart';
 
 class ActiveWorkoutScreen extends StatefulWidget {
@@ -50,7 +52,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   // Settings
   bool _autoStartTimer = false;
 
-  List<_ExerciseWithSets> _exercises = [];
+  List<ExerciseWithSets> _exercises = [];
 
   @override
   void initState() {
@@ -184,7 +186,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     for (final entry in entries) {
       final sets = List<Map<String, dynamic>>.from(
         await _workoutRepo.getExerciseSets(entry['id'] as String));
-      _exercises.add(_ExerciseWithSets(
+      _exercises.add(ExerciseWithSets(
         entryId: entry['id'] as String,
         exerciseId: entry['exercise_id'] as String,
         name: entry['exercise_name'] as String? ?? '',
@@ -479,7 +481,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }
 
     setState(() {
-      _exercises.add(_ExerciseWithSets(
+      _exercises.add(ExerciseWithSets(
         entryId: entryId,
         exerciseId: exerciseId,
         name: name,
@@ -492,7 +494,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     });
   }
 
-  Future<void> _addSet(_ExerciseWithSets exercise) async {
+  Future<void> _addSet(ExerciseWithSets exercise) async {
     double? lastWeight;
     int? lastReps;
     double? lastDistance;
@@ -520,7 +522,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   Future<void> _toggleSet(String setId) async {
-    _ExerciseWithSets? parentExercise;
+    ExerciseWithSets? parentExercise;
     Map<String, dynamic>? theSet;
     for (final ex in _exercises) {
       for (final s in ex.sets) {
@@ -743,7 +745,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }
   }
 
-  Future<void> _removeExercise(_ExerciseWithSets exercise) async {
+  Future<void> _removeExercise(ExerciseWithSets exercise) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -799,7 +801,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (ctx) => _FinishWorkoutSheet(summary: summary),
+      builder: (ctx) => FinishWorkoutSheet(summary: summary),
     );
 
     if (result == null || !mounted) return;
@@ -822,12 +824,12 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   /// Compute workout summary: duration, volume, sets, and personal records.
-  Future<_WorkoutSummary> _computeSummary() async {
+  Future<WorkoutSummary> _computeSummary() async {
     int durationSeconds = 0;
     double totalVolume = 0;
     int totalSets = 0;
     int completedSets = 0;
-    final List<_PR> prs = [];
+    final List<PR> prs = [];
 
     if (_timerStart != null) {
       final end = _timerEnd ?? DateTime.now();
@@ -835,7 +837,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }
 
     // Collect bests from THIS workout per exercise
-    final Map<String, _ExerciseBests> thisWorkoutBests = {};
+    final Map<String, ExerciseBests> thisWorkoutBests = {};
 
     for (final ex in _exercises) {
       double maxWeight = 0;
@@ -864,7 +866,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       }
 
       if (maxWeight > 0) {
-        thisWorkoutBests[ex.exerciseId] = _ExerciseBests(
+        thisWorkoutBests[ex.exerciseId] = ExerciseBests(
           name: ex.localizedName(AppLocalizations.of(context)!),
           maxWeight: maxWeight,
           bestReps: bestReps,
@@ -898,7 +900,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               (rows.first['best_volume'] as num?)?.toDouble() ?? 0;
 
           if (bestWeight > 0 && current.maxWeight >= bestWeight) {
-            prs.add(_PR(
+            prs.add(PR(
               exerciseName: current.name,
               type: 'weight',
               value:
@@ -908,7 +910,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             ));
           }
           if (bestVolume > 0 && current.volume > bestVolume) {
-            prs.add(_PR(
+            prs.add(PR(
               exerciseName: current.name,
               type: 'volume',
               value: '${current.volume.toStringAsFixed(0)} kg',
@@ -919,7 +921,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       }
     }
 
-    return _WorkoutSummary(
+    return WorkoutSummary(
       durationSeconds: durationSeconds,
       totalVolume: totalVolume,
       totalSets: totalSets,
@@ -1082,7 +1084,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 100),
             itemCount: _exercises.length,
-            itemBuilder: (context, index) => _ExerciseCard(
+            itemBuilder: (context, index) => ExerciseCard(
               exercise: _exercises[index],
               onAddSet: () => _addSet(_exercises[index]),
               onToggleSet: _toggleSet,
@@ -1376,7 +1378,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
   }
 
-  void _changeExerciseRestTime(_ExerciseWithSets exercise, int currentRest) {
+  void _changeExerciseRestTime(ExerciseWithSets exercise, int currentRest) {
     final presets = [30, 60, 90, 120, 180];
     showModalBottomSheet(
       context: context,
@@ -1430,7 +1432,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
   }
 
-  void _showCustomRestTimeDialog(_ExerciseWithSets exercise) {
+  void _showCustomRestTimeDialog(ExerciseWithSets exercise) {
     final ctl = TextEditingController(text: exercise.restTimeSeconds.toString());
     showDialog(
       context: context,
@@ -1467,7 +1469,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
   }
 
-  void _updateRestTimeAndClose(_ExerciseWithSets exercise, int seconds) async {
+  void _updateRestTimeAndClose(ExerciseWithSets exercise, int seconds) async {
     await _workoutRepo.updateExerciseEntryRestTime(exercise.entryId, seconds);
     await _loadExercises();
     setState(() {});
@@ -1508,768 +1510,3 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 }
 
 /// Returns the field labels and keys for a given exercise type.
-Map<String, String> getFieldsForType(String type) {
-  switch (type) {
-    case 'weightReps': return {'weight': 'Peso', 'reps': 'Reps'};
-    case 'distanceTime': return {'distance': 'Dist.', 'time_seconds': 'Tempo'};
-    case 'weightDistance': return {'weight': 'Peso', 'distance': 'Dist.'};
-    case 'weightTime': return {'weight': 'Peso', 'time_seconds': 'Tempo'};
-    case 'repsDistance': return {'reps': 'Reps', 'distance': 'Dist.'};
-    case 'repsTime': return {'reps': 'Reps', 'time_seconds': 'Tempo'};
-    case 'weightOnly': return {'weight': 'Peso'};
-    case 'repsOnly': return {'reps': 'Reps'};
-    case 'distanceOnly': return {'distance': 'Dist.'};
-    case 'timeOnly': return {'time_seconds': 'Tempo'};
-    default: return {'weight': 'Peso', 'reps': 'Reps'};
-  }
-}
-
-String formatFieldValue(Map<String, dynamic> set, String key) {
-  if (key == 'weight') {
-    final v = (set['weight'] as num?)?.toDouble();
-    return v != null ? v.toStringAsFixed(1) : '-';
-  }
-  if (key == 'distance') {
-    final v = (set['distance'] as num?)?.toDouble();
-    return v != null ? v.toStringAsFixed(1) : '-';
-  }
-  if (key == 'reps') {
-    return (set['reps'] as int?)?.toString() ?? '-';
-  }
-  if (key == 'time_seconds') {
-    final v = (set['time_seconds'] as int?);
-    if (v == null) return '-';
-    if (v >= 60) return '${v ~/ 60}:${(v % 60).toString().padLeft(2, '0')}';
-    return '${v}s';
-  }
-  return '-';
-}
-
-class _ExerciseWithSets {
-  final String entryId;
-  final String exerciseId;
-  final String name;
-  final String? localeKey;
-  final String exerciseType;
-  final String? categoryId;
-  final String categoryName;
-  final Color categoryColor;
-  final List<Map<String, dynamic>> sets;
-  final int restTimeSeconds;
-
-  _ExerciseWithSets({
-    required this.entryId,
-    required this.exerciseId,
-    required this.name,
-    this.localeKey,
-    required this.exerciseType,
-    this.categoryId,
-    required this.categoryName,
-    required this.categoryColor,
-    List<Map<String, dynamic>>? sets,
-    this.restTimeSeconds = 90,
-  }) : sets = sets ?? [];
-
-  String localizedName(AppLocalizations loc) {
-    if (localeKey != null) {
-      final translated = ExerciseLocaleHelper.exerciseNameFromKey(loc, localeKey!);
-      if (translated.isNotEmpty) return translated;
-    }
-    return name;
-  }
-
-  String localizedCategory(AppLocalizations loc) {
-    if (categoryId != null) {
-      final translated = ExerciseLocaleHelper.categoryNameFromId(loc, categoryId!);
-      if (translated.isNotEmpty) return translated;
-    }
-    return categoryName;
-  }
-
-  int get completedSets => sets.where((s) => (s['is_complete'] as int?) == 1).length;
-  double get maxWeight => sets.fold<double>(0, (max, s) {
-    final w = (s['weight'] as num?)?.toDouble() ?? 0;
-    return w > max ? w : max;
-  });
-}
-
-class _ExerciseCard extends StatelessWidget {
-  final _ExerciseWithSets exercise;
-  final VoidCallback onAddSet;
-  final Function(String) onToggleSet;
-  final void Function(String, Map<String, dynamic>, int) onEditSet;
-  final Function(String) onDeleteSet;
-  final ThemeData theme;
-  final ValueChanged<int> onChangeRestTime;
-  final VoidCallback? onRemoveExercise;
-
-  const _ExerciseCard({
-    required this.exercise, required this.onAddSet, required this.onToggleSet,
-    required this.onEditSet, required this.onDeleteSet, required this.theme,
-    required this.onChangeRestTime,
-    this.onRemoveExercise,
-  });
-
-  void _showExerciseModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Row(
-                children: [
-                  Icon(Icons.fitness_center, size: 18, color: theme.colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      exercise.localizedName(AppLocalizations.of(context)!),
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.open_in_new),
-              title: Text(AppLocalizations.of(context)!.workoutDetailViewExercise),
-              subtitle: Text(exercise.localizedName(AppLocalizations.of(context)!)),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ExerciseDetailTabsScreen(
-                      exerciseId: exercise.exerciseId,
-                      exerciseName: exercise.localizedName(AppLocalizations.of(context)!),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final restMin = exercise.restTimeSeconds ~/ 60;
-    final restSec = exercise.restTimeSeconds % 60;
-    final restStr = restMin > 0 ? '${restMin}min$restSec' : '${restSec}s';
-
-    return GestureDetector(
-      onLongPress: () => _showExerciseModal(context),
-      child: Card(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-        ),
-        child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 4, height: 24,
-                  decoration: BoxDecoration(
-                    color: exercise.categoryColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(exercise.localizedName(AppLocalizations.of(context)!), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                ),
-                GestureDetector(
-                  onTap: () => onChangeRestTime(exercise.restTimeSeconds),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.timer_outlined, size: 14, color: theme.colorScheme.primary),
-                        const SizedBox(width: 4),
-                        Text(restStr, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(exercise.categoryName, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                if (onRemoveExercise != null) ...[                  const SizedBox(width: 2),
-                  GestureDetector(
-                    onTap: () => onRemoveExercise!(),
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.error.withAlpha(20),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.close, size: 16, color: theme.colorScheme.error),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 8),
-            _buildHeaderRow(theme),
-            const Divider(height: 4),
-            ...List.generate(exercise.sets.length, (i) {
-              final set = exercise.sets[i];
-              final isComplete = (set['is_complete'] as int?) == 1;
-              final isWarmup = (set['is_warmup'] as int?) == 1;
-              return InkWell(
-                onTap: () => onEditSet(set['id'] as String, set, i + 1),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => onToggleSet(set['id'] as String),
-                        child: Container(
-                          width: 24, height: 24,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isComplete ? theme.colorScheme.primary : null,
-                            border: Border.all(color: isComplete ? theme.colorScheme.primary : theme.colorScheme.outline),
-                          ),
-                          child: isComplete
-                              ? Icon(Icons.check, size: 16, color: theme.colorScheme.onPrimary)
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(flex: 2, child: Text(
-                        isWarmup ? 'W' : '${i + 1}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: isWarmup ? Colors.orange : null,
-                        ),
-                      )),
-                      ..._buildSetColumns(exercise, set, theme),
-                    ],
-                  ),
-                ),
-              );
-            }),
-            const SizedBox(height: 4),
-            TextButton.icon(
-              onPressed: onAddSet,
-              icon: const Icon(Icons.add, size: 18),
-              label: Text(AppLocalizations.of(context)!.activeWorkoutAddSet),
-              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-  }
-
-  Widget _buildHeaderRow(ThemeData theme) {
-    final fields = getFieldsForType(exercise.exerciseType);
-    final keys = fields.keys.toList();
-    return Row(
-      children: [
-        const SizedBox(width: 24),
-        Expanded(flex: 2, child: Text('#', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-        Expanded(flex: 3, child: Text(fields[keys[0]] ?? '', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-        if (keys.length > 1)
-          Expanded(flex: 3, child: Text(fields[keys[1]] ?? '', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-        if (exercise.sets.any((s) => s['rpe'] != null))
-          Expanded(flex: 2, child: Text('RPE', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-        const SizedBox(width: 40),
-      ],
-    );
-  }
-
-  List<Widget> _buildSetColumns(_ExerciseWithSets ex, Map<String, dynamic> set, ThemeData theme) {
-    final fields = getFieldsForType(ex.exerciseType);
-    final keys = fields.keys.toList();
-    return [
-      Expanded(flex: 3, child: Text(
-        formatFieldValue(set, keys[0]),
-        style: theme.textTheme.bodyMedium),
-      ),
-      if (keys.length > 1)
-        Expanded(flex: 3, child: Text(
-          formatFieldValue(set, keys[1]),
-          style: theme.textTheme.bodyMedium),
-        ),
-      if (ex.sets.any((s) => s['rpe'] != null))
-        Expanded(flex: 2, child: Text(
-          (set['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
-          style: theme.textTheme.bodyMedium),
-        ),
-      GestureDetector(
-        onTap: () => onDeleteSet(set['id'] as String),
-        child: Icon(Icons.close, size: 16, color: theme.colorScheme.error.withAlpha(180)),
-      ),
-    ];
-  }
-}
-
-// ── Data classes for workout summary ──
-
-class _WorkoutSummary {
-  final int durationSeconds;
-  final double totalVolume;
-  final int totalSets;
-  final int completedSets;
-  final List<_PR> prs;
-
-  const _WorkoutSummary({
-    required this.durationSeconds,
-    required this.totalVolume,
-    required this.totalSets,
-    required this.completedSets,
-    required this.prs,
-  });
-
-  String get formattedDuration {
-    if (durationSeconds <= 0) return '--';
-    final h = durationSeconds ~/ 3600;
-    final m = (durationSeconds % 3600) ~/ 60;
-    final s = durationSeconds % 60;
-    if (h > 0) {
-      return '${h}h${m.toString().padLeft(2, '0')}min';
-    }
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
-
-  String get formattedVolume {
-    if (totalVolume >= 1000000) {
-      return '${(totalVolume / 1000000).toStringAsFixed(1)}M';
-    }
-    if (totalVolume >= 1000) {
-      return '${(totalVolume / 1000).toStringAsFixed(1)}k';
-    }
-    return totalVolume.toStringAsFixed(0);
-  }
-}
-
-class _PR {
-  final String exerciseName;
-  final String type; // 'weight' or 'volume'
-  final String value;
-  final String previous;
-
-  const _PR({
-    required this.exerciseName,
-    required this.type,
-    required this.value,
-    required this.previous,
-  });
-
-  String get label {
-    return type == 'weight' ? '🏋️ Peso Máximo' : '📦 Volume';
-  }
-
-  IconData get icon => type == 'weight' ? Icons.emoji_events : Icons.inventory_2;
-}
-
-class _ExerciseBests {
-  final String name;
-  final double maxWeight;
-  final int bestReps;
-  final double volume;
-  final int completedSets;
-
-  const _ExerciseBests({
-    required this.name,
-    required this.maxWeight,
-    required this.bestReps,
-    required this.volume,
-    required this.completedSets,
-  });
-}
-
-// ── Unified Finish Workout Sheet ──
-
-class _FinishWorkoutSheet extends StatefulWidget {
-  final _WorkoutSummary summary;
-
-  const _FinishWorkoutSheet({required this.summary});
-
-  @override
-  State<_FinishWorkoutSheet> createState() => _FinishWorkoutSheetState();
-}
-
-class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
-  int _rating = 3;
-  final _commentCtl = TextEditingController();
-
-  @override
-  void dispose() {
-    _commentCtl.dispose();
-    super.dispose();
-  }
-
-  String get _feelingLabel {
-    final loc = AppLocalizations.of(context)!;
-    switch (_rating) {
-      case 1: return loc.activeWorkoutFeeling1;
-      case 2: return loc.activeWorkoutFeeling2;
-      case 3: return loc.activeWorkoutFeeling3;
-      case 4: return loc.activeWorkoutFeeling4;
-      case 5: return loc.activeWorkoutFeeling5;
-      default: return '';
-    }
-  }
-
-  IconData get _feelingIcon {
-    switch (_rating) {
-      case 1: return Icons.sentiment_very_dissatisfied;
-      case 2: return Icons.sentiment_dissatisfied;
-      case 3: return Icons.sentiment_neutral;
-      case 4: return Icons.sentiment_satisfied;
-      case 5: return Icons.sentiment_very_satisfied;
-      default: return Icons.sentiment_neutral;
-    }
-  }
-
-  Color _feelingColor(ThemeData theme) {
-    if (_rating <= 2) return Colors.red;
-    if (_rating == 3) return Colors.orange;
-    return Colors.green;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final s = widget.summary;
-    final completedPct =
-        s.totalSets > 0 ? s.completedSets / s.totalSets : 0.0;
-
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ── Handle ──
-            Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 4),
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-
-            // ── Header ──
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.celebration,
-                      size: 36,
-                      color: theme.colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    AppLocalizations.of(context)!.activeWorkoutCompleted,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    AppLocalizations.of(context)!.activeWorkoutSummarySubtitle,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // ── Stats Grid ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                children: [
-                  StatTile(
-                    icon: Icons.timer,
-                    label: AppLocalizations.of(context)!.activeWorkoutTimerDuration,
-                    value: s.formattedDuration,
-                    color: theme.colorScheme.primary,
-                    theme: theme,
-                  ),
-                  const SizedBox(width: 8),
-                  StatTile(
-                    icon: Icons.auto_graph,
-                    label: AppLocalizations.of(context)!.commonVolume,
-                    value: '${s.formattedVolume} kg',
-                    color: theme.colorScheme.secondary,
-                    theme: theme,
-                  ),
-                  const SizedBox(width: 8),
-                  StatTile(
-                    icon: Icons.fitness_center,
-                    label: AppLocalizations.of(context)!.commonSets,
-                    value: '${s.completedSets}/${s.totalSets}',
-                    color: Colors.orange,
-                    theme: theme,
-                  ),
-                ],
-              ),
-            ),
-
-            // Progress bar
-            if (s.totalSets > 0)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: completedPct,
-                    minHeight: 8,
-                    backgroundColor:
-                        theme.colorScheme.surfaceContainerHighest,
-                    color: completedPct >= 1.0
-                        ? Colors.green
-                        : theme.colorScheme.primary,
-                  ),
-                ),
-              ),
-
-            // ── PRs Section ──
-            if (s.prs.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.emoji_events, size: 20, color: Colors.amber.shade700),
-                        const SizedBox(width: 8),
-                        Text(
-                          AppLocalizations.of(context)!
-                              .activeWorkoutPersonalRecords,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ...s.prs.map((pr) => Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.withAlpha(20),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.amber.withAlpha(60),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.emoji_events,
-                              size: 18, color: Colors.amber.shade700),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  pr.exerciseName,
-                                  style: theme.textTheme.bodyMedium
-                                      ?.copyWith(fontWeight: FontWeight.w600),
-                                ),
-                                Text(
-                                  pr.value,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            '🎉',
-                            style: theme.textTheme.titleMedium,
-                          ),
-                        ],
-                      ),
-                    )),
-                  ],
-                ),
-              ),
-            ],
-
-            // ── Feeling Rating ──
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.favorite, size: 18, color: Colors.red.shade300),
-                      const SizedBox(width: 8),
-                      Text(
-                        AppLocalizations.of(context)!.activeWorkoutHowWasWorkout,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (i) {
-                      final star = i + 1;
-                      final isFilled = star <= _rating;
-                      return GestureDetector(
-                        onTap: () => setState(() => _rating = star),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          padding: const EdgeInsets.all(6),
-                          child: Icon(
-                            isFilled ? Icons.star : Icons.star_outline,
-                            color: isFilled ? Colors.amber : theme.colorScheme.outlineVariant,
-                            size: 36,
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(_feelingIcon,
-                          size: 16, color: _feelingColor(theme)),
-                      const SizedBox(width: 6),
-                      Text(
-                        _feelingLabel,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: _feelingColor(theme),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            // ── Comment ──
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: TextField(
-                controller: _commentCtl,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  hintText: AppLocalizations.of(context)!
-                      .activeWorkoutCommentHint,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor:
-                      theme.colorScheme.surfaceContainerHighest.withAlpha(80),
-                  prefixIcon: Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: Icon(
-                      Icons.edit_note,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // ── Buttons ──
-            const SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: Text(AppLocalizations.of(context)!.commonCancel),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton(
-                      onPressed: () => Navigator.pop(context, {
-                        'feeling': _rating,
-                        'comment': _commentCtl.text,
-                      }),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: Text(
-                        AppLocalizations.of(context)!
-                            .activeWorkoutFinishWorkout,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Bottom padding for safe area
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Stat Tile widget for the summary grid ──
-
-
