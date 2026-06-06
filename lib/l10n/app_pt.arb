@@ -349,6 +349,8 @@
   "workoutDetailKg": "kg",
   "workoutDetailViewExercise": "Ver exercício",
   "workoutDetailSelectDate": "Selecione a nova data",
+  "workoutDetailCopy": "Copiar Treino",
+  "workoutDetailCopyDateChanged": "✅ Treino copiado!",
   "workoutDetailDuration": "{min}min {sec}s",
   "activeWorkoutTitle": "Treino",
   "activeWorkoutFinishWorkout": "Finalizar",

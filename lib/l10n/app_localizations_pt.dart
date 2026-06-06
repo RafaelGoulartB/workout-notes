@@ -1056,6 +1056,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get workoutDetailSelectDate => 'Selecione a nova data';
 
   @override
+  String get workoutDetailCopy => 'Copiar Treino';
+
+  @override
+  String get workoutDetailCopyDateChanged => '✅ Treino copiado!';
+
+  @override
   String workoutDetailDuration(Object min, Object sec) {
     return '${min}min ${sec}s';
   }

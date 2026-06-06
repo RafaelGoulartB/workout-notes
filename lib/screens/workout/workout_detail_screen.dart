@@ -87,6 +87,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
               PopupMenuItem(value: 'edit_date', child: Row(
                 children: [Icon(Icons.calendar_today, size: 18), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailEditDate)],
               )),
+              PopupMenuItem(value: 'copy', child: Row(
+                children: [Icon(Icons.content_copy, size: 18), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailCopy)],
+              )),
               PopupMenuItem(value: 'delete', child: Row(
                 children: [Icon(Icons.delete_outline, size: 18, color: Colors.red), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailDelete, style: TextStyle(color: Colors.red))],
               )),
@@ -94,6 +97,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
             onSelected: (v) {
               if (v == 'continue') _continueWorkout();
               if (v == 'edit_date') _editDate();
+              if (v == 'copy') _copyWorkout();
               if (v == 'delete') _deleteWorkout();
             },
           ),
@@ -363,6 +367,28 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AppLocalizations.of(context)!.workoutDetailDateChanged), behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
+  }
+
+  Future<void> _copyWorkout() async {
+    final currentDate = DateTime.parse(_workout!['date'] as String);
+    final newDate = await showDatePicker(
+      context: context,
+      initialDate: currentDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      helpText: AppLocalizations.of(context)!.workoutDetailCopy,
+    );
+    if (newDate != null && mounted) {
+      await _db.copyWorkoutToDate(widget.workoutId, newDate);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.workoutDetailCopyDateChanged),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }

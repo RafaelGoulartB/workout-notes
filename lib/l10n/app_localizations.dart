@@ -2066,6 +2066,18 @@ abstract class AppLocalizations {
   /// **'Select the new date'**
   String get workoutDetailSelectDate;
 
+  /// No description provided for @workoutDetailCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Workout'**
+  String get workoutDetailCopy;
+
+  /// No description provided for @workoutDetailCopyDateChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ Workout copied!'**
+  String get workoutDetailCopyDateChanged;
+
   /// No description provided for @workoutDetailDuration.
   ///
   /// In en, this message translates to:
