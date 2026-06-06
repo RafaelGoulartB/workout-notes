@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import '../../database/database_helper.dart';
+import '../../repositories/workout_repository.dart';
 import '../../services/export_service.dart';
 import 'exercise_detail_tabs_screen.dart';
 import 'active_workout_screen.dart';
@@ -16,7 +16,7 @@ class WorkoutDetailScreen extends StatefulWidget {
 }
 
 class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
-  final _db = DatabaseHelper.instance;
+  final _workoutRepo = WorkoutRepository();
   Map<String, dynamic>? _workout;
   List<_ExerciseWithSets> _exercises = [];
   bool _isLoading = true;
@@ -28,16 +28,16 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   }
 
   Future<void> _load() async {
-    _workout = await _db.getWorkout(widget.workoutId);
+    _workout = await _workoutRepo.getWorkout(widget.workoutId);
     if (_workout == null) {
       if (mounted) Navigator.pop(context);
       return;
     }
 
-    final entries = await _db.getWorkoutExercises(widget.workoutId);
+    final entries = await _workoutRepo.getWorkoutExercises(widget.workoutId);
     final exercises = <_ExerciseWithSets>[];
     for (final entry in entries) {
-      final sets = await _db.getExerciseSets(entry['id'] as String);
+      final sets = await _workoutRepo.getExerciseSets(entry['id'] as String);
       exercises.add(_ExerciseWithSets(
         exerciseId: entry['exercise_id'] as String? ?? '',
         name: entry['exercise_name'] as String? ?? '',
@@ -361,7 +361,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       helpText: AppLocalizations.of(context)!.workoutDetailSelectDate,
     );
     if (newDate != null && mounted) {
-      await DatabaseHelper.instance.updateWorkoutDate(widget.workoutId, newDate);
+      await _workoutRepo.updateWorkoutDate(widget.workoutId, newDate);
       _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -381,7 +381,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       helpText: AppLocalizations.of(context)!.workoutDetailCopy,
     );
     if (newDate != null && mounted) {
-      final newWorkoutId = await _db.copyWorkoutToDate(widget.workoutId, newDate);
+      final newWorkoutId = await _workoutRepo.copyWorkoutToDate(widget.workoutId, newDate);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -405,7 +405,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   }
 
   Future<void> _continueWorkout() async {
-    await DatabaseHelper.instance.resetWorkoutToInProgress(widget.workoutId);
+    await _workoutRepo.resetWorkoutToInProgress(widget.workoutId);
     if (mounted) {
       final result = await Navigator.pushReplacement(
         context,
@@ -433,7 +433,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       ),
     );
     if (confirm == true) {
-      await _db.deleteWorkout(widget.workoutId);
+      await _workoutRepo.deleteWorkout(widget.workoutId);
       if (mounted) Navigator.pop(context, true);
     }
   }

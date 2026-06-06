@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import '../../database/database_helper.dart';
+import '../repositories/exercise_repository.dart';
 
 /// A bottom sheet that lets the user add/remove exercises to a workout or routine.
 /// Keeps open and calls [onExerciseAdded] / [onExerciseRemoved] in real-time.
@@ -23,7 +23,7 @@ class ExercisePickerSheet extends StatefulWidget {
 }
 
 class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
-  final _db = DatabaseHelper.instance;
+  final _exerciseRepo = ExerciseRepository();
   List<Map<String, dynamic>> _categories = [];
   final Map<String, List<Map<String, dynamic>>> _exercisesByCategory = {};
   String? _selectedCategoryId;
@@ -39,10 +39,10 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
   }
 
   Future<void> _load() async {
-    _categories = await _db.getCategories();
+    _categories = await _exerciseRepo.getCategories();
     
     // Load all exercises grouped by category
-    final allExercises = await _db.getExercises();
+    final allExercises = await _exerciseRepo.getExercises();
     for (final cat in _categories) {
       final catId = cat['id'] as String;
       _exercisesByCategory[catId] = allExercises

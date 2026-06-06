@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import '../../database/database_helper.dart';
+import '../../repositories/exercise_repository.dart';
 
 class ExerciseFormScreen extends StatefulWidget {
   final String? exerciseId;
@@ -12,7 +12,7 @@ class ExerciseFormScreen extends StatefulWidget {
 }
 
 class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
-  final _db = DatabaseHelper.instance;
+  final _exerciseRepo = ExerciseRepository();
   final _nameCtl = TextEditingController();
   final _notesCtl = TextEditingController();
   String _categoryId = 'chest';
@@ -47,9 +47,9 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
   }
 
   Future<void> _load() async {
-    _categories = await _db.getCategories();
+    _categories = await _exerciseRepo.getCategories();
     if (_isEditing) {
-      final ex = await _db.getExercise(widget.exerciseId!);
+      final ex = await _exerciseRepo.getExercise(widget.exerciseId!);
       if (ex != null) {
         _nameCtl.text = ex['name'] as String? ?? '';
         _categoryId = ex['category_id'] as String? ?? 'chest';
@@ -74,12 +74,12 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
     setState(() => _isSaving = true);
     try {
       if (_isEditing) {
-        await _db.updateExercise(widget.exerciseId!, name: _nameCtl.text.trim(),
+        await _exerciseRepo.updateExercise(widget.exerciseId!, name: _nameCtl.text.trim(),
           categoryId: _categoryId, type: _type, notes: _notesCtl.text.trim(),
           equipment: _equipment.isEmpty ? null : _equipment,
           weightIncrement: _weightIncrement, defaultRestTime: _defaultRestTime);
       } else {
-        await _db.addExercise(name: _nameCtl.text.trim(), categoryId: _categoryId,
+        await _exerciseRepo.addExercise(name: _nameCtl.text.trim(), categoryId: _categoryId,
           type: _type, notes: _notesCtl.text.trim(),
           equipment: _equipment.isEmpty ? null : _equipment,
           weightIncrement: _weightIncrement, defaultRestTime: _defaultRestTime);

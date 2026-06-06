@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import '../../database/database_helper.dart';
+import '../../repositories/exercise_repository.dart';
 import 'exercise_form_screen.dart';
 import 'exercise_detail_tabs_screen.dart';
 
@@ -13,7 +13,7 @@ class ExerciseLibraryScreen extends StatefulWidget {
 }
 
 class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
-  final _db = DatabaseHelper.instance;
+  final _exerciseRepo = ExerciseRepository();
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _exercises = [];
   String? _selectedCategoryId;
@@ -29,8 +29,8 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
 
   Future<void> _load() async {
     setState(() => _isLoading = true);
-    _categories = await _db.getCategories();
-    _exercises = await _db.getExercises(favorites: _showFavorites ? true : null);
+    _categories = await _exerciseRepo.getCategories();
+    _exercises = await _exerciseRepo.getExercises(favorites: _showFavorites ? true : null);
     setState(() => _isLoading = false);
   }
 
@@ -43,7 +43,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   }
 
   Future<void> _toggleFavorite(String id) async {
-    await _db.toggleFavorite(id);
+    await _exerciseRepo.toggleFavorite(id);
     _load();
   }
 

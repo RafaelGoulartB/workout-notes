@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:workout_notes/database/database_helper.dart';
+import '../../repositories/body_measurement_repository.dart';
+import '../../repositories/settings_repository.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
 import 'package:workout_notes/screens/workout/body_tracker_dialogs.dart';
@@ -17,7 +18,8 @@ class BodyTrackerScreen extends StatefulWidget {
 }
 
 class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
-  final _db = DatabaseHelper.instance;
+  final _bodyRepo = BodyMeasurementRepository();
+  final _settingsRepo = SettingsRepository();
 
   // ── State ──────────────────────────────────────────────────────────
   String _selectedType = 'weight';
@@ -69,7 +71,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   }
 
   Future<void> _loadEnabledTypes() async {
-    final raw = await _db.getSetting('body_tracker_enabled_types');
+    final raw = await _settingsRepo.getSetting('body_tracker_enabled_types');
     if (raw != null) {
       try {
         final list = raw.split(',');
@@ -87,7 +89,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   }
 
   Future<void> _saveEnabledTypes() async {
-    await _db.setSetting('body_tracker_enabled_types',
+    await _settingsRepo.setSetting('body_tracker_enabled_types',
         _enabledTypeIds.join(','));
   }
 
@@ -97,8 +99,8 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
       _historyDisplayCount = 5;
     });
     try {
-      final all = await _db.getBodyMeasurements(limit: 500);
-      final summary = await _db.getBodyMeasurementsSummary();
+      final all = await _bodyRepo.getBodyMeasurements(limit: 500);
+      final summary = await _bodyRepo.getBodyMeasurementsSummary();
       final latestMap = <String, Map<String, dynamic>?>{};
       for (final t in _allTypes) {
         try {
@@ -298,7 +300,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                     setState(() => _fabOpen = false);
                     showAddMeasurementSheet(
                       context,
-                      db: _db,
+                      repo: _bodyRepo,
                       currentType: _currentType,
                       typeId: _selectedType,
                       onSaved: _load,
@@ -314,7 +316,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                     setState(() => _fabOpen = false);
                     showQuickMeasureSheet(
                       context,
-                      db: _db,
+                      repo: _bodyRepo,
                       types: _activeTypes,
                       latestByType: _latestByType,
                       onSaved: _load,
@@ -386,7 +388,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
           onAction: () {
             showQuickMeasureSheet(
               context,
-              db: _db,
+              repo: _bodyRepo,
               types: _activeTypes,
               latestByType: _latestByType,
               onSaved: _load,
@@ -666,7 +668,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
           type: _currentType,
           typeId: _selectedType,
           delta: delta,
-          db: _db,
+          repo: _bodyRepo,
           onDeleted: _load,
         );
       },
@@ -689,7 +691,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
           ),
         );
         if (confirm == true) {
-          await _db.deleteBodyMeasurement(m['id'] as String);
+          await _bodyRepo.deleteBodyMeasurement(m['id'] as String);
           _load();
         }
       },

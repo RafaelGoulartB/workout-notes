@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import '../../database/database_helper.dart';
+import '../../repositories/routine_repository.dart';
 import '../../widgets/exercise_picker_sheet.dart';
 
 class RoutinesScreen extends StatefulWidget {
@@ -12,7 +12,7 @@ class RoutinesScreen extends StatefulWidget {
 }
 
 class _RoutinesScreenState extends State<RoutinesScreen> {
-  final _db = DatabaseHelper.instance;
+  final _routineRepo = RoutineRepository();
   List<Map<String, dynamic>> _routines = [];
   bool _isLoading = true;
 
@@ -24,7 +24,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
 
   Future<void> _load() async {
     setState(() => _isLoading = true);
-    _routines = await _db.getRoutines();
+    _routines = await _routineRepo.getRoutines();
     setState(() => _isLoading = false);
   }
 
@@ -47,7 +47,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
           FilledButton(onPressed: () async {
             if (ctl.text.trim().isNotEmpty) {
-              await _db.createRoutine(ctl.text.trim());
+              await _routineRepo.createRoutine(ctl.text.trim());
               if (ctx.mounted) Navigator.pop(ctx);
               _load();
             }
@@ -168,7 +168,7 @@ class RoutineFormScreen extends StatefulWidget {
 }
 
 class _RoutineFormScreenState extends State<RoutineFormScreen> {
-  final _db = DatabaseHelper.instance;
+  final _routineRepo = RoutineRepository();
   Map<String, dynamic>? _routine;
   List<Map<String, dynamic>> _days = [];
   bool _isLoading = true;
@@ -181,8 +181,8 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
   }
 
   Future<void> _load() async {
-    _routine = await _db.getRoutine(widget.routineId);
-    _days = await _db.getRoutineDays(widget.routineId);
+    _routine = await _routineRepo.getRoutine(widget.routineId);
+    _days = await _routineRepo.getRoutineDays(widget.routineId);
     setState(() {
       _isLoading = false;
       _refreshKey++;
@@ -208,7 +208,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
           FilledButton(onPressed: () async {
             if (ctl.text.trim().isNotEmpty) {
-              await _db.addRoutineDay(widget.routineId, ctl.text.trim());
+              await _routineRepo.addRoutineDay(widget.routineId, ctl.text.trim());
               if (ctx.mounted) Navigator.pop(ctx);
               _load();
             }
@@ -250,7 +250,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                   ),
                 );
                 if (name != null && name.isNotEmpty) {
-                  await _db.updateRoutine(widget.routineId, name: name);
+                  await _routineRepo.updateRoutine(widget.routineId, name: name);
                   _load();
                 }
               } else if (v == 'delete') {
@@ -270,7 +270,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                   ),
                 );
                 if (confirm == true) {
-                  await _db.deleteRoutine(widget.routineId);
+                  await _routineRepo.deleteRoutine(widget.routineId);
                   if (!mounted) return;
                   if (!context.mounted) return;
                   Navigator.pop(context, true);
@@ -306,7 +306,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                     itemBuilder: (ctx, i) => _DayCard(
                       key: ValueKey('day_${_days[i]['id']}_$_refreshKey'),
                       day: _days[i],
-                      db: _db,
+                      routineRepo: _routineRepo,
                       onChanged: _load,
                     ),
                   ),
@@ -322,12 +322,12 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
 
 class _DayCard extends StatefulWidget {
   final Map<String, dynamic> day;
-  final DatabaseHelper db;
+  final RoutineRepository routineRepo;
   final VoidCallback onChanged;
 
   const _DayCard({
     super.key,
-    required this.day, required this.db,
+    required this.day, required this.routineRepo,
     required this.onChanged,
   });
 
@@ -346,7 +346,7 @@ class _DayCardState extends State<_DayCard> {
   }
 
   Future<void> _load() async {
-    _exercises = await widget.db.getRoutineExercises(widget.day['id'] as String);
+    _exercises = await widget.routineRepo.getRoutineExercises(widget.day['id'] as String);
     if (mounted) setState(() => _isLoading = false);
   }
 
@@ -381,7 +381,7 @@ class _DayCardState extends State<_DayCard> {
                   label: Text(sec >= 60 ? '${sec ~/ 60}min${sec % 60}s' : '${sec}s'),
                   selected: currentRest == sec,
                   onSelected: (_) {
-                    widget.db.updateRoutineExerciseRestTime(exId, sec);
+                    widget.routineRepo.updateRoutineExerciseRestTime(exId, sec);
                     _load();
                     Navigator.pop(ctx);
                   },
@@ -406,7 +406,7 @@ class _DayCardState extends State<_DayCard> {
       builder: (_) => ExercisePickerSheet(
         currentExerciseIds: currentExerciseIds,
         onExerciseAdded: (exercise) async {
-          await widget.db.addRoutineExercise(
+          await widget.routineRepo.addRoutineExercise(
             widget.day['id'] as String,
             exercise['id'] as String,
             restTimeSeconds: (exercise['default_rest_time'] as int?),
@@ -421,7 +421,7 @@ class _DayCardState extends State<_DayCard> {
             orElse: () => <String, dynamic>{},
           );
           if (routineExercise.isNotEmpty) {
-            await widget.db.removeRoutineExercise(routineExercise['id'] as String);
+            await widget.routineRepo.removeRoutineExercise(routineExercise['id'] as String);
             _load();
           }
         },
@@ -468,11 +468,11 @@ class _DayCardState extends State<_DayCard> {
                         ),
                       );
                       if (name != null && name.isNotEmpty) {
-                        await widget.db.updateRoutine(widget.day['routine_id'] as String, name: name);
+                        await widget.routineRepo.updateRoutine(widget.day['routine_id'] as String, name: name);
                         widget.onChanged();
                       }
                     } else if (v == 'delete') {
-                      await widget.db.deleteRoutineDay(widget.day['id'] as String);
+                      await widget.routineRepo.deleteRoutineDay(widget.day['id'] as String);
                       widget.onChanged();
                     }
                   },
@@ -519,7 +519,7 @@ class _DayCardState extends State<_DayCard> {
                     ),
                     GestureDetector(
                       onTap: () async {
-                        await widget.db.removeRoutineExercise(ex['id'] as String);
+                        await widget.routineRepo.removeRoutineExercise(ex['id'] as String);
                         _load();
                       },
                       child: Icon(Icons.close, size: 16, color: theme.colorScheme.error.withAlpha(180)),

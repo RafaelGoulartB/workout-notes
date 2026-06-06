@@ -5,9 +5,14 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:uuid/uuid.dart';
 import '../../database/database_helper.dart';
+import '../../repositories/workout_repository.dart';
+import '../../repositories/routine_repository.dart';
+import '../../repositories/settings_repository.dart';
 import '../../services/rest_timer_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/exercise_picker_sheet.dart';
+import '../../widgets/workout/stat_tile.dart';
+import '../../widgets/workout/stepper_button.dart';
 import 'exercise_detail_tabs_screen.dart';
 import 'rest_timer_screen.dart';
 
@@ -28,7 +33,9 @@ class ActiveWorkoutScreen extends StatefulWidget {
 }
 
 class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
-  final _db = DatabaseHelper.instance;
+  final _workoutRepo = WorkoutRepository();
+  final _routineRepo = RoutineRepository();
+  final _settingsRepo = SettingsRepository();
   final _timerService = RestTimerService.instance;
   final _uuid = const Uuid();
   bool _isLoading = true;
@@ -84,7 +91,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
   Future<void> _initialize() async {
     // Load settings
-    final settings = await _db.getAllSettings();
+    final settings = await _settingsRepo.getAllSettings();
     _autoStartTimer = settings['auto_start_workout_timer'] == 'true';
 
     if (widget.workoutId != null) {
@@ -98,14 +105,14 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   Future<void> _createNewWorkout() async {
-    final id = await _db.createWorkout();
+    final id = await _workoutRepo.createWorkout();
     _workoutId = id;
     // start_time is NOT set until user clicks "Iniciar"
   }
 
   Future<void> _loadExistingWorkout(String id) async {
     _workoutId = id;
-    final workout = await _db.getWorkout(id);
+    final workout = await _workoutRepo.getWorkout(id);
     if (workout != null) {
       final startStr = workout['start_time'] as String?;
       if (startStr != null) _timerStart = DateTime.parse(startStr);
@@ -144,11 +151,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
   Future<void> _createFromRoutine() async {
     if (widget.routineDayId == null) return;
-    final routineExercises = await _db.getRoutineExercises(widget.routineDayId!);
+    final routineExercises = await _routineRepo.getRoutineExercises(widget.routineDayId!);
     final exercises = <Map<String, dynamic>>[];
 
     for (final re in routineExercises) {
-      final sets = await _db.getPredefinedSets(re['id'] as String);
+      final sets = await _routineRepo.getPredefinedSets(re['id'] as String);
       exercises.add({
         'exercise_id': re['exercise_id'],
         'notes': null,
@@ -162,7 +169,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       });
     }
 
-    final id = await _db.createWorkout(
+    final id = await _workoutRepo.createWorkout(
       routineId: widget.routineId,
       exercises: exercises,
     );
@@ -172,11 +179,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
   Future<void> _loadExercises() async {
     if (_workoutId == null) return;
-    final entries = await _db.getWorkoutExercises(_workoutId!);
+    final entries = await _workoutRepo.getWorkoutExercises(_workoutId!);
     _exercises = [];
     for (final entry in entries) {
       final sets = List<Map<String, dynamic>>.from(
-        await _db.getExerciseSets(entry['id'] as String));
+        await _workoutRepo.getExerciseSets(entry['id'] as String));
       _exercises.add(_ExerciseWithSets(
         entryId: entry['id'] as String,
         exerciseId: entry['exercise_id'] as String,
@@ -199,7 +206,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final now = DateTime.now();
     _timerStart = now;
     _timerEnd = null;
-    await _db.startWorkoutTimer(_workoutId!);
+    await _workoutRepo.startWorkoutTimer(_workoutId!);
     _startElapsedTimer();
     setState(() => _elapsedStr = '00:00');
     NotificationService.instance.showWorkoutTimer('00:00');
@@ -210,7 +217,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final now = DateTime.now();
     _timerEnd = now;
     _elapsedTimer?.cancel();
-    await _db.stopWorkoutTimer(_workoutId!);
+    await _workoutRepo.stopWorkoutTimer(_workoutId!);
     _updateElapsedStr();
     setState(() {});
     NotificationService.instance.cancelWorkoutTimer();
@@ -233,7 +240,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       _timerEnd = null;
       _elapsedTimer?.cancel();
       _elapsedStr = '00:00';
-      await _db.resetWorkoutTimer(_workoutId!);
+      await _workoutRepo.resetWorkoutTimer(_workoutId!);
       setState(() {});
       NotificationService.instance.cancelWorkoutTimer();
     }
@@ -301,9 +308,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         Text(AppLocalizations.of(context)!.activeWorkoutWeight, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Row(children: [
-          _StepperButton(icon: Icons.remove, onTap: () => onChanged(weight - 2.5)),
+          StepperButton(icon: Icons.remove, onTap: () => onChanged(weight - 2.5)),
           const SizedBox(width: 6),
-          _StepperButton(icon: Icons.remove, small: true, onTap: () => onChanged(weight - 0.5)),
+          StepperButton(icon: Icons.remove, small: true, onTap: () => onChanged(weight - 0.5)),
           Expanded(
             child: GestureDetector(
               onTap: () => _quickEditNumber(ctx, weight, false, onChanged),
@@ -315,9 +322,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ),
             ),
           ),
-          _StepperButton(icon: Icons.add, small: true, onTap: () => onChanged(weight + 0.5)),
+          StepperButton(icon: Icons.add, small: true, onTap: () => onChanged(weight + 0.5)),
           const SizedBox(width: 6),
-          _StepperButton(icon: Icons.add, onTap: () => onChanged(weight + 2.5)),
+          StepperButton(icon: Icons.add, onTap: () => onChanged(weight + 2.5)),
         ]),
         const SizedBox(height: 4),
         Wrap(spacing: 4, runSpacing: 4, children: [20, 30, 40, 50, 60, 80, 100, 120].map((v) => ActionChip(
@@ -338,7 +345,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         Text(AppLocalizations.of(context)!.activeWorkoutReps, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Row(children: [
-          _StepperButton(icon: Icons.remove, onTap: () => onChanged(reps - 1)),
+          StepperButton(icon: Icons.remove, onTap: () => onChanged(reps - 1)),
           Expanded(
             child: GestureDetector(
               onTap: () => _quickEditNumber(ctx, reps.toDouble(), true, (v) => onChanged(v.round())),
@@ -350,7 +357,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ),
             ),
           ),
-          _StepperButton(icon: Icons.add, onTap: () => onChanged(reps + 1)),
+          StepperButton(icon: Icons.add, onTap: () => onChanged(reps + 1)),
         ]),
         const SizedBox(height: 4),
         Wrap(spacing: 4, runSpacing: 4, children: [1, 3, 5, 8, 10, 12, 15, 20].map((v) => ActionChip(
@@ -371,8 +378,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         Text(AppLocalizations.of(context)!.activeWorkoutDistance, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Row(children: [
-          _StepperButton(icon: Icons.remove, small: true, onTap: () => onChanged((distance - 0.1).clamp(0, 999))),
-          _StepperButton(icon: Icons.remove, onTap: () => onChanged((distance - 0.5).clamp(0, 999))),
+          StepperButton(icon: Icons.remove, small: true, onTap: () => onChanged((distance - 0.1).clamp(0, 999))),
+          StepperButton(icon: Icons.remove, onTap: () => onChanged((distance - 0.5).clamp(0, 999))),
           Expanded(
             child: GestureDetector(
               onTap: () => _quickEditNumber(ctx, distance, false, onChanged, title: 'Digite a distância', suffix: ' km'),
@@ -384,8 +391,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ),
             ),
           ),
-          _StepperButton(icon: Icons.add, onTap: () => onChanged((distance + 0.5).clamp(0, 999))),
-          _StepperButton(icon: Icons.add, small: true, onTap: () => onChanged((distance + 0.1).clamp(0, 999))),
+          StepperButton(icon: Icons.add, onTap: () => onChanged((distance + 0.5).clamp(0, 999))),
+          StepperButton(icon: Icons.add, small: true, onTap: () => onChanged((distance + 0.1).clamp(0, 999))),
         ]),
         const SizedBox(height: 4),
         Wrap(spacing: 4, runSpacing: 4, children: [1.0, 2.0, 3.0, 5.0, 10.0].map((v) => ActionChip(
@@ -408,8 +415,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         Text(AppLocalizations.of(context)!.activeWorkoutTime, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Row(children: [
-          _StepperButton(icon: Icons.remove, onTap: () => onChanged((timeSeconds - 30).clamp(0, 99999))),
-          _StepperButton(icon: Icons.remove, small: true, onTap: () => onChanged((timeSeconds - 5).clamp(0, 99999))),
+          StepperButton(icon: Icons.remove, onTap: () => onChanged((timeSeconds - 30).clamp(0, 99999))),
+          StepperButton(icon: Icons.remove, small: true, onTap: () => onChanged((timeSeconds - 5).clamp(0, 99999))),
           Expanded(
             child: GestureDetector(
               onTap: () => _quickEditNumber(ctx, timeSeconds.toDouble(), true, (v) => onChanged(v.round()), title: 'Digite o tempo (segundos)', suffix: ' s'),
@@ -426,8 +433,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ),
             ),
           ),
-          _StepperButton(icon: Icons.add, small: true, onTap: () => onChanged((timeSeconds + 5).clamp(0, 99999))),
-          _StepperButton(icon: Icons.add, onTap: () => onChanged((timeSeconds + 30).clamp(0, 99999))),
+          StepperButton(icon: Icons.add, small: true, onTap: () => onChanged((timeSeconds + 5).clamp(0, 99999))),
+          StepperButton(icon: Icons.add, onTap: () => onChanged((timeSeconds + 30).clamp(0, 99999))),
         ]),
         const SizedBox(height: 4),
         Wrap(spacing: 4, runSpacing: 4, children: [30, 60, 120, 180, 300, 600].map((v) => ActionChip(
@@ -445,7 +452,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   Future<void> addExercise(String exerciseId, String name, String catName, Color catColor, {int? restTimeSeconds}) async {
     if (_workoutId == null) return;
     final entryId = _uuid.v4();
-    final db = await _db.database;
+    final db = await DatabaseHelper.instance.database;
     final rt = restTimeSeconds ?? 90;
     await db.insert('exercise_entries', {
       'id': entryId,
@@ -458,9 +465,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     // Auto-populate sets from last workout (excluding current workout)
     List<Map<String, dynamic>> autoSets = [];
     if (_workoutId != null) {
-      final lastSets = await _db.getLastWorkoutSets(exerciseId, excludeWorkoutId: _workoutId);
+      final lastSets = await _workoutRepo.getLastWorkoutSets(exerciseId, excludeWorkoutId: _workoutId);
       for (final s in lastSets) {
-        await _db.addSet(
+        await _workoutRepo.addSet(
           exerciseEntryId: entryId,
           weight: (s['weight'] as num?)?.toDouble(),
           reps: (s['reps'] as int?),
@@ -468,7 +475,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         );
       }
       // Reload the newly created sets to get their IDs
-      autoSets = await _db.getExerciseSets(entryId);
+      autoSets = await _workoutRepo.getExerciseSets(entryId);
     }
 
     setState(() {
@@ -500,7 +507,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       lastWarmup = (last['is_warmup'] as int?) == 1;
     }
 
-    await _db.addSet(
+    await _workoutRepo.addSet(
       exerciseEntryId: exercise.entryId,
       weight: lastWeight,
       reps: lastReps,
@@ -527,7 +534,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }
 
     final wasComplete = (theSet?['is_complete'] as int?) == 1;
-    await _db.toggleSetComplete(setId);
+    await _workoutRepo.toggleSetComplete(setId);
     await _loadExercises();
     setState(() {});
 
@@ -722,7 +729,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
 
     if (result == true && _workoutId != null) {
-      await _db.updateSet(setId,
+      await _workoutRepo.updateSet(setId,
         weight: weight,
         reps: reps,
         distance: distance,
@@ -753,7 +760,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
 
     if (confirm == true && _workoutId != null) {
-      await _db.deleteExerciseEntry(exercise.entryId);
+      await _workoutRepo.deleteExerciseEntry(exercise.entryId);
       await _loadExercises();
       if (mounted) setState(() {});
       if (mounted) {
@@ -765,7 +772,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   Future<void> _deleteSet(String setId) async {
-    await _db.deleteSet(setId);
+    await _workoutRepo.deleteSet(setId);
     await _loadExercises();
     setState(() {});
   }
@@ -800,7 +807,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final feeling = result['feeling'] as int;
     final comment = result['comment'] as String? ?? '';
 
-    await _db.finishWorkout(_workoutId!, comment: comment, feelingRating: feeling);
+    await _workoutRepo.finishWorkout(_workoutId!, comment: comment, feelingRating: feeling);
 
     if (mounted) {
       final loc = AppLocalizations.of(context)!;
@@ -869,7 +876,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     // Detect PRs by comparing against historical data (excluding this workout)
     if (_workoutId != null && thisWorkoutBests.isNotEmpty) {
-      final db = await _db.database;
+      final db = await DatabaseHelper.instance.database;
       for (final entry in thisWorkoutBests.entries) {
         final exId = entry.key;
         final current = entry.value;
@@ -1220,7 +1227,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final ctx = context;
     final scaffoldMessenger = ScaffoldMessenger.of(ctx);
     final loc = AppLocalizations.of(ctx);
-    final routines = await _db.getRoutines();
+    final routines = await _routineRepo.getRoutines();
     if (routines.isEmpty) {
       if (mounted) {
         scaffoldMessenger.showSnackBar(
@@ -1239,7 +1246,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     );
     if (routineId == null || !mounted) return;
 
-    final days = await _db.getRoutineDays(routineId);
+    final days = await _routineRepo.getRoutineDays(routineId);
     if (days.isEmpty) {
       if (mounted) {
         scaffoldMessenger.showSnackBar(
@@ -1262,7 +1269,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final workoutId = _workoutId;
     if (workoutId == null) return;
     if (!mounted) return;
-    await _db.importRoutineDayToWorkout(workoutId, dayId);
+    await _workoutRepo.importRoutineDayToWorkout(workoutId, dayId);
     await _loadExercises();
     if (!mounted) return;
     setState(() {});
@@ -1461,7 +1468,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   void _updateRestTimeAndClose(_ExerciseWithSets exercise, int seconds) async {
-    await _db.updateExerciseEntryRestTime(exercise.entryId, seconds);
+    await _workoutRepo.updateExerciseEntryRestTime(exercise.entryId, seconds);
     await _loadExercises();
     setState(() {});
   }
@@ -1488,7 +1495,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         },
         onExerciseRemoved: (exercise) async {
           final exerciseId = exercise['id'] as String;
-          await _db.removeExerciseEntryFromWorkout(_workoutId!, exerciseId);
+          await _workoutRepo.removeExerciseEntryFromWorkout(_workoutId!, exerciseId);
           if (mounted) {
             setState(() {
               _exercises.removeWhere((e) => e.exerciseId == exerciseId);
@@ -2011,7 +2018,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
                 children: [
-                  _StatTile(
+                  StatTile(
                     icon: Icons.timer,
                     label: AppLocalizations.of(context)!.activeWorkoutTimerDuration,
                     value: s.formattedDuration,
@@ -2019,7 +2026,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                     theme: theme,
                   ),
                   const SizedBox(width: 8),
-                  _StatTile(
+                  StatTile(
                     icon: Icons.auto_graph,
                     label: AppLocalizations.of(context)!.commonVolume,
                     value: '${s.formattedVolume} kg',
@@ -2027,7 +2034,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                     theme: theme,
                   ),
                   const SizedBox(width: 8),
-                  _StatTile(
+                  StatTile(
                     icon: Icons.fitness_center,
                     label: AppLocalizations.of(context)!.commonSets,
                     value: '${s.completedSets}/${s.totalSets}',
@@ -2265,83 +2272,4 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
 
 // ── Stat Tile widget for the summary grid ──
 
-class _StatTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-  final ThemeData theme;
 
-  const _StatTile({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.theme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-        decoration: BoxDecoration(
-          color: color.withAlpha(15),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withAlpha(40)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 20, color: color),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-              ),
-            ),
-            Text(
-              label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontSize: 10,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StepperButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool small;
-
-  const _StepperButton({
-    required this.icon,
-    required this.onTap,
-    this.small = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final size = small ? 36.0 : 48.0;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(120)),
-        ),
-        child: Icon(icon, size: small ? 18 : 24, color: theme.colorScheme.onSurface),
-      ),
-    );
-  }
-}

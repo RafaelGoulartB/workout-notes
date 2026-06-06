@@ -3,7 +3,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import '../../database/database_helper.dart';
+import '../../repositories/analytics_repository.dart';
+import '../../repositories/exercise_repository.dart';
+import '../../repositories/body_measurement_repository.dart';
 import 'workout_detail_screen.dart';
 import '../../widgets/collapsible_section.dart';
 import '../../widgets/workout_heatmap.dart';
@@ -17,7 +19,9 @@ class ProgressScreen extends StatefulWidget {
 }
 
 class _ProgressScreenState extends State<ProgressScreen> {
-  final _db = DatabaseHelper.instance;
+  final _analytics = AnalyticsRepository();
+  final _exerciseRepo = ExerciseRepository();
+  final _bodyRepo = BodyMeasurementRepository();
 
   bool _isLoading = true;
 
@@ -98,10 +102,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
     try {
       // Load only immediately visible data
       final results = await Future.wait([
-        _db.getWorkoutOverviewStats(),
-        _db.getMonthlyVolume(),
-        _db.getMonthlyReport(now.year, now.month),
-        _db.getMonthComparison(now.year, now.month),
+        _analytics.getWorkoutOverviewStats(),
+        _analytics.getMonthlyVolume(),
+        _analytics.getMonthlyReport(now.year, now.month),
+        _analytics.getMonthComparison(now.year, now.month),
       ]);
 
       if (!mounted) return;
@@ -127,8 +131,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final now = DateTime.now();
     try {
       final results = await Future.wait([
-        _db.getYearlyHeatmapData(now.year),
-        _db.getWorkoutDatesInRange(DateTime(now.year, 1, 1)),
+        _analytics.getYearlyHeatmapData(now.year),
+        _analytics.getWorkoutDatesInRange(DateTime(now.year, 1, 1)),
       ]);
       if (!mounted) return;
       _heatmapData = results[0] as Map<String, int>;
@@ -145,9 +149,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
     setState(() => _isLoadingVolume = true);
     try {
       final results = await Future.wait([
-        _db.getVolumeByCategory(),
-        _db.getTopExercisesByVolume(),
-        _db.getEnergySystemDistribution(),
+        _analytics.getVolumeByCategory(),
+        _analytics.getTopExercisesByVolume(),
+        _analytics.getEnergySystemDistribution(),
       ]);
       if (!mounted) return;
       _volumeByCategory = results[0];
@@ -165,7 +169,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     setState(() => _isLoadingPerformance = true);
     try {
       // Only load the exercise list (lightweight) — no history or PRs
-      _allExercises = await _db.getExercises();
+      _allExercises = await _exerciseRepo.getExercises();
       if (!mounted) return;
       _loadedPerformance = true;
       setState(() => _isLoadingPerformance = false);
@@ -179,8 +183,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
     setState(() => _isLoadingDuration = true);
     try {
       final results = await Future.wait([
-        _db.getDurationTrend(),
-        _db.getWorkoutDensity(),
+        _analytics.getDurationTrend(),
+        _analytics.getWorkoutDensity(),
       ]);
       if (!mounted) return;
       _durationTrend = results[0];
@@ -197,8 +201,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
     setState(() => _isLoadingRecovery = true);
     try {
       final results = await Future.wait([
-        _db.getFeelingTrend(),
-        _db.getFeelingVsVolume(),
+        _analytics.getFeelingTrend(),
+        _analytics.getFeelingVsVolume(),
       ]);
       if (!mounted) return;
       _feelingTrend = results[0];
@@ -215,9 +219,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
     setState(() => _isLoadingBody = true);
     try {
       final results = await Future.wait([
-        _db.getBodyWeightWithVolume(),
-        _db.getBodyMeasurementsSummary(),
-        _db.getBodyCompositionTrend(),
+        _analytics.getBodyWeightWithVolume(),
+        _bodyRepo.getBodyMeasurementsSummary(),
+        _bodyRepo.getBodyCompositionTrend(),
       ]);
       if (!mounted) return;
       _bodyData = results[0];
@@ -231,7 +235,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Future<void> _loadHistory(String exerciseId) async {
-    final data = await _db.getExerciseHistory(exerciseId, limit: 30);
+    final data = await _analytics.getExerciseHistory(exerciseId, limit: 30);
     setState(() {
       _selectedHistory = data;
       _showingOverview = false;
@@ -302,7 +306,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
       builder: (ctx) => _ExerciseDetailSheet(
         exerciseId: exerciseId,
         exerciseName: exerciseName,
-        db: _db,
+        analytics: _analytics,
       ),
     );
   }
@@ -2758,12 +2762,12 @@ class _WeekBar {
 class _ExerciseDetailSheet extends StatefulWidget {
   final String exerciseId;
   final String exerciseName;
-  final DatabaseHelper db;
+  final AnalyticsRepository analytics;
 
   const _ExerciseDetailSheet({
     required this.exerciseId,
     required this.exerciseName,
-    required this.db,
+    required this.analytics,
   });
 
   @override
@@ -2789,7 +2793,7 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
   }
 
   Future<void> _load() async {
-    final data = await widget.db.getExerciseHistory(widget.exerciseId, limit: 30);
+    final data = await widget.analytics.getExerciseHistory(widget.exerciseId, limit: 30);
     if (!mounted) return;
     setState(() {
       _history = data;

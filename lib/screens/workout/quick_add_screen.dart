@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
+import '../../repositories/exercise_repository.dart';
+import '../../repositories/workout_repository.dart';
 import '../../database/database_helper.dart';
 
 class QuickAddScreen extends StatefulWidget {
@@ -12,7 +14,8 @@ class QuickAddScreen extends StatefulWidget {
 }
 
 class _QuickAddScreenState extends State<QuickAddScreen> {
-  final _db = DatabaseHelper.instance;
+  final _exerciseRepo = ExerciseRepository();
+  final _workoutRepo = WorkoutRepository();
   final _textController = TextEditingController();
   final _focusNode = FocusNode();
   List<_ParsedSet> _parsedSets = [];
@@ -30,12 +33,12 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
   }
 
   Future<void> _loadRecent() async {
-    final workouts = await _db.getWorkouts(limit: 5);
+    final workouts = await _workoutRepo.getWorkouts(limit: 5);
     final exerciseIds = <String>{};
     final exercises = <Map<String, dynamic>>[];
 
     for (final w in workouts) {
-      final entries = await _db.getWorkoutExercises(w['id'] as String);
+      final entries = await _workoutRepo.getWorkoutExercises(w['id'] as String);
       for (final e in entries) {
         final exId = e['exercise_id'] as String;
         if (!exerciseIds.contains(exId)) {
@@ -176,7 +179,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       // Find or create exercise — search both DB name and localized names
       Map<String, dynamic>? exercise;
       // First try SQL LIKE search on DB name
-      final exercises = await _db.getExercises(search: exerciseName);
+      final exercises = await _exerciseRepo.getExercises(search: exerciseName);
       if (exercises.isNotEmpty) {
         exercise = exercises.firstWhere(
           (e) => (e['name'] as String).toLowerCase() == exerciseName.toLowerCase(),
@@ -188,7 +191,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
         if (!mounted) return;
         final loc = AppLocalizations.of(context);
         if (loc != null) {
-          final allExercises = await _db.getExercises();
+          final allExercises = await _exerciseRepo.getExercises();
           for (final ex in allExercises) {
             if (ExerciseLocaleHelper.exerciseMatchesSearch(loc, ex, exerciseName)) {
               exercise = ex;
@@ -216,10 +219,10 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       }
 
       // Create workout and add sets
-      final workoutId = await _db.createWorkout();
+      final workoutId = await _workoutRepo.createWorkout();
       final entryId = const Uuid().v4();
 
-      final database = await _db.database;
+      final database = await DatabaseHelper.instance.database;
       await database.insert('exercise_entries', {
         'id': entryId,
         'workout_id': workoutId,
@@ -228,7 +231,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       });
 
       for (final set in _parsedSets) {
-        await _db.addSet(
+        await _workoutRepo.addSet(
           exerciseEntryId: entryId,
           weight: set.weight,
           reps: set.reps,
@@ -236,7 +239,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       }
 
       // Finish workout automatically
-      await _db.finishWorkout(workoutId, feelingRating: 3);
+      await _workoutRepo.finishWorkout(workoutId, feelingRating: 3);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -259,14 +262,14 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
 
   Future<void> _createAndSave(String exerciseName, double weight) async {
     final catId = 'fullbody';
-    final exId = await _db.addExercise(
+    final exId = await _exerciseRepo.addExercise(
       name: exerciseName,
       categoryId: catId,
     );
 
-    final workoutId = await _db.createWorkout();
+    final workoutId = await _workoutRepo.createWorkout();
     final entryId = const Uuid().v4();
-    final database = await _db.database;
+    final database = await DatabaseHelper.instance.database;
     await database.insert('exercise_entries', {
       'id': entryId,
       'workout_id': workoutId,
@@ -275,14 +278,14 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     });
 
     for (final set in _parsedSets) {
-      await _db.addSet(
+      await _workoutRepo.addSet(
         exerciseEntryId: entryId,
         weight: set.weight,
         reps: set.reps,
       );
     }
 
-    await _db.finishWorkout(workoutId, feelingRating: 3);
+    await _workoutRepo.finishWorkout(workoutId, feelingRating: 3);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

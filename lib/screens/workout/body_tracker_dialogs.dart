@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
@@ -14,7 +14,7 @@ import 'package:workout_notes/widgets/body_tracker_selectors.dart';
 /// Shows a bottom sheet for adding a single measurement.
 Future<void> showAddMeasurementSheet(
   BuildContext context, {
-  required DatabaseHelper db,
+  required BodyMeasurementRepository repo,
   required MeasureType currentType,
   required String typeId,
   required VoidCallback onSaved,
@@ -239,7 +239,7 @@ Future<void> showAddMeasurementSheet(
                           final value = double.tryParse(
                               valueCtl.text.replaceAll(',', '.'));
                           if (value == null || value <= 0) return;
-                          await db.addBodyMeasurement(
+                          await repo.addBodyMeasurement(
                             typeId,
                             value,
                             currentType.unit,
@@ -296,7 +296,7 @@ Future<void> showAddMeasurementSheet(
 /// Shows a bottom sheet for quickly entering measurements for all types.
 Future<void> showQuickMeasureSheet(
   BuildContext context, {
-  required DatabaseHelper db,
+  required BodyMeasurementRepository repo,
   required List<MeasureType> types,
   required Map<String, Map<String, dynamic>?> latestByType,
   required VoidCallback onSaved,
@@ -543,7 +543,7 @@ Future<void> showQuickMeasureSheet(
                                   }
                                 }
                                 if (batch.isNotEmpty) {
-                                  await db.addBodyMeasurementsBatch(batch);
+                                  await repo.addBodyMeasurementsBatch(batch);
                                   if (ctx.mounted) {
                                     Navigator.pop(ctx);
                                     ScaffoldMessenger.of(context)
@@ -729,7 +729,7 @@ Future<void> showMeasurementDetailSheet(
   required MeasureType type,
   required String typeId,
   required double? delta,
-  required DatabaseHelper db,
+  required BodyMeasurementRepository repo,
   required VoidCallback onDeleted,
 }) async {
   final theme = Theme.of(context);
@@ -903,7 +903,7 @@ Future<void> showMeasurementDetailSheet(
                       ),
                     );
                     if (confirm == true) {
-                      await db.deleteBodyMeasurement(
+                      await repo.deleteBodyMeasurement(
                           measurement['id'] as String);
                       onDeleted();
                     }

@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import '../../database/database_helper.dart';
+import '../../repositories/workout_repository.dart';
+import '../../repositories/analytics_repository.dart';
 import '../../services/rest_timer_service.dart';
 import 'active_workout_screen.dart';
 import 'quick_add_screen.dart';
@@ -23,7 +24,8 @@ class WorkoutHomeScreen extends StatefulWidget {
 }
 
 class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
-  final _db = DatabaseHelper.instance;
+  final _workoutRepo = WorkoutRepository();
+  final _analyticsRepo = AnalyticsRepository();
   final _timerService = RestTimerService.instance;
   bool _isLoading = true;
   List<Map<String, dynamic>> _activeWorkouts = [];
@@ -61,11 +63,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       final tomorrow = DateTime(now.year, now.month, now.day + 1);
       final monthStart = DateTime(now.year, now.month, 1);
 
-      final allWorkouts = await _db.getWorkouts(limit: 50);
-      final futureWorkouts = await _db.getWorkouts(startDate: tomorrow, limit: 20);
+      final allWorkouts = await _workoutRepo.getWorkouts(limit: 50);
+      final futureWorkouts = await _workoutRepo.getWorkouts(startDate: tomorrow, limit: 20);
 
       // Load stats
-      final overview = await _db.getWorkoutOverviewStats();
+      final overview = await _analyticsRepo.getWorkoutOverviewStats();
       _currentStreak = (overview['current_streak'] as int?) ?? 0;
 
       // Calculate month stats
@@ -77,9 +79,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         if (wDate.startsWith(monthStr)) {
           monthCount++;
           // Get volume for this workout
-          final exercises = await _db.getWorkoutExercises(w['id'] as String);
+          final exercises = await _workoutRepo.getWorkoutExercises(w['id'] as String);
           for (final ee in exercises) {
-            final sets = await _db.getExerciseSets(ee['id'] as String);
+            final sets = await _workoutRepo.getExerciseSets(ee['id'] as String);
             for (final s in sets) {
               if ((s['is_warmup'] as int? ?? 0) == 0) {
                 monthVol += ((s['weight'] as num?)?.toDouble() ?? 0) * ((s['reps'] as int?) ?? 0);

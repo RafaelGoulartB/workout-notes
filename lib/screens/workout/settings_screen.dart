@@ -3,7 +3,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import '../../database/database_helper.dart';
+import '../../repositories/settings_repository.dart';
+import '../../repositories/export_import_repository.dart';
 import '../../database/test_seed_data.dart';
 import '../../services/export_service.dart';
 import '../../services/notification_service.dart';
@@ -17,7 +18,7 @@ class WorkoutSettingsScreen extends StatefulWidget {
 }
 
 class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
-  final _db = DatabaseHelper.instance;
+  final _settingsRepo = SettingsRepository();
   Map<String, String> _settings = {};
   bool _isLoading = true;
   int _selectedAccentIndex = AccentColors.indexOf(AccentColors.defaultColor);
@@ -34,12 +35,12 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   }
 
   Future<void> _load() async {
-    _settings = await _db.getAllSettings();
+    _settings = await _settingsRepo.getAllSettings();
     setState(() => _isLoading = false);
   }
 
   Future<void> _update(String key, String value) async {
-    await _db.setSetting(key, value);
+    await _settingsRepo.setSetting(key, value);
     _settings[key] = value;
     setState(() {});
   }
@@ -199,7 +200,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     );
 
     if (confirm == true) {
-      await _db.deleteAllWorkoutData();
+      await ExportImportRepository().deleteAllWorkoutData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AppLocalizations.of(context)!.settingsDeleteHistorySuccess), behavior: SnackBarBehavior.floating),

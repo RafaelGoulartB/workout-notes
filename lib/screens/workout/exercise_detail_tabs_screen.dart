@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import '../../database/database_helper.dart';
+import '../../repositories/exercise_repository.dart';
+import '../../repositories/analytics_repository.dart';
 import 'workout_detail_screen.dart';
 
 /// Tabbed detail screen for an exercise: Edit | History | Charts
@@ -22,7 +23,8 @@ class ExerciseDetailTabsScreen extends StatefulWidget {
 
 class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     with SingleTickerProviderStateMixin {
-  final _db = DatabaseHelper.instance;
+  final _exerciseRepo = ExerciseRepository();
+  final _analyticsRepo = AnalyticsRepository();
   late TabController _tabCtl;
 
   // Edit form state
@@ -82,8 +84,8 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   }
 
   Future<void> _loadForm() async {
-    _categories = await _db.getCategories();
-    final ex = await _db.getExercise(widget.exerciseId);
+    _categories = await _exerciseRepo.getCategories();
+    final ex = await _exerciseRepo.getExercise(widget.exerciseId);
     if (ex != null && mounted) {
       _nameCtl.text = ex['name'] as String? ?? '';
       _categoryId = ex['category_id'] as String? ?? 'chest';
@@ -97,7 +99,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   }
 
   Future<void> _loadHistory() async {
-    final data = await _db.getExerciseHistory(widget.exerciseId, limit: 30);
+    final data = await _analyticsRepo.getExerciseHistory(widget.exerciseId, limit: 30);
     if (!mounted) return;
     setState(() {
       _history = data;
@@ -114,7 +116,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     }
     setState(() => _isSaving = true);
     try {
-      await _db.updateExercise(widget.exerciseId,
+      await _exerciseRepo.updateExercise(widget.exerciseId,
         name: _nameCtl.text.trim(),
         categoryId: _categoryId,
         type: _type,
@@ -151,7 +153,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
       ),
     );
     if (confirm == true) {
-      await _db.deleteExercise(widget.exerciseId);
+      await _exerciseRepo.deleteExercise(widget.exerciseId);
       if (mounted) Navigator.pop(context, true);
     }
   }
