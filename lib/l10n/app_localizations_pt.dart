@@ -784,6 +784,12 @@ class AppLocalizationsPt extends AppLocalizations {
   String get bodyTrackerCalf => 'Panturrilha';
 
   @override
+  String get bodyTrackerForearm => 'Antebraço';
+
+  @override
+  String get bodyTrackerNeck => 'Pescoço';
+
+  @override
   String get bodyTrackerLeft => 'Esquerdo';
 
   @override

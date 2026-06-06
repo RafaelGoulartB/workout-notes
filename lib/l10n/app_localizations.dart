@@ -1550,6 +1550,18 @@ abstract class AppLocalizations {
   /// **'Calf'**
   String get bodyTrackerCalf;
 
+  /// No description provided for @bodyTrackerForearm.
+  ///
+  /// In en, this message translates to:
+  /// **'Forearm'**
+  String get bodyTrackerForearm;
+
+  /// No description provided for @bodyTrackerNeck.
+  ///
+  /// In en, this message translates to:
+  /// **'Neck'**
+  String get bodyTrackerNeck;
+
   /// No description provided for @bodyTrackerLeft.
   ///
   /// In en, this message translates to:

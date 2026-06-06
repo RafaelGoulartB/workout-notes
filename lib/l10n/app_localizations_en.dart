@@ -780,6 +780,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bodyTrackerCalf => 'Calf';
 
   @override
+  String get bodyTrackerForearm => 'Forearm';
+
+  @override
+  String get bodyTrackerNeck => 'Neck';
+
+  @override
   String get bodyTrackerLeft => 'Left';
 
   @override

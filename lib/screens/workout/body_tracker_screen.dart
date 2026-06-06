@@ -35,25 +35,53 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   // ── History pagination ────────────────────────────────────────────
   int _historyDisplayCount = 5;
 
+  // ── Enabled types ─────────────────────────────────────────────────
+  Set<String> _enabledTypeIds = {};
+
+  /// Returns only the types the user chose to track.
+  List<MeasureType> get _activeTypes =>
+      _allTypes.where((t) => _enabledTypeIds.contains(t.id)).toList();
+
   // ── Measurement type definitions ───────────────────────────────────
-  static const _types = <MeasureType>[
+  static const _allTypes = <MeasureType>[
     MeasureType('weight', Icons.monitor_weight, 'kg', Colors.indigo, false),
     MeasureType('bodyFat', Icons.water_drop, '%', Colors.orange, false),
     MeasureType('waist', Icons.straighten, 'cm', Colors.teal, false),
     MeasureType('chest', Icons.straighten, 'cm', Colors.blue, false),
     MeasureType('arm', Icons.straighten, 'cm', Colors.purple, true),
+    MeasureType('forearm', Icons.straighten, 'cm', Colors.deepPurple, true),
+    MeasureType('neck', Icons.straighten, 'cm', Colors.blueGrey, false),
     MeasureType('thigh', Icons.straighten, 'cm', Colors.deepOrange, true),
     MeasureType('calf', Icons.straighten, 'cm', Colors.brown, true),
     MeasureType('hip', Icons.straighten, 'cm', Colors.cyan, false),
   ];
 
   MeasureType get _currentType =>
-      _types.firstWhere((t) => t.id == _selectedType);
+      _activeTypes.firstWhere((t) => t.id == _selectedType,
+          orElse: () => _activeTypes.first);
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadEnabledTypes().then((_) => _load());
+  }
+
+  Future<void> _loadEnabledTypes() async {
+    final raw = await _db.getSetting('body_tracker_enabled_types');
+    if (raw != null) {
+      try {
+        final list = raw.split(',');
+        _enabledTypeIds = list.toSet();
+        return;
+      } catch (_) {}
+    }
+    // Default: all types enabled
+    _enabledTypeIds = _allTypes.map((t) => t.id).toSet();
+  }
+
+  Future<void> _saveEnabledTypes() async {
+    await _db.setSetting('body_tracker_enabled_types',
+        _enabledTypeIds.join(','));
   }
 
   Future<void> _load() async {
@@ -65,12 +93,17 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
       final all = await _db.getBodyMeasurements(limit: 500);
       final summary = await _db.getBodyMeasurementsSummary();
       final latestMap = <String, Map<String, dynamic>?>{};
-      for (final t in _types) {
+      for (final t in _allTypes) {
         try {
           latestMap[t.id] = summary.firstWhere((s) => s['type'] == t.id);
         } catch (_) {
           latestMap[t.id] = null;
         }
+      }
+      // Ensure selected type is still enabled
+      final activeIds = _activeTypes.map((t) => t.id).toList();
+      if (!activeIds.contains(_selectedType)) {
+        _selectedType = activeIds.isNotEmpty ? activeIds.first : 'weight';
       }
       final filtered = all.where((m) => m['type'] == _selectedType).toList();
       if (!mounted) return;
@@ -120,6 +153,19 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
 
   void _loadMoreHistory() {
     setState(() => _historyDisplayCount += 5);
+  }
+
+  void _onCustomizeTypes(List<MeasureType> enabled) {
+    final newIds = enabled.map((t) => t.id).toSet();
+    if (newIds.isEmpty) return;
+    _enabledTypeIds = newIds;
+    _saveEnabledTypes();
+    // Ensure current selection is still valid
+    final activeIds = _activeTypes.map((t) => t.id).toList();
+    if (!activeIds.contains(_selectedType)) {
+      _selectedType = activeIds.first;
+    }
+    _load();
   }
 
   // ── Derived stats (unilateral) ─────────────────────────────────────
@@ -262,7 +308,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                     showQuickMeasureSheet(
                       context,
                       db: _db,
-                      types: _types,
+                      types: _activeTypes,
                       latestByType: _latestByType,
                       onSaved: _load,
                     );
@@ -325,7 +371,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
         showQuickMeasureSheet(
           context,
           db: _db,
-          types: _types,
+          types: _activeTypes,
           latestByType: _latestByType,
           onSaved: _load,
         );
@@ -344,10 +390,12 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
     return Column(
       children: [
         BodyTypeSelector(
-          types: _types,
+          types: _activeTypes,
           selectedType: _selectedType,
           onSelected: _switchType,
           latestByType: _latestByType,
+          allTypes: _allTypes,
+          onCustomize: _onCustomizeTypes,
         ),
         const SizedBox(height: 12),
 

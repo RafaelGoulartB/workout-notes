@@ -254,6 +254,8 @@
   "bodyTrackerEvening": "Evening",
   "bodyTrackerNight": "Night",
   "bodyTrackerCalf": "Calf",
+  "bodyTrackerForearm": "Forearm",
+  "bodyTrackerNeck": "Neck",
   "bodyTrackerLeft": "Left",
   "bodyTrackerRight": "Right",
   "bodyTrackerLeanMass": "Lean Mass",

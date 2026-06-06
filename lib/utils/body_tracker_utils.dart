@@ -65,6 +65,10 @@ String typeName(String typeId, BuildContext context) {
       return loc.bodyTrackerChest;
     case 'arm':
       return loc.bodyTrackerArm;
+    case 'forearm':
+      return loc.bodyTrackerForearm;
+    case 'neck':
+      return loc.bodyTrackerNeck;
     case 'thigh':
       return loc.bodyTrackerThigh;
     case 'calf':
