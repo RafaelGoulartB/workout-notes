@@ -56,9 +56,11 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
     MeasureType('hip', Icons.straighten, 'cm', Colors.cyan, false),
   ];
 
-  MeasureType get _currentType =>
-      _activeTypes.firstWhere((t) => t.id == _selectedType,
-          orElse: () => _activeTypes.first);
+  MeasureType get _currentType {
+    if (_activeTypes.isEmpty) return _allTypes.first;
+    return _activeTypes.firstWhere((t) => t.id == _selectedType,
+        orElse: () => _activeTypes.first);
+  }
 
   @override
   void initState() {
@@ -366,7 +368,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
             ),
         ],
       ),
-      floatingActionButton: _buildSpeedDial(theme, loc),
+      floatingActionButton: _isLoading ? null : _buildSpeedDial(theme, loc),
     );
   }
 
