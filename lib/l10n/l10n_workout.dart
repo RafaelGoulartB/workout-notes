@@ -102,6 +102,8 @@ mixin WorkoutLocale {
   String get progressDuration;
   String progressAverage(Object avg);
   String get progressDensity;
+  String progressDensityAverage(Object avg);
+  String get progressWeekAbbreviation;
   String get progressBodyWeight;
   String get progressNoChartData;
   String get progressHistoryTitle;
@@ -588,6 +590,14 @@ mixin WorkoutLocaleEn on WorkoutLocale {
 
   @override
   String get progressDensity => 'Density (Volume per Minute)';
+
+  @override
+  String progressDensityAverage(Object avg) {
+    return 'Average: $avg kg/min';
+  }
+
+  @override
+  String get progressWeekAbbreviation => 'W';
 
   @override
   String get progressBodyWeight => 'Body Weight';
@@ -1437,6 +1447,14 @@ mixin WorkoutLocalePt on WorkoutLocale {
 
   @override
   String get progressDensity => 'Densidade (Volume por Minuto)';
+
+  @override
+  String progressDensityAverage(Object avg) {
+    return 'Média: $avg kg/min';
+  }
+
+  @override
+  String get progressWeekAbbreviation => 'S';
 
   @override
   String get progressBodyWeight => 'Peso Corporal';

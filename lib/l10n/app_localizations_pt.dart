@@ -569,6 +569,14 @@ class AppLocalizationsPt extends AppLocalizations {
   String get progressDensity => 'Densidade (Volume por Minuto)';
 
   @override
+  String progressDensityAverage(Object avg) {
+    return 'Média: $avg kg/min';
+  }
+
+  @override
+  String get progressWeekAbbreviation => 'S';
+
+  @override
   String get progressBodyWeight => 'Peso Corporal';
 
   @override

@@ -186,6 +186,8 @@
   "progressDuration": "Workout Duration",
   "progressAverage": "Average: {avg}min",
   "progressDensity": "Density (Volume per Minute)",
+  "progressDensityAverage": "Average: {avg} kg/min",
+  "progressWeekAbbreviation": "W",
   "progressBodyWeight": "Body Weight",
   "progressNoChartData": "No data available for this chart",
   "progressHistoryTitle": "Workout History",

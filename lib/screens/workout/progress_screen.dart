@@ -260,9 +260,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
   }
 
-  String _weekLabel(DateTime date) {
+  String _weekLabel(DateTime date, String prefix) {
     final week = DateFormat('w', Intl.defaultLocale).format(date);
-    return 'S$week';
+    return '$prefix$week';
   }
 
   Widget _sectionLoading(ThemeData theme) {
@@ -506,7 +506,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                           ),
                           const SizedBox(width: 2),
                           Text(
-                            '${deltaW > 0 ? '+' : ''}$deltaW vs mês ant.',
+                            AppLocalizations.of(context)!.progressVsLastMonth('${deltaW > 0 ? '+' : ''}$deltaW'),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
@@ -631,6 +631,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Widget _buildWeeklyFrequencyChart(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
     final now = DateTime.now();
     final weeks = <_WeekBar>[];
 
@@ -648,7 +649,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           count++;
         }
       }
-      weeks.add(_WeekBar(_weekLabel(weekStart), count));
+      weeks.add(_WeekBar(_weekLabel(weekStart, AppLocalizations.of(context)!.progressWeekAbbreviation), count));
     }
 
     final maxCount = weeks.fold<int>(0, (a, b) => a > b.count ? a : b.count);
@@ -672,7 +673,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   getTooltipItem: (g, gi, r, ri) {
                     final w = weeks[gi];
                     return BarTooltipItem(
-                      '${w.label}: ${w.count} treinos',
+                      '${w.label}: ${w.count} ${loc.progressWorkouts}',
                       TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 12),
                     );
                   },
@@ -741,7 +742,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
       dowCount[dow] = (dowCount[dow] ?? 0) + 1;
     }
 
-    final labels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    final loc = AppLocalizations.of(context)!;
+    final labels = [loc.calendarSun, loc.calendarMon, loc.calendarTue, loc.calendarWed, loc.calendarThu, loc.calendarFri, loc.calendarSat];
     final maxVal = dowCount.values.fold<int>(0, (a, b) => a > b ? a : b);
 
     return Card(
@@ -755,7 +757,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Dia da semana', style: theme.textTheme.bodySmall?.copyWith(
+            Text(loc.progressDayOfWeek, style: theme.textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w600, fontSize: 10)),
             const SizedBox(height: 6),
             SizedBox(
@@ -862,7 +864,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Horário', style: theme.textTheme.bodySmall?.copyWith(
+            Text(AppLocalizations.of(context)!.progressTimeOfDay, style: theme.textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w600, fontSize: 10)),
             const SizedBox(height: 6),
             SizedBox(
@@ -927,7 +929,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
         // Top exercises
         if (_topExercises.isNotEmpty) ...[
-          Text('Top Exercícios por Volume',
+          Text(AppLocalizations.of(context)!.progressTopExercises,
               style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           _buildTopExercisesChart(theme),
@@ -942,7 +944,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Center(child: Text('Sem dados', style: theme.textTheme.bodySmall)),
+          child: Center(child: Text(AppLocalizations.of(context)!.progressNoData, style: theme.textTheme.bodySmall)),
         ),
       );
     }
@@ -960,7 +962,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Volume por Grupo', style: theme.textTheme.bodySmall?.copyWith(
+            Text(AppLocalizations.of(context)!.progressVolumeByGroup, style: theme.textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w600, fontSize: 10)),
             const SizedBox(height: 6),
             SizedBox(
@@ -1026,7 +1028,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     final total = _energySystems.fold<double>(0, (a, b) => a + ((b['volume'] as num?)?.toDouble() ?? 0));
     final colors = {'aerobic': Colors.green, 'anaerobic': Colors.red};
-    final labels = {'aerobic': 'Aeróbico', 'anaerobic': 'Anaeróbico'};
+    final labels = {'aerobic': AppLocalizations.of(context)!.progressAerobic, 'anaerobic': AppLocalizations.of(context)!.progressAnaerobic};
 
     return Card(
       elevation: 0,
@@ -1038,7 +1040,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         padding: const EdgeInsets.all(10),
         child: Column(
           children: [
-            Text('Sistema Energético', style: theme.textTheme.bodySmall?.copyWith(
+            Text(AppLocalizations.of(context)!.progressEnergySystem, style: theme.textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.w600, fontSize: 10)),
             const SizedBox(height: 8),
             SizedBox(
@@ -1163,7 +1165,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
               Icon(Icons.fitness_center_outlined, size: 32,
                   color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
               const SizedBox(height: 8),
-              Text('Nenhum exercício cadastrado',
+              Text(AppLocalizations.of(context)!.progressNoExercises,
                   style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant)),
             ],
@@ -1184,7 +1186,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Toque em um exercício para ver o histórico completo',
+          Text(AppLocalizations.of(context)!.progressTapForHistory,
               style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 12),
@@ -1289,14 +1291,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (_durationTrend.isNotEmpty) ...[
-          Text('Duração dos Treinos',
+          Text(AppLocalizations.of(context)!.progressDuration,
               style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           _buildDurationChart(theme),
           const SizedBox(height: 16),
         ],
         if (_densityData.isNotEmpty) ...[
-          Text('Densidade (Volume por Minuto)',
+          Text(AppLocalizations.of(context)!.progressDensity,
               style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           _buildDensityChart(theme),
@@ -1326,7 +1328,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           children: [
             Row(
               children: [
-                Text('Média: ${avg.toStringAsFixed(0)}min',
+                Text(AppLocalizations.of(context)!.progressAverage(avg.toStringAsFixed(0)),
                     style: theme.textTheme.bodySmall?.copyWith(fontSize: 11)),
               ],
             ),
@@ -1422,7 +1424,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           children: [
             Row(
               children: [
-                Text('Média: ${avg.toStringAsFixed(1)} kg/min',
+                Text(AppLocalizations.of(context)!.progressDensityAverage(avg.toStringAsFixed(1)),
                     style: theme.textTheme.bodySmall?.copyWith(fontSize: 11)),
               ],
             ),
@@ -1493,14 +1495,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (_feelingTrend.isNotEmpty) ...[
-          Text('Sentimento ao Longo do Tempo',
+          Text(AppLocalizations.of(context)!.progressRecoveryFeeling,
               style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           _buildFeelingChart(theme),
           const SizedBox(height: 16),
         ],
         if (_feelingVsVolume.isNotEmpty) ...[
-          Text('Sentimento vs Volume Médio',
+          Text(AppLocalizations.of(context)!.progressRecoveryFeelingVsVolume,
               style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           _buildFeelingVsVolumeChart(theme),
@@ -1596,6 +1598,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   Widget _buildFeelingVsVolumeChart(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
     final maxVol = _feelingVsVolume.fold<double>(0, (a, b) {
       final v = (b['avg_volume'] as num?)?.toDouble() ?? 0;
       return a > v ? a : v;
@@ -1623,7 +1626,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     final vol = (d['avg_volume'] as num?)?.toDouble() ?? 0;
                     final count = d['workout_count'] as int? ?? 0;
                     return BarTooltipItem(
-                      '${'★' * feeling}\nVolume: ${_formatVolume(vol)}\n$count treinos',
+                      '${'★' * feeling}\n${loc.commonVolume}: ${_formatVolume(vol)}\n$count ${loc.progressWorkouts}',
                       TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 11),
                     );
                   },
@@ -1688,7 +1691,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Peso Corporal vs Volume de Treino',
+        Text(AppLocalizations.of(context)!.progressBodyWeightVsVolume,
             style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         _buildBodyWeightChart(theme),
@@ -1699,6 +1702,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   Widget _buildBodyWeightChart(ThemeData theme) {
     if (_bodyData.isEmpty) return const SizedBox.shrink();
 
+    final loc = AppLocalizations.of(context)!;
     final weights = _bodyData.map((d) => (d['weight'] as num?)?.toDouble() ?? 0).toList();
     final volumes = _bodyData.map((d) => (d['volume'] as num?)?.toDouble() ?? 0).toList();
     final maxWeight = weights.fold<double>(0, (a, b) => a > b ? a : b);
@@ -1719,9 +1723,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
           children: [
             Row(
               children: [
-                _legendDotWeight(Colors.indigo, 'Peso'),
+                _legendDotWeight(Colors.indigo, AppLocalizations.of(context)!.progressBodyWeight),
                 const SizedBox(width: 16),
-                _legendDotWeight(Colors.teal, 'Volume'),
+                _legendDotWeight(Colors.teal, AppLocalizations.of(context)!.commonVolume),
               ],
             ),
             const SizedBox(height: 8),
@@ -1793,7 +1797,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         final d = idx < _bodyData.length ? (_bodyData[idx]['date'] as String? ?? '') : '';
                         final isWeight = s.barIndex == 0;
                         return LineTooltipItem(
-                          '$d\n${isWeight ? 'Peso: ${s.y.toStringAsFixed(1)}kg' : 'Volume: ${_formatVolume(s.y)}'}',
+                          '$d\n${isWeight ? '${loc.progressBodyWeight}: ${s.y.toStringAsFixed(1)}${loc.workoutDetailKg}' : '${loc.commonVolume}: ${_formatVolume(s.y)}'}',
                           TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 11),
                         );
                       }).toList(),
@@ -1824,6 +1828,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   // ===================== MONTHLY VOLUME CHART (existing) =====================
 
   Widget _buildMonthlyVolumeChart(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
     final volumes = _monthlyVolume.map((m) => (m['volume'] as double?) ?? 0).toList();
     final maxVol = volumes.fold<double>(0, (a, b) => a > b ? a : b);
     if (maxVol <= 0) return const SizedBox.shrink();
@@ -1839,7 +1844,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Volume por Mês', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+            Text(loc.progressVolumeByMonth, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             SizedBox(
               height: 180,
@@ -1855,7 +1860,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         final vol = (m['volume'] as double?) ?? 0;
                         final wo = (m['workouts'] as int?) ?? 0;
                         return BarTooltipItem(
-                          '${_monthLabel(month)}\n${_formatVolume(vol)}\n${wo} treinos',
+                          '${_monthLabel(month)}\n${_formatVolume(vol)}\n$wo ${loc.progressWorkouts}',
                           TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 12),
                         );
                       },

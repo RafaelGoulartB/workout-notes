@@ -1148,6 +1148,18 @@ abstract class AppLocalizations {
   /// **'Density (Volume per Minute)'**
   String get progressDensity;
 
+  /// No description provided for @progressDensityAverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Average: {avg} kg/min'**
+  String progressDensityAverage(Object avg);
+
+  /// No description provided for @progressWeekAbbreviation.
+  ///
+  /// In en, this message translates to:
+  /// **'W'**
+  String get progressWeekAbbreviation;
+
   /// No description provided for @progressBodyWeight.
   ///
   /// In en, this message translates to:

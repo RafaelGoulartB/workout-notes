@@ -186,6 +186,8 @@
   "progressDuration": "Duração dos Treinos",
   "progressAverage": "Média: {avg}min",
   "progressDensity": "Densidade (Volume por Minuto)",
+  "progressDensityAverage": "Média: {avg} kg/min",
+  "progressWeekAbbreviation": "S",
   "progressBodyWeight": "Peso Corporal",
   "progressNoChartData": "Nenhum dado disponível para este gráfico",
   "progressHistoryTitle": "Histórico de Treinos",
