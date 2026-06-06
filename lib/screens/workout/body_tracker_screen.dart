@@ -47,65 +47,68 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(AppLocalizations.of(context)!.bodyTrackerAddTitle(_typeName(_selectedType))),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: valueCtl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Valor (${_types.firstWhere((t) => t['id'] == _selectedType)['unit']})',
-                border: const OutlineInputBorder(),
+      builder: (ctx) {
+        final loc = AppLocalizations.of(ctx)!;
+        return AlertDialog(
+          title: Text(loc.bodyTrackerAddTitle(_typeName(_selectedType))),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: valueCtl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: '${loc.bodyTrackerValue} (${_types.firstWhere((t) => t['id'] == _selectedType)['unit']})',
+                  border: const OutlineInputBorder(),
+                ),
+                autofocus: true,
               ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: dateCtl,
-              decoration: const InputDecoration(
-                labelText: 'Data',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.calendar_today),
+              const SizedBox(height: 12),
+              TextField(
+                controller: dateCtl,
+                decoration: InputDecoration(
+                  labelText: loc.bodyTrackerDate,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.calendar_today),
+                ),
+                readOnly: true,
+                onTap: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (date != null) dateCtl.text = DateFormat('yyyy-MM-dd').format(date);
+                },
               ),
-              readOnly: true,
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
-                );
-                if (date != null) dateCtl.text = DateFormat('yyyy-MM-dd').format(date);
-              },
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: commentCtl,
-              decoration: const InputDecoration(
-                labelText: 'Observação (opcional)',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 12),
+              TextField(
+                controller: commentCtl,
+                decoration: InputDecoration(
+                  labelText: loc.bodyTrackerComment,
+                  border: const OutlineInputBorder(),
+                ),
               ),
-            ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(loc.commonCancel)),
+            FilledButton(onPressed: () async {
+              final value = double.tryParse(valueCtl.text.replaceAll(',', '.'));
+              if (value == null || value <= 0) return;
+              final date = DateTime.tryParse(dateCtl.text);
+              await _db.addBodyMeasurement(
+                _selectedType, value,
+                _types.firstWhere((t) => t['id'] == _selectedType)['unit'] as String,
+                date: date, comment: commentCtl.text,
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+              _load();
+            }, child: Text(loc.bodyTrackerSave)),
           ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(onPressed: () async {
-            final value = double.tryParse(valueCtl.text.replaceAll(',', '.'));
-            if (value == null || value <= 0) return;
-            final date = DateTime.tryParse(dateCtl.text);
-            await _db.addBodyMeasurement(
-              _selectedType, value,
-              _types.firstWhere((t) => t['id'] == _selectedType)['unit'] as String,
-              date: date, comment: commentCtl.text,
-            );
-            if (ctx.mounted) Navigator.pop(ctx);
-            _load();
-          }, child: const Text('Adicionar')),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -116,7 +119,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Medidas Corporais'),
+        title: Text(AppLocalizations.of(context)!.bodyTrackerTitle),
         centerTitle: true,
       ),
       body: Column(
@@ -259,13 +262,16 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                             onLongPress: () async {
                               final confirm = await showDialog<bool>(
                                 context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('Excluir medida?'),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-                                    TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Excluir', style: TextStyle(color: Colors.red))),
-                                  ],
-                                ),
+                                builder: (ctx) {
+                                  final loc = AppLocalizations.of(ctx)!;
+                                  return AlertDialog(
+                                    title: Text(loc.bodyTrackerDeleteConfirm),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc.commonCancel)),
+                                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(loc.commonDelete, style: const TextStyle(color: Colors.red))),
+                                    ],
+                                  );
+                                },
                               );
                               if (confirm == true) {
                                 await _db.deleteBodyMeasurement(m['id'] as String);

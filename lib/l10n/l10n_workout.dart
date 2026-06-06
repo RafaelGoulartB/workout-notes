@@ -228,6 +228,8 @@ mixin WorkoutLocale {
   String workoutDetailDuration(int min, int sec);
   String get activeWorkoutTitle;
   String get activeWorkoutFinishWorkout;
+  String get activeWorkoutFinished;
+  String activeWorkoutFinishedWithPRs(Object count);
   String get activeWorkoutAddExercise;
   String get activeWorkoutEmptyTitle;
   String get activeWorkoutEmptySubtitle;
@@ -946,6 +948,14 @@ mixin WorkoutLocaleEn on WorkoutLocale {
 
   @override
   String get activeWorkoutFinishWorkout => 'Finish';
+
+  @override
+  String get activeWorkoutFinished => '💪 Workout finished!';
+
+  @override
+  String activeWorkoutFinishedWithPRs(Object count) {
+    return '🎉 Workout finished! $count personal record(s)!';
+  }
 
   @override
   String get activeWorkoutAddExercise => 'Add Exercise';
@@ -1804,6 +1814,14 @@ mixin WorkoutLocalePt on WorkoutLocale {
 
   @override
   String get activeWorkoutFinishWorkout => 'Finalizar';
+
+  @override
+  String get activeWorkoutFinished => '💪 Treino finalizado!';
+
+  @override
+  String activeWorkoutFinishedWithPRs(Object count) {
+    return '🎉 Treino finalizado! $count recorde(s) pessoal(is)!';
+  }
 
   @override
   String get activeWorkoutAddExercise => 'Adicionar Exercício';

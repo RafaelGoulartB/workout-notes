@@ -995,6 +995,14 @@ class AppLocalizationsPt extends AppLocalizations {
   String get activeWorkoutFinishWorkout => 'Finalizar';
 
   @override
+  String get activeWorkoutFinished => '💪 Treino finalizado!';
+
+  @override
+  String activeWorkoutFinishedWithPRs(Object count) {
+    return '🎉 Treino finalizado! $count recorde(s) pessoal(is)!';
+  }
+
+  @override
   String get activeWorkoutAddExercise => 'Adicionar Exercício';
 
   @override

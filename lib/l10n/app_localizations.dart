@@ -1952,6 +1952,18 @@ abstract class AppLocalizations {
   /// **'Finish'**
   String get activeWorkoutFinishWorkout;
 
+  /// No description provided for @activeWorkoutFinished.
+  ///
+  /// In en, this message translates to:
+  /// **'💪 Workout finished!'**
+  String get activeWorkoutFinished;
+
+  /// No description provided for @activeWorkoutFinishedWithPRs.
+  ///
+  /// In en, this message translates to:
+  /// **'🎉 Workout finished! {count} personal record(s)!'**
+  String activeWorkoutFinishedWithPRs(Object count);
+
   /// No description provided for @activeWorkoutAddExercise.
   ///
   /// In en, this message translates to:

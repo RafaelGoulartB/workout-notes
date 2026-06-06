@@ -802,9 +802,10 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     await _db.finishWorkout(_workoutId!, comment: comment, feelingRating: feeling);
 
     if (mounted) {
+      final loc = AppLocalizations.of(context)!;
       final msg = summary.prs.isNotEmpty
-          ? '🎉 Treino finalizado! ${summary.prs.length} recorde(s) pessoal(is)!'
-          : '💪 Treino finalizado!';
+          ? loc.activeWorkoutFinishedWithPRs(summary.prs.length)
+          : loc.activeWorkoutFinished;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
       );

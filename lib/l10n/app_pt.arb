@@ -329,6 +329,8 @@
   "workoutDetailDuration": "{min}min {sec}s",
   "activeWorkoutTitle": "Treino",
   "activeWorkoutFinishWorkout": "Finalizar",
+  "activeWorkoutFinished": "💪 Treino finalizado!",
+  "activeWorkoutFinishedWithPRs": "🎉 Treino finalizado! {count} recorde(s) pessoal(is)!",
   "activeWorkoutAddExercise": "Adicionar Exercício",
   "activeWorkoutEmptyTitle": "Nenhum exercício ainda",
   "activeWorkoutEmptySubtitle": "Adicione exercícios para começar seu treino",
