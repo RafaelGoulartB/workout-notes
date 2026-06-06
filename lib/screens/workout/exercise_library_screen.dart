@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import '../../database/database_helper.dart';
+import 'package:workout_notes/l10n/exercise_locale_helper.dart';
+import '../../repositories/exercise_repository.dart';
 import 'exercise_form_screen.dart';
 import 'exercise_detail_tabs_screen.dart';
 
@@ -12,7 +13,7 @@ class ExerciseLibraryScreen extends StatefulWidget {
 }
 
 class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
-  final _db = DatabaseHelper.instance;
+  final _exerciseRepo = ExerciseRepository();
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _exercises = [];
   String? _selectedCategoryId;
@@ -28,8 +29,8 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
 
   Future<void> _load() async {
     setState(() => _isLoading = true);
-    _categories = await _db.getCategories();
-    _exercises = await _db.getExercises(favorites: _showFavorites ? true : null);
+    _categories = await _exerciseRepo.getCategories();
+    _exercises = await _exerciseRepo.getExercises(favorites: _showFavorites ? true : null);
     setState(() => _isLoading = false);
   }
 
@@ -42,7 +43,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   }
 
   Future<void> _toggleFavorite(String id) async {
-    await _db.toggleFavorite(id);
+    await _exerciseRepo.toggleFavorite(id);
     _load();
   }
 
@@ -99,7 +100,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                 ..._categories.map((cat) => Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: FilterChip(
-                    label: Text(cat['name'] as String),
+                    label: Text(ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, cat)),
                     selected: _selectedCategoryId == cat['id'],
                     onSelected: (_) => setState(
                       () => _selectedCategoryId = _selectedCategoryId == cat['id'] ? null : cat['id'] as String),
@@ -157,7 +158,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                                     MaterialPageRoute(
                                       builder: (_) => ExerciseDetailTabsScreen(
                                         exerciseId: ex['id'] as String,
-                                        exerciseName: ex['name'] as String,
+                                        exerciseName: ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, ex),
                                       ),
                                     ),
                                   );
@@ -179,11 +180,11 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(ex['name'] as String, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                                            Text(ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, ex), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                                             const SizedBox(height: 2),
                                             Row(
                                               children: [
-                                                Text(ex['category_name'] as String? ?? '', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                                                Text(ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, ex), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                                                 const SizedBox(width: 6),
                                                 _buildEnergyChip(ex['category_energy'] as String? ?? 'anaerobic', theme),
                                                 if (equipment != null && equipment.isNotEmpty) ...[
@@ -202,7 +203,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                                           ],
                                         ),
                                       ),
-                                      if (ex['notes'] != null && (ex['notes'] as String).isNotEmpty)
+                                      if (ExerciseLocaleHelper.exerciseNotes(AppLocalizations.of(context)!, ex).isNotEmpty)
                                         Icon(Icons.info_outline, size: 16, color: theme.colorScheme.onSurfaceVariant.withAlpha(120)),
                                       IconButton(
                                         icon: Icon(

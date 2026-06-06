@@ -506,6 +506,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get progressBodyMeasurements => 'Body Measurements';
 
   @override
+  String get progressBodyMeasurementsSubtitle =>
+      'View detailed trends, photos, and body composition charts';
+
+  @override
+  String get progressBodyComposition => 'Body Composition Evolution';
+
+  @override
   String get progressYearHeatmap => 'Annual heatmap';
 
   @override
@@ -668,6 +675,169 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bodyTrackerDeleteConfirm => 'Delete this measurement?';
+
+  @override
+  String get bodyTrackerQuickMeasure => 'Quick Measure';
+
+  @override
+  String get bodyTrackerQuickMeasureSubtitle =>
+      'Fill in the measurements you want to record. Leave blank to skip.';
+
+  @override
+  String get bodyTrackerSaveAll => 'Save Measurements';
+
+  @override
+  String bodyTrackerAddSingle(Object type) {
+    return 'Add $type';
+  }
+
+  @override
+  String get bodyTrackerEmptyTitle => 'No measurements yet';
+
+  @override
+  String get bodyTrackerEmptySubtitle =>
+      'Start tracking your body measurements to see your progress over time.';
+
+  @override
+  String get bodyTrackerBodyMap => 'BODY MAP';
+
+  @override
+  String get bodyTrackerLastValue => 'Last';
+
+  @override
+  String get bodyTrackerCurrent => 'Current';
+
+  @override
+  String get bodyTrackerAverage => 'Average';
+
+  @override
+  String get bodyTrackerMin => 'Min';
+
+  @override
+  String get bodyTrackerMax => 'Max';
+
+  @override
+  String get bodyTrackerTrendLine => 'Trend';
+
+  @override
+  String get bodyTrackerHistory => 'History';
+
+  @override
+  String get bodyTrackerEntries => 'entries';
+
+  @override
+  String get bodyTrackerNeedTwoMeasurements =>
+      'Add at least 2 measurements to see the chart';
+
+  @override
+  String get bodyTrackerPhoto => 'Photo (optional)';
+
+  @override
+  String get bodyTrackerCamera => 'Camera';
+
+  @override
+  String get bodyTrackerGallery => 'Gallery';
+
+  @override
+  String get bodyTrackerInvalidValue => 'Invalid value';
+
+  @override
+  String get bodyTrackerFasting => 'Fasting';
+
+  @override
+  String get bodyTrackerFasted => 'Fasted';
+
+  @override
+  String get bodyTrackerQuickCommentHint => 'Quick note (optional)';
+
+  @override
+  String bodyTrackerSavedBatch(Object count) {
+    return '✅ $count measurements saved!';
+  }
+
+  @override
+  String get bodyTrackerLeftAbbr => 'L';
+
+  @override
+  String get bodyTrackerRightAbbr => 'R';
+
+  @override
+  String get bodyTrackerLastLabel => 'Last: ';
+
+  @override
+  String get bodyTrackerMorning => 'Morning';
+
+  @override
+  String get bodyTrackerAfternoon => 'Afternoon';
+
+  @override
+  String get bodyTrackerEvening => 'Evening';
+
+  @override
+  String get bodyTrackerNight => 'Night';
+
+  @override
+  String get bodyTrackerCalf => 'Calf';
+
+  @override
+  String get bodyTrackerForearm => 'Forearm';
+
+  @override
+  String get bodyTrackerNeck => 'Neck';
+
+  @override
+  String get bodyTrackerLeft => 'Left';
+
+  @override
+  String get bodyTrackerRight => 'Right';
+
+  @override
+  String get bodyTrackerLeanMass => 'Lean Mass';
+
+  @override
+  String get bodyTrackerFatMass => 'Fat Mass';
+
+  @override
+  String get bodyTrackerHealthy => 'Healthy';
+
+  @override
+  String get bodyTrackerModerate => 'Moderate Risk';
+
+  @override
+  String get bodyTrackerHigh => 'High Risk';
+
+  @override
+  String bodyTrackerAsymmetry(Object diff, Object largerSide, Object unit) {
+    return 'Difference: $diff $unit ($largerSide larger)';
+  }
+
+  @override
+  String get bodyTrackerTrendComparison => 'Left vs Right';
+
+  @override
+  String bodyTrackerLoadMore(Object count) {
+    return 'Load $count more entries';
+  }
+
+  @override
+  String bodyTrackerLoadMoreCount(Object count) {
+    return 'Load $count more';
+  }
+
+  @override
+  String get bodyTrackerWHR => 'WHR';
+
+  @override
+  String get bodyTrackerEstimatedComposition => 'Estimated Body Composition';
+
+  @override
+  String get bodyTrackerTimeOfDay => 'Time of day';
+
+  @override
+  String get bodyTrackerNotInformed => 'Not informed';
+
+  @override
+  String get commonOptional => 'optional';
 
   @override
   String get routinesTitle => 'Routines';
@@ -976,6 +1146,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workoutDetailSelectDate => 'Select the new date';
+
+  @override
+  String get workoutDetailCopy => 'Copy Workout';
+
+  @override
+  String get workoutDetailCopyDateChanged => '✅ Workout copied!';
+
+  @override
+  String get workoutDetailGoToWorkout => 'Go to workout';
 
   @override
   String workoutDetailDuration(Object min, Object sec) {

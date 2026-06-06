@@ -23,8 +23,9 @@ class TestDataGenerator {
     }
 
     final now = DateTime.now();
+    final periodStart = DateTime(now.year, now.month - months, 1);
     int workoutsCreated = 0;
-    DateTime currentDate = DateTime(now.year, now.month - months, 1);
+    DateTime currentDate = periodStart;
 
     // Build a progression map per exercise: {exerciseId: baseWeight}
     final progression = <String, double>{};
@@ -141,7 +142,151 @@ class TestDataGenerator {
       workoutsCreated++;
     }
 
+    // Generate body measurements over the same period
+    await _generateBodyMeasurements(periodStart, now);
+
     return workoutsCreated;
+  }
+
+  /// Generates realistic body measurement data over the given period.
+  Future<void> _generateBodyMeasurements(DateTime periodStart, DateTime now) async {
+    final db = await _db.database;
+
+    // ── Measurement definitions with realistic progression ───────────
+    // Each entry: (type, startVal, endVal, unit, isBilateral, dayInterval)
+    final definitions = [
+      ('weight',   82.0,  77.0,  'kg', false, 7),
+      ('bodyFat',  18.5,  14.0,  '%',  false, 14),
+      ('waist',    88.0,  81.0,  'cm', false, 10),
+      ('chest',    100.0, 104.5, 'cm', false, 14),
+      ('arm',      33.5,  36.5,  'cm', true,  14),
+      ('forearm',  27.0,  29.0,  'cm', true,  14),
+      ('neck',     39.0,  38.0,  'cm', false, 14),
+      ('thigh',    55.0,  57.5,  'cm', true,  14),
+      ('calf',     36.0,  37.0,  'cm', true,  14),
+      ('hip',      98.0,  94.0,  'cm', false, 14),
+    ];
+
+    final totalDays = now.difference(periodStart).inDays;
+
+    for (final def in definitions) {
+      final type = def.$1;
+      final startVal = def.$2;
+      final endVal = def.$3;
+      final unit = def.$4;
+      final isBilateral = def.$5;
+      final interval = def.$6;
+
+      final progress = endVal - startVal;
+
+      // Time-of-day distribution
+      final todOptions = [null, null, null, 'morning', 'afternoon', 'morning', 'evening'];
+
+      // Generate measurements at regular intervals with some noise
+      int dayOffset = _rng.nextInt(interval); // random start offset
+      while (dayOffset < totalDays) {
+        final date = periodStart.add(Duration(days: dayOffset));
+        if (date.isAfter(now)) break;
+
+        final dateStr = date.toIso8601String().substring(0, 10);
+
+        // Progress factor (0.0 to 1.0) with slight random jitter
+        final rawFactor = dayOffset / totalDays;
+        // Add noise: most measurements are close to the trend line
+        final noise = (_rng.nextDouble() - 0.5) * 0.6; // ±0.3 progress noise
+        final factor = (rawFactor + noise).clamp(0.0, 1.0);
+
+        final trendValue = startVal + progress * factor;
+
+        // Add measurement noise: larger for weight, smaller for tape measures
+        final measurementNoise = type == 'weight'
+            ? (_rng.nextDouble() - 0.5) * 1.2   // ±0.6kg for weight
+            : type == 'bodyFat'
+                ? (_rng.nextDouble() - 0.5) * 0.8 // ±0.4% for body fat
+                : (_rng.nextDouble() - 0.5) * 0.6; // ±0.3cm for tape
+
+        double value = (trendValue + measurementNoise).clamp(1.0, 200.0);
+        value = double.parse(value.toStringAsFixed(1));
+
+        final tod = todOptions[_rng.nextInt(todOptions.length)];
+        final isFasted = _rng.nextDouble() < 0.35 ? 1 : 0;
+
+        // 30% chance of a comment on weight/bodyfat measurements
+        String? comment;
+        if (_rng.nextDouble() < 0.3 && (type == 'weight' || type == 'bodyFat')) {
+          comment = _randomWeightComment();
+          if (comment?.isEmpty == true) comment = null;
+        }
+
+        if (isBilateral) {
+          // Generate left and right with slight natural asymmetry
+          final asymmetry = double.parse(
+              ((_rng.nextDouble() - 0.5) * 0.8).toStringAsFixed(1)); // ±0.4cm asymmetry
+
+          for (final side in ['left', 'right']) {
+            final sideOffset = side == 'right' ? asymmetry : 0.0;
+            final sideValue = double.parse(
+                (value + sideOffset).clamp(1.0, 200.0).toStringAsFixed(1));
+
+            await db.rawInsert(
+              'INSERT INTO body_measurements '
+              '(id, type, value, unit, date, comment, time_of_day, is_fasted, side, created_at) '
+              'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              [
+                _uuid.v4(),
+                type,
+                sideValue,
+                unit,
+                dateStr,
+                comment,
+                tod,
+                isFasted,
+                side,
+                date.toIso8601String(),
+              ],
+            );
+          }
+        } else {
+          await db.rawInsert(
+            'INSERT INTO body_measurements '
+            '(id, type, value, unit, date, comment, time_of_day, is_fasted, side, created_at) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+              _uuid.v4(),
+              type,
+              value,
+              unit,
+              dateStr,
+              comment,
+              tod,
+              isFasted,
+              null,
+              date.toIso8601String(),
+            ],
+          );
+        }
+
+        // Next measurement: interval with some randomness
+        final jitter = _rng.nextInt(5) - 2; // -2 to +2 days
+        dayOffset += (interval + jitter).clamp(3, 21);
+      }
+    }
+  }
+
+  String? _randomWeightComment() {
+    final options = [
+      'Pós treino',
+      'Em jejum',
+      'Depois do café',
+      'Final de semana',
+      'Segunda feira',
+      'Pós refeição',
+      null,
+      null,
+      null,
+      null,
+    ];
+    return options[_rng.nextInt(options.length)];
   }
 
   List<Map<String, dynamic>> _pickExercises(

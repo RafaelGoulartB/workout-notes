@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../database/database_helper.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/exercise_locale_helper.dart';
+import '../repositories/exercise_repository.dart';
 
 /// A bottom sheet that lets the user add/remove exercises to a workout or routine.
 /// Keeps open and calls [onExerciseAdded] / [onExerciseRemoved] in real-time.
@@ -21,9 +23,9 @@ class ExercisePickerSheet extends StatefulWidget {
 }
 
 class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
-  final _db = DatabaseHelper.instance;
+  final _exerciseRepo = ExerciseRepository();
   List<Map<String, dynamic>> _categories = [];
-  Map<String, List<Map<String, dynamic>>> _exercisesByCategory = {};
+  final Map<String, List<Map<String, dynamic>>> _exercisesByCategory = {};
   String? _selectedCategoryId;
   String _search = '';
   bool _isLoading = true;
@@ -37,10 +39,10 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
   }
 
   Future<void> _load() async {
-    _categories = await _db.getCategories();
+    _categories = await _exerciseRepo.getCategories();
     
     // Load all exercises grouped by category
-    final allExercises = await _db.getExercises();
+    final allExercises = await _exerciseRepo.getExercises();
     for (final cat in _categories) {
       final catId = cat['id'] as String;
       _exercisesByCategory[catId] = allExercises
@@ -56,6 +58,13 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
     
     final exercises = _exercisesByCategory[_selectedCategoryId] ?? [];
     if (_search.isEmpty) return exercises;
+    
+    final loc = AppLocalizations.of(context);
+    if (loc != null) {
+      return exercises.where((e) {
+        return ExerciseLocaleHelper.exerciseMatchesSearch(loc, e, _search);
+      }).toList();
+    }
     
     return exercises.where((e) {
       final name = (e['name'] as String? ?? '').toLowerCase();
@@ -187,7 +196,7 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      cat['name'] as String? ?? '',
+                                      ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, cat),
                                       style: theme.textTheme.titleMedium?.copyWith(
                                         fontWeight: FontWeight.w600,
                                       ),
@@ -231,7 +240,7 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        selectedCategory['name'] as String? ?? '',
+                        ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, selectedCategory),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: Color(selectedCategory['color'] as int? ?? 0xFF757575),
@@ -285,14 +294,14 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                                     ),
                                   ),
                                   title: Text(
-                                    ex['name'] as String,
+                                    ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, ex),
                                     style: TextStyle(
                                       fontWeight: isSelected ? FontWeight.w600 : null,
                                       color: isSelected ? theme.colorScheme.primary : null,
                                     ),
                                   ),
-                                  subtitle: ex['equipment'] != null && (ex['equipment'] as String).isNotEmpty
-                                      ? Text(ex['equipment'] as String)
+                                  subtitle: ExerciseLocaleHelper.equipment(ex).isNotEmpty
+                                      ? Text(ExerciseLocaleHelper.equipment(ex))
                                       : null,
                                   trailing: AnimatedSwitcher(
                                     duration: const Duration(milliseconds: 200),

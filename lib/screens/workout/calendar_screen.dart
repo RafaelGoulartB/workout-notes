@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import '../../database/database_helper.dart';
+import '../../repositories/workout_repository.dart';
 import 'workout_detail_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
@@ -12,7 +12,7 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
-  final _db = DatabaseHelper.instance;
+  final _workoutRepo = WorkoutRepository();
   DateTime _selectedDate = DateTime.now();
   int _currentMonth = DateTime.now().month;
   int _currentYear = DateTime.now().year;
@@ -29,7 +29,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Future<void> _loadMonth() async {
     setState(() => _isLoading = true);
-    final workouts = await _db.getWorkoutsByMonth(_currentYear, _currentMonth);
+    final workouts = await _workoutRepo.getWorkoutsByMonth(_currentYear, _currentMonth);
     
     final Map<String, List<Map<String, dynamic>>> grouped = {};
     for (final w in workouts) {
@@ -37,7 +37,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
       grouped.putIfAbsent(date, () => []).add(w);
     }
 
-    final categories = await _db.getWorkoutCategoriesByDate(_currentYear, _currentMonth);
+    final categories = await _workoutRepo.getWorkoutCategoriesByDate(_currentYear, _currentMonth);
 
     _selectedDayWorkouts = grouped[_selectedDate.toIso8601String().substring(0, 10)] ?? [];
 
@@ -220,7 +220,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     // Day cells
     for (int day = 1; day <= daysInMonth; day++) {
-      final dateStr = '${_currentYear}-${_currentMonth.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+      final dateStr = '$_currentYear-${_currentMonth.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
       final cats = _categoriesByDate[dateStr] ?? [];
       final hasWorkout = cats.isNotEmpty;
       final isToday = dateStr == today;
@@ -316,7 +316,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _createWorkoutForSelectedDate() async {
-    await _db.createWorkout(date: _selectedDate);
+    await _workoutRepo.createWorkout(date: _selectedDate);
     _loadMonth();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

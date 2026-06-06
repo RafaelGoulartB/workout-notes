@@ -3,13 +3,15 @@ import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import '../database/database_helper.dart';
+import '../repositories/workout_repository.dart';
+import '../repositories/export_import_repository.dart';
 
 class ExportService {
-  final DatabaseHelper _db = DatabaseHelper.instance;
+  final _workoutRepo = WorkoutRepository();
+  final _exportRepo = ExportImportRepository();
 
   Future<String> exportToJson() async {
-    final data = await _db.exportAllData();
+    final data = await _exportRepo.exportAllData();
     final json = const JsonEncoder.withIndent('  ').convert(data);
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/workout_notes_backup_${DateTime.now().millisecondsSinceEpoch}.json');
@@ -29,7 +31,7 @@ class ExportService {
     DateTime? startDate,
     DateTime? endDate,
   }) async {
-    final rows = await _db.exportWorkoutsCsvData(
+    final rows = await _exportRepo.exportWorkoutsCsvData(
       exerciseId: exerciseId,
       startDate: startDate,
       endDate: endDate,
@@ -82,14 +84,14 @@ class ExportService {
     final file = File(filePath);
     final content = await file.readAsString();
     final data = jsonDecode(content) as Map<String, dynamic>;
-    return _db.importData(data);
+    return _exportRepo.importData(data);
   }
 
   Future<void> shareWorkoutSummary(String workoutId) async {
-    final workout = await _db.getWorkout(workoutId);
+    final workout = await _workoutRepo.getWorkout(workoutId);
     if (workout == null) return;
 
-    final exercises = await _db.getWorkoutExercises(workoutId);
+    final exercises = await _workoutRepo.getWorkoutExercises(workoutId);
     final date = (workout['date'] as String?) ?? '';
     final comment = (workout['comment'] as String?) ?? '';
 
@@ -98,7 +100,7 @@ class ExportService {
     text += '\n';
 
     for (final ex in exercises) {
-      final sets = await _db.getExerciseSets(ex['id'] as String);
+      final sets = await _workoutRepo.getExerciseSets(ex['id'] as String);
       final exName = (ex['exercise_name'] as String?) ?? '';
       text += '\n$exName\n';
       for (int i = 0; i < sets.length; i++) {

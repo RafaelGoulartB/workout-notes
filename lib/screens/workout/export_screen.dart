@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import '../../database/database_helper.dart';
+import '../../repositories/exercise_repository.dart';
+import '../../repositories/workout_repository.dart';
 import '../../services/export_service.dart';
 
 class ExportScreen extends StatelessWidget {
@@ -102,7 +103,7 @@ class ExportScreen extends StatelessWidget {
   }
 
   void _showCsvExportDialog(BuildContext context, ExportService exportService) {
-    final db = DatabaseHelper.instance;
+    final exerciseRepo = ExerciseRepository();
     final exerciseCtl = TextEditingController();
     final startDateCtl = TextEditingController();
     final endDateCtl = TextEditingController();
@@ -142,7 +143,7 @@ class ExportScreen extends StatelessWidget {
                   exerciseId = null;
                   return;
                 }
-                final exercises = await db.getExercises(search: v);
+                final exercises = await exerciseRepo.getExercises(search: v);
                 if (exercises.isNotEmpty) {
                   exerciseId = exercises.first['id'] as String;
                   exerciseCtl.text = exercises.first['name'] as String;
@@ -231,8 +232,8 @@ class ExportScreen extends StatelessWidget {
   }
 
   void _pickAndShareWorkout(BuildContext context, ExportService exportService) async {
-    final db = DatabaseHelper.instance;
-    final workouts = await db.getWorkouts(limit: 20);
+    final workoutRepo = WorkoutRepository();
+    final workouts = await workoutRepo.getWorkouts(limit: 20);
 
     if (workouts.isEmpty) {
       if (context.mounted) {
@@ -266,7 +267,7 @@ class ExportScreen extends StatelessWidget {
                 height: 300,
                 child: ListView.separated(
                   itemCount: workouts.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (ctxx, i) {
                     final w = workouts[i];
                     final date = w['date'] as String? ?? '';

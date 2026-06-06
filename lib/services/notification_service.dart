@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import '../database/database_helper.dart';
+import '../repositories/settings_repository.dart';
 
 /// Centralized notification service for timer notifications.
 ///
@@ -74,8 +74,8 @@ class NotificationService {
 
   /// Load notification settings from the database and update channels.
   Future<void> loadSettings() async {
-    final db = DatabaseHelper.instance;
-    final settings = await db.getAllSettings();
+    final settingsRepo = SettingsRepository();
+    final settings = await settingsRepo.getAllSettings();
 
     _restEnabled = settings['notification_rest_timer_enabled'] != 'false';
     _restSound = settings['notification_rest_timer_sound'] != 'false';

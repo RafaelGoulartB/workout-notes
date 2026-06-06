@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import '../../database/database_helper.dart';
+import 'package:workout_notes/l10n/exercise_locale_helper.dart';
+import '../../repositories/exercise_repository.dart';
+import '../../repositories/analytics_repository.dart';
 import 'workout_detail_screen.dart';
 
 /// Tabbed detail screen for an exercise: Edit | History | Charts
@@ -21,7 +23,8 @@ class ExerciseDetailTabsScreen extends StatefulWidget {
 
 class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     with SingleTickerProviderStateMixin {
-  final _db = DatabaseHelper.instance;
+  final _exerciseRepo = ExerciseRepository();
+  final _analyticsRepo = AnalyticsRepository();
   late TabController _tabCtl;
 
   // Edit form state
@@ -81,8 +84,8 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   }
 
   Future<void> _loadForm() async {
-    _categories = await _db.getCategories();
-    final ex = await _db.getExercise(widget.exerciseId);
+    _categories = await _exerciseRepo.getCategories();
+    final ex = await _exerciseRepo.getExercise(widget.exerciseId);
     if (ex != null && mounted) {
       _nameCtl.text = ex['name'] as String? ?? '';
       _categoryId = ex['category_id'] as String? ?? 'chest';
@@ -96,7 +99,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   }
 
   Future<void> _loadHistory() async {
-    final data = await _db.getExerciseHistory(widget.exerciseId, limit: 30);
+    final data = await _analyticsRepo.getExerciseHistory(widget.exerciseId, limit: 30);
     if (!mounted) return;
     setState(() {
       _history = data;
@@ -113,7 +116,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     }
     setState(() => _isSaving = true);
     try {
-      await _db.updateExercise(widget.exerciseId,
+      await _exerciseRepo.updateExercise(widget.exerciseId,
         name: _nameCtl.text.trim(),
         categoryId: _categoryId,
         type: _type,
@@ -150,7 +153,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
       ),
     );
     if (confirm == true) {
-      await _db.deleteExercise(widget.exerciseId);
+      await _exerciseRepo.deleteExercise(widget.exerciseId);
       if (mounted) Navigator.pop(context, true);
     }
   }
@@ -168,10 +171,15 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     double temp = rough;
     while (temp >= 10) { temp /= 10; magnitude *= 10; }
     while (temp < 1) { temp *= 10; magnitude /= 10; }
-    if (temp <= 1) temp = 1;
-    else if (temp <= 2) temp = 2;
-    else if (temp <= 5) temp = 5;
-    else temp = 10;
+    if (temp <= 1) {
+      temp = 1;
+    } else if (temp <= 2) {
+      temp = 2;
+    } else if (temp <= 5) {
+      temp = 5;
+    } else {
+      temp = 10;
+    }
     return temp * magnitude;
   }
 
@@ -237,7 +245,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _categoryId,
+                initialValue: _categoryId,
                 decoration: const InputDecoration(
                   labelText: 'Grupo Muscular',
                   border: OutlineInputBorder(),
@@ -250,7 +258,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                         color: Color(cat['color'] as int), shape: BoxShape.circle,
                       )),
                       const SizedBox(width: 8),
-                      Text(cat['name'] as String),
+                      Text(ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, cat)),
                     ],
                   ),
                 )).toList(),
@@ -258,7 +266,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _types.any((t) => t['id'] == _type) ? _type : 'weightReps',
+                initialValue: _types.any((t) => t['id'] == _type) ? _type : 'weightReps',
                 decoration: const InputDecoration(
                   labelText: 'Tipo',
                   border: OutlineInputBorder(),
@@ -440,13 +448,13 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                     children: [
                       Expanded(flex: 2, child: Text(date.length >= 10 ? date.substring(5) : date,
                           style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                      Expanded(flex: 2, child: Text(maxW > 0 ? '${maxW.toStringAsFixed(1)}' : '-',
+                      Expanded(flex: 2, child: Text(maxW > 0 ? maxW.toStringAsFixed(1) : '-',
                           style: theme.textTheme.bodySmall)),
-                      Expanded(flex: 2, child: Text(vol > 0 ? '${vol.toStringAsFixed(0)}' : '-',
+                      Expanded(flex: 2, child: Text(vol > 0 ? vol.toStringAsFixed(0) : '-',
                           style: theme.textTheme.bodySmall)),
                       Expanded(flex: 2, child: Text('$sets×$reps',
                           style: theme.textTheme.bodySmall)),
-                      Expanded(flex: 2, child: Text(est1RM != null ? '${est1RM.toStringAsFixed(1)}' : '-',
+                      Expanded(flex: 2, child: Text(est1RM != null ? est1RM.toStringAsFixed(1) : '-',
                           style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: Colors.amber[700]))),
                     ],
                   ),
@@ -609,7 +617,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                           getTitlesWidget: (v, _) => Padding(
                             padding: const EdgeInsets.only(right: 4),
                             child: Text(
-                              _chartType == 3 ? '${v.toInt()}' : '${v.toStringAsFixed(1)}',
+                              _chartType == 3 ? v.toInt().toString() : v.toStringAsFixed(1),
                               style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
                             ),
                           ),
