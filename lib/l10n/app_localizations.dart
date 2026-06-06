@@ -1604,6 +1604,18 @@ abstract class AppLocalizations {
   /// **'Left vs Right'**
   String get bodyTrackerTrendComparison;
 
+  /// No description provided for @bodyTrackerLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load {count} more entries'**
+  String bodyTrackerLoadMore(Object count);
+
+  /// No description provided for @bodyTrackerLoadMoreCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Load {count} more'**
+  String bodyTrackerLoadMoreCount(Object count);
+
   /// No description provided for @bodyTrackerWHR.
   ///
   /// In en, this message translates to:

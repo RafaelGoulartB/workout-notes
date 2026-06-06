@@ -809,6 +809,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bodyTrackerTrendComparison => 'Left vs Right';
 
   @override
+  String bodyTrackerLoadMore(Object count) {
+    return 'Load $count more entries';
+  }
+
+  @override
+  String bodyTrackerLoadMoreCount(Object count) {
+    return 'Load $count more';
+  }
+
+  @override
   String get bodyTrackerWHR => 'WHR';
 
   @override

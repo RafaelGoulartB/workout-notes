@@ -32,6 +32,9 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   List<Map<String, dynamic>> _leftMeasurements = [];
   List<Map<String, dynamic>> _rightMeasurements = [];
 
+  // ── History pagination ────────────────────────────────────────────
+  int _historyDisplayCount = 5;
+
   // ── Measurement type definitions ───────────────────────────────────
   static const _types = <MeasureType>[
     MeasureType('weight', Icons.monitor_weight, 'kg', Colors.indigo, false),
@@ -54,7 +57,10 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _historyDisplayCount = 5;
+    });
     try {
       final all = await _db.getBodyMeasurements(limit: 500);
       final summary = await _db.getBodyMeasurementsSummary();
@@ -98,6 +104,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
     setState(() {
       _selectedType = typeId;
       _selectedSide = null;
+      _historyDisplayCount = 5;
       _measurements =
           _allMeasurements.where((m) => m['type'] == typeId).toList();
       _updateBilateralData(_measurements);
@@ -105,7 +112,14 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   }
 
   void _switchSide(String? side) {
-    setState(() => _selectedSide = side);
+    setState(() {
+      _selectedSide = side;
+      _historyDisplayCount = 5;
+    });
+  }
+
+  void _loadMoreHistory() {
+    setState(() => _historyDisplayCount += 5);
   }
 
   // ── Derived stats (unilateral) ─────────────────────────────────────
@@ -455,13 +469,24 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                 const SliverToBoxAdapter(child: SizedBox(height: 8)),
               ],
 
-              // ── History list ───────────────────────────────────────
+              // ── History list (paginated) ──────────────────────────
               SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (ctx, i) => _buildMeasurementCard(theme, loc, i, historyList),
-                  childCount: historyList.length,
+                  childCount: historyList.length > _historyDisplayCount
+                      ? _historyDisplayCount
+                      : historyList.length,
                 ),
               ),
+
+              // ── Load more button ───────────────────────────────────
+              if (historyList.length > _historyDisplayCount) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                SliverToBoxAdapter(
+                  child: _buildLoadMoreButton(theme, loc, historyList),
+                ),
+              ],
+
               const SliverToBoxAdapter(child: SizedBox(height: 80)),
             ],
           ),
@@ -470,7 +495,40 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
     );
   }
 
-  /// Side filter tabs for bilateral measurements.
+  /// Minimalistic "+ Load more" button for paginated history.
+  Widget _buildLoadMoreButton(ThemeData theme, AppLocalizations loc, List<Map<String, dynamic>> list) {
+    final remaining = list.length - _historyDisplayCount;
+    final remainingText = remaining > 5
+        ? loc.bodyTrackerLoadMore(remaining)
+        : loc.bodyTrackerLoadMoreCount(remaining);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: InkWell(
+        onTap: _loadMoreHistory,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          width: double.infinity,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.add, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                remainingText,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSideTabs(ThemeData theme, AppLocalizations loc) {
     final tabs = <Widget>[
       _SideTab(
@@ -513,12 +571,19 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   Widget _buildMeasurementCard(ThemeData theme, AppLocalizations loc, int index, List<Map<String, dynamic>> list) {
     final m = list[index];
     final value = (m['value'] as num).toDouble();
+    final isBilateral = _currentType.isBilateral;
+    final side = m['side'] as String?;
 
+    // Delta: compare only with the previous entry of the SAME side
+    // (prevents comparing left vs right when viewing "All")
     double? delta;
-    if (index < list.length - 1) {
-      final prevVal =
-          (list[index + 1]['value'] as num).toDouble();
-      delta = value - prevVal;
+    for (int j = index + 1; j < list.length; j++) {
+      final prev = list[j];
+      if (!isBilateral || prev['side'] == side) {
+        final prevVal = (prev['value'] as num).toDouble();
+        delta = value - prevVal;
+        break;
+      }
     }
 
     return BodyMeasurementCard(

@@ -263,6 +263,8 @@
   "bodyTrackerHigh": "High Risk",
   "bodyTrackerAsymmetry": "Difference: {diff} {unit} ({largerSide} larger)",
   "bodyTrackerTrendComparison": "Left vs Right",
+  "bodyTrackerLoadMore": "Load {count} more entries",
+  "bodyTrackerLoadMoreCount": "Load {count} more",
   "bodyTrackerWHR": "WHR",
   "bodyTrackerEstimatedComposition": "Estimated Body Composition",
   "bodyTrackerTimeOfDay": "Time of day",

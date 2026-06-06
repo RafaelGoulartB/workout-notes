@@ -621,7 +621,7 @@ class _AsymmetryIndicator extends StatelessWidget {
           Icon(Icons.compare_arrows, size: 14, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 6),
           Text(
-            loc.bodyTrackerAsymmetry(diff.toStringAsFixed(1), unit, larger),
+            loc.bodyTrackerAsymmetry(diff.toStringAsFixed(1), larger, unit),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
               fontSize: 11,

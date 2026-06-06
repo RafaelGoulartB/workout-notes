@@ -813,6 +813,16 @@ class AppLocalizationsPt extends AppLocalizations {
   String get bodyTrackerTrendComparison => 'Esquerda vs Direita';
 
   @override
+  String bodyTrackerLoadMore(Object count) {
+    return 'Carregar mais $count entradas';
+  }
+
+  @override
+  String bodyTrackerLoadMoreCount(Object count) {
+    return 'Carregar mais $count';
+  }
+
+  @override
   String get bodyTrackerWHR => 'RCQ';
 
   @override
