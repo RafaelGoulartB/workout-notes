@@ -305,28 +305,52 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
         actions: [
           PopupMenuButton(
             itemBuilder: (ctx) => [
-              PopupMenuItem(value: 'rename', child: Text(AppLocalizations.of(context)!.routinesRename)),
+              PopupMenuItem(value: 'edit', child: Text(AppLocalizations.of(context)!.routinesEdit)),
               PopupMenuItem(value: 'delete', child: Text(AppLocalizations.of(context)!.routinesDelete)),
             ],
             onSelected: (v) async {
-              if (v == 'rename') {
-                final ctl = TextEditingController(text: _routine?['name'] as String? ?? '');
-                final name = await showDialog<String>(
+              if (v == 'edit') {
+                final nameCtl = TextEditingController(text: _routine?['name'] as String? ?? '');
+                final notesCtl = TextEditingController(text: _routine?['notes'] as String? ?? '');
+                final result = await showDialog<Map<String, String>>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: Text(AppLocalizations.of(context)!.routinesRename),
-                    content: TextField(
-                      controller: ctl, autofocus: true,
-                      decoration: const InputDecoration(border: OutlineInputBorder()),
+                    title: Text(AppLocalizations.of(context)!.routinesEdit),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(
+                          controller: nameCtl, autofocus: true,
+                          decoration: InputDecoration(
+                            labelText: AppLocalizations.of(context)!.routinesName,
+                            border: const OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: notesCtl,
+                          decoration: const InputDecoration(
+                            labelText: 'Descrição',
+                            border: OutlineInputBorder(),
+                            hintText: 'Descrição opcional da rotina',
+                          ),
+                          maxLines: 3,
+                        ),
+                      ],
                     ),
                     actions: [
                       TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
-                      FilledButton(onPressed: () => Navigator.pop(ctx, ctl.text.trim()), child: Text(AppLocalizations.of(context)!.commonSave)),
+                      FilledButton(onPressed: () {
+                        final name = nameCtl.text.trim();
+                        if (name.isNotEmpty) {
+                          Navigator.pop(ctx, {'name': name, 'notes': notesCtl.text.trim()});
+                        }
+                      }, child: Text(AppLocalizations.of(context)!.commonSave)),
                     ],
                   ),
                 );
-                if (name != null && name.isNotEmpty) {
-                  await _routineRepo.updateRoutine(widget.routineId, name: name);
+                if (result != null) {
+                  await _routineRepo.updateRoutine(widget.routineId, name: result['name'], notes: result['notes']);
                   _load();
                 }
               } else if (v == 'delete') {
