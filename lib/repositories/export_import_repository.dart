@@ -142,6 +142,10 @@ class ExportImportRepository extends BaseRepository {
   Future<void> deleteAllWorkoutData() async {
     final db = await this.db;
     await db.transaction((txn) async {
+      await txn.delete('predefined_sets');
+      await txn.delete('routine_exercises');
+      await txn.delete('routine_days');
+      await txn.delete('routines');
       await txn.delete('sets');
       await txn.delete('exercise_entries');
       await txn.delete('workouts');

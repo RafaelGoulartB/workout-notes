@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import '../../repositories/routine_repository.dart';
-import '../../widgets/exercise_picker_sheet.dart';
+import 'routine_day_editor_screen.dart';
 
 class RoutinesScreen extends StatefulWidget {
   const RoutinesScreen({super.key});
@@ -172,7 +171,8 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
   Map<String, dynamic>? _routine;
   List<Map<String, dynamic>> _days = [];
   bool _isLoading = true;
-  int _refreshKey = 0;
+  bool _dashboardLoading = false;
+  _RoutineDashboardData? _dashboard;
 
   @override
   void initState() {
@@ -181,12 +181,88 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
   }
 
   Future<void> _load() async {
-    _routine = await _routineRepo.getRoutine(widget.routineId);
-    _days = await _routineRepo.getRoutineDays(widget.routineId);
+    try {
+      _routine = await _routineRepo.getRoutine(widget.routineId);
+      _days = await _routineRepo.getRoutineDays(widget.routineId);
+    } catch (_) {
+      // Gracefully handle errors
+    }
     setState(() {
       _isLoading = false;
-      _refreshKey++;
     });
+    _loadDashboard();
+  }
+
+  Future<void> _loadDashboard() async {
+    if (_days.isEmpty) {
+      setState(() => _dashboard = null);
+      return;
+    }
+    setState(() => _dashboardLoading = true);
+
+    try {
+      final perDay = <String, List<_DayStat>>{};
+      final perCategory = <String, _RoutineCatStat>{};
+
+      for (final day in _days) {
+        final dayId = day['id'] as String;
+        final exercises =
+            await _routineRepo.getRoutineExercises(dayId);
+        final dayStats = <_DayStat>[];
+
+        for (final ex in exercises) {
+          final catId =
+              ex['category_id'] as String? ?? '';
+          final catName =
+              ex['category_name'] as String? ?? 'Outros';
+          final colorVal =
+              ex['category_color'] as int? ?? 0xFF757575;
+          final exerciseType =
+              ex['exercise_type'] as String? ?? 'weightReps';
+          final sets = await _routineRepo.getPredefinedSets(
+              ex['id'] as String);
+
+          int catSets = 0;
+          double catVolume = 0;
+          for (final s in sets) {
+            if ((s['is_warmup'] as int?) == 1) continue;
+            catSets++;
+            dayStats.add(_DayStat(
+              categoryId: catId,
+              categoryName: catName,
+              color: Color(colorVal),
+              sets: 1,
+              volume: exerciseType == 'weightReps'
+                  ? ((s['weight'] as num?)?.toDouble() ?? 0) *
+                      ((s['reps'] as int?) ?? 0)
+                  : 0,
+            ));
+          }
+
+          perCategory.putIfAbsent(
+              catId,
+              () => _RoutineCatStat(
+                  name: catName, color: Color(colorVal)));
+          perCategory[catId]!.sets += catSets;
+          perCategory[catId]!.volume += catVolume;
+        }
+
+        perDay[dayId] = dayStats;
+      }
+
+      setState(() {
+        _dashboard = _RoutineDashboardData(
+          perDay: perDay,
+          perCategory: perCategory,
+        );
+        _dashboardLoading = false;
+      });
+    } catch (_) {
+      setState(() {
+        _dashboard = null;
+        _dashboardLoading = false;
+      });
+    }
   }
 
   void _addDay() {
@@ -302,13 +378,11 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                   onRefresh: _load,
                   child: ListView.builder(
                     padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
-                    itemCount: _days.length,
-                    itemBuilder: (ctx, i) => _DayCard(
-                      key: ValueKey('day_${_days[i]['id']}_$_refreshKey'),
-                      day: _days[i],
-                      routineRepo: _routineRepo,
-                      onChanged: _load,
-                    ),
+                    itemCount: _days.length + 1,
+                    itemBuilder: (ctx, i) {
+                      if (i == 0) return _buildRoutineDashboard(theme);
+                      return _buildDayCard(_days[i - 1], theme);
+                    },
                   ),
                 ),
       floatingActionButton: FloatingActionButton.extended(
@@ -318,120 +392,8 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
       ),
     );
   }
-}
 
-class _DayCard extends StatefulWidget {
-  final Map<String, dynamic> day;
-  final RoutineRepository routineRepo;
-  final VoidCallback onChanged;
-
-  const _DayCard({
-    super.key,
-    required this.day, required this.routineRepo,
-    required this.onChanged,
-  });
-
-  @override
-  State<_DayCard> createState() => _DayCardState();
-}
-
-class _DayCardState extends State<_DayCard> {
-  List<Map<String, dynamic>> _exercises = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    _exercises = await widget.routineRepo.getRoutineExercises(widget.day['id'] as String);
-    if (mounted) setState(() => _isLoading = false);
-  }
-
-  void _changeRestTime(Map<String, dynamic> exercise) {
-    final currentRest = (exercise['rest_time_seconds'] as int?) ?? 90;
-    final exId = exercise['id'] as String;
-    final presets = [30, 60, 90, 120, 180];
-
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(80),
-              borderRadius: BorderRadius.circular(2),
-            ))),
-            const SizedBox(height: 16),
-            Text(AppLocalizations.of(context)!.routinesRestTimeTitle, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                ...presets.map((sec) => ChoiceChip(
-                  label: Text(sec >= 60 ? '${sec ~/ 60}min${sec % 60}s' : '${sec}s'),
-                  selected: currentRest == sec,
-                  onSelected: (_) {
-                    widget.routineRepo.updateRoutineExerciseRestTime(exId, sec);
-                    _load();
-                    Navigator.pop(ctx);
-                  },
-                )),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openExercisePicker() async {
-    final currentExerciseIds = _exercises.map((e) => e['exercise_id'] as String).toSet();
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      isDismissible: true,
-      enableDrag: true,
-      useSafeArea: true,
-      builder: (_) => ExercisePickerSheet(
-        currentExerciseIds: currentExerciseIds,
-        onExerciseAdded: (exercise) async {
-          await widget.routineRepo.addRoutineExercise(
-            widget.day['id'] as String,
-            exercise['id'] as String,
-            restTimeSeconds: (exercise['default_rest_time'] as int?),
-          );
-          _load();
-        },
-        onExerciseRemoved: (exercise) async {
-          final exerciseId = exercise['id'] as String;
-          // Find the routine exercise entry and remove it
-          final routineExercise = _exercises.firstWhere(
-            (e) => e['exercise_id'] == exerciseId,
-            orElse: () => <String, dynamic>{},
-          );
-          if (routineExercise.isNotEmpty) {
-            await widget.routineRepo.removeRoutineExercise(routineExercise['id'] as String);
-            _load();
-          }
-        },
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget _buildDayCard(Map<String, dynamic> day, ThemeData theme) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       elevation: 0,
@@ -439,104 +401,263 @@ class _DayCardState extends State<_DayCard> {
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(widget.day['name'] as String? ?? 'Dia', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                const Spacer(),
-                PopupMenuButton(
-                  itemBuilder: (ctx) => [
-                    PopupMenuItem(value: 'rename', child: Text(AppLocalizations.of(context)!.routinesRename)),
-                    PopupMenuItem(value: 'delete', child: Text(AppLocalizations.of(context)!.routinesDeleteDay)),
-                  ],
-                  onSelected: (v) async {
-                    if (v == 'rename') {
-                      final ctl = TextEditingController(text: widget.day['name'] as String? ?? '');
-                      final name = await showDialog<String>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: Text(AppLocalizations.of(context)!.routinesRename),
-                          content: TextField(controller: ctl, autofocus: true, decoration: const InputDecoration(border: OutlineInputBorder())),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
-                            FilledButton(onPressed: () => Navigator.pop(ctx, ctl.text.trim()), child: Text(AppLocalizations.of(context)!.commonSave)),
-                          ],
-                        ),
-                      );
-                      if (name != null && name.isNotEmpty) {
-                        await widget.routineRepo.updateRoutine(widget.day['routine_id'] as String, name: name);
-                        widget.onChanged();
-                      }
-                    } else if (v == 'delete') {
-                      await widget.routineRepo.deleteRoutineDay(widget.day['id'] as String);
-                      widget.onChanged();
-                    }
-                  },
-                ),
-              ],
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RoutineDayEditorScreen(
+                routineDayId: day['id'] as String,
+                routineId: widget.routineId,
+                dayName: day['name'] as String? ?? 'Dia',
+              ),
             ),
-            if (_isLoading)
-              const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
-            else if (_exercises.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(AppLocalizations.of(context)!.routinesNoExercises, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-              )
-            else ...[
-              ..._exercises.map((ex) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
+          );
+          if (result == true) _load();
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.today, color: theme.colorScheme.onPrimaryContainer),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(width: 4, height: 16, decoration: BoxDecoration(
-                      color: Color(ex['category_color'] as int? ?? 0xFF757575),
-                      borderRadius: BorderRadius.circular(2),
-                    )),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, ex), style: theme.textTheme.bodyMedium)),
-                    GestureDetector(
-                      onTap: () => _changeRestTime(ex),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.timer_outlined, size: 12, color: theme.colorScheme.primary),
-                            const SizedBox(width: 2),
-                            Text('${ex['rest_time_seconds'] ?? 90}s',
-                                style: theme.textTheme.bodySmall?.copyWith(fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () async {
-                        await widget.routineRepo.removeRoutineExercise(ex['id'] as String);
-                        _load();
-                      },
-                      child: Icon(Icons.close, size: 16, color: theme.colorScheme.error.withAlpha(180)),
-                    ),
+                    Text(day['name'] as String? ?? 'Dia',
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                   ],
                 ),
-              )),
+              ),
+              Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
             ],
-            TextButton.icon(
-              onPressed: _openExercisePicker,
-              icon: const Icon(Icons.add, size: 18),
-              label: Text(AppLocalizations.of(context)!.routinesAddExercise),
-              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
+
+  Widget _buildRoutineDashboard(ThemeData theme) {
+    if (_dashboardLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
+      );
+    }
+    final dash = _dashboard;
+    if (dash == null) return const SizedBox.shrink();
+
+    final cats = dash.perCategory.values.toList()..sort((a, b) => b.sets.compareTo(a.sets));
+    final totalSets = cats.fold<int>(0, (a, c) => a + c.sets);
+    final totalVolume = cats.fold<double>(0, (a, c) => a + c.volume);
+    final daysCount = _days.length;
+    final maxSets = cats.isEmpty ? 1 : cats.first.sets;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Icon(Icons.analytics_outlined, size: 18, color: theme.colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Text('Visão Semanal',
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  if (_dashboardLoading)
+                    const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text('$daysCount dias · $totalSets séries${totalVolume > 0 ? ' · ${totalVolume.toStringAsFixed(0)}kg volume' : ''}',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              const SizedBox(height: 12),
+
+              // Per-category bars
+              ...cats.map((cat) {
+                final pct = maxSets > 0 ? cat.sets / maxSets : 0.0;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(width: 10, height: 10,
+                              decoration: BoxDecoration(color: cat.color, shape: BoxShape.circle)),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(cat.name,
+                              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
+                          Text('${cat.sets}s',
+                              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                          if (cat.volume > 0) ...[
+                            const SizedBox(width: 4),
+                            Text('${cat.volume.toStringAsFixed(0)}kg',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant)),
+                          ],
+                          const SizedBox(width: 4),
+                          Text('${(cat.sets / totalSets * 100).round()}%',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.primary, fontSize: 11)),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: pct.clamp(0.0, 1.0),
+                          minHeight: 5,
+                          backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                          valueColor: AlwaysStoppedAnimation<Color>(cat.color.withAlpha(200)),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+
+              // Per-day mini summary
+              if (_days.length > 1) ...[
+                const Divider(height: 16),
+                Text('Por Dia',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w600, color: theme.colorScheme.onSurfaceVariant)),
+                const SizedBox(height: 6),
+                ..._days.map((day) {
+                  final dayId = day['id'] as String;
+                  final dayName = day['name'] as String? ?? 'Dia';
+                  final dayStats = dash.perDay[dayId] ?? [];
+                  final daySets = dayStats.fold<int>(0, (a, s) => a + s.sets);
+                  final dayVol = dayStats.fold<double>(0, (a, s) => a + s.volume);
+                  // Unique categories
+                  final dayCats = dayStats.map((s) => s.categoryName).toSet().length;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        Icon(Icons.today, size: 12, color: theme.colorScheme.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(dayName,
+                              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
+                        ),
+                        Text('$daySets séries',
+                            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                        if (dayVol > 0) ...[
+                          const SizedBox(width: 4),
+                          Text('· ${dayVol.toStringAsFixed(0)}kg',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant)),
+                        ],
+                        const SizedBox(width: 4),
+                        Text('$dayCats grupos',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+
+              // Balance insight
+              if (cats.length >= 2) ...[
+                const Divider(height: 16),
+                _buildWeeklyInsight(theme, cats, totalSets, daysCount),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeeklyInsight(ThemeData theme, List<_RoutineCatStat> cats, int totalSets, int daysCount) {
+    final sorted = List<_RoutineCatStat>.from(cats)..sort((a, b) => b.sets.compareTo(a.sets));
+    final highest = sorted.first;
+    final lowest = sorted.last;
+    final idealPerGroup = totalSets / cats.length;
+    final deviation = (highest.sets - idealPerGroup).abs();
+
+    String insight;
+    if (cats.length < 3) {
+      insight = '📋 ${cats.length} grupos musculares na semana';
+    } else if (deviation < 2 && cats.length >= 5) {
+      insight = '⚖️ Semana equilibrada! Todos os grupos com volume similar.';
+    } else if (highest.sets >= lowest.sets * 3) {
+      insight = '💪 ${highest.name} (${highest.sets}s) está muito acima de ${lowest.name} (${lowest.sets}s). Considere redistribuir.';
+    } else {
+      final pct = ((highest.sets / totalSets) * 100).round();
+      insight = '📊 Foco em $highest.name ($pct% das séries). ${lowest.name} com ${lowest.sets}s — volume menor.';
+    }
+
+    // Additional schedule info
+    final setsPerDay = totalSets / daysCount;
+    final scheduleNote = 'Média de ${setsPerDay.toStringAsFixed(0)} séries/dia em $daysCount dias de treino.';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(insight,
+            style: theme.textTheme.bodySmall?.copyWith(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 2),
+        Text(scheduleNote,
+            style: theme.textTheme.bodySmall?.copyWith(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+      ],
+    );
+  }
+}
+
+/// Data for the weekly routine dashboard.
+class _RoutineDashboardData {
+  final Map<String, List<_DayStat>> perDay;
+  final Map<String, _RoutineCatStat> perCategory;
+
+  _RoutineDashboardData({required this.perDay, required this.perCategory});
+}
+
+/// Per-category stat for the routine dashboard.
+class _RoutineCatStat {
+  final String name;
+  final Color color;
+  int sets = 0;
+  double volume = 0;
+
+  _RoutineCatStat({required this.name, required this.color});
+}
+
+/// Stat for a single exercise entry within a day.
+class _DayStat {
+  final String categoryId;
+  final String categoryName;
+  final Color color;
+  final int sets;
+  final double volume;
+
+  _DayStat({
+    required this.categoryId,
+    required this.categoryName,
+    required this.color,
+    required this.sets,
+    required this.volume,
+  });
 }

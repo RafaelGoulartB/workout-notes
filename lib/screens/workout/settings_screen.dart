@@ -168,10 +168,13 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
 
     try {
       final generator = TestDataGenerator();
-      final count = await generator.generate();
+      final result = await generator.generate();
       if (mounted) {
+        final wc = result['workouts'] as int;
+        final rc = result['routines'] as int;
+        final msg = '✅ $wc treinos e $rc rotinas gerados!';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.settingsGenerateSuccess(count)), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
         );
       }
     } catch (e) {

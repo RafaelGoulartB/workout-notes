@@ -94,7 +94,7 @@ class RoutineRepository extends BaseRepository {
       'routine_day_id': routineDayId,
       'exercise_id': exerciseId,
       'order_index': count,
-      'rest_time_seconds': ?restTimeSeconds,
+      'rest_time_seconds': restTimeSeconds,
     });
     return id;
   }
