@@ -350,6 +350,7 @@
   "workoutDetailSelectDate": "Select the new date",
   "workoutDetailCopy": "Copy Workout",
   "workoutDetailCopyDateChanged": "✅ Workout copied!",
+  "workoutDetailGoToWorkout": "Go to workout",
   "workoutDetailDuration": "{min}min {sec}s",
   "activeWorkoutTitle": "Workout",
   "activeWorkoutFinishWorkout": "Finish",

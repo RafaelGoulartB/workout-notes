@@ -1056,6 +1056,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workoutDetailCopyDateChanged => '✅ Workout copied!';
 
   @override
+  String get workoutDetailGoToWorkout => 'Go to workout';
+
+  @override
   String workoutDetailDuration(Object min, Object sec) {
     return '${min}min ${sec}s';
   }

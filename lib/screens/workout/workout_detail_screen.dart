@@ -382,12 +382,23 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       helpText: AppLocalizations.of(context)!.workoutDetailCopy,
     );
     if (newDate != null && mounted) {
-      await _db.copyWorkoutToDate(widget.workoutId, newDate);
+      final newWorkoutId = await _db.copyWorkoutToDate(widget.workoutId, newDate);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(AppLocalizations.of(context)!.workoutDetailCopyDateChanged),
             behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: AppLocalizations.of(context)!.workoutDetailGoToWorkout,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => WorkoutDetailScreen(workoutId: newWorkoutId),
+                  ),
+                );
+              },
+            ),
           ),
         );
       }

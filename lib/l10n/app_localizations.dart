@@ -2078,6 +2078,12 @@ abstract class AppLocalizations {
   /// **'✅ Workout copied!'**
   String get workoutDetailCopyDateChanged;
 
+  /// No description provided for @workoutDetailGoToWorkout.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to workout'**
+  String get workoutDetailGoToWorkout;
+
   /// No description provided for @workoutDetailDuration.
   ///
   /// In en, this message translates to:
