@@ -347,6 +347,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
           types: _types,
           selectedType: _selectedType,
           onSelected: _switchType,
+          latestByType: _latestByType,
         ),
         const SizedBox(height: 12),
 
