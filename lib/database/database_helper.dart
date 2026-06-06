@@ -1602,6 +1602,7 @@ class DatabaseHelper {
       await txn.delete('sets');
       await txn.delete('exercise_entries');
       await txn.delete('workouts');
+      await txn.delete('body_measurements');
     });
   }
 

@@ -160,6 +160,8 @@ class TestDataGenerator {
       ('waist',    88.0,  81.0,  'cm', false, 10),
       ('chest',    100.0, 104.5, 'cm', false, 14),
       ('arm',      33.5,  36.5,  'cm', true,  14),
+      ('forearm',  27.0,  29.0,  'cm', true,  14),
+      ('neck',     39.0,  38.0,  'cm', false, 14),
       ('thigh',    55.0,  57.5,  'cm', true,  14),
       ('calf',     36.0,  37.0,  'cm', true,  14),
       ('hip',      98.0,  94.0,  'cm', false, 14),

@@ -72,11 +72,16 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
       try {
         final list = raw.split(',');
         _enabledTypeIds = list.toSet();
-        return;
-      } catch (_) {}
+      } catch (_) {
+        _enabledTypeIds = {};
+      }
+    } else {
+      _enabledTypeIds = {};
     }
-    // Default: all types enabled
-    _enabledTypeIds = _allTypes.map((t) => t.id).toSet();
+    // Ensure every type exists in the set (handles newly added types)
+    for (final t in _allTypes) {
+      _enabledTypeIds.add(t.id);
+    }
   }
 
   Future<void> _saveEnabledTypes() async {
