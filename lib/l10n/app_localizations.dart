@@ -1034,6 +1034,18 @@ abstract class AppLocalizations {
   /// **'Body Measurements'**
   String get progressBodyMeasurements;
 
+  /// No description provided for @progressBodyMeasurementsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'View detailed trends, photos, and body composition charts'**
+  String get progressBodyMeasurementsSubtitle;
+
+  /// No description provided for @progressBodyComposition.
+  ///
+  /// In en, this message translates to:
+  /// **'Body Composition Evolution'**
+  String get progressBodyComposition;
+
   /// No description provided for @progressYearHeatmap.
   ///
   /// In en, this message translates to:
@@ -1345,6 +1357,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete this measurement?'**
   String get bodyTrackerDeleteConfirm;
+
+  /// No description provided for @bodyTrackerQuickMeasure.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Measure'**
+  String get bodyTrackerQuickMeasure;
+
+  /// No description provided for @bodyTrackerQuickMeasureSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill in the measurements you want to record. Leave blank to skip.'**
+  String get bodyTrackerQuickMeasureSubtitle;
+
+  /// No description provided for @bodyTrackerSaveAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Measurements'**
+  String get bodyTrackerSaveAll;
+
+  /// No description provided for @bodyTrackerAddSingle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add {type}'**
+  String bodyTrackerAddSingle(Object type);
+
+  /// No description provided for @bodyTrackerEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No measurements yet'**
+  String get bodyTrackerEmptyTitle;
+
+  /// No description provided for @bodyTrackerEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start tracking your body measurements to see your progress over time.'**
+  String get bodyTrackerEmptySubtitle;
+
+  /// No description provided for @bodyTrackerBodyMap.
+  ///
+  /// In en, this message translates to:
+  /// **'BODY MAP'**
+  String get bodyTrackerBodyMap;
+
+  /// No description provided for @bodyTrackerLastValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Last'**
+  String get bodyTrackerLastValue;
+
+  /// No description provided for @bodyTrackerCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get bodyTrackerCurrent;
+
+  /// No description provided for @bodyTrackerAverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Average'**
+  String get bodyTrackerAverage;
+
+  /// No description provided for @bodyTrackerMin.
+  ///
+  /// In en, this message translates to:
+  /// **'Min'**
+  String get bodyTrackerMin;
+
+  /// No description provided for @bodyTrackerMax.
+  ///
+  /// In en, this message translates to:
+  /// **'Max'**
+  String get bodyTrackerMax;
+
+  /// No description provided for @bodyTrackerTrendLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Trend'**
+  String get bodyTrackerTrendLine;
+
+  /// No description provided for @bodyTrackerHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get bodyTrackerHistory;
+
+  /// No description provided for @bodyTrackerEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'entries'**
+  String get bodyTrackerEntries;
+
+  /// No description provided for @bodyTrackerNeedTwoMeasurements.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least 2 measurements to see the chart'**
+  String get bodyTrackerNeedTwoMeasurements;
+
+  /// No description provided for @bodyTrackerPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo (optional)'**
+  String get bodyTrackerPhoto;
+
+  /// No description provided for @bodyTrackerCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera'**
+  String get bodyTrackerCamera;
+
+  /// No description provided for @bodyTrackerGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery'**
+  String get bodyTrackerGallery;
+
+  /// No description provided for @commonOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'optional'**
+  String get commonOptional;
 
   /// No description provided for @routinesTitle.
   ///

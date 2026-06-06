@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import '../../database/database_helper.dart';
 import '../../widgets/exercise_picker_sheet.dart';
 
@@ -489,7 +490,7 @@ class _DayCardState extends State<_DayCard> {
                       borderRadius: BorderRadius.circular(2),
                     )),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(ex['exercise_name'] as String? ?? '', style: theme.textTheme.bodyMedium)),
+                    Expanded(child: Text(ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, ex), style: theme.textTheme.bodyMedium)),
                     GestureDetector(
                       onTap: () => _changeRestTime(ex),
                       child: Container(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import '../../database/database_helper.dart';
 
 class ExerciseFormScreen extends StatefulWidget {
@@ -153,7 +154,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                             color: Color(cat['color'] as int), shape: BoxShape.circle,
                           )),
                           const SizedBox(width: 8),
-                          Text(cat['name'] as String),
+                          Text(ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, cat)),
                         ],
                       ),
                     )).toList(),

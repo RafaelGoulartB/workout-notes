@@ -506,6 +506,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get progressBodyMeasurements => 'Body Measurements';
 
   @override
+  String get progressBodyMeasurementsSubtitle =>
+      'View detailed trends, photos, and body composition charts';
+
+  @override
+  String get progressBodyComposition => 'Body Composition Evolution';
+
+  @override
   String get progressYearHeatmap => 'Annual heatmap';
 
   @override
@@ -668,6 +675,71 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bodyTrackerDeleteConfirm => 'Delete this measurement?';
+
+  @override
+  String get bodyTrackerQuickMeasure => 'Quick Measure';
+
+  @override
+  String get bodyTrackerQuickMeasureSubtitle =>
+      'Fill in the measurements you want to record. Leave blank to skip.';
+
+  @override
+  String get bodyTrackerSaveAll => 'Save Measurements';
+
+  @override
+  String bodyTrackerAddSingle(Object type) {
+    return 'Add $type';
+  }
+
+  @override
+  String get bodyTrackerEmptyTitle => 'No measurements yet';
+
+  @override
+  String get bodyTrackerEmptySubtitle =>
+      'Start tracking your body measurements to see your progress over time.';
+
+  @override
+  String get bodyTrackerBodyMap => 'BODY MAP';
+
+  @override
+  String get bodyTrackerLastValue => 'Last';
+
+  @override
+  String get bodyTrackerCurrent => 'Current';
+
+  @override
+  String get bodyTrackerAverage => 'Average';
+
+  @override
+  String get bodyTrackerMin => 'Min';
+
+  @override
+  String get bodyTrackerMax => 'Max';
+
+  @override
+  String get bodyTrackerTrendLine => 'Trend';
+
+  @override
+  String get bodyTrackerHistory => 'History';
+
+  @override
+  String get bodyTrackerEntries => 'entries';
+
+  @override
+  String get bodyTrackerNeedTwoMeasurements =>
+      'Add at least 2 measurements to see the chart';
+
+  @override
+  String get bodyTrackerPhoto => 'Photo (optional)';
+
+  @override
+  String get bodyTrackerCamera => 'Camera';
+
+  @override
+  String get bodyTrackerGallery => 'Gallery';
+
+  @override
+  String get commonOptional => 'optional';
 
   @override
   String get routinesTitle => 'Routines';

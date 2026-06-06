@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import '../../database/database_helper.dart';
 import 'workout_detail_screen.dart';
 import '../../widgets/collapsible_section.dart';
 import '../../widgets/workout_heatmap.dart';
+import 'body_tracker_screen.dart';
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -62,6 +64,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   // === BODY ===
   List<Map<String, dynamic>> _bodyData = [];
+  List<Map<String, dynamic>> _bodySummary = [];
+  List<Map<String, dynamic>> _bodyComposition = [];
 
   // === EXERCISE DETAIL STATE ===
   Map<String, dynamic>? _selectedHistory;
@@ -210,8 +214,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
     if (_loadedBody) return;
     setState(() => _isLoadingBody = true);
     try {
-      _bodyData = await _db.getBodyWeightWithVolume();
+      final results = await Future.wait([
+        _db.getBodyWeightWithVolume(),
+        _db.getBodyMeasurementsSummary(),
+        _db.getBodyCompositionTrend(),
+      ]);
       if (!mounted) return;
+      _bodyData = results[0] as List<Map<String, dynamic>>;
+      _bodySummary = results[1] as List<Map<String, dynamic>>;
+      _bodyComposition = results[2] as List<Map<String, dynamic>>;
       _loadedBody = true;
       setState(() => _isLoadingBody = false);
     } catch (_) {
@@ -1005,7 +1016,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                               borderRadius: BorderRadius.circular(2),
                             )),
                             const SizedBox(width: 4),
-                            Text('${cat['name']} ${pct.toStringAsFixed(0)}%',
+                            Text('${ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, cat)} ${pct.toStringAsFixed(0)}%',
                                 style: TextStyle(fontSize: 8)),
                           ],
                         ),
@@ -1119,7 +1130,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   const SizedBox(width: 8),
                   SizedBox(
                     width: 100,
-                    child: Text(ex['name'] as String? ?? '',
+                    child: Text(ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, ex),
                         style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
                         overflow: TextOverflow.ellipsis),
                   ),
@@ -1177,7 +1188,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     // Group exercises by category
     final Map<String, List<Map<String, dynamic>>> grouped = {};
     for (final ex in _allExercises) {
-      final catName = ex['category_name'] as String? ?? 'Outros';
+      final catName = ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, ex);
       grouped.putIfAbsent(catName, () => []).add(ex);
     }
     final sortedKeys = grouped.keys.toList()..sort();
@@ -1239,7 +1250,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   Widget _buildCategoryExerciseCard(Map<String, dynamic> ex, ThemeData theme) {
     final catColor = Color(ex['category_color'] as int? ?? 0xFF757575);
-    final name = ex['name'] as String? ?? '';
+    final name = ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, ex);
     final type = ex['type'] as String? ?? 'weightReps';
     final icon = type == 'weightReps' ? Icons.fitness_center :
                 type == 'cardio' ? Icons.directions_run :
@@ -1691,11 +1702,294 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(AppLocalizations.of(context)!.progressBodyWeightVsVolume,
-            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 6),
-        _buildBodyWeightChart(theme),
+        // === Summary cards grid ===
+        if (_bodySummary.isNotEmpty) ...[
+          _buildBodySummaryGrid(theme),
+          const SizedBox(height: 16),
+        ],
+
+        // === Body composition chart ===
+        if (_bodyComposition.isNotEmpty && _bodyComposition.length >= 2) ...[
+          Text(AppLocalizations.of(context)!.progressBodyComposition,
+              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          _buildBodyCompositionChart(theme),
+          const SizedBox(height: 16),
+        ],
+
+        // === Weight vs Volume chart ===
+        if (_bodyData.isNotEmpty) ...[
+          Text(AppLocalizations.of(context)!.progressBodyWeightVsVolume,
+              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          _buildBodyWeightChart(theme),
+        ],
+
+        // === Body measurements link ===
+        const SizedBox(height: 12),
+        _buildBodyTrackerLink(theme),
       ],
+    );
+  }
+
+  Widget _buildBodySummaryGrid(ThemeData theme) {
+    final types = [
+      {'id': 'weight', 'name': AppLocalizations.of(context)!.bodyTrackerWeight, 'unit': 'kg', 'color': Colors.indigo, 'icon': Icons.monitor_weight},
+      {'id': 'bodyFat', 'name': AppLocalizations.of(context)!.bodyTrackerBodyFat, 'unit': '%', 'color': Colors.orange, 'icon': Icons.water_drop},
+      {'id': 'waist', 'name': AppLocalizations.of(context)!.bodyTrackerWaist, 'unit': 'cm', 'color': Colors.teal, 'icon': Icons.straighten},
+      {'id': 'chest', 'name': AppLocalizations.of(context)!.bodyTrackerChest, 'unit': 'cm', 'color': Colors.blue, 'icon': Icons.straighten},
+      {'id': 'arm', 'name': AppLocalizations.of(context)!.bodyTrackerArm, 'unit': 'cm', 'color': Colors.purple, 'icon': Icons.straighten},
+      {'id': 'hip', 'name': AppLocalizations.of(context)!.bodyTrackerHip, 'unit': 'cm', 'color': Colors.cyan, 'icon': Icons.straighten},
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        childAspectRatio: 1.5,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: types.length,
+      itemBuilder: (ctx, i) {
+        final t = types[i];
+        final typeId = t['id'] as String;
+        final color = t['color'] as Color;
+        final icon = t['icon'] as IconData;
+        final unit = t['unit'] as String;
+
+        // Find latest and previous values
+        Map<String, dynamic>? latest;
+        Map<String, dynamic>? previous;
+        try {
+          latest = _bodySummary.firstWhere((s) => s['type'] == typeId);
+        } catch (_) {}
+
+        // Find previous from bodyComposition (has prev_value)
+        if (latest != null && _bodyComposition.isNotEmpty) {
+          final latestDate = latest['date'] as String? ?? '';
+          for (final bc in _bodyComposition) {
+            final bcDate = bc['date'] as String? ?? '';
+            if (bcDate.compareTo(latestDate) < 0) {
+              previous = bc;
+              break;
+            }
+          }
+        }
+
+        final currentValue = latest != null ? (latest['value'] as num?)?.toDouble() : null;
+        final prevValue = previous != null ? (previous[typeId] as num?)?.toDouble() : null;
+
+        double? delta;
+        double? deltaPercent;
+        if (currentValue != null && prevValue != null && prevValue > 0) {
+          delta = currentValue - prevValue;
+          deltaPercent = (delta / prevValue) * 100;
+        }
+
+        return Card(
+          elevation: 0,
+          color: color.withAlpha(12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: color.withAlpha(40)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(height: 4),
+                Text(
+                  currentValue != null ? '${currentValue.toStringAsFixed(1)}' : '--',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: currentValue != null ? null : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  t['name'] as String,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 8, color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (delta != null && delta != 0)
+                  Text(
+                    '${delta > 0 ? '+' : ''}${delta.toStringAsFixed(1)}$unit',
+                    style: TextStyle(
+                      fontSize: 8,
+                      fontWeight: FontWeight.w600,
+                      color: _isPositiveForType(typeId) ? (delta > 0 ? Colors.green : Colors.red)
+                          : (delta > 0 ? Colors.red : Colors.green),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// For weight/bodyFat: increase is bad (red), decrease is good (green)
+  /// For measurements: increase can be good (muscle) or neutral
+  bool _isPositiveForType(String typeId) {
+    return typeId == 'weight' || typeId == 'bodyFat';
+  }
+
+  Widget _buildBodyCompositionChart(ThemeData theme) {
+    final data = _bodyComposition;
+    if (data.isEmpty) return const SizedBox.shrink();
+
+    final weights = data.map((d) => (d['weight'] as num?)?.toDouble() ?? 0).where((v) => v > 0).toList();
+    final bodyFats = data.map((d) => (d['body_fat'] as num?)?.toDouble()).where((v) => v != null && v! > 0).toList();
+    final waists = data.map((d) => (d['waist'] as num?)?.toDouble()).where((v) => v != null && v! > 0).toList();
+    final chests = data.map((d) => (d['chest'] as num?)?.toDouble()).where((v) => v != null && v! > 0).toList();
+
+    // Get data points where we have both weight and at least one measurement
+    final validData = data.where((d) {
+      final w = (d['weight'] as num?)?.toDouble() ?? 0;
+      return w > 0;
+    }).toList();
+
+    if (validData.length < 2) return const SizedBox.shrink();
+
+    final maxWeight = validData.map((d) => (d['weight'] as num?)?.toDouble() ?? 0).reduce((a, b) => a > b ? a : b);
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Legend
+            Wrap(
+              spacing: 12,
+              runSpacing: 4,
+              children: [
+                _legendDotWeight(Colors.indigo, AppLocalizations.of(context)!.bodyTrackerWeight),
+                if (bodyFats.isNotEmpty)
+                  _legendDotWeight(Colors.orange, AppLocalizations.of(context)!.bodyTrackerBodyFat),
+                if (waists.isNotEmpty)
+                  _legendDotWeight(Colors.teal, AppLocalizations.of(context)!.bodyTrackerWaist),
+                if (chests.isNotEmpty)
+                  _legendDotWeight(Colors.blue, AppLocalizations.of(context)!.bodyTrackerChest),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  minY: 0,
+                  maxY: maxWeight * 1.15,
+                  gridData: FlGridData(
+                    show: true, drawVerticalLine: false,
+                    horizontalInterval: _niceInterval(maxWeight / 4),
+                  ),
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true, reservedSize: 36,
+                        getTitlesWidget: (v, _) => Text(
+                          v > 100 ? '${(v / 1000).toStringAsFixed(0)}k' : v.toStringAsFixed(0),
+                          style: theme.textTheme.bodySmall?.copyWith(fontSize: 8),
+                        ),
+                      ),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true, reservedSize: 20,
+                        interval: validData.length > 8 ? 2 : 1,
+                        getTitlesWidget: (v, _) {
+                          final idx = v.toInt();
+                          if (idx < 0 || idx >= validData.length) return const SizedBox.shrink();
+                          final d = validData[idx]['date'] as String? ?? '';
+                          return Text(d.length >= 10 ? d.substring(5) : d,
+                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 7));
+                        },
+                      ),
+                    ),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    // Weight
+                    LineChartBarData(
+                      spots: validData.asMap().entries.map((e) {
+                        final w = (e.value['weight'] as num?)?.toDouble() ?? 0;
+                        return FlSpot(e.key.toDouble(), w);
+                      }).toList(),
+                      isCurved: true,
+                      color: Colors.indigo,
+                      barWidth: 3,
+                      dotData: FlDotData(show: true, getDotPainter: (s, p, b, i) =>
+                        FlDotCirclePainter(radius: 4, color: Colors.indigo)),
+                      belowBarData: BarAreaData(show: false),
+                    ),
+                    // Body fat
+                    if (bodyFats.length >= 2)
+                      LineChartBarData(
+                        spots: validData.asMap().entries.map((e) {
+                          final bf = (e.value['body_fat'] as num?)?.toDouble();
+                          return FlSpot(e.key.toDouble(), bf ?? 0);
+                        }).where((s) => s.y > 0).toList(),
+                        isCurved: true,
+                        color: Colors.orange,
+                        barWidth: 2,
+                        dashArray: [6, 3],
+                        dotData: FlDotData(show: false),
+                        belowBarData: BarAreaData(show: false),
+                      ),
+                    // Waist
+                    if (waists.length >= 2)
+                      LineChartBarData(
+                        spots: validData.asMap().entries.map((e) {
+                          final w = (e.value['waist'] as num?)?.toDouble();
+                          return FlSpot(e.key.toDouble(), w ?? 0);
+                        }).where((s) => s.y > 0).toList(),
+                        isCurved: true,
+                        color: Colors.teal,
+                        barWidth: 2,
+                        dashArray: [3, 3],
+                        dotData: FlDotData(show: false),
+                        belowBarData: BarAreaData(show: false),
+                      ),
+                  ],
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipItems: (spots) => spots.map((s) {
+                        final idx = s.spotIndex;
+                        final d = idx < validData.length ? (validData[idx]['date'] as String? ?? '') : '';
+                        String label;
+                        if (s.barIndex == 0) label = '${AppLocalizations.of(context)!.bodyTrackerWeight}: ${s.y.toStringAsFixed(1)}kg';
+                        else if (s.barIndex == 1) label = '${AppLocalizations.of(context)!.bodyTrackerBodyFat}: ${s.y.toStringAsFixed(1)}%';
+                        else label = '${AppLocalizations.of(context)!.bodyTrackerWaist}: ${s.y.toStringAsFixed(1)}cm';
+                        return LineTooltipItem(
+                          '$d\n$label',
+                          TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 10),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1822,6 +2116,59 @@ class _ProgressScreenState extends State<ProgressScreen> {
         const SizedBox(width: 4),
         Text(label, style: TextStyle(fontSize: 10)),
       ],
+    );
+  }
+
+  Widget _buildBodyTrackerLink(ThemeData theme) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          Navigator.push(context, MaterialPageRoute(
+            builder: (_) => const BodyTrackerScreen(),
+          ));
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.withAlpha(20),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.accessibility_new, size: 20, color: Colors.indigo),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppLocalizations.of(context)!.progressBodyMeasurements,
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      AppLocalizations.of(context)!.progressBodyMeasurementsSubtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1996,7 +2343,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                ex['name'] as String? ?? '',
+                ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, ex),
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                 ),

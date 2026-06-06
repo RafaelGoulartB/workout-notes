@@ -508,6 +508,13 @@ class AppLocalizationsPt extends AppLocalizations {
   String get progressBodyMeasurements => 'Medidas Corporais';
 
   @override
+  String get progressBodyMeasurementsSubtitle =>
+      'Veja tendências detalhadas, fotos e gráficos de composição corporal';
+
+  @override
+  String get progressBodyComposition => 'Evolução da Composição Corporal';
+
+  @override
   String get progressYearHeatmap => 'Mapa de calor anual';
 
   @override
@@ -672,6 +679,71 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get bodyTrackerDeleteConfirm => 'Excluir esta medida?';
+
+  @override
+  String get bodyTrackerQuickMeasure => 'Medir Agora';
+
+  @override
+  String get bodyTrackerQuickMeasureSubtitle =>
+      'Preencha as medidas que deseja registrar. Deixe em branco para pular.';
+
+  @override
+  String get bodyTrackerSaveAll => 'Salvar Medidas';
+
+  @override
+  String bodyTrackerAddSingle(Object type) {
+    return 'Adicionar $type';
+  }
+
+  @override
+  String get bodyTrackerEmptyTitle => 'Nenhuma medida ainda';
+
+  @override
+  String get bodyTrackerEmptySubtitle =>
+      'Comece a registrar suas medidas corporais para acompanhar sua evolução ao longo do tempo.';
+
+  @override
+  String get bodyTrackerBodyMap => 'MAPA CORPORAL';
+
+  @override
+  String get bodyTrackerLastValue => 'Último';
+
+  @override
+  String get bodyTrackerCurrent => 'Atual';
+
+  @override
+  String get bodyTrackerAverage => 'Média';
+
+  @override
+  String get bodyTrackerMin => 'Mín';
+
+  @override
+  String get bodyTrackerMax => 'Máx';
+
+  @override
+  String get bodyTrackerTrendLine => 'Tendência';
+
+  @override
+  String get bodyTrackerHistory => 'Histórico';
+
+  @override
+  String get bodyTrackerEntries => 'registros';
+
+  @override
+  String get bodyTrackerNeedTwoMeasurements =>
+      'Adicione pelo menos 2 medidas para ver o gráfico';
+
+  @override
+  String get bodyTrackerPhoto => 'Foto (opcional)';
+
+  @override
+  String get bodyTrackerCamera => 'Câmera';
+
+  @override
+  String get bodyTrackerGallery => 'Galeria';
+
+  @override
+  String get commonOptional => 'opcional';
 
   @override
   String get routinesTitle => 'Rotinas';

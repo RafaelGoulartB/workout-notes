@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import '../../database/database_helper.dart';
 import 'exercise_form_screen.dart';
 import 'exercise_detail_tabs_screen.dart';
@@ -99,7 +100,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                 ..._categories.map((cat) => Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: FilterChip(
-                    label: Text(cat['name'] as String),
+                    label: Text(ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, cat)),
                     selected: _selectedCategoryId == cat['id'],
                     onSelected: (_) => setState(
                       () => _selectedCategoryId = _selectedCategoryId == cat['id'] ? null : cat['id'] as String),
@@ -157,7 +158,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                                     MaterialPageRoute(
                                       builder: (_) => ExerciseDetailTabsScreen(
                                         exerciseId: ex['id'] as String,
-                                        exerciseName: ex['name'] as String,
+                                        exerciseName: ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, ex),
                                       ),
                                     ),
                                   );
@@ -179,11 +180,11 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(ex['name'] as String, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                                            Text(ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, ex), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                                             const SizedBox(height: 2),
                                             Row(
                                               children: [
-                                                Text(ex['category_name'] as String? ?? '', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                                                Text(ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, ex), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                                                 const SizedBox(width: 6),
                                                 _buildEnergyChip(ex['category_energy'] as String? ?? 'anaerobic', theme),
                                                 if (equipment != null && equipment.isNotEmpty) ...[
@@ -202,7 +203,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                                           ],
                                         ),
                                       ),
-                                      if (ex['notes'] != null && (ex['notes'] as String).isNotEmpty)
+                                      if (ExerciseLocaleHelper.exerciseNotes(AppLocalizations.of(context)!, ex).isNotEmpty)
                                         Icon(Icons.info_outline, size: 16, color: theme.colorScheme.onSurfaceVariant.withAlpha(120)),
                                       IconButton(
                                         icon: Icon(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import '../../database/database_helper.dart';
 
 class QuickAddScreen extends StatefulWidget {
@@ -175,14 +176,28 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
 
       final exerciseName = parts.sublist(0, weightIdx).join(' ');
 
-      // Find or create exercise
-      final exercises = await _db.getExercises(search: exerciseName);
+      // Find or create exercise — search both DB name and localized names
       Map<String, dynamic>? exercise;
+      // First try SQL LIKE search on DB name
+      final exercises = await _db.getExercises(search: exerciseName);
       if (exercises.isNotEmpty) {
         exercise = exercises.firstWhere(
           (e) => (e['name'] as String).toLowerCase() == exerciseName.toLowerCase(),
           orElse: () => exercises.first,
         );
+      }
+      // If not found, search across all exercises using localized names
+      if (exercise == null) {
+        final loc = AppLocalizations.of(context);
+        if (loc != null) {
+          final allExercises = await _db.getExercises();
+          for (final ex in allExercises) {
+            if (ExerciseLocaleHelper.exerciseMatchesSearch(loc, ex, exerciseName)) {
+              exercise = ex;
+              break;
+            }
+          }
+        }
       }
 
       if (exercise == null) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import '../../database/database_helper.dart';
 import '../../services/export_service.dart';
 import 'exercise_detail_tabs_screen.dart';
@@ -40,6 +41,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       exercises.add(_ExerciseWithSets(
         exerciseId: entry['exercise_id'] as String? ?? '',
         name: entry['exercise_name'] as String? ?? '',
+        localeKey: entry['exercise_locale_key'] as String?,
+        categoryId: entry['category_id'] as String?,
         categoryName: entry['category_name'] as String? ?? '',
         categoryColor: Color(entry['category_color'] as int? ?? 0xFF757575),
         sets: sets,
@@ -257,9 +260,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                     color: exercise.categoryColor, borderRadius: BorderRadius.circular(2),
                   )),
                   const SizedBox(width: 10),
-                  Text(exercise.name, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                  Text(exercise.localizedName(AppLocalizations.of(context)!), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(width: 8),
-                  Text(exercise.categoryName, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  Text(exercise.localizedCategory(AppLocalizations.of(context)!), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                 ],
               ),
               const SizedBox(height: 8),
@@ -403,14 +406,36 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
 class _ExerciseWithSets {
   final String exerciseId;
   final String name;
+  final String? localeKey;
+  final String? categoryId;
   final String categoryName;
   final Color categoryColor;
   final List<Map<String, dynamic>> sets;
   _ExerciseWithSets({
     required this.exerciseId,
-    required this.name, required this.categoryName,
-    required this.categoryColor, required this.sets,
+    required this.name,
+    this.localeKey,
+    this.categoryId,
+    required this.categoryName,
+    required this.categoryColor,
+    required this.sets,
   });
+
+  String localizedName(AppLocalizations loc) {
+    if (localeKey != null) {
+      final translated = ExerciseLocaleHelper.exerciseNameFromKey(loc, localeKey!);
+      if (translated.isNotEmpty) return translated;
+    }
+    return name;
+  }
+
+  String localizedCategory(AppLocalizations loc) {
+    if (categoryId != null) {
+      final translated = ExerciseLocaleHelper.categoryNameFromId(loc, categoryId!);
+      if (translated.isNotEmpty) return translated;
+    }
+    return categoryName;
+  }
 }
 
 class _InfoChip extends StatelessWidget {

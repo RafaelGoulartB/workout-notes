@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:uuid/uuid.dart';
 import '../../database/database_helper.dart';
 import '../../services/rest_timer_service.dart';
@@ -740,7 +741,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(AppLocalizations.of(context)!.activeWorkoutRemoveExercise),
-        content: Text('Remover "${exercise.name}" do treino? Todas as séries registradas serão perdidas.'),
+        content: Text('Remover "${exercise.localizedName(AppLocalizations.of(context)!)}" do treino? Todas as séries registradas serão perdidas.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context)!.commonCancel)),
           TextButton(
@@ -757,7 +758,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       if (mounted) setState(() {});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.activeWorkoutRemoved(exercise.name)), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.activeWorkoutRemoved(exercise.localizedName(AppLocalizations.of(context)!))), behavior: SnackBarBehavior.floating),
         );
       }
     }
@@ -857,7 +858,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
       if (maxWeight > 0) {
         thisWorkoutBests[ex.exerciseId] = _ExerciseBests(
-          name: ex.name,
+          name: ex.localizedName(AppLocalizations.of(context)!),
           maxWeight: maxWeight,
           bestReps: bestReps,
           volume: exerciseVolume,
@@ -1381,7 +1382,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             const SizedBox(height: 16),
             Text('Tempo de Descanso', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            Text(exercise.name, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            Text(exercise.localizedName(AppLocalizations.of(context)!), style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
@@ -1472,8 +1473,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         onExerciseAdded: (exercise) async {
           await _addExercise(
             exercise['id'] as String,
-            exercise['name'] as String,
-            exercise['category_name'] as String? ?? '',
+            ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, exercise),
+            ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, exercise),
             Color(exercise['category_color'] as int? ?? 0xFF757575),
             restTimeSeconds: (exercise['default_rest_time'] as int?),
           );
@@ -1534,7 +1535,9 @@ class _ExerciseWithSets {
   final String entryId;
   final String exerciseId;
   final String name;
+  final String? localeKey;
   final String exerciseType;
+  final String? categoryId;
   final String categoryName;
   final Color categoryColor;
   final List<Map<String, dynamic>> sets;
@@ -1544,12 +1547,30 @@ class _ExerciseWithSets {
     required this.entryId,
     required this.exerciseId,
     required this.name,
+    this.localeKey,
     required this.exerciseType,
+    this.categoryId,
     required this.categoryName,
     required this.categoryColor,
     List<Map<String, dynamic>>? sets,
     this.restTimeSeconds = 90,
   }) : sets = sets ?? [];
+
+  String localizedName(AppLocalizations loc) {
+    if (localeKey != null) {
+      final translated = ExerciseLocaleHelper.exerciseNameFromKey(loc, localeKey!);
+      if (translated.isNotEmpty) return translated;
+    }
+    return name;
+  }
+
+  String localizedCategory(AppLocalizations loc) {
+    if (categoryId != null) {
+      final translated = ExerciseLocaleHelper.categoryNameFromId(loc, categoryId!);
+      if (translated.isNotEmpty) return translated;
+    }
+    return categoryName;
+  }
 
   int get completedSets => sets.where((s) => (s['is_complete'] as int?) == 1).length;
   double get maxWeight => sets.fold<double>(0, (max, s) {
@@ -1590,7 +1611,7 @@ class _ExerciseCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      exercise.name,
+                      exercise.localizedName(AppLocalizations.of(context)!),
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -1601,7 +1622,7 @@ class _ExerciseCard extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.open_in_new),
               title: Text(AppLocalizations.of(context)!.workoutDetailViewExercise),
-              subtitle: Text(exercise.name),
+              subtitle: Text(exercise.localizedName(AppLocalizations.of(context)!)),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
                 Navigator.pop(ctx);
@@ -1610,7 +1631,7 @@ class _ExerciseCard extends StatelessWidget {
                   MaterialPageRoute(
                     builder: (_) => ExerciseDetailTabsScreen(
                       exerciseId: exercise.exerciseId,
-                      exerciseName: exercise.name,
+                      exerciseName: exercise.localizedName(AppLocalizations.of(context)!),
                     ),
                   ),
                 );
@@ -1653,7 +1674,7 @@ class _ExerciseCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(exercise.name, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                  child: Text(exercise.localizedName(AppLocalizations.of(context)!), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                 ),
                 GestureDetector(
                   onTap: () => onChangeRestTime(exercise.restTimeSeconds),
