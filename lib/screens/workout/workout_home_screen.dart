@@ -257,7 +257,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 Expanded(
                   child: _StatItem(
                     label: AppLocalizations.of(context)!.workoutHomeMonthWorkouts,
-                    value: '${_monthWorkouts}',
+                    value: '$_monthWorkouts',
                     icon: Icons.fitness_center,
                     color: theme.colorScheme.primary,
                     theme: theme,

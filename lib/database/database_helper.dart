@@ -799,7 +799,9 @@ class DatabaseHelper {
       'end_time': now.toIso8601String(),
       'duration_seconds': duration,
       'start_time': startTimeStr ?? now.toIso8601String(),
+      // ignore: use_null_aware_elements
       if (comment != null) 'comment': comment,
+      // ignore: use_null_aware_elements
       if (feelingRating != null) 'feeling_rating': feelingRating,
     }, where: 'id = ?', whereArgs: [id]);
   }
@@ -1093,6 +1095,7 @@ class DatabaseHelper {
       'routine_day_id': routineDayId,
       'exercise_id': exerciseId,
       'order_index': count,
+      // ignore: use_null_aware_elements
       if (restTimeSeconds != null) 'rest_time_seconds': restTimeSeconds,
     });
     return id;

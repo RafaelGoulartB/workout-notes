@@ -220,7 +220,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     // Day cells
     for (int day = 1; day <= daysInMonth; day++) {
-      final dateStr = '${_currentYear}-${_currentMonth.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+      final dateStr = '$_currentYear-${_currentMonth.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
       final cats = _categoriesByDate[dateStr] ?? [];
       final hasWorkout = cats.isNotEmpty;
       final isToday = dateStr == today;

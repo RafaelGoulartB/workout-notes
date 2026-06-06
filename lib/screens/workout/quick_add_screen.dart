@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
@@ -147,7 +146,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
     } catch (e) {
       setState(() {
         _parsedSets = [];
-        _error = '${AppLocalizations.of(context)!.commonError(e.toString())}';
+        _error = AppLocalizations.of(context)!.commonError(e.toString());
       });
     }
   }
@@ -186,6 +185,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       }
       // If not found, search across all exercises using localized names
       if (exercise == null) {
+        if (!mounted) return;
         final loc = AppLocalizations.of(context);
         if (loc != null) {
           final allExercises = await _db.getExercises();

@@ -47,7 +47,7 @@ class AccentColors {
 
   static int indexOf(Color color) {
     for (int i = 0; i < options.length; i++) {
-      if (options[i].value == color.value) return i;
+      if (options[i].toARGB32() == color.toARGB32()) return i;
     }
     return defaultIndex;
   }
@@ -99,7 +99,7 @@ void main() async {
 
   // Load saved settings
   final prefs = await SharedPreferences.getInstance();
-  final savedColor = prefs.getInt('accent_color') ?? AccentColors.defaultColor.value;
+  final savedColor = prefs.getInt('accent_color') ?? AccentColors.defaultColor.toARGB32();
   final initialColor = Color(savedColor);
 
   final themeModeStr = prefs.getString('theme_mode') ?? 'system';

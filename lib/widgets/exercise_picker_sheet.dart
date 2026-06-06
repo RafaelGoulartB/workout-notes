@@ -25,7 +25,7 @@ class ExercisePickerSheet extends StatefulWidget {
 class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
   final _db = DatabaseHelper.instance;
   List<Map<String, dynamic>> _categories = [];
-  Map<String, List<Map<String, dynamic>>> _exercisesByCategory = {};
+  final Map<String, List<Map<String, dynamic>>> _exercisesByCategory = {};
   String? _selectedCategoryId;
   String _search = '';
   bool _isLoading = true;

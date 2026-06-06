@@ -47,7 +47,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   Future<void> _changeAccentColor(int index) async {
     final color = AccentColors.options[index];
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('accent_color', color.value);
+    await prefs.setInt('accent_color', color.toARGB32());
     setState(() => _selectedAccentIndex = index);
     WorkoutNotesApp.themeNotifier.setSeedColor(color);
   }
@@ -387,7 +387,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         trailing: SizedBox(
                           width: 100,
                           child: DropdownButtonFormField<int>(
-                            value: int.tryParse(_settings['default_rest_time'] ?? '90') ?? 90,
+                            initialValue: int.tryParse(_settings['default_rest_time'] ?? '90') ?? 90,
                             items: const [30, 45, 60, 90, 120, 180].map((s) => DropdownMenuItem(
                               value: s, child: Text(s >= 60 ? '${s ~/ 60}min' : '${s}s'),
                             )).toList(),

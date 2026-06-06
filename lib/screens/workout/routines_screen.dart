@@ -261,13 +261,19 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                     content: Text(AppLocalizations.of(context)!.commonActionCannotBeUndone),
                     actions: [
                       TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context)!.commonCancel)),
-                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(AppLocalizations.of(context)!.commonDelete), style: TextButton.styleFrom(foregroundColor: Colors.red)),
+                      TextButton.icon(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        label: Text(AppLocalizations.of(context)!.commonDelete),
+                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      ),
                     ],
                   ),
                 );
                 if (confirm == true) {
                   await _db.deleteRoutine(widget.routineId);
-                  if (mounted) Navigator.pop(context, true);
+                  if (!mounted) return;
+                  if (!context.mounted) return;
+                  Navigator.pop(context, true);
                 }
               }
             },

@@ -940,7 +940,7 @@ mixin WorkoutLocaleEn on WorkoutLocale {
 
   @override
   String workoutDetailDuration(int min, int sec) {
-    return '$min' + 'min ' + '$sec' + 's';
+    return '${min}min ${sec}s';
   }
 
   @override
@@ -1806,7 +1806,7 @@ mixin WorkoutLocalePt on WorkoutLocale {
 
   @override
   String workoutDetailDuration(int min, int sec) {
-    return '$min' + 'min ' + '$sec' + 's';
+    return '${min}min ${sec}s';
   }
 
   @override

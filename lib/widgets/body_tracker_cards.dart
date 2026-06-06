@@ -867,7 +867,7 @@ class BodyBilateralChartCard extends StatelessWidget {
     }
 
     // Legend item
-    Widget _legendItem(Color color, String label) {
+    Widget legendItem(Color color, String label) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -918,9 +918,9 @@ class BodyBilateralChartCard extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
-                    _legendItem(Colors.blue, loc.bodyTrackerLeft),
+                    legendItem(Colors.blue, loc.bodyTrackerLeft),
                     const SizedBox(width: 12),
-                    _legendItem(Colors.red, loc.bodyTrackerRight),
+                    legendItem(Colors.red, loc.bodyTrackerRight),
                   ],
                 ),
               ),

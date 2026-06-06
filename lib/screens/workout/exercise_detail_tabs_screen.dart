@@ -169,10 +169,15 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     double temp = rough;
     while (temp >= 10) { temp /= 10; magnitude *= 10; }
     while (temp < 1) { temp *= 10; magnitude /= 10; }
-    if (temp <= 1) temp = 1;
-    else if (temp <= 2) temp = 2;
-    else if (temp <= 5) temp = 5;
-    else temp = 10;
+    if (temp <= 1) {
+      temp = 1;
+    } else if (temp <= 2) {
+      temp = 2;
+    } else if (temp <= 5) {
+      temp = 5;
+    } else {
+      temp = 10;
+    }
     return temp * magnitude;
   }
 
@@ -238,7 +243,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _categoryId,
+                initialValue: _categoryId,
                 decoration: const InputDecoration(
                   labelText: 'Grupo Muscular',
                   border: OutlineInputBorder(),
@@ -259,7 +264,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _types.any((t) => t['id'] == _type) ? _type : 'weightReps',
+                initialValue: _types.any((t) => t['id'] == _type) ? _type : 'weightReps',
                 decoration: const InputDecoration(
                   labelText: 'Tipo',
                   border: OutlineInputBorder(),
@@ -441,13 +446,13 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                     children: [
                       Expanded(flex: 2, child: Text(date.length >= 10 ? date.substring(5) : date,
                           style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                      Expanded(flex: 2, child: Text(maxW > 0 ? '${maxW.toStringAsFixed(1)}' : '-',
+                      Expanded(flex: 2, child: Text(maxW > 0 ? maxW.toStringAsFixed(1) : '-',
                           style: theme.textTheme.bodySmall)),
-                      Expanded(flex: 2, child: Text(vol > 0 ? '${vol.toStringAsFixed(0)}' : '-',
+                      Expanded(flex: 2, child: Text(vol > 0 ? vol.toStringAsFixed(0) : '-',
                           style: theme.textTheme.bodySmall)),
                       Expanded(flex: 2, child: Text('$sets×$reps',
                           style: theme.textTheme.bodySmall)),
-                      Expanded(flex: 2, child: Text(est1RM != null ? '${est1RM.toStringAsFixed(1)}' : '-',
+                      Expanded(flex: 2, child: Text(est1RM != null ? est1RM.toStringAsFixed(1) : '-',
                           style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: Colors.amber[700]))),
                     ],
                   ),
@@ -610,7 +615,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                           getTitlesWidget: (v, _) => Padding(
                             padding: const EdgeInsets.only(right: 4),
                             child: Text(
-                              _chartType == 3 ? '${v.toInt()}' : '${v.toStringAsFixed(1)}',
+                              _chartType == 3 ? v.toInt().toString() : v.toStringAsFixed(1),
                               style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
                             ),
                           ),

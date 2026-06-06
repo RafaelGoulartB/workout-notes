@@ -249,10 +249,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
     double temp = rough;
     while (temp >= 10) { temp /= 10; magnitude *= 10; }
     while (temp < 1) { temp *= 10; magnitude /= 10; }
-    if (temp <= 1) temp = 1;
-    else if (temp <= 2) temp = 2;
-    else if (temp <= 5) temp = 5;
-    else temp = 10;
+    if (temp <= 1) {
+      temp = 1;
+    } else if (temp <= 2) {
+      temp = 2;
+    } else if (temp <= 5) {
+      temp = 5;
+    } else {
+      temp = 10;
+    }
     final result = temp * magnitude;
     return result < 0.5 ? 0.5 : result;
   }
@@ -829,10 +834,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
       if (startTime == null) continue;
       try {
         final hour = DateTime.parse(startTime).hour;
-        if (hour < 6) periods['madrugada'] = periods['madrugada']! + 1;
-        else if (hour < 12) periods['manhã'] = periods['manhã']! + 1;
-        else if (hour < 18) periods['tarde'] = periods['tarde']! + 1;
-        else periods['noite'] = periods['noite']! + 1;
+        if (hour < 6) {
+          periods['madrugada'] = periods['madrugada']! + 1;
+        } else if (hour < 12) {
+          periods['manhã'] = periods['manhã']! + 1;
+        } else if (hour < 18) {
+          periods['tarde'] = periods['tarde']! + 1;
+        } else {
+          periods['noite'] = periods['noite']! + 1;
+        }
       } catch (_) {}
     }
 
@@ -1450,7 +1460,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true, reservedSize: 32,
-                        getTitlesWidget: (v, _) => Text('${v.toStringAsFixed(0)}',
+                        getTitlesWidget: (v, _) => Text(v.toStringAsFixed(0),
                             style: theme.textTheme.bodySmall?.copyWith(fontSize: 8)),
                       ),
                     ),
@@ -1561,7 +1571,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     showTitles: true, reservedSize: 24,
                     getTitlesWidget: (v, _) {
                       if (v < 1) return const SizedBox.shrink();
-                      return Text('${'★' * v.toInt()}',
+                      return Text('★' * v.toInt(),
                           style: TextStyle(fontSize: 9, color: Colors.amber));
                     },
                   ),
@@ -1650,7 +1660,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                       final idx = v.toInt();
                       if (idx < 0 || idx >= _feelingVsVolume.length) return const SizedBox.shrink();
                       final feeling = _feelingVsVolume[idx]['feeling_rating'] as int? ?? 0;
-                      return Text('${'★' * feeling}',
+                      return Text('★' * feeling,
                           style: TextStyle(fontSize: 10, color: Colors.amber));
                     },
                   ),
@@ -1827,12 +1837,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  /// For weight/bodyFat: increase is bad (red), decrease is good (green)
-  /// For measurements: increase can be good (muscle) or neutral
-  bool _isPositiveForType(String typeId) {
-    return typeId == 'weight' || typeId == 'bodyFat';
-  }
-
   Widget _buildBodyCompositionChart(ThemeData theme) {
     final data = _bodyComposition;
     if (data.isEmpty) return const SizedBox.shrink();
@@ -1963,9 +1967,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
                         final idx = s.spotIndex;
                         final d = idx < validData.length ? (validData[idx]['date'] as String? ?? '') : '';
                         String label;
-                        if (s.barIndex == 0) label = '${AppLocalizations.of(context)!.bodyTrackerWeight}: ${s.y.toStringAsFixed(1)}kg';
-                        else if (s.barIndex == 1) label = '${AppLocalizations.of(context)!.bodyTrackerBodyFat}: ${s.y.toStringAsFixed(1)}%';
-                        else label = '${AppLocalizations.of(context)!.bodyTrackerWaist}: ${s.y.toStringAsFixed(1)}cm';
+                        if (s.barIndex == 0) {
+                          label = '${AppLocalizations.of(context)!.bodyTrackerWeight}: ${s.y.toStringAsFixed(1)}kg';
+                        } else if (s.barIndex == 1) {
+                          label = '${AppLocalizations.of(context)!.bodyTrackerBodyFat}: ${s.y.toStringAsFixed(1)}%';
+                        } else {
+                          label = '${AppLocalizations.of(context)!.bodyTrackerWaist}: ${s.y.toStringAsFixed(1)}cm';
+                        }
                         return LineTooltipItem(
                           '$d\n$label',
                           TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold, fontSize: 10),
@@ -2315,7 +2323,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
 
     return DropdownButtonFormField<String>(
-      value: selectedEx['id'] as String?,
+      initialValue: selectedEx['id'] as String?,
       decoration: InputDecoration(
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -2378,17 +2386,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
     return Row(
       children: [
         Expanded(child: _StatCard(
-          label: AppLocalizations.of(context)!.exerciseDetailChartMaxWeight, value: bestWeight > 0 ? '${bestWeight.toStringAsFixed(1)}' : '--',
+          label: AppLocalizations.of(context)!.exerciseDetailChartMaxWeight, value: bestWeight > 0 ? bestWeight.toStringAsFixed(1) : '--',
           icon: Icons.monitor_weight, color: theme.colorScheme.primary,
         )),
         const SizedBox(width: 8),
         Expanded(child: _StatCard(
-          label: AppLocalizations.of(context)!.commonVolume, value: bestVolume > 0 ? '${_formatVolume(bestVolume)}' : '--',
+          label: AppLocalizations.of(context)!.commonVolume, value: bestVolume > 0 ? _formatVolume(bestVolume) : '--',
           icon: Icons.auto_graph, color: theme.colorScheme.secondary,
         )),
         const SizedBox(width: 8),
         Expanded(child: _StatCard(
-          label: AppLocalizations.of(context)!.exerciseDetailChart1RM, value: best1RM > 0 ? '${best1RM.toStringAsFixed(1)}' : '--',
+          label: AppLocalizations.of(context)!.exerciseDetailChart1RM, value: best1RM > 0 ? best1RM.toStringAsFixed(1) : '--',
           icon: Icons.emoji_events, color: Colors.amber,
         )),
       ],
@@ -2495,7 +2503,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                           return Padding(
                             padding: const EdgeInsets.only(right: 4),
                             child: Text(
-                              _selectedChartType == 3 ? '${v.toInt()}' : '${v.toStringAsFixed(1)}',
+                              _selectedChartType == 3 ? v.toInt().toString() : v.toStringAsFixed(1),
                               style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
                             ),
                           );
@@ -2636,13 +2644,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   children: [
                     Expanded(flex: 2, child: Text(date.length >= 10 ? date.substring(5) : date,
                         style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                    Expanded(flex: 2, child: Text(maxW > 0 ? '${maxW.toStringAsFixed(1)}' : '-',
+                    Expanded(flex: 2, child: Text(maxW > 0 ? maxW.toStringAsFixed(1) : '-',
                         style: theme.textTheme.bodySmall)),
-                    Expanded(flex: 2, child: Text(vol > 0 ? '${vol.toStringAsFixed(0)}' : '-',
+                    Expanded(flex: 2, child: Text(vol > 0 ? vol.toStringAsFixed(0) : '-',
                         style: theme.textTheme.bodySmall)),
                     Expanded(flex: 2, child: Text('$sets×$reps',
                         style: theme.textTheme.bodySmall)),
-                    Expanded(flex: 2, child: Text(est1RM != null ? '${est1RM.toStringAsFixed(1)}' : '-',
+                    Expanded(flex: 2, child: Text(est1RM != null ? est1RM.toStringAsFixed(1) : '-',
                         style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: Colors.amber[700]))),
                   ],
                 ),
@@ -2907,17 +2915,17 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
     return Row(
       children: [
         Expanded(child: _StatCard(
-          label: AppLocalizations.of(context)!.exerciseDetailChartMaxWeight, value: bestWeight > 0 ? '${bestWeight.toStringAsFixed(1)}' : '--',
+          label: AppLocalizations.of(context)!.exerciseDetailChartMaxWeight, value: bestWeight > 0 ? bestWeight.toStringAsFixed(1) : '--',
           icon: Icons.monitor_weight, color: theme.colorScheme.primary,
         )),
         const SizedBox(width: 8),
         Expanded(child: _StatCard(
-          label: AppLocalizations.of(context)!.commonVolume, value: bestVolume > 0 ? '${_formatVolume(bestVolume)}' : '--',
+          label: AppLocalizations.of(context)!.commonVolume, value: bestVolume > 0 ? _formatVolume(bestVolume) : '--',
           icon: Icons.auto_graph, color: theme.colorScheme.secondary,
         )),
         const SizedBox(width: 8),
         Expanded(child: _StatCard(
-          label: AppLocalizations.of(context)!.exerciseDetailChart1RM, value: best1RM > 0 ? '${best1RM.toStringAsFixed(1)}' : '--',
+          label: AppLocalizations.of(context)!.exerciseDetailChart1RM, value: best1RM > 0 ? best1RM.toStringAsFixed(1) : '--',
           icon: Icons.emoji_events, color: Colors.amber,
         )),
       ],
@@ -2931,10 +2939,15 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
     double temp = rough;
     while (temp >= 10) { temp /= 10; magnitude *= 10; }
     while (temp < 1) { temp *= 10; magnitude /= 10; }
-    if (temp <= 1) temp = 1;
-    else if (temp <= 2) temp = 2;
-    else if (temp <= 5) temp = 5;
-    else temp = 10;
+    if (temp <= 1) {
+      temp = 1;
+    } else if (temp <= 2) {
+      temp = 2;
+    } else if (temp <= 5) {
+      temp = 5;
+    } else {
+      temp = 10;
+    }
     final result = temp * magnitude;
     return result < 0.5 ? 0.5 : result;
   }
@@ -3039,7 +3052,7 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
                           return Padding(
                             padding: const EdgeInsets.only(right: 4),
                             child: Text(
-                              _chartType == 3 ? '${v.toInt()}' : '${v.toStringAsFixed(1)}',
+                              _chartType == 3 ? v.toInt().toString() : v.toStringAsFixed(1),
                               style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
                             ),
                           );
@@ -3180,13 +3193,13 @@ class _ExerciseDetailSheetState extends State<_ExerciseDetailSheet> {
                   children: [
                     Expanded(flex: 2, child: Text(date.length >= 10 ? date.substring(5) : date,
                         style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                    Expanded(flex: 2, child: Text(maxW > 0 ? '${maxW.toStringAsFixed(1)}' : '-',
+                    Expanded(flex: 2, child: Text(maxW > 0 ? maxW.toStringAsFixed(1) : '-',
                         style: theme.textTheme.bodySmall)),
-                    Expanded(flex: 2, child: Text(vol > 0 ? '${vol.toStringAsFixed(0)}' : '-',
+                    Expanded(flex: 2, child: Text(vol > 0 ? vol.toStringAsFixed(0) : '-',
                         style: theme.textTheme.bodySmall)),
                     Expanded(flex: 2, child: Text('$sets×$reps',
                         style: theme.textTheme.bodySmall)),
-                    Expanded(flex: 2, child: Text(est1RM != null ? '${est1RM.toStringAsFixed(1)}' : '-',
+                    Expanded(flex: 2, child: Text(est1RM != null ? est1RM.toStringAsFixed(1) : '-',
                         style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: Colors.amber[700]))),
                   ],
                 ),

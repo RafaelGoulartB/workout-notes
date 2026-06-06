@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
@@ -390,7 +389,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         ]),
         const SizedBox(height: 4),
         Wrap(spacing: 4, runSpacing: 4, children: [1.0, 2.0, 3.0, 5.0, 10.0].map((v) => ActionChip(
-          label: Text('${v.toStringAsFixed(1)}', style: const TextStyle(fontSize: 10)),
+          label: Text(v.toStringAsFixed(1), style: const TextStyle(fontSize: 10)),
           onPressed: () => onChanged(v),
           visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: 4),
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -420,7 +419,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 decoration: BoxDecoration(color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withAlpha(120), borderRadius: BorderRadius.circular(10)),
                 child: Center(
                   child: Text(
-                    timeSeconds >= 60 ? '${minutes}:${seconds.toString().padLeft(2, '0')}' : '${timeSeconds}s',
+                    timeSeconds >= 60 ? '$minutes:${seconds.toString().padLeft(2, '0')}' : '${timeSeconds}s',
                     style: Theme.of(ctx).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -443,7 +442,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
   // ===================== EXERCISE ACTIONS =====================
 
-  Future<void> _addExercise(String exerciseId, String name, String catName, Color catColor, {int? restTimeSeconds}) async {
+  Future<void> addExercise(String exerciseId, String name, String catName, Color catColor, {int? restTimeSeconds}) async {
     if (_workoutId == null) return;
     final entryId = _uuid.v4();
     final db = await _db.database;
@@ -1218,10 +1217,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   // ===================== REST =====================
 
   Future<void> _importFromRoutine() async {
+    final ctx = context;
+    final scaffoldMessenger = ScaffoldMessenger.of(ctx);
+    final loc = AppLocalizations.of(ctx);
     final routines = await _db.getRoutines();
     if (routines.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(content: Text(AppLocalizations.of(context)!.activeWorkoutNoRoutineFound), behavior: SnackBarBehavior.floating),
         );
       }
@@ -1229,7 +1231,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }
 
     final routineId = await showModalBottomSheet<String>(
-      context: context,
+      // ignore: use_build_context_synchronously
+      context: ctx,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (ctx) => _buildRoutinePicker(routines),
@@ -1239,8 +1242,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final days = await _db.getRoutineDays(routineId);
     if (days.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.activeWorkoutNoRoutineDays), behavior: SnackBarBehavior.floating),
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text(loc!.activeWorkoutNoRoutineDays), behavior: SnackBarBehavior.floating),
         );
       }
       return;
@@ -1248,22 +1251,25 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     final routineName = routines.firstWhere((r) => r['id'] == routineId)['name'] as String;
     final dayId = await showModalBottomSheet<String>(
-      context: context,
+      // ignore: use_build_context_synchronously
+      context: ctx,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (ctx) => _buildDayPicker(ctx, days, routineName),
     );
     if (dayId == null || !mounted) return;
 
-    if (_workoutId == null) return;
-    await _db.importRoutineDayToWorkout(_workoutId!, dayId);
+    final workoutId = _workoutId;
+    if (workoutId == null) return;
+    if (!mounted) return;
+    await _db.importRoutineDayToWorkout(workoutId, dayId);
     await _loadExercises();
+    if (!mounted) return;
     setState(() {});
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.activeWorkoutRoutineImported), behavior: SnackBarBehavior.floating),
-      );
-    }
+    if (!mounted) return;
+    scaffoldMessenger.showSnackBar(
+      SnackBar(content: Text(loc!.activeWorkoutRoutineImported), behavior: SnackBarBehavior.floating),
+    );
   }
 
   Widget _buildRoutinePicker(List<Map<String, dynamic>> routines) {
@@ -1285,7 +1291,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             height: 300,
             child: ListView.separated(
               itemCount: routines.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (ctx, i) {
                 final routine = routines[i];
                 return ListTile(
@@ -1339,7 +1345,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             height: 300,
             child: ListView.separated(
               itemCount: days.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (ctx, i) {
                 final day = days[i];
                 return ListTile(
@@ -1472,7 +1478,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       builder: (_) => ExercisePickerSheet(
         currentExerciseIds: currentExerciseIds,
         onExerciseAdded: (exercise) async {
-          await _addExercise(
+          await addExercise(
             exercise['id'] as String,
             ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, exercise),
             ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, exercise),
@@ -2100,7 +2106,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                                       ?.copyWith(fontWeight: FontWeight.w600),
                                 ),
                                 Text(
-                                  '${pr.value}',
+                                  pr.value,
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: theme.colorScheme.onSurfaceVariant,
                                   ),

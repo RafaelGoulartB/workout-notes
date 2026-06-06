@@ -141,7 +141,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
 
                   // Category
                   DropdownButtonFormField<String>(
-                    value: _categoryId,
+                    initialValue: _categoryId,
                     decoration: InputDecoration(
                       labelText: AppLocalizations.of(context)!.exerciseFormCategory,
                       border: OutlineInputBorder(),
@@ -164,7 +164,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
 
                   // Type
                   DropdownButtonFormField<String>(
-                    value: _types.any((t) => t['id'] == _type) ? _type : 'weightReps',
+                    initialValue: _types.any((t) => t['id'] == _type) ? _type : 'weightReps',
                     decoration: InputDecoration(
                       labelText: AppLocalizations.of(context)!.exerciseFormType,
                       border: OutlineInputBorder(),

@@ -266,7 +266,7 @@ class ExportScreen extends StatelessWidget {
                 height: 300,
                 child: ListView.separated(
                   itemCount: workouts.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (ctxx, i) {
                     final w = workouts[i];
                     final date = w['date'] as String? ?? '';
