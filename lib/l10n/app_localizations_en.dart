@@ -739,6 +739,80 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bodyTrackerGallery => 'Gallery';
 
   @override
+  String get bodyTrackerInvalidValue => 'Invalid value';
+
+  @override
+  String get bodyTrackerFasting => 'Fasting';
+
+  @override
+  String get bodyTrackerFasted => 'Fasted';
+
+  @override
+  String get bodyTrackerQuickCommentHint => 'Quick note (optional)';
+
+  @override
+  String bodyTrackerSavedBatch(Object count) {
+    return '✅ $count measurements saved!';
+  }
+
+  @override
+  String get bodyTrackerLeftAbbr => 'L';
+
+  @override
+  String get bodyTrackerRightAbbr => 'R';
+
+  @override
+  String get bodyTrackerLastLabel => 'Last: ';
+
+  @override
+  String get bodyTrackerMorning => 'Morning';
+
+  @override
+  String get bodyTrackerAfternoon => 'Afternoon';
+
+  @override
+  String get bodyTrackerEvening => 'Evening';
+
+  @override
+  String get bodyTrackerNight => 'Night';
+
+  @override
+  String get bodyTrackerCalf => 'Calf';
+
+  @override
+  String get bodyTrackerLeft => 'Left';
+
+  @override
+  String get bodyTrackerRight => 'Right';
+
+  @override
+  String get bodyTrackerLeanMass => 'Lean Mass';
+
+  @override
+  String get bodyTrackerFatMass => 'Fat Mass';
+
+  @override
+  String get bodyTrackerHealthy => 'Healthy';
+
+  @override
+  String get bodyTrackerModerate => 'Moderate Risk';
+
+  @override
+  String get bodyTrackerHigh => 'High Risk';
+
+  @override
+  String get bodyTrackerWHR => 'WHR';
+
+  @override
+  String get bodyTrackerEstimatedComposition => 'Estimated Body Composition';
+
+  @override
+  String get bodyTrackerTimeOfDay => 'Time of day';
+
+  @override
+  String get bodyTrackerNotInformed => 'Not informed';
+
+  @override
   String get commonOptional => 'optional';
 
   @override

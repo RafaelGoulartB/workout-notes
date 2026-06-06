@@ -1472,6 +1472,150 @@ abstract class AppLocalizations {
   /// **'Gallery'**
   String get bodyTrackerGallery;
 
+  /// No description provided for @bodyTrackerInvalidValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid value'**
+  String get bodyTrackerInvalidValue;
+
+  /// No description provided for @bodyTrackerFasting.
+  ///
+  /// In en, this message translates to:
+  /// **'Fasting'**
+  String get bodyTrackerFasting;
+
+  /// No description provided for @bodyTrackerFasted.
+  ///
+  /// In en, this message translates to:
+  /// **'Fasted'**
+  String get bodyTrackerFasted;
+
+  /// No description provided for @bodyTrackerQuickCommentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick note (optional)'**
+  String get bodyTrackerQuickCommentHint;
+
+  /// No description provided for @bodyTrackerSavedBatch.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ {count} measurements saved!'**
+  String bodyTrackerSavedBatch(Object count);
+
+  /// No description provided for @bodyTrackerLeftAbbr.
+  ///
+  /// In en, this message translates to:
+  /// **'L'**
+  String get bodyTrackerLeftAbbr;
+
+  /// No description provided for @bodyTrackerRightAbbr.
+  ///
+  /// In en, this message translates to:
+  /// **'R'**
+  String get bodyTrackerRightAbbr;
+
+  /// No description provided for @bodyTrackerLastLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Last: '**
+  String get bodyTrackerLastLabel;
+
+  /// No description provided for @bodyTrackerMorning.
+  ///
+  /// In en, this message translates to:
+  /// **'Morning'**
+  String get bodyTrackerMorning;
+
+  /// No description provided for @bodyTrackerAfternoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Afternoon'**
+  String get bodyTrackerAfternoon;
+
+  /// No description provided for @bodyTrackerEvening.
+  ///
+  /// In en, this message translates to:
+  /// **'Evening'**
+  String get bodyTrackerEvening;
+
+  /// No description provided for @bodyTrackerNight.
+  ///
+  /// In en, this message translates to:
+  /// **'Night'**
+  String get bodyTrackerNight;
+
+  /// No description provided for @bodyTrackerCalf.
+  ///
+  /// In en, this message translates to:
+  /// **'Calf'**
+  String get bodyTrackerCalf;
+
+  /// No description provided for @bodyTrackerLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get bodyTrackerLeft;
+
+  /// No description provided for @bodyTrackerRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get bodyTrackerRight;
+
+  /// No description provided for @bodyTrackerLeanMass.
+  ///
+  /// In en, this message translates to:
+  /// **'Lean Mass'**
+  String get bodyTrackerLeanMass;
+
+  /// No description provided for @bodyTrackerFatMass.
+  ///
+  /// In en, this message translates to:
+  /// **'Fat Mass'**
+  String get bodyTrackerFatMass;
+
+  /// No description provided for @bodyTrackerHealthy.
+  ///
+  /// In en, this message translates to:
+  /// **'Healthy'**
+  String get bodyTrackerHealthy;
+
+  /// No description provided for @bodyTrackerModerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Moderate Risk'**
+  String get bodyTrackerModerate;
+
+  /// No description provided for @bodyTrackerHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High Risk'**
+  String get bodyTrackerHigh;
+
+  /// No description provided for @bodyTrackerWHR.
+  ///
+  /// In en, this message translates to:
+  /// **'WHR'**
+  String get bodyTrackerWHR;
+
+  /// No description provided for @bodyTrackerEstimatedComposition.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated Body Composition'**
+  String get bodyTrackerEstimatedComposition;
+
+  /// No description provided for @bodyTrackerTimeOfDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Time of day'**
+  String get bodyTrackerTimeOfDay;
+
+  /// No description provided for @bodyTrackerNotInformed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not informed'**
+  String get bodyTrackerNotInformed;
+
   /// No description provided for @commonOptional.
   ///
   /// In en, this message translates to:

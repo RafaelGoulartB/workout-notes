@@ -98,8 +98,6 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
         return;
       }
 
-      final exerciseName = parts.sublist(0, weightIdx).join(' ');
-
       // Remaining parts contain sets/reps info
       final remaining = parts.sublist(weightIdx + 1);
       final sets = <_ParsedSet>[];

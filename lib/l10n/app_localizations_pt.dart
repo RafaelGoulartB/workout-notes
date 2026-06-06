@@ -743,6 +743,80 @@ class AppLocalizationsPt extends AppLocalizations {
   String get bodyTrackerGallery => 'Galeria';
 
   @override
+  String get bodyTrackerInvalidValue => 'Valor inválido';
+
+  @override
+  String get bodyTrackerFasting => 'Jejum';
+
+  @override
+  String get bodyTrackerFasted => 'Em jejum';
+
+  @override
+  String get bodyTrackerQuickCommentHint => 'Anotação rápida (opcional)';
+
+  @override
+  String bodyTrackerSavedBatch(Object count) {
+    return '✅ $count medidas salvas!';
+  }
+
+  @override
+  String get bodyTrackerLeftAbbr => 'E';
+
+  @override
+  String get bodyTrackerRightAbbr => 'D';
+
+  @override
+  String get bodyTrackerLastLabel => 'Última: ';
+
+  @override
+  String get bodyTrackerMorning => 'Manhã';
+
+  @override
+  String get bodyTrackerAfternoon => 'Tarde';
+
+  @override
+  String get bodyTrackerEvening => 'Noite';
+
+  @override
+  String get bodyTrackerNight => 'Madrugada';
+
+  @override
+  String get bodyTrackerCalf => 'Panturrilha';
+
+  @override
+  String get bodyTrackerLeft => 'Esquerdo';
+
+  @override
+  String get bodyTrackerRight => 'Direito';
+
+  @override
+  String get bodyTrackerLeanMass => 'Massa Magra';
+
+  @override
+  String get bodyTrackerFatMass => 'Massa Gorda';
+
+  @override
+  String get bodyTrackerHealthy => 'Saudável';
+
+  @override
+  String get bodyTrackerModerate => 'Risco Moderado';
+
+  @override
+  String get bodyTrackerHigh => 'Risco Alto';
+
+  @override
+  String get bodyTrackerWHR => 'RCQ';
+
+  @override
+  String get bodyTrackerEstimatedComposition => 'Composição Corporal Estimada';
+
+  @override
+  String get bodyTrackerTimeOfDay => 'Horário';
+
+  @override
+  String get bodyTrackerNotInformed => 'Não informado';
+
+  @override
   String get commonOptional => 'opcional';
 
   @override

@@ -150,9 +150,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
         _db.getEnergySystemDistribution(),
       ]);
       if (!mounted) return;
-      _volumeByCategory = results[0] as List<Map<String, dynamic>>;
-      _topExercises = results[1] as List<Map<String, dynamic>>;
-      _energySystems = results[2] as List<Map<String, dynamic>>;
+      _volumeByCategory = results[0];
+      _topExercises = results[1];
+      _energySystems = results[2];
       _loadedVolume = true;
       setState(() => _isLoadingVolume = false);
     } catch (_) {
@@ -183,8 +183,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
         _db.getWorkoutDensity(),
       ]);
       if (!mounted) return;
-      _durationTrend = results[0] as List<Map<String, dynamic>>;
-      _densityData = results[1] as List<Map<String, dynamic>>;
+      _durationTrend = results[0];
+      _densityData = results[1];
       _loadedDuration = true;
       setState(() => _isLoadingDuration = false);
     } catch (_) {
@@ -201,8 +201,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
         _db.getFeelingVsVolume(),
       ]);
       if (!mounted) return;
-      _feelingTrend = results[0] as List<Map<String, dynamic>>;
-      _feelingVsVolume = results[1] as List<Map<String, dynamic>>;
+      _feelingTrend = results[0];
+      _feelingVsVolume = results[1];
       _loadedRecovery = true;
       setState(() => _isLoadingRecovery = false);
     } catch (_) {
@@ -220,9 +220,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
         _db.getBodyCompositionTrend(),
       ]);
       if (!mounted) return;
-      _bodyData = results[0] as List<Map<String, dynamic>>;
-      _bodySummary = results[1] as List<Map<String, dynamic>>;
-      _bodyComposition = results[2] as List<Map<String, dynamic>>;
+      _bodyData = results[0];
+      _bodySummary = results[1];
+      _bodyComposition = results[2];
       _loadedBody = true;
       setState(() => _isLoadingBody = false);
     } catch (_) {
@@ -305,7 +305,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
@@ -1782,10 +1781,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
         final prevValue = previous != null ? (previous[typeId] as num?)?.toDouble() : null;
 
         double? delta;
-        double? deltaPercent;
         if (currentValue != null && prevValue != null && prevValue > 0) {
           delta = currentValue - prevValue;
-          deltaPercent = (delta / prevValue) * 100;
         }
 
         return Card(
@@ -1847,10 +1844,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final data = _bodyComposition;
     if (data.isEmpty) return const SizedBox.shrink();
 
-    final weights = data.map((d) => (d['weight'] as num?)?.toDouble() ?? 0).where((v) => v > 0).toList();
-    final bodyFats = data.map((d) => (d['body_fat'] as num?)?.toDouble()).where((v) => v != null && v! > 0).toList();
-    final waists = data.map((d) => (d['waist'] as num?)?.toDouble()).where((v) => v != null && v! > 0).toList();
-    final chests = data.map((d) => (d['chest'] as num?)?.toDouble()).where((v) => v != null && v! > 0).toList();
+    final bodyFats = data.map((d) => (d['body_fat'] as num?)?.toDouble()).where((v) => v != null && v > 0).toList();
+    final waists = data.map((d) => (d['waist'] as num?)?.toDouble()).where((v) => v != null && v > 0).toList();
+    final chests = data.map((d) => (d['chest'] as num?)?.toDouble()).where((v) => v != null && v > 0).toList();
 
     // Get data points where we have both weight and at least one measurement
     final validData = data.where((d) {

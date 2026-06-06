@@ -182,6 +182,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         entryId: entry['id'] as String,
         exerciseId: entry['exercise_id'] as String,
         name: entry['exercise_name'] as String? ?? '',
+        localeKey: entry['exercise_locale_key'] as String?,
+        categoryId: entry['category_id'] as String?,
         exerciseType: entry['exercise_type'] as String? ?? 'weightReps',
         categoryName: entry['category_name'] as String? ?? '',
         categoryColor: Color(entry['category_color'] as int? ?? 0xFF757575),
@@ -279,7 +281,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final widgets = <Widget>[];
 
     for (final key in keys) {
-      final label = fields[key] ?? key;
       if (key == 'weight') {
         widgets.add(_buildWeightControl(ctx, setSheetState, weight, (v) => onFieldChange('weight', v)));
       } else if (key == 'reps') {

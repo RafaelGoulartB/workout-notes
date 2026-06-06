@@ -138,7 +138,6 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     if (_workout == null) return const SizedBox.shrink();
     final date = DateFormat(Intl.defaultLocale?.startsWith('pt') == true ? "EEEE, d 'de' MMMM 'de' yyyy" : 'EEEE, MMMM d, yyyy', Intl.defaultLocale).format(
       DateTime.parse(_workout!['date'] as String));
-    final start = _workout!['start_time'] as String?;
     final end = _workout!['end_time'] as String?;
     final duration = (_workout!['duration_seconds'] as int?) ?? 0;
     final feeling = (_workout!['feeling_rating'] as int?) ?? 0;

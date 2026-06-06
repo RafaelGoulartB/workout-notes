@@ -292,7 +292,7 @@ class BodyQuickStats extends StatelessWidget {
           Icons.trending_up, typeColor),
       (loc.bodyTrackerAverage, avgValue?.toStringAsFixed(1) ?? '--',
           Icons.show_chart, typeColor.withAlpha(200)),
-      ('Total', '$totalCount', Icons.receipt_long,
+      (loc.bodyTrackerEntries, '$totalCount', Icons.receipt_long,
           theme.colorScheme.secondary),
     ];
 
@@ -529,6 +529,7 @@ class BodyDerivedStatsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
 
     final bodyFatLatest = latestByType['bodyFat'];
     final bodyFatVal = bodyFatLatest != null
@@ -553,7 +554,7 @@ class BodyDerivedStatsCard extends StatelessWidget {
     final stats = <DerivedStat>[];
     if (leanMass != null) {
       stats.add(DerivedStat(
-        'Massa Magra',
+        loc.bodyTrackerLeanMass,
         '${leanMass.toStringAsFixed(1)} kg',
         Icons.fitness_center,
         Colors.green,
@@ -561,17 +562,20 @@ class BodyDerivedStatsCard extends StatelessWidget {
     }
     if (fatMass != null) {
       stats.add(DerivedStat(
-        'Massa Gorda',
+        loc.bodyTrackerFatMass,
         '${fatMass.toStringAsFixed(1)} kg',
         Icons.water_drop,
         Colors.orange,
       ));
     }
     if (whr != null) {
-      final whrEval =
-          whr < 0.9 ? 'Saudável' : whr < 1.0 ? 'Moderado' : 'Elevado';
+      final whrEval = whr < 0.9
+          ? loc.bodyTrackerHealthy
+          : whr < 1.0
+              ? loc.bodyTrackerModerate
+              : loc.bodyTrackerHigh;
       stats.add(DerivedStat(
-        'RCQ (C/Q)',
+        loc.bodyTrackerWHR,
         '${whr.toStringAsFixed(2)} · $whrEval',
         Icons.monitor_weight,
         Colors.teal,
@@ -595,7 +599,7 @@ class BodyDerivedStatsCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Composição Estimada',
+                loc.bodyTrackerEstimatedComposition,
                 style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.5,

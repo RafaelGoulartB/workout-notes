@@ -115,7 +115,7 @@ Future<void> showAddMeasurementSheet(
                       validator: (v) {
                         final val =
                             double.tryParse(v?.replaceAll(',', '.') ?? '');
-                        if (val == null || val <= 0) return 'Valor inválido';
+                        if (val == null || val <= 0) return loc.bodyTrackerInvalidValue;
                         return null;
                       },
                     ),
@@ -182,7 +182,7 @@ Future<void> showAddMeasurementSheet(
                                 color: isFasted
                                     ? Colors.deepPurple
                                     : theme.colorScheme.onSurfaceVariant),
-                            label: const Text('Em jejum'),
+                            label: Text(loc.bodyTrackerFasting),
                             selected: isFasted,
                             onSelected: (v) =>
                                 setSheetState(() => isFasted = v),
@@ -436,7 +436,7 @@ Future<void> showQuickMeasureSheet(
                               color: isFasted
                                   ? Colors.deepPurple
                                   : theme.colorScheme.onSurfaceVariant),
-                          label: const Text('Jejum',
+                          label: Text(loc.bodyTrackerFasted,
                               style: TextStyle(fontSize: 12)),
                           selected: isFasted,
                           onSelected: (v) =>
@@ -476,7 +476,7 @@ Future<void> showQuickMeasureSheet(
                       controller: commentCtl,
                       maxLines: 2,
                       decoration: InputDecoration(
-                        hintText: '${loc.bodyTrackerComment} (comum a todas)',
+                        hintText: loc.bodyTrackerQuickCommentHint,
                         prefixIcon: Icon(Icons.notes,
                             size: 16,
                             color: theme.colorScheme.onSurfaceVariant),
@@ -550,7 +550,7 @@ Future<void> showQuickMeasureSheet(
                                         .showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                            '✅ ${batch.length} medidas salvas!'),
+                                            loc.bodyTrackerSavedBatch(batch.length)),
                                         behavior: SnackBarBehavior.floating,
                                         shape: RoundedRectangleBorder(
                                           borderRadius:
@@ -596,6 +596,7 @@ List<Widget> _buildQuickMeasureFields(
   List<MeasureType> types,
   Map<String, Map<String, dynamic>?> latestByType,
 ) {
+  final loc = AppLocalizations.of(context)!;
   final items = <Widget>[];
   for (final t in types) {
     if (t.isBilateral) {
@@ -604,9 +605,10 @@ List<Widget> _buildQuickMeasureFields(
         final ctl = controllers[key]!;
         items.add(_buildQuickMeasureField(
           theme: theme,
+          loc: loc,
           type: t,
           label:
-              '${_typeLabel(t.id, context)} ${side == 'left' ? 'Esq.' : 'Dir.'}',
+              '${_typeLabel(t.id, context)} ${side == 'left' ? loc.bodyTrackerLeftAbbr : loc.bodyTrackerRightAbbr}.',
           controller: ctl,
           isFilled: hasValue[key] == true,
           latest: latestByType[t.id],
@@ -617,6 +619,7 @@ List<Widget> _buildQuickMeasureFields(
       final ctl = controllers[t.id]!;
       items.add(_buildQuickMeasureField(
         theme: theme,
+        loc: loc,
         type: t,
         label: _typeLabel(t.id, context),
         controller: ctl,
@@ -632,6 +635,7 @@ List<Widget> _buildQuickMeasureFields(
 /// Builds a single quick-measure field row.
 Widget _buildQuickMeasureField({
   required ThemeData theme,
+  required AppLocalizations loc,
   required MeasureType type,
   required String label,
   required TextEditingController controller,
@@ -671,7 +675,7 @@ Widget _buildQuickMeasureField({
         ),
         subtitle: latestVal != null
             ? Text(
-                'Último: ${latestVal.toStringAsFixed(1)} ${type.unit}',
+                '${loc.bodyTrackerLastLabel}${latestVal.toStringAsFixed(1)} ${type.unit}',
                 style: TextStyle(
                     fontSize: 11,
                     color: theme.colorScheme.onSurfaceVariant.withAlpha(180)),

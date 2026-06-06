@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 
 /// Dropdown selector for time of day (used in add-measurement sheet).
 class TimeOfDaySelector extends StatelessWidget {
@@ -13,21 +14,22 @@ class TimeOfDaySelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     return DropdownButtonFormField<String>(
       initialValue: value,
       decoration: InputDecoration(
-        labelText: 'Horário',
+        labelText: loc.bodyTrackerTimeOfDay,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         isDense: true,
       ),
-      items: const [
-        DropdownMenuItem(value: null, child: Text('Não informado')),
-        DropdownMenuItem(value: 'morning', child: Text('\u{1F305} Manhã')),
-        DropdownMenuItem(value: 'afternoon', child: Text('\u{2600}\u{FE0F} Tarde')),
-        DropdownMenuItem(value: 'evening', child: Text('\u{1F306} Noite')),
-        DropdownMenuItem(value: 'night', child: Text('\u{1F319} Madrugada')),
+      items: [
+        DropdownMenuItem(value: null, child: Text(loc.bodyTrackerNotInformed)),
+        DropdownMenuItem(value: 'morning', child: Text('\u{1F305} ${loc.bodyTrackerMorning}')),
+        DropdownMenuItem(value: 'afternoon', child: Text('\u{2600}\u{FE0F} ${loc.bodyTrackerAfternoon}')),
+        DropdownMenuItem(value: 'evening', child: Text('\u{1F306} ${loc.bodyTrackerEvening}')),
+        DropdownMenuItem(value: 'night', child: Text('\u{1F319} ${loc.bodyTrackerNight}')),
       ],
       onChanged: onChanged,
     );
@@ -48,11 +50,12 @@ class QuickTimeOfDaySelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    const options = [
-      (null, 'Todas', Icons.all_inclusive),
-      ('morning', 'Manhã', Icons.wb_sunny),
-      ('afternoon', 'Tarde', Icons.wb_cloudy),
-      ('evening', 'Noite', Icons.nights_stay),
+    final loc = AppLocalizations.of(context)!;
+    final options = [
+      (null, loc.commonAll, Icons.all_inclusive),
+      ('morning', loc.bodyTrackerMorning, Icons.wb_sunny),
+      ('afternoon', loc.bodyTrackerAfternoon, Icons.wb_cloudy),
+      ('evening', loc.bodyTrackerEvening, Icons.nights_stay),
     ];
 
     return Row(
@@ -120,6 +123,7 @@ class SideSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     return Row(
       children: [
@@ -138,13 +142,13 @@ class SideSelector extends StatelessWidget {
                 ),
                 color: value == 'left' ? Colors.blue.withAlpha(15) : null,
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.arrow_back, size: 16, color: Colors.blue),
-                  SizedBox(width: 6),
-                  Text('Esquerdo',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Icon(Icons.arrow_back, size: 16, color: Colors.blue),
+                  const SizedBox(width: 6),
+                  Text(loc.bodyTrackerLeft,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
@@ -166,13 +170,13 @@ class SideSelector extends StatelessWidget {
                 ),
                 color: value == 'right' ? Colors.red.withAlpha(15) : null,
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.arrow_forward, size: 16, color: Colors.red),
-                  SizedBox(width: 6),
-                  Text('Direito',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  const Icon(Icons.arrow_forward, size: 16, color: Colors.red),
+                  const SizedBox(width: 6),
+                  Text(loc.bodyTrackerRight,
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
                 ],
               ),
             ),

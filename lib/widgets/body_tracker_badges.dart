@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -12,7 +13,7 @@ class TimeOfDayBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (icon, label) = timeOfDayData(tod);
+    final (icon, label) = timeOfDayData(tod, context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
@@ -38,6 +39,7 @@ class FastedBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
@@ -50,9 +52,10 @@ class FastedBadge extends StatelessWidget {
           Icon(Icons.nightlight_round,
               size: 10, color: Colors.deepPurple.shade400),
           const SizedBox(width: 2),
-          Text('Jejum',
-              style:
-                  TextStyle(fontSize: 9, color: Colors.deepPurple.shade500)),
+          Text(
+            loc.bodyTrackerFasted,
+            style: TextStyle(fontSize: 9, color: Colors.deepPurple.shade500),
+          ),
         ],
       ),
     );
@@ -66,6 +69,7 @@ class SideBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final isLeft = side == 'left';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -83,7 +87,7 @@ class SideBadge extends StatelessWidget {
           ),
           const SizedBox(width: 2),
           Text(
-            isLeft ? 'Esq' : 'Dir',
+            isLeft ? loc.bodyTrackerLeftAbbr : loc.bodyTrackerRightAbbr,
             style: TextStyle(
               fontSize: 9,
               color: (isLeft ? Colors.blue : Colors.red).shade700,
@@ -107,7 +111,7 @@ class TimeOfDayChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (icon, label) = timeOfDayData(tod);
+    final (icon, label) = timeOfDayData(tod, context);
     return Chip(
       avatar: Icon(icon, size: 16),
       label: Text(label),
@@ -127,9 +131,10 @@ class FastedChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     return Chip(
       avatar: Icon(Icons.nightlight_round, size: 16, color: Colors.deepPurple),
-      label: const Text('Em jejum'),
+      label: Text(loc.bodyTrackerFasting),
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       backgroundColor: Colors.deepPurple.withAlpha(20),
@@ -147,6 +152,7 @@ class SideChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final isLeft = side == 'left';
     final color = isLeft ? Colors.blue : Colors.red;
     return Chip(
@@ -155,7 +161,7 @@ class SideChip extends StatelessWidget {
         size: 16,
         color: color,
       ),
-      label: Text(isLeft ? 'Esquerdo' : 'Direito'),
+      label: Text(isLeft ? loc.bodyTrackerLeft : loc.bodyTrackerRight),
       visualDensity: VisualDensity.compact,
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       backgroundColor: color.withAlpha(20),

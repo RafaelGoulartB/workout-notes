@@ -3,16 +3,17 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 
 /// Returns icon and label for a given time-of-day identifier.
-(IconData, String) timeOfDayData(String tod) {
+(IconData, String) timeOfDayData(String tod, BuildContext context) {
+  final loc = AppLocalizations.of(context)!;
   switch (tod) {
     case 'morning':
-      return (Icons.wb_sunny, 'Manhã');
+      return (Icons.wb_sunny, loc.bodyTrackerMorning);
     case 'afternoon':
-      return (Icons.wb_cloudy, 'Tarde');
+      return (Icons.wb_cloudy, loc.bodyTrackerAfternoon);
     case 'evening':
-      return (Icons.nights_stay, 'Noite');
+      return (Icons.nights_stay, loc.bodyTrackerEvening);
     case 'night':
-      return (Icons.bedtime, 'Madrugada');
+      return (Icons.bedtime, loc.bodyTrackerNight);
     default:
       return (Icons.access_time, tod);
   }
@@ -67,7 +68,7 @@ String typeName(String typeId, BuildContext context) {
     case 'thigh':
       return loc.bodyTrackerThigh;
     case 'calf':
-      return 'Panturrilha';
+      return loc.bodyTrackerCalf;
     case 'hip':
       return loc.bodyTrackerHip;
     default:
