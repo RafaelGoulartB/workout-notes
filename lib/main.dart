@@ -20,28 +20,6 @@ class AccentColors {
     Color(0xFF4A6741), // Forest Green (default)
   ];
 
-  static const List<String> labels = [
-    'Vermelho',
-    'Laranja Escuro',
-    'Laranja',
-    'Âmbar',
-    'Roxo',
-    'Azul Escuro',
-    'Graphite',
-    'Verde Musgo',
-  ];
-
-  static const List<IconData> icons = [
-    Icons.circle,
-    Icons.circle,
-    Icons.circle,
-    Icons.circle,
-    Icons.circle,
-    Icons.circle,
-    Icons.circle,
-    Icons.circle,
-  ];
-
   static const defaultColor = Color(0xFF37474F);
   static const defaultIndex = 6;
 
