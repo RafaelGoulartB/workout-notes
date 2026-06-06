@@ -6,7 +6,7 @@ import 'seed_data.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 7;
+  static const _dbVersion = 8;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -175,6 +175,7 @@ class DatabaseHelper {
         time_of_day TEXT,
         is_fasted INTEGER DEFAULT 0,
         photos_paths TEXT,
+        side TEXT,
         created_at TEXT NOT NULL
       )
     ''');
@@ -299,6 +300,11 @@ class DatabaseHelper {
           'weight_increment': 0,
           'created_at': DateTime.now().toIso8601String(),
         }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      } catch (_) {}
+    }
+    if (oldVersion < 8) {
+      try {
+        await db.execute('ALTER TABLE body_measurements ADD COLUMN side TEXT');
       } catch (_) {}
     }
   }
@@ -1167,7 +1173,7 @@ class DatabaseHelper {
 
   Future<void> addBodyMeasurement(String type, double value, String unit, {
     DateTime? date, String? comment, String? timeOfDay,
-    bool isFasted = false, List<String>? photosPaths,
+    bool isFasted = false, List<String>? photosPaths, String? side,
   }) async {
     final db = await database;
     await db.insert('body_measurements', {
@@ -1181,6 +1187,7 @@ class DatabaseHelper {
       'is_fasted': isFasted ? 1 : 0,
       'photos_paths': photosPaths != null && photosPaths.isNotEmpty
           ? jsonEncode(photosPaths) : null,
+      'side': side,
       'created_at': DateTime.now().toIso8601String(),
     });
   }
@@ -1199,6 +1206,7 @@ class DatabaseHelper {
         'is_fasted': (m['is_fasted'] as bool?) == true ? 1 : 0,
         'photos_paths': m['photos_paths'] != null
             ? jsonEncode(m['photos_paths']) : null,
+        'side': m['side'],
         'created_at': DateTime.now().toIso8601String(),
       });
     }
