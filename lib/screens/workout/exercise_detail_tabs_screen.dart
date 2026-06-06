@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
+import 'workout_detail_screen.dart';
 
 /// Tabbed detail screen for an exercise: Edit | History | Charts
 class ExerciseDetailTabsScreen extends StatefulWidget {
@@ -38,7 +40,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   Map<String, dynamic>? _history;
   bool _historyLoading = true;
   int _chartType = 0;
-  static const _chartTypes = ['1RM', 'Peso Máx.', 'Volume', 'Total Reps'];
+  static const _chartTypes = ['1RM', 'Max Weight', 'Volume', 'Total Reps'];
 
   final _types = [
     {'id': 'weightReps', 'name': 'Peso × Repetições', 'icon': Icons.fitness_center},
@@ -415,27 +417,39 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
             final sets = (h['total_sets'] as int?) ?? 0;
             final reps = (h['total_reps'] as int?) ?? 0;
             final est1RM = (h['estimated_1rm'] as double?);
+            final workoutId = h['workout_id'] as String?;
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(flex: 2, child: Text(date.length >= 10 ? date.substring(5) : date,
-                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                    Expanded(flex: 2, child: Text(maxW > 0 ? '${maxW.toStringAsFixed(1)}' : '-',
-                        style: theme.textTheme.bodySmall)),
-                    Expanded(flex: 2, child: Text(vol > 0 ? '${vol.toStringAsFixed(0)}' : '-',
-                        style: theme.textTheme.bodySmall)),
-                    Expanded(flex: 2, child: Text('$sets×$reps',
-                        style: theme.textTheme.bodySmall)),
-                    Expanded(flex: 2, child: Text(est1RM != null ? '${est1RM.toStringAsFixed(1)}' : '-',
-                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: Colors.amber[700]))),
-                  ],
+              child: InkWell(
+                onTap: workoutId != null
+                    ? () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => WorkoutDetailScreen(workoutId: workoutId),
+                        ),
+                      )
+                    : null,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(flex: 2, child: Text(date.length >= 10 ? date.substring(5) : date,
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
+                      Expanded(flex: 2, child: Text(maxW > 0 ? '${maxW.toStringAsFixed(1)}' : '-',
+                          style: theme.textTheme.bodySmall)),
+                      Expanded(flex: 2, child: Text(vol > 0 ? '${vol.toStringAsFixed(0)}' : '-',
+                          style: theme.textTheme.bodySmall)),
+                      Expanded(flex: 2, child: Text('$sets×$reps',
+                          style: theme.textTheme.bodySmall)),
+                      Expanded(flex: 2, child: Text(est1RM != null ? '${est1RM.toStringAsFixed(1)}' : '-',
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: Colors.amber[700]))),
+                    ],
+                  ),
                 ),
               ),
             );

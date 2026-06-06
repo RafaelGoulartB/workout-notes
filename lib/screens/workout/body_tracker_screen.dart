@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 
 class BodyTrackerScreen extends StatefulWidget {
@@ -17,13 +18,13 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   bool _isLoading = true;
 
   final _types = [
-    {'id': 'weight', 'name': 'Peso Corporal', 'unit': 'kg', 'icon': Icons.monitor_weight},
-    {'id': 'bodyFat', 'name': '% Gordura', 'unit': '%', 'icon': Icons.water_drop},
-    {'id': 'waist', 'name': 'Cintura', 'unit': 'cm', 'icon': Icons.straighten},
-    {'id': 'chest', 'name': 'Peito', 'unit': 'cm', 'icon': Icons.straighten},
-    {'id': 'arm', 'name': 'Braço', 'unit': 'cm', 'icon': Icons.straighten},
-    {'id': 'thigh', 'name': 'Coxa', 'unit': 'cm', 'icon': Icons.straighten},
-    {'id': 'hip', 'name': 'Quadril', 'unit': 'cm', 'icon': Icons.straighten},
+    {'id': 'weight', 'name': 'bodyTrackerWeight', 'unit': 'kg', 'icon': Icons.monitor_weight},
+    {'id': 'bodyFat', 'name': 'bodyTrackerBodyFat', 'unit': '%', 'icon': Icons.water_drop},
+    {'id': 'waist', 'name': 'bodyTrackerWaist', 'unit': 'cm', 'icon': Icons.straighten},
+    {'id': 'chest', 'name': 'bodyTrackerChest', 'unit': 'cm', 'icon': Icons.straighten},
+    {'id': 'arm', 'name': 'bodyTrackerArm', 'unit': 'cm', 'icon': Icons.straighten},
+    {'id': 'thigh', 'name': 'bodyTrackerThigh', 'unit': 'cm', 'icon': Icons.straighten},
+    {'id': 'hip', 'name': 'bodyTrackerHip', 'unit': 'cm', 'icon': Icons.straighten},
   ];
 
   @override
@@ -46,65 +47,68 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Adicionar ${_types.firstWhere((t) => t['id'] == _selectedType)['name']}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: valueCtl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'Valor (${_types.firstWhere((t) => t['id'] == _selectedType)['unit']})',
-                border: const OutlineInputBorder(),
+      builder: (ctx) {
+        final loc = AppLocalizations.of(ctx)!;
+        return AlertDialog(
+          title: Text(loc.bodyTrackerAddTitle(_typeName(_selectedType))),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: valueCtl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: '${loc.bodyTrackerValue} (${_types.firstWhere((t) => t['id'] == _selectedType)['unit']})',
+                  border: const OutlineInputBorder(),
+                ),
+                autofocus: true,
               ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: dateCtl,
-              decoration: const InputDecoration(
-                labelText: 'Data',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.calendar_today),
+              const SizedBox(height: 12),
+              TextField(
+                controller: dateCtl,
+                decoration: InputDecoration(
+                  labelText: loc.bodyTrackerDate,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.calendar_today),
+                ),
+                readOnly: true,
+                onTap: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (date != null) dateCtl.text = DateFormat('yyyy-MM-dd').format(date);
+                },
               ),
-              readOnly: true,
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now(),
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
-                );
-                if (date != null) dateCtl.text = DateFormat('yyyy-MM-dd').format(date);
-              },
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: commentCtl,
-              decoration: const InputDecoration(
-                labelText: 'Observação (opcional)',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 12),
+              TextField(
+                controller: commentCtl,
+                decoration: InputDecoration(
+                  labelText: loc.bodyTrackerComment,
+                  border: const OutlineInputBorder(),
+                ),
               ),
-            ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(loc.commonCancel)),
+            FilledButton(onPressed: () async {
+              final value = double.tryParse(valueCtl.text.replaceAll(',', '.'));
+              if (value == null || value <= 0) return;
+              final date = DateTime.tryParse(dateCtl.text);
+              await _db.addBodyMeasurement(
+                _selectedType, value,
+                _types.firstWhere((t) => t['id'] == _selectedType)['unit'] as String,
+                date: date, comment: commentCtl.text,
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+              _load();
+            }, child: Text(loc.bodyTrackerSave)),
           ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(onPressed: () async {
-            final value = double.tryParse(valueCtl.text.replaceAll(',', '.'));
-            if (value == null || value <= 0) return;
-            final date = DateTime.tryParse(dateCtl.text);
-            await _db.addBodyMeasurement(
-              _selectedType, value,
-              _types.firstWhere((t) => t['id'] == _selectedType)['unit'] as String,
-              date: date, comment: commentCtl.text,
-            );
-            if (ctx.mounted) Navigator.pop(ctx);
-            _load();
-          }, child: const Text('Adicionar')),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -115,7 +119,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Medidas Corporais'),
+        title: Text(AppLocalizations.of(context)!.bodyTrackerTitle),
         centerTitle: true,
       ),
       body: Column(
@@ -131,7 +135,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
                     avatar: Icon(t['icon'] as IconData, size: 18),
-                    label: Text(t['name'] as String),
+                    label: Text(_typeName(t['id'] as String)),
                     selected: _selectedType == t['id'],
                     onSelected: (_) {
                       setState(() => _selectedType = t['id'] as String);
@@ -155,7 +159,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                     children: [
                       Icon(currentType['icon'] as IconData, size: 64, color: theme.colorScheme.primary.withAlpha(80)),
                       const SizedBox(height: 16),
-                      Text('Nenhuma medida de ${currentType['name']}', style: theme.textTheme.titleMedium),
+                      Text('${AppLocalizations.of(context)!.progressNoData}: ${_typeName(currentType['id'] as String)}', style: theme.textTheme.titleMedium),
                       const SizedBox(height: 8),
                       Text('Adicione sua primeira medida', style: theme.textTheme.bodySmall),
                     ],
@@ -258,13 +262,16 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                             onLongPress: () async {
                               final confirm = await showDialog<bool>(
                                 context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('Excluir medida?'),
-                                  actions: [
-                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-                                    TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Excluir', style: TextStyle(color: Colors.red))),
-                                  ],
-                                ),
+                                builder: (ctx) {
+                                  final loc = AppLocalizations.of(ctx)!;
+                                  return AlertDialog(
+                                    title: Text(loc.bodyTrackerDeleteConfirm),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc.commonCancel)),
+                                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(loc.commonDelete, style: const TextStyle(color: Colors.red))),
+                                    ],
+                                  );
+                                },
                               );
                               if (confirm == true) {
                                 await _db.deleteBodyMeasurement(m['id'] as String);
@@ -284,8 +291,21 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addMeasurement,
         icon: const Icon(Icons.add),
-        label: Text('Adicionar ${currentType['name']}'),
+        label: Text(AppLocalizations.of(context)!.bodyTrackerAddTitle(_typeName(currentType['id'] as String))),
       ),
     );
+  }
+
+  String _typeName(String typeId) {
+    switch (typeId) {
+      case 'weight': return AppLocalizations.of(context)!.bodyTrackerWeight;
+      case 'bodyFat': return AppLocalizations.of(context)!.bodyTrackerBodyFat;
+      case 'waist': return AppLocalizations.of(context)!.bodyTrackerWaist;
+      case 'chest': return AppLocalizations.of(context)!.bodyTrackerChest;
+      case 'arm': return AppLocalizations.of(context)!.bodyTrackerArm;
+      case 'thigh': return AppLocalizations.of(context)!.bodyTrackerThigh;
+      case 'hip': return AppLocalizations.of(context)!.bodyTrackerHip;
+      default: return typeId;
+    }
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 
 class ExerciseFormScreen extends StatefulWidget {
@@ -64,7 +65,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
   Future<void> _save() async {
     if (_nameCtl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nome é obrigatório'), behavior: SnackBarBehavior.floating),
+        SnackBar(content: Text(AppLocalizations.of(context)!.exerciseFormNameRequired), behavior: SnackBarBehavior.floating),
       );
       return;
     }
@@ -87,7 +88,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
       setState(() => _isSaving = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.commonError(e.toString())), behavior: SnackBarBehavior.floating),
         );
       }
     }
@@ -106,14 +107,14 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Editar Exercício' : 'Novo Exercício'),
+        title: Text(_isEditing ? AppLocalizations.of(context)!.exerciseFormTitleEdit : AppLocalizations.of(context)!.exerciseFormTitleNew),
         centerTitle: true,
         actions: [
           TextButton(
             onPressed: _isSaving ? null : _save,
             child: _isSaving
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Salvar'),
+                : Text(AppLocalizations.of(context)!.exerciseFormSave),
           ),
         ],
       ),
@@ -127,10 +128,10 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                   // Name
                   TextField(
                     controller: _nameCtl,
-                    decoration: const InputDecoration(
-                      labelText: 'Nome do Exercício',
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)!.exerciseFormName,
                       border: OutlineInputBorder(),
-                      hintText: 'Ex: Supino Inclinado',
+                      hintText: AppLocalizations.of(context)!.exerciseFormNameHint,
                     ),
                     textCapitalization: TextCapitalization.words,
                     autofocus: !_isEditing,
@@ -140,8 +141,8 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                   // Category
                   DropdownButtonFormField<String>(
                     value: _categoryId,
-                    decoration: const InputDecoration(
-                      labelText: 'Grupo Muscular',
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)!.exerciseFormCategory,
                       border: OutlineInputBorder(),
                     ),
                     items: _categories.map((cat) => DropdownMenuItem(
@@ -163,8 +164,8 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                   // Type
                   DropdownButtonFormField<String>(
                     value: _types.any((t) => t['id'] == _type) ? _type : 'weightReps',
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo',
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)!.exerciseFormType,
                       border: OutlineInputBorder(),
                     ),
                     items: _types.map((t) => DropdownMenuItem<String>(
@@ -173,7 +174,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                         children: [
                           Icon(t['icon'] as IconData, size: 18, color: theme.colorScheme.primary),
                           const SizedBox(width: 8),
-                          Text(t['name'] as String),
+                          Text(_exerciseTypeName(t['id'] as String)),
                         ],
                       ),
                     )).toList(),
@@ -193,10 +194,10 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                     fieldViewBuilder: (ctx, ctl, focusNode, onSubmit) => TextField(
                       controller: ctl,
                       focusNode: focusNode,
-                      decoration: const InputDecoration(
-                        labelText: 'Equipamento (opcional)',
+                      decoration: InputDecoration(
+                        labelText: AppLocalizations.of(context)!.exerciseFormEquipment,
                         border: OutlineInputBorder(),
-                        hintText: 'Barbell, Dumbbell, Machine...',
+                        hintText: AppLocalizations.of(context)!.exerciseFormEquipmentHint,
                       ),
                       onSubmitted: (_) => onSubmit(),
                       onChanged: (v) => _equipment = v,
@@ -206,10 +207,10 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
 
                   // Weight increment
                   TextField(
-                    decoration: const InputDecoration(
-                      labelText: 'Incremento de Peso (kg)',
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)!.exerciseFormWeightIncrement,
                       border: OutlineInputBorder(),
-                      hintText: 'Ex: 2.5',
+                      hintText: AppLocalizations.of(context)!.exerciseFormWeightIncrementHint,
                     ),
                     keyboardType: TextInputType.number,
                     controller: TextEditingController(
@@ -220,10 +221,10 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
 
                   // Default rest time
                   TextField(
-                    decoration: const InputDecoration(
-                      labelText: 'Descanso Padrão (segundos)',
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)!.exerciseFormDefaultRest,
                       border: OutlineInputBorder(),
-                      hintText: 'Ex: 90',
+                      hintText: AppLocalizations.of(context)!.exerciseFormDefaultRestHint,
                     ),
                     keyboardType: TextInputType.number,
                     controller: TextEditingController(
@@ -236,15 +237,31 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                   TextField(
                     controller: _notesCtl,
                     maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'Instruções / Dicas (opcional)',
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)!.exerciseFormNotes,
                       border: OutlineInputBorder(),
-                      hintText: 'Dicas de execução, forma correta...',
+                      hintText: AppLocalizations.of(context)!.exerciseFormNotesHint,
                     ),
                   ),
                 ],
               ),
             ),
     );
+  }
+
+  String _exerciseTypeName(String typeId) {
+    switch (typeId) {
+      case 'weightReps': return AppLocalizations.of(context)!.exerciseFormTypeWeightReps;
+      case 'distanceTime': return AppLocalizations.of(context)!.exerciseFormTypeDistanceTime;
+      case 'weightDistance': return AppLocalizations.of(context)!.exerciseFormTypeWeightDistance;
+      case 'weightTime': return AppLocalizations.of(context)!.exerciseFormTypeWeightTime;
+      case 'repsDistance': return AppLocalizations.of(context)!.exerciseFormTypeRepsDistance;
+      case 'repsTime': return AppLocalizations.of(context)!.exerciseFormTypeRepsTime;
+      case 'weightOnly': return AppLocalizations.of(context)!.exerciseFormTypeWeightOnly;
+      case 'repsOnly': return AppLocalizations.of(context)!.exerciseFormTypeRepsOnly;
+      case 'distanceOnly': return AppLocalizations.of(context)!.exerciseFormTypeDistanceOnly;
+      case 'timeOnly': return AppLocalizations.of(context)!.exerciseFormTypeTimeOnly;
+      default: return typeId;
+    }
   }
 }

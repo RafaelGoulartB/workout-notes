@@ -12,7 +12,7 @@ class ExportService {
     final data = await _db.exportAllData();
     final json = const JsonEncoder.withIndent('  ').convert(data);
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/life_notes_backup_${DateTime.now().millisecondsSinceEpoch}.json');
+    final file = File('${dir.path}/workout_notes_backup_${DateTime.now().millisecondsSinceEpoch}.json');
     await file.writeAsString(json);
     return file.path;
   }
@@ -20,7 +20,7 @@ class ExportService {
   Future<void> shareJsonBackup() async {
     final path = await exportToJson();
     final file = XFile(path, mimeType: 'application/json');
-    await Share.shareXFiles([file], text: 'Life Notes - Backup de Treinos');
+    await Share.shareXFiles([file], text: 'Workout Notes - Workout Backup');
   }
 
   Future<String> exportToCsv({
@@ -57,7 +57,7 @@ class ExportService {
 
     final csvData = const ListToCsvConverter().convert(csvRows);
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/life_notes_export_${DateTime.now().millisecondsSinceEpoch}.csv');
+    final file = File('${dir.path}/workout_notes_export_${DateTime.now().millisecondsSinceEpoch}.csv');
     await file.writeAsString(csvData);
     return file.path;
   }
@@ -75,7 +75,7 @@ class ExportService {
       endDate: endDate,
     );
     final file = XFile(path, mimeType: 'text/csv');
-    await Share.shareXFiles([file], text: 'Life Notes - Exportação de Treinos');
+    await Share.shareXFiles([file], text: 'Workout Notes - Workout Export');
   }
 
   Future<int> importFromJson(String filePath) async {

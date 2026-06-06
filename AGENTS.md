@@ -1,12 +1,12 @@
-# AGENTS.md — Life Notes
+# AGENTS.md — Workout Notes
 
-A comprehensive guide for LLM agents working on the Life Notes project. This document captures the project's architecture, conventions, design decisions, and common patterns to help agents produce correct, maintainable code.
+A comprehensive guide for LLM agents working on the Workout Notes project. This document captures the project's architecture, conventions, design decisions, and common patterns to help agents produce correct, maintainable code.
 
 ---
 
 ## 1. Project Overview
 
-**Life Notes** is a Flutter mobile application that combines a personal journal with a workout tracker. It supports Android, iOS, web, and desktop (Linux, macOS, Windows).
+**Workout Notes** is a Flutter mobile application for tracking workouts, exercises, sets, and progress. It supports Android, iOS, web, and desktop (Linux, macOS, Windows).
 
 - **Journal module:** Write, edit, browse, and delete personal notes. Persisted via `shared_preferences` (local JSON).
 - **Workout tracker module:** Exercise library, workout logging, set tracking, routines, body measurements, progress charts, calendar, rest timer, CSV export. All persisted via **SQLite** (`sqflite`).
@@ -85,7 +85,7 @@ The project intentionally avoids heavy state management libraries (Riverpod, Blo
 
 ### 4.2 Database Architecture
 
-**Notes** are stored in `shared_preferences` as a single JSON string (`life_notes` key). The `Note` model is self-contained with `toJson`/`fromJson`.
+**Notes** (removed) — previously stored in `shared_preferences` as a single JSON string. The app is now workout-only.
 
 **Workout data** uses SQLite via `sqflite` with the following relational schema:
 
@@ -263,7 +263,7 @@ class Note {
 5. **Workout timer:** The timer in `active_workout_screen.dart` is managed client-side; `startWorkoutTimer`/`stopWorkoutTimer`/`resetWorkoutTimer` in `DatabaseHelper` handle persistence.
 6. **File sizes:** `active_workout_screen.dart` (~1.6K lines) is the largest file. Consider splitting if new functionality is added.
 7. **Empty states:** Use `EmptyStatePlaceholder` widget for consistent empty-state UI across screens.
-8. **Don't use relative imports across top-level directories.** Use `package:life_notes/...` imports.
+8. **Don't use relative imports across top-level directories.** Use `package:workout_notes/...` imports.
 9. **Seed data** lives in `seed_data.dart` — categorized by `energy_system` (aerobic/anaerobic). The `test_seed_data.dart` file generates sample workouts for development testing.
 
 ---

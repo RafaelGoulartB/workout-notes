@@ -2,11 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:uuid/uuid.dart';
 import '../../database/database_helper.dart';
 import '../../services/rest_timer_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/exercise_picker_sheet.dart';
+import 'exercise_detail_tabs_screen.dart';
 import 'rest_timer_screen.dart';
 
 class ActiveWorkoutScreen extends StatefulWidget {
@@ -216,11 +218,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Resetar Timer?'),
-        content: const Text('Isso vai limpar o tempo de início e fim do treino.'),
+        title: Text(AppLocalizations.of(context)!.activeWorkoutResetTimer),
+        content: Text(AppLocalizations.of(context)!.activeWorkoutResetTimerContent),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Resetar', style: TextStyle(color: Colors.red))),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context)!.commonCancel)),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(AppLocalizations.of(context)!.activeWorkoutReset, style: TextStyle(color: Colors.red))),
         ],
       ),
     );
@@ -252,14 +254,14 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
           FilledButton(onPressed: () {
             final parsed = double.tryParse(ctl.text.replaceAll(',', '.'));
             if (parsed != null && parsed >= 0) {
               onSet(isInt ? parsed.roundToDouble() : parsed);
             }
             Navigator.pop(ctx);
-          }, child: const Text('OK')),
+          }, child: Text(AppLocalizations.of(context)!.activeWorkoutOK)),
         ],
       ),
     );
@@ -295,7 +297,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text('Peso (kg)', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        Text(AppLocalizations.of(context)!.activeWorkoutWeight, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Row(children: [
           _StepperButton(icon: Icons.remove, onTap: () => onChanged(weight - 2.5)),
@@ -332,7 +334,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 14),
-        Text('Repetições', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        Text(AppLocalizations.of(context)!.activeWorkoutReps, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Row(children: [
           _StepperButton(icon: Icons.remove, onTap: () => onChanged(reps - 1)),
@@ -365,7 +367,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text('Distância (km)', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        Text(AppLocalizations.of(context)!.activeWorkoutDistance, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Row(children: [
           _StepperButton(icon: Icons.remove, small: true, onTap: () => onChanged((distance - 0.1).clamp(0, 999))),
@@ -402,7 +404,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text('Tempo', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+        Text(AppLocalizations.of(context)!.activeWorkoutTime, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Row(children: [
           _StepperButton(icon: Icons.remove, onTap: () => onChanged((timeSeconds - 30).clamp(0, 99999))),
@@ -600,7 +602,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: Text('Editar Série', style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                      child: Text(AppLocalizations.of(context)!.activeWorkoutEditSet, style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                     ),
                     Text('$exerciseName • Série $setNumber', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
                       color: Theme.of(ctx).colorScheme.onSurfaceVariant,
@@ -627,7 +629,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   children: [
                     Icon(Icons.whatshot, size: 16, color: isWarmup ? Colors.orange : Theme.of(ctx).colorScheme.onSurfaceVariant),
                     const SizedBox(width: 6),
-                    Text('Aquecimento', style: Theme.of(ctx).textTheme.bodyMedium),
+                    Text(AppLocalizations.of(context)!.activeWorkoutWarmup, style: Theme.of(ctx).textTheme.bodyMedium),
                     const Spacer(),
                     SizedBox(
                       height: 28,
@@ -696,7 +698,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Cancelar'),
+                        child: Text(AppLocalizations.of(context)!.commonCancel),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -704,7 +706,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       flex: 2,
                       child: FilledButton(
                         onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Salvar'),
+                        child: Text(AppLocalizations.of(context)!.commonSave),
                       ),
                     ),
                   ],
@@ -737,13 +739,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remover Exercício?'),
+        title: Text(AppLocalizations.of(context)!.activeWorkoutRemoveExercise),
         content: Text('Remover "${exercise.name}" do treino? Todas as séries registradas serão perdidas.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context)!.commonCancel)),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Remover', style: TextStyle(color: Colors.red)),
+            child: Text(AppLocalizations.of(context)!.activeWorkoutRemove, style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -755,7 +757,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       if (mounted) setState(() {});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${exercise.name} removido do treino'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.activeWorkoutRemoved(exercise.name)), behavior: SnackBarBehavior.floating),
         );
       }
     }
@@ -800,9 +802,10 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     await _db.finishWorkout(_workoutId!, comment: comment, feelingRating: feeling);
 
     if (mounted) {
+      final loc = AppLocalizations.of(context)!;
       final msg = summary.prs.isNotEmpty
-          ? '🎉 Treino finalizado! ${summary.prs.length} recorde(s) pessoal(is)!'
-          : '💪 Treino finalizado!';
+          ? loc.activeWorkoutFinishedWithPRs(summary.prs.length)
+          : loc.activeWorkoutFinished;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
       );
@@ -930,7 +933,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Treino'),
+        title: Text(AppLocalizations.of(context)!.activeWorkoutTitle),
         centerTitle: true,
         actions: [
           if (_timerService.isActive)
@@ -984,7 +987,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           IconButton(
             icon: const Icon(Icons.check_circle_outline),
             onPressed: _exercises.isNotEmpty ? _finishWorkout : null,
-            tooltip: 'Finalizar Treino',
+            tooltip: AppLocalizations.of(context)!.activeWorkoutFinishWorkout,
           ),
         ],
       ),
@@ -996,7 +999,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _pickExercise,
         icon: const Icon(Icons.add),
-        label: const Text('Adicionar Exercício'),
+        label: Text(AppLocalizations.of(context)!.activeWorkoutAddExercise),
       ),
     );
   }
@@ -1010,21 +1013,20 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           children: [
             Icon(Icons.fitness_center, size: 80, color: theme.colorScheme.primary.withAlpha(80)),
             const SizedBox(height: 24),
-            Text('Nenhum exercício ainda', style: theme.textTheme.titleLarge),
+            Text(AppLocalizations.of(context)!.activeWorkoutEmptyTitle, style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
-            Text('Adicione exercícios para começar seu treino',
-                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text(AppLocalizations.of(context)!.activeWorkoutEmptySubtitle, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: _pickExercise,
               icon: const Icon(Icons.add),
-              label: const Text('Adicionar Exercício'),
+              label: Text(AppLocalizations.of(context)!.activeWorkoutAddExercise),
             ),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _importFromRoutine,
               icon: const Icon(Icons.repeat),
-              label: const Text('Importar de Rotina'),
+              label: Text(AppLocalizations.of(context)!.activeWorkoutImportRoutine),
             ),
           ],
         ),
@@ -1054,7 +1056,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             color: theme.colorScheme.surfaceContainerLow,
             child: Row(
               children: [
-                Text('$completedSets/$totalSets sets', style: theme.textTheme.bodySmall),
+                Text(AppLocalizations.of(context)!.activeWorkoutSetsSummary(completedSets, totalSets), style: theme.textTheme.bodySmall),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ClipRRect(
@@ -1091,7 +1093,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   // ===================== TIMER CARD =====================
   Widget _buildTimerCard(ThemeData theme) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -1137,7 +1139,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Início ${DateFormat('HH:mm').format(_timerStart!)}',
+                    '${AppLocalizations.of(context)!.activeWorkoutTimerStartLabel} ${DateFormat('HH:mm').format(_timerStart!)}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1145,7 +1147,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 ] else if (_timerStart != null && _timerEnd != null) ...[
                   // Finished
                   Text(
-                    'Duração $_elapsedStr',
+                    '${AppLocalizations.of(context)!.activeWorkoutTimerDuration} $_elapsedStr',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -1161,14 +1163,14 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 ] else ...[
                   // Not started
                   Text(
-                    'Temporizador de Treino',
+                    AppLocalizations.of(context)!.activeWorkoutTimerTitle,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Iniciar cronômetro do treino',
+                    AppLocalizations.of(context)!.activeWorkoutStartTimerTooltip,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1192,7 +1194,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       : Colors.white,
                 ),
                 child: Text(
-                  _timerStart == null ? 'Iniciar' : 'Finalizar',
+                  _timerStart == null ? AppLocalizations.of(context)!.activeWorkoutStart : AppLocalizations.of(context)!.activeWorkoutFinishWorkout,
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
               ),
@@ -1218,7 +1220,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     if (routines.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nenhuma rotina encontrada. Crie uma primeiro!'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.activeWorkoutNoRoutineFound), behavior: SnackBarBehavior.floating),
         );
       }
       return;
@@ -1236,7 +1238,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     if (days.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Esta rotina não tem dias.'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.activeWorkoutNoRoutineDays), behavior: SnackBarBehavior.floating),
         );
       }
       return;
@@ -1257,7 +1259,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     setState(() {});
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Exercícios importados da rotina!'), behavior: SnackBarBehavior.floating),
+        SnackBar(content: Text(AppLocalizations.of(context)!.activeWorkoutRoutineImported), behavior: SnackBarBehavior.floating),
       );
     }
   }
@@ -1275,7 +1277,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             borderRadius: BorderRadius.circular(2),
           ))),
           const SizedBox(height: 16),
-          Text('Selecione a Rotina', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+          Text(AppLocalizations.of(context)!.activeWorkoutSelectRoutine, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           SizedBox(
             height: 300,
@@ -1323,13 +1325,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               TextButton.icon(
                 onPressed: () => Navigator.pop(sheetContext),
                 icon: const Icon(Icons.arrow_back, size: 18),
-                label: const Text('Voltar'),
+                label: Text(AppLocalizations.of(context)!.activeWorkoutBack),
               ),
             ],
           ),
           Text(routineName, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text('Selecione o dia para importar', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(AppLocalizations.of(context)!.activeWorkoutSelectDay, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 16),
           SizedBox(
             height: 300,
@@ -1404,7 +1406,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   _showCustomRestTimeDialog(exercise);
                 },
                 icon: const Icon(Icons.edit),
-                label: const Text('Personalizado'),
+                label: Text(AppLocalizations.of(context)!.activeWorkoutCustom),
               ),
             ),
           ],
@@ -1418,7 +1420,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Tempo Personalizado'),
+        title: Text(AppLocalizations.of(context)!.activeWorkoutCustomTime),
         content: Row(
           children: [
             Expanded(
@@ -1437,7 +1439,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
           FilledButton(onPressed: () {
             final v = int.tryParse(ctl.text);
             if (v != null && v > 0) {
@@ -1573,20 +1575,69 @@ class _ExerciseCard extends StatelessWidget {
     this.onRemoveExercise,
   });
 
+  void _showExerciseModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(
+                children: [
+                  Icon(Icons.fitness_center, size: 18, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      exercise.name,
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.open_in_new),
+              title: Text(AppLocalizations.of(context)!.workoutDetailViewExercise),
+              subtitle: Text(exercise.name),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ExerciseDetailTabsScreen(
+                      exerciseId: exercise.exerciseId,
+                      exerciseName: exercise.name,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final restMin = exercise.restTimeSeconds ~/ 60;
     final restSec = exercise.restTimeSeconds % 60;
     final restStr = restMin > 0 ? '${restMin}min$restSec' : '${restSec}s';
 
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
+    return GestureDetector(
+      onLongPress: () => _showExerciseModal(context),
+      child: Card(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        ),
+        child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1684,13 +1735,14 @@ class _ExerciseCard extends StatelessWidget {
             TextButton.icon(
               onPressed: onAddSet,
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('Adicionar Série'),
+              label: Text(AppLocalizations.of(context)!.activeWorkoutAddSet),
               style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
             ),
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildHeaderRow(ThemeData theme) {
@@ -1833,12 +1885,13 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
   }
 
   String get _feelingLabel {
+    final loc = AppLocalizations.of(context)!;
     switch (_rating) {
-      case 1: return 'Ruim';
-      case 2: return 'Ok';
-      case 3: return 'Bom';
-      case 4: return 'Ótimo';
-      case 5: return 'Excelente!';
+      case 1: return loc.activeWorkoutFeeling1;
+      case 2: return loc.activeWorkoutFeeling2;
+      case 3: return loc.activeWorkoutFeeling3;
+      case 4: return loc.activeWorkoutFeeling4;
+      case 5: return loc.activeWorkoutFeeling5;
       default: return '';
     }
   }
@@ -1907,14 +1960,14 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Treino Concluído!',
+                    AppLocalizations.of(context)!.activeWorkoutCompleted,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Ótimo trabalho! Aqui está o resumo:',
+                    AppLocalizations.of(context)!.activeWorkoutSummarySubtitle,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1932,7 +1985,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                 children: [
                   _StatTile(
                     icon: Icons.timer,
-                    label: 'Duração',
+                    label: AppLocalizations.of(context)!.activeWorkoutTimerDuration,
                     value: s.formattedDuration,
                     color: theme.colorScheme.primary,
                     theme: theme,
@@ -1940,7 +1993,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                   const SizedBox(width: 8),
                   _StatTile(
                     icon: Icons.auto_graph,
-                    label: 'Volume',
+                    label: AppLocalizations.of(context)!.commonVolume,
                     value: '${s.formattedVolume} kg',
                     color: theme.colorScheme.secondary,
                     theme: theme,
@@ -1948,7 +2001,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                   const SizedBox(width: 8),
                   _StatTile(
                     icon: Icons.fitness_center,
-                    label: 'Sets',
+                    label: AppLocalizations.of(context)!.commonSets,
                     value: '${s.completedSets}/${s.totalSets}',
                     color: Colors.orange,
                     theme: theme,
@@ -1988,7 +2041,8 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                         Icon(Icons.emoji_events, size: 20, color: Colors.amber.shade700),
                         const SizedBox(width: 8),
                         Text(
-                          'Novos Recordes Pessoais',
+                          AppLocalizations.of(context)!
+                              .activeWorkoutPersonalRecords,
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -2055,7 +2109,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                       Icon(Icons.favorite, size: 18, color: Colors.red.shade300),
                       const SizedBox(width: 8),
                       Text(
-                        'Como foi o treino?',
+                        AppLocalizations.of(context)!.activeWorkoutHowWasWorkout,
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -2110,7 +2164,8 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                 controller: _commentCtl,
                 maxLines: 2,
                 decoration: InputDecoration(
-                  hintText: 'Observação do treino (opcional)...',
+                  hintText: AppLocalizations.of(context)!
+                      .activeWorkoutCommentHint,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -2143,7 +2198,7 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text('Cancelar'),
+                      child: Text(AppLocalizations.of(context)!.commonCancel),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -2160,9 +2215,10 @@ class _FinishWorkoutSheetState extends State<_FinishWorkoutSheet> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: const Text(
-                        'Finalizar',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      child: Text(
+                        AppLocalizations.of(context)!
+                            .activeWorkoutFinishWorkout,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),

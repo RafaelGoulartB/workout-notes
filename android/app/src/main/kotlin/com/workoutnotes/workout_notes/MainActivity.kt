@@ -1,4 +1,4 @@
-package com.lifenotes.life_notes
+package com.workoutnotes.workout_notes
 
 import io.flutter.embedding.android.FlutterActivity
 

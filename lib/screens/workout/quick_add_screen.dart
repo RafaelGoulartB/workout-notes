@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 
 class QuickAddScreen extends StatefulWidget {
@@ -69,7 +70,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       if (parts.length < 2) {
         setState(() {
           _parsedSets = [];
-          _error = 'Formato: NomeExercício Peso [SériesxReps]';
+          _error = AppLocalizations.of(context)!.quickAddFormatError;
         });
         return;
       }
@@ -91,7 +92,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       if (weightIdx == -1) {
         setState(() {
           _parsedSets = [];
-          _error = 'Peso não encontrado. Use: Nome Peso [SériesxReps]';
+          _error = AppLocalizations.of(context)!.quickAddWeightNotFound;
         });
         return;
       }
@@ -142,12 +143,12 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
 
       setState(() {
         _parsedSets = sets;
-        _error = sets.isEmpty ? 'Nenhuma série identificada' : null;
+        _error = sets.isEmpty ? AppLocalizations.of(context)!.quickAddNoSets : null;
       });
     } catch (e) {
       setState(() {
         _parsedSets = [];
-        _error = 'Erro ao interpretar: $e';
+        _error = '${AppLocalizations.of(context)!.commonError(e.toString())}';
       });
     }
   }
@@ -188,10 +189,10 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Exercício "$exerciseName" não encontrado'),
+              content: Text(AppLocalizations.of(context)!.quickAddExerciseNotFound(exerciseName)),
               behavior: SnackBarBehavior.floating,
               action: SnackBarAction(
-                label: 'Criar',
+                label: AppLocalizations.of(context)!.quickAddCreate,
                 onPressed: () => _createAndSave(exerciseName, weight),
               ),
             ),
@@ -227,7 +228,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ ${exercise['name']} • ${_parsedSets.length} séries registradas'),
+            content: Text(AppLocalizations.of(context)!.quickAddSaved(exercise['name'], _parsedSets.length.toString())),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -237,7 +238,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       setState(() => _isSaving = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e'), behavior: SnackBarBehavior.floating),
+          SnackBar(content: Text(AppLocalizations.of(context)!.commonError(e.toString())), behavior: SnackBarBehavior.floating),
         );
       }
     }
@@ -272,7 +273,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('✅ $exerciseName criado e registrado!'), behavior: SnackBarBehavior.floating),
+        SnackBar(content: Text(AppLocalizations.of(context)!.quickAddCreatedAndSaved(exerciseName)), behavior: SnackBarBehavior.floating),
       );
       Navigator.pop(context, true);
     }
@@ -291,14 +292,14 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quick Add'),
+        title: Text(AppLocalizations.of(context)!.quickAddTitle),
         centerTitle: true,
         actions: [
           TextButton(
             onPressed: _parsedSets.isNotEmpty && !_isSaving ? _save : null,
             child: _isSaving
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Salvar'),
+                : Text(AppLocalizations.of(context)!.quickAddSave),
           ),
         ],
       ),
@@ -325,7 +326,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
                   onSubmitted: (_) => _parsedSets.isNotEmpty ? _save() : null,
                   style: theme.textTheme.bodyLarge,
                   decoration: InputDecoration(
-                    hintText: 'Ex: Supino 80kg 3x10',
+                    hintText: AppLocalizations.of(context)!.quickAddHint,
                     hintStyle: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(120)),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.all(16),
@@ -346,7 +347,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
             // Examples
             if (_parsedSets.isEmpty && _textController.text.isEmpty) ...[
               const SizedBox(height: 16),
-              Text('Formatos aceitos:', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              Text(AppLocalizations.of(context)!.quickAddAcceptedFormats, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               ...[
                 'Supino 80kg 3x10',
@@ -381,7 +382,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
                 children: [
                   Icon(Icons.check_circle, color: Colors.green, size: 18),
                   const SizedBox(width: 8),
-                  Text('${_parsedSets.length} série(s) identificada(s)',
+                  Text(AppLocalizations.of(context)!.quickAddSetsIdentified(_parsedSets.length.toString()),
                       style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                 ],
               ),
@@ -430,7 +431,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
             // Recent exercises quick pick
             if (_recentExercises.isNotEmpty && _textController.text.isEmpty) ...[
               const SizedBox(height: 24),
-              Text('Exercícios Recentes', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              Text(AppLocalizations.of(context)!.quickAddRecentExercises, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,

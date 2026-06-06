@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:intl/intl.dart';
+import 'l10n/app_localizations.dart';
 import 'services/notification_service.dart';
 import 'screens/workout/workout_home_screen.dart';
-import 'screens/home_screen.dart';
 
 /// List of accent seed colors available in settings.
 class AccentColors {
@@ -72,9 +74,22 @@ class ThemeNotifier extends ChangeNotifier {
   }
 }
 
+/// Notifier for locale/language changes.
+class LocaleNotifier extends ChangeNotifier {
+  Locale _locale;
+
+  LocaleNotifier(this._locale);
+
+  Locale get locale => _locale;
+
+  void setLocale(Locale locale) {
+    _locale = locale;
+    notifyListeners();
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('pt_BR', null);
 
   // Initialize notification service
   final notif = NotificationService.instance;
@@ -90,10 +105,31 @@ void main() async {
   final themeModeStr = prefs.getString('theme_mode') ?? 'system';
   final initialThemeMode = _parseThemeMode(themeModeStr);
 
-  // Initialize the theme notifier with the loaded values
-  LifeNotesApp.themeNotifier = ThemeNotifier(initialColor, initialThemeMode);
+  // Load saved locale
+  final localeStr = prefs.getString('app_locale') ?? 'en';
+  final initialLocale = _parseLocale(localeStr);
 
-  runApp(LifeNotesApp(initialColor: initialColor, initialThemeMode: initialThemeMode));
+  // Initialize date formatting based on locale
+  final localeForDateFormat = localeStr == 'pt' ? 'pt_BR' : 'en';
+  await initializeDateFormatting(localeForDateFormat, null);
+  Intl.defaultLocale = localeForDateFormat;
+
+  // Initialize the theme notifier with the loaded values
+  WorkoutNotesApp.themeNotifier = ThemeNotifier(initialColor, initialThemeMode);
+  WorkoutNotesApp.localeNotifier = LocaleNotifier(initialLocale);
+
+  runApp(WorkoutNotesApp(
+    initialColor: initialColor,
+    initialThemeMode: initialThemeMode,
+    initialLocale: initialLocale,
+  ));
+}
+
+Locale _parseLocale(String value) {
+  if (value == 'pt' || value == 'pt_BR') {
+    return const Locale('pt', 'BR');
+  }
+  return const Locale('en');
 }
 
 ThemeMode _parseThemeMode(String value) {
@@ -107,43 +143,61 @@ ThemeMode _parseThemeMode(String value) {
   }
 }
 
-class LifeNotesApp extends StatefulWidget {
+class WorkoutNotesApp extends StatefulWidget {
   final Color initialColor;
   final ThemeMode initialThemeMode;
-  
-  const LifeNotesApp({super.key, required this.initialColor, required this.initialThemeMode});
+  final Locale initialLocale;
+
+  const WorkoutNotesApp({
+    super.key,
+    required this.initialColor,
+    required this.initialThemeMode,
+    required this.initialLocale,
+  });
 
   static late ThemeNotifier themeNotifier;
+  static late LocaleNotifier localeNotifier;
 
   @override
-  State<LifeNotesApp> createState() => _LifeNotesAppState();
+  State<WorkoutNotesApp> createState() => _WorkoutNotesAppState();
 }
 
-class _LifeNotesAppState extends State<LifeNotesApp> {
+class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
   late Color _seedColor;
   late ThemeMode _themeMode;
+  late Locale _locale;
 
   @override
   void initState() {
     super.initState();
     _seedColor = widget.initialColor;
     _themeMode = widget.initialThemeMode;
-    LifeNotesApp.themeNotifier.addListener(_onThemeChanged);
-    // Sync the notifier's initial value
-    LifeNotesApp.themeNotifier.setSeedColor(_seedColor);
-    LifeNotesApp.themeNotifier.setThemeMode(_themeMode);
+    _locale = widget.initialLocale;
+    WorkoutNotesApp.themeNotifier.addListener(_onThemeChanged);
+    WorkoutNotesApp.localeNotifier.addListener(_onLocaleChanged);
+    // Sync the notifier's initial values
+    WorkoutNotesApp.themeNotifier.setSeedColor(_seedColor);
+    WorkoutNotesApp.themeNotifier.setThemeMode(_themeMode);
+    WorkoutNotesApp.localeNotifier.setLocale(_locale);
   }
 
   @override
   void dispose() {
-    LifeNotesApp.themeNotifier.removeListener(_onThemeChanged);
+    WorkoutNotesApp.themeNotifier.removeListener(_onThemeChanged);
+    WorkoutNotesApp.localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
   }
 
   void _onThemeChanged() {
     setState(() {
-      _seedColor = LifeNotesApp.themeNotifier.seedColor;
-      _themeMode = LifeNotesApp.themeNotifier.themeMode;
+      _seedColor = WorkoutNotesApp.themeNotifier.seedColor;
+      _themeMode = WorkoutNotesApp.themeNotifier.themeMode;
+    });
+  }
+
+  void _onLocaleChanged() {
+    setState(() {
+      _locale = WorkoutNotesApp.localeNotifier.locale;
     });
   }
 
@@ -180,68 +234,26 @@ class _LifeNotesAppState extends State<LifeNotesApp> {
         ),
         filled: true,
       ),
-      navigationBarTheme: NavigationBarThemeData(
-        elevation: 0,
-        shadowColor: Colors.transparent,
-        indicatorShape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Life Notes',
+      title: 'Workout Notes',
       debugShowCheckedModeBanner: false,
+      locale: _locale,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: _buildTheme(_seedColor, Brightness.light),
       darkTheme: _buildTheme(_seedColor, Brightness.dark),
       themeMode: _themeMode,
-      home: const MainShell(),
-    );
-  }
-}
-
-class MainShell extends StatefulWidget {
-  const MainShell({super.key});
-
-  @override
-  State<MainShell> createState() => _MainShellState();
-}
-
-class _MainShellState extends State<MainShell> {
-  int _selectedIndex = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: const [
-          HomeScreen(),
-          WorkoutHomeScreen(),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (i) => setState(() => _selectedIndex = i),
-        backgroundColor: theme.colorScheme.surface,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.auto_stories_outlined),
-            selectedIcon: Icon(Icons.auto_stories),
-            label: 'Notas',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.fitness_center_outlined),
-            selectedIcon: Icon(Icons.fitness_center),
-            label: 'Treino',
-          ),
-        ],
-      ),
+      home: const WorkoutHomeScreen(),
     );
   }
 }

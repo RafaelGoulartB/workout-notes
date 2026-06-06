@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../database/database_helper.dart';
 import '../../widgets/exercise_picker_sheet.dart';
 
@@ -31,25 +32,25 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Nova Rotina'),
+        title: Text(AppLocalizations.of(context)!.routinesNew),
         content: TextField(
           controller: ctl,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Nome da Rotina',
+          decoration: InputDecoration(
+            labelText: AppLocalizations.of(context)!.routinesName,
             border: OutlineInputBorder(),
-            hintText: 'Ex: Push Pull Legs',
+            hintText: AppLocalizations.of(context)!.routinesNameHint,
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
           FilledButton(onPressed: () async {
             if (ctl.text.trim().isNotEmpty) {
               await _db.createRoutine(ctl.text.trim());
               if (ctx.mounted) Navigator.pop(ctx);
               _load();
             }
-          }, child: const Text('Criar')),
+          }, child: Text(AppLocalizations.of(context)!.routinesCreate)),
         ],
       ),
     );
@@ -61,7 +62,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Rotinas'),
+        title: Text(AppLocalizations.of(context)!.routinesTitle),
         centerTitle: true,
       ),
       body: _isLoading
@@ -75,15 +76,15 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
                       children: [
                         Icon(Icons.repeat, size: 80, color: theme.colorScheme.primary.withAlpha(80)),
                         const SizedBox(height: 24),
-                        Text('Nenhuma rotina ainda', style: theme.textTheme.titleLarge),
+                        Text(AppLocalizations.of(context)!.routinesEmptyTitle, style: theme.textTheme.titleLarge),
                         const SizedBox(height: 8),
-                        Text('Crie uma rotina para treinar mais rápido',
+                        Text(AppLocalizations.of(context)!.routinesEmptySubtitle,
                             style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
                         const SizedBox(height: 24),
                         FilledButton.icon(
                           onPressed: _createRoutine,
                           icon: const Icon(Icons.add),
-                          label: const Text('Criar Rotina'),
+                          label: Text(AppLocalizations.of(context)!.routinesCreate),
                         ),
                       ],
                     ),
@@ -151,7 +152,7 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _createRoutine,
         icon: const Icon(Icons.add),
-        label: const Text('Nova Rotina'),
+        label: Text(AppLocalizations.of(context)!.routinesNew),
       ),
     );
   }
@@ -192,25 +193,25 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Novo Dia'),
+        title: Text(AppLocalizations.of(context)!.routinesNewDay),
         content: TextField(
           controller: ctl,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Nome do Dia',
-            border: OutlineInputBorder(),
-            hintText: 'Ex: Push Day, Segunda-Feira',
+          decoration: InputDecoration(
+            labelText: AppLocalizations.of(context)!.routinesDayName,
+            border: const OutlineInputBorder(),
+            hintText: AppLocalizations.of(context)!.routinesDayNameHint,
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
           FilledButton(onPressed: () async {
             if (ctl.text.trim().isNotEmpty) {
               await _db.addRoutineDay(widget.routineId, ctl.text.trim());
               if (ctx.mounted) Navigator.pop(ctx);
               _load();
             }
-          }, child: const Text('Adicionar')),
+          }, child: Text(AppLocalizations.of(context)!.routinesAddDay)),
         ],
       ),
     );
@@ -222,13 +223,13 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_routine?['name'] as String? ?? 'Rotina'),
+        title: Text(_routine?['name'] as String? ?? AppLocalizations.of(context)!.routinesTitle),
         centerTitle: true,
         actions: [
           PopupMenuButton(
             itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'rename', child: Text('Renomear')),
-              const PopupMenuItem(value: 'delete', child: Text('Excluir Rotina')),
+              PopupMenuItem(value: 'rename', child: Text(AppLocalizations.of(context)!.routinesRename)),
+              PopupMenuItem(value: 'delete', child: Text(AppLocalizations.of(context)!.routinesDelete)),
             ],
             onSelected: (v) async {
               if (v == 'rename') {
@@ -236,14 +237,14 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                 final name = await showDialog<String>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Renomear'),
+                    title: Text(AppLocalizations.of(context)!.routinesRename),
                     content: TextField(
                       controller: ctl, autofocus: true,
                       decoration: const InputDecoration(border: OutlineInputBorder()),
                     ),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-                      FilledButton(onPressed: () => Navigator.pop(ctx, ctl.text.trim()), child: const Text('Salvar')),
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
+                      FilledButton(onPressed: () => Navigator.pop(ctx, ctl.text.trim()), child: Text(AppLocalizations.of(context)!.commonSave)),
                     ],
                   ),
                 );
@@ -255,11 +256,11 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Excluir Rotina?'),
-                    content: const Text('Esta ação não pode ser desfeita.'),
+                    title: Text(AppLocalizations.of(context)!.routinesDeleteConfirm(_routine?['name'] ?? '')),
+                    content: Text(AppLocalizations.of(context)!.commonActionCannotBeUndone),
                     actions: [
-                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Excluir'), style: TextButton.styleFrom(foregroundColor: Colors.red)),
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context)!.commonCancel)),
+                      TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(AppLocalizations.of(context)!.commonDelete), style: TextButton.styleFrom(foregroundColor: Colors.red)),
                     ],
                   ),
                 );
@@ -283,9 +284,9 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                       children: [
                         Icon(Icons.today, size: 64, color: theme.colorScheme.primary.withAlpha(80)),
                         const SizedBox(height: 16),
-                        Text('Nenhum dia ainda', style: theme.textTheme.titleMedium),
+                        Text(AppLocalizations.of(context)!.routinesDayEmpty, style: theme.textTheme.titleMedium),
                         const SizedBox(height: 8),
-                        Text('Adicione dias para sua rotina', style: theme.textTheme.bodySmall),
+                        Text(AppLocalizations.of(context)!.routinesDayEmptySubtitle, style: theme.textTheme.bodySmall),
                       ],
                     ),
                   ),
@@ -306,7 +307,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addDay,
         icon: const Icon(Icons.add),
-        label: const Text('Adicionar Dia'),
+        label: Text(AppLocalizations.of(context)!.routinesAddDay),
       ),
     );
   }
@@ -363,7 +364,7 @@ class _DayCardState extends State<_DayCard> {
               borderRadius: BorderRadius.circular(2),
             ))),
             const SizedBox(height: 16),
-            Text('Tempo de Descanso', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            Text(AppLocalizations.of(context)!.routinesRestTimeTitle, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
@@ -442,8 +443,8 @@ class _DayCardState extends State<_DayCard> {
                 const Spacer(),
                 PopupMenuButton(
                   itemBuilder: (ctx) => [
-                    const PopupMenuItem(value: 'rename', child: Text('Renomear')),
-                    const PopupMenuItem(value: 'delete', child: Text('Excluir Dia')),
+                    PopupMenuItem(value: 'rename', child: Text(AppLocalizations.of(context)!.routinesRename)),
+                    PopupMenuItem(value: 'delete', child: Text(AppLocalizations.of(context)!.routinesDeleteDay)),
                   ],
                   onSelected: (v) async {
                     if (v == 'rename') {
@@ -451,11 +452,11 @@ class _DayCardState extends State<_DayCard> {
                       final name = await showDialog<String>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text('Renomear'),
+                          title: Text(AppLocalizations.of(context)!.routinesRename),
                           content: TextField(controller: ctl, autofocus: true, decoration: const InputDecoration(border: OutlineInputBorder())),
                           actions: [
-                            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-                            FilledButton(onPressed: () => Navigator.pop(ctx, ctl.text.trim()), child: const Text('Salvar')),
+                            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
+                            FilledButton(onPressed: () => Navigator.pop(ctx, ctl.text.trim()), child: Text(AppLocalizations.of(context)!.commonSave)),
                           ],
                         ),
                       );
@@ -476,7 +477,7 @@ class _DayCardState extends State<_DayCard> {
             else if (_exercises.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('Nenhum exercício adicionado', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                child: Text(AppLocalizations.of(context)!.routinesNoExercises, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               )
             else ...[
               ..._exercises.map((ex) => Padding(
@@ -523,7 +524,7 @@ class _DayCardState extends State<_DayCard> {
             TextButton.icon(
               onPressed: _openExercisePicker,
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('Adicionar Exercício'),
+              label: Text(AppLocalizations.of(context)!.routinesAddExercise),
               style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
             ),
           ],

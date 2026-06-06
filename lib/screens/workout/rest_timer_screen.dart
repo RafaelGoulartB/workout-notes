@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../services/rest_timer_service.dart';
 
 class RestTimerScreen extends StatefulWidget {
@@ -50,7 +51,7 @@ class _RestTimerScreenState extends State<RestTimerScreen> with WidgetsBindingOb
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Temporizador'),
+        title: Text(AppLocalizations.of(context)!.restTimerTitle),
         centerTitle: true,
         actions: [
           if (isActive)
@@ -59,7 +60,7 @@ class _RestTimerScreenState extends State<RestTimerScreen> with WidgetsBindingOb
                 _timerService.stop();
                 setState(() {});
               },
-              child: const Text('Parar'),
+              child: Text(AppLocalizations.of(context)!.restTimerStop),
             ),
         ],
       ),
@@ -120,12 +121,12 @@ class _RestTimerScreenState extends State<RestTimerScreen> with WidgetsBindingOb
                         const SizedBox(height: 4),
                         Text(
                           isComplete
-                              ? 'CONCLUÍDO'
+                              ? AppLocalizations.of(context)!.restTimerComplete
                               : isPaused
-                                  ? 'PAUSADO'
+                                  ? AppLocalizations.of(context)!.restTimerPaused
                                   : _timerService.isRunning
-                                      ? 'DESCANSANDO'
-                                      : 'PRONTO',
+                                      ? AppLocalizations.of(context)!.restTimerResting
+                                      : AppLocalizations.of(context)!.restTimerReady,
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                             letterSpacing: 2,
@@ -161,7 +162,7 @@ class _RestTimerScreenState extends State<RestTimerScreen> with WidgetsBindingOb
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          isPaused ? 'Continuar' : 'Pausar',
+                          isPaused ? AppLocalizations.of(context)!.restTimerResume : AppLocalizations.of(context)!.restTimerPause,
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: isPaused ? Colors.green : null,
@@ -179,7 +180,7 @@ class _RestTimerScreenState extends State<RestTimerScreen> with WidgetsBindingOb
               if (!_timerService.isActive)
                 Column(
                   children: [
-                    Text('Iniciar descanso', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                    Text(AppLocalizations.of(context)!.restTimerStartRest, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
