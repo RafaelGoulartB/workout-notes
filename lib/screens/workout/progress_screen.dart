@@ -1795,15 +1795,18 @@ class _ProgressScreenState extends State<ProgressScreen> {
           child: Padding(
             padding: const EdgeInsets.all(8),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(icon, size: 16, color: color),
                 const SizedBox(height: 4),
                 Text(
-                  currentValue != null ? '${currentValue.toStringAsFixed(1)}' : '--',
+                  currentValue != null
+                      ? '${currentValue.toStringAsFixed(1)}${delta != null && delta != 0 ? " ${delta > 0 ? '+' : ''}${delta.toStringAsFixed(1)}$unit" : ""}'
+                      : '--',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    fontSize: 13,
+                    fontSize: 12,
                     color: currentValue != null ? null : theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
@@ -1816,16 +1819,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (delta != null && delta != 0)
-                  Text(
-                    '${delta > 0 ? '+' : ''}${delta.toStringAsFixed(1)}$unit',
-                    style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w600,
-                      color: _isPositiveForType(typeId) ? (delta > 0 ? Colors.green : Colors.red)
-                          : (delta > 0 ? Colors.red : Colors.green),
-                    ),
-                  ),
               ],
             ),
           ),
