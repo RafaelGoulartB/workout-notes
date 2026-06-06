@@ -805,6 +805,14 @@ class AppLocalizationsPt extends AppLocalizations {
   String get bodyTrackerHigh => 'Risco Alto';
 
   @override
+  String bodyTrackerAsymmetry(Object diff, Object largerSide, Object unit) {
+    return 'Diferença: $diff $unit ($largerSide maior)';
+  }
+
+  @override
+  String get bodyTrackerTrendComparison => 'Esquerda vs Direita';
+
+  @override
   String get bodyTrackerWHR => 'RCQ';
 
   @override

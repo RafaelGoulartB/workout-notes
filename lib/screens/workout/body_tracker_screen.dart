@@ -27,6 +27,11 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   bool _isLoading = true;
   bool _fabOpen = false;
 
+  // ── Bilateral state ───────────────────────────────────────────────
+  String? _selectedSide; // 'left', 'right', or null for 'all'
+  List<Map<String, dynamic>> _leftMeasurements = [];
+  List<Map<String, dynamic>> _rightMeasurements = [];
+
   // ── Measurement type definitions ───────────────────────────────────
   static const _types = <MeasureType>[
     MeasureType('weight', Icons.monitor_weight, 'kg', Colors.indigo, false),
@@ -67,6 +72,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
         _allMeasurements = all;
         _latestByType = latestMap;
         _measurements = filtered;
+        _updateBilateralData(filtered);
         _isLoading = false;
       });
     } catch (_) {
@@ -74,15 +80,35 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
     }
   }
 
+  void _updateBilateralData(List<Map<String, dynamic>> filtered) {
+    if (_currentType.isBilateral) {
+      _leftMeasurements =
+          filtered.where((m) => m['side'] == 'left').toList();
+      _rightMeasurements =
+          filtered.where((m) => m['side'] == 'right').toList();
+      _selectedSide ??= 'all';
+    } else {
+      _leftMeasurements = [];
+      _rightMeasurements = [];
+      _selectedSide = null;
+    }
+  }
+
   Future<void> _switchType(String typeId) async {
     setState(() {
       _selectedType = typeId;
+      _selectedSide = null;
       _measurements =
           _allMeasurements.where((m) => m['type'] == typeId).toList();
+      _updateBilateralData(_measurements);
     });
   }
 
-  // ── Derived stats ──────────────────────────────────────────────────
+  void _switchSide(String? side) {
+    setState(() => _selectedSide = side);
+  }
+
+  // ── Derived stats (unilateral) ─────────────────────────────────────
   double? get _currentValue {
     final latest = _latestByType[_selectedType];
     if (latest == null) return null;
@@ -123,6 +149,62 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
 
   bool get _isDecreasingGood =>
       _selectedType == 'weight' || _selectedType == 'bodyFat';
+
+  // ── Derived stats (bilateral) ──────────────────────────────────────
+  double? get _leftCurrentValue {
+    if (_leftMeasurements.isEmpty) return null;
+    return (_leftMeasurements.first['value'] as num?)?.toDouble();
+  }
+
+  double? get _rightCurrentValue {
+    if (_rightMeasurements.isEmpty) return null;
+    return (_rightMeasurements.first['value'] as num?)?.toDouble();
+  }
+
+  double? get _leftDelta {
+    if (_leftMeasurements.length < 2) return null;
+    final current = (_leftMeasurements[0]['value'] as num).toDouble();
+    final previous = (_leftMeasurements[1]['value'] as num).toDouble();
+    return current - previous;
+  }
+
+  double? get _rightDelta {
+    if (_rightMeasurements.length < 2) return null;
+    final current = (_rightMeasurements[0]['value'] as num).toDouble();
+    final previous = (_rightMeasurements[1]['value'] as num).toDouble();
+    return current - previous;
+  }
+
+  List<Map<String, dynamic>> get _bilateralFilteredMeasurements {
+    if (_selectedSide == 'left') return _leftMeasurements;
+    if (_selectedSide == 'right') return _rightMeasurements;
+    return _measurements; // 'all'
+  }
+
+  double? get _bilateralMinValue {
+    final list = _bilateralFilteredMeasurements;
+    if (list.isEmpty) return null;
+    return list
+        .map((m) => (m['value'] as num).toDouble())
+        .reduce((a, b) => a < b ? a : b);
+  }
+
+  double? get _bilateralMaxValue {
+    final list = _bilateralFilteredMeasurements;
+    if (list.isEmpty) return null;
+    return list
+        .map((m) => (m['value'] as num).toDouble())
+        .reduce((a, b) => a > b ? a : b);
+  }
+
+  double? get _bilateralAvgValue {
+    final list = _bilateralFilteredMeasurements;
+    if (list.isEmpty) return null;
+    return list
+            .map((m) => (m['value'] as num).toDouble())
+            .reduce((a, b) => a + b) /
+        list.length;
+  }
 
   // ── Speed Dial FAB ─────────────────────────────────────────────────
   Widget _buildSpeedDial(ThemeData theme, AppLocalizations loc) {
@@ -238,6 +320,13 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   }
 
   Widget _buildContent(ThemeData theme, AppLocalizations loc) {
+    final isBilateral = _currentType.isBilateral;
+
+    // Determine which data to use for history (chart uses all data)
+    final historyList = isBilateral
+        ? _bilateralFilteredMeasurements
+        : _measurements;
+
     return Column(
       children: [
         BodyTypeSelector(
@@ -246,14 +335,30 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
           onSelected: _switchType,
         ),
         const SizedBox(height: 12),
-        BodySummaryCard(
-          type: _currentType,
-          value: _currentValue,
-          delta: _delta,
-          isDecreasingGood: _isDecreasingGood,
-          measurements: _measurements,
-        ),
-        if (_measurements.isNotEmpty) ...[
+
+        // Summary card — bilateral or unilateral
+        if (isBilateral)
+          BodyBilateralSummaryCard(
+            type: _currentType,
+            leftValue: _leftCurrentValue,
+            rightValue: _rightCurrentValue,
+            leftDelta: _leftDelta,
+            rightDelta: _rightDelta,
+            isDecreasingGood: _isDecreasingGood,
+            leftMeasurements: _leftMeasurements,
+            rightMeasurements: _rightMeasurements,
+          )
+        else
+          BodySummaryCard(
+            type: _currentType,
+            value: _currentValue,
+            delta: _delta,
+            isDecreasingGood: _isDecreasingGood,
+            measurements: _measurements,
+          ),
+
+        // Quick stats (only for unilateral)
+        if (!isBilateral && _measurements.isNotEmpty) ...[
           const SizedBox(height: 12),
           BodyQuickStats(
             minValue: _minValue,
@@ -263,19 +368,44 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
             typeColor: _currentType.color,
           ),
         ],
+
         Expanded(
           child: CustomScrollView(
             slivers: [
+              // ── Chart ──────────────────────────────────────────────
               if (_measurements.length >= 2) ...[
                 const SliverToBoxAdapter(child: SizedBox(height: 12)),
                 SliverToBoxAdapter(
-                  child: BodyChartCard(
-                    measurements: _measurements,
-                    type: _currentType,
+                  child: isBilateral
+                      ? BodyBilateralChartCard(
+                          leftMeasurements: _leftMeasurements,
+                          rightMeasurements: _rightMeasurements,
+                          type: _currentType,
+                        )
+                      : BodyChartCard(
+                          measurements: _measurements,
+                          type: _currentType,
+                        ),
+                ),
+              ],
+
+              // ── Quick stats for bilateral ──────────────────────────
+              if (isBilateral && historyList.isNotEmpty) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                SliverToBoxAdapter(
+                  child: BodyQuickStats(
+                    minValue: _bilateralMinValue,
+                    maxValue: _bilateralMaxValue,
+                    avgValue: _bilateralAvgValue,
+                    totalCount: historyList.length,
+                    typeColor: _currentType.color,
                   ),
                 ),
               ],
-              if (_measurements.isNotEmpty &&
+
+              // ── Body composition (weight only) ─────────────────────
+              if (!isBilateral &&
+                  _measurements.isNotEmpty &&
                   _selectedType == 'weight' &&
                   _currentValue != null) ...[
                 const SliverToBoxAdapter(child: SizedBox(height: 12)),
@@ -286,8 +416,18 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                   ),
                 ),
               ],
-              if (_measurements.isNotEmpty) ...[
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+              // ── Side tabs (bilateral only) ─────────────────────────
+              if (isBilateral && _measurements.isNotEmpty) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                SliverToBoxAdapter(
+                  child: _buildSideTabs(theme, loc),
+                ),
+              ],
+
+              // ── History header ─────────────────────────────────────
+              if (historyList.isNotEmpty) ...[
+                const SliverToBoxAdapter(child: SizedBox(height: 8)),
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -297,11 +437,15 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                             size: 16,
                             color: theme.colorScheme.onSurfaceVariant),
                         const SizedBox(width: 6),
-                        Text(
-                          '${loc.bodyTrackerHistory} · ${_measurements.length} ${loc.bodyTrackerEntries}',
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            letterSpacing: 0.5,
+                        Expanded(
+                          child: Text(
+                            isBilateral
+                                ? '${loc.bodyTrackerHistory} · ${historyList.length} ${loc.bodyTrackerEntries}'
+                                : '${loc.bodyTrackerHistory} · ${_measurements.length} ${loc.bodyTrackerEntries}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
                       ],
@@ -310,10 +454,12 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 8)),
               ],
+
+              // ── History list ───────────────────────────────────────
               SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (ctx, i) => _buildMeasurementCard(theme, loc, i),
-                  childCount: _measurements.length,
+                  (ctx, i) => _buildMeasurementCard(theme, loc, i, historyList),
+                  childCount: historyList.length,
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 80)),
@@ -324,14 +470,54 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
     );
   }
 
-  Widget _buildMeasurementCard(ThemeData theme, AppLocalizations loc, int index) {
-    final m = _measurements[index];
+  /// Side filter tabs for bilateral measurements.
+  Widget _buildSideTabs(ThemeData theme, AppLocalizations loc) {
+    final tabs = <Widget>[
+      _SideTab(
+        label: loc.commonAll,
+        icon: Icons.sync_alt,
+        isSelected: _selectedSide == 'all' || _selectedSide == null,
+        color: theme.colorScheme.primary,
+        count: _measurements.length,
+        theme: theme,
+        onTap: () => _switchSide('all'),
+      ),
+      _SideTab(
+        label: loc.bodyTrackerLeftAbbr,
+        icon: Icons.arrow_back,
+        isSelected: _selectedSide == 'left',
+        color: Colors.blue,
+        count: _leftMeasurements.length,
+        theme: theme,
+        onTap: () => _switchSide('left'),
+      ),
+      _SideTab(
+        label: loc.bodyTrackerRightAbbr,
+        icon: Icons.arrow_forward,
+        isSelected: _selectedSide == 'right',
+        color: Colors.red,
+        count: _rightMeasurements.length,
+        theme: theme,
+        onTap: () => _switchSide('right'),
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: tabs.map((t) => Expanded(child: t)).toList(),
+      ),
+    );
+  }
+
+  Widget _buildMeasurementCard(ThemeData theme, AppLocalizations loc, int index, List<Map<String, dynamic>> list) {
+    final m = list[index];
     final value = (m['value'] as num).toDouble();
 
     double? delta;
-    if (index < _measurements.length - 1) {
+    if (index < list.length - 1) {
       final prevVal =
-          (_measurements[index + 1]['value'] as num).toDouble();
+          (list[index + 1]['value'] as num).toDouble();
       delta = value - prevVal;
     }
 
@@ -374,6 +560,86 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
           _load();
         }
       },
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SIDE TAB (inline filter button for bilateral measurements)
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Compact filter button used in the side selector for bilateral types.
+class _SideTab extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final Color color;
+  final int count;
+  final ThemeData theme;
+  final VoidCallback onTap;
+
+  const _SideTab({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.color,
+    required this.count,
+    required this.theme,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? color.withAlpha(120)
+                  : theme.colorScheme.outlineVariant.withAlpha(50),
+            ),
+            color: isSelected ? color.withAlpha(18) : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: isSelected ? color : theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 13,
+                  color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isSelected ? color.withAlpha(30) : theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

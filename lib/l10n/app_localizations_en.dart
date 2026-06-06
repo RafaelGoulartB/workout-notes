@@ -801,6 +801,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bodyTrackerHigh => 'High Risk';
 
   @override
+  String bodyTrackerAsymmetry(Object diff, Object largerSide, Object unit) {
+    return 'Difference: $diff $unit ($largerSide larger)';
+  }
+
+  @override
+  String get bodyTrackerTrendComparison => 'Left vs Right';
+
+  @override
   String get bodyTrackerWHR => 'WHR';
 
   @override

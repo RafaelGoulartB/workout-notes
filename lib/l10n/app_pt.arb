@@ -262,6 +262,8 @@
   "bodyTrackerHealthy": "Saudável",
   "bodyTrackerModerate": "Risco Moderado",
   "bodyTrackerHigh": "Risco Alto",
+  "bodyTrackerAsymmetry": "Diferença: {diff} {unit} ({largerSide} maior)",
+  "bodyTrackerTrendComparison": "Esquerda vs Direita",
   "bodyTrackerWHR": "RCQ",
   "bodyTrackerEstimatedComposition": "Composição Corporal Estimada",
   "bodyTrackerTimeOfDay": "Horário",

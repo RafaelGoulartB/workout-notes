@@ -1592,6 +1592,18 @@ abstract class AppLocalizations {
   /// **'High Risk'**
   String get bodyTrackerHigh;
 
+  /// No description provided for @bodyTrackerAsymmetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Difference: {diff} {unit} ({largerSide} larger)'**
+  String bodyTrackerAsymmetry(Object diff, Object largerSide, Object unit);
+
+  /// No description provided for @bodyTrackerTrendComparison.
+  ///
+  /// In en, this message translates to:
+  /// **'Left vs Right'**
+  String get bodyTrackerTrendComparison;
+
   /// No description provided for @bodyTrackerWHR.
   ///
   /// In en, this message translates to:
