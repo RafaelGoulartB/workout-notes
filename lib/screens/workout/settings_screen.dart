@@ -24,6 +24,10 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   int _selectedAccentIndex = AccentColors.indexOf(AccentColors.defaultColor);
   ThemeMode _selectedThemeMode = ThemeMode.system;
 
+  // Rest-time choices shown as chips in the timer card. The values are
+  // seconds; the label is formatted at render time.
+  static const _restChoices = [30, 45, 60, 90, 120, 180];
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +38,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     _load();
   }
 
+  // ===================== DATA =====================
   Future<void> _load() async {
     _settings = await _settingsRepo.getAllSettings();
     setState(() => _isLoading = false);
@@ -45,6 +50,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     setState(() {});
   }
 
+  // ===================== ACTIONS =====================
   Future<void> _changeAccentColor(int index) async {
     final color = AccentColors.options[index];
     final prefs = await SharedPreferences.getInstance();
@@ -72,66 +78,16 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     WorkoutNotesApp.themeNotifier.setThemeMode(mode);
   }
 
-  Widget _buildThemeModeOption({
-    required ThemeData theme,
-    required IconData icon,
-    required String label,
-    required String subtitle,
-    required ThemeMode mode,
-  }) {
-    final isSelected = _selectedThemeMode == mode;
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: () => _changeThemeMode(mode),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? theme.colorScheme.primaryContainer
-                    : theme.colorScheme.surfaceContainerHighest.withAlpha(120),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                icon,
-                size: 20,
-                color: isSelected
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (isSelected)
-              Icon(Icons.check_circle, size: 20, color: theme.colorScheme.primary)
-            else
-              Icon(Icons.circle_outlined, size: 20, color: theme.colorScheme.outlineVariant),
-          ],
-        ),
-      ),
-    );
+  Future<void> _changeLocale(Locale newLocale) async {
+    final prefs = await SharedPreferences.getInstance();
+    final localeStr = newLocale.languageCode == 'pt' ? 'pt' : 'en';
+    await prefs.setString('app_locale', localeStr);
+
+    // Update date formatting
+    await initializeDateFormatting(localeStr == 'pt' ? 'pt_BR' : 'en', null);
+    Intl.defaultLocale = localeStr == 'pt' ? 'pt_BR' : 'en_US';
+
+    WorkoutNotesApp.localeNotifier.setLocale(newLocale);
   }
 
   Future<void> _exportBackup() async {
@@ -140,13 +96,20 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       await exportService.shareJsonBackup();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.settingsExportSuccess), behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.settingsExportSuccess),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.settingsExportError(e.toString())), behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content: Text(
+                AppLocalizations.of(context)!.settingsExportError(e.toString())),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -159,8 +122,14 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
         title: Text(AppLocalizations.of(context)!.settingsGenerateTitle),
         content: Text(AppLocalizations.of(context)!.settingsGenerateContent),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context)!.commonCancel)),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(AppLocalizations.of(context)!.settingsGenerate)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(AppLocalizations.of(context)!.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(AppLocalizations.of(context)!.settingsGenerate),
+          ),
         ],
       ),
     );
@@ -180,7 +149,11 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.commonError(e.toString())), behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content:
+                Text(AppLocalizations.of(context)!.commonError(e.toString())),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -191,12 +164,19 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(AppLocalizations.of(context)!.settingsDeleteHistoryTitle),
-        content: Text(AppLocalizations.of(context)!.settingsDeleteHistoryContent),
+        content:
+            Text(AppLocalizations.of(context)!.settingsDeleteHistoryContent),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context)!.commonCancel)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(AppLocalizations.of(context)!.commonCancel),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(AppLocalizations.of(context)!.settingsDeleteEverything, style: TextStyle(color: Colors.red)),
+            child: Text(
+              AppLocalizations.of(context)!.settingsDeleteEverything,
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -206,501 +186,547 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       await ExportImportRepository().deleteAllWorkoutData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.settingsDeleteHistorySuccess), behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content:
+                Text(AppLocalizations.of(context)!.settingsDeleteHistorySuccess),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
   }
 
+  void _showAbout() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.fitness_center,
+                color: Theme.of(ctx).colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(AppLocalizations.of(ctx)!.appTitle),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppLocalizations.of(ctx)!.settingsAboutDescription,
+              style: Theme.of(ctx).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              AppLocalizations.of(ctx)!.settingsAboutSubtitle,
+              style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(AppLocalizations.of(ctx)!.settingsAboutOk),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===================== HELPERS =====================
+  String _accentColorLabel(int index, AppLocalizations loc) {
+    switch (index) {
+      case 0:
+        return loc.accentColorRed;
+      case 1:
+        return loc.accentColorDarkOrange;
+      case 2:
+        return loc.accentColorOrange;
+      case 3:
+        return loc.accentColorAmber;
+      case 4:
+        return loc.accentColorDeepPurple;
+      case 5:
+        return loc.accentColorDarkBlue;
+      case 6:
+        return loc.accentColorGraphite;
+      case 7:
+        return loc.accentColorForestGreen;
+      default:
+        return '';
+    }
+  }
+
+  /// Compact, locale-agnostic rest-time label: "30s", "1min", "1min 30s".
+  String _formatRestTime(int seconds) {
+    if (seconds < 60) return '${seconds}s';
+    final mins = seconds ~/ 60;
+    final secs = seconds % 60;
+    return secs == 0 ? '${mins}min' : '${mins}min ${secs}s';
+  }
+
+  // ===================== BUILD =====================
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(AppLocalizations.of(context)!.settingsTitle),
-        centerTitle: true,
+        title: Text(loc.settingsTitle,
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w600)),
+        centerTitle: false,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                // Theme (Color & Mode)
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Global title
-                        Row(
-                          children: [
-                            Icon(Icons.palette_outlined, size: 18, color: theme.colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(AppLocalizations.of(context)!.settingsAppearance, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        const Divider(),
-                        const SizedBox(height: 16),
-                        // Theme Mode section
-                        Row(
-                          children: [
-                            Icon(Icons.dark_mode, size: 18, color: theme.colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(AppLocalizations.of(context)!.settingsThemeMode, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _buildThemeModeOption(
-                          theme: theme,
-                          icon: Icons.brightness_auto,
-                          label: AppLocalizations.of(context)!.settingsSystem,
-                          subtitle: AppLocalizations.of(context)!.settingsSystemSubtitle,
-                          mode: ThemeMode.system,
-                        ),
-                        const Divider(height: 1, indent: 0, endIndent: 0),
-                        _buildThemeModeOption(
-                          theme: theme,
-                          icon: Icons.light_mode,
-                          label: AppLocalizations.of(context)!.settingsLight,
-                          subtitle: AppLocalizations.of(context)!.settingsLightSubtitle,
-                          mode: ThemeMode.light,
-                        ),
-                        const Divider(height: 1, indent: 0, endIndent: 0),
-                        _buildThemeModeOption(
-                          theme: theme,
-                          icon: Icons.dark_mode,
-                          label: AppLocalizations.of(context)!.settingsDark,
-                          subtitle: AppLocalizations.of(context)!.settingsDarkSubtitle,
-                          mode: ThemeMode.dark,
-                        ),
-                        const SizedBox(height: 16),
-                        const Divider(),
-                        const SizedBox(height: 16),
-                        // Accent Color section
-                        Row(
-                          children: [
-                            Icon(Icons.palette, size: 18, color: theme.colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(AppLocalizations.of(context)!.settingsThemeColor, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: List.generate(AccentColors.options.length, (i) {
-                            final isSelected = _selectedAccentIndex == i;
-                            final color = AccentColors.options[i];
-                            return GestureDetector(
-                              onTap: () => _changeAccentColor(i),
-                              child: Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: isSelected
-                                      ? Border.all(color: theme.colorScheme.onSurface, width: 2.5)
-                                      : Border.all(color: color.withAlpha(120), width: 1),
-                                  boxShadow: isSelected
-                                      ? [BoxShadow(color: color.withAlpha(100), blurRadius: 8, spreadRadius: 1)]
-                                      : null,
-                                ),
-                                child: isSelected
-                                    ? const Icon(Icons.check, color: Colors.white, size: 20)
-                                    : null,
-                              ),
-                            );
-                          }),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _accentColorLabel(_selectedAccentIndex),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+                // ===== APARÊNCIA =====
+                _SectionHeader(text: loc.settingsSectionAppearance),
+                _SettingsCard(
+                  title: loc.settingsThemeMode,
+                  icon: Icons.dark_mode_outlined,
+                  children: [
+                    _RadioOption(
+                      icon: Icons.brightness_auto,
+                      label: loc.settingsSystem,
+                      subtitle: loc.settingsSystemSubtitle,
+                      selected: _selectedThemeMode == ThemeMode.system,
+                      onTap: () => _changeThemeMode(ThemeMode.system),
                     ),
-                  ),
+                    const _CardDivider(),
+                    _RadioOption(
+                      icon: Icons.light_mode,
+                      label: loc.settingsLight,
+                      subtitle: loc.settingsLightSubtitle,
+                      selected: _selectedThemeMode == ThemeMode.light,
+                      onTap: () => _changeThemeMode(ThemeMode.light),
+                    ),
+                    const _CardDivider(),
+                    _RadioOption(
+                      icon: Icons.dark_mode,
+                      label: loc.settingsDark,
+                      subtitle: loc.settingsDarkSubtitle,
+                      selected: _selectedThemeMode == ThemeMode.dark,
+                      onTap: () => _changeThemeMode(ThemeMode.dark),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
-
-                // Unit system
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Row(
-                          children: [
-                            Icon(Icons.straighten, size: 18, color: theme.colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(AppLocalizations.of(context)!.settingsUnits, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
+                _SettingsCard(
+                  title: loc.settingsThemeColor,
+                  icon: Icons.palette_outlined,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                      child: Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: List.generate(AccentColors.options.length,
+                            (i) {
+                          final isSelected = _selectedAccentIndex == i;
+                          final color = AccentColors.options[i];
+                          return _ColorSwatch(
+                            color: color,
+                            isSelected: isSelected,
+                            onTap: () => _changeAccentColor(i),
+                          );
+                        }),
                       ),
-                      SwitchListTile(
-                        title: Text(AppLocalizations.of(context)!.settingsUnitSystem),
-                        subtitle: Text(_settings['unit_system'] == 'kg' ? AppLocalizations.of(context)!.settingsUnitKgCm : AppLocalizations.of(context)!.settingsUnitLbsIn),
-                        value: _settings['unit_system'] == 'kg',
-                        onChanged: (v) => _update('unit_system', v ? 'kg' : 'lbs'),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Rest timer defaults
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Row(
-                          children: [
-                            Icon(Icons.timer, size: 18, color: theme.colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(AppLocalizations.of(context)!.settingsTimer, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                      ListTile(
-                        title: Text(AppLocalizations.of(context)!.settingsDefaultRest),
-                        subtitle: Text('${_settings['default_rest_time'] ?? '90'} ${AppLocalizations.of(context)!.settingsSeconds}'),
-                        trailing: SizedBox(
-                          width: 100,
-                          child: DropdownButtonFormField<int>(
-                            initialValue: int.tryParse(_settings['default_rest_time'] ?? '90') ?? 90,
-                            items: const [30, 45, 60, 90, 120, 180].map((s) => DropdownMenuItem(
-                              value: s, child: Text(s >= 60 ? '${s ~/ 60}min' : '${s}s'),
-                            )).toList(),
-                            onChanged: (v) => _update('default_rest_time', v.toString()),
-                            decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: AccentColors.options[_selectedAccentIndex],
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 6),
+                          Text(
+                            _accentColorLabel(_selectedAccentIndex, loc),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
-                      SwitchListTile(
-                        title: Text(AppLocalizations.of(context)!.settingsAutoStartRest),
-                        subtitle: Text(AppLocalizations.of(context)!.settingsAutoStartRestSubtitle),
-                        value: _settings['auto_start_rest_timer'] == 'true',
-                        onChanged: (v) => _update('auto_start_rest_timer', v.toString()),
-                      ),
-                      SwitchListTile(
-                        title: Text(AppLocalizations.of(context)!.settingsAutoStartWorkoutTimer),
-                        subtitle: Text(AppLocalizations.of(context)!.settingsAutoStartWorkoutTimerSubtitle),
-                        value: _settings['auto_start_workout_timer'] == 'true',
-                        onChanged: (v) => _update('auto_start_workout_timer', v.toString()),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
+                _SettingsCard(
+                  title: loc.settingsLanguage,
+                  icon: Icons.language_outlined,
+                  children: [
+                    _RadioOption(
+                      icon: Icons.translate,
+                      label: loc.settingsPortuguese,
+                      subtitle: loc.settingsLanguageSubtitle,
+                      selected:
+                          Localizations.localeOf(context).languageCode == 'pt',
+                      onTap: () => _changeLocale(const Locale('pt', 'BR')),
+                    ),
+                    const _CardDivider(),
+                    _RadioOption(
+                      icon: Icons.translate,
+                      label: loc.settingsEnglish,
+                      subtitle: loc.settingsLanguageSubtitle,
+                      selected:
+                          Localizations.localeOf(context).languageCode == 'en',
+                      onTap: () => _changeLocale(const Locale('en')),
+                    ),
+                  ],
+                ),
 
-                // Notifications
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Row(
-                          children: [
-                            Icon(Icons.notifications, size: 18, color: theme.colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(AppLocalizations.of(context)!.settingsNotifications, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
+                // ===== TREINO =====
+                _SectionHeader(text: loc.settingsSectionWorkout),
+                _SettingsCard(
+                  children: [
+                    _SwitchTile(
+                      icon: Icons.straighten,
+                      title: loc.settingsUnitSystem,
+                      subtitle: _settings['unit_system'] == 'kg'
+                          ? loc.settingsUnitKgCm
+                          : loc.settingsUnitLbsIn,
+                      value: _settings['unit_system'] == 'kg',
+                      onChanged: (v) =>
+                          _update('unit_system', v ? 'kg' : 'lbs'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _SettingsCard(
+                  title: loc.settingsTimer,
+                  icon: Icons.timer_outlined,
+                  children: [
+                    _ValuePickerTile(
+                      icon: Icons.timer,
+                      title: loc.settingsDefaultRest,
+                      currentValue: int.tryParse(
+                              _settings['default_rest_time'] ?? '90') ??
+                          90,
+                      displayValue: _formatRestTime(
+                        int.tryParse(_settings['default_rest_time'] ?? '90') ??
+                            90,
                       ),
+                      choices: _restChoices,
+                      formatChoice: _formatRestTime,
+                      sheetTitle: loc.settingsDefaultRest,
+                      onChanged: (v) =>
+                          _update('default_rest_time', v.toString()),
+                    ),
+                    const _CardDivider(),
+                    _SwitchTile(
+                      icon: Icons.play_circle_outline,
+                      title: loc.settingsAutoStartRest,
+                      subtitle: loc.settingsAutoStartRestSubtitle,
+                      value: _settings['auto_start_rest_timer'] == 'true',
+                      onChanged: (v) =>
+                          _update('auto_start_rest_timer', v.toString()),
+                    ),
+                    const _CardDivider(),
+                    _SwitchTile(
+                      icon: Icons.av_timer,
+                      title: loc.settingsAutoStartWorkoutTimer,
+                      subtitle:
+                          loc.settingsAutoStartWorkoutTimerSubtitle,
+                      value: _settings['auto_start_workout_timer'] == 'true',
+                      onChanged: (v) =>
+                          _update('auto_start_workout_timer', v.toString()),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _SettingsCard(
+                  children: [
+                    _SwitchTile(
+                      icon: Icons.lightbulb_outline,
+                      title: loc.settingsKeepScreenOn,
+                      subtitle: loc.settingsKeepScreenOnSubtitle,
+                      value: _settings['keep_screen_on'] == 'true',
+                      onChanged: (v) => _update('keep_screen_on', v.toString()),
+                    ),
+                  ],
+                ),
 
-                      // ── Rest Timer Notification ──
-                      SwitchListTile(
-                        title: Text(AppLocalizations.of(context)!.settingsRestTimerNotif),
-                        subtitle: Text(AppLocalizations.of(context)!.settingsRestTimerNotifSubtitle),
-                        value: _settings['notification_rest_timer_enabled'] != 'false',
+                // ===== NOTIFICAÇÕES =====
+                _SectionHeader(text: loc.settingsSectionNotifications),
+                _SettingsCard(
+                  children: [
+                    _SwitchTile(
+                      icon: Icons.notifications_outlined,
+                      title: loc.settingsRestTimerNotif,
+                      subtitle: loc.settingsRestTimerNotifSubtitle,
+                      value:
+                          _settings['notification_rest_timer_enabled'] !=
+                              'false',
+                      onChanged: (v) {
+                        _update('notification_rest_timer_enabled',
+                            v.toString());
+                        NotificationService.instance.loadSettings();
+                      },
+                    ),
+                    if (_settings['notification_rest_timer_enabled'] !=
+                        'false') ...[
+                      const _CardDivider(),
+                      _SwitchTile(
+                        icon: Icons.volume_up_outlined,
+                        title: loc.settingsSound,
+                        subtitle: loc.settingsRestSoundSubtitle,
+                        indent: true,
+                        value: _settings['notification_rest_timer_sound'] !=
+                            'false',
                         onChanged: (v) {
-                          _update('notification_rest_timer_enabled', v.toString());
+                          _update('notification_rest_timer_sound',
+                              v.toString());
                           NotificationService.instance.loadSettings();
                         },
                       ),
-                      if (_settings['notification_rest_timer_enabled'] != 'false') ...[
-                        const SizedBox(height: 4),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 16),
-                          child: Row(
-                            children: [
-                              Icon(Icons.notifications_active, size: 16, color: theme.colorScheme.onSurfaceVariant.withAlpha(120)),
-                              const SizedBox(width: 8),
-                              Text(AppLocalizations.of(context)!.settingsAlertOptions, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                            ],
-                          ),
-                        ),
-                        SwitchListTile(
-                          title: Text(AppLocalizations.of(context)!.settingsSound),
-                          subtitle: Text(AppLocalizations.of(context)!.settingsRestSoundSubtitle),
-                          value: _settings['notification_rest_timer_sound'] != 'false',
-                          onChanged: (v) {
-                            _update('notification_rest_timer_sound', v.toString());
-                            NotificationService.instance.loadSettings();
-                          },
-                        ),
-                        SwitchListTile(
-                          title: Text(AppLocalizations.of(context)!.settingsVibration),
-                          subtitle: Text(AppLocalizations.of(context)!.settingsRestVibrationSubtitle),
-                          value: _settings['notification_rest_timer_vibration'] != 'false',
-                          onChanged: (v) {
-                            _update('notification_rest_timer_vibration', v.toString());
-                            NotificationService.instance.loadSettings();
-                          },
-                        ),
-                      ],
-                      const Divider(height: 1, indent: 16, endIndent: 16),
-
-                      // ── Workout Timer Notification ──
-                      SwitchListTile(
-                        title: Text(AppLocalizations.of(context)!.settingsWorkoutTimerNotif),
-                        subtitle: Text(AppLocalizations.of(context)!.settingsWorkoutTimerNotifSubtitle),
-                        value: _settings['notification_workout_timer_enabled'] != 'false',
+                      const _CardDivider(),
+                      _SwitchTile(
+                        icon: Icons.vibration,
+                        title: loc.settingsVibration,
+                        subtitle: loc.settingsRestVibrationSubtitle,
+                        indent: true,
+                        value: _settings['notification_rest_timer_vibration'] !=
+                            'false',
                         onChanged: (v) {
-                          _update('notification_workout_timer_enabled', v.toString());
+                          _update('notification_rest_timer_vibration',
+                              v.toString());
                           NotificationService.instance.loadSettings();
                         },
                       ),
-                      if (_settings['notification_workout_timer_enabled'] != 'false') ...[
-                        const SizedBox(height: 4),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 16),
-                          child: Row(
-                            children: [
-                              Icon(Icons.notifications_active, size: 16, color: theme.colorScheme.onSurfaceVariant.withAlpha(120)),
-                              const SizedBox(width: 8),
-                              Text(AppLocalizations.of(context)!.settingsAlertOptions, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                            ],
-                          ),
-                        ),
-                        SwitchListTile(
-                          title: Text(AppLocalizations.of(context)!.settingsSound),
-                          subtitle: Text(AppLocalizations.of(context)!.settingsWorkoutSoundSubtitle),
-                          value: _settings['notification_workout_timer_sound'] == 'true',
-                          onChanged: (v) {
-                            _update('notification_workout_timer_sound', v.toString());
-                            NotificationService.instance.loadSettings();
-                          },
-                        ),
-                        SwitchListTile(
-                          title: Text(AppLocalizations.of(context)!.settingsVibration),
-                          subtitle: Text(AppLocalizations.of(context)!.settingsWorkoutVibrationSubtitle),
-                          value: _settings['notification_workout_timer_vibration'] == 'true',
-                          onChanged: (v) {
-                            _update('notification_workout_timer_vibration', v.toString());
-                            NotificationService.instance.loadSettings();
-                          },
-                        ),
-                      ],
                     ],
-                  ),
+                  ],
                 ),
                 const SizedBox(height: 12),
-
-                // Display
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Row(
-                          children: [
-                            Icon(Icons.visibility, size: 18, color: theme.colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(AppLocalizations.of(context)!.settingsDisplay, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                      SwitchListTile(
-                        title: Text(AppLocalizations.of(context)!.settingsKeepScreenOn),
-                        subtitle: Text(AppLocalizations.of(context)!.settingsKeepScreenOnSubtitle),
-                        value: _settings['keep_screen_on'] == 'true',
-                        onChanged: (v) => _update('keep_screen_on', v.toString()),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Language
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.language, size: 18, color: theme.colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(AppLocalizations.of(context)!.settingsLanguage, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        _buildLanguageOption(
-                          theme: theme,
-                          label: AppLocalizations.of(context)!.settingsPortuguese,
-                          subtitle: AppLocalizations.of(context)!.settingsPortuguese,
-                          icon: Icons.flag,
-                          locale: const Locale('pt', 'BR'),
-                        ),
-                        const Divider(height: 1, indent: 0, endIndent: 0),
-                        _buildLanguageOption(
-                          theme: theme,
-                          label: AppLocalizations.of(context)!.settingsEnglish,
-                          subtitle: AppLocalizations.of(context)!.settingsEnglish,
-                          icon: Icons.language,
-                          locale: const Locale('en'),
-                        ),
-                      ],
+                _SettingsCard(
+                  children: [
+                    _SwitchTile(
+                      icon: Icons.notifications_active_outlined,
+                      title: loc.settingsWorkoutTimerNotif,
+                      subtitle: loc.settingsWorkoutTimerNotifSubtitle,
+                      value:
+                          _settings['notification_workout_timer_enabled'] !=
+                              'false',
+                      onChanged: (v) {
+                        _update('notification_workout_timer_enabled',
+                            v.toString());
+                        NotificationService.instance.loadSettings();
+                      },
                     ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Data management
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: Row(
-                          children: [
-                            Icon(Icons.storage, size: 18, color: theme.colorScheme.primary),
-                            const SizedBox(width: 8),
-                            Text(AppLocalizations.of(context)!.settingsData, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
+                    if (_settings['notification_workout_timer_enabled'] !=
+                        'false') ...[
+                      const _CardDivider(),
+                      _SwitchTile(
+                        icon: Icons.volume_up_outlined,
+                        title: loc.settingsSound,
+                        subtitle: loc.settingsWorkoutSoundSubtitle,
+                        indent: true,
+                        value: _settings['notification_workout_timer_sound'] ==
+                            'true',
+                        onChanged: (v) {
+                          _update('notification_workout_timer_sound',
+                              v.toString());
+                          NotificationService.instance.loadSettings();
+                        },
                       ),
-                      ListTile(
-                        leading: Icon(Icons.download, color: theme.colorScheme.primary),
-                        title: Text(AppLocalizations.of(context)!.settingsExportBackup),
-                        subtitle: Text(AppLocalizations.of(context)!.settingsExportBackupSubtitle),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _exportBackup(),
-                      ),
-                      const Divider(height: 1, indent: 16, endIndent: 16),
-                      ListTile(
-                        leading: Icon(Icons.bug_report, color: theme.colorScheme.secondary),
-                        title: Text(AppLocalizations.of(context)!.settingsGenerateTestData),
-                        subtitle: Text(AppLocalizations.of(context)!.settingsGenerateTestDataSubtitle),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _generateTestData(),
-                      ),
-                      const Divider(height: 1, indent: 16, endIndent: 16),
-                      ListTile(
-                        leading: Icon(Icons.info_outline, color: theme.colorScheme.onSurfaceVariant),
-                        title: Text(AppLocalizations.of(context)!.settingsAbout),
-                        subtitle: Text(AppLocalizations.of(context)!.settingsAboutSubtitle),
+                      const _CardDivider(),
+                      _SwitchTile(
+                        icon: Icons.vibration,
+                        title: loc.settingsVibration,
+                        subtitle: loc.settingsWorkoutVibrationSubtitle,
+                        indent: true,
+                        value:
+                            _settings['notification_workout_timer_vibration'] ==
+                                'true',
+                        onChanged: (v) {
+                          _update('notification_workout_timer_vibration',
+                              v.toString());
+                          NotificationService.instance.loadSettings();
+                        },
                       ),
                     ],
-                  ),
+                  ],
                 ),
-                const SizedBox(height: 24),
 
-                // Danger zone
-                Center(
-                  child: TextButton.icon(
-                    onPressed: _deleteAllHistory,
-                    icon: const Icon(Icons.delete_forever, color: Colors.red),
-                    label: Text(AppLocalizations.of(context)!.settingsDeleteAllHistory, style: TextStyle(color: Colors.red)),
-                  ),
+                // ===== DADOS =====
+                _SectionHeader(text: loc.settingsSectionData),
+                _SettingsCard(
+                  children: [
+                    _LinkTile(
+                      icon: Icons.download_outlined,
+                      iconColor: theme.colorScheme.primary,
+                      title: loc.settingsExportBackup,
+                      subtitle: loc.settingsExportBackupSubtitle,
+                      onTap: _exportBackup,
+                    ),
+                    const _CardDivider(),
+                    _LinkTile(
+                      icon: Icons.bug_report_outlined,
+                      iconColor: theme.colorScheme.secondary,
+                      title: loc.settingsGenerateTestData,
+                      subtitle: loc.settingsGenerateTestDataSubtitle,
+                      onTap: _generateTestData,
+                    ),
+                    const _CardDivider(),
+                    _LinkTile(
+                      icon: Icons.info_outline,
+                      iconColor: theme.colorScheme.onSurfaceVariant,
+                      title: loc.settingsAbout,
+                      subtitle: loc.settingsAboutSubtitle,
+                      onTap: _showAbout,
+                    ),
+                    const _CardDivider(),
+                    _LinkTile(
+                      icon: Icons.delete_outline,
+                      iconColor: Colors.red,
+                      title: loc.settingsDeleteAllHistory,
+                      subtitle:
+                          loc.settingsDeleteHistoryContent.split('\n').first,
+                      titleColor: Colors.red,
+                      onTap: _deleteAllHistory,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 40),
               ],
             ),
     );
   }
+}
 
-  String _accentColorLabel(int index) {
-    switch (index) {
-      case 0: return AppLocalizations.of(context)!.accentColorRed;
-      case 1: return AppLocalizations.of(context)!.accentColorDarkOrange;
-      case 2: return AppLocalizations.of(context)!.accentColorOrange;
-      case 3: return AppLocalizations.of(context)!.accentColorAmber;
-      case 4: return AppLocalizations.of(context)!.accentColorDeepPurple;
-      case 5: return AppLocalizations.of(context)!.accentColorDarkBlue;
-      case 6: return AppLocalizations.of(context)!.accentColorGraphite;
-      case 7: return AppLocalizations.of(context)!.accentColorForestGreen;
-      default: return '';
-    }
+// ===================== SHARED WIDGETS =====================
+
+/// Section header (uppercase, tracked, muted). Consistent with the
+/// home screen pattern.
+class _SectionHeader extends StatelessWidget {
+  final String text;
+  const _SectionHeader({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+      child: Text(
+        text,
+        style: theme.textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.5,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
   }
+}
 
-  Widget _buildLanguageOption({
-    required ThemeData theme,
-    required String label,
-    required String subtitle,
-    required IconData icon,
-    required Locale locale,
-  }) {
-    final isSelected = Localizations.localeOf(context).languageCode == locale.languageCode;
+/// Card container with optional title and rounded outline.
+class _SettingsCard extends StatelessWidget {
+  final String? title;
+  final IconData? icon;
+  final List<Widget> children;
+  const _SettingsCard({this.title, this.icon, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side:
+            BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (title != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+              child: Row(
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 18, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                  ],
+                  Text(
+                    title!,
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+/// Horizontal divider used between rows inside a [_SettingsCard].
+class _CardDivider extends StatelessWidget {
+  const _CardDivider();
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      indent: 56, // aligns under the title text, past the leading icon
+      endIndent: 16,
+      color: Theme.of(context).colorScheme.outlineVariant.withAlpha(60),
+    );
+  }
+}
+
+/// Radio-style row: leading icon, title + subtitle, check icon on the
+/// right when selected. Tapping the whole row triggers [onTap].
+class _RadioOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+  const _RadioOption({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return InkWell(
-      borderRadius: BorderRadius.circular(8),
-      onTap: () => _changeLocale(locale),
+      onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Row(
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: isSelected
+                color: selected
                     ? theme.colorScheme.primaryContainer
                     : theme.colorScheme.surfaceContainerHighest.withAlpha(120),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
                 icon,
-                size: 20,
-                color: isSelected
+                size: 18,
+                color: selected
                     ? theme.colorScheme.onPrimaryContainer
                     : theme.colorScheme.onSurfaceVariant,
               ),
@@ -709,13 +735,16 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     label,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight:
+                          selected ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -725,25 +754,367 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                 ],
               ),
             ),
-            if (isSelected)
-              Icon(Icons.check_circle, size: 20, color: theme.colorScheme.primary)
-            else
-              Icon(Icons.circle_outlined, size: 20, color: theme.colorScheme.outlineVariant),
+            const SizedBox(width: 8),
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: selected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.outlineVariant,
+              size: 22,
+            ),
           ],
         ),
       ),
     );
   }
+}
 
-  Future<void> _changeLocale(Locale newLocale) async {
-    final prefs = await SharedPreferences.getInstance();
-    final localeStr = newLocale.languageCode == 'pt' ? 'pt' : 'en';
-    await prefs.setString('app_locale', localeStr);
-    
-    // Update date formatting
-    await initializeDateFormatting(localeStr == 'pt' ? 'pt_BR' : 'en', null);
-    Intl.defaultLocale = localeStr == 'pt' ? 'pt_BR' : 'en_US';
-    
-    WorkoutNotesApp.localeNotifier.setLocale(newLocale);
+/// Switch tile with leading icon, title + subtitle, switch on the right.
+/// Tapping anywhere on the tile toggles the switch via [onChanged].
+class _SwitchTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final bool indent;
+  const _SwitchTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+    this.indent = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: () => onChanged(!value),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(indent ? 32 : 16, 12, 12, 12),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Switch(value: value, onChanged: onChanged),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tappable row that opens a deeper flow (or a dialog). Shows a chevron
+/// at the trailing edge. Use [titleColor] for destructive tiles.
+class _LinkTile extends StatelessWidget {
+  final IconData icon;
+  final Color? iconColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final Color? titleColor;
+  const _LinkTile({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.titleColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final fg = titleColor ?? theme.colorScheme.onSurface;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: (iconColor ?? theme.colorScheme.primary).withAlpha(25),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: iconColor ?? theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w500, color: fg),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Single color swatch used in the accent color grid. The selected
+/// swatch is highlighted with a thicker border and a white check.
+class _ColorSwatch extends StatelessWidget {
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
+  const _ColorSwatch({
+    required this.color,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: color.toARGB32().toRadixString(16),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(14),
+              border: isSelected
+                  ? Border.all(
+                      color: theme.colorScheme.onSurface, width: 2.5)
+                  : Border.all(color: color.withAlpha(120), width: 1),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: color.withAlpha(100),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: isSelected
+                ? const Icon(Icons.check, color: Colors.white, size: 22)
+                : null,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tappable row showing the current [displayValue] and a chevron. Tapping
+/// opens a bottom sheet that lets the user pick from [choices]. The chosen
+/// value is forwarded to [onChanged].
+///
+/// Use for "single value from a small set" settings like rest time, where
+/// chips or inline rows would either wrap to multiple lines or take too
+/// much vertical space.
+class _ValuePickerTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final int currentValue;
+  final String displayValue;
+  final List<int> choices;
+  final String Function(int) formatChoice;
+  final String sheetTitle;
+  final ValueChanged<int> onChanged;
+
+  const _ValuePickerTile({
+    required this.icon,
+    required this.title,
+    required this.currentValue,
+    required this.displayValue,
+    required this.choices,
+    required this.formatChoice,
+    required this.sheetTitle,
+    required this.onChanged,
+  });
+
+  Future<void> _openSheet(BuildContext context) async {
+    final theme = Theme.of(context);
+    final selected = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 18, color: theme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      sheetTitle,
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, thickness: 1),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: choices.length,
+                  itemBuilder: (ctx, i) {
+                    final value = choices[i];
+                    final isSelected = value == currentValue;
+                    return InkWell(
+                      onTap: () => Navigator.pop(ctx, value),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 14),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                formatChoice(value),
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                  color: isSelected
+                                      ? theme.colorScheme.primary
+                                      : theme.colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              isSelected
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_off,
+                              color: isSelected
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.outlineVariant,
+                              size: 22,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (selected != null) onChanged(selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: () => _openSheet(context),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon,
+                  size: 18, color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w500),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              displayValue,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant, size: 20),
+          ],
+        ),
+      ),
+    );
   }
 }

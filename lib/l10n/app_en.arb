@@ -71,6 +71,12 @@
 
   "settingsTitle": "Settings",
   "settingsAppearance": "Appearance",
+  "settingsSectionAppearance": "APPEARANCE",
+  "settingsSectionWorkout": "WORKOUT",
+  "settingsSectionNotifications": "NOTIFICATIONS",
+  "settingsSectionData": "DATA",
+  "settingsAboutDescription": "A complete workout tracker with routines, progress charts, body measurements and CSV export.",
+  "settingsAboutOk": "OK",
   "settingsThemeColor": "Theme Color",
   "settingsThemeMode": "Theme Mode",
   "settingsSystem": "System",

@@ -71,6 +71,12 @@
 
   "settingsTitle": "Configurações",
   "settingsAppearance": "Aparência",
+  "settingsSectionAppearance": "APARÊNCIA",
+  "settingsSectionWorkout": "TREINO",
+  "settingsSectionNotifications": "NOTIFICAÇÕES",
+  "settingsSectionData": "DADOS",
+  "settingsAboutDescription": "Um app completo para registrar treinos, rotinas, progresso, medidas corporais e exportar em CSV.",
+  "settingsAboutOk": "OK",
   "settingsThemeColor": "Cor do Tema",
   "settingsThemeMode": "Modo do Tema",
   "settingsSystem": "Sistema",

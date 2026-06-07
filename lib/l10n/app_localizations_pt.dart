@@ -208,6 +208,25 @@ class AppLocalizationsPt extends AppLocalizations {
   String get settingsAppearance => 'Aparência';
 
   @override
+  String get settingsSectionAppearance => 'APARÊNCIA';
+
+  @override
+  String get settingsSectionWorkout => 'TREINO';
+
+  @override
+  String get settingsSectionNotifications => 'NOTIFICAÇÕES';
+
+  @override
+  String get settingsSectionData => 'DADOS';
+
+  @override
+  String get settingsAboutDescription =>
+      'Um app completo para registrar treinos, rotinas, progresso, medidas corporais e exportar em CSV.';
+
+  @override
+  String get settingsAboutOk => 'OK';
+
+  @override
   String get settingsThemeColor => 'Cor do Tema';
 
   @override

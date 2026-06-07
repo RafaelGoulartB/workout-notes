@@ -208,6 +208,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAppearance => 'Appearance';
 
   @override
+  String get settingsSectionAppearance => 'APPEARANCE';
+
+  @override
+  String get settingsSectionWorkout => 'WORKOUT';
+
+  @override
+  String get settingsSectionNotifications => 'NOTIFICATIONS';
+
+  @override
+  String get settingsSectionData => 'DATA';
+
+  @override
+  String get settingsAboutDescription =>
+      'A complete workout tracker with routines, progress charts, body measurements and CSV export.';
+
+  @override
+  String get settingsAboutOk => 'OK';
+
+  @override
   String get settingsThemeColor => 'Theme Color';
 
   @override

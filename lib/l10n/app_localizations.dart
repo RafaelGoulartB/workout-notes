@@ -482,6 +482,42 @@ abstract class AppLocalizations {
   /// **'Appearance'**
   String get settingsAppearance;
 
+  /// No description provided for @settingsSectionAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'APPEARANCE'**
+  String get settingsSectionAppearance;
+
+  /// No description provided for @settingsSectionWorkout.
+  ///
+  /// In en, this message translates to:
+  /// **'WORKOUT'**
+  String get settingsSectionWorkout;
+
+  /// No description provided for @settingsSectionNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'NOTIFICATIONS'**
+  String get settingsSectionNotifications;
+
+  /// No description provided for @settingsSectionData.
+  ///
+  /// In en, this message translates to:
+  /// **'DATA'**
+  String get settingsSectionData;
+
+  /// No description provided for @settingsAboutDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'A complete workout tracker with routines, progress charts, body measurements and CSV export.'**
+  String get settingsAboutDescription;
+
+  /// No description provided for @settingsAboutOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get settingsAboutOk;
+
   /// No description provided for @settingsThemeColor.
   ///
   /// In en, this message translates to:
