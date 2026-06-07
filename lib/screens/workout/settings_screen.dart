@@ -5,8 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../repositories/settings_repository.dart';
 import '../../repositories/export_import_repository.dart';
-import '../../database/test_seed_data.dart';
 import '../../services/export_service.dart';
+import '../../database/test_seed_data.dart';
 import '../../services/notification_service.dart';
 import '../../main.dart';
 
@@ -91,14 +91,16 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   }
 
   Future<void> _exportBackup() async {
+    final loc = AppLocalizations.of(context)!;
     final exportService = ExportService();
     try {
-      await exportService.shareJsonBackup();
+      final savedPath = await exportService.shareJsonBackup();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(AppLocalizations.of(context)!.settingsExportSuccess),
+            content: Text('${loc.settingsExportSuccess}\n$savedPath'),
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 6),
           ),
         );
       }
@@ -106,8 +108,226 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-                AppLocalizations.of(context)!.settingsExportError(e.toString())),
+            content: Text(loc.settingsExportError(e.toString())),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _importBackup() async {
+    final ctx = context;
+    final loc = AppLocalizations.of(ctx)!;
+    final scaffoldMessenger = ScaffoldMessenger.of(ctx);
+    final service = ExportService();
+
+    // Get the path where backups are stored (show to user)
+    final backupsPath = await service.getBackupsPathDescription();
+
+    // 1. List available backup files
+    final backups = await service.listLocalBackups();
+
+    if (backups.isEmpty) {
+      if (!mounted) return;
+      // Show info dialog telling the user where to place files
+      await showDialog<void>(
+        context: ctx,
+        builder: (ctx) => AlertDialog(
+          title: Text(loc.settingsImportBackup),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.folder_open,
+                  size: 48,
+                  color: Theme.of(ctx).colorScheme.primary),
+              const SizedBox(height: 16),
+              Text(loc.settingsNoBackupFile),
+              const SizedBox(height: 12),
+              Text(
+                backupsPath,
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(loc.settingsAboutOk),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // 2. Show file picker bottom sheet
+    if (!mounted) return;
+    final selectedPath = await showModalBottomSheet<String>(
+      context: ctx,
+      showDragHandle: true,
+      builder: (ctx) {
+        final localTheme = Theme.of(ctx);
+        return SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Title
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+                child: Row(
+                  children: [
+                    Icon(Icons.restore_outlined,
+                        size: 18, color: localTheme.colorScheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      loc.settingsImportBackup,
+                      style: localTheme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              // Show the path where we look for files
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(
+                  backupsPath,
+                  style: localTheme.textTheme.bodySmall?.copyWith(
+                    fontFamily: 'monospace',
+                    color: localTheme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const Divider(height: 1, thickness: 1),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: backups.length,
+                  itemBuilder: (ctx, i) {
+                    final b = backups[i];
+                    final dateStr = DateFormat('dd/MM/yyyy HH:mm')
+                        .format(b.createdAt);
+                    return InkWell(
+                      onTap: () => Navigator.pop(ctx, b.path),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: localTheme.colorScheme.primaryContainer
+                                    .withAlpha(120),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(Icons.description_outlined,
+                                  size: 20,
+                                  color: localTheme
+                                      .colorScheme.onPrimaryContainer),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    dateStr,
+                                    style: localTheme.textTheme.bodyMedium
+                                        ?.copyWith(
+                                            fontWeight: FontWeight.w500),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    b.sizeFormatted,
+                                    style: localTheme.textTheme.bodySmall
+                                        ?.copyWith(
+                                      color: localTheme
+                                          .colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right,
+                                color: localTheme.colorScheme.onSurfaceVariant,
+                                size: 20),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selectedPath == null || !mounted) return;
+
+    // 3. Confirmation dialog
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.settingsImportBackup),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                size: 48,
+                color: Theme.of(ctx).colorScheme.error),
+            const SizedBox(height: 16),
+            Text(loc.settingsImportWarning),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(loc.commonCancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(loc.settingsImport),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    // 4. Restore
+    try {
+      final count = await service.restoreFromFile(selectedPath);
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(loc.settingsImportSuccess(count)),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(loc.settingsImportError(e.toString())),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -569,6 +789,14 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                       title: loc.settingsExportBackup,
                       subtitle: loc.settingsExportBackupSubtitle,
                       onTap: _exportBackup,
+                    ),
+                    const _CardDivider(),
+                    _LinkTile(
+                      icon: Icons.upload_outlined,
+                      iconColor: theme.colorScheme.primary,
+                      title: loc.settingsImportBackup,
+                      subtitle: loc.settingsImportBackupSubtitle,
+                      onTap: _importBackup,
                     ),
                     const _CardDivider(),
                     _LinkTile(

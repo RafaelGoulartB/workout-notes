@@ -2,11 +2,21 @@ import 'package:sqflite/sqflite.dart';
 import 'base_repository.dart';
 
 /// Repository for data export and import operations.
+///
+/// Export produces a JSON map with every table's rows plus a version
+/// marker. Import performs a full restore: it clears all tables, then
+/// inserts the backup rows inside a single transaction so the database
+/// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
+  // ------------------------------------------------------------------
+  // Export
+  // ------------------------------------------------------------------
+
+  /// Exports all user-modifiable data as a JSON-serialisable map.
   Future<Map<String, dynamic>> exportAllData() async {
     final db = await this.db;
     return {
-      'version': 1,
+      'version': 2,
       'exported_at': DateTime.now().toIso8601String(),
       'categories': await db.query('exercise_categories'),
       'exercises': await db.query('exercises'),
@@ -22,85 +32,68 @@ class ExportImportRepository extends BaseRepository {
     };
   }
 
-  Future<int> importData(Map<String, dynamic> data) async {
+  // ------------------------------------------------------------------
+  // Full restore (clear + import)
+  // ------------------------------------------------------------------
+
+  /// Completely replaces all data with the contents of [data].
+  ///
+  /// This is a destructive operation – existing rows are deleted before
+  /// the backup rows are inserted. The whole process runs inside a
+  /// single transaction so that an error rolls back everything.
+  ///
+  /// Returns the total number of rows inserted.
+  Future<int> restoreFromBackup(Map<String, dynamic> data) async {
     final db = await this.db;
-    int count = 0;
+    int totalRows = 0;
 
     await db.transaction((txn) async {
-      if (data['categories'] != null) {
-        for (final row in data['categories'] as List) {
-          await txn.insert('exercise_categories', row as Map<String, dynamic>,
-              conflictAlgorithm: ConflictAlgorithm.replace);
-          count++;
-        }
-      }
-      if (data['exercises'] != null) {
-        for (final row in data['exercises'] as List) {
-          await txn.insert('exercises', row as Map<String, dynamic>,
-              conflictAlgorithm: ConflictAlgorithm.replace);
-          count++;
-        }
-      }
-      if (data['workouts'] != null) {
-        for (final row in data['workouts'] as List) {
-          await txn.insert('workouts', row as Map<String, dynamic>,
-              conflictAlgorithm: ConflictAlgorithm.replace);
-          count++;
-        }
-      }
-      if (data['exercise_entries'] != null) {
-        for (final row in data['exercise_entries'] as List) {
-          await txn.insert('exercise_entries', row as Map<String, dynamic>,
-              conflictAlgorithm: ConflictAlgorithm.replace);
-          count++;
-        }
-      }
-      if (data['sets'] != null) {
-        for (final row in data['sets'] as List) {
-          await txn.insert('sets', row as Map<String, dynamic>,
-              conflictAlgorithm: ConflictAlgorithm.replace);
-          count++;
-        }
-      }
-      if (data['routines'] != null) {
-        for (final row in data['routines'] as List) {
-          await txn.insert('routines', row as Map<String, dynamic>,
-              conflictAlgorithm: ConflictAlgorithm.replace);
-          count++;
-        }
-      }
-      if (data['routine_days'] != null) {
-        for (final row in data['routine_days'] as List) {
-          await txn.insert('routine_days', row as Map<String, dynamic>,
-              conflictAlgorithm: ConflictAlgorithm.replace);
-          count++;
-        }
-      }
-      if (data['routine_exercises'] != null) {
-        for (final row in data['routine_exercises'] as List) {
-          await txn.insert('routine_exercises', row as Map<String, dynamic>,
-              conflictAlgorithm: ConflictAlgorithm.replace);
-          count++;
-        }
-      }
-      if (data['predefined_sets'] != null) {
-        for (final row in data['predefined_sets'] as List) {
-          await txn.insert('predefined_sets', row as Map<String, dynamic>,
-              conflictAlgorithm: ConflictAlgorithm.replace);
-          count++;
-        }
-      }
-      if (data['body_measurements'] != null) {
-        for (final row in data['body_measurements'] as List) {
-          await txn.insert('body_measurements', row as Map<String, dynamic>,
-              conflictAlgorithm: ConflictAlgorithm.replace);
-          count++;
-        }
-      }
+      // 1. Clear all tables (order matters because of FKs)
+      await txn.delete('predefined_sets');
+      await txn.delete('routine_exercises');
+      await txn.delete('routine_days');
+      await txn.delete('routines');
+      await txn.delete('sets');
+      await txn.delete('exercise_entries');
+      await txn.delete('workouts');
+      await txn.delete('body_measurements');
+      await txn.delete('exercises');
+      await txn.delete('exercise_categories');
+      await txn.delete('app_settings');
+
+      // 2. Insert backup rows in FK-safe order
+      totalRows += await _insertAll(txn, 'exercise_categories', data['categories']);
+      totalRows += await _insertAll(txn, 'exercises', data['exercises']);
+      totalRows += await _insertAll(txn, 'workouts', data['workouts']);
+      totalRows += await _insertAll(txn, 'exercise_entries', data['exercise_entries']);
+      totalRows += await _insertAll(txn, 'sets', data['sets']);
+      totalRows += await _insertAll(txn, 'routines', data['routines']);
+      totalRows += await _insertAll(txn, 'routine_days', data['routine_days']);
+      totalRows += await _insertAll(txn, 'routine_exercises', data['routine_exercises']);
+      totalRows += await _insertAll(txn, 'predefined_sets', data['predefined_sets']);
+      totalRows += await _insertAll(txn, 'body_measurements', data['body_measurements']);
+      totalRows += await _insertAll(txn, 'app_settings', data['settings']);
     });
 
+    return totalRows;
+  }
+
+  /// Inserts [rows] into [table], returning the count.
+  Future<int> _insertAll(
+      Transaction txn, String table, dynamic rows) async {
+    if (rows == null || rows is! List || rows.isEmpty) return 0;
+    int count = 0;
+    for (final row in rows) {
+      await txn.insert(table, row as Map<String, dynamic>,
+          conflictAlgorithm: ConflictAlgorithm.replace);
+      count++;
+    }
     return count;
   }
+
+  // ------------------------------------------------------------------
+  // CSV export (read-only query, unchanged)
+  // ------------------------------------------------------------------
 
   Future<List<Map<String, dynamic>>> exportWorkoutsCsvData({
     String? exerciseId,
@@ -138,6 +131,10 @@ class ExportImportRepository extends BaseRepository {
     query += ' ORDER BY w.date DESC, s.order_index ASC';
     return db.rawQuery(query, args);
   }
+
+  // ------------------------------------------------------------------
+  // Delete all user data (keeps seed categories & exercises)
+  // ------------------------------------------------------------------
 
   Future<void> deleteAllWorkoutData() async {
     final db = await this.db;

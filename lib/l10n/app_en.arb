@@ -130,6 +130,14 @@
   "settingsExportSuccess": "✅ Backup exported!",
   "settingsExportError": "Error: {error}",
 
+  "settingsImportBackup": "Import Backup",
+  "settingsImportBackupSubtitle": "Restore all data from a JSON backup",
+  "settingsImportWarning": "This will replace ALL your current data (workouts, exercises, routines, measurements, settings) with the backup data.\n\nThis action cannot be undone.",
+  "settingsImport": "Import",
+  "settingsImportSuccess": "✅ {count} records imported! Restart the app to apply changes.",
+  "settingsImportError": "Import error: {error}",
+  "settingsNoBackupFile": "No backup file selected",
+
   "settingsLanguage": "Language",
   "settingsEnglish": "English",
   "settingsPortuguese": "Português (Brasil)",

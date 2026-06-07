@@ -395,6 +395,33 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsImportBackup => 'Import Backup';
+
+  @override
+  String get settingsImportBackupSubtitle =>
+      'Restore all data from a JSON backup';
+
+  @override
+  String get settingsImportWarning =>
+      'This will replace ALL your current data (workouts, exercises, routines, measurements, settings) with the backup data.\n\nThis action cannot be undone.';
+
+  @override
+  String get settingsImport => 'Import';
+
+  @override
+  String settingsImportSuccess(Object count) {
+    return '✅ $count records imported! Restart the app to apply changes.';
+  }
+
+  @override
+  String settingsImportError(Object error) {
+    return 'Import error: $error';
+  }
+
+  @override
+  String get settingsNoBackupFile => 'No backup file selected';
+
+  @override
   String get settingsLanguage => 'Language';
 
   @override

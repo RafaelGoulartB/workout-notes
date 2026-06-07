@@ -830,6 +830,48 @@ abstract class AppLocalizations {
   /// **'Error: {error}'**
   String settingsExportError(Object error);
 
+  /// No description provided for @settingsImportBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Backup'**
+  String get settingsImportBackup;
+
+  /// No description provided for @settingsImportBackupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore all data from a JSON backup'**
+  String get settingsImportBackupSubtitle;
+
+  /// No description provided for @settingsImportWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This will replace ALL your current data (workouts, exercises, routines, measurements, settings) with the backup data.\n\nThis action cannot be undone.'**
+  String get settingsImportWarning;
+
+  /// No description provided for @settingsImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get settingsImport;
+
+  /// No description provided for @settingsImportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ {count} records imported! Restart the app to apply changes.'**
+  String settingsImportSuccess(Object count);
+
+  /// No description provided for @settingsImportError.
+  ///
+  /// In en, this message translates to:
+  /// **'Import error: {error}'**
+  String settingsImportError(Object error);
+
+  /// No description provided for @settingsNoBackupFile.
+  ///
+  /// In en, this message translates to:
+  /// **'No backup file selected'**
+  String get settingsNoBackupFile;
+
   /// No description provided for @settingsLanguage.
   ///
   /// In en, this message translates to:

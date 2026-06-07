@@ -522,7 +522,7 @@ class DatabaseHelper {
 
   // -- EXPORT / IMPORT --
   Future<Map<String, dynamic>> exportAllData() => exportImportRepo.exportAllData();
-  Future<int> importData(Map<String, dynamic> data) => exportImportRepo.importData(data);
+  Future<int> restoreFromBackup(Map<String, dynamic> data) => exportImportRepo.restoreFromBackup(data);
   Future<List<Map<String, dynamic>>> exportWorkoutsCsvData({String? exerciseId, DateTime? startDate, DateTime? endDate}) =>
       exportImportRepo.exportWorkoutsCsvData(exerciseId: exerciseId, startDate: startDate, endDate: endDate);
   Future<void> deleteAllWorkoutData() => exportImportRepo.deleteAllWorkoutData();

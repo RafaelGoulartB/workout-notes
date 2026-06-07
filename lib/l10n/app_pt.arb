@@ -130,6 +130,14 @@
   "settingsExportSuccess": "✅ Backup exportado!",
   "settingsExportError": "Erro: {error}",
 
+  "settingsImportBackup": "Importar Backup",
+  "settingsImportBackupSubtitle": "Restaurar todos os dados de um backup JSON",
+  "settingsImportWarning": "Isso vai substituir TODOS os seus dados atuais (treinos, exercícios, rotinas, medidas, configurações) pelos dados do backup.\n\nEsta ação não pode ser desfeita.",
+  "settingsImport": "Importar",
+  "settingsImportSuccess": "✅ {count} registros importados! Reinicie o app para aplicar as alterações.",
+  "settingsImportError": "Erro na importação: {error}",
+  "settingsNoBackupFile": "Nenhum arquivo de backup selecionado",
+
   "settingsLanguage": "Idioma / Language",
   "settingsEnglish": "English",
   "settingsPortuguese": "Português (Brasil)",

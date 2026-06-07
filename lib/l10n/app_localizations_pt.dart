@@ -397,6 +397,33 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String get settingsImportBackup => 'Importar Backup';
+
+  @override
+  String get settingsImportBackupSubtitle =>
+      'Restaurar todos os dados de um backup JSON';
+
+  @override
+  String get settingsImportWarning =>
+      'Isso vai substituir TODOS os seus dados atuais (treinos, exercícios, rotinas, medidas, configurações) pelos dados do backup.\n\nEsta ação não pode ser desfeita.';
+
+  @override
+  String get settingsImport => 'Importar';
+
+  @override
+  String settingsImportSuccess(Object count) {
+    return '✅ $count registros importados! Reinicie o app para aplicar as alterações.';
+  }
+
+  @override
+  String settingsImportError(Object error) {
+    return 'Erro na importação: $error';
+  }
+
+  @override
+  String get settingsNoBackupFile => 'Nenhum arquivo de backup selecionado';
+
+  @override
   String get settingsLanguage => 'Idioma / Language';
 
   @override
