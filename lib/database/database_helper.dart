@@ -11,7 +11,7 @@ import '../repositories/export_import_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 8;
+  static const _dbVersion = 9;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -90,6 +90,7 @@ class DatabaseHelper {
         feeling_rating INTEGER,
         is_from_routine INTEGER NOT NULL DEFAULT 0,
         routine_id TEXT,
+        pause_start_time TEXT,
         created_at TEXT NOT NULL
       )
     ''');
@@ -314,6 +315,11 @@ class DatabaseHelper {
     if (oldVersion < 8) {
       try {
         await db.execute('ALTER TABLE body_measurements ADD COLUMN side TEXT');
+      } catch (_) {}
+    }
+    if (oldVersion < 9) {
+      try {
+        await db.execute('ALTER TABLE workouts ADD COLUMN pause_start_time TEXT');
       } catch (_) {}
     }
   }

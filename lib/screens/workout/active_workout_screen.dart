@@ -122,14 +122,25 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       if (startStr != null) _timerStart = DateTime.parse(startStr);
       final endStr = workout['end_time'] as String?;
       if (endStr != null) _timerEnd = DateTime.parse(endStr);
-      
+      final pauseStr = workout['pause_start_time'] as String?;
+
+      // If the app was closed while paused, treat the reopen as an implicit
+      // resume: shift the start time forward by the elapsed pause duration
+      // and clear the pause state so the pause time is not counted.
+      if (pauseStr != null && _timerStart != null && _timerEnd == null) {
+        final pauseStart = DateTime.parse(pauseStr);
+        final pausedDuration = DateTime.now().difference(pauseStart);
+        _timerStart = _timerStart!.add(pausedDuration);
+        await _workoutRepo.clearWorkoutPause(_workoutId!, _timerStart!);
+      }
+
       if (_timerStart != null && _timerEnd == null) {
         _startElapsedTimer();
       }
       if (_timerStart != null && _timerEnd != null) {
         _updateElapsedStr();
       }
-      
+
       await _loadExercises();
     }
   }
@@ -228,10 +239,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   }
 
   Future<void> _pauseTimer() async {
-    if (_workoutId == null || _isPaused) return;
+    if (_workoutId == null || _isPaused || _timerStart == null) return;
     _pauseStart = DateTime.now();
     _isPaused = true;
     _elapsedTimer?.cancel();
+    // Persist the pause start so the pause time is not counted even if the
+    // app is closed or reloaded before resuming.
+    await _workoutRepo.setWorkoutPause(_workoutId!, _pauseStart!);
     setState(() {});
   }
 
@@ -242,6 +256,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     _timerStart = _timerStart!.add(pausedDuration);
     _pauseStart = null;
     _isPaused = false;
+    // Persist the shifted start time and clear the pause state so the
+    // adjustment survives an app reload.
+    await _workoutRepo.clearWorkoutPause(_workoutId!, _timerStart!);
     _startElapsedTimer();
     setState(() {});
   }

@@ -297,6 +297,7 @@ class WorkoutRepository extends BaseRepository {
       'end_time': now.toIso8601String(),
       'duration_seconds': duration,
       'start_time': startTimeStr ?? now.toIso8601String(),
+      'pause_start_time': null,
     }, where: 'id = ?', whereArgs: [id]);
   }
 
@@ -306,6 +307,25 @@ class WorkoutRepository extends BaseRepository {
       'start_time': null,
       'end_time': null,
       'duration_seconds': null,
+      'pause_start_time': null,
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Persists the workout pause start time.
+  Future<void> setWorkoutPause(String id, DateTime pauseStart) async {
+    final db = await this.db;
+    await db.update('workouts', {
+      'pause_start_time': pauseStart.toIso8601String(),
+    }, where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Clears the pause state and shifts the start time forward by the
+  /// accumulated pause duration, so the elapsed time excludes the pause.
+  Future<void> clearWorkoutPause(String id, DateTime newStartTime) async {
+    final db = await this.db;
+    await db.update('workouts', {
+      'pause_start_time': null,
+      'start_time': newStartTime.toIso8601String(),
     }, where: 'id = ?', whereArgs: [id]);
   }
 

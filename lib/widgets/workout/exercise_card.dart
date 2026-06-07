@@ -283,34 +283,21 @@ class ExerciseCard extends StatelessWidget {
   }
 
   Widget _buildAddSetButton(ThemeData theme, BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: Material(
-        color: theme.colorScheme.primary.withAlpha(15),
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            onAddSet();
-          },
-          borderRadius: BorderRadius.circular(10),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.add, size: 20, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  AppLocalizations.of(context)!.activeWorkoutAddSet,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () {
+          HapticFeedback.selectionClick();
+          onAddSet();
+        },
+        icon: const Icon(Icons.add, size: 18),
+        label: Text(AppLocalizations.of(context)!.activeWorkoutAddSet),
+        style: TextButton.styleFrom(
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          minimumSize: const Size(0, 32),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          foregroundColor: theme.colorScheme.primary,
         ),
       ),
     );
