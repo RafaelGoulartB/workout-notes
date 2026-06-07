@@ -2701,6 +2701,124 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This app needs notification permission to alert you when rest time is over during workouts.'**
   String get noticePermissionBody;
+
+  /// No description provided for @routinesDayDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Day Dashboard'**
+  String get routinesDayDashboard;
+
+  /// No description provided for @routinesNoExercisesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add exercises to build your workout template'**
+  String get routinesNoExercisesHint;
+
+  /// No description provided for @routinesDayDashboardSets.
+  ///
+  /// In en, this message translates to:
+  /// **'sets'**
+  String get routinesDayDashboardSets;
+
+  /// No description provided for @routinesDayDashboardVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'kg volume'**
+  String get routinesDayDashboardVolume;
+
+  /// No description provided for @routinesDayDashboardGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'groups'**
+  String get routinesDayDashboardGroups;
+
+  /// No description provided for @routinesWeeklyView.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly View'**
+  String get routinesWeeklyView;
+
+  /// No description provided for @routinesPerDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Per Day'**
+  String get routinesPerDay;
+
+  /// No description provided for @routinesDaySets.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} sets'**
+  String routinesDaySets(Object count);
+
+  /// No description provided for @routinesDayGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} groups'**
+  String routinesDayGroups(Object count);
+
+  /// No description provided for @routinesInsightMuscleGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'📋 {count} muscle groups this week'**
+  String routinesInsightMuscleGroups(Object count);
+
+  /// No description provided for @routinesInsightBalanced.
+  ///
+  /// In en, this message translates to:
+  /// **'⚖️ Balanced week! All groups with similar volume.'**
+  String get routinesInsightBalanced;
+
+  /// No description provided for @routinesInsightHighDiff.
+  ///
+  /// In en, this message translates to:
+  /// **'💪 {highest} ({highestSets}s) is far above {lowest} ({lowestSets}s). Consider redistributing.'**
+  String routinesInsightHighDiff(
+    Object highest,
+    Object highestSets,
+    Object lowest,
+    Object lowestSets,
+  );
+
+  /// No description provided for @routinesInsightFocus.
+  ///
+  /// In en, this message translates to:
+  /// **'📊 Focus on {highest} ({pct}% of sets). {lowest} with {lowestSets}s — lower volume.'**
+  String routinesInsightFocus(
+    Object highest,
+    Object lowest,
+    Object lowestSets,
+    Object pct,
+  );
+
+  /// No description provided for @routinesInsightAverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Average of {avg} sets/day over {days} training days.'**
+  String routinesInsightAverage(Object avg, Object days);
+
+  /// No description provided for @routinesWeeklyVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'{volume}kg volume'**
+  String routinesWeeklyVolume(Object volume);
+
+  /// No description provided for @routinesWeeklyDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} days'**
+  String routinesWeeklyDays(Object count);
+
+  /// No description provided for @routinesNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get routinesNotes;
+
+  /// No description provided for @routinesNotesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional routine description'**
+  String get routinesNotesHint;
 }
 
 class _AppLocalizationsDelegate

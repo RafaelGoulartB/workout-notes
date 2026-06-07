@@ -457,5 +457,25 @@
   "exportServiceWorkoutNote": "📝 {note}\n",
 
   "noticePermissionTitle": "Permissão do Timer",
-  "noticePermissionBody": "Este app precisa de permissão de notificação para alertar quando o descanso entre séries terminar."
+  "noticePermissionBody": "Este app precisa de permissão de notificação para alertar quando o descanso entre séries terminar.",
+  "routinesDayDashboard": "Dashboard do Dia",
+  "routinesNoExercisesHint": "Adicione exercícios para montar seu template",
+  "routinesDayDashboardSets": "séries",
+  "routinesDayDashboardVolume": "kg volume",
+  "routinesDayDashboardGroups": "grupos",
+
+  "routinesWeeklyView": "Visão Semanal",
+  "routinesPerDay": "Por Dia",
+  "routinesDaySets": "{count} séries",
+  "routinesDayGroups": "{count} grupos",
+  "routinesInsightMuscleGroups": "📋 {count} grupos musculares na semana",
+  "routinesInsightBalanced": "⚖️ Semana equilibrada! Todos os grupos com volume similar.",
+  "routinesInsightHighDiff": "💪 {highest} ({highestSets}s) está muito acima de {lowest} ({lowestSets}s). Considere redistribuir.",
+  "routinesInsightFocus": "📊 Foco em {highest} ({pct}% das séries). {lowest} com {lowestSets}s — volume menor.",
+  "routinesInsightAverage": "Média de {avg} séries/dia em {days} dias de treino.",
+  "routinesWeeklyVolume": "{volume}kg volume",
+  "routinesWeeklyDays": "{count} dias",
+
+  "routinesNotes": "Descrição",
+  "routinesNotesHint": "Descrição opcional da rotina"
 }

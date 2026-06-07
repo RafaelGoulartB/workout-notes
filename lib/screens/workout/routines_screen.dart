@@ -28,25 +28,41 @@ class _RoutinesScreenState extends State<RoutinesScreen> {
   }
 
   void _createRoutine() {
-    final ctl = TextEditingController();
+    final nameCtl = TextEditingController();
+    final notesCtl = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(AppLocalizations.of(context)!.routinesNew),
-        content: TextField(
-          controller: ctl,
-          autofocus: true,
-          decoration: InputDecoration(
-            labelText: AppLocalizations.of(context)!.routinesName,
-            border: OutlineInputBorder(),
-            hintText: AppLocalizations.of(context)!.routinesNameHint,
-          ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtl,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: AppLocalizations.of(context)!.routinesName,
+                border: OutlineInputBorder(),
+                hintText: AppLocalizations.of(context)!.routinesNameHint,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: notesCtl,
+              decoration: InputDecoration(
+                labelText: AppLocalizations.of(context)!.routinesNotes,
+                border: OutlineInputBorder(),
+                hintText: AppLocalizations.of(context)!.routinesNotesHint,
+              ),
+              maxLines: 3,
+            ),
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.commonCancel)),
           FilledButton(onPressed: () async {
-            if (ctl.text.trim().isNotEmpty) {
-              await _routineRepo.createRoutine(ctl.text.trim());
+            if (nameCtl.text.trim().isNotEmpty) {
+              await _routineRepo.createRoutine(nameCtl.text.trim(), notes: notesCtl.text.trim().isEmpty ? null : notesCtl.text.trim());
               if (ctx.mounted) Navigator.pop(ctx);
               _load();
             }
@@ -329,10 +345,10 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                         const SizedBox(height: 12),
                         TextField(
                           controller: notesCtl,
-                          decoration: const InputDecoration(
-                            labelText: 'Descrição',
+                          decoration: InputDecoration(
+                            labelText: AppLocalizations.of(context)!.routinesNotes,
                             border: OutlineInputBorder(),
-                            hintText: 'Descrição opcional da rotina',
+                            hintText: AppLocalizations.of(context)!.routinesNotesHint,
                           ),
                           maxLines: 3,
                         ),
@@ -504,7 +520,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                 children: [
                   Icon(Icons.analytics_outlined, size: 18, color: theme.colorScheme.primary),
                   const SizedBox(width: 6),
-                  Text('Visão Semanal',
+                  Text(AppLocalizations.of(context)!.routinesWeeklyView,
                       style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
                   const Spacer(),
                   if (_dashboardLoading)
@@ -512,7 +528,11 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                 ],
               ),
               const SizedBox(height: 4),
-              Text('$daysCount dias · $totalSets séries${totalVolume > 0 ? ' · ${totalVolume.toStringAsFixed(0)}kg volume' : ''}',
+              Text('${AppLocalizations.of(context)!.routinesWeeklyDays(daysCount)} · '
+                  '${AppLocalizations.of(context)!.routinesDaySets(totalSets)}' +
+                  (totalVolume > 0
+                      ? ' · ${AppLocalizations.of(context)!.routinesWeeklyVolume(totalVolume.toStringAsFixed(0))}'
+                      : ''),
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               const SizedBox(height: 12),
 
@@ -563,7 +583,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
               // Per-day mini summary
               if (_days.length > 1) ...[
                 const Divider(height: 16),
-                Text('Por Dia',
+                Text(AppLocalizations.of(context)!.routinesPerDay,
                     style: theme.textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.w600, color: theme.colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 6),
@@ -585,7 +605,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                           child: Text(dayName,
                               style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
                         ),
-                        Text('$daySets séries',
+                        Text(AppLocalizations.of(context)!.routinesDaySets(daySets),
                             style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
                         if (dayVol > 0) ...[
                           const SizedBox(width: 4),
@@ -594,7 +614,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                                   color: theme.colorScheme.onSurfaceVariant)),
                         ],
                         const SizedBox(width: 4),
-                        Text('$dayCats grupos',
+                        Text(AppLocalizations.of(context)!.routinesDayGroups(dayCats),
                             style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
                       ],
@@ -616,6 +636,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
   }
 
   Widget _buildWeeklyInsight(ThemeData theme, List<_RoutineCatStat> cats, int totalSets, int daysCount) {
+    final loc = AppLocalizations.of(context)!;
     final sorted = List<_RoutineCatStat>.from(cats)..sort((a, b) => b.sets.compareTo(a.sets));
     final highest = sorted.first;
     final lowest = sorted.last;
@@ -624,19 +645,19 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
 
     String insight;
     if (cats.length < 3) {
-      insight = '📋 ${cats.length} grupos musculares na semana';
+      insight = loc.routinesInsightMuscleGroups(cats.length);
     } else if (deviation < 2 && cats.length >= 5) {
-      insight = '⚖️ Semana equilibrada! Todos os grupos com volume similar.';
+      insight = loc.routinesInsightBalanced;
     } else if (highest.sets >= lowest.sets * 3) {
-      insight = '💪 ${highest.name} (${highest.sets}s) está muito acima de ${lowest.name} (${lowest.sets}s). Considere redistribuir.';
+      insight = loc.routinesInsightHighDiff(highest.name, '${highest.sets}', lowest.name, '${lowest.sets}');
     } else {
       final pct = ((highest.sets / totalSets) * 100).round();
-      insight = '📊 Foco em $highest.name ($pct% das séries). ${lowest.name} com ${lowest.sets}s — volume menor.';
+      insight = loc.routinesInsightFocus(highest.name, '$pct', lowest.name, '${lowest.sets}');
     }
 
     // Additional schedule info
     final setsPerDay = totalSets / daysCount;
-    final scheduleNote = 'Média de ${setsPerDay.toStringAsFixed(0)} séries/dia em $daysCount dias de treino.';
+    final scheduleNote = loc.routinesInsightAverage(setsPerDay.toStringAsFixed(0), '$daysCount');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

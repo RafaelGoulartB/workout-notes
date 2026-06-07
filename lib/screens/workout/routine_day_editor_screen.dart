@@ -103,9 +103,8 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remover Exercício?'),
-        content: Text(
-            'Remover "${_resolveExerciseName(ex)}" deste dia?'),
+        title: Text(AppLocalizations.of(ctx)!.activeWorkoutRemoveExercise),
+        content: Text(AppLocalizations.of(ctx)!.activeWorkoutRemoveExerciseContent(_resolveExerciseName(ex))),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -355,7 +354,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                                 .colorScheme
                                 .onSurfaceVariant),
                     const SizedBox(width: 6),
-                    Text('Aquecimento',
+                    Text(AppLocalizations.of(ctx)!.activeWorkoutWarmup,
                         style: Theme.of(ctx).textTheme.bodyMedium),
                     const Spacer(),
                     SizedBox(
@@ -486,7 +485,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text('Peso (kg)',
+        Text(AppLocalizations.of(ctx)!.activeWorkoutWeight,
             style: Theme.of(ctx)
                 .textTheme
                 .labelSmall
@@ -557,7 +556,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 14),
-        Text('Repetições',
+        Text(AppLocalizations.of(ctx)!.activeWorkoutReps,
             style: Theme.of(ctx)
                 .textTheme
                 .labelSmall
@@ -625,7 +624,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text('Distância (km)',
+        Text(AppLocalizations.of(ctx)!.activeWorkoutDistance,
             style: Theme.of(ctx)
                 .textTheme
                 .labelSmall
@@ -703,7 +702,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text('Tempo (segundos)',
+        Text(AppLocalizations.of(ctx)!.activeWorkoutTime,
             style: Theme.of(ctx)
                 .textTheme
                 .labelSmall
@@ -817,7 +816,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     showDialog(
       context: ctx,
       builder: (ctx) => AlertDialog(
-        title: Text(title ?? 'Digite o valor'),
+        title: Text(title ?? AppLocalizations.of(ctx)!.activeWorkoutOK),
         content: TextField(
           controller: ctl,
           keyboardType:
@@ -842,7 +841,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
               }
               Navigator.pop(ctx);
             },
-            child: const Text('OK'),
+            child: Text(AppLocalizations.of(ctx)!.activeWorkoutOK),
           ),
         ],
       ),
@@ -879,9 +878,9 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                         12, 8, 12, 100),
                     itemCount: _exercises.length + 1,
                     itemBuilder: (ctx, i) {
-                      if (i == 0) return _buildCategorySummary(theme);
+                      if (i == 0) return _buildCategorySummary(theme, loc);
                       return _buildExerciseCard(
-                          _exercises[i - 1], theme);
+                          _exercises[i - 1], theme, loc);
                     },
                   ),
                 ),
@@ -893,7 +892,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     );
   }
 
-  Widget _buildCategorySummary(ThemeData theme) {
+  Widget _buildCategorySummary(ThemeData theme, AppLocalizations loc) {
     if (_exercises.isEmpty) return const SizedBox.shrink();
 
     // Aggregate per-category data
@@ -954,7 +953,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                   Icon(Icons.bar_chart, size: 16,
                       color: theme.colorScheme.primary),
                   const SizedBox(width: 6),
-                  Text('Dashboard do Dia',
+                  Text(loc.routinesDayDashboard,
                       style: theme.textTheme.titleSmall
                           ?.copyWith(fontWeight: FontWeight.bold)),
                 ],
@@ -1119,18 +1118,17 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                 size: 80,
                 color: theme.colorScheme.primary.withAlpha(80)),
             const SizedBox(height: 24),
-            Text('Nenhum exercício ainda',
+            Text(loc.routinesNoExercises,
                 style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
-            Text(
-                'Adicione exercícios para montar seu template',
+            Text(loc.routinesNoExercisesHint,
                 style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: _openExercisePicker,
               icon: const Icon(Icons.add),
-              label: const Text('Adicionar Exercício'),
+              label: Text(loc.routinesAddExercise),
             ),
           ],
         ),
@@ -1139,7 +1137,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
   }
 
   Widget _buildExerciseCard(
-      Map<String, dynamic> ex, ThemeData theme) {
+      Map<String, dynamic> ex, ThemeData theme, AppLocalizations loc) {
     final sets =
         _predefinedSets[ex['id'] as String] ?? [];
     final exerciseType =
@@ -1245,7 +1243,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                     const SizedBox(width: 8),
                     if (keys.contains('weight'))
                       Expanded(
-                          child: Text('Peso',
+                          child: Text(fields['weight'] ?? 'Peso',
                               style: theme.textTheme.bodySmall
                                   ?.copyWith(
                                       fontWeight:
@@ -1253,7 +1251,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                                       fontSize: 11))),
                     if (keys.contains('reps'))
                       Expanded(
-                          child: Text('Reps',
+                          child: Text(fields['reps'] ?? 'Reps',
                               style: theme.textTheme.bodySmall
                                   ?.copyWith(
                                       fontWeight:
@@ -1261,7 +1259,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                                       fontSize: 11))),
                     if (keys.contains('distance'))
                       Expanded(
-                          child: Text('Dist.',
+                          child: Text(fields['distance'] ?? 'Dist.',
                               style: theme.textTheme.bodySmall
                                   ?.copyWith(
                                       fontWeight:
@@ -1269,7 +1267,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                                       fontSize: 11))),
                     if (keys.contains('time_seconds'))
                       Expanded(
-                          child: Text('Tempo',
+                          child: Text(fields['time_seconds'] ?? 'Tempo',
                               style: theme.textTheme.bodySmall
                                   ?.copyWith(
                                       fontWeight:
@@ -1356,7 +1354,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
             TextButton.icon(
               onPressed: () => _addPredefinedSet(ex),
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('Adicionar Série'),
+              label: Text(loc.activeWorkoutAddSet),
               style: TextButton.styleFrom(
                   visualDensity: VisualDensity.compact),
             ),

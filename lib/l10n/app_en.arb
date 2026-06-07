@@ -456,5 +456,25 @@
   "exportServiceWorkoutNote": "📝 {note}\n",
 
   "noticePermissionTitle": "Rest Timer Permission",
-  "noticePermissionBody": "This app needs notification permission to alert you when rest time is over during workouts."
+  "noticePermissionBody": "This app needs notification permission to alert you when rest time is over during workouts.",
+  "routinesDayDashboard": "Day Dashboard",
+  "routinesNoExercisesHint": "Add exercises to build your workout template",
+  "routinesDayDashboardSets": "sets",
+  "routinesDayDashboardVolume": "kg volume",
+  "routinesDayDashboardGroups": "groups",
+
+  "routinesWeeklyView": "Weekly View",
+  "routinesPerDay": "Per Day",
+  "routinesDaySets": "{count} sets",
+  "routinesDayGroups": "{count} groups",
+  "routinesInsightMuscleGroups": "📋 {count} muscle groups this week",
+  "routinesInsightBalanced": "⚖️ Balanced week! All groups with similar volume.",
+  "routinesInsightHighDiff": "💪 {highest} ({highestSets}s) is far above {lowest} ({lowestSets}s). Consider redistributing.",
+  "routinesInsightFocus": "📊 Focus on {highest} ({pct}% of sets). {lowest} with {lowestSets}s — lower volume.",
+  "routinesInsightAverage": "Average of {avg} sets/day over {days} training days.",
+  "routinesWeeklyVolume": "{volume}kg volume",
+  "routinesWeeklyDays": "{count} days",
+
+  "routinesNotes": "Description",
+  "routinesNotesHint": "Optional routine description"
 }

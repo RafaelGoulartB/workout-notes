@@ -1395,4 +1395,86 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get noticePermissionBody =>
       'This app needs notification permission to alert you when rest time is over during workouts.';
+
+  @override
+  String get routinesDayDashboard => 'Day Dashboard';
+
+  @override
+  String get routinesNoExercisesHint =>
+      'Add exercises to build your workout template';
+
+  @override
+  String get routinesDayDashboardSets => 'sets';
+
+  @override
+  String get routinesDayDashboardVolume => 'kg volume';
+
+  @override
+  String get routinesDayDashboardGroups => 'groups';
+
+  @override
+  String get routinesWeeklyView => 'Weekly View';
+
+  @override
+  String get routinesPerDay => 'Per Day';
+
+  @override
+  String routinesDaySets(Object count) {
+    return '$count sets';
+  }
+
+  @override
+  String routinesDayGroups(Object count) {
+    return '$count groups';
+  }
+
+  @override
+  String routinesInsightMuscleGroups(Object count) {
+    return '📋 $count muscle groups this week';
+  }
+
+  @override
+  String get routinesInsightBalanced =>
+      '⚖️ Balanced week! All groups with similar volume.';
+
+  @override
+  String routinesInsightHighDiff(
+    Object highest,
+    Object highestSets,
+    Object lowest,
+    Object lowestSets,
+  ) {
+    return '💪 $highest (${highestSets}s) is far above $lowest (${lowestSets}s). Consider redistributing.';
+  }
+
+  @override
+  String routinesInsightFocus(
+    Object highest,
+    Object lowest,
+    Object lowestSets,
+    Object pct,
+  ) {
+    return '📊 Focus on $highest ($pct% of sets). $lowest with ${lowestSets}s — lower volume.';
+  }
+
+  @override
+  String routinesInsightAverage(Object avg, Object days) {
+    return 'Average of $avg sets/day over $days training days.';
+  }
+
+  @override
+  String routinesWeeklyVolume(Object volume) {
+    return '${volume}kg volume';
+  }
+
+  @override
+  String routinesWeeklyDays(Object count) {
+    return '$count days';
+  }
+
+  @override
+  String get routinesNotes => 'Description';
+
+  @override
+  String get routinesNotesHint => 'Optional routine description';
 }

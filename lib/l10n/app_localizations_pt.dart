@@ -1402,4 +1402,86 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get noticePermissionBody =>
       'Este app precisa de permissão de notificação para alertar quando o descanso entre séries terminar.';
+
+  @override
+  String get routinesDayDashboard => 'Dashboard do Dia';
+
+  @override
+  String get routinesNoExercisesHint =>
+      'Adicione exercícios para montar seu template';
+
+  @override
+  String get routinesDayDashboardSets => 'séries';
+
+  @override
+  String get routinesDayDashboardVolume => 'kg volume';
+
+  @override
+  String get routinesDayDashboardGroups => 'grupos';
+
+  @override
+  String get routinesWeeklyView => 'Visão Semanal';
+
+  @override
+  String get routinesPerDay => 'Por Dia';
+
+  @override
+  String routinesDaySets(Object count) {
+    return '$count séries';
+  }
+
+  @override
+  String routinesDayGroups(Object count) {
+    return '$count grupos';
+  }
+
+  @override
+  String routinesInsightMuscleGroups(Object count) {
+    return '📋 $count grupos musculares na semana';
+  }
+
+  @override
+  String get routinesInsightBalanced =>
+      '⚖️ Semana equilibrada! Todos os grupos com volume similar.';
+
+  @override
+  String routinesInsightHighDiff(
+    Object highest,
+    Object highestSets,
+    Object lowest,
+    Object lowestSets,
+  ) {
+    return '💪 $highest (${highestSets}s) está muito acima de $lowest (${lowestSets}s). Considere redistribuir.';
+  }
+
+  @override
+  String routinesInsightFocus(
+    Object highest,
+    Object lowest,
+    Object lowestSets,
+    Object pct,
+  ) {
+    return '📊 Foco em $highest ($pct% das séries). $lowest com ${lowestSets}s — volume menor.';
+  }
+
+  @override
+  String routinesInsightAverage(Object avg, Object days) {
+    return 'Média de $avg séries/dia em $days dias de treino.';
+  }
+
+  @override
+  String routinesWeeklyVolume(Object volume) {
+    return '${volume}kg volume';
+  }
+
+  @override
+  String routinesWeeklyDays(Object count) {
+    return '$count dias';
+  }
+
+  @override
+  String get routinesNotes => 'Descrição';
+
+  @override
+  String get routinesNotesHint => 'Descrição opcional da rotina';
 }
