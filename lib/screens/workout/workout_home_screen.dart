@@ -208,7 +208,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       appBar: AppBar(
         title: Text(
           _formatHeaderDate(loc),
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -223,12 +223,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  // Active workout banner — pinned to the top so it never
-                  // gets buried under stats.
-                  if (_activeWorkouts.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: _buildActiveBanner(theme, loc, _activeWorkouts.first),
-                    ),
                   // First-time empty state replaces the stats card.
                   if (!_hasAnyHistory)
                     SliverToBoxAdapter(
@@ -237,6 +231,12 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                   else
                     SliverToBoxAdapter(
                       child: _buildHeaderStats(theme, loc),
+                    ),
+                  // Active workout banner — shown right after the stats
+                  // card so the high-level summary still leads the page.
+                  if (_activeWorkouts.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: _buildActiveBanner(theme, loc, _activeWorkouts.first),
                     ),
                   SliverToBoxAdapter(child: _buildSectionHeader(loc.workoutHomeSectionQuickActions, theme)),
                   SliverToBoxAdapter(child: _buildQuickActions(theme, loc)),
