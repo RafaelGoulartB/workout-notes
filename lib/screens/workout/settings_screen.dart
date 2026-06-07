@@ -411,7 +411,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
               Icon(Icons.content_paste_go,
                   color: Theme.of(ctx).colorScheme.primary),
               const SizedBox(width: 8),
-              Text('Colar backup'),
+              Text(loc.settingsImportPasteTitle),
             ],
           ),
           content: SizedBox(
@@ -421,8 +421,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
               maxLines: 12,
               minLines: 6,
               decoration: InputDecoration(
-                hintText:
-                    'Copie o conteúdo do arquivo .json e cole aqui',
+                hintText: loc.settingsImportPasteHint,
                 border: const OutlineInputBorder(),
                 contentPadding: const EdgeInsets.all(12),
                 filled: true,
@@ -484,9 +483,8 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
               ),
               _ImportOptionTile(
                 icon: Icons.content_paste_go,
-                title: 'Colar conte\'udo do backup',
-                subtitle:
-                    'Copie o JSON de outro dispositivo e cole aqui',
+                title: loc.settingsImportPasteOption,
+                subtitle: loc.settingsImportPasteSubtitle,
                 onTap: () => Navigator.pop(ctx, 'paste'),
               ),
             ],

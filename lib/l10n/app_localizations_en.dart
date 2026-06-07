@@ -422,6 +422,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsNoBackupFile => 'No backup file selected';
 
   @override
+  String get settingsImportPasteTitle => 'Paste Backup';
+
+  @override
+  String get settingsImportPasteHint =>
+      'Copy the .json file content and paste here';
+
+  @override
+  String get settingsImportPasteOption => 'Paste backup content';
+
+  @override
+  String get settingsImportPasteSubtitle =>
+      'Copy the JSON from another device and paste here';
+
+  @override
   String get settingsLanguage => 'Language';
 
   @override

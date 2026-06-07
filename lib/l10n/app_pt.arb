@@ -137,6 +137,10 @@
   "settingsImportSuccess": "✅ {count} registros importados! Reinicie o app para aplicar as alterações.",
   "settingsImportError": "Erro na importação: {error}",
   "settingsNoBackupFile": "Nenhum arquivo de backup selecionado",
+  "settingsImportPasteTitle": "Colar backup",
+  "settingsImportPasteHint": "Copie o conte\u00FAdo do arquivo .json e cole aqui",
+  "settingsImportPasteOption": "Colar conte\u00FAdo do backup",
+  "settingsImportPasteSubtitle": "Copie o JSON de outro dispositivo e cole aqui",
 
   "settingsLanguage": "Idioma / Language",
   "settingsEnglish": "English",

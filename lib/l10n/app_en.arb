@@ -137,6 +137,10 @@
   "settingsImportSuccess": "✅ {count} records imported! Restart the app to apply changes.",
   "settingsImportError": "Import error: {error}",
   "settingsNoBackupFile": "No backup file selected",
+  "settingsImportPasteTitle": "Paste Backup",
+  "settingsImportPasteHint": "Copy the .json file content and paste here",
+  "settingsImportPasteOption": "Paste backup content",
+  "settingsImportPasteSubtitle": "Copy the JSON from another device and paste here",
 
   "settingsLanguage": "Language",
   "settingsEnglish": "English",

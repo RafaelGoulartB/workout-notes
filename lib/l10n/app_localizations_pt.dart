@@ -424,6 +424,20 @@ class AppLocalizationsPt extends AppLocalizations {
   String get settingsNoBackupFile => 'Nenhum arquivo de backup selecionado';
 
   @override
+  String get settingsImportPasteTitle => 'Colar backup';
+
+  @override
+  String get settingsImportPasteHint =>
+      'Copie o conteúdo do arquivo .json e cole aqui';
+
+  @override
+  String get settingsImportPasteOption => 'Colar conteúdo do backup';
+
+  @override
+  String get settingsImportPasteSubtitle =>
+      'Copie o JSON de outro dispositivo e cole aqui';
+
+  @override
   String get settingsLanguage => 'Idioma / Language';
 
   @override

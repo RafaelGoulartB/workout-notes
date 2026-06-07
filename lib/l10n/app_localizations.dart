@@ -872,6 +872,30 @@ abstract class AppLocalizations {
   /// **'No backup file selected'**
   String get settingsNoBackupFile;
 
+  /// No description provided for @settingsImportPasteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste Backup'**
+  String get settingsImportPasteTitle;
+
+  /// No description provided for @settingsImportPasteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy the .json file content and paste here'**
+  String get settingsImportPasteHint;
+
+  /// No description provided for @settingsImportPasteOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste backup content'**
+  String get settingsImportPasteOption;
+
+  /// No description provided for @settingsImportPasteSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy the JSON from another device and paste here'**
+  String get settingsImportPasteSubtitle;
+
   /// No description provided for @settingsLanguage.
   ///
   /// In en, this message translates to:
