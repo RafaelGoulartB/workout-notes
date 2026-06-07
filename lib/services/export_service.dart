@@ -21,7 +21,6 @@ class BackupFileInfo {
     required this.sizeBytes,
   });
 
-  /// Human-readable file size.
   String get sizeFormatted {
     if (sizeBytes < 1024) return '$sizeBytes B';
     if (sizeBytes < 1024 * 1024) {
@@ -35,54 +34,52 @@ class ExportService {
   final _workoutRepo = WorkoutRepository();
   final _exportRepo = ExportImportRepository();
 
-  // ===================================================================
-  // Backups directory (public Downloads folder)
-  // ===================================================================
-
-  /// Folder name inside Downloads where backups are stored.
   static const _backupFolderName = 'WorkoutNotes';
 
-  /// Returns the public backups directory.
-  ///
-  /// On Android this is `Downloads/WorkoutNotes/`, on other platforms it
-  /// falls back to the app's documents directory.
-  ///
-  /// The path is shown to the user so they know where to place backup
-  /// files for manual import.
-  Future<Directory> getBackupsDirectory() async {
-    // Try the public Downloads folder first (Android)
-    final downloads = await getExternalStorageDirectories(
-      type: StorageDirectory.downloads,
-    );
-    if (downloads != null && downloads.isNotEmpty) {
-      final dir = Directory('${downloads.first.path}/$_backupFolderName');
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-      return dir;
-    }
+  // ===================================================================
+  // Backups directory
+  // ===================================================================
 
-    // Fallback: app's documents directory (iOS, desktop)
+  /// Returns the directory for saving/reading backup files.
+  ///
+  /// On Android, tries the public Downloads folder first so the user
+  /// can easily find the files. Falls back to the app's documents
+  /// directory if Downloads is not accessible (Android 11+ scoped
+  /// storage).
+  Future<Directory> getBackupsDirectory() async {
+    // Try public Downloads (Android 10-)
+    try {
+      final dirs = await getExternalStorageDirectories(
+        type: StorageDirectory.downloads,
+      );
+      if (dirs != null && dirs.isNotEmpty) {
+        final dir = Directory('${dirs.first.path}/$_backupFolderName');
+        if (!await dir.exists()) await dir.create(recursive: true);
+        return dir;
+      }
+    } catch (_) {}
+
+    // Fallback: app's documents
     final appDir = await getApplicationDocumentsDirectory();
-    final dir = Directory('${appDir.path}/backups');
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
+    final dir = Directory('${appDir.path}/$_backupFolderName');
+    if (!await dir.exists()) await dir.create(recursive: true);
     return dir;
   }
 
-  /// Returns a human-readable description of where backups are stored.
+  /// Human-readable path description to show the user.
   Future<String> getBackupsPathDescription() async {
-    final dir = await getBackupsDirectory();
-    return dir.path;
+    try {
+      return (await getBackupsDirectory()).path;
+    } catch (_) {
+      return '(indisponível)';
+    }
   }
 
-  /// Lists all `.json` backup files, sorted newest first.
+  /// Lists `.json` files from the backups directory, newest first.
   Future<List<BackupFileInfo>> listLocalBackups() async {
-    final dir = await getBackupsDirectory();
-    final files = <BackupFileInfo>[];
-
     try {
+      final dir = await getBackupsDirectory();
+      final files = <BackupFileInfo>[];
       await for (final entity in dir.list()) {
         if (entity is File && entity.path.endsWith('.json')) {
           final stat = await entity.stat();
@@ -94,21 +91,18 @@ class ExportService {
           ));
         }
       }
+      files.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return files;
     } catch (_) {
-      // Directory might not be accessible; return empty list
+      return [];
     }
-
-    files.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return files;
   }
 
   // ===================================================================
   // JSON Backup – Export
   // ===================================================================
 
-  /// Exports all data to a JSON file in the public backups directory.
-  ///
-  /// Returns the full file path of the saved backup.
+  /// Exports all data to JSON and returns the file path.
   Future<String> exportToJson() async {
     final data = await _exportRepo.exportAllData();
     final json = const JsonEncoder.withIndent('  ').convert(data);
@@ -119,58 +113,55 @@ class ExportService {
     return file.path;
   }
 
-  /// Saves the backup to the public directory AND shares it via the
-  /// system share sheet.
-  ///
-  /// After this call the file is available both in the public backups
-  /// directory (for later import) and via the share sheet (to transfer
-  /// to other devices or cloud storage).
+  /// Saves backup and opens share sheet. The file is also kept
+  /// locally in the backups directory.
   Future<String> shareJsonBackup() async {
     final path = await exportToJson();
-
-    // Share via system sheet (user can save to any location, email, etc.)
     final xfile = XFile(path, mimeType: 'application/json');
     await Share.shareXFiles([xfile], text: 'Workout Notes - Backup');
     return path;
   }
 
   // ===================================================================
-  // JSON Backup – Import (full restore)
+  // JSON Backup – Import (restore)
   // ===================================================================
 
-  /// Reads a JSON backup file at [filePath] and performs a full restore.
-  ///
-  /// Throws if the file is missing, invalid, or incompatible.
+  /// Restores all data from a JSON backup file.
   Future<int> restoreFromFile(String filePath) async {
     final file = File(filePath);
     if (!await file.exists()) {
       throw Exception('Arquivo não encontrado: $filePath');
     }
-
     final content = await file.readAsString();
-    final data = jsonDecode(content);
+    return _restoreFromJsonString(content);
+  }
 
+  /// Restores all data from a raw JSON string (pasted by the user).
+  Future<int> restoreFromJsonString(String jsonString) async {
+    return _restoreFromJsonString(jsonString);
+  }
+
+  Future<int> _restoreFromJsonString(String content) async {
+    final data = jsonDecode(content);
     if (data is! Map<String, dynamic>) {
       throw const FormatException(
-        'Formato de backup inválido: esperado um objeto JSON',
+        'Formato inválido: esperado um objeto JSON com os dados do backup.',
       );
     }
-
     if (!data.containsKey('version')) {
       throw const FormatException(
-        'Arquivo de backup inválido: campo version ausente',
+        'Arquivo de backup inválido: campo version ausente.',
       );
     }
-
     return _exportRepo.restoreFromBackup(data);
   }
 
-  /// Deletes a local backup file.
+  /// Deletes a backup file.
   Future<void> deleteBackupFile(String path) async {
-    final file = File(path);
-    if (await file.exists()) {
-      await file.delete();
-    }
+    try {
+      final f = File(path);
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
   }
 
   // ===================================================================
@@ -188,23 +179,13 @@ class ExportService {
       startDate: startDate,
       endDate: endDate,
     );
-
     final csvRows = <List<String>>[
       [
-        'Data',
-        'Exercício',
-        'Categoria',
-        'Peso',
-        'Repetições',
-        'Distância',
-        'Tempo (s)',
-        'Aquecimento',
-        'RPE',
-        'Nota',
+        'Data', 'Exercício', 'Categoria', 'Peso', 'Repetições',
+        'Distância', 'Tempo (s)', 'Aquecimento', 'RPE', 'Nota',
         'Observação do Treino',
       ],
     ];
-
     for (final row in rows) {
       csvRows.add([
         (row['date'] as String?) ?? '',
@@ -220,12 +201,9 @@ class ExportService {
         (row['workout_comment'] as String?) ?? '',
       ]);
     }
-
     final csvData = const ListToCsvConverter().convert(csvRows);
     final dir = await getTemporaryDirectory();
-    final file = File(
-      '${dir.path}/workout_notes_export_${DateTime.now().millisecondsSinceEpoch}.csv',
-    );
+    final file = File('${dir.path}/workout_notes_export_${DateTime.now().millisecondsSinceEpoch}.csv');
     await file.writeAsString(csvData);
     return file.path;
   }
@@ -247,21 +225,18 @@ class ExportService {
   }
 
   // ===================================================================
-  // Share workout summary (text)
+  // Share workout summary
   // ===================================================================
 
   Future<void> shareWorkoutSummary(String workoutId) async {
     final workout = await _workoutRepo.getWorkout(workoutId);
     if (workout == null) return;
-
     final exercises = await _workoutRepo.getWorkoutExercises(workoutId);
     final date = (workout['date'] as String?) ?? '';
     final comment = (workout['comment'] as String?) ?? '';
-
     var text = '🏋️ Treino - $date\n';
     if (comment.isNotEmpty) text += '📝 $comment\n';
     text += '\n';
-
     for (final ex in exercises) {
       final sets = await _workoutRepo.getExerciseSets(ex['id'] as String);
       final exName = (ex['exercise_name'] as String?) ?? '';
@@ -274,7 +249,6 @@ class ExportService {
         text += '   $complete $i: $weight kg × $reps\n';
       }
     }
-
     await Share.share(text);
   }
 }
