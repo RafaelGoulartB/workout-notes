@@ -24,6 +24,11 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   int _selectedAccentIndex = AccentColors.indexOf(AccentColors.defaultColor);
   ThemeMode _selectedThemeMode = ThemeMode.system;
 
+  // Easter egg: tap "Sobre" 10x em 15s para revelar o botão de dados de teste
+  int _aboutTapCount = 0;
+  DateTime? _aboutFirstTapTime;
+  bool _showTestData = false;
+
   // Rest-time choices shown as chips in the timer card. The values are
   // seconds; the label is formatted at render time.
   static const _restChoices = [30, 45, 60, 90, 120, 180];
@@ -581,6 +586,28 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   }
 
   void _showAbout() {
+    final now = DateTime.now();
+
+    // Reseta o contador se passaram mais de 15s desde o primeiro toque
+    if (_aboutFirstTapTime == null ||
+        now.difference(_aboutFirstTapTime!) > const Duration(seconds: 15)) {
+      _aboutFirstTapTime = now;
+      _aboutTapCount = 1;
+    } else {
+      _aboutTapCount++;
+      if (_aboutTapCount >= 10 && !_showTestData) {
+        _showTestData = true;
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('🔧 Modo desenvolvedor ativado!'),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -962,14 +989,16 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                       subtitle: loc.settingsImportBackupSubtitle,
                       onTap: _importBackup,
                     ),
-                    const _CardDivider(),
-                    _LinkTile(
-                      icon: Icons.bug_report_outlined,
-                      iconColor: theme.colorScheme.secondary,
-                      title: loc.settingsGenerateTestData,
-                      subtitle: loc.settingsGenerateTestDataSubtitle,
-                      onTap: _generateTestData,
-                    ),
+                    if (_showTestData) ...[
+                      const _CardDivider(),
+                      _LinkTile(
+                        icon: Icons.bug_report_outlined,
+                        iconColor: theme.colorScheme.secondary,
+                        title: loc.settingsGenerateTestData,
+                        subtitle: loc.settingsGenerateTestDataSubtitle,
+                        onTap: _generateTestData,
+                      ),
+                    ],
                     const _CardDivider(),
                     _LinkTile(
                       icon: Icons.info_outline,
