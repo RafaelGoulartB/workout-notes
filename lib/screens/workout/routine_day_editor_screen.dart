@@ -126,6 +126,40 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     }
   }
 
+  Future<void> _deleteDay() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(AppLocalizations.of(ctx)!.routinesDeleteConfirm(widget.dayName)),
+        content: Text(AppLocalizations.of(ctx)!.routinesDeleteContent),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(AppLocalizations.of(ctx)!.commonCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(AppLocalizations.of(ctx)!.commonDelete,
+                style: const TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _routineRepo.deleteRoutineDay(widget.routineDayId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.routinesDeleteDay),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    }
+  }
+
   // ===================== REST TIME =====================
 
   void _changeRestTime(Map<String, dynamic> exercise) {
@@ -866,6 +900,32 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
             icon: const Icon(Icons.add),
             onPressed: _openExercisePicker,
             tooltip: loc.routinesAddExercise,
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'Mais opções',
+            onSelected: (value) {
+              switch (value) {
+                case 'delete_day':
+                  _deleteDay();
+                  break;
+              }
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem<String>(
+                value: 'delete_day',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline, size: 20, color: Theme.of(context).colorScheme.error),
+                    const SizedBox(width: 12),
+                    Text(
+                      AppLocalizations.of(context)!.routinesDeleteDay,
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
