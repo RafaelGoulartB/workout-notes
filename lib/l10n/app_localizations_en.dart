@@ -161,6 +161,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workoutHomeDeleteWorkout => 'Delete Workout';
 
   @override
+  String get workoutHomeSectionQuickActions => 'QUICK ACTIONS';
+
+  @override
+  String get workoutHomeSectionTools => 'TOOLS';
+
+  @override
+  String get workoutHomeSectionHistory => 'HISTORY';
+
+  @override
+  String workoutHomeActiveBannerSubtitle(Object duration) {
+    return '$duration elapsed · tap to continue';
+  }
+
+  @override
+  String get workoutHomeActiveBannerAction => 'Continue';
+
+  @override
+  String get workoutHomeLastWorkout => 'Last workout';
+
+  @override
+  String workoutHomeLastWorkoutAgo(Object when) {
+    return '$when ago';
+  }
+
+  @override
+  String get workoutHomeLastWorkoutToday => 'Today';
+
+  @override
+  String get workoutHomeLastWorkoutYesterday => 'Yesterday';
+
+  @override
+  String get workoutHomeEmptyTitle => 'No workouts yet';
+
+  @override
+  String get workoutHomeEmptySubtitle =>
+      'Log your first workout to start tracking your progress';
+
+  @override
+  String get workoutHomeEmptyCta => 'Start first workout';
+
+  @override
   String get settingsTitle => 'Settings';
 
   @override

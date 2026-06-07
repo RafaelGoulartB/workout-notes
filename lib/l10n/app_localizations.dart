@@ -398,6 +398,78 @@ abstract class AppLocalizations {
   /// **'Delete Workout'**
   String get workoutHomeDeleteWorkout;
 
+  /// No description provided for @workoutHomeSectionQuickActions.
+  ///
+  /// In en, this message translates to:
+  /// **'QUICK ACTIONS'**
+  String get workoutHomeSectionQuickActions;
+
+  /// No description provided for @workoutHomeSectionTools.
+  ///
+  /// In en, this message translates to:
+  /// **'TOOLS'**
+  String get workoutHomeSectionTools;
+
+  /// No description provided for @workoutHomeSectionHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'HISTORY'**
+  String get workoutHomeSectionHistory;
+
+  /// No description provided for @workoutHomeActiveBannerSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{duration} elapsed · tap to continue'**
+  String workoutHomeActiveBannerSubtitle(Object duration);
+
+  /// No description provided for @workoutHomeActiveBannerAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get workoutHomeActiveBannerAction;
+
+  /// No description provided for @workoutHomeLastWorkout.
+  ///
+  /// In en, this message translates to:
+  /// **'Last workout'**
+  String get workoutHomeLastWorkout;
+
+  /// No description provided for @workoutHomeLastWorkoutAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{when} ago'**
+  String workoutHomeLastWorkoutAgo(Object when);
+
+  /// No description provided for @workoutHomeLastWorkoutToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get workoutHomeLastWorkoutToday;
+
+  /// No description provided for @workoutHomeLastWorkoutYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get workoutHomeLastWorkoutYesterday;
+
+  /// No description provided for @workoutHomeEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No workouts yet'**
+  String get workoutHomeEmptyTitle;
+
+  /// No description provided for @workoutHomeEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log your first workout to start tracking your progress'**
+  String get workoutHomeEmptySubtitle;
+
+  /// No description provided for @workoutHomeEmptyCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Start first workout'**
+  String get workoutHomeEmptyCta;
+
   /// No description provided for @settingsTitle.
   ///
   /// In en, this message translates to:

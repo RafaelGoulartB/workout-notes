@@ -161,6 +161,47 @@ class AppLocalizationsPt extends AppLocalizations {
   String get workoutHomeDeleteWorkout => 'Excluir Treino';
 
   @override
+  String get workoutHomeSectionQuickActions => 'AÇÕES RÁPIDAS';
+
+  @override
+  String get workoutHomeSectionTools => 'FERRAMENTAS';
+
+  @override
+  String get workoutHomeSectionHistory => 'HISTÓRICO';
+
+  @override
+  String workoutHomeActiveBannerSubtitle(Object duration) {
+    return '$duration decorridos · toque para continuar';
+  }
+
+  @override
+  String get workoutHomeActiveBannerAction => 'Continuar';
+
+  @override
+  String get workoutHomeLastWorkout => 'Último treino';
+
+  @override
+  String workoutHomeLastWorkoutAgo(Object when) {
+    return 'há $when';
+  }
+
+  @override
+  String get workoutHomeLastWorkoutToday => 'Hoje';
+
+  @override
+  String get workoutHomeLastWorkoutYesterday => 'Ontem';
+
+  @override
+  String get workoutHomeEmptyTitle => 'Nenhum treino ainda';
+
+  @override
+  String get workoutHomeEmptySubtitle =>
+      'Registre seu primeiro treino para começar a acompanhar seu progresso';
+
+  @override
+  String get workoutHomeEmptyCta => 'Começar primeiro treino';
+
+  @override
   String get settingsTitle => 'Configurações';
 
   @override
