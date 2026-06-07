@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
@@ -104,10 +105,11 @@ class ExerciseCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
                     width: 4,
-                    height: 24,
+                    height: 36,
                     decoration: BoxDecoration(
                       color: exercise.categoryColor,
                       borderRadius: BorderRadius.circular(2),
@@ -115,13 +117,32 @@ class ExerciseCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      exercise.localizedName(
-                          AppLocalizations.of(context)!),
-                      style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          exercise.localizedName(
+                              AppLocalizations.of(context)!),
+                          style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          exercise.localizedCategory(
+                              AppLocalizations.of(context)!),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: 11),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
                   ),
+                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () =>
                         onChangeRestTime(exercise.restTimeSeconds),
@@ -148,18 +169,12 @@ class ExerciseCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    exercise.localizedCategory(AppLocalizations.of(context)!),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant),
-                  ),
                   if (onRemoveExercise != null) ...[
-                    const SizedBox(width: 2),
+                    const SizedBox(width: 6),
                     GestureDetector(
                       onTap: () => onRemoveExercise!(),
                       child: Container(
-                        padding: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.error.withAlpha(20),
                           borderRadius: BorderRadius.circular(8),
@@ -171,7 +186,7 @@ class ExerciseCard extends StatelessWidget {
                   ],
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               _buildHeaderRow(theme),
               const Divider(height: 4),
               ...List.generate(exercise.sets.length, (i) {
@@ -182,26 +197,32 @@ class ExerciseCard extends StatelessWidget {
                 return InkWell(
                   onTap: () =>
                       onEditSet(set['id'] as String, set, i + 1),
+                  borderRadius: BorderRadius.circular(8),
                   child: Padding(
                     padding:
-                        const EdgeInsets.symmetric(vertical: 4),
+                        const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
                     child: Row(
                       children: [
                         GestureDetector(
-                          onTap: () =>
-                              onToggleSet(set['id'] as String),
-                          child: Container(
-                            width: 24,
-                            height: 24,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            onToggleSet(set['id'] as String);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            width: 26,
+                            height: 26,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: isComplete
                                   ? theme.colorScheme.primary
-                                  : null,
+                                  : Colors.transparent,
                               border: Border.all(
                                 color: isComplete
                                     ? theme.colorScheme.primary
-                                    : theme.colorScheme.outline,
+                                    : theme.colorScheme.outline
+                                        .withAlpha(150),
+                                width: 1.5,
                               ),
                             ),
                             child: isComplete
@@ -212,19 +233,38 @@ class ExerciseCard extends StatelessWidget {
                                 : null,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            isWarmup ? 'W' : '${i + 1}',
-                            style: theme.textTheme.bodyMedium
-                                ?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: isWarmup
-                                  ? Colors.orange
-                                  : null,
-                            ),
-                          ),
+                        const SizedBox(width: 10),
+                        SizedBox(
+                          width: 32,
+                          child: isWarmup
+                              ? Align(
+                                  alignment: Alignment.center,
+                                  child: Container(
+                                    padding: const EdgeInsets
+                                        .symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange
+                                          .withAlpha(35),
+                                      borderRadius:
+                                          BorderRadius.circular(6),
+                                    ),
+                                    child: Icon(
+                                      Icons.local_fire_department,
+                                      size: 14,
+                                      color:
+                                          Colors.orange.shade700,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  '${i + 1}',
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodyMedium
+                                      ?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                         ),
                         ..._buildSetColumns(
                             exercise, set, theme),
@@ -233,16 +273,43 @@ class ExerciseCard extends StatelessWidget {
                   ),
                 );
               }),
-              const SizedBox(height: 4),
-              TextButton.icon(
-                onPressed: onAddSet,
-                icon: const Icon(Icons.add, size: 18),
-                label: Text(AppLocalizations.of(context)!
-                    .activeWorkoutAddSet),
-                style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact),
-              ),
+              const SizedBox(height: 6),
+              _buildAddSetButton(theme, context),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddSetButton(ThemeData theme, BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: Material(
+        color: theme.colorScheme.primary.withAlpha(15),
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onAddSet();
+          },
+          borderRadius: BorderRadius.circular(10),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.add, size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  AppLocalizations.of(context)!.activeWorkoutAddSet,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -254,66 +321,89 @@ class ExerciseCard extends StatelessWidget {
     final keys = fields.keys.toList();
     return Row(
       children: [
-        const SizedBox(width: 24),
-        Expanded(
-          flex: 2,
-          child: Text('#',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(fontWeight: FontWeight.w600)),
-        ),
-        Expanded(
-          flex: 3,
-          child: Text(fields[keys[0]] ?? '',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(fontWeight: FontWeight.w600)),
-        ),
-        if (keys.length > 1)
-          Expanded(
-            flex: 3,
-            child: Text(fields[keys[1]] ?? '',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(fontWeight: FontWeight.w600)),
-          ),
-        if (exercise.sets.any((s) => s['rpe'] != null))
-          Expanded(
-            flex: 2,
-            child: Text('RPE',
-                style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600)),
-          ),
-        const SizedBox(width: 40),
+        const SizedBox(width: 26),
+        const SizedBox(width: 10),
+        const SizedBox(width: 32, child: SizedBox.shrink()),
+        ..._buildHeaderFieldColumns(theme, fields, keys),
+        const SizedBox(width: 32),
       ],
     );
+  }
+
+  List<Widget> _buildHeaderFieldColumns(
+      ThemeData theme, Map<String, String> fields, List<String> keys) {
+    final hasRpe = exercise.sets.any((s) => s['rpe'] != null);
+    return [
+      Expanded(
+        flex: 3,
+        child: Text(fields[keys[0]] ?? '',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(fontWeight: FontWeight.w600)),
+      ),
+      if (keys.length > 1)
+        Expanded(
+          flex: 3,
+          child: Text(fields[keys[1]] ?? '',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(fontWeight: FontWeight.w600)),
+        ),
+      if (hasRpe)
+        Expanded(
+          flex: 2,
+          child: Text('RPE',
+              style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600)),
+        ),
+    ];
   }
 
   List<Widget> _buildSetColumns(
       ExerciseWithSets ex, Map<String, dynamic> set, ThemeData theme) {
     final fields = getFieldsForType(ex.exerciseType);
     final keys = fields.keys.toList();
+    final hasRpe = ex.sets.any((s) => s['rpe'] != null);
     return [
       Expanded(
         flex: 3,
-        child: Text(formatFieldValue(set, keys[0]),
-            style: theme.textTheme.bodyMedium),
+        child: Text(
+          formatFieldValue(set, keys[0]),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: (set['is_complete'] as int?) == 1
+                ? theme.colorScheme.onSurface
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
       ),
       if (keys.length > 1)
         Expanded(
           flex: 3,
-          child: Text(formatFieldValue(set, keys[1]),
-              style: theme.textTheme.bodyMedium),
+          child: Text(
+            formatFieldValue(set, keys[1]),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: (set['is_complete'] as int?) == 1
+                  ? theme.colorScheme.onSurface
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
-      if (ex.sets.any((s) => s['rpe'] != null))
+      if (hasRpe)
         Expanded(
           flex: 2,
           child: Text(
               (set['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
               style: theme.textTheme.bodyMedium),
         ),
-      GestureDetector(
-        onTap: () => onDeleteSet(set['id'] as String),
-        child: Icon(Icons.close,
-            size: 16,
-            color: theme.colorScheme.error.withAlpha(180)),
+      SizedBox(
+        width: 32,
+        child: GestureDetector(
+          onTap: () => onDeleteSet(set['id'] as String),
+          behavior: HitTestBehavior.opaque,
+          child: Icon(Icons.close,
+              size: 18,
+              color: theme.colorScheme.error.withAlpha(180)),
+        ),
       ),
     ];
   }

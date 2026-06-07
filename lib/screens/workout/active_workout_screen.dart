@@ -689,39 +689,48 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 const SizedBox(height: 16),
 
                 // RPE
-                Row(
-                  children: [
-                    Text('RPE', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
-                    const SizedBox(width: 8),
-                    ...List.generate(11, (i) {
-                      final val = i.toDouble();
-                      final isSet = rpe != null && rpe!.round() == i;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 2),
-                        child: GestureDetector(
-                          onTap: () => setSheetState(() {
-                            rpe = (rpe == val) ? null : val;
-                          }),
-                          child: Container(
-                            width: 26, height: 26,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isSet ? Theme.of(ctx).colorScheme.primary : null,
-                              border: Border.all(color: isSet ? Theme.of(ctx).colorScheme.primary : Theme.of(ctx).colorScheme.outlineVariant),
-                            ),
-                            child: Center(child: Text(
-                              i == 0 ? '-' : '$i',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: isSet ? Theme.of(ctx).colorScheme.onPrimary : Theme.of(ctx).colorScheme.onSurface,
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8, top: 6),
+                        child: Text('RPE', style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
+                      ),
+                      ...List.generate(11, (i) {
+                        final val = i.toDouble();
+                        final isSet = rpe != null && rpe!.round() == i;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4, top: 4),
+                          child: GestureDetector(
+                            onTap: () => setSheetState(() {
+                              rpe = (rpe == val) ? null : val;
+                            }),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 120),
+                              width: 30, height: 30,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isSet ? Theme.of(ctx).colorScheme.primary : Colors.transparent,
+                                border: Border.all(
+                                  color: isSet ? Theme.of(ctx).colorScheme.primary : Theme.of(ctx).colorScheme.outlineVariant,
+                                  width: 1.5,
+                                ),
                               ),
-                            )),
+                              child: Center(child: Text(
+                                i == 0 ? '-' : '$i',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSet ? Theme.of(ctx).colorScheme.onPrimary : Theme.of(ctx).colorScheme.onSurface,
+                                ),
+                              )),
+                            ),
                           ),
-                        ),
-                      );
-                    }),
-                  ],
+                        );
+                      }),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 20),
 
@@ -976,7 +985,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             GestureDetector(
               onTap: _openRestTimer,
               child: Container(
-                margin: const EdgeInsets.only(right: 8),
+                margin: const EdgeInsets.only(right: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: _timerService.remainingSeconds <= 5 && _timerService.isRunning
@@ -1015,39 +1024,64 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               onPressed: _openRestTimer,
               tooltip: 'Temporizador',
             ),
-          IconButton(
-            icon: const Icon(Icons.repeat_outlined),
-            onPressed: _importFromRoutine,
-            tooltip: 'Importar de Rotina',
-          ),
           if (_isPaused)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.play_arrow),
-                  onPressed: _resumeTimer,
-                  tooltip: AppLocalizations.of(context)!.restTimerResume,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.check_circle_outline),
-                  onPressed: _exercises.isNotEmpty ? _finishWorkout : null,
-                  tooltip: AppLocalizations.of(context)!.activeWorkoutFinishWorkout,
-                ),
-              ],
+            IconButton(
+              icon: const Icon(Icons.play_arrow),
+              onPressed: _resumeTimer,
+              tooltip: AppLocalizations.of(context)!.restTimerResume,
             )
           else if (_timerStart != null && _timerEnd == null)
             IconButton(
               icon: const Icon(Icons.pause),
               onPressed: _pauseTimer,
               tooltip: AppLocalizations.of(context)!.restTimerPause,
-            )
-          else
-            IconButton(
+            ),
+          if (_exercises.isNotEmpty)
+            IconButton.filledTonal(
               icon: const Icon(Icons.check_circle_outline),
-              onPressed: _exercises.isNotEmpty ? _finishWorkout : null,
+              onPressed: _finishWorkout,
               tooltip: AppLocalizations.of(context)!.activeWorkoutFinishWorkout,
             ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'Mais opções',
+            onSelected: (value) {
+              switch (value) {
+                case 'import_routine':
+                  _importFromRoutine();
+                  break;
+                case 'reset_timer':
+                  _resetTimer();
+                  break;
+              }
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem<String>(
+                value: 'import_routine',
+                child: Row(
+                  children: [
+                    const Icon(Icons.repeat_outlined, size: 20),
+                    const SizedBox(width: 12),
+                    Text(AppLocalizations.of(context)!.activeWorkoutImportRoutine),
+                  ],
+                ),
+              ),
+              if (_timerStart != null)
+                PopupMenuItem<String>(
+                  value: 'reset_timer',
+                  child: Row(
+                    children: [
+                      Icon(Icons.restart_alt, size: 20, color: theme.colorScheme.error),
+                      const SizedBox(width: 12),
+                      Text(
+                        AppLocalizations.of(context)!.activeWorkoutReset,
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
       body: _isLoading
@@ -1284,65 +1318,32 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             ),
           ),
           if (_timerStart == null || (_timerStart != null && _timerEnd == null))
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  height: 36,
-                  child: FilledButton(
-                    onPressed: _timerStart == null
-                        ? _startTimer
-                        : (_isPaused ? _resumeTimer : _pauseTimer),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      backgroundColor: _timerStart == null
+            SizedBox(
+              height: 36,
+              child: FilledButton(
+                onPressed: _timerStart == null
+                    ? _startTimer
+                    : (_isPaused ? _resumeTimer : _pauseTimer),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  backgroundColor: _timerStart == null
+                      ? theme.colorScheme.primary
+                      : (_isPaused
                           ? theme.colorScheme.primary
-                          : (_isPaused
-                              ? theme.colorScheme.primary
-                              : Colors.orange.withAlpha(200)),
-                      foregroundColor: _timerStart == null
-                          ? theme.colorScheme.onPrimary
-                          : Colors.white,
-                    ),
-                    child: Text(
-                      _timerStart == null
-                          ? AppLocalizations.of(context)!.activeWorkoutStart
-                          : (_isPaused
-                              ? AppLocalizations.of(context)!.restTimerResume
-                              : AppLocalizations.of(context)!.restTimerPause),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                  ),
+                          : Colors.orange.withAlpha(200)),
+                  foregroundColor: _timerStart == null
+                      ? theme.colorScheme.onPrimary
+                      : Colors.white,
                 ),
-                if (_isPaused)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8),
-                    child: SizedBox(
-                      height: 36,
-                      child: OutlinedButton(
-                        onPressed: _finishWorkout,
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          side: BorderSide(color: theme.colorScheme.error.withAlpha(150)),
-                          foregroundColor: theme.colorScheme.error,
-                        ),
-                        child: Text(
-                          AppLocalizations.of(context)!.activeWorkoutFinishWorkout,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          if (_timerStart != null)
-            IconButton(
-              onPressed: _resetTimer,
-              icon: Icon(Icons.delete_outline, size: 20, color: theme.colorScheme.onSurfaceVariant.withAlpha(180)),
-              tooltip: 'Resetar Timer',
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                child: Text(
+                  _timerStart == null
+                      ? AppLocalizations.of(context)!.activeWorkoutStart
+                      : (_isPaused
+                          ? AppLocalizations.of(context)!.restTimerResume
+                          : AppLocalizations.of(context)!.restTimerPause),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
             ),
         ],
       ),
