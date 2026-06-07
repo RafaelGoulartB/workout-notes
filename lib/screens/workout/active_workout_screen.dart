@@ -1070,6 +1070,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 case 'reset_timer':
                   _resetTimer();
                   break;
+                case 'delete_workout':
+                  _deleteWorkout();
+                  break;
               }
             },
             itemBuilder: (ctx) => [
@@ -1097,6 +1100,20 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                     ],
                   ),
                 ),
+              PopupMenuDivider(),
+              PopupMenuItem<String>(
+                value: 'delete_workout',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline, size: 20, color: theme.colorScheme.error),
+                    const SizedBox(width: 12),
+                    Text(
+                      AppLocalizations.of(context)!.workoutHomeDeleteWorkout,
+                      style: TextStyle(color: theme.colorScheme.error),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ],
@@ -1650,6 +1667,45 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         },
       ),
     );
+  }
+
+  Future<void> _deleteWorkout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(AppLocalizations.of(context)!.commonConfirmDelete),
+        content: Text(AppLocalizations.of(context)!.commonActionCannotBeUndone),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(AppLocalizations.of(context)!.commonCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(AppLocalizations.of(context)!.commonDelete, style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && _workoutId != null) {
+      // Stop any running timers
+      _elapsedTimer?.cancel();
+      _timerService.stop();
+      NotificationService.instance.cancelWorkoutTimer();
+
+      await _workoutRepo.deleteWorkout(_workoutId!);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.workoutHomeDeleteWorkout),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.pop(context, true);
+      }
+    }
   }
 }
 

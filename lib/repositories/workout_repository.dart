@@ -162,6 +162,18 @@ class WorkoutRepository extends BaseRepository {
     final results = await db.query('workouts', where: 'id = ?', whereArgs: [id]);
     return results.isEmpty ? null : results.first;
   }
+  /// Returns workouts that are currently active (no end_time, from today,
+  /// and with at least one exercise entry).
+  Future<List<Map<String, dynamic>>> getActiveWorkouts() async {
+    final db = await this.db;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    return db.rawQuery('''
+      SELECT DISTINCT w.* FROM workouts w
+      JOIN exercise_entries ee ON ee.workout_id = w.id
+      WHERE w.end_time IS NULL AND w.date = ?
+      ORDER BY w.created_at DESC
+    ''', [today]);
+  }
 
   Future<List<Map<String, dynamic>>> getWorkouts({
     DateTime? startDate,

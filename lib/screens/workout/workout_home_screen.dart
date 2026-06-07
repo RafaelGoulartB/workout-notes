@@ -117,15 +117,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       _monthWorkouts = monthCount;
       _monthVolume = monthVol;
 
-      final active = <Map<String, dynamic>>[];
+      final active = await _workoutRepo.getActiveWorkouts();
       final completed = <Map<String, dynamic>>[];
-      final todayStr = now.toIso8601String().substring(0, 10);
       for (final w in allWorkouts) {
-        final wDate = w['date'] as String? ?? '';
-        final isToday = wDate == todayStr;
-        if ((w['end_time'] as String?) == null && isToday) {
-          active.add(w);
-        } else if ((w['end_time'] as String?) != null) {
+        if ((w['end_time'] as String?) != null) {
           completed.add(w);
         }
       }
