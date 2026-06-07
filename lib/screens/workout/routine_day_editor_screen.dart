@@ -901,7 +901,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
 
     for (final ex in _exercises) {
       final catId = ex['category_id'] as String? ?? '';
-      final catName = ex['category_name'] as String? ?? 'Outros';
+      final catName = ExerciseLocaleHelper.categoryName(loc, ex);
       final colorVal = ex['category_color'] as int? ?? 0xFF757575;
       final exerciseType =
           ex['exercise_type'] as String? ?? 'weightReps';
@@ -1040,10 +1040,6 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                 ],
               ),
 
-              // Balance insight
-              if (stats.length >= 2) ...[const SizedBox(height: 8),
-                _buildBalanceInsight(theme, stats, totalSets),
-              ],
             ],
           ),
         ),
@@ -1076,35 +1072,6 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
         ],
       ),
     );
-  }
-
-  Widget _buildBalanceInsight(ThemeData theme,
-      List<_CategoryStat> stats, int totalSets) {
-    final sorted = List<_CategoryStat>.from(stats)
-      ..sort((a, b) => b.sets.compareTo(a.sets));
-    final highest = sorted.first;
-    final lowest = sorted.last;
-    final idealPerGroup = totalSets / stats.length;
-    final deviation = (highest.sets - idealPerGroup).abs();
-
-    String insight;
-    if (deviation < 1) {
-      insight =
-          '⚖️ Distribuição equilibrada entre grupos';
-    } else if (highest.sets >= lowest.sets * 3) {
-      insight =
-          '💪 ${highest.name} tem ${highest.sets}s — muito acima de ${lowest.name} (${lowest.sets}s). Considere reduzir.';
-    } else {
-      final pct = ((highest.sets / totalSets) * 100).round();
-      insight =
-          '📊 ${highest.name} lidera com $pct% das séries (${highest.sets}s). ${lowest.name} tem ${lowest.sets}s.';
-    }
-
-    return Text(insight,
-        style: theme.textTheme.bodySmall?.copyWith(
-          fontSize: 11,
-          color: theme.colorScheme.onSurfaceVariant,
-        ));
   }
 
   Widget _buildEmptyState(ThemeData theme, AppLocalizations loc) {

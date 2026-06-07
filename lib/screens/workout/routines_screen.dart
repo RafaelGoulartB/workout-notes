@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import '../../repositories/routine_repository.dart';
 import 'routine_day_editor_screen.dart';
 
@@ -217,6 +218,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
     setState(() => _dashboardLoading = true);
 
     try {
+      final loc = AppLocalizations.of(context)!;
       final perDay = <String, List<_DayStat>>{};
       final perCategory = <String, _RoutineCatStat>{};
 
@@ -229,8 +231,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
         for (final ex in exercises) {
           final catId =
               ex['category_id'] as String? ?? '';
-          final catName =
-              ex['category_name'] as String? ?? 'Outros';
+          final catName = ExerciseLocaleHelper.categoryName(loc, ex);
           final colorVal =
               ex['category_color'] as int? ?? 0xFF757575;
           final exerciseType =
@@ -622,52 +623,10 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                   );
                 }),
               ],
-
-              // Balance insight
-              if (cats.length >= 2) ...[
-                const Divider(height: 16),
-                _buildWeeklyInsight(theme, cats, totalSets, daysCount),
-              ],
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildWeeklyInsight(ThemeData theme, List<_RoutineCatStat> cats, int totalSets, int daysCount) {
-    final loc = AppLocalizations.of(context)!;
-    final sorted = List<_RoutineCatStat>.from(cats)..sort((a, b) => b.sets.compareTo(a.sets));
-    final highest = sorted.first;
-    final lowest = sorted.last;
-    final idealPerGroup = totalSets / cats.length;
-    final deviation = (highest.sets - idealPerGroup).abs();
-
-    String insight;
-    if (cats.length < 3) {
-      insight = loc.routinesInsightMuscleGroups(cats.length);
-    } else if (deviation < 2 && cats.length >= 5) {
-      insight = loc.routinesInsightBalanced;
-    } else if (highest.sets >= lowest.sets * 3) {
-      insight = loc.routinesInsightHighDiff(highest.name, '${highest.sets}', lowest.name, '${lowest.sets}');
-    } else {
-      final pct = ((highest.sets / totalSets) * 100).round();
-      insight = loc.routinesInsightFocus(highest.name, '$pct', lowest.name, '${lowest.sets}');
-    }
-
-    // Additional schedule info
-    final setsPerDay = totalSets / daysCount;
-    final scheduleNote = loc.routinesInsightAverage(setsPerDay.toStringAsFixed(0), '$daysCount');
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(insight,
-            style: theme.textTheme.bodySmall?.copyWith(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 2),
-        Text(scheduleNote,
-            style: theme.textTheme.bodySmall?.copyWith(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
-      ],
     );
   }
 }
