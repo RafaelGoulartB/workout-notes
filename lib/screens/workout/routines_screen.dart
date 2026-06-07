@@ -189,6 +189,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
   List<Map<String, dynamic>> _days = [];
   bool _isLoading = true;
   bool _dashboardLoading = false;
+  bool _dashboardExpanded = false;
   _RoutineDashboardData? _dashboard;
 
   @override
@@ -511,121 +512,167 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Icon(Icons.analytics_outlined, size: 18, color: theme.colorScheme.primary),
-                  const SizedBox(width: 6),
-                  Text(AppLocalizations.of(context)!.routinesWeeklyView,
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-                  const Spacer(),
-                  if (_dashboardLoading)
-                    const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text('${AppLocalizations.of(context)!.routinesWeeklyDays(daysCount)} · '
-                  '${AppLocalizations.of(context)!.routinesDaySets(totalSets)}' +
-                  (totalVolume > 0
-                      ? ' · ${AppLocalizations.of(context)!.routinesWeeklyVolume(totalVolume.toStringAsFixed(0))}'
-                      : ''),
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-              const SizedBox(height: 12),
-
-              // Per-category bars
-              ...cats.map((cat) {
-                final pct = maxSets > 0 ? cat.sets / maxSets : 0.0;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(width: 10, height: 10,
-                              decoration: BoxDecoration(color: cat.color, shape: BoxShape.circle)),
-                          const SizedBox(width: 6),
-                          Expanded(child: Text(cat.name,
-                              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                          Text('${cat.sets}s',
-                              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
-                          if (cat.volume > 0) ...[
-                            const SizedBox(width: 4),
-                            Text('${cat.volume.toStringAsFixed(0)}kg',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant)),
-                          ],
-                          const SizedBox(width: 4),
-                          Text('${(cat.sets / totalSets * 100).round()}%',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.primary, fontSize: 11)),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(3),
-                        child: LinearProgressIndicator(
-                          value: pct.clamp(0.0, 1.0),
-                          minHeight: 5,
-                          backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                          valueColor: AlwaysStoppedAnimation<Color>(cat.color.withAlpha(200)),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-
-              // Per-day mini summary
-              if (_days.length > 1) ...[
-                const Divider(height: 16),
-                Text(AppLocalizations.of(context)!.routinesPerDay,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w600, color: theme.colorScheme.onSurfaceVariant)),
-                const SizedBox(height: 6),
-                ..._days.map((day) {
-                  final dayId = day['id'] as String;
-                  final dayName = day['name'] as String? ?? 'Dia';
-                  final dayStats = dash.perDay[dayId] ?? [];
-                  final daySets = dayStats.fold<int>(0, (a, s) => a + s.sets);
-                  final dayVol = dayStats.fold<double>(0, (a, s) => a + s.volume);
-                  // Unique categories
-                  final dayCats = dayStats.map((s) => s.categoryName).toSet().length;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      children: [
-                        Icon(Icons.today, size: 12, color: theme.colorScheme.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(dayName,
-                              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
-                        ),
-                        Text(AppLocalizations.of(context)!.routinesDaySets(daySets),
-                            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-                        if (dayVol > 0) ...[
-                          const SizedBox(width: 4),
-                          Text('· ${dayVol.toStringAsFixed(0)}kg',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant)),
-                        ],
-                        const SizedBox(width: 4),
-                        Text(AppLocalizations.of(context)!.routinesDayGroups(dayCats),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ],
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => setState(() => _dashboardExpanded = !_dashboardExpanded),
+          child: AnimatedCrossFade(
+            firstChild: _buildDashboardCollapsed(theme, daysCount, totalSets, totalVolume, cats),
+            secondChild: _buildDashboardExpanded(theme, cats, totalSets, totalVolume, daysCount, maxSets, dash),
+            crossFadeState: _dashboardExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 250),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardCollapsed(ThemeData theme, int daysCount, int totalSets, double totalVolume, List<_RoutineCatStat> cats) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Icon(Icons.analytics_outlined, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '${AppLocalizations.of(context)!.routinesWeeklyView} — '
+              '${AppLocalizations.of(context)!.routinesWeeklyDays(daysCount)} · '
+              '${AppLocalizations.of(context)!.routinesDaySets(totalSets)}' +
+              (totalVolume > 0
+                  ? ' · ${AppLocalizations.of(context)!.routinesWeeklyVolume(totalVolume.toStringAsFixed(0))}'
+                  : ''),
+              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          // Mini category dots for at-a-glance
+          ...cats.take(4).map((cat) => Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Container(width: 8, height: 8,
+                decoration: BoxDecoration(color: cat.color, shape: BoxShape.circle)),
+          )),
+          const SizedBox(width: 4),
+          Icon(_dashboardExpanded ? Icons.expand_less : Icons.expand_more,
+              size: 20, color: theme.colorScheme.onSurfaceVariant),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardExpanded(ThemeData theme, List<_RoutineCatStat> cats, int totalSets, double totalVolume, int daysCount, int maxSets, _RoutineDashboardData dash) {
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Icon(Icons.analytics_outlined, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(AppLocalizations.of(context)!.routinesWeeklyView,
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              Icon(_dashboardExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 20, color: theme.colorScheme.onSurfaceVariant),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text('${AppLocalizations.of(context)!.routinesWeeklyDays(daysCount)} · '
+              '${AppLocalizations.of(context)!.routinesDaySets(totalSets)}' +
+              (totalVolume > 0
+                  ? ' · ${AppLocalizations.of(context)!.routinesWeeklyVolume(totalVolume.toStringAsFixed(0))}'
+                  : ''),
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 12),
+
+          // Per-category bars
+          ...cats.map((cat) {
+            final pct = maxSets > 0 ? cat.sets / maxSets : 0.0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(width: 10, height: 10,
+                          decoration: BoxDecoration(color: cat.color, shape: BoxShape.circle)),
+                      const SizedBox(width: 6),
+                      Expanded(child: Text(cat.name,
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
+                      Text('${cat.sets}s',
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                      if (cat.volume > 0) ...[
+                        const SizedBox(width: 4),
+                        Text('${cat.volume.toStringAsFixed(0)}kg',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant)),
+                      ],
+                      const SizedBox(width: 4),
+                      Text('${(cat.sets / totalSets * 100).round()}%',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.primary, fontSize: 11)),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: pct.clamp(0.0, 1.0),
+                      minHeight: 5,
+                      backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation<Color>(cat.color.withAlpha(200)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          // Per-day mini summary
+          if (_days.length > 1) ...[
+            const Divider(height: 16),
+            Text(AppLocalizations.of(context)!.routinesPerDay,
+                style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w600, color: theme.colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 6),
+            ..._days.map((day) {
+              final dayId = day['id'] as String;
+              final dayName = day['name'] as String? ?? 'Dia';
+              final dayStats = dash.perDay[dayId] ?? [];
+              final daySets = dayStats.fold<int>(0, (a, s) => a + s.sets);
+              final dayVol = dayStats.fold<double>(0, (a, s) => a + s.volume);
+              // Unique categories
+              final dayCats = dayStats.map((s) => s.categoryName).toSet().length;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    Icon(Icons.today, size: 12, color: theme.colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(dayName,
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500)),
+                    ),
+                    Text(AppLocalizations.of(context)!.routinesDaySets(daySets),
+                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                    if (dayVol > 0) ...[
+                      const SizedBox(width: 4),
+                      Text('· ${dayVol.toStringAsFixed(0)}kg',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant)),
+                    ],
+                    const SizedBox(width: 4),
+                    Text(AppLocalizations.of(context)!.routinesDayGroups(dayCats),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
       ),
     );
   }
