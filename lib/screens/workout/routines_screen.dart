@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
+import 'package:workout_notes/widgets/category_timeline_bar.dart';
 import '../../repositories/routine_repository.dart';
 import 'routine_day_editor_screen.dart';
 
@@ -529,31 +530,42 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
   Widget _buildDashboardCollapsed(ThemeData theme, int daysCount, int totalSets, double totalVolume, List<_RoutineCatStat> cats) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(Icons.analytics_outlined, size: 18, color: theme.colorScheme.primary),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              '${AppLocalizations.of(context)!.routinesWeeklyView} — '
-              '${AppLocalizations.of(context)!.routinesWeeklyDays(daysCount)} · '
-              '${AppLocalizations.of(context)!.routinesDaySets(totalSets)}' +
-              (totalVolume > 0
-                  ? ' · ${AppLocalizations.of(context)!.routinesWeeklyVolume(totalVolume.toStringAsFixed(0))}'
-                  : ''),
-              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-              overflow: TextOverflow.ellipsis,
-            ),
+          Row(
+            children: [
+              Icon(Icons.analytics_outlined, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '${AppLocalizations.of(context)!.routinesWeeklyView} — '
+                  '${AppLocalizations.of(context)!.routinesWeeklyDays(daysCount)} · '
+                  '${AppLocalizations.of(context)!.routinesDaySets(totalSets)}' +
+                  (totalVolume > 0
+                      ? ' · ${AppLocalizations.of(context)!.routinesWeeklyVolume(totalVolume.toStringAsFixed(0))}'
+                      : ''),
+                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(_dashboardExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 20, color: theme.colorScheme.onSurfaceVariant),
+            ],
           ),
-          // Mini category dots for at-a-glance
-          ...cats.take(4).map((cat) => Padding(
-            padding: const EdgeInsets.only(left: 4),
-            child: Container(width: 8, height: 8,
-                decoration: BoxDecoration(color: cat.color, shape: BoxShape.circle)),
-          )),
-          const SizedBox(width: 4),
-          Icon(_dashboardExpanded ? Icons.expand_less : Icons.expand_more,
-              size: 20, color: theme.colorScheme.onSurfaceVariant),
+          if (cats.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            // Single category timeline bar — width is proportional to each
+            // category's share of the total sets. Replaces the old row of
+            // small dots for better at-a-glance distribution.
+            CategoryTimelineBar(
+              segments: [
+                for (final cat in cats) (color: cat.color, value: cat.sets),
+              ],
+              height: 7,
+            ),
+          ],
         ],
       ),
     );

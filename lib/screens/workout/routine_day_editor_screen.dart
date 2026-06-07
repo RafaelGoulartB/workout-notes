@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
+import 'package:workout_notes/widgets/category_timeline_bar.dart';
 import 'package:workout_notes/widgets/exercise_picker_sheet.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
 
@@ -960,31 +961,42 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
   Widget _buildDayDashboardCollapsed(ThemeData theme, AppLocalizations loc, List<_CategoryStat> stats, int totalSets, double totalVolume) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(Icons.bar_chart, size: 16, color: theme.colorScheme.primary),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              '${loc.routinesDayDashboard} — '
-              '${totalSets} ${loc.routinesDayDashboardSets}' +
-              (totalVolume > 0
-                  ? ' · ${totalVolume.toStringAsFixed(0)} ${loc.routinesDayDashboardVolume}'
-                  : '') +
-              ' · ${stats.length} ${loc.routinesDayDashboardGroups}',
-              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-              overflow: TextOverflow.ellipsis,
-            ),
+          Row(
+            children: [
+              Icon(Icons.bar_chart, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '${loc.routinesDayDashboard} — '
+                  '${totalSets} ${loc.routinesDayDashboardSets}' +
+                  (totalVolume > 0
+                      ? ' · ${totalVolume.toStringAsFixed(0)} ${loc.routinesDayDashboardVolume}'
+                      : '') +
+                  ' · ${stats.length} ${loc.routinesDayDashboardGroups}',
+                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(_dashboardExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 20, color: theme.colorScheme.onSurfaceVariant),
+            ],
           ),
-          // Mini category dots
-          ...stats.take(4).map((stat) => Padding(
-            padding: const EdgeInsets.only(left: 4),
-            child: Container(width: 8, height: 8,
-                decoration: BoxDecoration(color: stat.color, shape: BoxShape.circle)),
-          )),
-          const SizedBox(width: 4),
-          Icon(_dashboardExpanded ? Icons.expand_less : Icons.expand_more,
-              size: 20, color: theme.colorScheme.onSurfaceVariant),
+          if (stats.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            // Single category timeline bar — width is proportional to each
+            // category's share of the total sets. Replaces the old row of
+            // small dots for better at-a-glance distribution.
+            CategoryTimelineBar(
+              segments: [
+                for (final stat in stats) (color: stat.color, value: stat.sets),
+              ],
+              height: 7,
+            ),
+          ],
         ],
       ),
     );
