@@ -637,7 +637,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                     Expanded(
                       child: Text(AppLocalizations.of(context)!.activeWorkoutEditSet, style: Theme.of(ctx).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
                     ),
-                    Text('$exerciseName • Série $setNumber', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                    Text('$exerciseName • ${AppLocalizations.of(context)!.activeWorkoutSetLabel(setNumber)}', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
                       color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                     )),
                   ],

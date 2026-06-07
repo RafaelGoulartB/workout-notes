@@ -285,6 +285,10 @@
   "bodyTrackerNeck": "Pescoço",
   "bodyTrackerLeft": "Esquerdo",
   "bodyTrackerRight": "Direito",
+  "bodyTrackerSelectMeasurement": "Selecionar Medida",
+  "bodyTrackerCustomize": "Personalizar",
+  "bodyTrackerCustomizeTitle": "Personalizar Medidas",
+  "bodyTrackerCustomizeSubtitle": "Selecione as medidas que quer acompanhar",
   "bodyTrackerLeanMass": "Massa Magra",
   "bodyTrackerFatMass": "Massa Gorda",
   "bodyTrackerHealthy": "Saudável",
@@ -457,6 +461,7 @@
   "activeWorkoutFeeling3": "Bom",
   "activeWorkoutFeeling4": "Ótimo",
   "activeWorkoutFeeling5": "Excelente!",
+  "activeWorkoutSetLabel": "Série {number}",
   "workoutDetailSetNumber": "#",
   "workoutDetailRpe": "RPE",
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
+import 'package:workout_notes/l10n/l10n_exercises.dart';
 import '../../repositories/exercise_repository.dart';
 import '../../repositories/workout_repository.dart';
 import '../../database/database_helper.dart';
@@ -244,7 +245,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(AppLocalizations.of(context)!.quickAddSaved(exercise['name'], _parsedSets.length.toString())),
+            content: Text(AppLocalizations.of(context)!.quickAddSaved(ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, exercise), _parsedSets.length.toString())),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -365,13 +366,16 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
               const SizedBox(height: 16),
               Text(AppLocalizations.of(context)!.quickAddAcceptedFormats, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
-              ...[
-                'Supino 80kg 3x10',
-                'Rosca Direta 12kg 3x12',
-                'Agachamento 100kg 5x5',
-                'Leg Press 200kg 4x8',
-                'Puxada Alta 50kg 3x10',
-              ].map((ex) => Padding(
+              ...() {
+                final localeName = AppLocalizations.of(context)!.localeName;
+                return [
+                  '${ExerciseLocalization.exerciseName('bench_press', localeName) ?? 'Supino'} 80kg 3x10',
+                  '${ExerciseLocalization.exerciseName('bb_curl', localeName) ?? 'Rosca Direta'} 12kg 3x12',
+                  '${ExerciseLocalization.exerciseName('squat', localeName) ?? 'Agachamento'} 100kg 5x5',
+                  '${ExerciseLocalization.exerciseName('leg_press', localeName) ?? 'Leg Press'} 200kg 4x8',
+                  '${ExerciseLocalization.exerciseName('lat_pulldown', localeName) ?? 'Puxada Alta'} 50kg 3x10',
+                ];
+              }().map((ex) => Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: GestureDetector(
                   onTap: () {
@@ -452,17 +456,21 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: _recentExercises.map((ex) => ActionChip(
-                  avatar: const Icon(Icons.fitness_center, size: 16),
-                  label: Text('${ex['name']}'),
-                  onPressed: () {
-                    _textController.text = '${ex['name']} ';
-                    _textController.selection = TextSelection.fromPosition(
-                      TextPosition(offset: _textController.text.length),
-                    );
-                    _focusNode.requestFocus();
-                  },
-                )).toList(),
+                children: _recentExercises.map((ex) {
+                  final loc = AppLocalizations.of(context)!;
+                  final localizedName = ExerciseLocaleHelper.exerciseName(loc, ex);
+                  return ActionChip(
+                    avatar: const Icon(Icons.fitness_center, size: 16),
+                    label: Text(localizedName),
+                    onPressed: () {
+                      _textController.text = '$localizedName ';
+                      _textController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: _textController.text.length),
+                      );
+                      _focusNode.requestFocus();
+                    },
+                  );
+                }).toList(),
               ),
             ],
           ],

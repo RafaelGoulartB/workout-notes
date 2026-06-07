@@ -150,7 +150,7 @@ class ExerciseCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    exercise.categoryName,
+                    exercise.localizedCategory(AppLocalizations.of(context)!),
                     style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant),
                   ),

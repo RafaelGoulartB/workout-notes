@@ -879,6 +879,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bodyTrackerRight => 'Right';
 
   @override
+  String get bodyTrackerSelectMeasurement => 'Select Measurement';
+
+  @override
+  String get bodyTrackerCustomize => 'Customize';
+
+  @override
+  String get bodyTrackerCustomizeTitle => 'Customize Measurements';
+
+  @override
+  String get bodyTrackerCustomizeSubtitle =>
+      'Select the measurements you want to track';
+
+  @override
   String get bodyTrackerLeanMass => 'Lean Mass';
 
   @override
@@ -1403,6 +1416,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get activeWorkoutFeeling5 => 'Excellent!';
+
+  @override
+  String activeWorkoutSetLabel(Object number) {
+    return 'Set $number';
+  }
 
   @override
   String get workoutDetailSetNumber => '#';

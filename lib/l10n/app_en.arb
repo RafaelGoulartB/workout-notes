@@ -284,6 +284,10 @@
   "bodyTrackerNeck": "Neck",
   "bodyTrackerLeft": "Left",
   "bodyTrackerRight": "Right",
+  "bodyTrackerSelectMeasurement": "Select Measurement",
+  "bodyTrackerCustomize": "Customize",
+  "bodyTrackerCustomizeTitle": "Customize Measurements",
+  "bodyTrackerCustomizeSubtitle": "Select the measurements you want to track",
   "bodyTrackerLeanMass": "Lean Mass",
   "bodyTrackerFatMass": "Fat Mass",
   "bodyTrackerHealthy": "Healthy",
@@ -456,6 +460,7 @@
   "activeWorkoutFeeling3": "Good",
   "activeWorkoutFeeling4": "Great",
   "activeWorkoutFeeling5": "Excellent!",
+  "activeWorkoutSetLabel": "Set {number}",
   "workoutDetailSetNumber": "#",
   "workoutDetailRpe": "RPE",
 

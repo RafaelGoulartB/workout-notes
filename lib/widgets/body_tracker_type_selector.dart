@@ -152,7 +152,7 @@ class BodyTypeSelector extends StatelessWidget {
 
               // Title
               Text(
-                'Selecionar Medida',
+                loc.bodyTrackerSelectMeasurement,
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -191,7 +191,7 @@ class BodyTypeSelector extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Personalizar',
+                            loc.bodyTrackerCustomize,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.primary,
                               fontWeight: FontWeight.w600,
@@ -249,14 +249,14 @@ class BodyTypeSelector extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Personalizar Medidas',
+                    loc.bodyTrackerCustomizeTitle,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Selecione as medidas que quer acompanhar',
+                    loc.bodyTrackerCustomizeSubtitle,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -313,7 +313,7 @@ class BodyTypeSelector extends StatelessWidget {
                         Navigator.pop(ctx);
                         onCustomize?.call(result);
                       },
-                      child: const Text('Salvar'),
+                      child: Text(loc.bodyTrackerSave),
                     ),
                   ),
                 ],

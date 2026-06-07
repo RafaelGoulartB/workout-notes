@@ -1724,6 +1724,30 @@ abstract class AppLocalizations {
   /// **'Right'**
   String get bodyTrackerRight;
 
+  /// No description provided for @bodyTrackerSelectMeasurement.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Measurement'**
+  String get bodyTrackerSelectMeasurement;
+
+  /// No description provided for @bodyTrackerCustomize.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize'**
+  String get bodyTrackerCustomize;
+
+  /// No description provided for @bodyTrackerCustomizeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize Measurements'**
+  String get bodyTrackerCustomizeTitle;
+
+  /// No description provided for @bodyTrackerCustomizeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the measurements you want to track'**
+  String get bodyTrackerCustomizeSubtitle;
+
   /// No description provided for @bodyTrackerLeanMass.
   ///
   /// In en, this message translates to:
@@ -2707,6 +2731,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Excellent!'**
   String get activeWorkoutFeeling5;
+
+  /// No description provided for @activeWorkoutSetLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Set {number}'**
+  String activeWorkoutSetLabel(Object number);
 
   /// No description provided for @workoutDetailSetNumber.
   ///

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
@@ -39,6 +40,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   double _monthVolume = 0;
   int _currentStreak = 0;
 
+  // Elapsed time timer for active workout
+  Timer? _elapsedTimer;
+
   @override
   void initState() {
     super.initState();
@@ -49,11 +53,29 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   @override
   void dispose() {
     _timerService.removeListener(_onTimerTick);
+    _elapsedTimer?.cancel();
     super.dispose();
   }
 
   void _onTimerTick() {
     if (mounted) setState(() {});
+  }
+
+  /// Starts a periodic timer that keeps the elapsed time on the active
+  /// workout banner live. Cancels any previous timer first.
+  void _startElapsedTimer() {
+    _elapsedTimer?.cancel();
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _activeWorkouts.isNotEmpty) {
+        setState(() {});
+      }
+    });
+  }
+
+  /// Cancels the elapsed timer.
+  void _stopElapsedTimer() {
+    _elapsedTimer?.cancel();
+    _elapsedTimer = null;
   }
 
   Future<void> _loadData() async {
@@ -115,6 +137,12 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           _completedWorkouts = completed.take(5).toList();
           _isLoading = false;
         });
+        // Keep the elapsed time live when there is an active workout
+        if (active.isNotEmpty) {
+          _startElapsedTimer();
+        } else {
+          _stopElapsedTimer();
+        }
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);

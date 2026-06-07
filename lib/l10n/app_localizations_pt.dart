@@ -883,6 +883,19 @@ class AppLocalizationsPt extends AppLocalizations {
   String get bodyTrackerRight => 'Direito';
 
   @override
+  String get bodyTrackerSelectMeasurement => 'Selecionar Medida';
+
+  @override
+  String get bodyTrackerCustomize => 'Personalizar';
+
+  @override
+  String get bodyTrackerCustomizeTitle => 'Personalizar Medidas';
+
+  @override
+  String get bodyTrackerCustomizeSubtitle =>
+      'Selecione as medidas que quer acompanhar';
+
+  @override
   String get bodyTrackerLeanMass => 'Massa Magra';
 
   @override
@@ -1410,6 +1423,11 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get activeWorkoutFeeling5 => 'Excelente!';
+
+  @override
+  String activeWorkoutSetLabel(Object number) {
+    return 'Série $number';
+  }
 
   @override
   String get workoutDetailSetNumber => '#';
