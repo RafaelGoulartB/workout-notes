@@ -48,6 +48,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   DateTime? _timerEnd;
   Timer? _elapsedTimer; // periodic tick for live elapsed time
   String _elapsedStr = '00:00';
+  bool _isPaused = false;
+  DateTime? _pauseStart;
   
   // Settings
   bool _autoStartTimer = false;
@@ -225,6 +227,25 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     NotificationService.instance.cancelWorkoutTimer();
   }
 
+  Future<void> _pauseTimer() async {
+    if (_workoutId == null || _isPaused) return;
+    _pauseStart = DateTime.now();
+    _isPaused = true;
+    _elapsedTimer?.cancel();
+    setState(() {});
+  }
+
+  Future<void> _resumeTimer() async {
+    if (_workoutId == null || !_isPaused || _pauseStart == null) return;
+    final now = DateTime.now();
+    final pausedDuration = now.difference(_pauseStart!);
+    _timerStart = _timerStart!.add(pausedDuration);
+    _pauseStart = null;
+    _isPaused = false;
+    _startElapsedTimer();
+    setState(() {});
+  }
+
   Future<void> _resetTimer() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -240,6 +261,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     if (confirm == true && _workoutId != null) {
       _timerStart = null;
       _timerEnd = null;
+      _isPaused = false;
+      _pauseStart = null;
       _elapsedTimer?.cancel();
       _elapsedStr = '00:00';
       await _workoutRepo.resetWorkoutTimer(_workoutId!);
@@ -783,8 +806,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     if (_workoutId == null) return;
     if (_exercises.isEmpty) return;
 
-    // Stop timer if still running
+    // Stop timer if still running or paused
     if (_timerStart != null && _timerEnd == null) {
+      if (_isPaused) {
+        await _resumeTimer();
+      }
       await _stopTimer();
     }
 
@@ -994,11 +1020,34 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             onPressed: _importFromRoutine,
             tooltip: 'Importar de Rotina',
           ),
-          IconButton(
-            icon: const Icon(Icons.check_circle_outline),
-            onPressed: _exercises.isNotEmpty ? _finishWorkout : null,
-            tooltip: AppLocalizations.of(context)!.activeWorkoutFinishWorkout,
-          ),
+          if (_isPaused)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.play_arrow),
+                  onPressed: _resumeTimer,
+                  tooltip: AppLocalizations.of(context)!.restTimerResume,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.check_circle_outline),
+                  onPressed: _exercises.isNotEmpty ? _finishWorkout : null,
+                  tooltip: AppLocalizations.of(context)!.activeWorkoutFinishWorkout,
+                ),
+              ],
+            )
+          else if (_timerStart != null && _timerEnd == null)
+            IconButton(
+              icon: const Icon(Icons.pause),
+              onPressed: _pauseTimer,
+              tooltip: AppLocalizations.of(context)!.restTimerPause,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.check_circle_outline),
+              onPressed: _exercises.isNotEmpty ? _finishWorkout : null,
+              tooltip: AppLocalizations.of(context)!.activeWorkoutFinishWorkout,
+            ),
         ],
       ),
       body: _isLoading
@@ -1121,14 +1170,18 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           Icon(
             _timerEnd != null
                 ? Icons.check_circle
-                : _timerStart != null
-                    ? Icons.timer_outlined
-                    : Icons.play_circle_outline,
+                : _isPaused
+                    ? Icons.pause_circle_outline
+                    : _timerStart != null
+                        ? Icons.timer_outlined
+                        : Icons.play_circle_outline,
             color: _timerEnd != null
                 ? Colors.green
-                : _timerStart != null
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant,
+                : _isPaused
+                    ? Colors.orange
+                    : _timerStart != null
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
             size: 22,
           ),
           const SizedBox(width: 10),
@@ -1137,7 +1190,48 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (_timerStart != null && _timerEnd == null) ...[
+                if (_isPaused) ...[
+                  // Paused
+                  Text(
+                    _elapsedStr,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withAlpha(30),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          AppLocalizations.of(context)!.restTimerPaused,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.orange.shade700,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          '${AppLocalizations.of(context)!.activeWorkoutTimerStartLabel} ${DateFormat('HH:mm').format(_timerStart!)}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else if (_timerStart != null && _timerEnd == null) ...[
                   // Running
                   Text(
                     _elapsedStr,
@@ -1190,24 +1284,56 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             ),
           ),
           if (_timerStart == null || (_timerStart != null && _timerEnd == null))
-            SizedBox(
-              height: 36,
-              child: FilledButton(
-                onPressed: _timerStart == null ? _startTimer : _stopTimer,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  backgroundColor: _timerStart == null
-                      ? theme.colorScheme.primary
-                      : Colors.red.withAlpha(200),
-                  foregroundColor: _timerStart == null
-                      ? theme.colorScheme.onPrimary
-                      : Colors.white,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 36,
+                  child: FilledButton(
+                    onPressed: _timerStart == null
+                        ? _startTimer
+                        : (_isPaused ? _resumeTimer : _pauseTimer),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      backgroundColor: _timerStart == null
+                          ? theme.colorScheme.primary
+                          : (_isPaused
+                              ? theme.colorScheme.primary
+                              : Colors.orange.withAlpha(200)),
+                      foregroundColor: _timerStart == null
+                          ? theme.colorScheme.onPrimary
+                          : Colors.white,
+                    ),
+                    child: Text(
+                      _timerStart == null
+                          ? AppLocalizations.of(context)!.activeWorkoutStart
+                          : (_isPaused
+                              ? AppLocalizations.of(context)!.restTimerResume
+                              : AppLocalizations.of(context)!.restTimerPause),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                  ),
                 ),
-                child: Text(
-                  _timerStart == null ? AppLocalizations.of(context)!.activeWorkoutStart : AppLocalizations.of(context)!.activeWorkoutFinishWorkout,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-              ),
+                if (_isPaused)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: SizedBox(
+                      height: 36,
+                      child: OutlinedButton(
+                        onPressed: _finishWorkout,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          side: BorderSide(color: theme.colorScheme.error.withAlpha(150)),
+                          foregroundColor: theme.colorScheme.error,
+                        ),
+                        child: Text(
+                          AppLocalizations.of(context)!.activeWorkoutFinishWorkout,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           if (_timerStart != null)
             IconButton(
