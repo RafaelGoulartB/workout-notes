@@ -350,9 +350,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         Text(AppLocalizations.of(context)!.activeWorkoutWeight, style: Theme.of(ctx).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Row(children: [
-          StepperButton(icon: Icons.remove, onTap: () => onChanged(weight - 2.5)),
+          StepperButton(icon: Icons.remove, onTap: () => onChanged(weight - 2)),
           const SizedBox(width: 6),
-          StepperButton(icon: Icons.remove, small: true, onTap: () => onChanged(weight - 0.5)),
+          StepperButton(icon: Icons.remove, small: true, onTap: () => onChanged(weight - 1)),
           Expanded(
             child: GestureDetector(
               onTap: () => _quickEditNumber(ctx, weight, false, onChanged),
@@ -364,9 +364,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ),
             ),
           ),
-          StepperButton(icon: Icons.add, small: true, onTap: () => onChanged(weight + 0.5)),
+          StepperButton(icon: Icons.add, small: true, onTap: () => onChanged(weight + 1)),
           const SizedBox(width: 6),
-          StepperButton(icon: Icons.add, onTap: () => onChanged(weight + 2.5)),
+          StepperButton(icon: Icons.add, onTap: () => onChanged(weight + 2)),
         ]),
         const SizedBox(height: 4),
         Wrap(spacing: 4, runSpacing: 4, children: [20, 30, 40, 50, 60, 80, 100, 120].map((v) => ActionChip(
