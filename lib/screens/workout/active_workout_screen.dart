@@ -1137,7 +1137,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               exercise: _exercises[index],
               onAddSet: () => _addSet(_exercises[index]),
               onToggleSet: _toggleSet,
-              onEditSet: (setId, data, setIdx) => _editSetDialog(setId, data, _exercises[index].name, setIdx, _exercises[index].exerciseType),
+              onEditSet: (setId, data, setIdx) => _editSetDialog(setId, data, _exercises[index].localizedName(AppLocalizations.of(context)!), setIdx, _exercises[index].exerciseType),
               onDeleteSet: _deleteSet,
               onRemoveExercise: () => _removeExercise(_exercises[index]),
               onChangeRestTime: (currentRest) => _changeExerciseRestTime(_exercises[index], currentRest),
