@@ -899,6 +899,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get routinesDeleteDay => 'Excluir Dia';
 
   @override
+  String get routinesEditDay => 'Editar Dia';
+
+  @override
   String get routinesDayEmpty => 'Nenhum dia ainda';
 
   @override

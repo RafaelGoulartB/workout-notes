@@ -893,6 +893,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get routinesDeleteDay => 'Delete Day';
 
   @override
+  String get routinesEditDay => 'Edit Day';
+
+  @override
   String get routinesDayEmpty => 'No days yet';
 
   @override

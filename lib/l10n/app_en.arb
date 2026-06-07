@@ -290,6 +290,7 @@
   "routinesDayNameHint": "Ex: Push Day, Monday",
   "routinesAddDay": "Add Day",
   "routinesDeleteDay": "Delete Day",
+  "routinesEditDay": "Edit Day",
   "routinesDayEmpty": "No days yet",
   "routinesDayEmptySubtitle": "Add days to your routine",
   "routinesNoExercises": "No exercises added",

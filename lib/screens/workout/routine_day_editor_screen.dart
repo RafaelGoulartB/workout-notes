@@ -30,6 +30,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
   List<Map<String, dynamic>> _exercises = [];
   final Map<String, List<Map<String, dynamic>>> _predefinedSets = {};
   bool _isLoading = true;
+  bool _dashboardExpanded = false;
 
   @override
   void initState() {
@@ -942,107 +943,155 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
           side: BorderSide(
               color: theme.colorScheme.outlineVariant.withAlpha(80)),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Icon(Icons.bar_chart, size: 16,
-                      color: theme.colorScheme.primary),
-                  const SizedBox(width: 6),
-                  Text(loc.routinesDayDashboard,
-                      style: theme.textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Per-category rows with visual bars
-              ...stats.map((stat) {
-                final pct = maxSets > 0 ? stat.sets / maxSets : 0.0;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 10, height: 10,
-                            decoration: BoxDecoration(
-                              color: stat.color,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(stat.name,
-                                style: theme.textTheme.bodySmall
-                                    ?.copyWith(
-                                        fontWeight:
-                                            FontWeight.w600)),
-                          ),
-                          Text('${stat.sets}s',
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(
-                                      fontWeight:
-                                          FontWeight.bold)),
-                          if (stat.volume > 0) ...[
-                            const SizedBox(width: 4),
-                            Text(
-                                '${stat.volume.toStringAsFixed(0)}kg',
-                                style: theme.textTheme.bodySmall
-                                    ?.copyWith(
-                                        color: theme
-                                            .colorScheme
-                                            .onSurfaceVariant)),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      // Bar
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(3),
-                        child: LinearProgressIndicator(
-                          value: pct.clamp(0.0, 1.0),
-                          minHeight: 6,
-                          backgroundColor: theme.colorScheme
-                              .surfaceContainerHighest,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                              stat.color.withAlpha(200)),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-
-              const Divider(height: 12),
-
-              // Totals
-              Row(
-                children: [
-                  _buildStatChip(theme, '$totalSets', 'séries'),
-                  const SizedBox(width: 12),
-                  if (totalVolume > 0)
-                    _buildStatChip(
-                        theme,
-                        totalVolume.toStringAsFixed(0),
-                        'kg volume'),
-                  const SizedBox(width: 12),
-                  _buildStatChip(
-                      theme,
-                      '${stats.length}',
-                      'grupos'),
-                ],
-              ),
-
-            ],
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => setState(() => _dashboardExpanded = !_dashboardExpanded),
+          child: AnimatedCrossFade(
+            firstChild: _buildDayDashboardCollapsed(theme, loc, stats, totalSets, totalVolume),
+            secondChild: _buildDayDashboardExpanded(theme, loc, stats, totalSets, totalVolume, maxSets),
+            crossFadeState: _dashboardExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 250),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDayDashboardCollapsed(ThemeData theme, AppLocalizations loc, List<_CategoryStat> stats, int totalSets, double totalVolume) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Icon(Icons.bar_chart, size: 16, color: theme.colorScheme.primary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '${loc.routinesDayDashboard} — '
+              '${totalSets} ${loc.routinesDayDashboardSets}' +
+              (totalVolume > 0
+                  ? ' · ${totalVolume.toStringAsFixed(0)} ${loc.routinesDayDashboardVolume}'
+                  : '') +
+              ' · ${stats.length} ${loc.routinesDayDashboardGroups}',
+              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          // Mini category dots
+          ...stats.take(4).map((stat) => Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Container(width: 8, height: 8,
+                decoration: BoxDecoration(color: stat.color, shape: BoxShape.circle)),
+          )),
+          const SizedBox(width: 4),
+          Icon(_dashboardExpanded ? Icons.expand_less : Icons.expand_more,
+              size: 20, color: theme.colorScheme.onSurfaceVariant),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDayDashboardExpanded(ThemeData theme, AppLocalizations loc, List<_CategoryStat> stats, int totalSets, double totalVolume, int maxSets) {
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Icon(Icons.bar_chart, size: 16,
+                  color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Text(loc.routinesDayDashboard,
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              Icon(_dashboardExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 20, color: theme.colorScheme.onSurfaceVariant),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Per-category rows with visual bars
+          ...stats.map((stat) {
+            final pct = maxSets > 0 ? stat.sets / maxSets : 0.0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 10, height: 10,
+                        decoration: BoxDecoration(
+                          color: stat.color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(stat.name,
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(
+                                    fontWeight:
+                                        FontWeight.w600)),
+                      ),
+                      Text('${stat.sets}s',
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(
+                                  fontWeight:
+                                      FontWeight.bold)),
+                      if (stat.volume > 0) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                            '${stat.volume.toStringAsFixed(0)}kg',
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(
+                                    color: theme
+                                        .colorScheme
+                                        .onSurfaceVariant)),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  // Bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: pct.clamp(0.0, 1.0),
+                      minHeight: 6,
+                      backgroundColor: theme.colorScheme
+                          .surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                          stat.color.withAlpha(200)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+
+          const Divider(height: 12),
+
+          // Totals
+          Row(
+            children: [
+              _buildStatChip(theme, '$totalSets', loc.routinesDayDashboardSets),
+              const SizedBox(width: 12),
+              if (totalVolume > 0)
+                _buildStatChip(
+                    theme,
+                    totalVolume.toStringAsFixed(0),
+                    loc.routinesDayDashboardVolume),
+              const SizedBox(width: 12),
+              _buildStatChip(
+                  theme,
+                  '${stats.length}',
+                  loc.routinesDayDashboardGroups),
+            ],
+          ),
+        ],
       ),
     );
   }

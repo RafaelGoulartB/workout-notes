@@ -1760,6 +1760,12 @@ abstract class AppLocalizations {
   /// **'Delete Day'**
   String get routinesDeleteDay;
 
+  /// No description provided for @routinesEditDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Day'**
+  String get routinesEditDay;
+
   /// No description provided for @routinesDayEmpty.
   ///
   /// In en, this message translates to:
