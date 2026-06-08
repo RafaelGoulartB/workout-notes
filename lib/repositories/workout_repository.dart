@@ -59,6 +59,41 @@ class WorkoutRepository extends BaseRepository {
     return id;
   }
 
+  /// Adds an exercise entry to an existing workout.
+  /// Returns the newly created entry ID.
+  Future<String> addExerciseToWorkout(String workoutId, String exerciseId, {int? restTimeSeconds}) async {
+    final db = await this.db;
+    final entryId = const Uuid().v4();
+    final count = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM exercise_entries WHERE workout_id = ?', [workoutId]),
+    ) ?? 0;
+    final rt = restTimeSeconds ?? 90;
+    await db.insert('exercise_entries', {
+      'id': entryId,
+      'workout_id': workoutId,
+      'exercise_id': exerciseId,
+      'order_index': count,
+      'rest_time_seconds': rt,
+    });
+    // Auto-populate sets from last workout for this exercise
+    final lastSets = await getLastWorkoutSets(exerciseId, excludeWorkoutId: workoutId);
+    for (final s in lastSets) {
+      final setId = const Uuid().v4();
+      await db.insert('sets', {
+        'id': setId,
+        'exercise_entry_id': entryId,
+        'weight': s['weight'],
+        'reps': s['reps'],
+        'distance': s['distance'],
+        'time_seconds': s['time_seconds'],
+        'is_complete': 0,
+        'is_warmup': s['is_warmup'] ?? 0,
+        'order_index': s['order_index'],
+      });
+    }
+    return entryId;
+  }
+
   Future<void> importRoutineDayToWorkout(String workoutId, String routineDayId) async {
     final db = await this.db;
     final routineExercises = await _getRoutineExercises(db, routineDayId);

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../repositories/workout_repository.dart';
+import '../../repositories/routine_repository.dart';
 import 'workout_detail_screen.dart';
+import 'future_workout_planner_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -13,6 +15,7 @@ class CalendarScreen extends StatefulWidget {
 
 class _CalendarScreenState extends State<CalendarScreen> {
   final _workoutRepo = WorkoutRepository();
+  final _routineRepo = RoutineRepository();
   DateTime _selectedDate = DateTime.now();
   int _currentMonth = DateTime.now().month;
   int _currentYear = DateTime.now().year;
@@ -153,6 +156,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                   icon: const Icon(Icons.add, size: 18),
                                   label: Text(AppLocalizations.of(context)!.calendarCreateWorkout),
                                 ),
+                                const SizedBox(height: 8),
+                                OutlinedButton.icon(
+                                  onPressed: _importFromRoutine,
+                                  icon: const Icon(Icons.repeat, size: 18),
+                                  label: Text(AppLocalizations.of(context)!.activeWorkoutImportRoutine),
+                                ),
                               ],
                             ),
                           ),
@@ -185,11 +194,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 subtitle: Text(durStr),
                                 trailing: const Icon(Icons.chevron_right),
                                 onTap: () async {
+                                  final today = DateTime.now().toIso8601String().substring(0, 10);
+                                  final workoutDate = w['date'] as String? ?? '';
+                                  final isFuture = workoutDate.compareTo(today) > 0;
+                                  Widget target;
+                                  if (isFuture) {
+                                    target = FutureWorkoutPlannerScreen(workoutId: w['id'] as String);
+                                  } else {
+                                    target = WorkoutDetailScreen(workoutId: w['id'] as String);
+                                  }
                                   final result = await Navigator.push(
                                     context,
-                                    MaterialPageRoute(
-                                      builder: (_) => WorkoutDetailScreen(workoutId: w['id'] as String),
-                                    ),
+                                    MaterialPageRoute(builder: (_) => target),
                                   );
                                   if (result == true) _loadMonth();
                                 },
@@ -321,6 +337,146 @@ class _CalendarScreenState extends State<CalendarScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context)!.calendarWorkoutCreated), behavior: SnackBarBehavior.floating),
+      );
+    }
+  }
+
+  Future<void> _importFromRoutine() async {
+    final ctx = context;
+    final scaffoldMessenger = ScaffoldMessenger.of(ctx);
+    final loc = AppLocalizations.of(ctx)!;
+    final routines = await _routineRepo.getRoutines();
+    if (routines.isEmpty) {
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text(loc.activeWorkoutNoRoutineFound), behavior: SnackBarBehavior.floating),
+        );
+      }
+      return;
+    }
+
+    final theme = Theme.of(ctx);
+    final routineId = await showModalBottomSheet<String>(
+      context: ctx,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+              borderRadius: BorderRadius.circular(2),
+            ))),
+            const SizedBox(height: 16),
+            Text(loc.activeWorkoutSelectRoutine, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 300,
+              child: ListView.separated(
+                itemCount: routines.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (ctx, i) {
+                  final routine = routines[i];
+                  return ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.repeat, color: theme.colorScheme.onSecondaryContainer, size: 20),
+                    ),
+                    title: Text(routine['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pop(ctx, routine['id'] as String),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (routineId == null || !mounted) return;
+
+    final days = await _routineRepo.getRoutineDays(routineId);
+    if (days.isEmpty) {
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text(loc.activeWorkoutNoRoutineDays), behavior: SnackBarBehavior.floating),
+        );
+      }
+      return;
+    }
+
+    final routineName = routines.firstWhere((r) => r['id'] == routineId)['name'] as String;
+    final dayId = await showModalBottomSheet<String>(
+      context: ctx,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+              borderRadius: BorderRadius.circular(2),
+            ))),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(Icons.arrow_back, size: 18),
+                  label: Text(loc.activeWorkoutBack),
+                ),
+              ],
+            ),
+            Text(routineName, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(loc.activeWorkoutSelectDay, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 300,
+              child: ListView.separated(
+                itemCount: days.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (ctx, i) {
+                  final day = days[i];
+                  return ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.today, color: theme.colorScheme.onPrimaryContainer, size: 20),
+                    ),
+                    title: Text(day['name'] as String? ?? 'Dia ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    trailing: const Icon(Icons.download),
+                    onTap: () => Navigator.pop(ctx, day['id'] as String),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (dayId == null || !mounted) return;
+
+    // Create workout and import
+    final newWorkoutId = await _workoutRepo.createWorkout(date: _selectedDate);
+    await _workoutRepo.importRoutineDayToWorkout(newWorkoutId, dayId);
+    _loadMonth();
+    if (mounted) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text(loc.activeWorkoutRoutineImported), behavior: SnackBarBehavior.floating),
       );
     }
   }
