@@ -11,7 +11,7 @@ import '../repositories/export_import_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 10;
+  static const _dbVersion = 12;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -326,6 +326,145 @@ class DatabaseHelper {
       try {
         await db.execute('ALTER TABLE routine_days ADD COLUMN notes TEXT');
       } catch (_) {}
+    }
+    if (oldVersion < 12) {
+      // New category: forearms
+      try {
+        await db.insert('exercise_categories', {
+          'id': 'forearms',
+          'name': 'Antebraço',
+          'locale_key': 'forearms',
+          'color': 0xFF8D6E63,
+          'order_index': 9,
+          'energy_system': 'anaerobic',
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      } catch (_) {}
+
+      // New exercises for all categories
+      final v12Exercises = [
+        // === FULLBODY ===
+        {'id': 'kettlebell_swing', 'name': 'Kettlebell Swing', 'locale_key': 'kettlebell_swing', 'category_id': 'fullbody', 'type': 'weightReps', 'notes': 'Balanço com kettlebell, cadeia posterior + cardio', 'equipment': 'Kettlebell', 'default_rest_time': 90, 'weight_increment': 2.0},
+        {'id': 'thruster', 'name': 'Thruster', 'locale_key': 'thruster', 'category_id': 'fullbody', 'type': 'weightReps', 'notes': 'Agachamento frontal + desenvolvimento acima da cabeça', 'equipment': 'Barbell', 'default_rest_time': 120, 'weight_increment': 2.5},
+        {'id': 'clean_press', 'name': 'Clean and Press', 'locale_key': 'clean_press', 'category_id': 'fullbody', 'type': 'weightReps', 'notes': 'Arranque do chão até os ombros + desenvolvimento', 'equipment': 'Barbell', 'default_rest_time': 120, 'weight_increment': 2.5},
+        {'id': 'turkish_getup', 'name': 'Turkish Get-Up', 'locale_key': 'turkish_getup', 'category_id': 'fullbody', 'type': 'weightReps', 'notes': 'Levantar do chão com peso acima da cabeça, cada lado', 'equipment': 'Kettlebell', 'default_rest_time': 90, 'weight_increment': 2.0},
+        {'id': 'snatch', 'name': 'Snatch (Arranco)', 'locale_key': 'snatch', 'category_id': 'fullbody', 'type': 'weightReps', 'notes': 'Levantamento olímpico do chão até acima da cabeça em um movimento', 'equipment': 'Barbell', 'default_rest_time': 120, 'weight_increment': 2.5},
+        {'id': 'bear_crawl', 'name': 'Bear Crawl', 'locale_key': 'bear_crawl', 'category_id': 'fullbody', 'type': 'distanceTime', 'notes': 'Engatinhar em quatro apoios, joelhos fora do chão', 'equipment': 'Bodyweight', 'default_rest_time': 60, 'weight_increment': 0},
+        {'id': 'devils_press', 'name': "Devil's Press", 'locale_key': 'devils_press', 'category_id': 'fullbody', 'type': 'weightReps', 'notes': 'Burpee + desenvolvimento com halteres', 'equipment': 'Dumbbell', 'default_rest_time': 90, 'weight_increment': 1.0},
+        {'id': 'man_maker', 'name': 'Man Maker', 'locale_key': 'man_maker', 'category_id': 'fullbody', 'type': 'weightReps', 'notes': 'Burpee + remada + desenvolvimento com halteres', 'equipment': 'Dumbbell', 'default_rest_time': 90, 'weight_increment': 1.0},
+        {'id': 'wall_ball', 'name': 'Wall Ball', 'locale_key': 'wall_ball', 'category_id': 'fullbody', 'type': 'weightReps', 'notes': 'Agachar e arremessar bola medicinal na parede', 'equipment': 'Medicine Ball', 'default_rest_time': 60, 'weight_increment': 1.0},
+        {'id': 'burpee_full', 'name': 'Burpee Completo', 'locale_key': 'burpee_full', 'category_id': 'fullbody', 'type': 'weightReps', 'notes': 'Agachar, flexão, pular e bater palma acima da cabeça', 'equipment': 'Bodyweight', 'default_rest_time': 60, 'weight_increment': 0},
+        // === FOREARMS ===
+        {'id': 'wrist_curl', 'name': 'Rosca de Punho', 'locale_key': 'wrist_curl', 'category_id': 'forearms', 'type': 'weightReps', 'notes': 'Antebraços apoiados no banco ou coxas, flexionar punhos', 'equipment': 'Barbell', 'default_rest_time': 45, 'weight_increment': 1.0},
+        {'id': 'reverse_wrist_curl', 'name': 'Rosca de Punho Invertida', 'locale_key': 'reverse_wrist_curl', 'category_id': 'forearms', 'type': 'weightReps', 'notes': 'Antebraços apoiados, palmas para baixo, estender punhos', 'equipment': 'Barbell', 'default_rest_time': 45, 'weight_increment': 1.0},
+        {'id': 'farmer_walk', 'name': "Farmer's Walk", 'locale_key': 'farmer_walk', 'category_id': 'forearms', 'type': 'distanceTime', 'notes': 'Caminhar segurando pesos pesados em cada mão', 'equipment': 'Dumbbell', 'default_rest_time': 60, 'weight_increment': 2.0},
+        {'id': 'pinch_grip', 'name': 'Pinch Grip Hold', 'locale_key': 'pinch_grip', 'category_id': 'forearms', 'type': 'timeOnly', 'notes': 'Segurar anilhas juntas apenas com a pinça dos dedos', 'equipment': 'Plates', 'default_rest_time': 60, 'weight_increment': 1.0},
+        // === ADDITIONAL CHEST ===
+        {'id': 'cable_crossover', 'name': 'Crossover na Polia', 'locale_key': 'cable_crossover', 'category_id': 'chest', 'type': 'weightReps', 'notes': 'Polias altas, puxar para frente e baixo, contrair no centro', 'equipment': 'Cable', 'default_rest_time': 60, 'weight_increment': 2.5},
+        {'id': 'parallel_dip', 'name': 'Dips nas Paralelas', 'locale_key': 'parallel_dip', 'category_id': 'chest', 'type': 'weightReps', 'notes': 'Tronco inclinado para frente foca peito; reto foca tríceps', 'equipment': 'Bodyweight', 'default_rest_time': 90, 'weight_increment': 0},
+        {'id': 'decline_pushup', 'name': 'Flexão Declinada', 'locale_key': 'decline_pushup', 'category_id': 'chest', 'type': 'weightReps', 'notes': 'Pés elevados, mãos no chão, foco no peitoral superior', 'equipment': 'Bodyweight', 'default_rest_time': 60, 'weight_increment': 0},
+        {'id': 'floor_press', 'name': 'Supino no Solo', 'locale_key': 'floor_press', 'category_id': 'chest', 'type': 'weightReps', 'notes': 'Deitado no chão, amplitude reduzida, protege ombros', 'equipment': 'Barbell', 'default_rest_time': 90, 'weight_increment': 2.5},
+        // === ADDITIONAL BACK ===
+        {'id': 'seal_row', 'name': 'Remada Cavalinho', 'locale_key': 'seal_row', 'category_id': 'back', 'type': 'weightReps', 'notes': 'Deitado de bruços em banco elevado, remada com barra', 'equipment': 'Barbell', 'default_rest_time': 90, 'weight_increment': 2.5},
+        {'id': 'vbar_pulldown', 'name': 'Puxada Alta Triângulo', 'locale_key': 'vbar_pulldown', 'category_id': 'back', 'type': 'weightReps', 'notes': 'Pegada neutra com triângulo, puxar até o peito', 'equipment': 'Cable', 'default_rest_time': 90, 'weight_increment': 2.5},
+        {'id': 'renegade_row', 'name': 'Remada Renegada', 'locale_key': 'renegade_row', 'category_id': 'back', 'type': 'weightReps', 'notes': 'Em posição de prancha, remar um halter de cada vez', 'equipment': 'Dumbbell', 'default_rest_time': 60, 'weight_increment': 2.0},
+        {'id': 'superman', 'name': 'Superman', 'locale_key': 'superman', 'category_id': 'back', 'type': 'weightReps', 'notes': 'Deitado de bruços, elevar braços e pernas simultaneamente', 'equipment': 'Bodyweight', 'default_rest_time': 45, 'weight_increment': 0},
+        // === ADDITIONAL SHOULDERS ===
+        {'id': 'db_rear_delt_fly', 'name': 'Crucifixo Invertido Halteres', 'locale_key': 'db_rear_delt_fly', 'category_id': 'shoulders', 'type': 'weightReps', 'notes': 'Tronco inclinado, halteres abrindo lateralmente para deltoide posterior', 'equipment': 'Dumbbell', 'default_rest_time': 60, 'weight_increment': 1.0},
+        {'id': 'cable_rear_delt_fly', 'name': 'Crucifixo Invertido na Polia', 'locale_key': 'cable_rear_delt_fly', 'category_id': 'shoulders', 'type': 'weightReps', 'notes': 'Polias altas cruzadas, puxar para trás e lateral', 'equipment': 'Cable', 'default_rest_time': 60, 'weight_increment': 1.0},
+        // === ADDITIONAL BICEPS ===
+        {'id': 'cable_rope_curl', 'name': 'Rosca Corda na Polia', 'locale_key': 'cable_rope_curl', 'category_id': 'biceps', 'type': 'weightReps', 'notes': 'Polia baixa com corda, pegada neutra', 'equipment': 'Cable', 'default_rest_time': 60, 'weight_increment': 2.5},
+        {'id': 'bayesian_curl', 'name': 'Rosca Bayesian', 'locale_key': 'bayesian_curl', 'category_id': 'biceps', 'type': 'weightReps', 'notes': 'Polia alta, de costas, braços estendidos para trás', 'equipment': 'Cable', 'default_rest_time': 60, 'weight_increment': 2.5},
+        {'id': 'drag_curl', 'name': 'Rosca Arrastada', 'locale_key': 'drag_curl', 'category_id': 'biceps', 'type': 'weightReps', 'notes': 'Barra rente ao corpo, cotovelos indo para trás', 'equipment': 'Barbell', 'default_rest_time': 60, 'weight_increment': 1.0},
+        // === ADDITIONAL TRICEPS ===
+        {'id': 'triceps_parallel_dip', 'name': 'Tríceps na Paralela', 'locale_key': 'triceps_parallel_dip', 'category_id': 'triceps', 'type': 'weightReps', 'notes': 'Tronco reto, cotovelos para trás, foco total no tríceps', 'equipment': 'Bodyweight', 'default_rest_time': 90, 'weight_increment': 0},
+        {'id': 'cable_kickback', 'name': 'Tríceps Coice na Polia', 'locale_key': 'cable_kickback', 'category_id': 'triceps', 'type': 'weightReps', 'notes': 'Polia baixa, cotovelo fixo, estender o braço para trás', 'equipment': 'Cable', 'default_rest_time': 60, 'weight_increment': 1.0},
+        {'id': 'tate_press', 'name': 'Tate Press', 'locale_key': 'tate_press', 'category_id': 'triceps', 'type': 'weightReps', 'notes': 'Deitado, halteres juntos acima do peito, cotovelos abrindo para os lados', 'equipment': 'Dumbbell', 'default_rest_time': 60, 'weight_increment': 1.0},
+        // === ADDITIONAL LEGS ===
+        {'id': 'sumo_squat', 'name': 'Agachamento Sumô', 'locale_key': 'sumo_squat', 'category_id': 'legs', 'type': 'weightReps', 'notes': 'Pés bem afastados, pontas para fora, ênfase em adutores e glúteos', 'equipment': 'Barbell', 'default_rest_time': 120, 'weight_increment': 5.0},
+        {'id': 'seated_leg_curl', 'name': 'Cadeira Flexora', 'locale_key': 'seated_leg_curl', 'category_id': 'legs', 'type': 'weightReps', 'notes': 'Sentado, flexionar as pernas contra a resistência', 'equipment': 'Machine', 'default_rest_time': 90, 'weight_increment': 2.5},
+        {'id': 'pistol_squat', 'name': 'Pistol Squat', 'locale_key': 'pistol_squat', 'category_id': 'legs', 'type': 'weightReps', 'notes': 'Agachamento unilateral, uma perna estendida à frente', 'equipment': 'Bodyweight', 'default_rest_time': 90, 'weight_increment': 0},
+        {'id': 'wall_sit', 'name': 'Wall Sit', 'locale_key': 'wall_sit', 'category_id': 'legs', 'type': 'timeOnly', 'notes': 'Costas na parede, joelhos 90°, manter posição isométrica', 'equipment': 'Bodyweight', 'default_rest_time': 60, 'weight_increment': 0},
+        {'id': 'box_jump', 'name': 'Box Jump', 'locale_key': 'box_jump', 'category_id': 'legs', 'type': 'weightReps', 'notes': 'Salto pliométrico sobre caixa, aterrissar suavemente', 'equipment': 'Bodyweight', 'default_rest_time': 90, 'weight_increment': 0},
+        {'id': 'glute_kickback', 'name': 'Coice de Glúteo na Polia', 'locale_key': 'glute_kickback', 'category_id': 'legs', 'type': 'weightReps', 'notes': 'Polia baixa, estender a perna para trás, foco no glúteo', 'equipment': 'Cable', 'default_rest_time': 60, 'weight_increment': 2.5},
+        // === ADDITIONAL CORE ===
+        {'id': 'mountain_climbers', 'name': 'Mountain Climbers', 'locale_key': 'mountain_climbers', 'category_id': 'core', 'type': 'weightReps', 'notes': 'Em posição de prancha, alternar joelhos em direção ao peito', 'equipment': 'Bodyweight', 'default_rest_time': 45, 'weight_increment': 0},
+        {'id': 'flutter_kicks', 'name': 'Flutter Kicks', 'locale_key': 'flutter_kicks', 'category_id': 'core', 'type': 'weightReps', 'notes': 'Deitado, pernas esticadas, alternar batidas curtas para cima e baixo', 'equipment': 'Bodyweight', 'default_rest_time': 45, 'weight_increment': 0},
+        {'id': 'woodchopper', 'name': 'Woodchopper', 'locale_key': 'woodchopper', 'category_id': 'core', 'type': 'weightReps', 'notes': 'Polia alta, girar tronco diagonalmente como se cortasse lenha', 'equipment': 'Cable', 'default_rest_time': 60, 'weight_increment': 2.5},
+        {'id': 'l_sit', 'name': 'L-Sit', 'locale_key': 'l_sit', 'category_id': 'core', 'type': 'timeOnly', 'notes': 'Apoiado nas mãos, pernas esticadas à frente formando um L', 'equipment': 'Bodyweight', 'default_rest_time': 60, 'weight_increment': 0},
+        // === ADDITIONAL CARDIO ===
+        {'id': 'hiit', 'name': 'HIIT', 'locale_key': 'hiit', 'category_id': 'cardio', 'type': 'timeOnly', 'notes': 'Treino intervalado de alta intensidade (genérico)', 'equipment': 'Bodyweight', 'default_rest_time': 30, 'weight_increment': 0},
+        {'id': 'jumping_jacks', 'name': 'Polichinelos', 'locale_key': 'jumping_jacks', 'category_id': 'cardio', 'type': 'weightReps', 'notes': 'Abrir e fechar pernas e braços simultaneamente saltando', 'equipment': 'Bodyweight', 'default_rest_time': 30, 'weight_increment': 0},
+        {'id': 'sprint', 'name': 'Sprint / Tiro', 'locale_key': 'sprint', 'category_id': 'cardio', 'type': 'distanceTime', 'notes': 'Corrida curta em máxima velocidade', 'equipment': 'Bodyweight', 'default_rest_time': 120, 'weight_increment': 0},
+        {'id': 'skater_jumps', 'name': 'Skater Jumps', 'locale_key': 'skater_jumps', 'category_id': 'cardio', 'type': 'weightReps', 'notes': 'Salto lateral de uma perna para a outra, tocando o pé atrás', 'equipment': 'Bodyweight', 'default_rest_time': 45, 'weight_increment': 0},
+      ];
+      for (final ex in v12Exercises) {
+        try {
+          await db.insert('exercises', {
+            'id': ex['id'],
+            'name': ex['name'],
+            'locale_key': ex['locale_key'],
+            'category_id': ex['category_id'],
+            'type': ex['type'],
+            'notes': ex['notes'],
+            'equipment': ex['equipment'],
+            'is_favorite': 0,
+            'default_rest_time': ex['default_rest_time'],
+            'weight_increment': ex['weight_increment'],
+            'created_at': DateTime.now().toIso8601String(),
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        } catch (_) {}
+      }
+    }
+    if (oldVersion < 11) {
+      final newExercises = [
+        {'id': 'db_fly', 'name': 'Crucifixo com Halteres', 'locale_key': 'db_fly', 'category_id': 'chest', 'type': 'weightReps', 'notes': 'Deitado no banco, halteres abertos e fechando no centro', 'equipment': 'Dumbbell', 'default_rest_time': 60, 'weight_increment': 1.0},
+        {'id': 'pullover', 'name': 'Pullover', 'locale_key': 'pullover', 'category_id': 'chest', 'type': 'weightReps', 'notes': 'Deitado no banco, halter atrás da cabeça', 'equipment': 'Dumbbell', 'default_rest_time': 90, 'weight_increment': 2.0},
+        {'id': 'straight_arm_pulldown', 'name': 'Puxada Braço Reto', 'locale_key': 'straight_arm_pulldown', 'category_id': 'back', 'type': 'weightReps', 'notes': 'Polia alta, braços esticados puxando até a coxa', 'equipment': 'Cable', 'default_rest_time': 60, 'weight_increment': 2.5},
+        {'id': 'good_morning', 'name': 'Good Morning', 'locale_key': 'good_morning', 'category_id': 'back', 'type': 'weightReps', 'notes': 'Barra nas costas, tronco inclinando para frente', 'equipment': 'Barbell', 'default_rest_time': 90, 'weight_increment': 2.5},
+        {'id': 'inverted_row', 'name': 'Remada Invertida', 'locale_key': 'inverted_row', 'category_id': 'back', 'type': 'weightReps', 'notes': 'Barra baixa, puxar o peito até a barra', 'equipment': 'Bodyweight', 'default_rest_time': 60, 'weight_increment': 0},
+        {'id': 'cable_lat_raise', 'name': 'Elevação Lateral na Polia', 'locale_key': 'cable_lat_raise', 'category_id': 'shoulders', 'type': 'weightReps', 'notes': 'Polia baixa, elevar lateralmente', 'equipment': 'Cable', 'default_rest_time': 60, 'weight_increment': 1.0},
+        {'id': 'machine_ohp', 'name': 'Desenvolvimento na Máquina', 'locale_key': 'machine_ohp', 'category_id': 'shoulders', 'type': 'weightReps', 'notes': 'Máquina de ombro sentado', 'equipment': 'Machine', 'default_rest_time': 90, 'weight_increment': 2.5},
+        {'id': 'landmine_press', 'name': 'Desenvolvimento com Barra no Chão', 'locale_key': 'landmine_press', 'category_id': 'shoulders', 'type': 'weightReps', 'notes': 'Barra apoiada no chão, pressionar em ângulo', 'equipment': 'Barbell', 'default_rest_time': 90, 'weight_increment': 2.5},
+        {'id': 'incline_curl', 'name': 'Rosca Inclinada', 'locale_key': 'incline_curl', 'category_id': 'biceps', 'type': 'weightReps', 'notes': 'Banco inclinado a 45°, braços pendurados para trás', 'equipment': 'Dumbbell', 'default_rest_time': 60, 'weight_increment': 1.0},
+        {'id': 'reverse_curl', 'name': 'Rosca Inversa', 'locale_key': 'reverse_curl', 'category_id': 'biceps', 'type': 'weightReps', 'notes': 'Barra com pegada pronada, foco no braquial', 'equipment': 'Barbell', 'default_rest_time': 60, 'weight_increment': 1.0},
+        {'id': 'spider_curl', 'name': 'Rosca Spider', 'locale_key': 'spider_curl', 'category_id': 'biceps', 'type': 'weightReps', 'notes': 'Banco inclinado, braços pendurados na vertical', 'equipment': 'Dumbbell', 'default_rest_time': 60, 'weight_increment': 1.0},
+        {'id': 'overhead_cable_ext', 'name': 'Tríceps Polia Alta', 'locale_key': 'overhead_cable_ext', 'category_id': 'triceps', 'type': 'weightReps', 'notes': 'Corda ou barra atrás da cabeça, estender acima', 'equipment': 'Cable', 'default_rest_time': 60, 'weight_increment': 2.5},
+        {'id': 'single_pushdown', 'name': 'Tríceps Polia Unilateral', 'locale_key': 'single_pushdown', 'category_id': 'triceps', 'type': 'weightReps', 'notes': 'Cada braço de cada vez, maior foco', 'equipment': 'Cable', 'default_rest_time': 60, 'weight_increment': 1.0},
+        {'id': 'diamond_pushup', 'name': 'Flexão Diamante', 'locale_key': 'diamond_pushup', 'category_id': 'triceps', 'type': 'weightReps', 'notes': 'Mãos juntas formando um diamante, foco no tríceps', 'equipment': 'Bodyweight', 'default_rest_time': 60, 'weight_increment': 0},
+        {'id': 'adductor_machine', 'name': 'Máquina de Adutor', 'locale_key': 'adductor_machine', 'category_id': 'legs', 'type': 'weightReps', 'notes': 'Fechar as pernas contra a resistência', 'equipment': 'Machine', 'default_rest_time': 60, 'weight_increment': 2.5},
+        {'id': 'abductor_machine', 'name': 'Máquina de Abdutor', 'locale_key': 'abductor_machine', 'category_id': 'legs', 'type': 'weightReps', 'notes': 'Abrir as pernas contra a resistência', 'equipment': 'Machine', 'default_rest_time': 60, 'weight_increment': 2.5},
+        {'id': 'seated_calf', 'name': 'Panturrilha Sentado', 'locale_key': 'seated_calf', 'category_id': 'legs', 'type': 'weightReps', 'notes': 'Joelhos a 90°, elevar os calcanhares', 'equipment': 'Machine', 'default_rest_time': 60, 'weight_increment': 5.0},
+        {'id': 'glute_bridge', 'name': 'Ponte de Glúteo', 'locale_key': 'glute_bridge', 'category_id': 'legs', 'type': 'weightReps', 'notes': 'Deitado, joelhos flexionados, elevar o quadril', 'equipment': 'Bodyweight', 'default_rest_time': 60, 'weight_increment': 0},
+        {'id': 'step_up', 'name': 'Step Up', 'locale_key': 'step_up', 'category_id': 'legs', 'type': 'weightReps', 'notes': 'Subir em um banco ou caixa, halteres nas mãos', 'equipment': 'Dumbbell', 'default_rest_time': 60, 'weight_increment': 2.0},
+        {'id': 'nordic_curl', 'name': 'Flexão Nórdica', 'locale_key': 'nordic_curl', 'category_id': 'legs', 'type': 'weightReps', 'notes': 'Joelhos no chão, pés presos, descer controlado', 'equipment': 'Bodyweight', 'default_rest_time': 90, 'weight_increment': 0},
+        {'id': 'reverse_lunge', 'name': 'Afundo Reverso', 'locale_key': 'reverse_lunge', 'category_id': 'legs', 'type': 'weightReps', 'notes': 'Passo para trás em vez de frente', 'equipment': 'Dumbbell', 'default_rest_time': 60, 'weight_increment': 2.0},
+        {'id': 'side_plank', 'name': 'Prancha Lateral', 'locale_key': 'side_plank', 'category_id': 'core', 'type': 'timeOnly', 'notes': 'Corpo reto de lado, antebraço no chão', 'equipment': 'Bodyweight', 'default_rest_time': 45, 'weight_increment': 0},
+        {'id': 'bicycle_crunch', 'name': 'Abdominal Bicicleta', 'locale_key': 'bicycle_crunch', 'category_id': 'core', 'type': 'weightReps', 'notes': 'Deitado, joelho ao cotovelo oposto alternado', 'equipment': 'Bodyweight', 'default_rest_time': 45, 'weight_increment': 0},
+        {'id': 'reverse_crunch', 'name': 'Reverse Crunch', 'locale_key': 'reverse_crunch', 'category_id': 'core', 'type': 'weightReps', 'notes': 'Elevar o quadril do chão contraindo o abdômen', 'equipment': 'Bodyweight', 'default_rest_time': 45, 'weight_increment': 0},
+        {'id': 'dead_bug', 'name': 'Dead Bug', 'locale_key': 'dead_bug', 'category_id': 'core', 'type': 'weightReps', 'notes': 'Braço e perna opostos estendendo simultaneamente', 'equipment': 'Bodyweight', 'default_rest_time': 45, 'weight_increment': 0},
+        {'id': 'pallof_press', 'name': 'Pallof Press', 'locale_key': 'pallof_press', 'category_id': 'core', 'type': 'weightReps', 'notes': 'Polia lateral, empurrar para frente sem girar o tronco', 'equipment': 'Cable', 'default_rest_time': 60, 'weight_increment': 2.5},
+        {'id': 'elliptical', 'name': 'Elíptico', 'locale_key': 'elliptical', 'category_id': 'cardio', 'type': 'distanceTime', 'notes': '', 'equipment': 'Machine', 'default_rest_time': 0, 'weight_increment': 0},
+        {'id': 'stair_climber', 'name': 'Escada', 'locale_key': 'stair_climber', 'category_id': 'cardio', 'type': 'timeOnly', 'notes': 'Simulador de escada', 'equipment': 'Machine', 'default_rest_time': 0, 'weight_increment': 0},
+        {'id': 'burpee', 'name': 'Burpee', 'locale_key': 'burpee', 'category_id': 'cardio', 'type': 'weightReps', 'notes': 'Agachar, pular para trás, flexão, voltar e saltar', 'equipment': 'Bodyweight', 'default_rest_time': 60, 'weight_increment': 0},
+        {'id': 'battle_ropes', 'name': 'Corda de Batalha', 'locale_key': 'battle_ropes', 'category_id': 'cardio', 'type': 'timeOnly', 'notes': 'Ondular as cordas alternadamente ou simultaneamente', 'equipment': 'Bodyweight', 'default_rest_time': 60, 'weight_increment': 0},
+      ];
+      for (final ex in newExercises) {
+        try {
+          await db.insert('exercises', {
+            'id': ex['id'],
+            'name': ex['name'],
+            'locale_key': ex['locale_key'],
+            'category_id': ex['category_id'],
+            'type': ex['type'],
+            'notes': ex['notes'],
+            'equipment': ex['equipment'],
+            'is_favorite': 0,
+            'default_rest_time': ex['default_rest_time'],
+            'weight_increment': ex['weight_increment'],
+            'created_at': DateTime.now().toIso8601String(),
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        } catch (_) {}
+      }
     }
   }
 
