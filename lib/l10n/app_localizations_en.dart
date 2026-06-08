@@ -1599,4 +1599,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get routinesNotesHint => 'Optional routine description';
+
+  @override
+  String get reorderHint => 'Press and hold an exercise to reorder';
+
+  @override
+  String get reorderMovedToTop => 'Moved to top';
+
+  @override
+  String get reorderMovedToBottom => 'Moved to bottom';
 }

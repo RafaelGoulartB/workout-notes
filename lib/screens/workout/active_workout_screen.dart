@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
@@ -55,6 +56,62 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   bool _autoStartTimer = false;
 
   List<ExerciseWithSets> _exercises = [];
+
+  /// Handles drag-to-reorder of exercises during an active workout.
+  /// Updates the local list order optimistically and persists the new
+  /// `order_index` values in a single batch transaction.
+  ///
+  /// The framework's `onReorderItem` callback already adjusts `newIndex` to
+  /// account for the item removed at `oldIndex`, so we use `newIndex`
+  /// directly as the insert position.
+  Future<void> _onReorderExercises(int oldIndex, int newIndex) async {
+    if (_workoutId == null) return;
+    if (oldIndex == newIndex) return;
+
+    final reordered = List<ExerciseWithSets>.from(_exercises);
+    final moved = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, moved);
+
+    setState(() => _exercises = reordered);
+
+    final orderedIds =
+        reordered.map((e) => e.entryId).toList(growable: false);
+    try {
+      await _workoutRepo.reorderWorkoutExercises(_workoutId!, orderedIds);
+    } catch (e) {
+      // Roll back to the persisted order on failure.
+      if (!mounted) return;
+      await _loadExercises();
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao reordenar: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  /// Provides a subtle visual lift + shadow while dragging an exercise
+  /// card during reorder, matching Material 3 guidance.
+  Widget _dragProxyDecorator(
+      Widget child, int index, Animation<double> animation) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (ctx, _) {
+        final t = Curves.easeInOut.transform(animation.value);
+        return Material(
+          elevation: 8 * t,
+          color: Colors.transparent,
+          shadowColor: Colors.black.withAlpha(80),
+          borderRadius: BorderRadius.circular(12),
+          child: child,
+        );
+      },
+      child: child,
+    );
+  }
 
   @override
   void initState() {
@@ -1198,20 +1255,27 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             ),
           ),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 100),
-            itemCount: _exercises.length,
-            itemBuilder: (context, index) => ExerciseCard(
-              exercise: _exercises[index],
-              onAddSet: () => _addSet(_exercises[index]),
-              onToggleSet: _toggleSet,
-              onEditSet: (setId, data, setIdx) => _editSetDialog(setId, data, _exercises[index].localizedName(AppLocalizations.of(context)!), setIdx, _exercises[index].exerciseType),
-              onDeleteSet: _deleteSet,
-              onRemoveExercise: () => _removeExercise(_exercises[index]),
-              onChangeRestTime: (currentRest) => _changeExerciseRestTime(_exercises[index], currentRest),
-              theme: theme,
-            ),
-          ),
+          child: _exercises.isEmpty
+              ? const SizedBox.shrink()
+              : ReorderableListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 100),
+                  itemCount: _exercises.length,
+                  buildDefaultDragHandles: true,
+                  proxyDecorator: _dragProxyDecorator,
+                  onReorderStart: (_) => HapticFeedback.mediumImpact(),
+                  onReorderItem: _onReorderExercises,
+                  itemBuilder: (context, index) => ExerciseCard(
+                    key: ValueKey(_exercises[index].entryId),
+                    exercise: _exercises[index],
+                    onAddSet: () => _addSet(_exercises[index]),
+                    onToggleSet: _toggleSet,
+                    onEditSet: (setId, data, setIdx) => _editSetDialog(setId, data, _exercises[index].localizedName(AppLocalizations.of(context)!), setIdx, _exercises[index].exerciseType),
+                    onDeleteSet: _deleteSet,
+                    onRemoveExercise: () => _removeExercise(_exercises[index]),
+                    onChangeRestTime: (currentRest) => _changeExerciseRestTime(_exercises[index], currentRest),
+                    theme: theme,
+                  ),
+                ),
         ),
       ],
     );

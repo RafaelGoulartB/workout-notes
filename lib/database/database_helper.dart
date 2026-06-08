@@ -441,6 +441,8 @@ class DatabaseHelper {
   Future<void> deleteSet(String setId) => workoutRepo.deleteSet(setId);
   Future<void> removeExerciseEntryFromWorkout(String workoutId, String exerciseId) =>
       workoutRepo.removeExerciseEntryFromWorkout(workoutId, exerciseId);
+  Future<void> reorderWorkoutExercises(String workoutId, List<String> orderedEntryIds) =>
+      workoutRepo.reorderWorkoutExercises(workoutId, orderedEntryIds);
   Future<void> deleteExerciseEntry(String entryId) => workoutRepo.deleteExerciseEntry(entryId);
   Future<void> updateExerciseEntryRestTime(String exerciseEntryId, int restTimeSeconds) =>
       workoutRepo.updateExerciseEntryRestTime(exerciseEntryId, restTimeSeconds);
@@ -461,6 +463,8 @@ class DatabaseHelper {
   Future<String> addRoutineExercise(String routineDayId, String exerciseId, {int? restTimeSeconds}) =>
       routineRepo.addRoutineExercise(routineDayId, exerciseId, restTimeSeconds: restTimeSeconds);
   Future<void> removeRoutineExercise(String id) => routineRepo.removeRoutineExercise(id);
+  Future<void> reorderRoutineExercises(String routineDayId, List<String> orderedIds) =>
+      routineRepo.reorderRoutineExercises(routineDayId, orderedIds);
   Future<void> updateRoutineExerciseRestTime(String routineExerciseId, int restTimeSeconds) =>
       routineRepo.updateRoutineExerciseRestTime(routineExerciseId, restTimeSeconds);
   Future<List<Map<String, dynamic>>> getPredefinedSets(String routineExerciseId) => routineRepo.getPredefinedSets(routineExerciseId);

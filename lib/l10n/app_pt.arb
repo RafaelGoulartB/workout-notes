@@ -513,5 +513,9 @@
   "routinesWeeklyDays": "{count} dias",
 
   "routinesNotes": "Descrição",
-  "routinesNotesHint": "Descrição opcional da rotina"
+  "routinesNotesHint": "Descrição opcional da rotina",
+
+  "reorderHint": "Pressione e segure um exercício para reordenar",
+  "reorderMovedToTop": "Movido para o topo",
+  "reorderMovedToBottom": "Movido para o final"
 }

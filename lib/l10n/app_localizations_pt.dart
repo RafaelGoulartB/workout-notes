@@ -1606,4 +1606,13 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get routinesNotesHint => 'Descrição opcional da rotina';
+
+  @override
+  String get reorderHint => 'Pressione e segure um exercício para reordenar';
+
+  @override
+  String get reorderMovedToTop => 'Movido para o topo';
+
+  @override
+  String get reorderMovedToBottom => 'Movido para o final';
 }

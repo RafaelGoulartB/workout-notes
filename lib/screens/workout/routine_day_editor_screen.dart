@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
@@ -34,6 +35,61 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
   final Map<String, List<Map<String, dynamic>>> _predefinedSets = {};
   bool _isLoading = true;
   bool _dashboardExpanded = false;
+
+  /// Handles drag-to-reorder of routine exercises. Updates the local list
+  /// optimistically and persists the new `order_index` values in a single
+  /// batch transaction.
+  ///
+  /// The framework's `onReorderItem` callback already adjusts `newIndex` to
+  /// account for the item removed at `oldIndex`, so we use `newIndex`
+  /// directly as the insert position.
+  Future<void> _onReorderExercises(int oldIndex, int newIndex) async {
+    if (oldIndex == newIndex) return;
+
+    final reordered = List<Map<String, dynamic>>.from(_exercises);
+    final moved = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, moved);
+
+    setState(() => _exercises = reordered);
+
+    final orderedIds = reordered
+        .map((e) => e['id'] as String)
+        .toList(growable: false);
+    try {
+      await _routineRepo.reorderRoutineExercises(
+          widget.routineDayId, orderedIds);
+    } catch (e) {
+      if (!mounted) return;
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao reordenar: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  /// Provides a subtle visual lift + shadow while dragging a routine
+  /// exercise card during reorder, matching Material 3 guidance.
+  Widget _dragProxyDecorator(
+      Widget child, int index, Animation<double> animation) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (ctx, _) {
+        final t = Curves.easeInOut.transform(animation.value);
+        return Material(
+          elevation: 8 * t,
+          color: Colors.transparent,
+          shadowColor: Colors.black.withAlpha(80),
+          borderRadius: BorderRadius.circular(12),
+          child: child,
+        );
+      },
+      child: child,
+    );
+  }
 
   @override
   void initState() {
@@ -991,15 +1047,33 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
               ? _buildEmptyState(theme, loc)
               : RefreshIndicator(
                   onRefresh: _load,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(
-                        12, 8, 12, 100),
-                    itemCount: _exercises.length + 1,
-                    itemBuilder: (ctx, i) {
-                      if (i == 0) return _buildCategorySummary(theme, loc);
-                      return _buildExerciseCard(
-                          _exercises[i - 1], theme, loc);
-                    },
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                        sliver: SliverToBoxAdapter(
+                          child: _buildCategorySummary(theme, loc),
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 100),
+                        sliver: SliverReorderableList(
+                          itemCount: _exercises.length,
+                          proxyDecorator: _dragProxyDecorator,
+                          onReorderStart: (_) => HapticFeedback.mediumImpact(),
+                          onReorderItem: _onReorderExercises,
+                          itemBuilder: (ctx, i) => ReorderableDelayedDragStartListener(
+                            key: ValueKey(_exercises[i]['id'] as String),
+                            index: i,
+                            child: _buildExerciseCard(
+                              _exercises[i],
+                              theme,
+                              loc,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
       floatingActionButton: FloatingActionButton.extended(
@@ -1308,6 +1382,17 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
             // Exercise header
             Row(
               children: [
+                // Drag handle — purely visual; long-pressing anywhere on
+                // the card starts the drag (SliverReorderableList default).
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Icon(
+                    Icons.drag_indicator,
+                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant
+                        .withAlpha(140),
+                  ),
+                ),
                 Container(
                   width: 4,
                   height: 24,

@@ -114,6 +114,25 @@ class RoutineRepository extends BaseRepository {
     await db.delete('routine_exercises', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Persists a new ordering of routine exercises for a routine day.
+  /// The list [orderedIds] must contain the IDs of every routine_exercise
+  /// currently belonging to [routineDayId] in the desired order.
+  /// Performed in a single batch transaction.
+  Future<void> reorderRoutineExercises(
+      String routineDayId, List<String> orderedIds) async {
+    final db = await this.db;
+    final batch = db.batch();
+    for (int i = 0; i < orderedIds.length; i++) {
+      batch.update(
+        'routine_exercises',
+        {'order_index': i},
+        where: 'id = ? AND routine_day_id = ?',
+        whereArgs: [orderedIds[i], routineDayId],
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
   Future<void> updateRoutineExerciseRestTime(String routineExerciseId, int restTimeSeconds) async {
     final db = await this.db;
     await db.update('routine_exercises',

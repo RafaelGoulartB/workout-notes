@@ -449,6 +449,25 @@ class WorkoutRepository extends BaseRepository {
     }
   }
 
+  /// Persists a new ordering of exercise entries for a workout.
+  /// The list [orderedEntryIds] must contain the IDs of every exercise_entry
+  /// currently belonging to [workoutId] in the desired order.
+  /// Performed in a single batch transaction.
+  Future<void> reorderWorkoutExercises(
+      String workoutId, List<String> orderedEntryIds) async {
+    final db = await this.db;
+    final batch = db.batch();
+    for (int i = 0; i < orderedEntryIds.length; i++) {
+      batch.update(
+        'exercise_entries',
+        {'order_index': i},
+        where: 'id = ? AND workout_id = ?',
+        whereArgs: [orderedEntryIds[i], workoutId],
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
   Future<void> deleteExerciseEntry(String entryId) async {
     final db = await this.db;
     await db.delete('sets', where: 'exercise_entry_id = ?', whereArgs: [entryId]);

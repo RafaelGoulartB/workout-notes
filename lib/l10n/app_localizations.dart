@@ -3029,6 +3029,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Optional routine description'**
   String get routinesNotesHint;
+
+  /// No description provided for @reorderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Press and hold an exercise to reorder'**
+  String get reorderHint;
+
+  /// No description provided for @reorderMovedToTop.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved to top'**
+  String get reorderMovedToTop;
+
+  /// No description provided for @reorderMovedToBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved to bottom'**
+  String get reorderMovedToBottom;
 }
 
 class _AppLocalizationsDelegate
