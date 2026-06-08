@@ -55,7 +55,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     });
   }
 
-  int get _totalSets => _exercises.fold<int>(0, (sum, e) => sum + e.sets.length);
+  int get _totalSets => _exercises.fold<int>(0, (sum, e) => sum + e.sets.where((s) => (s['is_warmup'] as int?) != 1).length);
   double get _totalVolume {
     double v = 0;
     for (final e in _exercises) {

@@ -955,22 +955,26 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       int exCompletedSets = 0;
 
       for (final s in ex.sets) {
-        totalSets++;
         final isComplete = (s['is_complete'] as int?) == 1;
         final isWarmup = (s['is_warmup'] as int?) == 1;
 
-        if (isComplete) completedSets++;
-        if (!isWarmup && isComplete) {
-          final weight = (s['weight'] as num?)?.toDouble() ?? 0;
-          final reps = (s['reps'] as int?) ?? 0;
-          final setVolume = weight * reps;
-          exerciseVolume += setVolume;
-          totalVolume += setVolume;
-          if (weight > maxWeight) {
-            maxWeight = weight;
-            bestReps = reps;
+        // Warmup sets are excluded from all metrics — they serve only
+        // as a log/reference for what to do during the workout.
+        if (!isWarmup) {
+          totalSets++;
+          if (isComplete) {
+            completedSets++;
+            final weight = (s['weight'] as num?)?.toDouble() ?? 0;
+            final reps = (s['reps'] as int?) ?? 0;
+            final setVolume = weight * reps;
+            exerciseVolume += setVolume;
+            totalVolume += setVolume;
+            if (weight > maxWeight) {
+              maxWeight = weight;
+              bestReps = reps;
+            }
+            exCompletedSets++;
           }
-          exCompletedSets++;
         }
       }
 
@@ -1223,8 +1227,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     int completedSets = 0;
     for (final ex in _exercises) {
       for (final s in ex.sets) {
-        totalSets++;
-        if ((s['is_complete'] as int?) == 1) completedSets++;
+        // Warmup sets are excluded from the progress counter.
+        if ((s['is_warmup'] as int?) != 1) {
+          totalSets++;
+          if ((s['is_complete'] as int?) == 1) completedSets++;
+        }
       }
     }
 
