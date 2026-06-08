@@ -103,7 +103,10 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.share_outlined),
-            onPressed: () => ExportService().shareWorkoutSummary(widget.workoutId),
+            onPressed: () => ExportService().shareWorkoutSummary(
+              widget.workoutId,
+              AppLocalizations.of(context)!,
+            ),
             tooltip: AppLocalizations.of(context)!.workoutDetailShare,
           ),
         ],

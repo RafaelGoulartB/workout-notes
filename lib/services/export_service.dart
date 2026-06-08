@@ -4,6 +4,8 @@ import 'package:csv/csv.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/l10n_exercises.dart';
 import '../repositories/workout_repository.dart';
 import '../repositories/export_import_repository.dart';
 
@@ -228,27 +230,39 @@ class ExportService {
   // Share workout summary
   // ===================================================================
 
-  Future<void> shareWorkoutSummary(String workoutId) async {
+  Future<void> shareWorkoutSummary(String workoutId, AppLocalizations loc) async {
     final workout = await _workoutRepo.getWorkout(workoutId);
     if (workout == null) return;
     final exercises = await _workoutRepo.getWorkoutExercises(workoutId);
     final date = (workout['date'] as String?) ?? '';
     final comment = (workout['comment'] as String?) ?? '';
-    var text = '🏋️ Treino - $date\n';
-    if (comment.isNotEmpty) text += '📝 $comment\n';
+    var text = loc.exportServiceWorkoutSummary(date);
+    if (comment.isNotEmpty) text += loc.exportServiceWorkoutNote(comment);
     text += '\n';
     for (final ex in exercises) {
       final sets = await _workoutRepo.getExerciseSets(ex['id'] as String);
-      final exName = (ex['exercise_name'] as String?) ?? '';
+      final exName = _localizedExerciseName(loc, ex);
       text += '\n$exName\n';
       for (int i = 0; i < sets.length; i++) {
         final s = sets[i];
         final weight = (s['weight'] as num?)?.toStringAsFixed(1) ?? '-';
         final reps = (s['reps'] as int?)?.toString() ?? '-';
         final complete = (s['is_complete'] as int?) == 1 ? '✅' : '⬜';
-        text += '   $complete $i: $weight kg × $reps\n';
+        text += '   $complete $i: $weight ${loc.workoutDetailKg} × $reps\n';
       }
     }
     await Share.share(text);
+  }
+
+  /// Returns the localized exercise name using the locale key, falling back
+  /// to the database-stored name if no translation exists.
+  String _localizedExerciseName(AppLocalizations loc, Map<String, dynamic> ex) {
+    final localeKey = ex['exercise_locale_key'] as String?;
+    if (localeKey != null) {
+      final translated =
+          ExerciseLocalization.exerciseName(localeKey, loc.localeName);
+      if (translated != null && translated.isNotEmpty) return translated;
+    }
+    return (ex['exercise_name'] as String?) ?? '';
   }
 }
