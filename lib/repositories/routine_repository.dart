@@ -70,6 +70,16 @@ class RoutineRepository extends BaseRepository {
     await db.delete('routine_days', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<void> updateRoutineDay(String id, {String? name, String? notes}) async {
+    final db = await this.db;
+    final updates = <String, dynamic>{};
+    if (name != null) updates['name'] = name;
+    if (notes != null) updates['notes'] = notes;
+    if (updates.isNotEmpty) {
+      await db.update('routine_days', updates, where: 'id = ?', whereArgs: [id]);
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getRoutineExercises(String routineDayId) async {
     final db = await this.db;
     return db.rawQuery('''

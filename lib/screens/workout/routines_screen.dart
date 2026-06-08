@@ -454,6 +454,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                 routineDayId: day['id'] as String,
                 routineId: widget.routineId,
                 dayName: day['name'] as String? ?? 'Dia',
+                dayNotes: day['notes'] as String?,
               ),
             ),
           );

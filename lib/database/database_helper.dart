@@ -11,7 +11,7 @@ import '../repositories/export_import_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 9;
+  static const _dbVersion = 10;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -322,6 +322,11 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE workouts ADD COLUMN pause_start_time TEXT');
       } catch (_) {}
     }
+    if (oldVersion < 10) {
+      try {
+        await db.execute('ALTER TABLE routine_days ADD COLUMN notes TEXT');
+      } catch (_) {}
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -451,6 +456,7 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getRoutineDays(String routineId) => routineRepo.getRoutineDays(routineId);
   Future<String> addRoutineDay(String routineId, String name) => routineRepo.addRoutineDay(routineId, name);
   Future<void> deleteRoutineDay(String id) => routineRepo.deleteRoutineDay(id);
+  Future<void> updateRoutineDay(String id, {String? name, String? notes}) => routineRepo.updateRoutineDay(id, name: name, notes: notes);
   Future<List<Map<String, dynamic>>> getRoutineExercises(String routineDayId) => routineRepo.getRoutineExercises(routineDayId);
   Future<String> addRoutineExercise(String routineDayId, String exerciseId, {int? restTimeSeconds}) =>
       routineRepo.addRoutineExercise(routineDayId, exerciseId, restTimeSeconds: restTimeSeconds);

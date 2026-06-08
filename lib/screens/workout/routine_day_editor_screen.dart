@@ -13,12 +13,14 @@ class RoutineDayEditorScreen extends StatefulWidget {
   final String routineDayId;
   final String routineId;
   final String dayName;
+  final String? dayNotes;
 
   const RoutineDayEditorScreen({
     super.key,
     required this.routineDayId,
     required this.routineId,
     required this.dayName,
+    this.dayNotes,
   });
 
   @override
@@ -123,6 +125,62 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     if (confirm == true) {
       await _routineRepo.removeRoutineExercise(ex['id'] as String);
       _load();
+    }
+  }
+
+  Future<void> _editDay() async {
+    final nameCtl = TextEditingController(text: widget.dayName);
+    final notesCtl = TextEditingController(text: widget.dayNotes ?? '');
+
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(AppLocalizations.of(ctx)!.routinesEditDay),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtl,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: AppLocalizations.of(ctx)!.routinesDayName,
+                border: const OutlineInputBorder(),
+                hintText: AppLocalizations.of(ctx)!.routinesDayNameHint,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: notesCtl,
+              decoration: InputDecoration(
+                labelText: AppLocalizations.of(ctx)!.routinesNotes,
+                border: const OutlineInputBorder(),
+                hintText: AppLocalizations.of(ctx)!.routinesNotesHint,
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(ctx)!.commonCancel)),
+          FilledButton(onPressed: () {
+            final name = nameCtl.text.trim();
+            if (name.isNotEmpty) {
+              Navigator.pop(ctx, {'name': name, 'notes': notesCtl.text.trim()});
+            }
+          }, child: Text(AppLocalizations.of(ctx)!.commonSave)),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      await _routineRepo.updateRoutineDay(
+        widget.routineDayId,
+        name: result['name'],
+        notes: result['notes']?.isEmpty == true ? null : result['notes'],
+      );
+      if (!mounted) return;
+      // Pop with result to refresh the parent screen
+      Navigator.pop(context, true);
     }
   }
 
@@ -906,6 +964,9 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
             tooltip: 'Mais opções',
             onSelected: (value) {
               switch (value) {
+                case 'edit_day':
+                  _editDay();
+                  break;
                 case 'delete_day':
                   _deleteDay();
                   break;
@@ -913,17 +974,12 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
             },
             itemBuilder: (ctx) => [
               PopupMenuItem<String>(
+                value: 'edit_day',
+                child: Text(AppLocalizations.of(context)!.routinesEditDay),
+              ),
+              PopupMenuItem<String>(
                 value: 'delete_day',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_outline, size: 20, color: Theme.of(context).colorScheme.error),
-                    const SizedBox(width: 12),
-                    Text(
-                      AppLocalizations.of(context)!.routinesDeleteDay,
-                      style: TextStyle(color: Theme.of(context).colorScheme.error),
-                    ),
-                  ],
-                ),
+                child: Text(AppLocalizations.of(context)!.routinesDeleteDay),
               ),
             ],
           ),
