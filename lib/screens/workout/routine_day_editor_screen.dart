@@ -5,6 +5,7 @@ import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/widgets/category_timeline_bar.dart';
 import 'package:workout_notes/widgets/exercise_picker_sheet.dart';
+import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
 
 /// Full-screen editor for a routine day.
@@ -182,6 +183,18 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       await _routineRepo.removeRoutineExercise(ex['id'] as String);
       _load();
     }
+  }
+
+  void _openExerciseDetails(BuildContext context, Map<String, dynamic> ex) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ExerciseDetailTabsScreen(
+          exerciseId: ex['exercise_id'] as String,
+          exerciseName: _resolveExerciseName(ex),
+        ),
+      ),
+    );
   }
 
   Future<void> _editDay() async {
@@ -1435,6 +1448,22 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                         ),
                       ],
                     ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                // Info button — opens the exercise details screen
+                GestureDetector(
+                  onTap: () => _openExerciseDetails(context, ex),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer
+                          .withAlpha(80),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.info_outline,
+                        size: 16,
+                        color: theme.colorScheme.onPrimaryContainer),
                   ),
                 ),
                 const SizedBox(width: 4),
