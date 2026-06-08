@@ -88,6 +88,7 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
     final filtered = _filteredExercises;
     final selectedCategory = _selectedCategoryId != null
         ? _categories.firstWhere(
@@ -124,7 +125,7 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
               children: [
                 Expanded(
                   child: Text(
-                    'Adicionar Exercício',
+                    loc.routinesAddExercise,
                     style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -135,7 +136,7 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                       _search = '';
                     }),
                     icon: const Icon(Icons.arrow_back, size: 18),
-                    label: const Text('Voltar'),
+                    label: Text(loc.activeWorkoutBack),
                   ),
               ],
             ),
@@ -203,7 +204,7 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      '${exercises.length} exercícios${selectedCount > 0 ? ' · $selectedCount adicionado(s)' : ''}',
+                                      '${exercises.length} ${loc.commonExercises.toLowerCase()}${selectedCount > 0 ? ' · $selectedCount' : ''}',
                                       style: theme.textTheme.bodySmall?.copyWith(
                                         color: selectedCount > 0
                                             ? theme.colorScheme.primary
@@ -252,7 +253,7 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                     // Search
                     TextField(
                       decoration: InputDecoration(
-                        hintText: 'Buscar exercício...',
+                        hintText: loc.exerciseLibrarySearch,
                         prefixIcon: const Icon(Icons.search),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         filled: true,
@@ -268,8 +269,8 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                           ? Center(
                               child: Text(
                                 _search.isEmpty
-                                    ? 'Nenhum exercício nesta categoria'
-                                    : 'Nenhum exercício encontrado',
+                                    ? loc.routinesNoExercises
+                                    : loc.exerciseLibraryNoResults,
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
