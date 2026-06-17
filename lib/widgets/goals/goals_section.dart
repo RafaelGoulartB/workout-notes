@@ -178,9 +178,9 @@ class _GoalsSectionState extends State<GoalsSection> {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 1.1,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 1.4,
           ),
           itemCount: _goals.length,
           itemBuilder: (context, i) {
