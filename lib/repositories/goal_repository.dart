@@ -140,6 +140,110 @@ class GoalRepository extends BaseRepository {
     return (current, results);
   }
 
+  /// Returns the list of workouts that contributed to the goal's progress
+  /// in the current period, most recent first.
+  /// - For volume/distance/time: the value contributed by that workout.
+  /// - For days: contributedValue is always 1.0 (one workout = one day).
+  Future<List<ContributingWorkout>> getContributingWorkouts(Goal goal) async {
+    final db = await this.db;
+    final (start, end) = currentPeriod(goal.period);
+    final startStr = start.toIso8601String().substring(0, 10);
+    final endStr = end.toIso8601String().substring(0, 10);
+
+    switch (goal.metric) {
+      case GoalMetric.volume:
+        final rows = await db.rawQuery('''
+          SELECT w.id as workout_id, w.date,
+            SUM(s.weight * s.reps) as value,
+            COUNT(s.id) as set_count
+          FROM sets s
+          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+          JOIN workouts w ON ee.workout_id = w.id
+          WHERE w.date >= ? AND w.date <= ? AND s.is_warmup = 0
+          GROUP BY w.id
+          ORDER BY w.date DESC
+        ''', [startStr, endStr]);
+        return rows
+            .where((r) => ((r['value'] as num?) ?? 0) > 0)
+            .map((r) => ContributingWorkout(
+                  workoutId: r['workout_id'] as String,
+                  date: r['date'] as String,
+                  contributedValue: (r['value'] as num?)?.toDouble() ?? 0,
+                  setCount: (r['set_count'] as int?) ?? 0,
+                ))
+            .toList();
+
+      case GoalMetric.days:
+        final rows = await db.rawQuery('''
+          SELECT id as workout_id, date
+          FROM workouts
+          WHERE date >= ? AND date <= ?
+          ORDER BY date DESC
+        ''', [startStr, endStr]);
+        return rows
+            .map((r) => ContributingWorkout(
+                  workoutId: r['workout_id'] as String,
+                  date: r['date'] as String,
+                  contributedValue: 1.0,
+                  setCount: 0,
+                ))
+            .toList();
+
+      case GoalMetric.distance:
+        final rows = await db.rawQuery('''
+          SELECT w.id as workout_id, w.date,
+            SUM(s.distance) as value,
+            COUNT(s.id) as set_count
+          FROM sets s
+          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+          JOIN exercises e ON ee.exercise_id = e.id
+          JOIN exercise_categories ec ON e.category_id = ec.id
+          JOIN workouts w ON ee.workout_id = w.id
+          WHERE w.date >= ? AND w.date <= ? AND s.is_warmup = 0
+            AND ec.energy_system = 'aerobic'
+            AND s.distance IS NOT NULL AND s.distance > 0
+          GROUP BY w.id
+          ORDER BY w.date DESC
+        ''', [startStr, endStr]);
+        return rows
+            .where((r) => ((r['value'] as num?) ?? 0) > 0)
+            .map((r) => ContributingWorkout(
+                  workoutId: r['workout_id'] as String,
+                  date: r['date'] as String,
+                  contributedValue: (r['value'] as num?)?.toDouble() ?? 0,
+                  setCount: (r['set_count'] as int?) ?? 0,
+                ))
+            .toList();
+
+      case GoalMetric.time:
+        final rows = await db.rawQuery('''
+          SELECT w.id as workout_id, w.date,
+            SUM(s.time_seconds) as value,
+            COUNT(s.id) as set_count
+          FROM sets s
+          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+          JOIN exercises e ON ee.exercise_id = e.id
+          JOIN exercise_categories ec ON e.category_id = ec.id
+          JOIN workouts w ON ee.workout_id = w.id
+          WHERE w.date >= ? AND w.date <= ? AND s.is_warmup = 0
+            AND ec.energy_system = 'aerobic'
+            AND s.time_seconds IS NOT NULL AND s.time_seconds > 0
+          GROUP BY w.id
+          ORDER BY w.date DESC
+        ''', [startStr, endStr]);
+        return rows
+            .where((r) => ((r['value'] as num?) ?? 0) > 0)
+            .map((r) => ContributingWorkout(
+                  workoutId: r['workout_id'] as String,
+                  date: r['date'] as String,
+                  contributedValue:
+                      ((r['value'] as int?) ?? 0).toDouble(),
+                  setCount: (r['set_count'] as int?) ?? 0,
+                ))
+            .toList();
+    }
+  }
+
   /// Suggested target based on the average of the last [weeks] weeks (or months)
   /// of the same metric, multiplied by [multiplier].
   Future<double?> suggestTarget(GoalScope scope, GoalMetric metric, GoalPeriod period,

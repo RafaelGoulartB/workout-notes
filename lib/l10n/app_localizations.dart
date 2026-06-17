@@ -3623,6 +3623,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Amazing! You crushed your goal!'**
   String get goalMotivationDone;
+
+  /// No description provided for @goalContributingWorkouts.
+  ///
+  /// In en, this message translates to:
+  /// **'Workouts this period'**
+  String get goalContributingWorkouts;
+
+  /// No description provided for @goalNoContributors.
+  ///
+  /// In en, this message translates to:
+  /// **'No workouts in this period yet'**
+  String get goalNoContributors;
 }
 
 class _AppLocalizationsDelegate

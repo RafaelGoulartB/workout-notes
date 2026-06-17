@@ -615,5 +615,8 @@
   "goalMotivationNear": "Falta pouco — você consegue!",
   "goalMotivationMid": "No ritmo certo. Continue!",
   "goalMotivationEarly": "Vamos começar! Cada treino conta.",
-  "goalMotivationDone": "Incrível! Você bateu a meta!"
+  "goalMotivationDone": "Incrível! Você bateu a meta!",
+
+  "goalContributingWorkouts": "Treinos deste período",
+  "goalNoContributors": "Nenhum treino no período ainda"
 }

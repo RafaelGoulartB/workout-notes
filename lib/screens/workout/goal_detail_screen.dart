@@ -3,6 +3,8 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/repositories/goal_repository.dart';
+import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
+import 'package:workout_notes/widgets/goals/goal_contributing_workouts.dart';
 import 'package:workout_notes/widgets/goals/goal_form_sheet.dart';
 import 'package:workout_notes/widgets/goals/goal_formatters.dart';
 import 'package:workout_notes/widgets/goals/goal_progress_ring.dart';
@@ -22,6 +24,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   late Goal _goal;
   GoalProgress? _current;
   List<GoalPeriodResult> _history = [];
+  List<ContributingWorkout> _contributors = [];
   bool _isLoading = true;
   bool _isKm = true;
 
@@ -38,15 +41,23 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
       _isKm = await widget.db.settingsRepo.getIsDistanceKm();
       final repo = GoalRepository();
       final (current, history) = await repo.getProgressWithHistory(_goal, historyCount: 6);
+      final contributors = await repo.getContributingWorkouts(_goal);
       if (!mounted) return;
       setState(() {
         _current = current;
         _history = history;
+        _contributors = contributors;
         _isLoading = false;
       });
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _openWorkout(String workoutId) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => WorkoutDetailScreen(workoutId: workoutId),
+    ));
   }
 
   Future<void> _edit() async {
@@ -162,6 +173,13 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                   _buildHeader(theme, loc, color),
                   const SizedBox(height: 16),
                   _buildCurrentCard(theme, loc, color),
+                  const SizedBox(height: 12),
+                  GoalContributingWorkouts(
+                    workouts: _contributors,
+                    goal: _goal,
+                    isKm: _isKm,
+                    onTapWorkout: _openWorkout,
+                  ),
                   const SizedBox(height: 12),
                   _buildHistory(theme, loc, color),
                 ],

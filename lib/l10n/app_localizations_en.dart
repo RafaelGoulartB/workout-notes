@@ -1924,4 +1924,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get goalMotivationDone => 'Amazing! You crushed your goal!';
+
+  @override
+  String get goalContributingWorkouts => 'Workouts this period';
+
+  @override
+  String get goalNoContributors => 'No workouts in this period yet';
 }

@@ -614,5 +614,8 @@
   "goalMotivationNear": "Almost there — you got this!",
   "goalMotivationMid": "On track. Keep going!",
   "goalMotivationEarly": "Let's start! Every workout counts.",
-  "goalMotivationDone": "Amazing! You crushed your goal!"
+  "goalMotivationDone": "Amazing! You crushed your goal!",
+
+  "goalContributingWorkouts": "Workouts this period",
+  "goalNoContributors": "No workouts in this period yet"
 }

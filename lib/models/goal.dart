@@ -216,3 +216,18 @@ class GoalPeriodResult {
     return (value / targetValue).clamp(0.0, 1.5);
   }
 }
+
+/// A workout that contributed to the current period's progress.
+class ContributingWorkout {
+  final String workoutId;
+  final String date; // YYYY-MM-DD
+  final double contributedValue; // volume/distance/time in the goal's unit
+  final int setCount; // number of sets contributing (for days = 0)
+
+  const ContributingWorkout({
+    required this.workoutId,
+    required this.date,
+    required this.contributedValue,
+    required this.setCount,
+  });
+}
