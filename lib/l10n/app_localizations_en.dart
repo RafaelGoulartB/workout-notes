@@ -611,6 +611,86 @@ class AppLocalizationsEn extends AppLocalizations {
       'View detailed trends, photos, and body composition charts';
 
   @override
+  String get progressCardio => 'Cardio';
+
+  @override
+  String get progressCardioSubtitle =>
+      'Distance, pace, and cardiovascular tracking';
+
+  @override
+  String get progressCardioWeekly => 'Weekly Distance';
+
+  @override
+  String get progressCardioByModality => 'Distance by Modality';
+
+  @override
+  String get progressCardioPace => 'Pace Trend';
+
+  @override
+  String get progressCardioPRs => 'Cardio Records';
+
+  @override
+  String progressCardioTotal(Object distance) {
+    return 'Total: $distance this month';
+  }
+
+  @override
+  String progressCardioAvgPace(Object pace) {
+    return 'Avg pace: $pace';
+  }
+
+  @override
+  String get progressCardioNoData => 'No cardio workouts yet';
+
+  @override
+  String get progressCardioNoDataCta => 'Start a cardio workout';
+
+  @override
+  String get progressFilterAll => 'All';
+
+  @override
+  String get progressFilterStrength => 'Strength';
+
+  @override
+  String get progressFilterCardio => 'Cardio';
+
+  @override
+  String get progressSelectExercise => 'Select exercise';
+
+  @override
+  String get cardioLongestDistance => 'Longest Distance';
+
+  @override
+  String get cardioLongestDuration => 'Longest Duration';
+
+  @override
+  String get cardioBestPace => 'Best Pace';
+
+  @override
+  String get settingsDistanceUnit => 'Distance Unit';
+
+  @override
+  String get settingsDistanceUnitKm => 'km';
+
+  @override
+  String get settingsDistanceUnitMi => 'mi (miles)';
+
+  @override
+  String get workoutHomeCardioDistance => 'Cardio Dist.';
+
+  @override
+  String get workoutHomeCardioTime => 'Cardio Time';
+
+  @override
+  String get commonDistance => 'Distance';
+
+  @override
+  String get commonPace => 'Pace';
+
+  @override
+  String get commonTotal => 'Total';
+
+  @override
   String get progressBodyComposition => 'Body Composition Evolution';
 
   @override

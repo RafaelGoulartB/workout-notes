@@ -1214,6 +1214,156 @@ abstract class AppLocalizations {
   /// **'View detailed trends, photos, and body composition charts'**
   String get progressBodyMeasurementsSubtitle;
 
+  /// No description provided for @progressCardio.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio'**
+  String get progressCardio;
+
+  /// No description provided for @progressCardioSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance, pace, and cardiovascular tracking'**
+  String get progressCardioSubtitle;
+
+  /// No description provided for @progressCardioWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly Distance'**
+  String get progressCardioWeekly;
+
+  /// No description provided for @progressCardioByModality.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance by Modality'**
+  String get progressCardioByModality;
+
+  /// No description provided for @progressCardioPace.
+  ///
+  /// In en, this message translates to:
+  /// **'Pace Trend'**
+  String get progressCardioPace;
+
+  /// No description provided for @progressCardioPRs.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio Records'**
+  String get progressCardioPRs;
+
+  /// No description provided for @progressCardioTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total: {distance} this month'**
+  String progressCardioTotal(Object distance);
+
+  /// No description provided for @progressCardioAvgPace.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg pace: {pace}'**
+  String progressCardioAvgPace(Object pace);
+
+  /// No description provided for @progressCardioNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No cardio workouts yet'**
+  String get progressCardioNoData;
+
+  /// No description provided for @progressCardioNoDataCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a cardio workout'**
+  String get progressCardioNoDataCta;
+
+  /// No description provided for @progressFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get progressFilterAll;
+
+  /// No description provided for @progressFilterStrength.
+  ///
+  /// In en, this message translates to:
+  /// **'Strength'**
+  String get progressFilterStrength;
+
+  /// No description provided for @progressFilterCardio.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio'**
+  String get progressFilterCardio;
+
+  /// No description provided for @progressSelectExercise.
+  ///
+  /// In en, this message translates to:
+  /// **'Select exercise'**
+  String get progressSelectExercise;
+
+  /// No description provided for @cardioLongestDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Longest Distance'**
+  String get cardioLongestDistance;
+
+  /// No description provided for @cardioLongestDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Longest Duration'**
+  String get cardioLongestDuration;
+
+  /// No description provided for @cardioBestPace.
+  ///
+  /// In en, this message translates to:
+  /// **'Best Pace'**
+  String get cardioBestPace;
+
+  /// No description provided for @settingsDistanceUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance Unit'**
+  String get settingsDistanceUnit;
+
+  /// No description provided for @settingsDistanceUnitKm.
+  ///
+  /// In en, this message translates to:
+  /// **'km'**
+  String get settingsDistanceUnitKm;
+
+  /// No description provided for @settingsDistanceUnitMi.
+  ///
+  /// In en, this message translates to:
+  /// **'mi (miles)'**
+  String get settingsDistanceUnitMi;
+
+  /// No description provided for @workoutHomeCardioDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio Dist.'**
+  String get workoutHomeCardioDistance;
+
+  /// No description provided for @workoutHomeCardioTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio Time'**
+  String get workoutHomeCardioTime;
+
+  /// No description provided for @commonDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance'**
+  String get commonDistance;
+
+  /// No description provided for @commonPace.
+  ///
+  /// In en, this message translates to:
+  /// **'Pace'**
+  String get commonPace;
+
+  /// No description provided for @commonTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get commonTotal;
+
   /// No description provided for @progressBodyComposition.
   ///
   /// In en, this message translates to:

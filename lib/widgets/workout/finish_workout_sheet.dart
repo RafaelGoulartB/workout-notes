@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/widgets/workout/stat_tile.dart';
+import 'package:workout_notes/utils/pace_calculator.dart';
 
 /// Summary data class for finished workout.
 class WorkoutSummary {
@@ -9,13 +10,17 @@ class WorkoutSummary {
   final int totalSets;
   final int completedSets;
   final List<PR> prs;
+  final double totalDistance;
+  final int totalCardioTime;
 
   const WorkoutSummary({
     required this.durationSeconds,
     required this.totalVolume,
     required this.totalSets,
     required this.completedSets,
-    required this.prs,
+    this.prs = const [],
+    this.totalDistance = 0,
+    this.totalCardioTime = 0,
   });
 
   String get formattedDuration {
@@ -37,6 +42,20 @@ class WorkoutSummary {
       return '${(totalVolume / 1000).toStringAsFixed(1)}k';
     }
     return totalVolume.toStringAsFixed(0);
+  }
+
+  String get formattedDistance {
+    if (totalDistance <= 0) return '--';
+    return '${totalDistance.toStringAsFixed(1)} km';
+  }
+
+  String get formattedCardioTime {
+    if (totalCardioTime <= 0) return '--';
+    final min = totalCardioTime ~/ 60;
+    if (min >= 60) {
+      return '${min ~/ 60}h${min % 60}min';
+    }
+    return '${min}min';
   }
 }
 
@@ -60,6 +79,21 @@ class PR {
 
   IconData get icon =>
       type == 'weight' ? Icons.emoji_events : Icons.inventory_2;
+}
+
+/// Cardio bests data class for tracking distance/pace PRs.
+class CardioBests {
+  final String name;
+  final double distance;
+  final int timeSeconds;
+
+  const CardioBests({
+    required this.name,
+    required this.distance,
+    required this.timeSeconds,
+  });
+
+  double get paceSeconds => distance > 0 ? timeSeconds / distance : 0;
 }
 
 /// Exercise bests data class.
@@ -251,21 +285,56 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
             // Progress bar
             if (s.totalSets > 0)
               Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    24, 12, 24, 0),
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(
                     value: completedPct,
                     minHeight: 8,
-                    backgroundColor: theme
-                        .colorScheme.surfaceContainerHighest,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
                     color: completedPct >= 1.0
                         ? Colors.green
                         : theme.colorScheme.primary,
                   ),
                 ),
               ),
+
+            // Cardio stats - only show if there's cardio data
+            if (s.totalDistance > 0 || s.totalCardioTime > 0) ...[
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: [
+                    StatTile(
+                      icon: Icons.map,
+                      label: AppLocalizations.of(context)!.workoutHomeCardioDistance,
+                      value: s.formattedDistance,
+                      color: const Color(0xFF6D4C41),
+                      theme: theme,
+                    ),
+                    const SizedBox(width: 8),
+                    StatTile(
+                      icon: Icons.timer_outlined,
+                      label: AppLocalizations.of(context)!.workoutHomeCardioTime,
+                      value: s.formattedCardioTime,
+                      color: Colors.deepOrange,
+                      theme: theme,
+                    ),
+                    if (s.totalDistance > 0 && s.totalCardioTime > 0) ...[
+                      const SizedBox(width: 8),
+                      StatTile(
+                        icon: Icons.speed,
+                        label: AppLocalizations.of(context)!.commonPace,
+                        value: PaceCalculator.formatPace(s.totalCardioTime / s.totalDistance),
+                        color: Colors.brown,
+                        theme: theme,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
 
             // ── PRs Section ──
             if (s.prs.isNotEmpty) ...[

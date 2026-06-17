@@ -613,6 +613,86 @@ class AppLocalizationsPt extends AppLocalizations {
       'Veja tendências detalhadas, fotos e gráficos de composição corporal';
 
   @override
+  String get progressCardio => 'Cardio';
+
+  @override
+  String get progressCardioSubtitle =>
+      'Distância, pace e acompanhamento cardiovascular';
+
+  @override
+  String get progressCardioWeekly => 'Distância Semanal';
+
+  @override
+  String get progressCardioByModality => 'Distância por Modalidade';
+
+  @override
+  String get progressCardioPace => 'Tendência de Pace';
+
+  @override
+  String get progressCardioPRs => 'Recordes de Cardio';
+
+  @override
+  String progressCardioTotal(Object distance) {
+    return 'Total: $distance neste mês';
+  }
+
+  @override
+  String progressCardioAvgPace(Object pace) {
+    return 'Pace médio: $pace';
+  }
+
+  @override
+  String get progressCardioNoData => 'Nenhum treino cardio ainda';
+
+  @override
+  String get progressCardioNoDataCta => 'Iniciar treino cardio';
+
+  @override
+  String get progressFilterAll => 'Todos';
+
+  @override
+  String get progressFilterStrength => 'Força';
+
+  @override
+  String get progressFilterCardio => 'Cardio';
+
+  @override
+  String get progressSelectExercise => 'Selecione o exercício';
+
+  @override
+  String get cardioLongestDistance => 'Maior Distância';
+
+  @override
+  String get cardioLongestDuration => 'Maior Duração';
+
+  @override
+  String get cardioBestPace => 'Melhor Pace';
+
+  @override
+  String get settingsDistanceUnit => 'Unidade de Distância';
+
+  @override
+  String get settingsDistanceUnitKm => 'km';
+
+  @override
+  String get settingsDistanceUnitMi => 'mi (milhas)';
+
+  @override
+  String get workoutHomeCardioDistance => 'Dist. Cardio';
+
+  @override
+  String get workoutHomeCardioTime => 'Tempo Cardio';
+
+  @override
+  String get commonDistance => 'Distância';
+
+  @override
+  String get commonPace => 'Pace';
+
+  @override
+  String get commonTotal => 'Total';
+
+  @override
   String get progressBodyComposition => 'Evolução da Composição Corporal';
 
   @override

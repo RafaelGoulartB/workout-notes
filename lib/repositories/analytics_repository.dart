@@ -524,4 +524,143 @@ class AnalyticsRepository extends BaseRepository {
       'current_streak': currentStreak,
     };
   }
+
+  // ===================================================================
+  // CARDIO STATS
+  // ===================================================================
+
+  /// Weekly cardio distance grouped by modality (running, cycling, etc.)
+  Future<List<Map<String, dynamic>>> getCardioWeeklyDistance({int weeks = 12}) async {
+    final db = await this.db;
+    final start = DateTime.now().subtract(Duration(days: weeks * 7))
+        .toIso8601String().substring(0, 10);
+    return db.rawQuery('''
+      SELECT w.date,
+        ec.name as modality, ec.color as modality_color,
+        s.distance, s.time_seconds, w.id as workout_id,
+        e.name as exercise_name, e.id as exercise_id
+      FROM sets s
+      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+      JOIN exercises e ON ee.exercise_id = e.id
+      JOIN exercise_categories ec ON e.category_id = ec.id
+      JOIN workouts w ON ee.workout_id = w.id
+      WHERE ec.energy_system = 'aerobic' AND s.is_warmup = 0
+        AND s.distance IS NOT NULL AND s.distance > 0
+        AND w.date >= ?
+      ORDER BY w.date ASC
+    ''', [start]);
+  }
+
+  /// Monthly cardio stats (distance, time, sessions) by modality.
+  Future<List<Map<String, dynamic>>> getCardioMonthlyDistance({int months = 6}) async {
+    final db = await this.db;
+    final start = DateTime.now().subtract(Duration(days: months * 31))
+        .toIso8601String().substring(0, 10);
+    return db.rawQuery('''
+      SELECT substr(w.date, 1, 7) as month,
+        ec.name as modality, ec.color as modality_color,
+        SUM(s.distance) as total_distance,
+        SUM(s.time_seconds) as total_time,
+        COUNT(DISTINCT w.id) as sessions
+      FROM sets s
+      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+      JOIN exercises e ON ee.exercise_id = e.id
+      JOIN exercise_categories ec ON e.category_id = ec.id
+      JOIN workouts w ON ee.workout_id = w.id
+      WHERE ec.energy_system = 'aerobic' AND s.is_warmup = 0
+        AND s.distance IS NOT NULL AND s.distance > 0
+        AND w.date >= ?
+      GROUP BY month, ec.id
+      ORDER BY month ASC
+    ''', [start]);
+  }
+
+  /// Total distance grouped by modality (for pie chart).
+  Future<List<Map<String, dynamic>>> getCardioDistanceByModality() async {
+    final db = await this.db;
+    return db.rawQuery('''
+      SELECT ec.id, ec.name as modality, ec.color as modality_color,
+        COALESCE(SUM(s.distance), 0) as total_distance,
+        COUNT(s.id) as sets_count
+      FROM exercise_categories ec
+      JOIN exercises e ON e.category_id = ec.id
+      JOIN exercise_entries ee ON ee.exercise_id = e.id
+      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      WHERE ec.energy_system = 'aerobic' AND s.distance IS NOT NULL AND s.distance > 0
+      GROUP BY ec.id
+      ORDER BY total_distance DESC
+    ''');
+  }
+
+  /// Pace trend (distance + time per session) for a specific cardio exercise.
+  Future<List<Map<String, dynamic>>> getPaceTrend(String exerciseId, {int limit = 30}) async {
+    final db = await this.db;
+    return db.rawQuery('''
+      SELECT w.date,
+        SUM(s.distance) as total_distance,
+        SUM(s.time_seconds) as total_time,
+        COUNT(s.id) as sets_count
+      FROM sets s
+      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+      JOIN workouts w ON ee.workout_id = w.id
+      WHERE ee.exercise_id = ? AND s.is_warmup = 0
+        AND s.distance IS NOT NULL AND s.distance > 0
+        AND s.time_seconds IS NOT NULL AND s.time_seconds > 0
+      GROUP BY w.id
+      ORDER BY w.date ASC
+      LIMIT ?
+    ''', [exerciseId, limit]);
+  }
+
+  /// Cardio personal records: best distance, best pace, longest duration per exercise.
+  Future<List<Map<String, dynamic>>> getCardioPRs({int limit = 20}) async {
+    final db = await this.db;
+    return db.rawQuery('''
+      SELECT e.id as exercise_id, e.name as exercise_name,
+        ec.name as modality, ec.color as modality_color,
+        MAX(s.distance) as best_distance,
+        MAX(s.time_seconds) as best_time,
+        MIN(CAST(s.time_seconds AS REAL) / NULLIF(s.distance, 0)) as best_pace
+      FROM exercises e
+      JOIN exercise_categories ec ON e.category_id = ec.id
+      JOIN exercise_entries ee ON ee.exercise_id = e.id
+      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      WHERE ec.energy_system = 'aerobic'
+        AND s.distance IS NOT NULL AND s.distance > 0
+      GROUP BY e.id
+      HAVING best_distance > 0
+      ORDER BY best_distance DESC
+      LIMIT ?
+    ''', [limit]);
+  }
+
+  /// Overall cardio stats for a given month.
+  Future<Map<String, dynamic>> getMonthlyCardioStats(int year, int month) async {
+    final db = await this.db;
+    final monthStr = '$year-${month.toString().padLeft(2, '0')}';
+    final row = await db.rawQuery('''
+      SELECT
+        COALESCE(SUM(s.distance), 0) as total_distance,
+        COALESCE(SUM(s.time_seconds), 0) as total_time,
+        COUNT(DISTINCT w.id) as cardio_sessions,
+        COUNT(s.id) as cardio_sets
+      FROM sets s
+      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+      JOIN exercises e ON ee.exercise_id = e.id
+      JOIN exercise_categories ec ON e.category_id = ec.id
+      JOIN workouts w ON ee.workout_id = w.id
+      WHERE ec.energy_system = 'aerobic' AND s.is_warmup = 0
+        AND w.date LIKE ? AND s.distance IS NOT NULL AND s.distance > 0
+    ''', ['$monthStr%']);
+
+    if (row.isEmpty) {
+      return {'total_distance': 0.0, 'total_time': 0, 'cardio_sessions': 0, 'cardio_sets': 0};
+    }
+    return {
+      'total_distance': (row.first['total_distance'] as num?)?.toDouble() ?? 0,
+      'total_time': (row.first['total_time'] as int?) ?? 0,
+      'cardio_sessions': (row.first['cardio_sessions'] as int?) ?? 0,
+      'cardio_sets': (row.first['cardio_sets'] as int?) ?? 0,
+    };
+  }
 }
