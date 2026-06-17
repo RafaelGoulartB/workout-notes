@@ -8,13 +8,13 @@ class GoalRepository extends BaseRepository {
   // CRUD
   // ===================================================================
 
-  Future<List<Goal>> getAll({bool activeOnly = true}) async {
+  Future<List<Goal>> getAll({bool activeOnly = false}) async {
     final db = await this.db;
     final where = activeOnly ? 'is_active = 1' : null;
     final rows = await db.query(
       'user_goals',
       where: where,
-      orderBy: 'created_at DESC',
+      orderBy: 'is_active DESC, created_at DESC',
     );
     return rows.map(Goal.fromMap).toList();
   }

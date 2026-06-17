@@ -82,7 +82,7 @@ class GoalCard extends StatelessWidget {
         onLongPress: () => _showContextMenu(context),
         borderRadius: BorderRadius.circular(20),
         child: Opacity(
-          opacity: isPaused ? 0.6 : 1.0,
+          opacity: isPaused ? 0.75 : 1.0,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: Container(
