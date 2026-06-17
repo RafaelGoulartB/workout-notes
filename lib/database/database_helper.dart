@@ -12,7 +12,7 @@ import '../repositories/goal_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 13;
+  static const _dbVersion = 14;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -499,6 +499,15 @@ class DatabaseHelper {
             color INTEGER
           )
         ''');
+      } catch (_) {}
+    }
+    if (oldVersion < 14) {
+      // Update cardio category color to red (was brown in earlier seeds).
+      try {
+        await db.rawUpdate(
+          'UPDATE exercise_categories SET color = ? WHERE id = ?',
+          [0xFFE53935, 'cardio'],
+        );
       } catch (_) {}
     }
   }
