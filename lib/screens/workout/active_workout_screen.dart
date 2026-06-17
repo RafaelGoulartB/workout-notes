@@ -415,19 +415,19 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF6D4C41).withAlpha(15),
+          color: const Color(0xFFE53935).withAlpha(15),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.speed, size: 16, color: const Color(0xFF6D4C41)),
+            Icon(Icons.speed, size: 16, color: const Color(0xFFE53935)),
             const SizedBox(width: 6),
             Text(
               'Pace: $minutes:${seconds.toString().padLeft(2, '0')} /km',
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
-                color: const Color(0xFF6D4C41),
+                color: const Color(0xFFE53935),
               ),
             ),
           ],

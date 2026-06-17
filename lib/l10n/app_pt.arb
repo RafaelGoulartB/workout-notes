@@ -431,6 +431,7 @@
   "workoutDetailContinue": "Continuar Treino",
   "workoutDetailDelete": "Excluir Treino",
   "workoutDetailDeleteConfirm": "Excluir Treino?",
+  "workoutDetailEdit": "Editar Treino",
   "workoutDetailEditDate": "Alterar Data",
   "workoutDetailShare": "Compartilhar",
   "workoutDetailNoSets": "Nenhuma série",
@@ -542,5 +543,23 @@
 
   "reorderHint": "Pressione e segure um exercício para reordenar",
   "reorderMovedToTop": "Movido para o topo",
-  "reorderMovedToBottom": "Movido para o final"
+  "reorderMovedToBottom": "Movido para o final",
+
+  "editWorkoutTitle": "Editar Treino",
+  "editWorkoutDateTime": "Data e Horário",
+  "editWorkoutStart": "Início",
+  "editWorkoutEnd": "Fim",
+  "editWorkoutDuration": "Duração",
+  "editWorkoutChangeDate": "Alterar Data",
+  "editWorkoutChangeStart": "Alterar horário de início",
+  "editWorkoutChangeEnd": "Alterar horário de fim",
+  "editWorkoutChangeStartDate": "Alterar data e horário de início",
+  "editWorkoutChangeEndDate": "Alterar data e horário de fim",
+  "editWorkoutSelectDate": "Selecione a data",
+  "editWorkoutSelectTime": "Selecione o horário",
+  "editWorkoutEndAfterStart": "O horário de fim deve ser depois do início",
+  "editWorkoutInvalidRange": "Intervalo de datas inválido",
+  "editWorkoutSaved": "Treino atualizado",
+  "editWorkoutReorderHint": "Pressione e segure um exercício para reordenar",
+  "editWorkoutAddExercise": "Adicionar Exercício"
 }

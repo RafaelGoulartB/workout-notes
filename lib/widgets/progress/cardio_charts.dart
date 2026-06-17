@@ -24,7 +24,7 @@ class CardioHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
-    final cardioColor = const Color(0xFF6D4C41);
+    final cardioColor = const Color(0xFFE53935);
 
     final timeStr = totalTimeSeconds >= 3600
         ? '${totalTimeSeconds ~/ 3600}h${(totalTimeSeconds % 3600) ~/ 60}min'
@@ -120,7 +120,7 @@ class WeeklyDistanceChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
-    final cardioColor = const Color(0xFF6D4C41);
+    final cardioColor = const Color(0xFFE53935);
 
     if (data.isEmpty) return const SizedBox.shrink();
 
@@ -317,7 +317,7 @@ class DistanceByModalityChart extends StatelessWidget {
                           final d = entry.value;
                           final dist = (d['total_distance'] as num?)?.toDouble() ?? 0;
                           final pct = totalDist > 0 ? dist / totalDist : 0.0;
-                          final color = Color(d['modality_color'] as int? ?? 0xFF6D4C41);
+                          final color = Color(d['modality_color'] as int? ?? 0xFFE53935);
                           return PieChartSectionData(
                             value: dist,
                             color: color,
@@ -340,7 +340,7 @@ class DistanceByModalityChart extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: valid.map((d) {
                         final dist = (d['total_distance'] as num?)?.toDouble() ?? 0;
-                        final color = Color(d['modality_color'] as int? ?? 0xFF6D4C41);
+                        final color = Color(d['modality_color'] as int? ?? 0xFFE53935);
                         final name = ExerciseLocaleHelper.categoryNameFromId(
                           AppLocalizations.of(context)!,
                           d['id'] as String? ?? '',
@@ -551,20 +551,20 @@ class _PaceTrendChartState extends State<PaceTrendChart> {
             LineChartBarData(
               spots: paces.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value)).toList(),
               isCurved: true,
-              color: const Color(0xFF6D4C41),
+              color: const Color(0xFFE53935),
               barWidth: 2.5,
               dotData: FlDotData(
                 show: true,
                 getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
                   radius: 3,
-                  color: const Color(0xFF6D4C41),
+                  color: const Color(0xFFE53935),
                   strokeWidth: 1,
                   strokeColor: Colors.white,
                 ),
               ),
               belowBarData: BarAreaData(
                 show: true,
-                color: const Color(0xFF6D4C41).withAlpha(25),
+                color: const Color(0xFFE53935).withAlpha(25),
               ),
             ),
           ],
@@ -585,7 +585,7 @@ class CardioPRsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
-    final cardioColor = const Color(0xFF6D4C41);
+    final cardioColor = const Color(0xFFE53935);
 
     return Card(
       elevation: 0,
@@ -630,7 +630,7 @@ class CardioPRsCard extends StatelessWidget {
                 final bestDist = (pr['best_distance'] as num?)?.toDouble() ?? 0;
                 final bestTime = (pr['best_time'] as int?) ?? 0;
                 final bestPace = (pr['best_pace'] as num?)?.toDouble();
-                final modalityColor = Color(pr['modality_color'] as int? ?? 0xFF6D4C41);
+                final modalityColor = Color(pr['modality_color'] as int? ?? 0xFFE53935);
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 6),

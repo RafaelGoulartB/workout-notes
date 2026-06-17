@@ -310,7 +310,7 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
                       icon: Icons.map,
                       label: AppLocalizations.of(context)!.workoutHomeCardioDistance,
                       value: s.formattedDistance,
-                      color: const Color(0xFF6D4C41),
+                      color: const Color(0xFFE53935),
                       theme: theme,
                     ),
                     const SizedBox(width: 8),

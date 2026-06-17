@@ -479,7 +479,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                       label: loc.workoutHomeCardioDistance,
                       value: _formatDistance(_monthCardioDistance),
                       icon: Icons.map,
-                      color: const Color(0xFF6D4C41),
+                      color: const Color(0xFFE53935),
                       theme: theme,
                     ),
                   ),

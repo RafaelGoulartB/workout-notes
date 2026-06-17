@@ -383,6 +383,33 @@ class WorkoutRepository extends BaseRepository {
     }, where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Persists user-edited start/end timestamps for a completed workout and
+  /// recomputes the cached `duration_seconds`. Any in-progress pause state
+  /// is cleared so the new times are not double-counted.
+  Future<void> updateWorkoutTimes(
+    String id, {
+    required DateTime? startTime,
+    required DateTime? endTime,
+  }) async {
+    final db = await this.db;
+    int? duration;
+    if (startTime != null && endTime != null) {
+      final diff = endTime.difference(startTime).inSeconds;
+      duration = diff > 0 ? diff : 0;
+    }
+    await db.update(
+      'workouts',
+      {
+        'start_time': startTime?.toIso8601String(),
+        'end_time': endTime?.toIso8601String(),
+        'duration_seconds': duration,
+        'pause_start_time': null,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<void> resetWorkoutToInProgress(String id) async {
     final db = await this.db;
     await db.update('workouts', {

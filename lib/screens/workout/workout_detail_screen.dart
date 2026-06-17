@@ -6,6 +6,7 @@ import '../../repositories/workout_repository.dart';
 import '../../services/export_service.dart';
 import 'exercise_detail_tabs_screen.dart';
 import 'active_workout_screen.dart';
+import 'edit_workout_screen.dart';
 
 class WorkoutDetailScreen extends StatefulWidget {
   final String workoutId;
@@ -84,6 +85,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
               PopupMenuItem(value: 'continue', child: Row(
                 children: [Icon(Icons.play_arrow, size: 18, color: Colors.green), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailContinue, style: TextStyle(color: Colors.green))],
               )),
+              PopupMenuItem(value: 'edit', child: Row(
+                children: [Icon(Icons.edit_outlined, size: 18), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailEdit)],
+              )),
               PopupMenuItem(value: 'edit_date', child: Row(
                 children: [Icon(Icons.calendar_today, size: 18), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailEditDate)],
               )),
@@ -96,6 +100,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
             ],
             onSelected: (v) {
               if (v == 'continue') _continueWorkout();
+              if (v == 'edit') _editWorkout();
               if (v == 'edit_date') _editDate();
               if (v == 'copy') _copyWorkout();
               if (v == 'delete') _deleteWorkout();
@@ -369,6 +374,27 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AppLocalizations.of(context)!.workoutDetailDateChanged), behavior: SnackBarBehavior.floating),
+        );
+      }
+    }
+  }
+
+  Future<void> _editWorkout() async {
+    final loc = AppLocalizations.of(context)!;
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditWorkoutScreen(workoutId: widget.workoutId),
+      ),
+    );
+    if (result == true) {
+      _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.editWorkoutSaved),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }

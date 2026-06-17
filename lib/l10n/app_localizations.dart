@@ -2552,6 +2552,12 @@ abstract class AppLocalizations {
   /// **'Delete Workout?'**
   String get workoutDetailDeleteConfirm;
 
+  /// No description provided for @workoutDetailEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Workout'**
+  String get workoutDetailEdit;
+
   /// No description provided for @workoutDetailEditDate.
   ///
   /// In en, this message translates to:
@@ -3197,6 +3203,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Moved to bottom'**
   String get reorderMovedToBottom;
+
+  /// No description provided for @editWorkoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Workout'**
+  String get editWorkoutTitle;
+
+  /// No description provided for @editWorkoutDateTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Date and Time'**
+  String get editWorkoutDateTime;
+
+  /// No description provided for @editWorkoutStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get editWorkoutStart;
+
+  /// No description provided for @editWorkoutEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get editWorkoutEnd;
+
+  /// No description provided for @editWorkoutDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get editWorkoutDuration;
+
+  /// No description provided for @editWorkoutChangeDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Date'**
+  String get editWorkoutChangeDate;
+
+  /// No description provided for @editWorkoutChangeStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Change start time'**
+  String get editWorkoutChangeStart;
+
+  /// No description provided for @editWorkoutChangeEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Change end time'**
+  String get editWorkoutChangeEnd;
+
+  /// No description provided for @editWorkoutChangeStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Change start date and time'**
+  String get editWorkoutChangeStartDate;
+
+  /// No description provided for @editWorkoutChangeEndDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Change end date and time'**
+  String get editWorkoutChangeEndDate;
+
+  /// No description provided for @editWorkoutSelectDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select date'**
+  String get editWorkoutSelectDate;
+
+  /// No description provided for @editWorkoutSelectTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Select time'**
+  String get editWorkoutSelectTime;
+
+  /// No description provided for @editWorkoutEndAfterStart.
+  ///
+  /// In en, this message translates to:
+  /// **'End time must be after start time'**
+  String get editWorkoutEndAfterStart;
+
+  /// No description provided for @editWorkoutInvalidRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid date range'**
+  String get editWorkoutInvalidRange;
+
+  /// No description provided for @editWorkoutSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Workout updated'**
+  String get editWorkoutSaved;
+
+  /// No description provided for @editWorkoutReorderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Press and hold an exercise to reorder'**
+  String get editWorkoutReorderHint;
+
+  /// No description provided for @editWorkoutAddExercise.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Exercise'**
+  String get editWorkoutAddExercise;
 }
 
 class _AppLocalizationsDelegate

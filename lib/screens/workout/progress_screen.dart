@@ -393,7 +393,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
           CollapsibleSection(
             title: AppLocalizations.of(context)!.progressCardio,
             icon: Icons.directions_run,
-            iconColor: const Color(0xFF6D4C41),
+            iconColor: const Color(0xFFE53935),
             onExpanded: _loadCardio,
             child: _buildCardioContent(theme),
           ),
@@ -522,7 +522,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
                 label: AppLocalizations.of(context)!.workoutHomeCardioDistance,
                 value: PaceCalculator.formatDistance(cardioDist),
                 icon: Icons.map,
-                color: const Color(0xFF6D4C41),
+                color: const Color(0xFFE53935),
               ),
             ),
             const SizedBox(width: 6),

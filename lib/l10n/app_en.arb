@@ -430,6 +430,7 @@
   "workoutDetailContinue": "Continue Workout",
   "workoutDetailDelete": "Delete Workout",
   "workoutDetailDeleteConfirm": "Delete Workout?",
+  "workoutDetailEdit": "Edit Workout",
   "workoutDetailEditDate": "Change Date",
   "workoutDetailShare": "Share",
   "workoutDetailNoSets": "No sets",
@@ -541,5 +542,23 @@
 
   "reorderHint": "Press and hold an exercise to reorder",
   "reorderMovedToTop": "Moved to top",
-  "reorderMovedToBottom": "Moved to bottom"
+  "reorderMovedToBottom": "Moved to bottom",
+
+  "editWorkoutTitle": "Edit Workout",
+  "editWorkoutDateTime": "Date and Time",
+  "editWorkoutStart": "Start",
+  "editWorkoutEnd": "End",
+  "editWorkoutDuration": "Duration",
+  "editWorkoutChangeDate": "Change Date",
+  "editWorkoutChangeStart": "Change start time",
+  "editWorkoutChangeEnd": "Change end time",
+  "editWorkoutChangeStartDate": "Change start date and time",
+  "editWorkoutChangeEndDate": "Change end date and time",
+  "editWorkoutSelectDate": "Select date",
+  "editWorkoutSelectTime": "Select time",
+  "editWorkoutEndAfterStart": "End time must be after start time",
+  "editWorkoutInvalidRange": "Invalid date range",
+  "editWorkoutSaved": "Workout updated",
+  "editWorkoutReorderHint": "Press and hold an exercise to reorder",
+  "editWorkoutAddExercise": "Add Exercise"
 }

@@ -1321,6 +1321,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workoutDetailDeleteConfirm => 'Delete Workout?';
 
   @override
+  String get workoutDetailEdit => 'Edit Workout';
+
+  @override
   String get workoutDetailEditDate => 'Change Date';
 
   @override
@@ -1688,4 +1691,55 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reorderMovedToBottom => 'Moved to bottom';
+
+  @override
+  String get editWorkoutTitle => 'Edit Workout';
+
+  @override
+  String get editWorkoutDateTime => 'Date and Time';
+
+  @override
+  String get editWorkoutStart => 'Start';
+
+  @override
+  String get editWorkoutEnd => 'End';
+
+  @override
+  String get editWorkoutDuration => 'Duration';
+
+  @override
+  String get editWorkoutChangeDate => 'Change Date';
+
+  @override
+  String get editWorkoutChangeStart => 'Change start time';
+
+  @override
+  String get editWorkoutChangeEnd => 'Change end time';
+
+  @override
+  String get editWorkoutChangeStartDate => 'Change start date and time';
+
+  @override
+  String get editWorkoutChangeEndDate => 'Change end date and time';
+
+  @override
+  String get editWorkoutSelectDate => 'Select date';
+
+  @override
+  String get editWorkoutSelectTime => 'Select time';
+
+  @override
+  String get editWorkoutEndAfterStart => 'End time must be after start time';
+
+  @override
+  String get editWorkoutInvalidRange => 'Invalid date range';
+
+  @override
+  String get editWorkoutSaved => 'Workout updated';
+
+  @override
+  String get editWorkoutReorderHint => 'Press and hold an exercise to reorder';
+
+  @override
+  String get editWorkoutAddExercise => 'Add Exercise';
 }
