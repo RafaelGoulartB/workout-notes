@@ -1751,4 +1751,187 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get editWorkoutAddExercise => 'Adicionar Exercício';
+
+  @override
+  String get progressGoals => 'Metas';
+
+  @override
+  String get progressGoalsSubtitle =>
+      'Acompanhe e supere seus desafios pessoais';
+
+  @override
+  String get goalScopeAnaerobic => 'Força';
+
+  @override
+  String get goalScopeAerobic => 'Cardio';
+
+  @override
+  String get goalMetricVolume => 'Volume';
+
+  @override
+  String get goalMetricDays => 'Dias';
+
+  @override
+  String get goalMetricDistance => 'Distância';
+
+  @override
+  String get goalMetricTime => 'Tempo';
+
+  @override
+  String get goalPeriodWeekly => 'Semanal';
+
+  @override
+  String get goalPeriodMonthly => 'Mensal';
+
+  @override
+  String get goalCreateTitle => 'Nova Meta';
+
+  @override
+  String get goalEditTitle => 'Editar Meta';
+
+  @override
+  String get goalLabelTitle => 'Título (opcional)';
+
+  @override
+  String get goalTitleHint => 'Ex: Mês de hipertrofia';
+
+  @override
+  String get goalChooseMetric => 'Escolha a métrica';
+
+  @override
+  String get goalChoosePeriod => 'Periodicidade';
+
+  @override
+  String get goalTargetValue => 'Valor alvo';
+
+  @override
+  String get goalTargetHint => 'Valor numérico';
+
+  @override
+  String get goalCurrentProgress => 'Progresso atual';
+
+  @override
+  String goalDaysRemaining(num days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days dias restantes',
+      one: '1 dia restante',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get goalCompleted => 'Meta atingida! 🎉';
+
+  @override
+  String get goalKeepGoing => 'Continue firme!';
+
+  @override
+  String get goalHistory => 'Histórico';
+
+  @override
+  String get goalEmpty => 'Nenhuma meta criada';
+
+  @override
+  String get goalEmptySubtitle => 'Toque em + para criar sua primeira meta';
+
+  @override
+  String get goalDelete => 'Excluir meta';
+
+  @override
+  String get goalDeleteConfirm => 'Excluir esta meta?';
+
+  @override
+  String get goalDeleteMessage => 'Esta ação não pode ser desfeita.';
+
+  @override
+  String get goalPaused => 'Pausada';
+
+  @override
+  String get goalPausedBadge => 'PAUSADA';
+
+  @override
+  String goalAchievementRate(Object rate) {
+    return '$rate% de sucesso';
+  }
+
+  @override
+  String get goalGridAdd => 'Adicionar meta';
+
+  @override
+  String goalSuggestedTarget(Object value) {
+    return 'Sugerido: $value';
+  }
+
+  @override
+  String get goalPickScope => 'Sistema Energético';
+
+  @override
+  String get goalPickScopeSubtitle => 'Força ou Cardio?';
+
+  @override
+  String get goalStep1 => 'Escopo';
+
+  @override
+  String get goalStep2 => 'Métrica';
+
+  @override
+  String get goalStep3 => 'Detalhe';
+
+  @override
+  String get goalNoHistory => 'Sem períodos anteriores';
+
+  @override
+  String get goalNoHistoryHint =>
+      'O histórico aparecerá após o primeiro ciclo ser concluído';
+
+  @override
+  String get goalResume => 'Retomar';
+
+  @override
+  String get goalPause => 'Pausar';
+
+  @override
+  String get goalSaved => 'Meta salva';
+
+  @override
+  String get goalDeleted => 'Meta excluída';
+
+  @override
+  String goalValueVolumeKg(Object value) {
+    return '$value kg';
+  }
+
+  @override
+  String goalValueDistance(Object value) {
+    return '$value km';
+  }
+
+  @override
+  String goalValueTime(Object value) {
+    return '$value';
+  }
+
+  @override
+  String goalValueDays(Object value) {
+    return '$value dias';
+  }
+
+  @override
+  String goalValueDaysShort(Object value) {
+    return '${value}d';
+  }
+
+  @override
+  String get goalMotivationNear => 'Falta pouco — você consegue!';
+
+  @override
+  String get goalMotivationMid => 'No ritmo certo. Continue!';
+
+  @override
+  String get goalMotivationEarly => 'Vamos começar! Cada treino conta.';
+
+  @override
+  String get goalMotivationDone => 'Incrível! Você bateu a meta!';
 }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/analytics_repository.dart';
 import 'package:workout_notes/repositories/exercise_repository.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/utils/pace_calculator.dart';
 import 'package:workout_notes/widgets/collapsible_section.dart';
+import 'package:workout_notes/widgets/goals/goals_section.dart';
 import 'package:workout_notes/widgets/progress/monthly_report_card.dart';
 import 'package:workout_notes/widgets/progress/monthly_volume_chart.dart';
 import 'package:workout_notes/widgets/progress/progress_stat_cards.dart';
@@ -52,6 +54,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   bool _loadedRecovery = false;
   bool _loadedBody = false;
   bool _loadedCardio = false;
+  bool _loadedMonthlyVolume = false;
 
   // === FREQUENCY DATA ===
   Map<String, int> _heatmapData = {};
@@ -242,6 +245,18 @@ class _ProgressScreenState extends State<ProgressScreen> {
     }
   }
 
+  Future<void> _loadMonthlyVolume() async {
+    if (_loadedMonthlyVolume) return;
+    try {
+      _monthlyVolume = await _analytics.getMonthlyVolume();
+      if (!mounted) return;
+      _loadedMonthlyVolume = true;
+      setState(() {});
+    } catch (_) {
+      // Silent: keep the empty list and don't crash.
+    }
+  }
+
   Future<void> _loadCardio() async {
     if (_loadedCardio) return;
     setState(() => _isLoadingCardio = true);
@@ -372,13 +387,24 @@ class _ProgressScreenState extends State<ProgressScreen> {
           _buildStatsRow(theme),
           const SizedBox(height: 8),
 
-          // Monthly volume chart
-          if (_monthlyVolume.isNotEmpty) ...[
-            MonthlyVolumeChart(data: _monthlyVolume),
-            const SizedBox(height: 4),
-          ],
+          // === Goals (always visible, no collapsible) ===
+          _buildGoalsHeader(theme),
+          const SizedBox(height: 8),
+          GoalsSection(
+            db: DatabaseHelper.instance,
+            settingsRepo: DatabaseHelper.instance.settingsRepo,
+          ),
 
           // === Collapsible Sections (lazy loaded on expand) ===
+          _buildDivider(theme),
+          CollapsibleSection(
+            title: AppLocalizations.of(context)!.progressVolumeByMonth,
+            icon: Icons.bar_chart,
+            iconColor: theme.colorScheme.primary,
+            onExpanded: _loadMonthlyVolume,
+            child: _buildMonthlyVolumeContent(theme),
+          ),
+
           _buildDivider(theme),
           CollapsibleSection(
             title: AppLocalizations.of(context)!.progressFrequency,
@@ -552,6 +578,68 @@ class _ProgressScreenState extends State<ProgressScreen> {
       workoutDates: _workoutDates,
       year: DateTime.now().year,
     );
+  }
+
+  // ===================== GOALS HEADER (no collapsible) =====================
+
+  Widget _buildGoalsHeader(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.deepPurple.withAlpha(25),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(Icons.flag, size: 18, color: Colors.deepPurple),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          loc.progressGoals.toUpperCase(),
+          style: theme.textTheme.labelSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            loc.progressGoalsSubtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 11,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===================== MONTHLY VOLUME CONTENT =====================
+
+  Widget _buildMonthlyVolumeContent(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
+    if (!_loadedMonthlyVolume) {
+      // First time opened: trigger lazy load and show loading.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadMonthlyVolume());
+      return _sectionLoading(theme);
+    }
+    if (_monthlyVolume.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Text(
+          loc.progressNoData,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      );
+    }
+    return MonthlyVolumeChart(data: _monthlyVolume);
   }
 
   // ===================== CARDIO CONTENT =====================

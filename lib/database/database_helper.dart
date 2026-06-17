@@ -8,10 +8,11 @@ import '../repositories/routine_repository.dart';
 import '../repositories/body_measurement_repository.dart';
 import '../repositories/analytics_repository.dart';
 import '../repositories/export_import_repository.dart';
+import '../repositories/goal_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 12;
+  static const _dbVersion = 13;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -24,6 +25,7 @@ class DatabaseHelper {
   late final BodyMeasurementRepository bodyMeasurementRepo = BodyMeasurementRepository();
   late final AnalyticsRepository analyticsRepo = AnalyticsRepository();
   late final ExportImportRepository exportImportRepo = ExportImportRepository();
+  late final GoalRepository goalRepo = GoalRepository();
 
   DatabaseHelper._();
 
@@ -200,6 +202,21 @@ class DatabaseHelper {
       CREATE TABLE app_settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
+      )
+    ''');
+
+    // User goals (v13)
+    await db.execute('''
+      CREATE TABLE user_goals (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        scope TEXT NOT NULL,
+        metric TEXT NOT NULL,
+        period TEXT NOT NULL,
+        target_value REAL NOT NULL,
+        created_at TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        color INTEGER
       )
     ''');
 
@@ -465,6 +482,24 @@ class DatabaseHelper {
           }, conflictAlgorithm: ConflictAlgorithm.ignore);
         } catch (_) {}
       }
+    }
+    if (oldVersion < 13) {
+      // User goals table
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS user_goals (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            metric TEXT NOT NULL,
+            period TEXT NOT NULL,
+            target_value REAL NOT NULL,
+            created_at TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            color INTEGER
+          )
+        ''');
+      } catch (_) {}
     }
   }
 

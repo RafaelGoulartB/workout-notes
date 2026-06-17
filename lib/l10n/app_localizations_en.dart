@@ -1742,4 +1742,186 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get editWorkoutAddExercise => 'Add Exercise';
+
+  @override
+  String get progressGoals => 'Goals';
+
+  @override
+  String get progressGoalsSubtitle => 'Track and beat your personal challenges';
+
+  @override
+  String get goalScopeAnaerobic => 'Strength';
+
+  @override
+  String get goalScopeAerobic => 'Cardio';
+
+  @override
+  String get goalMetricVolume => 'Volume';
+
+  @override
+  String get goalMetricDays => 'Days';
+
+  @override
+  String get goalMetricDistance => 'Distance';
+
+  @override
+  String get goalMetricTime => 'Time';
+
+  @override
+  String get goalPeriodWeekly => 'Weekly';
+
+  @override
+  String get goalPeriodMonthly => 'Monthly';
+
+  @override
+  String get goalCreateTitle => 'New Goal';
+
+  @override
+  String get goalEditTitle => 'Edit Goal';
+
+  @override
+  String get goalLabelTitle => 'Title (optional)';
+
+  @override
+  String get goalTitleHint => 'e.g. Hypertrophy month';
+
+  @override
+  String get goalChooseMetric => 'Pick a metric';
+
+  @override
+  String get goalChoosePeriod => 'Period';
+
+  @override
+  String get goalTargetValue => 'Target value';
+
+  @override
+  String get goalTargetHint => 'Numeric value';
+
+  @override
+  String get goalCurrentProgress => 'Current progress';
+
+  @override
+  String goalDaysRemaining(num days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days days left',
+      one: '1 day left',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get goalCompleted => 'Goal reached! 🎉';
+
+  @override
+  String get goalKeepGoing => 'Keep pushing!';
+
+  @override
+  String get goalHistory => 'History';
+
+  @override
+  String get goalEmpty => 'No goals yet';
+
+  @override
+  String get goalEmptySubtitle => 'Tap + to create your first goal';
+
+  @override
+  String get goalDelete => 'Delete goal';
+
+  @override
+  String get goalDeleteConfirm => 'Delete this goal?';
+
+  @override
+  String get goalDeleteMessage => 'This action cannot be undone.';
+
+  @override
+  String get goalPaused => 'Paused';
+
+  @override
+  String get goalPausedBadge => 'PAUSED';
+
+  @override
+  String goalAchievementRate(Object rate) {
+    return '$rate% success';
+  }
+
+  @override
+  String get goalGridAdd => 'Add goal';
+
+  @override
+  String goalSuggestedTarget(Object value) {
+    return 'Suggested: $value';
+  }
+
+  @override
+  String get goalPickScope => 'Energy System';
+
+  @override
+  String get goalPickScopeSubtitle => 'Strength or Cardio?';
+
+  @override
+  String get goalStep1 => 'Scope';
+
+  @override
+  String get goalStep2 => 'Metric';
+
+  @override
+  String get goalStep3 => 'Details';
+
+  @override
+  String get goalNoHistory => 'No past periods';
+
+  @override
+  String get goalNoHistoryHint =>
+      'History will appear after the first cycle completes';
+
+  @override
+  String get goalResume => 'Resume';
+
+  @override
+  String get goalPause => 'Pause';
+
+  @override
+  String get goalSaved => 'Goal saved';
+
+  @override
+  String get goalDeleted => 'Goal deleted';
+
+  @override
+  String goalValueVolumeKg(Object value) {
+    return '$value kg';
+  }
+
+  @override
+  String goalValueDistance(Object value) {
+    return '$value km';
+  }
+
+  @override
+  String goalValueTime(Object value) {
+    return '$value';
+  }
+
+  @override
+  String goalValueDays(Object value) {
+    return '$value days';
+  }
+
+  @override
+  String goalValueDaysShort(Object value) {
+    return '${value}d';
+  }
+
+  @override
+  String get goalMotivationNear => 'Almost there — you got this!';
+
+  @override
+  String get goalMotivationMid => 'On track. Keep going!';
+
+  @override
+  String get goalMotivationEarly => 'Let\'s start! Every workout counts.';
+
+  @override
+  String get goalMotivationDone => 'Amazing! You crushed your goal!';
 }
