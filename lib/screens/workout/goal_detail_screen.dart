@@ -303,6 +303,8 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                   strokeWidth: 12,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
                         '${(percent * 100).clamp(0, 999).toInt()}%',
@@ -311,13 +313,14 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                           color: isComplete ? Colors.green : color,
                         ),
                       ),
-                      Text(
-                        isComplete ? '✓' : '',
-                        style: TextStyle(
-                          fontSize: 20,
-                          color: isComplete ? Colors.green : color,
+                      if (isComplete)
+                        Text(
+                          '✓',
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: Colors.green,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
