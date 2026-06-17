@@ -176,6 +176,7 @@ class _GoalsSectionState extends State<GoalsSection> {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             mainAxisSpacing: 8,
@@ -197,13 +198,18 @@ class _GoalsSectionState extends State<GoalsSection> {
             );
           },
         ),
-        const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
+          height: 32,
           child: TextButton.icon(
             onPressed: _addGoal,
-            icon: const Icon(Icons.add, size: 18),
-            label: Text(loc.goalGridAdd),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            icon: const Icon(Icons.add, size: 16),
+            label: Text(loc.goalGridAdd, style: const TextStyle(fontSize: 12)),
           ),
         ),
       ],
