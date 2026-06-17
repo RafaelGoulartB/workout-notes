@@ -149,6 +149,7 @@ class GoalRepository extends BaseRepository {
     final (start, end) = currentPeriod(goal.period);
     final startStr = start.toIso8601String().substring(0, 10);
     final endStr = end.toIso8601String().substring(0, 10);
+    final energySystem = goal.scope.value;
 
     switch (goal.metric) {
       case GoalMetric.volume:
@@ -158,11 +159,16 @@ class GoalRepository extends BaseRepository {
             COUNT(s.id) as set_count
           FROM sets s
           JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+          JOIN exercises e ON ee.exercise_id = e.id
+          JOIN exercise_categories ec ON e.category_id = ec.id
           JOIN workouts w ON ee.workout_id = w.id
           WHERE w.date >= ? AND w.date <= ? AND s.is_warmup = 0
+            AND ec.energy_system = ?
+            AND s.weight IS NOT NULL AND s.reps IS NOT NULL
+            AND s.weight > 0 AND s.reps > 0
           GROUP BY w.id
           ORDER BY w.date DESC
-        ''', [startStr, endStr]);
+        ''', [startStr, endStr, energySystem]);
         return rows
             .where((r) => ((r['value'] as num?) ?? 0) > 0)
             .map((r) => ContributingWorkout(
@@ -174,12 +180,21 @@ class GoalRepository extends BaseRepository {
             .toList();
 
       case GoalMetric.days:
+        // Workouts that contain at least one exercise of the goal's scope.
         final rows = await db.rawQuery('''
-          SELECT id as workout_id, date
-          FROM workouts
-          WHERE date >= ? AND date <= ?
-          ORDER BY date DESC
-        ''', [startStr, endStr]);
+          SELECT w.id as workout_id, w.date
+          FROM workouts w
+          WHERE w.date >= ? AND w.date <= ?
+            AND EXISTS (
+              SELECT 1
+              FROM exercise_entries ee
+              JOIN exercises e ON ee.exercise_id = e.id
+              JOIN exercise_categories ec ON e.category_id = ec.id
+              WHERE ee.workout_id = w.id
+                AND ec.energy_system = ?
+            )
+          ORDER BY w.date DESC
+        ''', [startStr, endStr, energySystem]);
         return rows
             .map((r) => ContributingWorkout(
                   workoutId: r['workout_id'] as String,
@@ -297,26 +312,42 @@ class GoalRepository extends BaseRepository {
     final db = await this.db;
     final startStr = start.toIso8601String().substring(0, 10);
     final endStr = end.toIso8601String().substring(0, 10);
+    final energySystem = scope.value;
 
     switch (metric) {
       case GoalMetric.volume:
-        // Anaerobic: sum of (weight * reps) for all sets in range
+        // Sum of (weight * reps) only for sets whose exercise belongs to
+        // a category of the goal's scope (anaerobic for strength).
         final row = await db.rawQuery('''
           SELECT COALESCE(SUM(s.weight * s.reps), 0) as value
           FROM sets s
           JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+          JOIN exercises e ON ee.exercise_id = e.id
+          JOIN exercise_categories ec ON e.category_id = ec.id
           JOIN workouts w ON ee.workout_id = w.id
           WHERE w.date >= ? AND w.date <= ? AND s.is_warmup = 0
-        ''', [startStr, endStr]);
+            AND ec.energy_system = ?
+            AND s.weight IS NOT NULL AND s.reps IS NOT NULL
+            AND s.weight > 0 AND s.reps > 0
+        ''', [startStr, endStr, energySystem]);
         return (row.first['value'] as num?)?.toDouble() ?? 0;
 
       case GoalMetric.days:
-        // Number of distinct workout dates in range
+        // Distinct workout dates that contain at least one exercise
+        // whose category matches the goal's scope.
         final row = await db.rawQuery('''
           SELECT COUNT(DISTINCT w.date) as value
           FROM workouts w
           WHERE w.date >= ? AND w.date <= ?
-        ''', [startStr, endStr]);
+            AND EXISTS (
+              SELECT 1
+              FROM exercise_entries ee
+              JOIN exercises e ON ee.exercise_id = e.id
+              JOIN exercise_categories ec ON e.category_id = ec.id
+              WHERE ee.workout_id = w.id
+                AND ec.energy_system = ?
+            )
+        ''', [startStr, endStr, energySystem]);
         return ((row.first['value'] as int?) ?? 0).toDouble();
 
       case GoalMetric.distance:
