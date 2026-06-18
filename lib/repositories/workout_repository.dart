@@ -104,17 +104,22 @@ class WorkoutRepository extends BaseRepository {
         await db.rawQuery('SELECT COUNT(*) FROM exercise_entries WHERE workout_id = ?', [workoutId]),
       ) ?? 0;
 
+      final exerciseId = re['exercise_id'] as String;
       await db.insert('exercise_entries', {
         'id': entryId,
         'workout_id': workoutId,
-        'exercise_id': re['exercise_id'],
+        'exercise_id': exerciseId,
         'order_index': count,
         'rest_time_seconds': re['rest_time_seconds'],
       });
 
-      final sets = await _getPredefinedSets(db, re['id'] as String);
-      for (int j = 0; j < sets.length; j++) {
-        final s = sets[j];
+      final lastSets = await getLastWorkoutSets(exerciseId, excludeWorkoutId: workoutId);
+      final sourceSets = lastSets.isNotEmpty
+          ? lastSets
+          : await _getPredefinedSets(db, re['id'] as String);
+
+      for (int j = 0; j < sourceSets.length; j++) {
+        final s = sourceSets[j];
         await db.insert('sets', {
           'id': const Uuid().v4(),
           'exercise_entry_id': entryId,

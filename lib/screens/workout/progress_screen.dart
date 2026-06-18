@@ -8,7 +8,6 @@ import 'package:workout_notes/utils/pace_calculator.dart';
 import 'package:workout_notes/widgets/collapsible_section.dart';
 import 'package:workout_notes/widgets/goals/goals_section.dart';
 import 'package:workout_notes/widgets/progress/monthly_report_card.dart';
-import 'package:workout_notes/widgets/progress/monthly_volume_chart.dart';
 import 'package:workout_notes/widgets/progress/progress_stat_cards.dart';
 import 'package:workout_notes/widgets/progress/frequency_charts.dart';
 import 'package:workout_notes/widgets/progress/volume_charts.dart';
@@ -35,7 +34,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   // === OVERVIEW DATA (loaded immediately) ===
   Map<String, dynamic>? _overviewStats;
-  List<Map<String, dynamic>> _monthlyVolume = [];
   Map<String, dynamic>? _monthReport;
   Map<String, dynamic>? _monthComparison;
 
@@ -54,7 +52,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
   bool _loadedRecovery = false;
   bool _loadedBody = false;
   bool _loadedCardio = false;
-  bool _loadedMonthlyVolume = false;
 
   // === FREQUENCY DATA ===
   Map<String, int> _heatmapData = {};
@@ -108,7 +105,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
     try {
       final results = await Future.wait([
         _analytics.getWorkoutOverviewStats(),
-        _analytics.getMonthlyVolume(),
         _analytics.getMonthlyReport(now.year, now.month),
         _analytics.getMonthComparison(now.year, now.month),
         _analytics.getMonthlyCardioStats(now.year, now.month),
@@ -117,10 +113,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
       if (!mounted) return;
 
       _overviewStats = results[0] as Map<String, dynamic>;
-      _monthlyVolume = results[1] as List<Map<String, dynamic>>;
-      _monthReport = results[2] as Map<String, dynamic>;
-      _monthComparison = results[3] as Map<String, dynamic>;
-      _monthlyCardioStats = results[4] as Map<String, dynamic>;
+      _monthReport = results[1] as Map<String, dynamic>;
+      _monthComparison = results[2] as Map<String, dynamic>;
+      _monthlyCardioStats = results[3] as Map<String, dynamic>;
 
       setState(() => _isLoading = false);
     } catch (e) {
@@ -230,18 +225,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
       setState(() => _isLoadingBody = false);
     } catch (_) {
       if (mounted) setState(() => _isLoadingBody = false);
-    }
-  }
-
-  Future<void> _loadMonthlyVolume() async {
-    if (_loadedMonthlyVolume) return;
-    try {
-      _monthlyVolume = await _analytics.getMonthlyVolume();
-      if (!mounted) return;
-      _loadedMonthlyVolume = true;
-      setState(() {});
-    } catch (_) {
-      // Silent: keep the empty list and don't crash.
     }
   }
 
@@ -384,15 +367,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
           ),
 
           // === Collapsible Sections (lazy loaded on expand) ===
-          _buildDivider(theme),
-          CollapsibleSection(
-            title: AppLocalizations.of(context)!.progressVolumeByMonth,
-            icon: Icons.bar_chart,
-            iconColor: theme.colorScheme.primary,
-            onExpanded: _loadMonthlyVolume,
-            child: _buildMonthlyVolumeContent(theme),
-          ),
-
           _buildDivider(theme),
           CollapsibleSection(
             title: AppLocalizations.of(context)!.progressFrequency,
@@ -605,29 +579,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
         ),
       ],
     );
-  }
-
-  // ===================== MONTHLY VOLUME CONTENT =====================
-
-  Widget _buildMonthlyVolumeContent(ThemeData theme) {
-    final loc = AppLocalizations.of(context)!;
-    if (!_loadedMonthlyVolume) {
-      // First time opened: trigger lazy load and show loading.
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadMonthlyVolume());
-      return _sectionLoading(theme);
-    }
-    if (_monthlyVolume.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Text(
-          loc.progressNoData,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      );
-    }
-    return MonthlyVolumeChart(data: _monthlyVolume);
   }
 
   // ===================== CARDIO CONTENT =====================

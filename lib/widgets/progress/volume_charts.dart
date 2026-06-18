@@ -60,8 +60,6 @@ class _VolumeChartsState extends State<VolumeCharts> {
     }
   }
 
-  /// Maps the current bucket to (rangeStart, rangeEnd) used for the
-  /// pie chart and top-exercises list.
   (DateTime, DateTime) _currentRange() {
     final now = DateTime.now();
     if (_bucket == AnaerobicTrendBucket.week) {
@@ -644,7 +642,7 @@ class _CategoryLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const SizedBox(
-      height: 140,
+      height: 150,
       child: Center(
         child: SizedBox(
           width: 20,
@@ -675,115 +673,105 @@ class _CategoryPie extends StatelessWidget {
     final theme = Theme.of(context);
 
     return SizedBox(
-      height: 140,
+      height: 160,
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
+            child: Center(
               child: Stack(
-              alignment: Alignment.center,
-              children: [
-                PieChart(
-                  PieChartData(
-                    sectionsSpace: 2,
-                    centerSpaceRadius: 36,
-                    startDegreeOffset: -90,
-                    sections: data.take(8).map((e) {
-                      final vol = (e['volume'] as num?)?.toDouble() ?? 0;
-                      final pct = total > 0 ? vol / total * 100 : 0.0;
-                      final base =
-                          Color(e['color'] as int? ?? 0xFF757575);
-                      return PieChartSectionData(
-                        color: base,
-                        value: vol,
-                        title: pct >= 8 ? '${pct.toStringAsFixed(0)}%' : '',
-                        titleStyle: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                        titlePositionPercentageOffset: 0.6,
-                        radius: pct >= 15 ? 44 : 38,
-                        borderSide: BorderSide(
-                          color: theme.colorScheme.surface,
-                          width: 1.5,
-                        ),
-                      );
-                    }).toList(),
+                alignment: Alignment.center,
+                children: [
+                  PieChart(
+                    PieChartData(
+                      sectionsSpace: 1,
+                      centerSpaceRadius: 22,
+                      startDegreeOffset: -90,
+                      sections: data.take(8).map((e) {
+                        final vol = (e['volume'] as num?)?.toDouble() ?? 0;
+                        final pct = total > 0 ? vol / total * 100 : 0.0;
+                        final base =
+                            Color(e['color'] as int? ?? 0xFF757575);
+                        return PieChartSectionData(
+                          color: base,
+                          value: vol,
+                          title: pct >= 8
+                              ? '${pct.toStringAsFixed(0)}%'
+                              : '',
+                          titleStyle: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          titlePositionPercentageOffset: 0.65,
+                          radius: pct >= 15 ? 40 : 34,
+                          borderSide: BorderSide(
+                            color: theme.colorScheme.surface,
+                            width: 1.5,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeOutCubic,
                   ),
-                  duration: const Duration(milliseconds: 400),
-                  curve: Curves.easeOutCubic,
-                ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      formatValue(total),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: theme.colorScheme.onSurface,
-                        height: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      unitLabel,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 10,
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: data.take(5).map((cat) {
-                final vol = (cat['volume'] as num?)?.toDouble() ?? 0;
-                final pct = total > 0 ? vol / total * 100 : 0.0;
-                final color = Color(cat['color'] as int? ?? 0xFF757575);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2.5),
-                  child: Row(
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: BorderRadius.circular(2.5),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          ExerciseLocaleHelper.categoryName(
-                              AppLocalizations.of(context)!, cat),
-                          style: const TextStyle(
-                              fontSize: 10, fontWeight: FontWeight.w500),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
                       Text(
-                        '${pct.toStringAsFixed(0)}%',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
+                        formatValue(total),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
                           color: theme.colorScheme.onSurface,
+                          fontSize: 13,
+                          height: 1.0,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        unitLabel,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 9,
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                          height: 1.0,
                         ),
                       ),
                     ],
                   ),
-                );
-              }).toList(),
+                ],
+              ),
             ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: data.take(5).map((cat) {
+              final vol = (cat['volume'] as num?)?.toDouble() ?? 0;
+              final pct = total > 0 ? vol / total * 100 : 0.0;
+              final color = Color(cat['color'] as int? ?? 0xFF757575);
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: color,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, cat)} ${pct.toStringAsFixed(0)}%',
+                      style: const TextStyle(fontSize: 8),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),

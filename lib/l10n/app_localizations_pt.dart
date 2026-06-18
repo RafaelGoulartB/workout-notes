@@ -806,9 +806,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get progressBodyWeightVsVolume => 'Peso Corporal vs Volume de Treino';
 
   @override
-  String get progressVolumeByMonth => 'Volume por Mês';
-
-  @override
   String get bodyTrackerTitle => 'Medidas Corporais';
 
   @override

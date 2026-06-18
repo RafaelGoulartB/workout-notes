@@ -1574,12 +1574,6 @@ abstract class AppLocalizations {
   /// **'Body Weight vs Workout Volume'**
   String get progressBodyWeightVsVolume;
 
-  /// No description provided for @progressVolumeByMonth.
-  ///
-  /// In en, this message translates to:
-  /// **'Volume by Month'**
-  String get progressVolumeByMonth;
-
   /// No description provided for @bodyTrackerTitle.
   ///
   /// In en, this message translates to:
