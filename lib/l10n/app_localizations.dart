@@ -3635,6 +3635,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No workouts in this period yet'**
   String get goalNoContributors;
+
+  /// No description provided for @progressPeriodWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Week'**
+  String get progressPeriodWeek;
+
+  /// No description provided for @progressPeriodMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get progressPeriodMonth;
+
+  /// No description provided for @progressPeriodYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get progressPeriodYear;
+
+  /// No description provided for @progressVolumeTypeWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight'**
+  String get progressVolumeTypeWeight;
+
+  /// No description provided for @progressVolumeTypeSets.
+  ///
+  /// In en, this message translates to:
+  /// **'Sets'**
+  String get progressVolumeTypeSets;
+
+  /// No description provided for @progressVolumeTrend.
+  ///
+  /// In en, this message translates to:
+  /// **'Trend'**
+  String get progressVolumeTrend;
+
+  /// No description provided for @progressVolumeTrendLast12Weeks.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 12 weeks'**
+  String get progressVolumeTrendLast12Weeks;
+
+  /// No description provided for @progressVolumeTrendLast12Months.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 12 months'**
+  String get progressVolumeTrendLast12Months;
+
+  /// No description provided for @progressVolumeTrendLast5Years.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 5 years'**
+  String get progressVolumeTrendLast5Years;
+
+  /// No description provided for @progressVolumeUnitSets.
+  ///
+  /// In en, this message translates to:
+  /// **'sets'**
+  String get progressVolumeUnitSets;
+
+  /// No description provided for @progressVolumeUnitWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'kg'**
+  String get progressVolumeUnitWeight;
+
+  /// No description provided for @progressVolumeViewPie.
+  ///
+  /// In en, this message translates to:
+  /// **'Pie'**
+  String get progressVolumeViewPie;
+
+  /// No description provided for @progressVolumeViewList.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get progressVolumeViewList;
+
+  /// No description provided for @progressVolumeTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get progressVolumeTotal;
 }
 
 class _AppLocalizationsDelegate

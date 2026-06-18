@@ -698,6 +698,15 @@ class DatabaseHelper {
       analyticsRepo.getTopExercisesByVolume(limit: limit);
   Future<List<Map<String, dynamic>>> getEnergySystemDistribution() =>
       analyticsRepo.getEnergySystemDistribution();
+  Future<List<Map<String, dynamic>>> getAnaerobicVolumeByCategory(
+          DateTime start, DateTime end, {required bool bySets}) =>
+      analyticsRepo.getAnaerobicVolumeByCategory(start, end, bySets: bySets);
+  Future<List<Map<String, dynamic>>> getAnaerobicTopExercises(
+          DateTime start, DateTime end, {required bool bySets, int limit = 5}) =>
+      analyticsRepo.getAnaerobicTopExercises(start, end, bySets: bySets, limit: limit);
+  Future<List<Map<String, dynamic>>> getAnaerobicVolumeTrend(
+          DateTime end, AnaerobicTrendBucket bucket, {required bool bySets}) =>
+      analyticsRepo.getAnaerobicVolumeTrend(end, bucket, bySets: bySets);
   Future<List<Map<String, dynamic>>> getRpeTrend({int limit = 50}) =>
       analyticsRepo.getRpeTrend(limit: limit);
   Future<List<Map<String, dynamic>>> getWorkoutDensity({int limit = 50}) =>

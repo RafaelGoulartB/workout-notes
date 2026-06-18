@@ -1930,4 +1930,46 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get goalNoContributors => 'No workouts in this period yet';
+
+  @override
+  String get progressPeriodWeek => 'Week';
+
+  @override
+  String get progressPeriodMonth => 'Month';
+
+  @override
+  String get progressPeriodYear => 'Year';
+
+  @override
+  String get progressVolumeTypeWeight => 'Weight';
+
+  @override
+  String get progressVolumeTypeSets => 'Sets';
+
+  @override
+  String get progressVolumeTrend => 'Trend';
+
+  @override
+  String get progressVolumeTrendLast12Weeks => 'Last 12 weeks';
+
+  @override
+  String get progressVolumeTrendLast12Months => 'Last 12 months';
+
+  @override
+  String get progressVolumeTrendLast5Years => 'Last 5 years';
+
+  @override
+  String get progressVolumeUnitSets => 'sets';
+
+  @override
+  String get progressVolumeUnitWeight => 'kg';
+
+  @override
+  String get progressVolumeViewPie => 'Pie';
+
+  @override
+  String get progressVolumeViewList => 'List';
+
+  @override
+  String get progressVolumeTotal => 'Total';
 }

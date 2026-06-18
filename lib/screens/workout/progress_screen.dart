@@ -60,11 +60,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
   Map<String, int> _heatmapData = {};
   List<Map<String, dynamic>> _workoutDates = [];
 
-  // === VOLUME DATA ===
-  List<Map<String, dynamic>> _volumeByCategory = [];
-  List<Map<String, dynamic>> _topExercises = [];
-  List<Map<String, dynamic>> _energySystems = [];
-
   // === PERFORMANCE DATA ===
   List<Map<String, dynamic>> _allExercises = [];
 
@@ -160,17 +155,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
     if (_loadedVolume) return;
     setState(() => _isLoadingVolume = true);
     try {
-      final results = await Future.wait([
-        _analytics.getVolumeByCategory(),
-        _analytics.getTopExercisesByVolume(),
-        _analytics.getEnergySystemDistribution(),
-      ]);
-      if (!mounted) return;
-      _volumeByCategory = results[0];
-      _topExercises = results[1];
-      _energySystems = results[2];
+      // The VolumeCharts widget handles its own data fetching lazily when
+      // expanded. We just need to know it should start fetching.
       _loadedVolume = true;
-      setState(() => _isLoadingVolume = false);
+      if (mounted) setState(() => _isLoadingVolume = false);
     } catch (_) {
       if (mounted) setState(() => _isLoadingVolume = false);
     }
@@ -745,11 +733,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   Widget _buildVolumeContent(ThemeData theme) {
     if (_isLoadingVolume) return _sectionLoading(theme);
     if (!_loadedVolume) return const SizedBox.shrink();
-    return VolumeCharts(
-      volumeByCategory: _volumeByCategory,
-      energySystems: _energySystems,
-      topExercises: _topExercises,
-    );
+    return VolumeCharts(analytics: _analytics);
   }
 
   // ===================== PERFORMANCE CONTENT =====================

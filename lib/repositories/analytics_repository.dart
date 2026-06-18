@@ -1,6 +1,9 @@
 import 'package:sqflite/sqflite.dart';
 import 'base_repository.dart';
 
+/// Time bucketing used for the anaerobic volume trend chart.
+enum AnaerobicTrendBucket { week, month, year }
+
 /// Repository for statistics, progress charts, PRs, heatmap, and trends.
 class AnalyticsRepository extends BaseRepository {
   // ===================================================================
@@ -258,6 +261,161 @@ class AnalyticsRepository extends BaseRepository {
       JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
       GROUP BY ec.energy_system
     ''');
+  }
+
+  // ===================================================================
+  // ANAEROBIC VOLUME (strength only, scoped to a date range)
+  // ===================================================================
+
+  /// Volume by muscle group (anaerobic only) for a date range.
+  /// `bySets = true` counts sets; otherwise sums weight*reps.
+  Future<List<Map<String, dynamic>>> getAnaerobicVolumeByCategory(
+    DateTime start,
+    DateTime end, {
+    required bool bySets,
+  }) async {
+    final db = await this.db;
+    final startStr = start.toIso8601String().substring(0, 10);
+    final endStr = end.toIso8601String().substring(0, 10);
+    final valueExpr = bySets ? 'COUNT(s.id)' : 'COALESCE(SUM(s.weight * s.reps), 0)';
+    return db.rawQuery('''
+      SELECT ec.id, ec.name, ec.color,
+        $valueExpr as volume,
+        COUNT(s.id) as sets_count
+      FROM exercise_categories ec
+      JOIN exercises e ON e.category_id = ec.id
+      JOIN exercise_entries ee ON ee.exercise_id = e.id
+      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN workouts w ON ee.workout_id = w.id
+      WHERE ec.energy_system = 'anaerobic'
+        AND w.date >= ? AND w.date <= ?
+      GROUP BY ec.id
+      ORDER BY volume DESC
+    ''', [startStr, endStr]);
+  }
+
+  /// Top exercises (anaerobic only) for a date range.
+  Future<List<Map<String, dynamic>>> getAnaerobicTopExercises(
+    DateTime start,
+    DateTime end, {
+    required bool bySets,
+    int limit = 5,
+  }) async {
+    final db = await this.db;
+    final startStr = start.toIso8601String().substring(0, 10);
+    final endStr = end.toIso8601String().substring(0, 10);
+    final valueExpr = bySets ? 'COUNT(s.id)' : 'COALESCE(SUM(s.weight * s.reps), 0)';
+    return db.rawQuery('''
+      SELECT e.id, e.name, ec.name as category_name, ec.color as category_color,
+        $valueExpr as volume,
+        COUNT(s.id) as sets_count
+      FROM exercises e
+      JOIN exercise_categories ec ON e.category_id = ec.id
+      JOIN exercise_entries ee ON ee.exercise_id = e.id
+      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN workouts w ON ee.workout_id = w.id
+      WHERE ec.energy_system = 'anaerobic'
+        AND w.date >= ? AND w.date <= ?
+      GROUP BY e.id
+      ORDER BY volume DESC
+      LIMIT ?
+    ''', [startStr, endStr, limit]);
+  }
+
+  /// Time-bucketed trend of anaerobic volume.
+  /// - [AnaerobicTrendBucket.week]   → last 12 ISO weeks
+  /// - [AnaerobicTrendBucket.month]  → last 12 months
+  /// - [AnaerobicTrendBucket.year]   → last 5 years
+  Future<List<Map<String, dynamic>>> getAnaerobicVolumeTrend(
+    DateTime end,
+    AnaerobicTrendBucket bucket, {
+    required bool bySets,
+  }) async {
+    final db = await this.db;
+    final valueExpr = bySets ? 'COUNT(s.id)' : 'COALESCE(SUM(s.weight * s.reps), 0)';
+
+    final List<Map<String, dynamic>> results = [];
+
+    if (bucket == AnaerobicTrendBucket.week) {
+      // 12 weeks ending on the week of `end`. Monday-anchored.
+      const count = 12;
+      final endMonday = end.subtract(Duration(days: end.weekday - 1));
+      for (int i = count - 1; i >= 0; i--) {
+        final weekStart = endMonday.subtract(Duration(days: i * 7));
+        final weekEnd = weekStart.add(const Duration(days: 6));
+        final rows = await db.rawQuery('''
+          SELECT $valueExpr as volume
+          FROM sets s
+          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+          JOIN exercises e ON ee.exercise_id = e.id
+          JOIN exercise_categories ec ON e.category_id = ec.id
+          JOIN workouts w ON ee.workout_id = w.id
+          WHERE ec.energy_system = 'anaerobic'
+            AND s.is_warmup = 0
+            AND w.date >= ? AND w.date <= ?
+        ''', [
+          weekStart.toIso8601String().substring(0, 10),
+          weekEnd.toIso8601String().substring(0, 10),
+        ]);
+        results.add({
+          'bucket_start': weekStart.toIso8601String().substring(0, 10),
+          'volume': (rows.first['volume'] as num?)?.toDouble() ?? 0,
+        });
+      }
+      return results;
+    } else if (bucket == AnaerobicTrendBucket.month) {
+      const count = 12;
+      for (int i = count - 1; i >= 0; i--) {
+        final ref = DateTime(end.year, end.month - i, 1);
+        final nextMonth = ref.month == 12
+            ? DateTime(ref.year + 1, 1, 1)
+            : DateTime(ref.year, ref.month + 1, 1);
+        final lastDay = nextMonth.subtract(const Duration(days: 1));
+        final monthStr =
+            '${ref.year}-${ref.month.toString().padLeft(2, '0')}';
+        final rows = await db.rawQuery('''
+          SELECT $valueExpr as volume
+          FROM sets s
+          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+          JOIN exercises e ON ee.exercise_id = e.id
+          JOIN exercise_categories ec ON e.category_id = ec.id
+          JOIN workouts w ON ee.workout_id = w.id
+          WHERE ec.energy_system = 'anaerobic'
+            AND s.is_warmup = 0
+            AND w.date >= ? AND w.date <= ?
+        ''', [
+          '$monthStr-01',
+          lastDay.toIso8601String().substring(0, 10),
+        ]);
+        results.add({
+          'bucket_start': '$monthStr-01',
+          'volume': (rows.first['volume'] as num?)?.toDouble() ?? 0,
+        });
+      }
+      return results;
+    } else {
+      // year: last 5 calendar years.
+      const count = 5;
+      for (int i = count - 1; i >= 0; i--) {
+        final year = end.year - i;
+        final rows = await db.rawQuery('''
+          SELECT $valueExpr as volume
+          FROM sets s
+          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+          JOIN exercises e ON ee.exercise_id = e.id
+          JOIN exercise_categories ec ON e.category_id = ec.id
+          JOIN workouts w ON ee.workout_id = w.id
+          WHERE ec.energy_system = 'anaerobic'
+            AND s.is_warmup = 0
+            AND w.date >= ? AND w.date <= ?
+        ''', ['$year-01-01', '$year-12-31']);
+        results.add({
+          'bucket_start': '$year-01-01',
+          'volume': (rows.first['volume'] as num?)?.toDouble() ?? 0,
+        });
+      }
+      return results;
+    }
   }
 
   // ===================================================================

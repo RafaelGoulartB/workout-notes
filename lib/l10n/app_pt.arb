@@ -618,5 +618,20 @@
   "goalMotivationDone": "Incrível! Você bateu a meta!",
 
   "goalContributingWorkouts": "Treinos deste período",
-  "goalNoContributors": "Nenhum treino no período ainda"
+  "goalNoContributors": "Nenhum treino no período ainda",
+
+  "progressPeriodWeek": "Semana",
+  "progressPeriodMonth": "Mês",
+  "progressPeriodYear": "Ano",
+  "progressVolumeTypeWeight": "Peso",
+  "progressVolumeTypeSets": "Séries",
+  "progressVolumeTrend": "Tendência",
+  "progressVolumeTrendLast12Weeks": "Últimas 12 semanas",
+  "progressVolumeTrendLast12Months": "Últimos 12 meses",
+  "progressVolumeTrendLast5Years": "Últimos 5 anos",
+  "progressVolumeUnitSets": "séries",
+  "progressVolumeUnitWeight": "kg",
+  "progressVolumeViewPie": "Pizza",
+  "progressVolumeViewList": "Lista",
+  "progressVolumeTotal": "Total"
 }

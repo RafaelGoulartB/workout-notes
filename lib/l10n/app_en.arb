@@ -617,5 +617,20 @@
   "goalMotivationDone": "Amazing! You crushed your goal!",
 
   "goalContributingWorkouts": "Workouts this period",
-  "goalNoContributors": "No workouts in this period yet"
+  "goalNoContributors": "No workouts in this period yet",
+
+  "progressPeriodWeek": "Week",
+  "progressPeriodMonth": "Month",
+  "progressPeriodYear": "Year",
+  "progressVolumeTypeWeight": "Weight",
+  "progressVolumeTypeSets": "Sets",
+  "progressVolumeTrend": "Trend",
+  "progressVolumeTrendLast12Weeks": "Last 12 weeks",
+  "progressVolumeTrendLast12Months": "Last 12 months",
+  "progressVolumeTrendLast5Years": "Last 5 years",
+  "progressVolumeUnitSets": "sets",
+  "progressVolumeUnitWeight": "kg",
+  "progressVolumeViewPie": "Pie",
+  "progressVolumeViewList": "List",
+  "progressVolumeTotal": "Total"
 }
