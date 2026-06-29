@@ -104,17 +104,22 @@ class WorkoutRepository extends BaseRepository {
         await db.rawQuery('SELECT COUNT(*) FROM exercise_entries WHERE workout_id = ?', [workoutId]),
       ) ?? 0;
 
+      final exerciseId = re['exercise_id'] as String;
       await db.insert('exercise_entries', {
         'id': entryId,
         'workout_id': workoutId,
-        'exercise_id': re['exercise_id'],
+        'exercise_id': exerciseId,
         'order_index': count,
         'rest_time_seconds': re['rest_time_seconds'],
       });
 
-      final sets = await _getPredefinedSets(db, re['id'] as String);
-      for (int j = 0; j < sets.length; j++) {
-        final s = sets[j];
+      final lastSets = await getLastWorkoutSets(exerciseId, excludeWorkoutId: workoutId);
+      final sourceSets = lastSets.isNotEmpty
+          ? lastSets
+          : await _getPredefinedSets(db, re['id'] as String);
+
+      for (int j = 0; j < sourceSets.length; j++) {
+        final s = sourceSets[j];
         await db.insert('sets', {
           'id': const Uuid().v4(),
           'exercise_entry_id': entryId,
@@ -381,6 +386,33 @@ class WorkoutRepository extends BaseRepository {
     await db.update('workouts', {
       'date': newDate.toIso8601String().substring(0, 10),
     }, where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Persists user-edited start/end timestamps for a completed workout and
+  /// recomputes the cached `duration_seconds`. Any in-progress pause state
+  /// is cleared so the new times are not double-counted.
+  Future<void> updateWorkoutTimes(
+    String id, {
+    required DateTime? startTime,
+    required DateTime? endTime,
+  }) async {
+    final db = await this.db;
+    int? duration;
+    if (startTime != null && endTime != null) {
+      final diff = endTime.difference(startTime).inSeconds;
+      duration = diff > 0 ? diff : 0;
+    }
+    await db.update(
+      'workouts',
+      {
+        'start_time': startTime?.toIso8601String(),
+        'end_time': endTime?.toIso8601String(),
+        'duration_seconds': duration,
+        'pause_start_time': null,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> resetWorkoutToInProgress(String id) async {

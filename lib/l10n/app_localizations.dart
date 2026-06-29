@@ -1214,6 +1214,156 @@ abstract class AppLocalizations {
   /// **'View detailed trends, photos, and body composition charts'**
   String get progressBodyMeasurementsSubtitle;
 
+  /// No description provided for @progressCardio.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio'**
+  String get progressCardio;
+
+  /// No description provided for @progressCardioSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance, pace, and cardiovascular tracking'**
+  String get progressCardioSubtitle;
+
+  /// No description provided for @progressCardioWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly Distance'**
+  String get progressCardioWeekly;
+
+  /// No description provided for @progressCardioByModality.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance by Modality'**
+  String get progressCardioByModality;
+
+  /// No description provided for @progressCardioPace.
+  ///
+  /// In en, this message translates to:
+  /// **'Pace Trend'**
+  String get progressCardioPace;
+
+  /// No description provided for @progressCardioPRs.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio Records'**
+  String get progressCardioPRs;
+
+  /// No description provided for @progressCardioTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total: {distance} this month'**
+  String progressCardioTotal(Object distance);
+
+  /// No description provided for @progressCardioAvgPace.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg pace: {pace}'**
+  String progressCardioAvgPace(Object pace);
+
+  /// No description provided for @progressCardioNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No cardio workouts yet'**
+  String get progressCardioNoData;
+
+  /// No description provided for @progressCardioNoDataCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a cardio workout'**
+  String get progressCardioNoDataCta;
+
+  /// No description provided for @progressFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get progressFilterAll;
+
+  /// No description provided for @progressFilterStrength.
+  ///
+  /// In en, this message translates to:
+  /// **'Strength'**
+  String get progressFilterStrength;
+
+  /// No description provided for @progressFilterCardio.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio'**
+  String get progressFilterCardio;
+
+  /// No description provided for @progressSelectExercise.
+  ///
+  /// In en, this message translates to:
+  /// **'Select exercise'**
+  String get progressSelectExercise;
+
+  /// No description provided for @cardioLongestDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Longest Distance'**
+  String get cardioLongestDistance;
+
+  /// No description provided for @cardioLongestDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Longest Duration'**
+  String get cardioLongestDuration;
+
+  /// No description provided for @cardioBestPace.
+  ///
+  /// In en, this message translates to:
+  /// **'Best Pace'**
+  String get cardioBestPace;
+
+  /// No description provided for @settingsDistanceUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance Unit'**
+  String get settingsDistanceUnit;
+
+  /// No description provided for @settingsDistanceUnitKm.
+  ///
+  /// In en, this message translates to:
+  /// **'km'**
+  String get settingsDistanceUnitKm;
+
+  /// No description provided for @settingsDistanceUnitMi.
+  ///
+  /// In en, this message translates to:
+  /// **'mi (miles)'**
+  String get settingsDistanceUnitMi;
+
+  /// No description provided for @workoutHomeCardioDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio Dist.'**
+  String get workoutHomeCardioDistance;
+
+  /// No description provided for @workoutHomeCardioTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio Time'**
+  String get workoutHomeCardioTime;
+
+  /// No description provided for @commonDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance'**
+  String get commonDistance;
+
+  /// No description provided for @commonPace.
+  ///
+  /// In en, this message translates to:
+  /// **'Pace'**
+  String get commonPace;
+
+  /// No description provided for @commonTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get commonTotal;
+
   /// No description provided for @progressBodyComposition.
   ///
   /// In en, this message translates to:
@@ -1423,12 +1573,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Body Weight vs Workout Volume'**
   String get progressBodyWeightVsVolume;
-
-  /// No description provided for @progressVolumeByMonth.
-  ///
-  /// In en, this message translates to:
-  /// **'Volume by Month'**
-  String get progressVolumeByMonth;
 
   /// No description provided for @bodyTrackerTitle.
   ///
@@ -2402,6 +2546,12 @@ abstract class AppLocalizations {
   /// **'Delete Workout?'**
   String get workoutDetailDeleteConfirm;
 
+  /// No description provided for @workoutDetailEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Workout'**
+  String get workoutDetailEdit;
+
   /// No description provided for @workoutDetailEditDate.
   ///
   /// In en, this message translates to:
@@ -3047,6 +3197,522 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Moved to bottom'**
   String get reorderMovedToBottom;
+
+  /// No description provided for @editWorkoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Workout'**
+  String get editWorkoutTitle;
+
+  /// No description provided for @editWorkoutDateTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Date and Time'**
+  String get editWorkoutDateTime;
+
+  /// No description provided for @editWorkoutStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get editWorkoutStart;
+
+  /// No description provided for @editWorkoutEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End'**
+  String get editWorkoutEnd;
+
+  /// No description provided for @editWorkoutDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get editWorkoutDuration;
+
+  /// No description provided for @editWorkoutChangeDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Date'**
+  String get editWorkoutChangeDate;
+
+  /// No description provided for @editWorkoutChangeStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Change start time'**
+  String get editWorkoutChangeStart;
+
+  /// No description provided for @editWorkoutChangeEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Change end time'**
+  String get editWorkoutChangeEnd;
+
+  /// No description provided for @editWorkoutChangeStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Change start date and time'**
+  String get editWorkoutChangeStartDate;
+
+  /// No description provided for @editWorkoutChangeEndDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Change end date and time'**
+  String get editWorkoutChangeEndDate;
+
+  /// No description provided for @editWorkoutSelectDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Select date'**
+  String get editWorkoutSelectDate;
+
+  /// No description provided for @editWorkoutSelectTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Select time'**
+  String get editWorkoutSelectTime;
+
+  /// No description provided for @editWorkoutEndAfterStart.
+  ///
+  /// In en, this message translates to:
+  /// **'End time must be after start time'**
+  String get editWorkoutEndAfterStart;
+
+  /// No description provided for @editWorkoutInvalidRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid date range'**
+  String get editWorkoutInvalidRange;
+
+  /// No description provided for @editWorkoutSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Workout updated'**
+  String get editWorkoutSaved;
+
+  /// No description provided for @editWorkoutReorderHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Press and hold an exercise to reorder'**
+  String get editWorkoutReorderHint;
+
+  /// No description provided for @editWorkoutAddExercise.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Exercise'**
+  String get editWorkoutAddExercise;
+
+  /// No description provided for @progressGoals.
+  ///
+  /// In en, this message translates to:
+  /// **'Goals'**
+  String get progressGoals;
+
+  /// No description provided for @progressGoalsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Track and beat your personal challenges'**
+  String get progressGoalsSubtitle;
+
+  /// No description provided for @goalScopeAnaerobic.
+  ///
+  /// In en, this message translates to:
+  /// **'Strength'**
+  String get goalScopeAnaerobic;
+
+  /// No description provided for @goalScopeAerobic.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio'**
+  String get goalScopeAerobic;
+
+  /// No description provided for @goalMetricVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume'**
+  String get goalMetricVolume;
+
+  /// No description provided for @goalMetricDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Days'**
+  String get goalMetricDays;
+
+  /// No description provided for @goalMetricDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'Distance'**
+  String get goalMetricDistance;
+
+  /// No description provided for @goalMetricTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get goalMetricTime;
+
+  /// No description provided for @goalPeriodWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly'**
+  String get goalPeriodWeekly;
+
+  /// No description provided for @goalPeriodMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get goalPeriodMonthly;
+
+  /// No description provided for @goalCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New Goal'**
+  String get goalCreateTitle;
+
+  /// No description provided for @goalEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Goal'**
+  String get goalEditTitle;
+
+  /// No description provided for @goalLabelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title (optional)'**
+  String get goalLabelTitle;
+
+  /// No description provided for @goalTitleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Hypertrophy month'**
+  String get goalTitleHint;
+
+  /// No description provided for @goalChooseMetric.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a metric'**
+  String get goalChooseMetric;
+
+  /// No description provided for @goalChoosePeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Period'**
+  String get goalChoosePeriod;
+
+  /// No description provided for @goalTargetValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Target value'**
+  String get goalTargetValue;
+
+  /// No description provided for @goalTargetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Numeric value'**
+  String get goalTargetHint;
+
+  /// No description provided for @goalCurrentProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Current progress'**
+  String get goalCurrentProgress;
+
+  /// No description provided for @goalDaysRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{days, plural, =1{1 day left} other{{days} days left}}'**
+  String goalDaysRemaining(num days);
+
+  /// No description provided for @goalCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal reached! 🎉'**
+  String get goalCompleted;
+
+  /// No description provided for @goalKeepGoing.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep pushing!'**
+  String get goalKeepGoing;
+
+  /// No description provided for @goalHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get goalHistory;
+
+  /// No description provided for @goalEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No goals yet'**
+  String get goalEmpty;
+
+  /// No description provided for @goalEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap + to create your first goal'**
+  String get goalEmptySubtitle;
+
+  /// No description provided for @goalDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete goal'**
+  String get goalDelete;
+
+  /// No description provided for @goalDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this goal?'**
+  String get goalDeleteConfirm;
+
+  /// No description provided for @goalDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This action cannot be undone.'**
+  String get goalDeleteMessage;
+
+  /// No description provided for @goalPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get goalPaused;
+
+  /// No description provided for @goalPausedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'PAUSED'**
+  String get goalPausedBadge;
+
+  /// No description provided for @goalAchievementRate.
+  ///
+  /// In en, this message translates to:
+  /// **'{rate}% success'**
+  String goalAchievementRate(Object rate);
+
+  /// No description provided for @goalGridAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add goal'**
+  String get goalGridAdd;
+
+  /// No description provided for @goalSuggestedTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested: {value}'**
+  String goalSuggestedTarget(Object value);
+
+  /// No description provided for @goalPickScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Energy System'**
+  String get goalPickScope;
+
+  /// No description provided for @goalPickScopeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Strength or Cardio?'**
+  String get goalPickScopeSubtitle;
+
+  /// No description provided for @goalStep1.
+  ///
+  /// In en, this message translates to:
+  /// **'Scope'**
+  String get goalStep1;
+
+  /// No description provided for @goalStep2.
+  ///
+  /// In en, this message translates to:
+  /// **'Metric'**
+  String get goalStep2;
+
+  /// No description provided for @goalStep3.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get goalStep3;
+
+  /// No description provided for @goalNoHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'No past periods'**
+  String get goalNoHistory;
+
+  /// No description provided for @goalNoHistoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'History will appear after the first cycle completes'**
+  String get goalNoHistoryHint;
+
+  /// No description provided for @goalResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get goalResume;
+
+  /// No description provided for @goalPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get goalPause;
+
+  /// No description provided for @goalSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal saved'**
+  String get goalSaved;
+
+  /// No description provided for @goalDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal deleted'**
+  String get goalDeleted;
+
+  /// No description provided for @goalValueVolumeKg.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} kg'**
+  String goalValueVolumeKg(Object value);
+
+  /// No description provided for @goalValueDistance.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} km'**
+  String goalValueDistance(Object value);
+
+  /// No description provided for @goalValueTime.
+  ///
+  /// In en, this message translates to:
+  /// **'{value}'**
+  String goalValueTime(Object value);
+
+  /// No description provided for @goalValueDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} days'**
+  String goalValueDays(Object value);
+
+  /// No description provided for @goalValueDaysShort.
+  ///
+  /// In en, this message translates to:
+  /// **'{value}d'**
+  String goalValueDaysShort(Object value);
+
+  /// No description provided for @goalMotivationNear.
+  ///
+  /// In en, this message translates to:
+  /// **'Almost there — you got this!'**
+  String get goalMotivationNear;
+
+  /// No description provided for @goalMotivationMid.
+  ///
+  /// In en, this message translates to:
+  /// **'On track. Keep going!'**
+  String get goalMotivationMid;
+
+  /// No description provided for @goalMotivationEarly.
+  ///
+  /// In en, this message translates to:
+  /// **'Let\'s start! Every workout counts.'**
+  String get goalMotivationEarly;
+
+  /// No description provided for @goalMotivationDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Amazing! You crushed your goal!'**
+  String get goalMotivationDone;
+
+  /// No description provided for @goalContributingWorkouts.
+  ///
+  /// In en, this message translates to:
+  /// **'Workouts this period'**
+  String get goalContributingWorkouts;
+
+  /// No description provided for @goalNoContributors.
+  ///
+  /// In en, this message translates to:
+  /// **'No workouts in this period yet'**
+  String get goalNoContributors;
+
+  /// No description provided for @progressPeriodWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Week'**
+  String get progressPeriodWeek;
+
+  /// No description provided for @progressPeriodMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get progressPeriodMonth;
+
+  /// No description provided for @progressPeriodYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get progressPeriodYear;
+
+  /// No description provided for @progressVolumeTypeWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight'**
+  String get progressVolumeTypeWeight;
+
+  /// No description provided for @progressVolumeTypeSets.
+  ///
+  /// In en, this message translates to:
+  /// **'Sets'**
+  String get progressVolumeTypeSets;
+
+  /// No description provided for @progressVolumeTrend.
+  ///
+  /// In en, this message translates to:
+  /// **'Trend'**
+  String get progressVolumeTrend;
+
+  /// No description provided for @progressVolumeTrendLast12Weeks.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 12 weeks'**
+  String get progressVolumeTrendLast12Weeks;
+
+  /// No description provided for @progressVolumeTrendLast12Months.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 12 months'**
+  String get progressVolumeTrendLast12Months;
+
+  /// No description provided for @progressVolumeTrendLast5Years.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 5 years'**
+  String get progressVolumeTrendLast5Years;
+
+  /// No description provided for @progressVolumeUnitSets.
+  ///
+  /// In en, this message translates to:
+  /// **'sets'**
+  String get progressVolumeUnitSets;
+
+  /// No description provided for @progressVolumeUnitWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'kg'**
+  String get progressVolumeUnitWeight;
+
+  /// No description provided for @progressVolumeViewPie.
+  ///
+  /// In en, this message translates to:
+  /// **'Pie'**
+  String get progressVolumeViewPie;
+
+  /// No description provided for @progressVolumeViewList.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get progressVolumeViewList;
+
+  /// No description provided for @progressVolumeTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get progressVolumeTotal;
 }
 
 class _AppLocalizationsDelegate

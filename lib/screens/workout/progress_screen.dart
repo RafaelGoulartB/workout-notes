@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/repositories/analytics_repository.dart';
 import 'package:workout_notes/repositories/exercise_repository.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
+import 'package:workout_notes/utils/pace_calculator.dart';
 import 'package:workout_notes/widgets/collapsible_section.dart';
+import 'package:workout_notes/widgets/goals/goals_section.dart';
 import 'package:workout_notes/widgets/progress/monthly_report_card.dart';
-import 'package:workout_notes/widgets/progress/monthly_volume_chart.dart';
 import 'package:workout_notes/widgets/progress/progress_stat_cards.dart';
 import 'package:workout_notes/widgets/progress/frequency_charts.dart';
 import 'package:workout_notes/widgets/progress/volume_charts.dart';
@@ -14,6 +16,7 @@ import 'package:workout_notes/widgets/progress/duration_recovery_charts.dart';
 import 'package:workout_notes/widgets/progress/body_section_charts.dart';
 import 'package:workout_notes/widgets/progress/exercise_detail_sheet.dart';
 import 'package:workout_notes/widgets/progress/exercise_detail_view.dart';
+import 'package:workout_notes/widgets/progress/cardio_charts.dart';
 
 class ProgressScreen extends StatefulWidget {
   const ProgressScreen({super.key});
@@ -31,7 +34,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   // === OVERVIEW DATA (loaded immediately) ===
   Map<String, dynamic>? _overviewStats;
-  List<Map<String, dynamic>> _monthlyVolume = [];
   Map<String, dynamic>? _monthReport;
   Map<String, dynamic>? _monthComparison;
 
@@ -42,21 +44,18 @@ class _ProgressScreenState extends State<ProgressScreen> {
   bool _isLoadingDuration = false;
   bool _isLoadingRecovery = false;
   bool _isLoadingBody = false;
+  bool _isLoadingCardio = false;
   bool _loadedFrequency = false;
   bool _loadedVolume = false;
   bool _loadedPerformance = false;
   bool _loadedDuration = false;
   bool _loadedRecovery = false;
   bool _loadedBody = false;
+  bool _loadedCardio = false;
 
   // === FREQUENCY DATA ===
   Map<String, int> _heatmapData = {};
   List<Map<String, dynamic>> _workoutDates = [];
-
-  // === VOLUME DATA ===
-  List<Map<String, dynamic>> _volumeByCategory = [];
-  List<Map<String, dynamic>> _topExercises = [];
-  List<Map<String, dynamic>> _energySystems = [];
 
   // === PERFORMANCE DATA ===
   List<Map<String, dynamic>> _allExercises = [];
@@ -73,6 +72,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
   List<Map<String, dynamic>> _bodyData = [];
   List<Map<String, dynamic>> _bodySummary = [];
   List<Map<String, dynamic>> _bodyComposition = [];
+
+  // === CARDIO DATA ===
+  List<Map<String, dynamic>> _cardioWeeklyData = [];
+  List<Map<String, dynamic>> _cardioModalityData = [];
+  List<Map<String, dynamic>> _paceTrendData = [];
+  List<Map<String, dynamic>> _cardioPRs = [];
+  Map<String, dynamic>? _monthlyCardioStats;
+  String? _selectedPaceExerciseId;
+  String? _selectedPaceExerciseName;
+  int _exerciseFilter = 0; // 0=all, 1=strength, 2=cardio
 
   // === EXERCISE DETAIL STATE ===
   Map<String, dynamic>? _selectedHistory;
@@ -96,17 +105,17 @@ class _ProgressScreenState extends State<ProgressScreen> {
     try {
       final results = await Future.wait([
         _analytics.getWorkoutOverviewStats(),
-        _analytics.getMonthlyVolume(),
         _analytics.getMonthlyReport(now.year, now.month),
         _analytics.getMonthComparison(now.year, now.month),
+        _analytics.getMonthlyCardioStats(now.year, now.month),
       ]);
 
       if (!mounted) return;
 
       _overviewStats = results[0] as Map<String, dynamic>;
-      _monthlyVolume = results[1] as List<Map<String, dynamic>>;
-      _monthReport = results[2] as Map<String, dynamic>;
-      _monthComparison = results[3] as Map<String, dynamic>;
+      _monthReport = results[1] as Map<String, dynamic>;
+      _monthComparison = results[2] as Map<String, dynamic>;
+      _monthlyCardioStats = results[3] as Map<String, dynamic>;
 
       setState(() => _isLoading = false);
     } catch (e) {
@@ -141,17 +150,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
     if (_loadedVolume) return;
     setState(() => _isLoadingVolume = true);
     try {
-      final results = await Future.wait([
-        _analytics.getVolumeByCategory(),
-        _analytics.getTopExercisesByVolume(),
-        _analytics.getEnergySystemDistribution(),
-      ]);
-      if (!mounted) return;
-      _volumeByCategory = results[0];
-      _topExercises = results[1];
-      _energySystems = results[2];
+      // The VolumeCharts widget handles its own data fetching lazily when
+      // expanded. We just need to know it should start fetching.
       _loadedVolume = true;
-      setState(() => _isLoadingVolume = false);
+      if (mounted) setState(() => _isLoadingVolume = false);
     } catch (_) {
       if (mounted) setState(() => _isLoadingVolume = false);
     }
@@ -223,6 +225,50 @@ class _ProgressScreenState extends State<ProgressScreen> {
       setState(() => _isLoadingBody = false);
     } catch (_) {
       if (mounted) setState(() => _isLoadingBody = false);
+    }
+  }
+
+  Future<void> _loadCardio() async {
+    if (_loadedCardio) return;
+    setState(() => _isLoadingCardio = true);
+    final now = DateTime.now();
+    try {
+      // Ensure exercises are loaded for the pace selector
+      final futures = <Future>[
+        _analytics.getCardioWeeklyDistance(),
+        _analytics.getCardioDistanceByModality(),
+        _analytics.getCardioPRs(),
+        _analytics.getMonthlyCardioStats(now.year, now.month),
+      ];
+      if (!_loadedPerformance) {
+        futures.add(_exerciseRepo.getExercises());
+      }
+      final results = await Future.wait(futures);
+      if (!mounted) return;
+      _cardioWeeklyData = results[0] as List<Map<String, dynamic>>;
+      _cardioModalityData = results[1] as List<Map<String, dynamic>>;
+      _cardioPRs = results[2] as List<Map<String, dynamic>>;
+      _monthlyCardioStats = results[3] as Map<String, dynamic>;
+      if (!_loadedPerformance && results.length > 4) {
+        _allExercises = results[4] as List<Map<String, dynamic>>;
+        _loadedPerformance = true;
+      }
+      _loadedCardio = true;
+      setState(() => _isLoadingCardio = false);
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingCardio = false);
+    }
+  }
+
+  /// Loads pace trend for a specific cardio exercise.
+  Future<void> _loadPaceForExercise(String exerciseId, String exerciseName) async {
+    _selectedPaceExerciseId = exerciseId;
+    _selectedPaceExerciseName = exerciseName;
+    try {
+      _paceTrendData = await _analytics.getPaceTrend(exerciseId);
+      if (mounted) setState(() {});
+    } catch (_) {
+      if (mounted) setState(() {});
     }
   }
 
@@ -312,11 +358,13 @@ class _ProgressScreenState extends State<ProgressScreen> {
           _buildStatsRow(theme),
           const SizedBox(height: 8),
 
-          // Monthly volume chart
-          if (_monthlyVolume.isNotEmpty) ...[
-            MonthlyVolumeChart(data: _monthlyVolume),
-            const SizedBox(height: 4),
-          ],
+          // === Goals (always visible, no collapsible) ===
+          _buildGoalsHeader(theme),
+          const SizedBox(height: 8),
+          GoalsSection(
+            db: DatabaseHelper.instance,
+            settingsRepo: DatabaseHelper.instance.settingsRepo,
+          ),
 
           // === Collapsible Sections (lazy loaded on expand) ===
           _buildDivider(theme),
@@ -326,6 +374,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
             iconColor: Colors.blue,
             onExpanded: _loadFrequency,
             child: _buildFrequencyContent(theme),
+          ),
+
+          // ── Cardio Section ──
+          _buildDivider(theme),
+          CollapsibleSection(
+            title: AppLocalizations.of(context)!.progressCardio,
+            icon: Icons.directions_run,
+            iconColor: const Color(0xFFE53935),
+            onExpanded: _loadCardio,
+            child: _buildCardioContent(theme),
           ),
 
           _buildDivider(theme),
@@ -395,44 +453,78 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final totalVolume = (stats?['total_volume'] as int?) ?? 0;
     final streak = (stats?['current_streak'] as int?) ?? 0;
 
-    return Row(
+    final cardioStats = _monthlyCardioStats;
+    final cardioDist = (cardioStats?['total_distance'] as num?)?.toDouble() ?? 0;
+    final cardioTime = (cardioStats?['total_time'] as int?) ?? 0;
+    final cardioTimeMin = cardioTime ~/ 60;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: ProgressStatCard(
-            label: AppLocalizations.of(context)!.progressWorkouts,
-            value: '$totalWorkouts',
-            icon: Icons.fitness_center,
-            color: theme.colorScheme.primary,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: ProgressStatCard(
+                label: AppLocalizations.of(context)!.progressWorkouts,
+                value: '$totalWorkouts',
+                icon: Icons.fitness_center,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: ProgressStatCard(
+                label: AppLocalizations.of(context)!.progressSets,
+                value: '$totalSets',
+                icon: Icons.repeat,
+                color: theme.colorScheme.secondary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: ProgressStatCard(
+                label: AppLocalizations.of(context)!.progressStreak,
+                value: '$streak ${streak == 1 ? AppLocalizations.of(context)!.workoutHomeDay : AppLocalizations.of(context)!.workoutHomeDays}',
+                icon: Icons.local_fire_department,
+                color: Colors.orange,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: ProgressStatCard(
-            label: AppLocalizations.of(context)!.progressSets,
-            value: '$totalSets',
-            icon: Icons.repeat,
-            color: theme.colorScheme.secondary,
-          ),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: ProgressStatCard(
-            label: AppLocalizations.of(context)!.commonVolume,
-            value: totalVolume >= 1000
-                ? '${(totalVolume / 1000).toStringAsFixed(1)}k'
-                : '$totalVolume',
-            icon: Icons.auto_graph,
-            color: Colors.teal,
-          ),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: ProgressStatCard(
-            label: AppLocalizations.of(context)!.progressStreak,
-            value: '$streak ${streak == 1 ? AppLocalizations.of(context)!.workoutHomeDay : AppLocalizations.of(context)!.workoutHomeDays}',
-            icon: Icons.local_fire_department,
-            color: Colors.orange,
-          ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: ProgressStatCard(
+                label: AppLocalizations.of(context)!.commonVolume,
+                value: totalVolume >= 1000
+                    ? '${(totalVolume / 1000).toStringAsFixed(1)}k'
+                    : '$totalVolume',
+                icon: Icons.auto_graph,
+                color: Colors.teal,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: ProgressStatCard(
+                label: AppLocalizations.of(context)!.workoutHomeCardioDistance,
+                value: PaceCalculator.formatDistance(cardioDist),
+                icon: Icons.map,
+                color: const Color(0xFFE53935),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: ProgressStatCard(
+                label: AppLocalizations.of(context)!.workoutHomeCardioTime,
+                value: cardioTimeMin >= 60
+                    ? '${cardioTimeMin ~/ 60}h${cardioTimeMin % 60}'
+                    : '${cardioTimeMin}min',
+                icon: Icons.timer_outlined,
+                color: Colors.deepOrange,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -450,16 +542,149 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
+  // ===================== GOALS HEADER (no collapsible) =====================
+
+  Widget _buildGoalsHeader(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.deepPurple.withAlpha(25),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(Icons.flag, size: 18, color: Colors.deepPurple),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          loc.progressGoals.toUpperCase(),
+          style: theme.textTheme.labelSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            loc.progressGoalsSubtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 11,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ===================== CARDIO CONTENT =====================
+
+  Widget _buildCardioContent(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
+    if (_isLoadingCardio) return _sectionLoading(theme);
+    if (!_loadedCardio) return const SizedBox.shrink();
+
+    final cardioStats = _monthlyCardioStats;
+    final totalDist = (cardioStats?['total_distance'] as num?)?.toDouble() ?? 0;
+    final totalTime = (cardioStats?['total_time'] as int?) ?? 0;
+    final cardioSessions = (cardioStats?['cardio_sessions'] as int?) ?? 0;
+    double? avgPace;
+    if (totalDist > 0 && totalTime > 0) {
+      avgPace = totalTime / totalDist;
+    }
+
+    // Compute cardio exercises list for pace trend selector
+    final cardioExercises = _allExercises
+        .where((e) => (e['category_energy'] as String?) == 'aerobic')
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CardioHeader(
+          totalDistance: totalDist,
+          avgPaceSeconds: avgPace,
+          totalTimeSeconds: totalTime,
+          sessionCount: cardioSessions,
+        ),
+        const SizedBox(height: 12),
+
+        if (_cardioWeeklyData.isNotEmpty) ...[
+          WeeklyDistanceChart(data: _cardioWeeklyData),
+          const SizedBox(height: 8),
+        ],
+
+        if (_cardioModalityData.isNotEmpty) ...[
+          DistanceByModalityChart(data: _cardioModalityData),
+          const SizedBox(height: 8),
+        ],
+
+        // Pace trend with exercise selector
+        if (cardioExercises.isNotEmpty) ...[
+          _buildPaceSelector(theme, loc, cardioExercises),
+          const SizedBox(height: 8),
+        ],
+
+        PaceTrendChart(
+          paceData: _paceTrendData,
+          selectedExerciseName: _selectedPaceExerciseName,
+        ),
+        const SizedBox(height: 8),
+
+        CardioPRsCard(prs: _cardioPRs),
+      ],
+    );
+  }
+
+  Widget _buildPaceSelector(ThemeData theme, AppLocalizations loc, List<Map<String, dynamic>> exercises) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            Icon(Icons.search, size: 16, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Expanded(
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  hint: Text(loc.progressSelectExercise, style: theme.textTheme.bodySmall),
+                  value: _selectedPaceExerciseId,
+                  items: exercises.map((e) {
+                    final id = e['id'] as String? ?? '';
+                    final name = e['name'] as String? ?? '';
+                    return DropdownMenuItem(value: id, child: Text(name, style: theme.textTheme.bodySmall));
+                  }).toList(),
+                  onChanged: (id) {
+                    if (id != null) {
+                      final ex = exercises.firstWhere((e) => e['id'] == id);
+                      _loadPaceForExercise(id, ex['name'] as String? ?? '');
+                    }
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ===================== VOLUME CONTENT =====================
 
   Widget _buildVolumeContent(ThemeData theme) {
     if (_isLoadingVolume) return _sectionLoading(theme);
     if (!_loadedVolume) return const SizedBox.shrink();
-    return VolumeCharts(
-      volumeByCategory: _volumeByCategory,
-      energySystems: _energySystems,
-      topExercises: _topExercises,
-    );
+    return VolumeCharts(analytics: _analytics);
   }
 
   // ===================== PERFORMANCE CONTENT =====================
@@ -467,9 +692,66 @@ class _ProgressScreenState extends State<ProgressScreen> {
   Widget _buildPerformanceContent(ThemeData theme) {
     if (_isLoadingPerformance) return _sectionLoading(theme);
     if (!_loadedPerformance) return const SizedBox.shrink();
-    return PerformanceSection(
-      allExercises: _allExercises,
-      onExerciseTap: (id, name, _) => _showExercisePopup(id, name, theme),
+    final loc = AppLocalizations.of(context)!;
+
+    // Filter based on selected tab
+    List<Map<String, dynamic>> filtered;
+    switch (_exerciseFilter) {
+      case 1: // strength only
+        filtered = _allExercises.where((e) => (e['category_energy'] as String?) != 'aerobic').toList();
+        break;
+      case 2: // cardio only
+        filtered = _allExercises.where((e) => (e['category_energy'] as String?) == 'aerobic').toList();
+        break;
+      default:
+        filtered = _allExercises;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Filter pills
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: [
+              _filterPill(loc.progressFilterAll, 0, theme),
+              const SizedBox(width: 6),
+              _filterPill(loc.progressFilterStrength, 1, theme),
+              const SizedBox(width: 6),
+              _filterPill(loc.progressFilterCardio, 2, theme),
+            ],
+          ),
+        ),
+        PerformanceSection(
+          allExercises: filtered,
+          onExerciseTap: (id, name, _) => _showExercisePopup(id, name, theme),
+        ),
+      ],
+    );
+  }
+
+  Widget _filterPill(String label, int filterValue, ThemeData theme) {
+    final isSelected = _exerciseFilter == filterValue;
+    return GestureDetector(
+      onTap: () => setState(() => _exerciseFilter = filterValue),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest.withAlpha(100),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant.withAlpha(80),
+          ),
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
     );
   }
 

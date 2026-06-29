@@ -1,6 +1,9 @@
 import 'package:sqflite/sqflite.dart';
 import 'base_repository.dart';
 
+/// Time bucketing used for the anaerobic volume trend chart.
+enum AnaerobicTrendBucket { week, month, year }
+
 /// Repository for statistics, progress charts, PRs, heatmap, and trends.
 class AnalyticsRepository extends BaseRepository {
   // ===================================================================
@@ -258,6 +261,161 @@ class AnalyticsRepository extends BaseRepository {
       JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
       GROUP BY ec.energy_system
     ''');
+  }
+
+  // ===================================================================
+  // ANAEROBIC VOLUME (strength only, scoped to a date range)
+  // ===================================================================
+
+  /// Volume by muscle group (anaerobic only) for a date range.
+  /// `bySets = true` counts sets; otherwise sums weight*reps.
+  Future<List<Map<String, dynamic>>> getAnaerobicVolumeByCategory(
+    DateTime start,
+    DateTime end, {
+    required bool bySets,
+  }) async {
+    final db = await this.db;
+    final startStr = start.toIso8601String().substring(0, 10);
+    final endStr = end.toIso8601String().substring(0, 10);
+    final valueExpr = bySets ? 'COUNT(s.id)' : 'COALESCE(SUM(s.weight * s.reps), 0)';
+    return db.rawQuery('''
+      SELECT ec.id, ec.name, ec.color,
+        $valueExpr as volume,
+        COUNT(s.id) as sets_count
+      FROM exercise_categories ec
+      JOIN exercises e ON e.category_id = ec.id
+      JOIN exercise_entries ee ON ee.exercise_id = e.id
+      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN workouts w ON ee.workout_id = w.id
+      WHERE ec.energy_system = 'anaerobic'
+        AND w.date >= ? AND w.date <= ?
+      GROUP BY ec.id
+      ORDER BY volume DESC
+    ''', [startStr, endStr]);
+  }
+
+  /// Top exercises (anaerobic only) for a date range.
+  Future<List<Map<String, dynamic>>> getAnaerobicTopExercises(
+    DateTime start,
+    DateTime end, {
+    required bool bySets,
+    int limit = 5,
+  }) async {
+    final db = await this.db;
+    final startStr = start.toIso8601String().substring(0, 10);
+    final endStr = end.toIso8601String().substring(0, 10);
+    final valueExpr = bySets ? 'COUNT(s.id)' : 'COALESCE(SUM(s.weight * s.reps), 0)';
+    return db.rawQuery('''
+      SELECT e.id, e.name, ec.name as category_name, ec.color as category_color,
+        $valueExpr as volume,
+        COUNT(s.id) as sets_count
+      FROM exercises e
+      JOIN exercise_categories ec ON e.category_id = ec.id
+      JOIN exercise_entries ee ON ee.exercise_id = e.id
+      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      JOIN workouts w ON ee.workout_id = w.id
+      WHERE ec.energy_system = 'anaerobic'
+        AND w.date >= ? AND w.date <= ?
+      GROUP BY e.id
+      ORDER BY volume DESC
+      LIMIT ?
+    ''', [startStr, endStr, limit]);
+  }
+
+  /// Time-bucketed trend of anaerobic volume.
+  /// - [AnaerobicTrendBucket.week]   → last 12 ISO weeks
+  /// - [AnaerobicTrendBucket.month]  → last 12 months
+  /// - [AnaerobicTrendBucket.year]   → last 5 years
+  Future<List<Map<String, dynamic>>> getAnaerobicVolumeTrend(
+    DateTime end,
+    AnaerobicTrendBucket bucket, {
+    required bool bySets,
+  }) async {
+    final db = await this.db;
+    final valueExpr = bySets ? 'COUNT(s.id)' : 'COALESCE(SUM(s.weight * s.reps), 0)';
+
+    final List<Map<String, dynamic>> results = [];
+
+    if (bucket == AnaerobicTrendBucket.week) {
+      // 12 weeks ending on the week of `end`. Monday-anchored.
+      const count = 12;
+      final endMonday = end.subtract(Duration(days: end.weekday - 1));
+      for (int i = count - 1; i >= 0; i--) {
+        final weekStart = endMonday.subtract(Duration(days: i * 7));
+        final weekEnd = weekStart.add(const Duration(days: 6));
+        final rows = await db.rawQuery('''
+          SELECT $valueExpr as volume
+          FROM sets s
+          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+          JOIN exercises e ON ee.exercise_id = e.id
+          JOIN exercise_categories ec ON e.category_id = ec.id
+          JOIN workouts w ON ee.workout_id = w.id
+          WHERE ec.energy_system = 'anaerobic'
+            AND s.is_warmup = 0
+            AND w.date >= ? AND w.date <= ?
+        ''', [
+          weekStart.toIso8601String().substring(0, 10),
+          weekEnd.toIso8601String().substring(0, 10),
+        ]);
+        results.add({
+          'bucket_start': weekStart.toIso8601String().substring(0, 10),
+          'volume': (rows.first['volume'] as num?)?.toDouble() ?? 0,
+        });
+      }
+      return results;
+    } else if (bucket == AnaerobicTrendBucket.month) {
+      const count = 12;
+      for (int i = count - 1; i >= 0; i--) {
+        final ref = DateTime(end.year, end.month - i, 1);
+        final nextMonth = ref.month == 12
+            ? DateTime(ref.year + 1, 1, 1)
+            : DateTime(ref.year, ref.month + 1, 1);
+        final lastDay = nextMonth.subtract(const Duration(days: 1));
+        final monthStr =
+            '${ref.year}-${ref.month.toString().padLeft(2, '0')}';
+        final rows = await db.rawQuery('''
+          SELECT $valueExpr as volume
+          FROM sets s
+          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+          JOIN exercises e ON ee.exercise_id = e.id
+          JOIN exercise_categories ec ON e.category_id = ec.id
+          JOIN workouts w ON ee.workout_id = w.id
+          WHERE ec.energy_system = 'anaerobic'
+            AND s.is_warmup = 0
+            AND w.date >= ? AND w.date <= ?
+        ''', [
+          '$monthStr-01',
+          lastDay.toIso8601String().substring(0, 10),
+        ]);
+        results.add({
+          'bucket_start': '$monthStr-01',
+          'volume': (rows.first['volume'] as num?)?.toDouble() ?? 0,
+        });
+      }
+      return results;
+    } else {
+      // year: last 5 calendar years.
+      const count = 5;
+      for (int i = count - 1; i >= 0; i--) {
+        final year = end.year - i;
+        final rows = await db.rawQuery('''
+          SELECT $valueExpr as volume
+          FROM sets s
+          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+          JOIN exercises e ON ee.exercise_id = e.id
+          JOIN exercise_categories ec ON e.category_id = ec.id
+          JOIN workouts w ON ee.workout_id = w.id
+          WHERE ec.energy_system = 'anaerobic'
+            AND s.is_warmup = 0
+            AND w.date >= ? AND w.date <= ?
+        ''', ['$year-01-01', '$year-12-31']);
+        results.add({
+          'bucket_start': '$year-01-01',
+          'volume': (rows.first['volume'] as num?)?.toDouble() ?? 0,
+        });
+      }
+      return results;
+    }
   }
 
   // ===================================================================
@@ -522,6 +680,145 @@ class AnalyticsRepository extends BaseRepository {
       'total_sets': totalSets,
       'total_volume': totalVolume,
       'current_streak': currentStreak,
+    };
+  }
+
+  // ===================================================================
+  // CARDIO STATS
+  // ===================================================================
+
+  /// Weekly cardio distance grouped by modality (running, cycling, etc.)
+  Future<List<Map<String, dynamic>>> getCardioWeeklyDistance({int weeks = 12}) async {
+    final db = await this.db;
+    final start = DateTime.now().subtract(Duration(days: weeks * 7))
+        .toIso8601String().substring(0, 10);
+    return db.rawQuery('''
+      SELECT w.date,
+        ec.name as modality, ec.color as modality_color,
+        s.distance, s.time_seconds, w.id as workout_id,
+        e.name as exercise_name, e.id as exercise_id
+      FROM sets s
+      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+      JOIN exercises e ON ee.exercise_id = e.id
+      JOIN exercise_categories ec ON e.category_id = ec.id
+      JOIN workouts w ON ee.workout_id = w.id
+      WHERE ec.energy_system = 'aerobic' AND s.is_warmup = 0
+        AND s.distance IS NOT NULL AND s.distance > 0
+        AND w.date >= ?
+      ORDER BY w.date ASC
+    ''', [start]);
+  }
+
+  /// Monthly cardio stats (distance, time, sessions) by modality.
+  Future<List<Map<String, dynamic>>> getCardioMonthlyDistance({int months = 6}) async {
+    final db = await this.db;
+    final start = DateTime.now().subtract(Duration(days: months * 31))
+        .toIso8601String().substring(0, 10);
+    return db.rawQuery('''
+      SELECT substr(w.date, 1, 7) as month,
+        ec.name as modality, ec.color as modality_color,
+        SUM(s.distance) as total_distance,
+        SUM(s.time_seconds) as total_time,
+        COUNT(DISTINCT w.id) as sessions
+      FROM sets s
+      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+      JOIN exercises e ON ee.exercise_id = e.id
+      JOIN exercise_categories ec ON e.category_id = ec.id
+      JOIN workouts w ON ee.workout_id = w.id
+      WHERE ec.energy_system = 'aerobic' AND s.is_warmup = 0
+        AND s.distance IS NOT NULL AND s.distance > 0
+        AND w.date >= ?
+      GROUP BY month, ec.id
+      ORDER BY month ASC
+    ''', [start]);
+  }
+
+  /// Total distance grouped by modality (for pie chart).
+  Future<List<Map<String, dynamic>>> getCardioDistanceByModality() async {
+    final db = await this.db;
+    return db.rawQuery('''
+      SELECT ec.id, ec.name as modality, ec.color as modality_color,
+        COALESCE(SUM(s.distance), 0) as total_distance,
+        COUNT(s.id) as sets_count
+      FROM exercise_categories ec
+      JOIN exercises e ON e.category_id = ec.id
+      JOIN exercise_entries ee ON ee.exercise_id = e.id
+      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      WHERE ec.energy_system = 'aerobic' AND s.distance IS NOT NULL AND s.distance > 0
+      GROUP BY ec.id
+      ORDER BY total_distance DESC
+    ''');
+  }
+
+  /// Pace trend (distance + time per session) for a specific cardio exercise.
+  Future<List<Map<String, dynamic>>> getPaceTrend(String exerciseId, {int limit = 30}) async {
+    final db = await this.db;
+    return db.rawQuery('''
+      SELECT w.date,
+        SUM(s.distance) as total_distance,
+        SUM(s.time_seconds) as total_time,
+        COUNT(s.id) as sets_count
+      FROM sets s
+      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+      JOIN workouts w ON ee.workout_id = w.id
+      WHERE ee.exercise_id = ? AND s.is_warmup = 0
+        AND s.distance IS NOT NULL AND s.distance > 0
+        AND s.time_seconds IS NOT NULL AND s.time_seconds > 0
+      GROUP BY w.id
+      ORDER BY w.date ASC
+      LIMIT ?
+    ''', [exerciseId, limit]);
+  }
+
+  /// Cardio personal records: best distance, best pace, longest duration per exercise.
+  Future<List<Map<String, dynamic>>> getCardioPRs({int limit = 20}) async {
+    final db = await this.db;
+    return db.rawQuery('''
+      SELECT e.id as exercise_id, e.name as exercise_name,
+        ec.name as modality, ec.color as modality_color,
+        MAX(s.distance) as best_distance,
+        MAX(s.time_seconds) as best_time,
+        MIN(CAST(s.time_seconds AS REAL) / NULLIF(s.distance, 0)) as best_pace
+      FROM exercises e
+      JOIN exercise_categories ec ON e.category_id = ec.id
+      JOIN exercise_entries ee ON ee.exercise_id = e.id
+      JOIN sets s ON s.exercise_entry_id = ee.id AND s.is_warmup = 0
+      WHERE ec.energy_system = 'aerobic'
+        AND s.distance IS NOT NULL AND s.distance > 0
+      GROUP BY e.id
+      HAVING best_distance > 0
+      ORDER BY best_distance DESC
+      LIMIT ?
+    ''', [limit]);
+  }
+
+  /// Overall cardio stats for a given month.
+  Future<Map<String, dynamic>> getMonthlyCardioStats(int year, int month) async {
+    final db = await this.db;
+    final monthStr = '$year-${month.toString().padLeft(2, '0')}';
+    final row = await db.rawQuery('''
+      SELECT
+        COALESCE(SUM(s.distance), 0) as total_distance,
+        COALESCE(SUM(s.time_seconds), 0) as total_time,
+        COUNT(DISTINCT w.id) as cardio_sessions,
+        COUNT(s.id) as cardio_sets
+      FROM sets s
+      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+      JOIN exercises e ON ee.exercise_id = e.id
+      JOIN exercise_categories ec ON e.category_id = ec.id
+      JOIN workouts w ON ee.workout_id = w.id
+      WHERE ec.energy_system = 'aerobic' AND s.is_warmup = 0
+        AND w.date LIKE ? AND s.distance IS NOT NULL AND s.distance > 0
+    ''', ['$monthStr%']);
+
+    if (row.isEmpty) {
+      return {'total_distance': 0.0, 'total_time': 0, 'cardio_sessions': 0, 'cardio_sets': 0};
+    }
+    return {
+      'total_distance': (row.first['total_distance'] as num?)?.toDouble() ?? 0,
+      'total_time': (row.first['total_time'] as int?) ?? 0,
+      'cardio_sessions': (row.first['cardio_sessions'] as int?) ?? 0,
+      'cardio_sets': (row.first['cardio_sets'] as int?) ?? 0,
     };
   }
 }

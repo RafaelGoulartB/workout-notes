@@ -38,6 +38,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   // Stats for header card
   int _monthWorkouts = 0;
   double _monthVolume = 0;
+  double _monthCardioDistance = 0;
+  int _monthCardioTime = 0;
   int _currentStreak = 0;
 
   // Elapsed time timer for active workout
@@ -96,12 +98,14 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       // Calculate month stats
       final monthStr = monthStart.toIso8601String().substring(0, 7);
       double monthVol = 0;
+      double monthCardioDist = 0;
+      int monthCardioTime = 0;
       int monthCount = 0;
       for (final w in allWorkouts) {
         final wDate = w['date'] as String? ?? '';
         if (wDate.startsWith(monthStr)) {
           monthCount++;
-          // Get volume for this workout
+          // Get volume and cardio distance/time for this workout
           final exercises = await _workoutRepo.getWorkoutExercises(w['id'] as String);
           for (final ee in exercises) {
             final sets = await _workoutRepo.getExerciseSets(ee['id'] as String);
@@ -109,6 +113,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
               if ((s['is_warmup'] as int? ?? 0) == 0) {
                 monthVol += ((s['weight'] as num?)?.toDouble() ?? 0) *
                     ((s['reps'] as int?) ?? 0);
+                monthCardioDist += (s['distance'] as num?)?.toDouble() ?? 0;
+                monthCardioTime += (s['time_seconds'] as int?) ?? 0;
               }
             }
           }
@@ -116,6 +122,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       }
       _monthWorkouts = monthCount;
       _monthVolume = monthVol;
+      _monthCardioDistance = monthCardioDist;
+      _monthCardioTime = monthCardioTime;
 
       final active = await _workoutRepo.getActiveWorkouts();
       final completed = <Map<String, dynamic>>[];
@@ -176,6 +184,18 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
     if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
     return v.toStringAsFixed(0);
+  }
+
+  String _formatDistance(double km) {
+    if (km >= 100) return '${km.toStringAsFixed(0)}k';
+    return km.toStringAsFixed(1);
+  }
+
+  String _formatMinutes(int seconds) {
+    if (seconds <= 0) return '0';
+    final min = seconds ~/ 60;
+    if (min >= 60) return '${min ~/ 60}h${min % 60}';
+    return '${min}min';
   }
 
   String _formatHeaderDate(AppLocalizations loc) {
@@ -445,6 +465,48 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 ),
               ],
             ),
+            if (_monthCardioDistance > 0 || _monthCardioTime > 0) ...[
+              const SizedBox(height: 10),
+              Container(
+                height: 1,
+                color: theme.colorScheme.outlineVariant.withAlpha(60),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _StatItem(
+                      label: loc.workoutHomeCardioDistance,
+                      value: _formatDistance(_monthCardioDistance),
+                      icon: Icons.map,
+                      color: const Color(0xFFE53935),
+                      theme: theme,
+                    ),
+                  ),
+                  _StatDivider(theme: theme),
+                  Expanded(
+                    child: _StatItem(
+                      label: loc.workoutHomeCardioTime,
+                      value: _formatMinutes(_monthCardioTime),
+                      icon: Icons.timer_outlined,
+                      color: Colors.deepOrange,
+                      theme: theme,
+                    ),
+                  ),
+                  _StatDivider(theme: theme),
+                  Expanded(
+                    child: _StatItem(
+                      label: loc.commonTotal,
+                      value: _monthCardioDistance > 0 && _monthCardioTime > 0 ? (_monthCardioTime / _monthCardioDistance).toStringAsFixed(0) : '--',
+                      unit: '/km',
+                      icon: Icons.speed,
+                      color: Colors.brown,
+                      theme: theme,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (lastWorkout.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(

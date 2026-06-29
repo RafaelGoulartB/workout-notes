@@ -21,4 +21,13 @@ class SettingsRepository extends BaseRepository {
     final result = await db.query('app_settings');
     return {for (var row in result) row['key'] as String: row['value'] as String};
   }
+
+  Future<bool> getIsDistanceKm() async {
+    final val = await getSetting('distance_unit');
+    return val != 'mi';
+  }
+
+  Future<void> setDistanceUnitKm(bool isKm) async {
+    await setSetting('distance_unit', isKm ? 'km' : 'mi');
+  }
 }

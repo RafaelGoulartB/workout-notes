@@ -611,6 +611,86 @@ class AppLocalizationsEn extends AppLocalizations {
       'View detailed trends, photos, and body composition charts';
 
   @override
+  String get progressCardio => 'Cardio';
+
+  @override
+  String get progressCardioSubtitle =>
+      'Distance, pace, and cardiovascular tracking';
+
+  @override
+  String get progressCardioWeekly => 'Weekly Distance';
+
+  @override
+  String get progressCardioByModality => 'Distance by Modality';
+
+  @override
+  String get progressCardioPace => 'Pace Trend';
+
+  @override
+  String get progressCardioPRs => 'Cardio Records';
+
+  @override
+  String progressCardioTotal(Object distance) {
+    return 'Total: $distance this month';
+  }
+
+  @override
+  String progressCardioAvgPace(Object pace) {
+    return 'Avg pace: $pace';
+  }
+
+  @override
+  String get progressCardioNoData => 'No cardio workouts yet';
+
+  @override
+  String get progressCardioNoDataCta => 'Start a cardio workout';
+
+  @override
+  String get progressFilterAll => 'All';
+
+  @override
+  String get progressFilterStrength => 'Strength';
+
+  @override
+  String get progressFilterCardio => 'Cardio';
+
+  @override
+  String get progressSelectExercise => 'Select exercise';
+
+  @override
+  String get cardioLongestDistance => 'Longest Distance';
+
+  @override
+  String get cardioLongestDuration => 'Longest Duration';
+
+  @override
+  String get cardioBestPace => 'Best Pace';
+
+  @override
+  String get settingsDistanceUnit => 'Distance Unit';
+
+  @override
+  String get settingsDistanceUnitKm => 'km';
+
+  @override
+  String get settingsDistanceUnitMi => 'mi (miles)';
+
+  @override
+  String get workoutHomeCardioDistance => 'Cardio Dist.';
+
+  @override
+  String get workoutHomeCardioTime => 'Cardio Time';
+
+  @override
+  String get commonDistance => 'Distance';
+
+  @override
+  String get commonPace => 'Pace';
+
+  @override
+  String get commonTotal => 'Total';
+
+  @override
   String get progressBodyComposition => 'Body Composition Evolution';
 
   @override
@@ -720,9 +800,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get progressBodyWeightVsVolume => 'Body Weight vs Workout Volume';
-
-  @override
-  String get progressVolumeByMonth => 'Volume by Month';
 
   @override
   String get bodyTrackerTitle => 'Body Measurements';
@@ -1241,6 +1318,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workoutDetailDeleteConfirm => 'Delete Workout?';
 
   @override
+  String get workoutDetailEdit => 'Edit Workout';
+
+  @override
   String get workoutDetailEditDate => 'Change Date';
 
   @override
@@ -1608,4 +1688,285 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reorderMovedToBottom => 'Moved to bottom';
+
+  @override
+  String get editWorkoutTitle => 'Edit Workout';
+
+  @override
+  String get editWorkoutDateTime => 'Date and Time';
+
+  @override
+  String get editWorkoutStart => 'Start';
+
+  @override
+  String get editWorkoutEnd => 'End';
+
+  @override
+  String get editWorkoutDuration => 'Duration';
+
+  @override
+  String get editWorkoutChangeDate => 'Change Date';
+
+  @override
+  String get editWorkoutChangeStart => 'Change start time';
+
+  @override
+  String get editWorkoutChangeEnd => 'Change end time';
+
+  @override
+  String get editWorkoutChangeStartDate => 'Change start date and time';
+
+  @override
+  String get editWorkoutChangeEndDate => 'Change end date and time';
+
+  @override
+  String get editWorkoutSelectDate => 'Select date';
+
+  @override
+  String get editWorkoutSelectTime => 'Select time';
+
+  @override
+  String get editWorkoutEndAfterStart => 'End time must be after start time';
+
+  @override
+  String get editWorkoutInvalidRange => 'Invalid date range';
+
+  @override
+  String get editWorkoutSaved => 'Workout updated';
+
+  @override
+  String get editWorkoutReorderHint => 'Press and hold an exercise to reorder';
+
+  @override
+  String get editWorkoutAddExercise => 'Add Exercise';
+
+  @override
+  String get progressGoals => 'Goals';
+
+  @override
+  String get progressGoalsSubtitle => 'Track and beat your personal challenges';
+
+  @override
+  String get goalScopeAnaerobic => 'Strength';
+
+  @override
+  String get goalScopeAerobic => 'Cardio';
+
+  @override
+  String get goalMetricVolume => 'Volume';
+
+  @override
+  String get goalMetricDays => 'Days';
+
+  @override
+  String get goalMetricDistance => 'Distance';
+
+  @override
+  String get goalMetricTime => 'Time';
+
+  @override
+  String get goalPeriodWeekly => 'Weekly';
+
+  @override
+  String get goalPeriodMonthly => 'Monthly';
+
+  @override
+  String get goalCreateTitle => 'New Goal';
+
+  @override
+  String get goalEditTitle => 'Edit Goal';
+
+  @override
+  String get goalLabelTitle => 'Title (optional)';
+
+  @override
+  String get goalTitleHint => 'e.g. Hypertrophy month';
+
+  @override
+  String get goalChooseMetric => 'Pick a metric';
+
+  @override
+  String get goalChoosePeriod => 'Period';
+
+  @override
+  String get goalTargetValue => 'Target value';
+
+  @override
+  String get goalTargetHint => 'Numeric value';
+
+  @override
+  String get goalCurrentProgress => 'Current progress';
+
+  @override
+  String goalDaysRemaining(num days) {
+    String _temp0 = intl.Intl.pluralLogic(
+      days,
+      locale: localeName,
+      other: '$days days left',
+      one: '1 day left',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get goalCompleted => 'Goal reached! 🎉';
+
+  @override
+  String get goalKeepGoing => 'Keep pushing!';
+
+  @override
+  String get goalHistory => 'History';
+
+  @override
+  String get goalEmpty => 'No goals yet';
+
+  @override
+  String get goalEmptySubtitle => 'Tap + to create your first goal';
+
+  @override
+  String get goalDelete => 'Delete goal';
+
+  @override
+  String get goalDeleteConfirm => 'Delete this goal?';
+
+  @override
+  String get goalDeleteMessage => 'This action cannot be undone.';
+
+  @override
+  String get goalPaused => 'Paused';
+
+  @override
+  String get goalPausedBadge => 'PAUSED';
+
+  @override
+  String goalAchievementRate(Object rate) {
+    return '$rate% success';
+  }
+
+  @override
+  String get goalGridAdd => 'Add goal';
+
+  @override
+  String goalSuggestedTarget(Object value) {
+    return 'Suggested: $value';
+  }
+
+  @override
+  String get goalPickScope => 'Energy System';
+
+  @override
+  String get goalPickScopeSubtitle => 'Strength or Cardio?';
+
+  @override
+  String get goalStep1 => 'Scope';
+
+  @override
+  String get goalStep2 => 'Metric';
+
+  @override
+  String get goalStep3 => 'Details';
+
+  @override
+  String get goalNoHistory => 'No past periods';
+
+  @override
+  String get goalNoHistoryHint =>
+      'History will appear after the first cycle completes';
+
+  @override
+  String get goalResume => 'Resume';
+
+  @override
+  String get goalPause => 'Pause';
+
+  @override
+  String get goalSaved => 'Goal saved';
+
+  @override
+  String get goalDeleted => 'Goal deleted';
+
+  @override
+  String goalValueVolumeKg(Object value) {
+    return '$value kg';
+  }
+
+  @override
+  String goalValueDistance(Object value) {
+    return '$value km';
+  }
+
+  @override
+  String goalValueTime(Object value) {
+    return '$value';
+  }
+
+  @override
+  String goalValueDays(Object value) {
+    return '$value days';
+  }
+
+  @override
+  String goalValueDaysShort(Object value) {
+    return '${value}d';
+  }
+
+  @override
+  String get goalMotivationNear => 'Almost there — you got this!';
+
+  @override
+  String get goalMotivationMid => 'On track. Keep going!';
+
+  @override
+  String get goalMotivationEarly => 'Let\'s start! Every workout counts.';
+
+  @override
+  String get goalMotivationDone => 'Amazing! You crushed your goal!';
+
+  @override
+  String get goalContributingWorkouts => 'Workouts this period';
+
+  @override
+  String get goalNoContributors => 'No workouts in this period yet';
+
+  @override
+  String get progressPeriodWeek => 'Week';
+
+  @override
+  String get progressPeriodMonth => 'Month';
+
+  @override
+  String get progressPeriodYear => 'Year';
+
+  @override
+  String get progressVolumeTypeWeight => 'Weight';
+
+  @override
+  String get progressVolumeTypeSets => 'Sets';
+
+  @override
+  String get progressVolumeTrend => 'Trend';
+
+  @override
+  String get progressVolumeTrendLast12Weeks => 'Last 12 weeks';
+
+  @override
+  String get progressVolumeTrendLast12Months => 'Last 12 months';
+
+  @override
+  String get progressVolumeTrendLast5Years => 'Last 5 years';
+
+  @override
+  String get progressVolumeUnitSets => 'sets';
+
+  @override
+  String get progressVolumeUnitWeight => 'kg';
+
+  @override
+  String get progressVolumeViewPie => 'Pie';
+
+  @override
+  String get progressVolumeViewList => 'List';
+
+  @override
+  String get progressVolumeTotal => 'Total';
 }

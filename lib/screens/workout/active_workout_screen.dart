@@ -384,6 +384,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final fields = getFieldsForType(type);
     final keys = fields.keys.toList();
     final widgets = <Widget>[];
+    bool hasDistance = false;
 
     for (final key in keys) {
       if (key == 'weight') {
@@ -391,12 +392,48 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       } else if (key == 'reps') {
         widgets.add(_buildRepsControl(ctx, setSheetState, reps, (v) => onFieldChange('reps', v)));
       } else if (key == 'distance') {
+        hasDistance = true;
         widgets.add(_buildDistanceControl(ctx, setSheetState, distance, (v) => onFieldChange('distance', v)));
       } else if (key == 'time_seconds') {
+        if (hasDistance && distance > 0 && timeSeconds > 0) {
+          final pace = timeSeconds / distance;
+          widgets.add(_buildPaceDisplay(ctx, pace));
+        }
         widgets.add(_buildTimeControl(ctx, setSheetState, timeSeconds, (v) => onFieldChange('time_seconds', v)));
       }
     }
     return widgets;
+  }
+
+  Widget _buildPaceDisplay(BuildContext ctx, double paceSecPerKm) {
+    final theme = Theme.of(ctx);
+    final minutes = paceSecPerKm ~/ 60;
+    final seconds = paceSecPerKm.round() % 60;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE53935).withAlpha(15),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.speed, size: 16, color: const Color(0xFFE53935)),
+            const SizedBox(width: 6),
+            Text(
+              'Pace: $minutes:${seconds.toString().padLeft(2, '0')} /km',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFFE53935),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildWeightControl(BuildContext ctx, StateSetter setSheetState, double weight, void Function(double) onChanged) {
@@ -932,12 +969,14 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     }
   }
 
-  /// Compute workout summary: duration, volume, sets, and personal records.
+  /// Compute workout summary: duration, volume, sets, distance/time, and PRs.
   Future<WorkoutSummary> _computeSummary() async {
     int durationSeconds = 0;
     double totalVolume = 0;
     int totalSets = 0;
     int completedSets = 0;
+    double totalDistance = 0;
+    int totalCardioTime = 0;
     final List<PR> prs = [];
 
     if (_timerStart != null) {
@@ -945,23 +984,36 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       durationSeconds = end.difference(_timerStart!).inSeconds;
     }
 
-    // Collect bests from THIS workout per exercise
+    // Collect strength and cardio stats per exercise
     final Map<String, ExerciseBests> thisWorkoutBests = {};
+    final Map<String, CardioBests> thisWorkoutCardio = {};
 
     for (final ex in _exercises) {
       double maxWeight = 0;
       int bestReps = 0;
       double exerciseVolume = 0;
       int exCompletedSets = 0;
+      double exerciseDistance = 0;
+      int exerciseTime = 0;
 
       for (final s in ex.sets) {
         final isComplete = (s['is_complete'] as int?) == 1;
         final isWarmup = (s['is_warmup'] as int?) == 1;
 
-        // Warmup sets are excluded from all metrics — they serve only
-        // as a log/reference for what to do during the workout.
         if (!isWarmup) {
           totalSets++;
+          final dist = (s['distance'] as num?)?.toDouble() ?? 0;
+          final time = (s['time_seconds'] as int?) ?? 0;
+
+          if (dist > 0) {
+            exerciseDistance += dist;
+            totalDistance += dist;
+          }
+          if (time > 0) {
+            exerciseTime += time;
+            totalCardioTime += time;
+          }
+
           if (isComplete) {
             completedSets++;
             final weight = (s['weight'] as num?)?.toDouble() ?? 0;
@@ -987,11 +1039,22 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           completedSets: exCompletedSets,
         );
       }
+
+      // Track cardio bests (longest distance, best pace)
+      if (exerciseDistance > 0 && exerciseTime > 0) {
+        thisWorkoutCardio[ex.exerciseId] = CardioBests(
+          name: ex.localizedName(AppLocalizations.of(context)!),
+          distance: exerciseDistance,
+          timeSeconds: exerciseTime,
+        );
+      }
     }
 
-    // Detect PRs by comparing against historical data (excluding this workout)
-    if (_workoutId != null && thisWorkoutBests.isNotEmpty) {
+    // Detect PRs
+    if (_workoutId != null) {
       final db = await DatabaseHelper.instance.database;
+
+      // Strength PRs
       for (final entry in thisWorkoutBests.entries) {
         final exId = entry.key;
         final current = entry.value;
@@ -1032,6 +1095,36 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           }
         }
       }
+
+      // Cardio PRs (best distance, best pace)
+      for (final entry in thisWorkoutCardio.entries) {
+        final exId = entry.key;
+        final current = entry.value;
+
+        final rows = await db.rawQuery('''
+          SELECT
+            COALESCE(MAX(s.distance), 0) as best_distance,
+            COALESCE(MIN(CAST(s.time_seconds AS REAL) / NULLIF(s.distance, 0)), 999999) as best_pace
+          FROM sets s
+          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+          WHERE ee.exercise_id = ? AND ee.workout_id != ?
+            AND s.is_warmup = 0 AND s.is_complete = 1
+            AND s.distance IS NOT NULL AND s.distance > 0
+        ''', [exId, _workoutId]);
+
+        if (rows.isNotEmpty) {
+          final bestDist =
+              (rows.first['best_distance'] as num?)?.toDouble() ?? 0;
+          if (bestDist > 0 && current.distance >= bestDist) {
+            prs.add(PR(
+              exerciseName: current.name,
+              type: 'distance',
+              value: '${current.distance.toStringAsFixed(1)} km',
+              previous: '${bestDist.toStringAsFixed(1)} km',
+            ));
+          }
+        }
+      }
     }
 
     return WorkoutSummary(
@@ -1039,6 +1132,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       totalVolume: totalVolume,
       totalSets: totalSets,
       completedSets: completedSets,
+      totalDistance: totalDistance,
+      totalCardioTime: totalCardioTime,
       prs: prs,
     );
   }

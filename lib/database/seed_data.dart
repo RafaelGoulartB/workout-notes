@@ -7,7 +7,7 @@ class SeedData {
     {'id': 'triceps', 'name': 'Tríceps', 'locale_key': 'triceps', 'color': 0xFF00ACC1, 'order_index': 4, 'energy_system': 'anaerobic'},
     {'id': 'legs', 'name': 'Pernas', 'locale_key': 'legs', 'color': 0xFF3949AB, 'order_index': 5, 'energy_system': 'anaerobic'},
     {'id': 'core', 'name': 'Abdômen', 'locale_key': 'core', 'color': 0xFFFDD835, 'order_index': 6, 'energy_system': 'anaerobic'},
-    {'id': 'cardio', 'name': 'Cardio', 'locale_key': 'cardio', 'color': 0xFF6D4C41, 'order_index': 7, 'energy_system': 'aerobic'},
+    {'id': 'cardio', 'name': 'Cardio', 'locale_key': 'cardio', 'color': 0xFFE53935, 'order_index': 7, 'energy_system': 'aerobic'},
     {'id': 'fullbody', 'name': 'Corpo Inteiro', 'locale_key': 'fullbody', 'color': 0xFF546E7A, 'order_index': 8, 'energy_system': 'anaerobic'},
     {'id': 'forearms', 'name': 'Antebraço', 'locale_key': 'forearms', 'color': 0xFF8D6E63, 'order_index': 9, 'energy_system': 'anaerobic'},
   ];

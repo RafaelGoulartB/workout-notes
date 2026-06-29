@@ -8,10 +8,11 @@ import '../repositories/routine_repository.dart';
 import '../repositories/body_measurement_repository.dart';
 import '../repositories/analytics_repository.dart';
 import '../repositories/export_import_repository.dart';
+import '../repositories/goal_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 12;
+  static const _dbVersion = 14;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -24,6 +25,7 @@ class DatabaseHelper {
   late final BodyMeasurementRepository bodyMeasurementRepo = BodyMeasurementRepository();
   late final AnalyticsRepository analyticsRepo = AnalyticsRepository();
   late final ExportImportRepository exportImportRepo = ExportImportRepository();
+  late final GoalRepository goalRepo = GoalRepository();
 
   DatabaseHelper._();
 
@@ -200,6 +202,21 @@ class DatabaseHelper {
       CREATE TABLE app_settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
+      )
+    ''');
+
+    // User goals (v13)
+    await db.execute('''
+      CREATE TABLE user_goals (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        scope TEXT NOT NULL,
+        metric TEXT NOT NULL,
+        period TEXT NOT NULL,
+        target_value REAL NOT NULL,
+        created_at TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        color INTEGER
       )
     ''');
 
@@ -466,6 +483,33 @@ class DatabaseHelper {
         } catch (_) {}
       }
     }
+    if (oldVersion < 13) {
+      // User goals table
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS user_goals (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            metric TEXT NOT NULL,
+            period TEXT NOT NULL,
+            target_value REAL NOT NULL,
+            created_at TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            color INTEGER
+          )
+        ''');
+      } catch (_) {}
+    }
+    if (oldVersion < 14) {
+      // Update cardio category color to red (was brown in earlier seeds).
+      try {
+        await db.rawUpdate(
+          'UPDATE exercise_categories SET color = ? WHERE id = ?',
+          [0xFFE53935, 'cardio'],
+        );
+      } catch (_) {}
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -654,6 +698,15 @@ class DatabaseHelper {
       analyticsRepo.getTopExercisesByVolume(limit: limit);
   Future<List<Map<String, dynamic>>> getEnergySystemDistribution() =>
       analyticsRepo.getEnergySystemDistribution();
+  Future<List<Map<String, dynamic>>> getAnaerobicVolumeByCategory(
+          DateTime start, DateTime end, {required bool bySets}) =>
+      analyticsRepo.getAnaerobicVolumeByCategory(start, end, bySets: bySets);
+  Future<List<Map<String, dynamic>>> getAnaerobicTopExercises(
+          DateTime start, DateTime end, {required bool bySets, int limit = 5}) =>
+      analyticsRepo.getAnaerobicTopExercises(start, end, bySets: bySets, limit: limit);
+  Future<List<Map<String, dynamic>>> getAnaerobicVolumeTrend(
+          DateTime end, AnaerobicTrendBucket bucket, {required bool bySets}) =>
+      analyticsRepo.getAnaerobicVolumeTrend(end, bucket, bySets: bySets);
   Future<List<Map<String, dynamic>>> getRpeTrend({int limit = 50}) =>
       analyticsRepo.getRpeTrend(limit: limit);
   Future<List<Map<String, dynamic>>> getWorkoutDensity({int limit = 50}) =>
