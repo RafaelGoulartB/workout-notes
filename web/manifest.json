@@ -1,11 +1,11 @@
 {
-    "name": "workout_notes",
-    "short_name": "workout_notes",
+    "name": "Workout Notes",
+    "short_name": "Workout Notes",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#090E10",
+    "theme_color": "#6CCFF6",
+    "description": "Workout journal for logging sessions, routines, progress and body measurements.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
