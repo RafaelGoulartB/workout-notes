@@ -382,6 +382,7 @@ class WorkoutRepository extends BaseRepository {
         db,
         workoutId,
         exerciseId,
+        completedOnly: false,
       );
       final lastVolume = await _getLastCompletedExerciseVolume(
         db,
@@ -432,6 +433,7 @@ class WorkoutRepository extends BaseRepository {
         db,
         workoutId,
         exerciseId,
+        completedOnly: false,
       );
       acc.lastVolume += await _getLastCompletedExerciseVolume(
         db,
@@ -463,8 +465,10 @@ class WorkoutRepository extends BaseRepository {
   Future<double> _getWorkoutExerciseVolume(
     Database db,
     String workoutId,
-    String exerciseId,
-  ) async {
+    String exerciseId, {
+    required bool completedOnly,
+  }) async {
+    final completeFilter = completedOnly ? 'AND s.is_complete = 1' : '';
     final rows = await db.rawQuery(
       '''
       SELECT COALESCE(SUM(s.weight * s.reps), 0) as volume
@@ -473,7 +477,7 @@ class WorkoutRepository extends BaseRepository {
       JOIN exercises e ON ee.exercise_id = e.id
       WHERE ee.workout_id = ? AND ee.exercise_id = ?
         AND e.type = 'weightReps'
-        AND s.is_complete = 1
+        $completeFilter
         AND s.is_warmup = 0
         AND s.weight IS NOT NULL
         AND s.reps IS NOT NULL
@@ -509,6 +513,7 @@ class WorkoutRepository extends BaseRepository {
       db,
       lastWorkout.first['id'] as String,
       exerciseId,
+      completedOnly: true,
     );
   }
 
