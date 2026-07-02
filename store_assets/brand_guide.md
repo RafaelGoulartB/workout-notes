@@ -1,6 +1,6 @@
 # Workout Notes - Identidade visual
 
-## Direção
+## Direcao
 A nova identidade foi criada a partir da screenshot real do app e das imagens geradas com $imagegen. O visual agora segue o produto atual: fundo quase preto, superficies grafite, cards arredondados, tipografia clara e acentos cyan com detalhe ambar para streak/energia.
 
 ## Paleta
@@ -24,6 +24,8 @@ O icone combina ficha de treino, check de conclusao e halteres. Ele comunica reg
 - `store_assets/screenshots/*.png`
 - `assets/brand/workout_notes_icon_512.png`
 - `assets/brand/workout_notes_icon_1024.png`
+- `android/app/src/main/res/mipmap-*/launch_image.png`
+- `ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage*.png`
 
 ## Prompts usados no $imagegen
 Os prompts priorizaram: dark graphite/cyan Material 3, cards densos, dashboard tecnico de treino, sem texto gerado, sem pessoas, sem estetica generica de academia.

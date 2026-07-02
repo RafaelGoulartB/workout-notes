@@ -10,18 +10,18 @@ import 'screens/workout/workout_home_screen.dart';
 /// List of accent seed colors available in settings.
 class AccentColors {
   static const List<Color> options = [
+    Color(0xFF6CCFF6), // Brand Cyan
+    Color(0xFF005F73), // Deep Cyan
+    Color(0xFFFFB000), // Amber
     Color(0xFFC62828), // Deep Red
     Color(0xFFD84315), // Dark Orange
-    Color(0xFFE65100), // Orange
-    Color(0xFFF9A825), // Amber
     Color(0xFF6A1B9A), // Deep Purple
     Color(0xFF0D47A1), // Dark Blue
     Color(0xFF37474F), // Graphite
-    Color(0xFF4A6741), // Forest Green (default)
   ];
 
-  static const defaultColor = Color(0xFF37474F);
-  static const defaultIndex = 6;
+  static const defaultColor = Color(0xFF6CCFF6);
+  static const defaultIndex = 0;
 
   static int indexOf(Color color) {
     for (int i = 0; i < options.length; i++) {
@@ -29,6 +29,18 @@ class AccentColors {
     }
     return defaultIndex;
   }
+}
+
+class BrandColors {
+  static const background = Color(0xFF090E10);
+  static const surface = Color(0xFF151B1E);
+  static const raisedSurface = Color(0xFF1F262B);
+  static const divider = Color(0xFF293237);
+  static const primaryCyan = Color(0xFF6CCFF6);
+  static const deepCyan = Color(0xFF005F73);
+  static const amber = Color(0xFFFFB000);
+  static const text = Color(0xFFDEE5E9);
+  static const mutedText = Color(0xFFA6B1B8);
 }
 
 /// Simple notifier for accent color and theme mode changes.
@@ -77,7 +89,8 @@ void main() async {
 
   // Load saved settings
   final prefs = await SharedPreferences.getInstance();
-  final savedColor = prefs.getInt('accent_color') ?? AccentColors.defaultColor.toARGB32();
+  final savedColor =
+      prefs.getInt('accent_color') ?? AccentColors.defaultColor.toARGB32();
   final initialColor = Color(savedColor);
 
   final themeModeStr = prefs.getString('theme_mode') ?? 'system';
@@ -96,11 +109,13 @@ void main() async {
   WorkoutNotesApp.themeNotifier = ThemeNotifier(initialColor, initialThemeMode);
   WorkoutNotesApp.localeNotifier = LocaleNotifier(initialLocale);
 
-  runApp(WorkoutNotesApp(
-    initialColor: initialColor,
-    initialThemeMode: initialThemeMode,
-    initialLocale: initialLocale,
-  ));
+  runApp(
+    WorkoutNotesApp(
+      initialColor: initialColor,
+      initialThemeMode: initialThemeMode,
+      initialLocale: initialLocale,
+    ),
+  );
 }
 
 Locale _parseLocale(String value) {
@@ -180,26 +195,56 @@ class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
   }
 
   ThemeData _buildTheme(Color seed, Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+    final colorScheme =
+        ColorScheme.fromSeed(seedColor: seed, brightness: brightness).copyWith(
+          primary: seed,
+          secondary: BrandColors.deepCyan,
+          tertiary: BrandColors.amber,
+          surface: isDark ? BrandColors.surface : null,
+          onPrimary: isDark ? BrandColors.background : null,
+          onSurface: isDark ? BrandColors.text : null,
+        );
+
     return ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: seed,
-        brightness: brightness,
-      ),
+      colorScheme: colorScheme,
       useMaterial3: true,
+      scaffoldBackgroundColor: isDark ? BrandColors.background : null,
+      dividerColor: isDark ? BrandColors.divider : null,
       appBarTheme: AppBarTheme(
         centerTitle: true,
         elevation: 0,
         scrolledUnderElevation: 1,
         backgroundColor: Colors.transparent,
+        foregroundColor: isDark ? BrandColors.text : null,
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        color: isDark ? BrandColors.surface : null,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: isDark ? BrandColors.surface : null,
+        indicatorColor: isDark ? BrandColors.deepCyan : null,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (!isDark) return null;
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: BrandColors.primaryCyan);
+          }
+          return const IconThemeData(color: BrandColors.mutedText);
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (!isDark) return null;
+          final color = states.contains(WidgetState.selected)
+              ? BrandColors.text
+              : BrandColors.mutedText;
+          return TextStyle(color: color, fontWeight: FontWeight.w600);
+        }),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          backgroundColor: isDark ? BrandColors.deepCyan : null,
+          foregroundColor: isDark ? BrandColors.text : null,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -207,10 +252,9 @@ class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
+        fillColor: isDark ? BrandColors.raisedSurface : null,
       ),
     );
   }
