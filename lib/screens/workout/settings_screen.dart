@@ -51,8 +51,17 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
 
   Future<void> _update(String key, String value) async {
     await _settingsRepo.setSetting(key, value);
+    if (!mounted) return;
     _settings[key] = value;
     setState(() {});
+  }
+
+  Future<void> _updateNotificationPreference(String key, bool enabled) async {
+    if (enabled) {
+      await NotificationService.instance.requestPermission();
+    }
+    await _update(key, enabled.toString());
+    await NotificationService.instance.loadSettings();
   }
 
   // ===================== ACTIONS =====================
@@ -140,9 +149,11 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.warning_amber_rounded,
-                  size: 48,
-                  color: Theme.of(ctx).colorScheme.error),
+              Icon(
+                Icons.warning_amber_rounded,
+                size: 48,
+                color: Theme.of(ctx).colorScheme.error,
+              ),
               const SizedBox(height: 16),
               Text(loc.settingsImportWarning),
             ],
@@ -199,9 +210,11 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.warning_amber_rounded,
-                  size: 48,
-                  color: Theme.of(ctx).colorScheme.error),
+              Icon(
+                Icons.warning_amber_rounded,
+                size: 48,
+                color: Theme.of(ctx).colorScheme.error,
+              ),
               const SizedBox(height: 16),
               Text(loc.settingsImportWarning),
             ],
@@ -262,18 +275,20 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.folder_open,
-                    size: 48,
-                    color: Theme.of(ctx).colorScheme.primary),
+                Icon(
+                  Icons.folder_open,
+                  size: 48,
+                  color: Theme.of(ctx).colorScheme.primary,
+                ),
                 const SizedBox(height: 16),
                 Text(loc.settingsNoBackupFile),
                 const SizedBox(height: 8),
                 Text(
                   backupsPath,
                   style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                        fontFamily: 'monospace',
-                        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                      ),
+                    fontFamily: 'monospace',
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -303,14 +318,18 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
                   child: Row(
                     children: [
-                      Icon(Icons.restore_outlined,
-                          size: 18, color: t.colorScheme.primary),
+                      Icon(
+                        Icons.restore_outlined,
+                        size: 18,
+                        color: t.colorScheme.primary,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           loc.settingsImportBackup,
-                          style: t.textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
+                          style: t.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
@@ -334,13 +353,16 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                     itemCount: localBackups.length,
                     itemBuilder: (ctx, i) {
                       final b = localBackups[i];
-                      final dateStr = DateFormat('dd/MM/yyyy HH:mm')
-                          .format(b.createdAt);
+                      final dateStr = DateFormat(
+                        'dd/MM/yyyy HH:mm',
+                      ).format(b.createdAt);
                       return InkWell(
                         onTap: () => Navigator.pop(ctx, b.path),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 12),
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
                           child: Row(
                             children: [
                               Container(
@@ -351,38 +373,38 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                                       .withAlpha(120),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: Icon(Icons.description_outlined,
-                                    size: 20,
-                                    color:
-                                        t.colorScheme.onPrimaryContainer),
+                                child: Icon(
+                                  Icons.description_outlined,
+                                  size: 20,
+                                  color: t.colorScheme.onPrimaryContainer,
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       dateStr,
-                                      style: t.textTheme.bodyMedium
-                                          ?.copyWith(
-                                              fontWeight: FontWeight.w500),
+                                      style: t.textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       b.sizeFormatted,
-                                      style: t.textTheme.bodySmall
-                                          ?.copyWith(
-                                        color: t
-                                            .colorScheme.onSurfaceVariant,
+                                      style: t.textTheme.bodySmall?.copyWith(
+                                        color: t.colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              Icon(Icons.chevron_right,
-                                  color: t.colorScheme.onSurfaceVariant,
-                                  size: 20),
+                              Icon(
+                                Icons.chevron_right,
+                                color: t.colorScheme.onSurfaceVariant,
+                                size: 20,
+                              ),
                             ],
                           ),
                         ),
@@ -408,8 +430,10 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
         builder: (ctx) => AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.content_paste_go,
-                  color: Theme.of(ctx).colorScheme.primary),
+              Icon(
+                Icons.content_paste_go,
+                color: Theme.of(ctx).colorScheme.primary,
+              ),
               const SizedBox(width: 8),
               Text(loc.settingsImportPasteTitle),
             ],
@@ -435,8 +459,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
               child: Text(loc.commonCancel),
             ),
             FilledButton(
-              onPressed: () =>
-                  Navigator.pop(ctx, controller.text),
+              onPressed: () => Navigator.pop(ctx, controller.text),
               child: Text(loc.settingsImport),
             ),
           ],
@@ -463,13 +486,17 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                 child: Row(
                   children: [
-                    Icon(Icons.restore_outlined,
-                        size: 18, color: t.colorScheme.primary),
+                    Icon(
+                      Icons.restore_outlined,
+                      size: 18,
+                      color: t.colorScheme.primary,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       loc.settingsImportBackup,
-                      style: t.textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                      style: t.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -537,8 +564,9 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                Text(AppLocalizations.of(context)!.commonError(e.toString())),
+            content: Text(
+              AppLocalizations.of(context)!.commonError(e.toString()),
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -551,8 +579,9 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(AppLocalizations.of(context)!.settingsDeleteHistoryTitle),
-        content:
-            Text(AppLocalizations.of(context)!.settingsDeleteHistoryContent),
+        content: Text(
+          AppLocalizations.of(context)!.settingsDeleteHistoryContent,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -574,8 +603,9 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                Text(AppLocalizations.of(context)!.settingsDeleteHistorySuccess),
+            content: Text(
+              AppLocalizations.of(context)!.settingsDeleteHistorySuccess,
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -611,8 +641,10 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.fitness_center,
-                color: Theme.of(ctx).colorScheme.primary),
+            Icon(
+              Icons.fitness_center,
+              color: Theme.of(ctx).colorScheme.primary,
+            ),
             const SizedBox(width: 8),
             Text(AppLocalizations.of(ctx)!.appTitle),
           ],
@@ -629,8 +661,8 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
             Text(
               AppLocalizations.of(ctx)!.settingsAboutSubtitle,
               style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -684,9 +716,12 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.settingsTitle,
-            style: theme.textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w600)),
+        title: Text(
+          loc.settingsTitle,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         centerTitle: false,
       ),
       body: _isLoading
@@ -735,8 +770,9 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                       child: Wrap(
                         spacing: 12,
                         runSpacing: 12,
-                        children: List.generate(AccentColors.options.length,
-                            (i) {
+                        children: List.generate(AccentColors.options.length, (
+                          i,
+                        ) {
                           final isSelected = _selectedAccentIndex == i;
                           final color = AccentColors.options[i];
                           return _ColorSwatch(
@@ -820,8 +856,10 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                     _ValuePickerTile(
                       icon: Icons.timer,
                       title: loc.settingsDefaultRest,
-                      currentValue: int.tryParse(
-                              _settings['default_rest_time'] ?? '90') ??
+                      currentValue:
+                          int.tryParse(
+                            _settings['default_rest_time'] ?? '90',
+                          ) ??
                           90,
                       displayValue: _formatRestTime(
                         int.tryParse(_settings['default_rest_time'] ?? '90') ??
@@ -846,8 +884,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                     _SwitchTile(
                       icon: Icons.av_timer,
                       title: loc.settingsAutoStartWorkoutTimer,
-                      subtitle:
-                          loc.settingsAutoStartWorkoutTimerSubtitle,
+                      subtitle: loc.settingsAutoStartWorkoutTimerSubtitle,
                       value: _settings['auto_start_workout_timer'] == 'true',
                       onChanged: (v) =>
                           _update('auto_start_workout_timer', v.toString()),
@@ -877,12 +914,11 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                       subtitle: loc.settingsRestTimerNotifSubtitle,
                       value:
                           _settings['notification_rest_timer_enabled'] !=
-                              'false',
-                      onChanged: (v) {
-                        _update('notification_rest_timer_enabled',
-                            v.toString());
-                        NotificationService.instance.loadSettings();
-                      },
+                          'false',
+                      onChanged: (v) => _updateNotificationPreference(
+                        'notification_rest_timer_enabled',
+                        v,
+                      ),
                     ),
                     if (_settings['notification_rest_timer_enabled'] !=
                         'false') ...[
@@ -892,11 +928,14 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         title: loc.settingsSound,
                         subtitle: loc.settingsRestSoundSubtitle,
                         indent: true,
-                        value: _settings['notification_rest_timer_sound'] !=
+                        value:
+                            _settings['notification_rest_timer_sound'] !=
                             'false',
                         onChanged: (v) {
-                          _update('notification_rest_timer_sound',
-                              v.toString());
+                          _update(
+                            'notification_rest_timer_sound',
+                            v.toString(),
+                          );
                           NotificationService.instance.loadSettings();
                         },
                       ),
@@ -906,11 +945,14 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         title: loc.settingsVibration,
                         subtitle: loc.settingsRestVibrationSubtitle,
                         indent: true,
-                        value: _settings['notification_rest_timer_vibration'] !=
+                        value:
+                            _settings['notification_rest_timer_vibration'] !=
                             'false',
                         onChanged: (v) {
-                          _update('notification_rest_timer_vibration',
-                              v.toString());
+                          _update(
+                            'notification_rest_timer_vibration',
+                            v.toString(),
+                          );
                           NotificationService.instance.loadSettings();
                         },
                       ),
@@ -926,12 +968,11 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                       subtitle: loc.settingsWorkoutTimerNotifSubtitle,
                       value:
                           _settings['notification_workout_timer_enabled'] !=
-                              'false',
-                      onChanged: (v) {
-                        _update('notification_workout_timer_enabled',
-                            v.toString());
-                        NotificationService.instance.loadSettings();
-                      },
+                          'false',
+                      onChanged: (v) => _updateNotificationPreference(
+                        'notification_workout_timer_enabled',
+                        v,
+                      ),
                     ),
                     if (_settings['notification_workout_timer_enabled'] !=
                         'false') ...[
@@ -941,11 +982,14 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         title: loc.settingsSound,
                         subtitle: loc.settingsWorkoutSoundSubtitle,
                         indent: true,
-                        value: _settings['notification_workout_timer_sound'] ==
+                        value:
+                            _settings['notification_workout_timer_sound'] ==
                             'true',
                         onChanged: (v) {
-                          _update('notification_workout_timer_sound',
-                              v.toString());
+                          _update(
+                            'notification_workout_timer_sound',
+                            v.toString(),
+                          );
                           NotificationService.instance.loadSettings();
                         },
                       ),
@@ -957,10 +1001,12 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         indent: true,
                         value:
                             _settings['notification_workout_timer_vibration'] ==
-                                'true',
+                            'true',
                         onChanged: (v) {
-                          _update('notification_workout_timer_vibration',
-                              v.toString());
+                          _update(
+                            'notification_workout_timer_vibration',
+                            v.toString(),
+                          );
                           NotificationService.instance.loadSettings();
                         },
                       ),
@@ -1010,8 +1056,9 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                       icon: Icons.delete_outline,
                       iconColor: Colors.red,
                       title: loc.settingsDeleteAllHistory,
-                      subtitle:
-                          loc.settingsDeleteHistoryContent.split('\n').first,
+                      subtitle: loc.settingsDeleteHistoryContent
+                          .split('\n')
+                          .first,
                       titleColor: Colors.red,
                       onTap: _deleteAllHistory,
                     ),
@@ -1063,8 +1110,7 @@ class _SettingsCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side:
-            BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1080,8 +1126,9 @@ class _SettingsCard extends StatelessWidget {
                   ],
                   Text(
                     title!,
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -1159,8 +1206,7 @@ class _RadioOption extends StatelessWidget {
                   Text(
                     label,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight:
-                          selected ? FontWeight.w600 : FontWeight.w500,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -1236,8 +1282,9 @@ class _SwitchTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.w500),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -1307,8 +1354,10 @@ class _LinkTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.w500, color: fg),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: fg,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -1323,8 +1372,11 @@ class _LinkTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(Icons.chevron_right,
-                color: theme.colorScheme.onSurfaceVariant, size: 20),
+            Icon(
+              Icons.chevron_right,
+              color: theme.colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
           ],
         ),
       ),
@@ -1364,8 +1416,7 @@ class _ColorSwatch extends StatelessWidget {
               color: color,
               borderRadius: BorderRadius.circular(14),
               border: isSelected
-                  ? Border.all(
-                      color: theme.colorScheme.onSurface, width: 2.5)
+                  ? Border.all(color: theme.colorScheme.onSurface, width: 2.5)
                   : Border.all(color: color.withAlpha(120), width: 1),
               boxShadow: isSelected
                   ? [
@@ -1434,8 +1485,9 @@ class _ValuePickerTile extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       sheetTitle,
-                      style: theme.textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -1453,7 +1505,9 @@ class _ValuePickerTile extends StatelessWidget {
                       onTap: () => Navigator.pop(ctx, value),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 14),
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
                         child: Row(
                           children: [
                             Expanded(
@@ -1509,15 +1563,19 @@ class _ValuePickerTile extends StatelessWidget {
                 color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon,
-                  size: 18, color: theme.colorScheme.onSurfaceVariant),
+              child: Icon(
+                icon,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 title,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(fontWeight: FontWeight.w500),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -1529,8 +1587,11 @@ class _ValuePickerTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            Icon(Icons.chevron_right,
-                color: theme.colorScheme.onSurfaceVariant, size: 20),
+            Icon(
+              Icons.chevron_right,
+              color: theme.colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
           ],
         ),
       ),
@@ -1568,17 +1629,23 @@ class _ImportOptionTile extends StatelessWidget {
                 color: theme.colorScheme.primaryContainer.withAlpha(120),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon,
-                  size: 22, color: theme.colorScheme.onPrimaryContainer),
+              child: Icon(
+                icon,
+                size: 22,
+                color: theme.colorScheme.onPrimaryContainer,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: theme.textTheme.bodyLarge
-                          ?.copyWith(fontWeight: FontWeight.w500)),
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
@@ -1592,8 +1659,11 @@ class _ImportOptionTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(Icons.chevron_right,
-                color: theme.colorScheme.onSurfaceVariant, size: 20),
+            Icon(
+              Icons.chevron_right,
+              color: theme.colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
           ],
         ),
       ),

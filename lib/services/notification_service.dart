@@ -18,6 +18,7 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+  bool? _notificationsAllowed;
 
   // ── Notification IDs ──
   static const int _restTimerId = 1001;
@@ -51,7 +52,9 @@ class NotificationService {
   Future<void> init() async {
     if (_initialized) return;
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
@@ -94,18 +97,31 @@ class NotificationService {
   /// Request the POST_NOTIFICATIONS permission on Android 13+.
   /// Returns `true` if already granted or permission was granted.
   Future<bool> requestPermission() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    if (android == null) return true; // not Android
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    if (android == null) {
+      _notificationsAllowed = true;
+      return true; // not Android
+    }
     final granted = await android.requestNotificationsPermission();
-    return granted ?? false;
+    _notificationsAllowed = granted ?? false;
+    return _notificationsAllowed!;
+  }
+
+  Future<bool> _ensureNotificationPermission() async {
+    if (_notificationsAllowed != null) return _notificationsAllowed!;
+    return requestPermission();
   }
 
   // ── Channel updates ──
 
   Future<void> _updateRestChannel() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android == null) return;
 
     await android.createNotificationChannel(
@@ -121,8 +137,10 @@ class NotificationService {
   }
 
   Future<void> _updateWorkoutChannel() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android == null) return;
 
     await android.createNotificationChannel(
@@ -142,6 +160,7 @@ class NotificationService {
   /// Show or update the rest timer countdown notification.
   Future<void> showRestTimer(int remainingSeconds) async {
     if (!_initialized || !_restEnabled) return;
+    if (!await _ensureNotificationPermission()) return;
 
     await _plugin.show(
       _restTimerId,
@@ -167,6 +186,7 @@ class NotificationService {
   /// Show the rest timer completion notification (with sound/vibration).
   Future<void> showRestTimerComplete() async {
     if (!_initialized || !_restEnabled) return;
+    if (!await _ensureNotificationPermission()) return;
 
     // Cancel the ongoing first so a fresh notification alert plays
     await _plugin.cancel(_restTimerId);
@@ -187,7 +207,10 @@ class NotificationService {
           onlyAlertOnce: false, // alert on this specific show
           showWhen: false,
           usesChronometer: false,
-          vibrationPattern: Int64List.fromList([0, 3000]), // vibrate for 3 seconds
+          vibrationPattern: Int64List.fromList([
+            0,
+            3000,
+          ]), // vibrate for 3 seconds
         ),
       ),
     );
@@ -204,6 +227,7 @@ class NotificationService {
   /// The elapsed time is shown in the notification body only (no header timer).
   Future<void> showWorkoutTimer(String elapsedFormatted) async {
     if (!_initialized || !_workoutEnabled) return;
+    if (!await _ensureNotificationPermission()) return;
 
     await _plugin.show(
       _workoutTimerId,
@@ -246,5 +270,4 @@ class NotificationService {
 
   @override
   String toString() => 'NotificationService(initialized: $_initialized)';
-
 }

@@ -244,12 +244,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 14),
-                Divider(
-                  height: 1,
-                  color: theme.colorScheme.outlineVariant.withAlpha(90),
-                ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 if (stats != null)
                   _buildStatsOverview(theme, stats, isActive)
                 else
@@ -307,59 +302,37 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   ) {
     final loc = AppLocalizations.of(context)!;
     final density = stats.densityKgPerMinute;
-    final metrics = <Widget>[
-      _DetailMetricChip(
-        icon: Icons.schedule,
-        label: loc.activeWorkoutTimerDuration,
-        value: isActive
-            ? loc.workoutHomeOngoing
-            : _formatDuration(stats.durationSeconds),
-        color: theme.colorScheme.primary,
-      ),
-      _DetailMetricChip(
-        icon: Icons.monitor_weight,
-        label: loc.commonVolume,
-        value: '${_formatVolume(stats.totalVolume)} ${loc.workoutDetailKg}',
-        color: theme.colorScheme.secondary,
-      ),
-      _DetailMetricChip(
-        icon: Icons.repeat,
-        label: loc.commonSets,
-        value: '${stats.completedSets}/${stats.totalSets}',
-        color: Colors.orange,
-      ),
-      if (density != null)
-        _DetailMetricChip(
-          icon: Icons.speed,
-          label: loc.workoutStatsDensity,
-          value: '${_formatDecimal(density)} ${loc.workoutStatsKgPerMin}',
-          color: Colors.teal,
-        ),
-    ];
-
-    return Column(
+    return Wrap(
+      spacing: 14,
+      runSpacing: 8,
       children: [
-        Row(
-          children: [
-            Expanded(child: metrics[0]),
-            const SizedBox(width: 8),
-            Expanded(child: metrics[1]),
-          ],
+        _InlineMetric(
+          icon: Icons.schedule,
+          label: loc.activeWorkoutTimerDuration,
+          value: isActive
+              ? loc.workoutHomeOngoing
+              : _formatDuration(stats.durationSeconds),
+          color: theme.colorScheme.primary,
         ),
-        if (metrics.length > 2) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: metrics[2]),
-              const SizedBox(width: 8),
-              Expanded(
-                child: metrics.length > 3
-                    ? metrics[3]
-                    : const SizedBox.shrink(),
-              ),
-            ],
+        _InlineMetric(
+          icon: Icons.monitor_weight,
+          label: loc.commonVolume,
+          value: '${_formatVolume(stats.totalVolume)} ${loc.workoutDetailKg}',
+          color: theme.colorScheme.secondary,
+        ),
+        _InlineMetric(
+          icon: Icons.repeat,
+          label: loc.commonSets,
+          value: '${stats.completedSets}/${stats.totalSets}',
+          color: Colors.orange,
+        ),
+        if (density != null)
+          _InlineMetric(
+            icon: Icons.speed,
+            label: loc.workoutStatsDensity,
+            value: '${_formatDecimal(density)} ${loc.workoutStatsKgPerMin}',
+            color: Colors.teal,
           ),
-        ],
       ],
     );
   }
@@ -1129,13 +1102,13 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-class _DetailMetricChip extends StatelessWidget {
+class _InlineMetric extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
   final Color color;
 
-  const _DetailMetricChip({
+  const _InlineMetric({
     required this.icon,
     required this.label,
     required this.value,
@@ -1145,39 +1118,36 @@ class _DetailMetricChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withAlpha(16),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withAlpha(38)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: color),
-          const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 15, color: color),
+        const SizedBox(width: 5),
+        RichText(
+          text: TextSpan(
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
             children: [
-              Text(
-                value,
-                style: theme.textTheme.labelLarge?.copyWith(
+              TextSpan(
+                text: value,
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              Text(
-                label,
-                style: theme.textTheme.labelSmall?.copyWith(
+              TextSpan(
+                text: '  $label',
+                style: TextStyle(
                   color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 10,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
