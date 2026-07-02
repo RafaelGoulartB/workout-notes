@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:workout_notes/models/exercise_with_sets.dart';
+import 'package:workout_notes/models/workout_stats.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'base_repository.dart';
@@ -358,6 +359,137 @@ class WorkoutRepository extends BaseRepository {
       whereArgs: [exerciseEntryId],
       orderBy: 'order_index ASC',
     );
+  }
+
+  Future<WorkoutStats?> getWorkoutStats(String workoutId) async {
+    final db = await this.db;
+    final workout = await _getWorkout(db, workoutId);
+    if (workout == null) return null;
+
+    final entries = await getWorkoutExercises(workoutId);
+    final inputs = <WorkoutStatsExerciseInput>[];
+    for (final entry in entries) {
+      if ((entry['exercise_type'] as String?) != 'weightReps') continue;
+      final sets = await getExerciseSets(entry['id'] as String);
+      inputs.add(
+        WorkoutStatsExerciseInput(
+          exerciseId: entry['exercise_id'] as String? ?? '',
+          name: entry['exercise_name'] as String? ?? '',
+          localeKey: entry['exercise_locale_key'] as String?,
+          categoryId: entry['category_id'] as String?,
+          categoryName: entry['category_name'] as String? ?? '',
+          categoryColor: Color(entry['category_color'] as int? ?? 0xFF757575),
+          sets: sets
+              .map(
+                (set) => WorkoutStatsSetInput(
+                  weight: (set['weight'] as num?)?.toDouble() ?? 0,
+                  reps: (set['reps'] as int?) ?? 0,
+                  isComplete: (set['is_complete'] as int?) == 1,
+                  isWarmup: (set['is_warmup'] as int?) == 1,
+                  rpe: (set['rpe'] as num?)?.toDouble(),
+                ),
+              )
+              .toList(),
+        ),
+      );
+    }
+
+    return WorkoutStats.calculate(
+      workoutId: workoutId,
+      durationSeconds: (workout['duration_seconds'] as int?) ?? 0,
+      exercises: inputs,
+    );
+  }
+
+  Future<WorkoutStatsComparison?> getWorkoutStatsComparison(
+    String workoutId,
+  ) async {
+    final db = await this.db;
+    final current = await getWorkoutStats(workoutId);
+    if (current == null) return null;
+
+    final comparableWorkoutId = await _findComparableWorkoutId(db, workoutId);
+    if (comparableWorkoutId == null) return null;
+
+    final previous = await getWorkoutStats(comparableWorkoutId);
+    if (previous == null) return null;
+
+    return WorkoutStatsComparison(current: current, previous: previous);
+  }
+
+  Future<String?> _findComparableWorkoutId(
+    Database db,
+    String workoutId,
+  ) async {
+    final workout = await _getWorkout(db, workoutId);
+    if (workout == null) return null;
+
+    final routineId = workout['routine_id'] as String?;
+    final currentDate = workout['date'] as String? ?? '';
+    final currentMoment =
+        (workout['end_time'] as String?) ??
+        (workout['start_time'] as String?) ??
+        (workout['created_at'] as String?) ??
+        '';
+    if (routineId != null && routineId.isNotEmpty) {
+      final rows = await db.rawQuery(
+        '''
+        SELECT id
+        FROM workouts
+        WHERE id != ?
+          AND routine_id = ?
+          AND end_time IS NOT NULL
+          AND (
+            date < ?
+            OR (date = ? AND COALESCE(end_time, start_time, created_at, '') < ?)
+          )
+        ORDER BY date DESC, end_time DESC, created_at DESC
+        LIMIT 1
+      ''',
+        [workoutId, routineId, currentDate, currentDate, currentMoment],
+      );
+      if (rows.isNotEmpty) return rows.first['id'] as String;
+    }
+
+    final currentExerciseRows = await db.rawQuery(
+      '''
+      SELECT DISTINCT exercise_id
+      FROM exercise_entries
+      WHERE workout_id = ?
+    ''',
+      [workoutId],
+    );
+    final exerciseIds = currentExerciseRows
+        .map((row) => row['exercise_id'] as String)
+        .toList(growable: false);
+    if (exerciseIds.isEmpty) return null;
+
+    final placeholders = List.filled(exerciseIds.length, '?').join(',');
+    final args = <Object?>[
+      workoutId,
+      currentDate,
+      currentDate,
+      currentMoment,
+      ...exerciseIds,
+    ];
+    final rows = await db.rawQuery('''
+      SELECT w.id, COUNT(DISTINCT ee.exercise_id) as shared_count
+      FROM workouts w
+      JOIN exercise_entries ee ON ee.workout_id = w.id
+      WHERE w.id != ?
+        AND w.end_time IS NOT NULL
+        AND (
+          w.date < ?
+          OR (w.date = ? AND COALESCE(w.end_time, w.start_time, w.created_at, '') < ?)
+        )
+        AND ee.exercise_id IN ($placeholders)
+      GROUP BY w.id
+      HAVING shared_count > 0
+      ORDER BY shared_count DESC, w.date DESC, w.end_time DESC, w.created_at DESC
+      LIMIT 1
+    ''', args);
+    if (rows.isEmpty) return null;
+    return rows.first['id'] as String;
   }
 
   Future<List<ExerciseVolumeComparison>> getExerciseVolumeComparisons(

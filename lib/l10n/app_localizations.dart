@@ -2828,6 +2828,60 @@ abstract class AppLocalizations {
   /// **'By muscle group'**
   String get activeWorkoutByMuscleGroup;
 
+  /// No description provided for @workoutStatsDensity.
+  ///
+  /// In en, this message translates to:
+  /// **'Density'**
+  String get workoutStatsDensity;
+
+  /// No description provided for @workoutStatsKgPerMin.
+  ///
+  /// In en, this message translates to:
+  /// **'kg/min'**
+  String get workoutStatsKgPerMin;
+
+  /// No description provided for @workoutStatsEvolution.
+  ///
+  /// In en, this message translates to:
+  /// **'Evolution'**
+  String get workoutStatsEvolution;
+
+  /// No description provided for @workoutStatsHighlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights'**
+  String get workoutStatsHighlights;
+
+  /// No description provided for @workoutStatsTopSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Top set'**
+  String get workoutStatsTopSet;
+
+  /// No description provided for @workoutStatsHighestVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Highest volume'**
+  String get workoutStatsHighestVolume;
+
+  /// No description provided for @workoutStatsAverageRpe.
+  ///
+  /// In en, this message translates to:
+  /// **'Average RPE'**
+  String get workoutStatsAverageRpe;
+
+  /// No description provided for @workoutStatsVsSimilarWorkout.
+  ///
+  /// In en, this message translates to:
+  /// **'vs similar workout'**
+  String get workoutStatsVsSimilarWorkout;
+
+  /// No description provided for @workoutStatsMuscleVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Muscle volume'**
+  String get workoutStatsMuscleVolume;
+
   /// No description provided for @activeWorkoutOK.
   ///
   /// In en, this message translates to:

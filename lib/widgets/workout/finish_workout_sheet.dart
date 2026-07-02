@@ -28,6 +28,11 @@ class WorkoutSummary {
     final h = durationSeconds ~/ 3600;
     final m = (durationSeconds % 3600) ~/ 60;
     final s = durationSeconds % 60;
+    if (h >= 24) {
+      final d = h ~/ 24;
+      final restH = h % 24;
+      return restH > 0 ? '${d}d ${restH}h' : '${d}d';
+    }
     if (h > 0) {
       return '${h}h${m.toString().padLeft(2, '0')}min';
     }
@@ -42,6 +47,17 @@ class WorkoutSummary {
       return '${(totalVolume / 1000).toStringAsFixed(1)}k';
     }
     return totalVolume.toStringAsFixed(0);
+  }
+
+  double? get densityKgPerMinute {
+    if (durationSeconds <= 0 || totalVolume <= 0) return null;
+    return totalVolume / (durationSeconds / 60.0);
+  }
+
+  String get formattedDensity {
+    final density = densityKgPerMinute;
+    if (density == null) return '--';
+    return density.toStringAsFixed(density >= 10 ? 0 : 1);
   }
 
   String get formattedDistance {
@@ -175,12 +191,64 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
     return Colors.green;
   }
 
+  Widget _buildStatsGrid(
+    BuildContext context,
+    ThemeData theme,
+    WorkoutSummary summary,
+  ) {
+    final loc = AppLocalizations.of(context)!;
+    final firstRow = [
+      StatTile(
+        icon: Icons.timer,
+        label: loc.activeWorkoutTimerDuration,
+        value: summary.formattedDuration,
+        color: theme.colorScheme.primary,
+        theme: theme,
+      ),
+      const SizedBox(width: 8),
+      StatTile(
+        icon: Icons.auto_graph,
+        label: loc.commonVolume,
+        value: '${summary.formattedVolume} kg',
+        color: theme.colorScheme.secondary,
+        theme: theme,
+      ),
+    ];
+
+    final secondRow = [
+      StatTile(
+        icon: Icons.fitness_center,
+        label: loc.commonSets,
+        value: '${summary.completedSets}/${summary.totalSets}',
+        color: Colors.orange,
+        theme: theme,
+      ),
+      if (summary.densityKgPerMinute != null) ...[
+        const SizedBox(width: 8),
+        StatTile(
+          icon: Icons.speed,
+          label: loc.workoutStatsDensity,
+          value: '${summary.formattedDensity} ${loc.workoutStatsKgPerMin}',
+          color: Colors.teal,
+          theme: theme,
+        ),
+      ],
+    ];
+
+    return Column(
+      children: [
+        Row(children: firstRow),
+        const SizedBox(height: 6),
+        Row(children: secondRow),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final s = widget.summary;
-    final completedPct =
-        s.totalSets > 0 ? s.completedSets / s.totalSets : 0.0;
+    final completedPct = s.totalSets > 0 ? s.completedSets / s.totalSets : 0.0;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -197,8 +265,7 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurfaceVariant
-                      .withAlpha(80),
+                  color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -206,8 +273,7 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
 
             // ── Header ──
             Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(24, 16, 24, 0),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
               child: Column(
                 children: [
                   Container(
@@ -219,22 +285,19 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
                     child: Icon(
                       Icons.celebration,
                       size: 36,
-                      color: theme
-                          .colorScheme.onPrimaryContainer,
+                      color: theme.colorScheme.onPrimaryContainer,
                     ),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    AppLocalizations.of(context)!
-                        .activeWorkoutCompleted,
+                    AppLocalizations.of(context)!.activeWorkoutCompleted,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    AppLocalizations.of(context)!
-                        .activeWorkoutSummarySubtitle,
+                    AppLocalizations.of(context)!.activeWorkoutSummarySubtitle,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -247,39 +310,8 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
 
             // ── Stats Grid ──
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                children: [
-                  StatTile(
-                    icon: Icons.timer,
-                    label: AppLocalizations.of(context)!
-                        .activeWorkoutTimerDuration,
-                    value: s.formattedDuration,
-                    color: theme.colorScheme.primary,
-                    theme: theme,
-                  ),
-                  const SizedBox(width: 8),
-                  StatTile(
-                    icon: Icons.auto_graph,
-                    label: AppLocalizations.of(context)!
-                        .commonVolume,
-                    value: '${s.formattedVolume} kg',
-                    color: theme.colorScheme.secondary,
-                    theme: theme,
-                  ),
-                  const SizedBox(width: 8),
-                  StatTile(
-                    icon: Icons.fitness_center,
-                    label: AppLocalizations.of(context)!
-                        .commonSets,
-                    value:
-                        '${s.completedSets}/${s.totalSets}',
-                    color: Colors.orange,
-                    theme: theme,
-                  ),
-                ],
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: _buildStatsGrid(context, theme, s),
             ),
 
             // Progress bar
@@ -308,7 +340,9 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
                   children: [
                     StatTile(
                       icon: Icons.map,
-                      label: AppLocalizations.of(context)!.workoutHomeCardioDistance,
+                      label: AppLocalizations.of(
+                        context,
+                      )!.workoutHomeCardioDistance,
                       value: s.formattedDistance,
                       color: const Color(0xFFE53935),
                       theme: theme,
@@ -316,7 +350,9 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
                     const SizedBox(width: 8),
                     StatTile(
                       icon: Icons.timer_outlined,
-                      label: AppLocalizations.of(context)!.workoutHomeCardioTime,
+                      label: AppLocalizations.of(
+                        context,
+                      )!.workoutHomeCardioTime,
                       value: s.formattedCardioTime,
                       color: Colors.deepOrange,
                       theme: theme,
@@ -326,7 +362,9 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
                       StatTile(
                         icon: Icons.speed,
                         label: AppLocalizations.of(context)!.commonPace,
-                        value: PaceCalculator.formatPace(s.totalCardioTime / s.totalDistance),
+                        value: PaceCalculator.formatPace(
+                          s.totalCardioTime / s.totalDistance,
+                        ),
                         color: Colors.brown,
                         theme: theme,
                       ),
@@ -340,89 +378,73 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
             if (s.prs.isNotEmpty) ...[
               const SizedBox(height: 20),
               Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.emoji_events,
-                            size: 20,
-                            color: Colors.amber.shade700),
+                        Icon(
+                          Icons.emoji_events,
+                          size: 20,
+                          color: Colors.amber.shade700,
+                        ),
                         const SizedBox(width: 8),
                         Text(
-                          AppLocalizations.of(context)!
-                              .activeWorkoutPersonalRecords,
-                          style: theme.textTheme.titleSmall
-                              ?.copyWith(
-                                  fontWeight:
-                                      FontWeight.bold),
+                          AppLocalizations.of(
+                            context,
+                          )!.activeWorkoutPersonalRecords,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    ...s.prs.map((pr) => Container(
-                          margin: const EdgeInsets.only(
-                              bottom: 6),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.withAlpha(20),
-                            borderRadius:
-                                BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.amber
-                                  .withAlpha(60),
+                    ...s.prs.map(
+                      (pr) => Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withAlpha(20),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.amber.withAlpha(60)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.emoji_events,
+                              size: 18,
+                              color: Colors.amber.shade700,
                             ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.emoji_events,
-                                  size: 18,
-                                  color:
-                                      Colors.amber.shade700),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment
-                                          .start,
-                                  children: [
-                                    Text(
-                                      pr.exerciseName,
-                                      style: theme
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(
-                                              fontWeight:
-                                                  FontWeight
-                                                      .w600),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    pr.exerciseName,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                    Text(
-                                      pr.value,
-                                      style: theme
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                        color: theme
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      ),
+                                  ),
+                                  Text(
+                                    pr.value,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                '🎉',
-                                style: theme.textTheme
-                                    .titleMedium,
-                              ),
-                            ],
-                          ),
-                        )),
+                            ),
+                            Text('🎉', style: theme.textTheme.titleMedium),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -431,23 +453,24 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
             // ── Feeling Rating ──
             const SizedBox(height: 20),
             Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.favorite,
-                          size: 18,
-                          color: Colors.red.shade300),
+                      Icon(
+                        Icons.favorite,
+                        size: 18,
+                        color: Colors.red.shade300,
+                      ),
                       const SizedBox(width: 8),
                       Text(
-                        AppLocalizations.of(context)!
-                            .activeWorkoutHowWasWorkout,
-                        style: theme.textTheme.titleSmall
-                            ?.copyWith(
-                                fontWeight:
-                                    FontWeight.bold),
+                        AppLocalizations.of(
+                          context,
+                        )!.activeWorkoutHowWasWorkout,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -458,21 +481,15 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
                       final star = i + 1;
                       final isFilled = star <= _rating;
                       return GestureDetector(
-                        onTap: () =>
-                            setState(() => _rating = star),
+                        onTap: () => setState(() => _rating = star),
                         child: Container(
-                          margin:
-                              const EdgeInsets.symmetric(
-                                  horizontal: 4),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
                           padding: const EdgeInsets.all(6),
                           child: Icon(
-                            isFilled
-                                ? Icons.star
-                                : Icons.star_outline,
+                            isFilled ? Icons.star : Icons.star_outline,
                             color: isFilled
                                 ? Colors.amber
-                                : theme.colorScheme
-                                    .outlineVariant,
+                                : theme.colorScheme.outlineVariant,
                             size: 36,
                           ),
                         ),
@@ -483,14 +500,11 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(_feelingIcon,
-                          size: 16,
-                          color: _feelingColor(theme)),
+                      Icon(_feelingIcon, size: 16, color: _feelingColor(theme)),
                       const SizedBox(width: 6),
                       Text(
                         _feelingLabel,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(
+                        style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: _feelingColor(theme),
                         ),
@@ -504,29 +518,25 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
             // ── Comment ──
             const SizedBox(height: 16),
             Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: TextField(
                 controller: _commentCtl,
                 maxLines: 2,
                 decoration: InputDecoration(
-                  hintText: AppLocalizations.of(context)!
-                      .activeWorkoutCommentHint,
+                  hintText: AppLocalizations.of(
+                    context,
+                  )!.activeWorkoutCommentHint,
                   border: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   filled: true,
-                  fillColor: theme
-                      .colorScheme.surfaceContainerHighest
+                  fillColor: theme.colorScheme.surfaceContainerHighest
                       .withAlpha(80),
                   prefixIcon: Padding(
-                    padding:
-                        const EdgeInsets.only(bottom: 24),
+                    padding: const EdgeInsets.only(bottom: 24),
                     child: Icon(
                       Icons.edit_note,
-                      color: theme
-                          .colorScheme.onSurfaceVariant,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -536,51 +546,40 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
             // ── Buttons ──
             const SizedBox(height: 24),
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                  24, 0, 24, 24),
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
               child: Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () =>
-                          Navigator.pop(context),
+                      onPressed: () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(
-                                vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      child: Text(
-                          AppLocalizations.of(context)!
-                              .commonCancel),
+                      child: Text(AppLocalizations.of(context)!.commonCancel),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     flex: 2,
                     child: FilledButton(
-                      onPressed: () =>
-                          Navigator.pop(context, {
+                      onPressed: () => Navigator.pop(context, {
                         'feeling': _rating,
                         'comment': _commentCtl.text,
                       }),
                       style: FilledButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(
-                                vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                       child: Text(
-                        AppLocalizations.of(context)!
-                            .activeWorkoutFinishWorkout,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold),
+                        AppLocalizations.of(
+                          context,
+                        )!.activeWorkoutFinishWorkout,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),

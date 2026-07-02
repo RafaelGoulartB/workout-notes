@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
+import 'package:workout_notes/models/workout_stats.dart';
 import '../../repositories/workout_repository.dart';
 import '../../services/export_service.dart';
 import 'exercise_detail_tabs_screen.dart';
@@ -20,6 +21,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   final _workoutRepo = WorkoutRepository();
   Map<String, dynamic>? _workout;
   List<_ExerciseWithSets> _exercises = [];
+  WorkoutStats? _stats;
+  WorkoutStatsComparison? _comparison;
   bool _isLoading = true;
 
   @override
@@ -36,37 +39,32 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     }
 
     final entries = await _workoutRepo.getWorkoutExercises(widget.workoutId);
+    final stats = await _workoutRepo.getWorkoutStats(widget.workoutId);
+    final comparison = await _workoutRepo.getWorkoutStatsComparison(
+      widget.workoutId,
+    );
     final exercises = <_ExerciseWithSets>[];
     for (final entry in entries) {
       final sets = await _workoutRepo.getExerciseSets(entry['id'] as String);
-      exercises.add(_ExerciseWithSets(
-        exerciseId: entry['exercise_id'] as String? ?? '',
-        name: entry['exercise_name'] as String? ?? '',
-        localeKey: entry['exercise_locale_key'] as String?,
-        categoryId: entry['category_id'] as String?,
-        categoryName: entry['category_name'] as String? ?? '',
-        categoryColor: Color(entry['category_color'] as int? ?? 0xFF757575),
-        sets: sets,
-      ));
+      exercises.add(
+        _ExerciseWithSets(
+          exerciseId: entry['exercise_id'] as String? ?? '',
+          name: entry['exercise_name'] as String? ?? '',
+          localeKey: entry['exercise_locale_key'] as String?,
+          categoryId: entry['category_id'] as String?,
+          categoryName: entry['category_name'] as String? ?? '',
+          categoryColor: Color(entry['category_color'] as int? ?? 0xFF757575),
+          sets: sets,
+        ),
+      );
     }
 
     setState(() {
       _exercises = exercises;
+      _stats = stats;
+      _comparison = comparison;
       _isLoading = false;
     });
-  }
-
-  int get _totalSets => _exercises.fold<int>(0, (sum, e) => sum + e.sets.where((s) => (s['is_warmup'] as int?) != 1).length);
-  double get _totalVolume {
-    double v = 0;
-    for (final e in _exercises) {
-      for (final s in e.sets) {
-        final weight = (s['weight'] as num?)?.toDouble() ?? 0;
-        final reps = (s['reps'] as int?) ?? 0;
-        if ((s['is_warmup'] as int?) != 1) v += weight * reps;
-      }
-    }
-    return v;
   }
 
   @override
@@ -75,28 +73,76 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_workout != null
-            ? DateFormat(Intl.defaultLocale?.startsWith('pt') == true ? "d 'de' MMMM" : 'MMMM d', Intl.defaultLocale).format(DateTime.parse(_workout!['date'] as String))
-            : AppLocalizations.of(context)!.workoutDetailContinue),
+        title: Text(
+          _workout != null
+              ? DateFormat(
+                  Intl.defaultLocale?.startsWith('pt') == true
+                      ? "d 'de' MMMM"
+                      : 'MMMM d',
+                  Intl.defaultLocale,
+                ).format(DateTime.parse(_workout!['date'] as String))
+              : AppLocalizations.of(context)!.workoutDetailContinue,
+        ),
         centerTitle: true,
         actions: [
           PopupMenuButton(
             itemBuilder: (ctx) => [
-              PopupMenuItem(value: 'continue', child: Row(
-                children: [Icon(Icons.play_arrow, size: 18, color: Colors.green), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailContinue, style: TextStyle(color: Colors.green))],
-              )),
-              PopupMenuItem(value: 'edit', child: Row(
-                children: [Icon(Icons.edit_outlined, size: 18), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailEdit)],
-              )),
-              PopupMenuItem(value: 'edit_date', child: Row(
-                children: [Icon(Icons.calendar_today, size: 18), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailEditDate)],
-              )),
-              PopupMenuItem(value: 'copy', child: Row(
-                children: [Icon(Icons.content_copy, size: 18), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailCopy)],
-              )),
-              PopupMenuItem(value: 'delete', child: Row(
-                children: [Icon(Icons.delete_outline, size: 18, color: Colors.red), SizedBox(width: 8), Text(AppLocalizations.of(context)!.workoutDetailDelete, style: TextStyle(color: Colors.red))],
-              )),
+              PopupMenuItem(
+                value: 'continue',
+                child: Row(
+                  children: [
+                    Icon(Icons.play_arrow, size: 18, color: Colors.green),
+                    SizedBox(width: 8),
+                    Text(
+                      AppLocalizations.of(context)!.workoutDetailContinue,
+                      style: TextStyle(color: Colors.green),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text(AppLocalizations.of(context)!.workoutDetailEdit),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'edit_date',
+                child: Row(
+                  children: [
+                    Icon(Icons.calendar_today, size: 18),
+                    SizedBox(width: 8),
+                    Text(AppLocalizations.of(context)!.workoutDetailEditDate),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'copy',
+                child: Row(
+                  children: [
+                    Icon(Icons.content_copy, size: 18),
+                    SizedBox(width: 8),
+                    Text(AppLocalizations.of(context)!.workoutDetailCopy),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text(
+                      AppLocalizations.of(context)!.workoutDetailDelete,
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ],
+                ),
+              ),
             ],
             onSelected: (v) {
               if (v == 'continue') _continueWorkout();
@@ -128,7 +174,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                   // Exercises
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => _buildExerciseCard(_exercises[index], theme),
+                      (context, index) =>
+                          _buildExerciseCard(_exercises[index], theme),
                       childCount: _exercises.length,
                     ),
                   ),
@@ -144,59 +191,407 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
 
   Widget _buildHeader(ThemeData theme) {
     if (_workout == null) return const SizedBox.shrink();
-    final date = DateFormat(Intl.defaultLocale?.startsWith('pt') == true ? "EEEE, d 'de' MMMM 'de' yyyy" : 'EEEE, MMMM d, yyyy', Intl.defaultLocale).format(
-      DateTime.parse(_workout!['date'] as String));
+    final date = DateFormat(
+      Intl.defaultLocale?.startsWith('pt') == true
+          ? "EEEE, d 'de' MMMM 'de' yyyy"
+          : 'EEEE, MMMM d, yyyy',
+      Intl.defaultLocale,
+    ).format(DateTime.parse(_workout!['date'] as String));
     final end = _workout!['end_time'] as String?;
     final duration = (_workout!['duration_seconds'] as int?) ?? 0;
     final feeling = (_workout!['feeling_rating'] as int?) ?? 0;
     final comment = _workout!['comment'] as String?;
+    final stats = _stats;
 
     final isActive = end == null;
 
     return Padding(
       padding: const EdgeInsets.all(16),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(date[0].toUpperCase() + date.substring(1), style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _InfoChip(icon: Icons.schedule, label: isActive ? AppLocalizations.of(context)!.workoutHomeOngoing : AppLocalizations.of(context)!.workoutDetailDuration(duration ~/ 60, duration % 60)),
-                  const SizedBox(width: 8),
-                  _InfoChip(icon: Icons.repeat, label: '$_totalSets ${AppLocalizations.of(context)!.commonSets.toLowerCase()}'),
-                  const SizedBox(width: 8),
-                  if (_totalVolume > 0)
-                    _InfoChip(icon: Icons.monitor_weight, label: '${_totalVolume.toStringAsFixed(0)} ${AppLocalizations.of(context)!.workoutDetailKg}'),
-                ],
-              ),
-              if (feeling > 0) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: List.generate(5, (i) => Icon(
-                    i < feeling ? Icons.star : Icons.star_border,
-                    size: 18, color: Colors.amber,
-                  )),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildSectionCard(
+            theme,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  date[0].toUpperCase() + date.substring(1),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
+                if (feeling > 0) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: List.generate(
+                      5,
+                      (i) => Icon(
+                        i < feeling ? Icons.star : Icons.star_border,
+                        size: 20,
+                        color: Colors.amber,
+                      ),
+                    ),
+                  ),
+                ],
+                if (comment != null && comment.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    comment,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                Divider(
+                  height: 1,
+                  color: theme.colorScheme.outlineVariant.withAlpha(90),
+                ),
+                const SizedBox(height: 14),
+                if (stats != null)
+                  _buildStatsOverview(theme, stats, isActive)
+                else
+                  _InfoChip(
+                    icon: Icons.schedule,
+                    label: isActive
+                        ? AppLocalizations.of(context)!.workoutHomeOngoing
+                        : _formatDuration(duration),
+                  ),
               ],
-              if (comment != null && comment.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(comment, style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic)),
-              ],
-            ],
+            ),
           ),
-        ),
+          if (_comparison != null && _comparison!.hasAnyDelta) ...[
+            const SizedBox(height: 10),
+            _buildSectionCard(
+              theme,
+              child: _buildEvolutionSection(theme, _comparison!),
+            ),
+          ],
+          if (stats != null && _hasHighlights(stats)) ...[
+            const SizedBox(height: 10),
+            _buildSectionCard(
+              theme,
+              child: _buildHighlightsSection(theme, stats),
+            ),
+          ],
+          if (stats != null && stats.categories.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _buildSectionCard(
+              theme,
+              child: _buildCategoryVolumeSection(theme, stats),
+            ),
+          ],
+        ],
       ),
     );
+  }
+
+  Widget _buildSectionCard(ThemeData theme, {required Widget child}) {
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
+    );
+  }
+
+  Widget _buildStatsOverview(
+    ThemeData theme,
+    WorkoutStats stats,
+    bool isActive,
+  ) {
+    final loc = AppLocalizations.of(context)!;
+    final density = stats.densityKgPerMinute;
+    final metrics = <Widget>[
+      _DetailMetricChip(
+        icon: Icons.schedule,
+        label: loc.activeWorkoutTimerDuration,
+        value: isActive
+            ? loc.workoutHomeOngoing
+            : _formatDuration(stats.durationSeconds),
+        color: theme.colorScheme.primary,
+      ),
+      _DetailMetricChip(
+        icon: Icons.monitor_weight,
+        label: loc.commonVolume,
+        value: '${_formatVolume(stats.totalVolume)} ${loc.workoutDetailKg}',
+        color: theme.colorScheme.secondary,
+      ),
+      _DetailMetricChip(
+        icon: Icons.repeat,
+        label: loc.commonSets,
+        value: '${stats.completedSets}/${stats.totalSets}',
+        color: Colors.orange,
+      ),
+      if (density != null)
+        _DetailMetricChip(
+          icon: Icons.speed,
+          label: loc.workoutStatsDensity,
+          value: '${_formatDecimal(density)} ${loc.workoutStatsKgPerMin}',
+          color: Colors.teal,
+        ),
+    ];
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(child: metrics[0]),
+            const SizedBox(width: 8),
+            Expanded(child: metrics[1]),
+          ],
+        ),
+        if (metrics.length > 2) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: metrics[2]),
+              const SizedBox(width: 8),
+              Expanded(
+                child: metrics.length > 3
+                    ? metrics[3]
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildEvolutionSection(
+    ThemeData theme,
+    WorkoutStatsComparison comparison,
+  ) {
+    final loc = AppLocalizations.of(context)!;
+    final densityDelta = comparison.densityDelta;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle(
+          icon: Icons.trending_up,
+          title: loc.workoutStatsEvolution,
+          subtitle: loc.workoutStatsVsSimilarWorkout,
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _DeltaPill(
+              label: loc.commonVolume,
+              value:
+                  '${_formatSignedVolume(comparison.volumeDelta)} ${loc.workoutDetailKg}',
+              delta: comparison.volumeDelta,
+            ),
+            if (densityDelta != null)
+              _DeltaPill(
+                label: loc.workoutStatsDensity,
+                value:
+                    '${_formatSignedDecimal(densityDelta)} ${loc.workoutStatsKgPerMin}',
+                delta: densityDelta,
+              ),
+            _DeltaPill(
+              label: loc.commonSets,
+              value: _formatSignedInt(comparison.setsDelta),
+              delta: comparison.setsDelta.toDouble(),
+            ),
+            _DeltaPill(
+              label: loc.activeWorkoutTimerDuration,
+              value: _formatSignedDuration(comparison.durationDelta),
+              delta: comparison.durationDelta.toDouble(),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHighlightsSection(ThemeData theme, WorkoutStats stats) {
+    final loc = AppLocalizations.of(context)!;
+    final topSet = stats.topSet;
+    final highest = stats.highestVolumeExercise;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle(icon: Icons.bolt, title: loc.workoutStatsHighlights),
+        const SizedBox(height: 8),
+        if (topSet != null)
+          _HighlightRow(
+            icon: Icons.whatshot,
+            label: loc.workoutStatsTopSet,
+            value:
+                '${_localizedExercise(topSet.exerciseName, topSet.exerciseLocaleKey)} · ${_formatWeight(topSet.weight)} x ${topSet.reps}',
+          ),
+        if (highest != null)
+          _HighlightRow(
+            icon: Icons.auto_graph,
+            label: loc.workoutStatsHighestVolume,
+            value:
+                '${_localizedExercise(highest.name, highest.localeKey)} · ${_formatVolume(highest.volume)} ${loc.workoutDetailKg}',
+          ),
+        if (stats.averageRpe != null)
+          _HighlightRow(
+            icon: Icons.speed,
+            label: loc.workoutStatsAverageRpe,
+            value: stats.averageRpe!.toStringAsFixed(1),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryVolumeSection(ThemeData theme, WorkoutStats stats) {
+    final loc = AppLocalizations.of(context)!;
+    final maxVolume = stats.categories.fold<double>(
+      0,
+      (max, category) => category.volume > max ? category.volume : max,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle(
+          icon: Icons.donut_small,
+          title: loc.workoutStatsMuscleVolume,
+        ),
+        const SizedBox(height: 8),
+        ...stats.categories.take(5).map((category) {
+          final name = category.categoryId != null
+              ? ExerciseLocaleHelper.categoryNameFromId(
+                  loc,
+                  category.categoryId!,
+                )
+              : category.categoryName;
+          final width = maxVolume > 0
+              ? (category.volume / maxVolume).clamp(0.0, 1.0)
+              : 0.0;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 86,
+                  child: Text(
+                    name,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Stack(
+                      children: [
+                        Container(
+                          height: 8,
+                          color: theme.colorScheme.surfaceContainerHighest,
+                        ),
+                        FractionallySizedBox(
+                          widthFactor: width.toDouble(),
+                          child: Container(
+                            height: 8,
+                            color: category.categoryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${_formatVolume(category.volume)} ${loc.workoutDetailKg}',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  bool _hasHighlights(WorkoutStats stats) {
+    return stats.topSet != null ||
+        stats.highestVolumeExercise != null ||
+        stats.averageRpe != null;
+  }
+
+  String _localizedExercise(String name, String? localeKey) {
+    if (localeKey != null) {
+      final translated = ExerciseLocaleHelper.exerciseNameFromKey(
+        AppLocalizations.of(context)!,
+        localeKey,
+      );
+      if (translated.isNotEmpty) return translated;
+    }
+    return name;
+  }
+
+  String _formatDuration(int seconds) {
+    if (seconds <= 0) return '--';
+    return _formatDurationCompact(seconds);
+  }
+
+  String _formatDurationCompact(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    if (minutes >= 24 * 60) {
+      final days = minutes ~/ (24 * 60);
+      final hours = (minutes % (24 * 60)) ~/ 60;
+      return hours > 0 ? '${days}d ${hours}h' : '${days}d';
+    }
+    if (minutes >= 60) {
+      final hours = minutes ~/ 60;
+      final restMinutes = minutes % 60;
+      return restMinutes > 0 ? '${hours}h${restMinutes}min' : '${hours}h';
+    }
+    return AppLocalizations.of(
+      context,
+    )!.workoutDetailDuration(minutes, remainingSeconds);
+  }
+
+  String _formatSignedDuration(int seconds) {
+    if (seconds == 0) return '0min';
+    final sign = seconds > 0 ? '+' : '-';
+    return '$sign${_formatDurationCompact(seconds.abs())}';
+  }
+
+  String _formatVolume(double value) {
+    return NumberFormat.decimalPattern(
+      AppLocalizations.of(context)!.localeName,
+    ).format(value.round());
+  }
+
+  String _formatSignedVolume(double value) {
+    final prefix = value > 0 ? '+' : '';
+    return '$prefix${_formatVolume(value)}';
+  }
+
+  String _formatDecimal(double value) {
+    return value.toStringAsFixed(value.abs() >= 10 ? 0 : 1);
+  }
+
+  String _formatSignedDecimal(double value) {
+    final prefix = value > 0 ? '+' : '';
+    return '$prefix${_formatDecimal(value)}';
+  }
+
+  String _formatSignedInt(int value) {
+    final prefix = value > 0 ? '+' : '';
+    return '$prefix$value';
+  }
+
+  String _formatWeight(double value) {
+    return '${value.toStringAsFixed(value % 1 == 0 ? 0 : 1)}kg';
   }
 
   void _showExerciseModal(BuildContext context, _ExerciseWithSets exercise) {
@@ -212,12 +607,18 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                 child: Row(
                   children: [
-                    Icon(Icons.fitness_center, size: 18, color: theme.colorScheme.primary),
+                    Icon(
+                      Icons.fitness_center,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         exercise.name,
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
@@ -226,7 +627,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.open_in_new),
-                title: Text(AppLocalizations.of(context)!.workoutDetailViewExercise),
+                title: Text(
+                  AppLocalizations.of(context)!.workoutDetailViewExercise,
+                ),
                 subtitle: Text(exercise.name),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
@@ -250,6 +653,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   }
 
   Widget _buildExerciseCard(_ExerciseWithSets exercise, ThemeData theme) {
+    final exerciseStats = _exerciseStatsFor(exercise.exerciseId);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: GestureDetector(
@@ -258,69 +662,201 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+            side: BorderSide(
+              color: theme.colorScheme.outlineVariant.withAlpha(80),
+            ),
           ),
           child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(width: 4, height: 24, decoration: BoxDecoration(
-                    color: exercise.categoryColor, borderRadius: BorderRadius.circular(2),
-                  )),
-                  const SizedBox(width: 10),
-                  Text(exercise.localizedName(AppLocalizations.of(context)!), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                  const SizedBox(width: 8),
-                  Text(exercise.localizedCategory(AppLocalizations.of(context)!), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (exercise.sets.isEmpty)
-                Text(AppLocalizations.of(context)!.workoutDetailNoSets, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant))
-              else ...[
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Row(
                   children: [
-                    const SizedBox(width: 34),
-                    Expanded(flex: 2, child: Text(AppLocalizations.of(context)!.workoutDetailSetNumber, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                    Expanded(flex: 3, child: Text(AppLocalizations.of(context)!.workoutDetailWeight, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                    Expanded(flex: 3, child: Text(AppLocalizations.of(context)!.commonReps, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                    Expanded(flex: 3, child: Text(AppLocalizations.of(context)!.workoutDetailRpe, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
+                    Container(
+                      width: 4,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: exercise.categoryColor,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      exercise.localizedName(AppLocalizations.of(context)!),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      exercise.localizedCategory(AppLocalizations.of(context)!),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
-                const Divider(height: 4),
-                ...exercise.sets.asMap().entries.map((entry) {
-                  final i = entry.key;
-                  final s = entry.value;
-                  final isWarmup = (s['is_warmup'] as int?) == 1;
-                  final isComplete = (s['is_complete'] as int?) == 1;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      children: [
-                        Container(width: 24, height: 24, decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isComplete ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest,
-                        ), child: isComplete
-                            ? Icon(Icons.check, size: 14, color: theme.colorScheme.onPrimary)
-                            : null),
-                        const SizedBox(width: 10),
-                        Expanded(flex: 2, child: Text(isWarmup ? 'W' : '${i + 1}',
-                            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: isWarmup ? Colors.orange : null))),
-                        Expanded(flex: 3, child: Text((s['weight'] as num?)?.toStringAsFixed(1) ?? '-', style: theme.textTheme.bodyMedium)),
-                        Expanded(flex: 3, child: Text((s['reps'] as int?)?.toString() ?? '-', style: theme.textTheme.bodyMedium)),
-                        Expanded(flex: 3, child: Text((s['rpe'] as num?)?.toStringAsFixed(1) ?? '-', style: theme.textTheme.bodyMedium)),
-                      ],
+                if (exerciseStats != null) ...[
+                  const SizedBox(height: 8),
+                  _buildExerciseStatsStrip(theme, exerciseStats),
+                ],
+                const SizedBox(height: 8),
+                if (exercise.sets.isEmpty)
+                  Text(
+                    AppLocalizations.of(context)!.workoutDetailNoSets,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
-                  );
-                }),
+                  )
+                else ...[
+                  Row(
+                    children: [
+                      const SizedBox(width: 34),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          AppLocalizations.of(context)!.workoutDetailSetNumber,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          AppLocalizations.of(context)!.workoutDetailWeight,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          AppLocalizations.of(context)!.commonReps,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 3,
+                        child: Text(
+                          AppLocalizations.of(context)!.workoutDetailRpe,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 4),
+                  ...exercise.sets.asMap().entries.map((entry) {
+                    final i = entry.key;
+                    final s = entry.value;
+                    final isWarmup = (s['is_warmup'] as int?) == 1;
+                    final isComplete = (s['is_complete'] as int?) == 1;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isComplete
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.surfaceContainerHighest,
+                            ),
+                            child: isComplete
+                                ? Icon(
+                                    Icons.check,
+                                    size: 14,
+                                    color: theme.colorScheme.onPrimary,
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              isWarmup ? 'W' : '${i + 1}',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: isWarmup ? Colors.orange : null,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              (s['weight'] as num?)?.toStringAsFixed(1) ?? '-',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              (s['reps'] as int?)?.toString() ?? '-',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              (s['rpe'] as num?)?.toStringAsFixed(1) ?? '-',
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
-    ),
+    );
+  }
+
+  ExerciseWorkoutStats? _exerciseStatsFor(String exerciseId) {
+    final stats = _stats;
+    if (stats == null) return null;
+    for (final exercise in stats.exercises) {
+      if (exercise.exerciseId == exerciseId) return exercise;
+    }
+    return null;
+  }
+
+  Widget _buildExerciseStatsStrip(ThemeData theme, ExerciseWorkoutStats stats) {
+    final loc = AppLocalizations.of(context)!;
+    final topSet = stats.topSet;
+    final parts = [
+      '${_formatVolume(stats.volume)} ${loc.workoutDetailKg}',
+      '${stats.completedSets} ${loc.commonSets.toLowerCase()}',
+      if (topSet != null)
+        '${loc.workoutStatsTopSet}: ${_formatWeight(topSet.weight)} x ${topSet.reps}',
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        parts.join(' · '),
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+        ),
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 
@@ -337,7 +873,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
               final result = await Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ActiveWorkoutScreen(workoutId: widget.workoutId),
+                  builder: (_) =>
+                      ActiveWorkoutScreen(workoutId: widget.workoutId),
                 ),
               );
               if (result == true) _load();
@@ -352,7 +889,10 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
           TextButton.icon(
             onPressed: () => _deleteWorkout(),
             icon: const Icon(Icons.delete_outline, color: Colors.red),
-            label: Text(AppLocalizations.of(context)!.workoutDetailDelete, style: TextStyle(color: Colors.red)),
+            label: Text(
+              AppLocalizations.of(context)!.workoutDetailDelete,
+              style: TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -373,7 +913,12 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.workoutDetailDateChanged), behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.workoutDetailDateChanged,
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -410,11 +955,16 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       helpText: AppLocalizations.of(context)!.workoutDetailCopy,
     );
     if (newDate != null && mounted) {
-      final newWorkoutId = await _workoutRepo.copyWorkoutToDate(widget.workoutId, newDate);
+      final newWorkoutId = await _workoutRepo.copyWorkoutToDate(
+        widget.workoutId,
+        newDate,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(AppLocalizations.of(context)!.workoutDetailCopyDateChanged),
+            content: Text(
+              AppLocalizations.of(context)!.workoutDetailCopyDateChanged,
+            ),
             behavior: SnackBarBehavior.floating,
             action: SnackBarAction(
               label: AppLocalizations.of(context)!.workoutDetailGoToWorkout,
@@ -422,7 +972,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => WorkoutDetailScreen(workoutId: newWorkoutId),
+                    builder: (_) =>
+                        WorkoutDetailScreen(workoutId: newWorkoutId),
                   ),
                 );
               },
@@ -453,10 +1004,16 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
         title: Text(AppLocalizations.of(context)!.workoutDetailDeleteConfirm),
         content: Text(AppLocalizations.of(context)!.commonActionCannotBeUndone),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(context)!.commonCancel)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(AppLocalizations.of(context)!.commonCancel),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(AppLocalizations.of(context)!.commonDelete, style: TextStyle(color: Colors.red)),
+            child: Text(
+              AppLocalizations.of(context)!.commonDelete,
+              style: TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -488,7 +1045,10 @@ class _ExerciseWithSets {
 
   String localizedName(AppLocalizations loc) {
     if (localeKey != null) {
-      final translated = ExerciseLocaleHelper.exerciseNameFromKey(loc, localeKey!);
+      final translated = ExerciseLocaleHelper.exerciseNameFromKey(
+        loc,
+        localeKey!,
+      );
       if (translated.isNotEmpty) return translated;
     }
     return name;
@@ -496,7 +1056,10 @@ class _ExerciseWithSets {
 
   String localizedCategory(AppLocalizations loc) {
     if (categoryId != null) {
-      final translated = ExerciseLocaleHelper.categoryNameFromId(loc, categoryId!);
+      final translated = ExerciseLocaleHelper.categoryNameFromId(
+        loc,
+        categoryId!,
+      );
       if (translated.isNotEmpty) return translated;
     }
     return categoryName;
@@ -523,6 +1086,192 @@ class _InfoChip extends StatelessWidget {
           Icon(icon, size: 14, color: theme.colorScheme.onSurfaceVariant),
           const SizedBox(width: 4),
           Text(label, style: theme.textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+
+  const _SectionTitle({required this.icon, required this.title, this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: theme.colorScheme.primary),
+        const SizedBox(width: 6),
+        Text(
+          title,
+          style: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              subtitle!,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _DetailMetricChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _DetailMetricChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withAlpha(16),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withAlpha(38)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                label,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DeltaPill extends StatelessWidget {
+  final String label;
+  final String value;
+  final double delta;
+
+  const _DeltaPill({
+    required this.label,
+    required this.value,
+    required this.delta,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = delta > 0
+        ? Colors.green
+        : delta < 0
+        ? theme.colorScheme.error
+        : theme.colorScheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withAlpha(18),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            delta > 0
+                ? Icons.trending_up
+                : delta < 0
+                ? Icons.trending_down
+                : Icons.trending_flat,
+            size: 14,
+            color: color,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            '$label $value',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HighlightRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _HighlightRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 15, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 92,
+            child: Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

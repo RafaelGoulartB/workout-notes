@@ -1473,6 +1473,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get activeWorkoutByMuscleGroup => 'By muscle group';
 
   @override
+  String get workoutStatsDensity => 'Density';
+
+  @override
+  String get workoutStatsKgPerMin => 'kg/min';
+
+  @override
+  String get workoutStatsEvolution => 'Evolution';
+
+  @override
+  String get workoutStatsHighlights => 'Highlights';
+
+  @override
+  String get workoutStatsTopSet => 'Top set';
+
+  @override
+  String get workoutStatsHighestVolume => 'Highest volume';
+
+  @override
+  String get workoutStatsAverageRpe => 'Average RPE';
+
+  @override
+  String get workoutStatsVsSimilarWorkout => 'vs similar workout';
+
+  @override
+  String get workoutStatsMuscleVolume => 'Muscle volume';
+
+  @override
   String get activeWorkoutOK => 'OK';
 
   @override
