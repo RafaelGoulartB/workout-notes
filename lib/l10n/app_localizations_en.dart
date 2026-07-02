@@ -1464,6 +1464,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get activeWorkoutCurrent => 'Current';
+
+  @override
+  String get activeWorkoutLast => 'Last';
+
+  @override
+  String get activeWorkoutByMuscleGroup => 'By muscle group';
+
+  @override
   String get activeWorkoutOK => 'OK';
 
   @override

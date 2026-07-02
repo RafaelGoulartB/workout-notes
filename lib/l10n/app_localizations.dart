@@ -2810,6 +2810,24 @@ abstract class AppLocalizations {
   /// **'{completed}/{total} sets'**
   String activeWorkoutSetsSummary(Object completed, Object total);
 
+  /// No description provided for @activeWorkoutCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get activeWorkoutCurrent;
+
+  /// No description provided for @activeWorkoutLast.
+  ///
+  /// In en, this message translates to:
+  /// **'Last'**
+  String get activeWorkoutLast;
+
+  /// No description provided for @activeWorkoutByMuscleGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'By muscle group'**
+  String get activeWorkoutByMuscleGroup;
+
   /// No description provided for @activeWorkoutOK.
   ///
   /// In en, this message translates to:

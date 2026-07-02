@@ -1470,6 +1470,15 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String get activeWorkoutCurrent => 'Atual';
+
+  @override
+  String get activeWorkoutLast => 'Último';
+
+  @override
+  String get activeWorkoutByMuscleGroup => 'Por grupo muscular';
+
+  @override
   String get activeWorkoutOK => 'OK';
 
   @override
