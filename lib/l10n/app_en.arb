@@ -509,6 +509,10 @@
   "notificationRestChannelDesc": "Rest timer notifications between sets",
   "notificationWorkoutChannelName": "Workout Timer",
   "notificationWorkoutChannelDesc": "Active workout timer notifications",
+  "notificationRestTimerTitle": "Rest",
+  "notificationRestCompleteTitle": "Rest Complete",
+  "notificationRestCompleteBody": "Rest time is over - time for the next set!",
+  "notificationWorkoutTimerTitle": "Active workout",
 
   "exportServiceBackupText": "Workout Notes - Workout Backup",
   "exportServiceCsvText": "Workout Notes - Workout Export",

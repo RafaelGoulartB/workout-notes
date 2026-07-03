@@ -26,8 +26,7 @@ class RoutineDayEditorScreen extends StatefulWidget {
   });
 
   @override
-  State<RoutineDayEditorScreen> createState() =>
-      _RoutineDayEditorScreenState();
+  State<RoutineDayEditorScreen> createState() => _RoutineDayEditorScreenState();
 }
 
 class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
@@ -58,7 +57,9 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
         .toList(growable: false);
     try {
       await _routineRepo.reorderRoutineExercises(
-          widget.routineDayId, orderedIds);
+        widget.routineDayId,
+        orderedIds,
+      );
     } catch (e) {
       if (!mounted) return;
       await _load();
@@ -75,7 +76,10 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
   /// Provides a subtle visual lift + shadow while dragging a routine
   /// exercise card during reorder, matching Material 3 guidance.
   Widget _dragProxyDecorator(
-      Widget child, int index, Animation<double> animation) {
+    Widget child,
+    int index,
+    Animation<double> animation,
+  ) {
     return AnimatedBuilder(
       animation: animation,
       builder: (ctx, _) {
@@ -99,12 +103,10 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
   }
 
   Future<void> _load() async {
-    _exercises =
-        await _routineRepo.getRoutineExercises(widget.routineDayId);
+    _exercises = await _routineRepo.getRoutineExercises(widget.routineDayId);
     _predefinedSets.clear();
     for (final ex in _exercises) {
-      final sets =
-          await _routineRepo.getPredefinedSets(ex['id'] as String);
+      final sets = await _routineRepo.getPredefinedSets(ex['id'] as String);
       _predefinedSets[ex['id'] as String] = sets;
     }
     if (mounted) setState(() => _isLoading = false);
@@ -115,8 +117,10 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     final loc = AppLocalizations.of(context)!;
     final localeKey = ex['exercise_locale_key'] as String?;
     if (localeKey != null) {
-      final translated =
-          ExerciseLocaleHelper.exerciseNameFromKey(loc, localeKey);
+      final translated = ExerciseLocaleHelper.exerciseNameFromKey(
+        loc,
+        localeKey,
+      );
       if (translated.isNotEmpty) return translated;
     }
     return (ex['exercise_name'] as String?) ?? '';
@@ -125,8 +129,9 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
   // ===================== EXERCISE MANAGEMENT =====================
 
   Future<void> _openExercisePicker() async {
-    final currentExerciseIds =
-        _exercises.map((e) => e['exercise_id'] as String).toSet();
+    final currentExerciseIds = _exercises
+        .map((e) => e['exercise_id'] as String)
+        .toSet();
 
     await showModalBottomSheet(
       context: context,
@@ -152,7 +157,8 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
           );
           if (routineExercise.isNotEmpty) {
             await _routineRepo.removeRoutineExercise(
-                routineExercise['id'] as String);
+              routineExercise['id'] as String,
+            );
             _load();
           }
         },
@@ -165,15 +171,22 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(AppLocalizations.of(ctx)!.activeWorkoutRemoveExercise),
-        content: Text(AppLocalizations.of(ctx)!.activeWorkoutRemoveExerciseContent(_resolveExerciseName(ex))),
+        content: Text(
+          AppLocalizations.of(
+            ctx,
+          )!.activeWorkoutRemoveExerciseContent(_resolveExerciseName(ex)),
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(AppLocalizations.of(ctx)!.commonCancel)),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(AppLocalizations.of(ctx)!.commonCancel),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(AppLocalizations.of(ctx)!.commonDelete,
-                style: const TextStyle(color: Colors.red)),
+            child: Text(
+              AppLocalizations.of(ctx)!.commonDelete,
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -230,13 +243,22 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(ctx)!.commonCancel)),
-          FilledButton(onPressed: () {
-            final name = nameCtl.text.trim();
-            if (name.isNotEmpty) {
-              Navigator.pop(ctx, {'name': name, 'notes': notesCtl.text.trim()});
-            }
-          }, child: Text(AppLocalizations.of(ctx)!.commonSave)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(AppLocalizations.of(ctx)!.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () {
+              final name = nameCtl.text.trim();
+              if (name.isNotEmpty) {
+                Navigator.pop(ctx, {
+                  'name': name,
+                  'notes': notesCtl.text.trim(),
+                });
+              }
+            },
+            child: Text(AppLocalizations.of(ctx)!.commonSave),
+          ),
         ],
       ),
     );
@@ -257,7 +279,9 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(AppLocalizations.of(ctx)!.routinesDeleteConfirm(widget.dayName)),
+        title: Text(
+          AppLocalizations.of(ctx)!.routinesDeleteConfirm(widget.dayName),
+        ),
         content: Text(AppLocalizations.of(ctx)!.routinesDeleteContent),
         actions: [
           TextButton(
@@ -266,8 +290,10 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(AppLocalizations.of(ctx)!.commonDelete,
-                style: const TextStyle(color: Colors.red)),
+            child: Text(
+              AppLocalizations.of(ctx)!.commonDelete,
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -290,16 +316,14 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
   // ===================== REST TIME =====================
 
   void _changeRestTime(Map<String, dynamic> exercise) {
-    final currentRest =
-        (exercise['rest_time_seconds'] as int?) ?? 90;
+    final currentRest = (exercise['rest_time_seconds'] as int?) ?? 90;
     final exId = exercise['id'] as String;
     final presets = [30, 60, 90, 120, 180];
 
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -308,39 +332,42 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-                child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant
-                          .withAlpha(80),
-                      borderRadius: BorderRadius.circular(2),
-                    ))),
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant.withAlpha(80),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
-            Text(AppLocalizations.of(context)!.routinesRestTimeTitle,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              AppLocalizations.of(context)!.routinesRestTimeTitle,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                ...presets.map((sec) => ChoiceChip(
-                      label: Text(sec >= 60
-                          ? '${sec ~/ 60}min${sec % 60}s'
-                          : '${sec}s'),
-                      selected: currentRest == sec,
-                      onSelected: (_) {
-                        _routineRepo.updateRoutineExerciseRestTime(
-                            exId, sec);
-                        _load();
-                        Navigator.pop(ctx);
-                      },
-                    )),
+                ...presets.map(
+                  (sec) => ChoiceChip(
+                    label: Text(
+                      sec >= 60 ? '${sec ~/ 60}min${sec % 60}s' : '${sec}s',
+                    ),
+                    selected: currentRest == sec,
+                    onSelected: (_) {
+                      _routineRepo.updateRoutineExerciseRestTime(exId, sec);
+                      _load();
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                ),
               ],
             ),
           ],
@@ -351,8 +378,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
 
   // ===================== PREDEFINED SET MANAGEMENT =====================
 
-  Future<void> _addPredefinedSet(
-      Map<String, dynamic> exercise) async {
+  Future<void> _addPredefinedSet(Map<String, dynamic> exercise) async {
     final exId = exercise['id'] as String;
     final existingSets = _predefinedSets[exId] ?? [];
 
@@ -395,11 +421,13 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     }
   }
 
-  Future<void> _editPredefinedSet(Map<String, dynamic> exercise,
-      Map<String, dynamic> setData, int index) async {
+  Future<void> _editPredefinedSet(
+    Map<String, dynamic> exercise,
+    Map<String, dynamic> setData,
+    int index,
+  ) async {
     final setId = setData['id'] as String;
-    final exerciseType =
-        exercise['exercise_type'] as String? ?? 'weightReps';
+    final exerciseType = exercise['exercise_type'] as String? ?? 'weightReps';
 
     final result = await _showSetEditor(
       exerciseType: exerciseType,
@@ -452,8 +480,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) => Padding(
@@ -465,16 +492,17 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
               children: [
                 // Handle
                 Center(
-                    child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Theme.of(ctx)
-                              .colorScheme
-                              .onSurfaceVariant
-                              .withAlpha(80),
-                          borderRadius: BorderRadius.circular(2),
-                        ))),
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        ctx,
+                      ).colorScheme.onSurfaceVariant.withAlpha(80),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 // Title
                 Row(
@@ -484,23 +512,16 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                         setNumber > 0
                             ? 'Editar Série $setNumber'
                             : 'Adicionar Série',
-                        style: Theme.of(ctx)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(
-                                fontWeight: FontWeight.bold),
+                        style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     Text(
                       exerciseName,
-                      style: Theme.of(ctx)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(
-                            color: Theme.of(ctx)
-                                .colorScheme
-                                .onSurfaceVariant,
-                          ),
+                      style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -509,23 +530,24 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                 // Warmup toggle
                 Row(
                   children: [
-                    Icon(Icons.whatshot,
-                        size: 16,
-                        color: editWarmup
-                            ? Colors.orange
-                            : Theme.of(ctx)
-                                .colorScheme
-                                .onSurfaceVariant),
+                    Icon(
+                      Icons.whatshot,
+                      size: 16,
+                      color: editWarmup
+                          ? Colors.orange
+                          : Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 6),
-                    Text(AppLocalizations.of(ctx)!.activeWorkoutWarmup,
-                        style: Theme.of(ctx).textTheme.bodyMedium),
+                    Text(
+                      AppLocalizations.of(ctx)!.activeWorkoutWarmup,
+                      style: Theme.of(ctx).textTheme.bodyMedium,
+                    ),
                     const Spacer(),
                     SizedBox(
                       height: 28,
                       child: Switch.adaptive(
                         value: editWarmup,
-                        onChanged: (v) =>
-                            setSheetState(() => editWarmup = v),
+                        onChanged: (v) => setSheetState(() => editWarmup = v),
                       ),
                     ),
                   ],
@@ -545,20 +567,16 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                     setSheetState(() {
                       switch (key) {
                         case 'weight':
-                          editWeight =
-                              (value as double).clamp(0, 999);
+                          editWeight = (value as double).clamp(0, 999);
                           break;
                         case 'reps':
-                          editReps =
-                              (value as int).clamp(0, 999);
+                          editReps = (value as int).clamp(0, 999);
                           break;
                         case 'distance':
-                          editDistance =
-                              (value as double).clamp(0, 999);
+                          editDistance = (value as double).clamp(0, 999);
                           break;
                         case 'time_seconds':
-                          editTime =
-                              (value as int).clamp(0, 99999);
+                          editTime = (value as int).clamp(0, 99999);
                           break;
                       }
                     });
@@ -573,8 +591,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(ctx),
-                        child: Text(AppLocalizations.of(ctx)!
-                            .commonCancel),
+                        child: Text(AppLocalizations.of(ctx)!.commonCancel),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -588,8 +605,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                           'time_seconds': editTime,
                           'is_warmup': editWarmup,
                         }),
-                        child: Text(AppLocalizations.of(ctx)!
-                            .commonSave),
+                        child: Text(AppLocalizations.of(ctx)!.commonSave),
                       ),
                     ),
                   ],
@@ -620,21 +636,41 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
 
     for (final key in keys) {
       if (key == 'weight') {
-        widgets.add(_buildWeightControl(
-            ctx, setSheetState, weight,
-            (v) => onFieldChange('weight', v)));
+        widgets.add(
+          _buildWeightControl(
+            ctx,
+            setSheetState,
+            weight,
+            (v) => onFieldChange('weight', v),
+          ),
+        );
       } else if (key == 'reps') {
-        widgets.add(_buildRepsControl(
-            ctx, setSheetState, reps,
-            (v) => onFieldChange('reps', v)));
+        widgets.add(
+          _buildRepsControl(
+            ctx,
+            setSheetState,
+            reps,
+            (v) => onFieldChange('reps', v),
+          ),
+        );
       } else if (key == 'distance') {
-        widgets.add(_buildDistanceControl(
-            ctx, setSheetState, distance,
-            (v) => onFieldChange('distance', v)));
+        widgets.add(
+          _buildDistanceControl(
+            ctx,
+            setSheetState,
+            distance,
+            (v) => onFieldChange('distance', v),
+          ),
+        );
       } else if (key == 'time_seconds') {
-        widgets.add(_buildTimeControl(
-            ctx, setSheetState, timeSeconds,
-            (v) => onFieldChange('time_seconds', v)));
+        widgets.add(
+          _buildTimeControl(
+            ctx,
+            setSheetState,
+            timeSeconds,
+            (v) => onFieldChange('time_seconds', v),
+          ),
+        );
       }
     }
     return widgets;
@@ -642,306 +678,367 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
 
   // ===================== FIELD CONTROLS (mirror active workout) =====================
 
-  Widget _buildWeightControl(BuildContext ctx, StateSetter setSheetState,
-      double weight, void Function(double) onChanged) {
+  Widget _buildWeightControl(
+    BuildContext ctx,
+    StateSetter setSheetState,
+    double weight,
+    void Function(double) onChanged,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text(AppLocalizations.of(ctx)!.activeWorkoutWeight,
-            style: Theme.of(ctx)
-                .textTheme
-                .labelSmall
-                ?.copyWith(fontWeight: FontWeight.w600)),
+        Text(
+          AppLocalizations.of(ctx)!.activeWorkoutWeight,
+          style: Theme.of(
+            ctx,
+          ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 4),
-        Row(children: [
-          _stepperButton(ctx, Icons.remove,
-              onTap: () => onChanged(weight - 2.5)),
-          const SizedBox(width: 6),
-          _stepperButton(ctx, Icons.remove, small: true,
-              onTap: () => onChanged(weight - 0.5)),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _quickEditNumber(
-                  ctx, weight, false, onChanged),
-              child: Container(
-                margin:
-                    const EdgeInsets.symmetric(horizontal: 4),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                    color: Theme.of(ctx)
-                        .colorScheme
-                        .surfaceContainerHighest
-                        .withAlpha(120),
-                    borderRadius:
-                        BorderRadius.circular(10)),
-                child: Center(
+        Row(
+          children: [
+            _stepperButton(
+              ctx,
+              Icons.remove,
+              onTap: () => onChanged(weight - 2.5),
+            ),
+            const SizedBox(width: 6),
+            _stepperButton(
+              ctx,
+              Icons.remove,
+              small: true,
+              onTap: () => onChanged(weight - 0.5),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => _quickEditNumber(ctx, weight, false, onChanged),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      ctx,
+                    ).colorScheme.surfaceContainerHighest.withAlpha(120),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
                     child: Text(
-                  weight.toStringAsFixed(1),
-                  style: Theme.of(ctx)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                )),
+                      weight.toStringAsFixed(1),
+                      style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-          _stepperButton(ctx, Icons.add, small: true,
-              onTap: () => onChanged(weight + 0.5)),
-          const SizedBox(width: 6),
-          _stepperButton(ctx, Icons.add,
-              onTap: () => onChanged(weight + 2.5)),
-        ]),
+            _stepperButton(
+              ctx,
+              Icons.add,
+              small: true,
+              onTap: () => onChanged(weight + 0.5),
+            ),
+            const SizedBox(width: 6),
+            _stepperButton(
+              ctx,
+              Icons.add,
+              onTap: () => onChanged(weight + 2.5),
+            ),
+          ],
+        ),
         const SizedBox(height: 4),
         Wrap(
-            spacing: 4,
-            runSpacing: 4,
-            children: [20, 30, 40, 50, 60, 80, 100, 120]
-                .map((v) => ActionChip(
-                      label: Text('$v',
-                          style: const TextStyle(fontSize: 10)),
-                      onPressed: () => onChanged(v.toDouble()),
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4),
-                      materialTapTargetSize:
-                          MaterialTapTargetSize.shrinkWrap,
-                    ))
-                .toList()),
+          spacing: 4,
+          runSpacing: 4,
+          children: [20, 30, 40, 50, 60, 80, 100, 120]
+              .map(
+                (v) => ActionChip(
+                  label: Text('$v', style: const TextStyle(fontSize: 10)),
+                  onPressed: () => onChanged(v.toDouble()),
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              )
+              .toList(),
+        ),
       ],
     );
   }
 
-  Widget _buildRepsControl(BuildContext ctx, StateSetter setSheetState,
-      int reps, void Function(int) onChanged) {
+  Widget _buildRepsControl(
+    BuildContext ctx,
+    StateSetter setSheetState,
+    int reps,
+    void Function(int) onChanged,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 14),
-        Text(AppLocalizations.of(ctx)!.activeWorkoutReps,
-            style: Theme.of(ctx)
-                .textTheme
-                .labelSmall
-                ?.copyWith(fontWeight: FontWeight.w600)),
+        Text(
+          AppLocalizations.of(ctx)!.activeWorkoutReps,
+          style: Theme.of(
+            ctx,
+          ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 4),
-        Row(children: [
-          _stepperButton(ctx, Icons.remove,
-              onTap: () => onChanged(reps - 1)),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _quickEditNumber(ctx, reps.toDouble(),
-                  true, (v) => onChanged(v.round())),
-              child: Container(
-                margin:
-                    const EdgeInsets.symmetric(horizontal: 4),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                    color: Theme.of(ctx)
-                        .colorScheme
-                        .surfaceContainerHighest
-                        .withAlpha(120),
-                    borderRadius:
-                        BorderRadius.circular(10)),
-                child: Center(
+        Row(
+          children: [
+            _stepperButton(ctx, Icons.remove, onTap: () => onChanged(reps - 1)),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => _quickEditNumber(
+                  ctx,
+                  reps.toDouble(),
+                  true,
+                  (v) => onChanged(v.round()),
+                ),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      ctx,
+                    ).colorScheme.surfaceContainerHighest.withAlpha(120),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
                     child: Text(
-                  '$reps',
-                  style: Theme.of(ctx)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                )),
+                      '$reps',
+                      style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-          _stepperButton(ctx, Icons.add,
-              onTap: () => onChanged(reps + 1)),
-        ]),
+            _stepperButton(ctx, Icons.add, onTap: () => onChanged(reps + 1)),
+          ],
+        ),
         const SizedBox(height: 4),
         Wrap(
-            spacing: 4,
-            runSpacing: 4,
-            children: [1, 3, 5, 8, 10, 12, 15, 20]
-                .map((v) => ActionChip(
-                      label: Text('$v',
-                          style: const TextStyle(fontSize: 10)),
-                      onPressed: () => onChanged(v),
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4),
-                      materialTapTargetSize:
-                          MaterialTapTargetSize.shrinkWrap,
-                    ))
-                .toList()),
+          spacing: 4,
+          runSpacing: 4,
+          children: [1, 3, 5, 8, 10, 12, 15, 20]
+              .map(
+                (v) => ActionChip(
+                  label: Text('$v', style: const TextStyle(fontSize: 10)),
+                  onPressed: () => onChanged(v),
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              )
+              .toList(),
+        ),
       ],
     );
   }
 
   Widget _buildDistanceControl(
-      BuildContext ctx,
-      StateSetter setSheetState,
-      double distance,
-      void Function(double) onChanged) {
+    BuildContext ctx,
+    StateSetter setSheetState,
+    double distance,
+    void Function(double) onChanged,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text(AppLocalizations.of(ctx)!.activeWorkoutDistance,
-            style: Theme.of(ctx)
-                .textTheme
-                .labelSmall
-                ?.copyWith(fontWeight: FontWeight.w600)),
+        Text(
+          AppLocalizations.of(ctx)!.activeWorkoutDistance,
+          style: Theme.of(
+            ctx,
+          ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 4),
-        Row(children: [
-          _stepperButton(ctx, Icons.remove, small: true,
-              onTap: () =>
-                  onChanged((distance - 0.1).clamp(0, 999))),
-          _stepperButton(ctx, Icons.remove,
-              onTap: () =>
-                  onChanged((distance - 0.5).clamp(0, 999))),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _quickEditNumber(
-                  ctx, distance, false, onChanged,
+        Row(
+          children: [
+            _stepperButton(
+              ctx,
+              Icons.remove,
+              small: true,
+              onTap: () => onChanged((distance - 0.1).clamp(0, 999)),
+            ),
+            _stepperButton(
+              ctx,
+              Icons.remove,
+              onTap: () => onChanged((distance - 0.5).clamp(0, 999)),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => _quickEditNumber(
+                  ctx,
+                  distance,
+                  false,
+                  onChanged,
                   title: 'Digite a distância',
-                  suffix: ' km'),
-              child: Container(
-                margin:
-                    const EdgeInsets.symmetric(horizontal: 4),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                    color: Theme.of(ctx)
-                        .colorScheme
-                        .surfaceContainerHighest
-                        .withAlpha(120),
-                    borderRadius:
-                        BorderRadius.circular(10)),
-                child: Center(
+                  suffix: ' km',
+                ),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      ctx,
+                    ).colorScheme.surfaceContainerHighest.withAlpha(120),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
                     child: Text(
-                  distance.toStringAsFixed(1),
-                  style: Theme.of(ctx)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                )),
+                      distance.toStringAsFixed(1),
+                      style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-          _stepperButton(ctx, Icons.add,
-              onTap: () =>
-                  onChanged((distance + 0.5).clamp(0, 999))),
-          _stepperButton(ctx, Icons.add, small: true,
-              onTap: () =>
-                  onChanged((distance + 0.1).clamp(0, 999))),
-        ]),
+            _stepperButton(
+              ctx,
+              Icons.add,
+              onTap: () => onChanged((distance + 0.5).clamp(0, 999)),
+            ),
+            _stepperButton(
+              ctx,
+              Icons.add,
+              small: true,
+              onTap: () => onChanged((distance + 0.1).clamp(0, 999)),
+            ),
+          ],
+        ),
         const SizedBox(height: 4),
         Wrap(
-            spacing: 4,
-            runSpacing: 4,
-            children: [1.0, 2.0, 3.0, 5.0, 10.0]
-                .map((v) => ActionChip(
-                      label: Text(v.toStringAsFixed(1),
-                          style:
-                              const TextStyle(fontSize: 10)),
-                      onPressed: () => onChanged(v),
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4),
-                      materialTapTargetSize:
-                          MaterialTapTargetSize.shrinkWrap,
-                    ))
-                .toList()),
+          spacing: 4,
+          runSpacing: 4,
+          children: [1.0, 2.0, 3.0, 5.0, 10.0]
+              .map(
+                (v) => ActionChip(
+                  label: Text(
+                    v.toStringAsFixed(1),
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                  onPressed: () => onChanged(v),
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              )
+              .toList(),
+        ),
       ],
     );
   }
 
-  Widget _buildTimeControl(BuildContext ctx, StateSetter setSheetState,
-      int timeSeconds, void Function(int) onChanged) {
+  Widget _buildTimeControl(
+    BuildContext ctx,
+    StateSetter setSheetState,
+    int timeSeconds,
+    void Function(int) onChanged,
+  ) {
     final minutes = timeSeconds ~/ 60;
     final seconds = timeSeconds % 60;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 16),
-        Text(AppLocalizations.of(ctx)!.activeWorkoutTime,
-            style: Theme.of(ctx)
-                .textTheme
-                .labelSmall
-                ?.copyWith(fontWeight: FontWeight.w600)),
+        Text(
+          AppLocalizations.of(ctx)!.activeWorkoutTime,
+          style: Theme.of(
+            ctx,
+          ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 4),
-        Row(children: [
-          _stepperButton(ctx, Icons.remove,
-              onTap: () =>
-                  onChanged((timeSeconds - 30).clamp(0, 99999))),
-          _stepperButton(ctx, Icons.remove, small: true,
-              onTap: () =>
-                  onChanged((timeSeconds - 5).clamp(0, 99999))),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _quickEditNumber(
-                  ctx, timeSeconds.toDouble(), true,
+        Row(
+          children: [
+            _stepperButton(
+              ctx,
+              Icons.remove,
+              onTap: () => onChanged((timeSeconds - 30).clamp(0, 99999)),
+            ),
+            _stepperButton(
+              ctx,
+              Icons.remove,
+              small: true,
+              onTap: () => onChanged((timeSeconds - 5).clamp(0, 99999)),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => _quickEditNumber(
+                  ctx,
+                  timeSeconds.toDouble(),
+                  true,
                   (v) => onChanged(v.round()),
                   title: 'Digite o tempo (segundos)',
-                  suffix: ' s'),
-              child: Container(
-                margin:
-                    const EdgeInsets.symmetric(horizontal: 4),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                    color: Theme.of(ctx)
-                        .colorScheme
-                        .surfaceContainerHighest
-                        .withAlpha(120),
-                    borderRadius:
-                        BorderRadius.circular(10)),
-                child: Center(
-                  child: Text(
-                    timeSeconds >= 60
-                        ? '$minutes:${seconds.toString().padLeft(2, '0')}'
-                        : '${timeSeconds}s',
-                    style: Theme.of(ctx)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                  suffix: ' s',
+                ),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      ctx,
+                    ).colorScheme.surfaceContainerHighest.withAlpha(120),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
+                    child: Text(
+                      timeSeconds >= 60
+                          ? '$minutes:${seconds.toString().padLeft(2, '0')}'
+                          : '${timeSeconds}s',
+                      style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          _stepperButton(ctx, Icons.add, small: true,
-              onTap: () =>
-                  onChanged((timeSeconds + 5).clamp(0, 99999))),
-          _stepperButton(ctx, Icons.add,
-              onTap: () =>
-                  onChanged((timeSeconds + 30).clamp(0, 99999))),
-        ]),
+            _stepperButton(
+              ctx,
+              Icons.add,
+              small: true,
+              onTap: () => onChanged((timeSeconds + 5).clamp(0, 99999)),
+            ),
+            _stepperButton(
+              ctx,
+              Icons.add,
+              onTap: () => onChanged((timeSeconds + 30).clamp(0, 99999)),
+            ),
+          ],
+        ),
         const SizedBox(height: 4),
         Wrap(
-            spacing: 4,
-            runSpacing: 4,
-            children: [30, 60, 120, 180, 300, 600]
-                .map((v) => ActionChip(
-                      label: Text(
-                          v >= 60 ? '${v ~/ 60}min' : '${v}s',
-                          style:
-                              const TextStyle(fontSize: 10)),
-                      onPressed: () => onChanged(v),
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4),
-                      materialTapTargetSize:
-                          MaterialTapTargetSize.shrinkWrap,
-                    ))
-                .toList()),
+          spacing: 4,
+          runSpacing: 4,
+          children: [30, 60, 120, 180, 300, 600]
+              .map(
+                (v) => ActionChip(
+                  label: Text(
+                    v >= 60 ? '${v ~/ 60}min' : '${v}s',
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                  onPressed: () => onChanged(v),
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              )
+              .toList(),
+        ),
       ],
     );
   }
 
-  Widget _stepperButton(BuildContext ctx, IconData icon,
-      {VoidCallback? onTap, bool small = false}) {
+  Widget _stepperButton(
+    BuildContext ctx,
+    IconData icon, {
+    VoidCallback? onTap,
+    bool small = false,
+  }) {
     final size = small ? 36.0 : 48.0;
     return GestureDetector(
       onTap: onTap,
@@ -952,14 +1049,14 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
           color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-              color: Theme.of(ctx)
-                  .colorScheme
-                  .outlineVariant
-                  .withAlpha(120)),
+            color: Theme.of(ctx).colorScheme.outlineVariant.withAlpha(120),
+          ),
         ),
-        child: Icon(icon,
-            size: small ? 18 : 24,
-            color: Theme.of(ctx).colorScheme.onSurface),
+        child: Icon(
+          icon,
+          size: small ? 18 : 24,
+          color: Theme.of(ctx).colorScheme.onSurface,
+        ),
       ),
     );
   }
@@ -973,17 +1070,15 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     String? suffix,
   }) {
     final ctl = TextEditingController(
-      text: isInt
-          ? current.round().toString()
-          : current.toStringAsFixed(1));
+      text: isInt ? current.round().toString() : current.toStringAsFixed(1),
+    );
     showDialog(
       context: ctx,
       builder: (ctx) => AlertDialog(
         title: Text(title ?? AppLocalizations.of(ctx)!.activeWorkoutOK),
         content: TextField(
           controller: ctl,
-          keyboardType:
-              TextInputType.numberWithOptions(decimal: !isInt),
+          keyboardType: TextInputType.numberWithOptions(decimal: !isInt),
           autofocus: true,
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
@@ -992,13 +1087,12 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child:
-                  Text(AppLocalizations.of(ctx)!.commonCancel)),
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(AppLocalizations.of(ctx)!.commonCancel),
+          ),
           FilledButton(
             onPressed: () {
-              final parsed =
-                  double.tryParse(ctl.text.replaceAll(',', '.'));
+              final parsed = double.tryParse(ctl.text.replaceAll(',', '.'));
               if (parsed != null && parsed >= 0) {
                 onSet(isInt ? parsed.roundToDouble() : parsed);
               }
@@ -1057,25 +1151,26 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _exercises.isEmpty
-              ? _buildEmptyState(theme, loc)
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-                        sliver: SliverToBoxAdapter(
-                          child: _buildCategorySummary(theme, loc),
-                        ),
-                      ),
-                      SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 100),
-                        sliver: SliverReorderableList(
-                          itemCount: _exercises.length,
-                          proxyDecorator: _dragProxyDecorator,
-                          onReorderStart: (_) => HapticFeedback.mediumImpact(),
-                          onReorderItem: _onReorderExercises,
-                          itemBuilder: (ctx, i) => ReorderableDelayedDragStartListener(
+          ? _buildEmptyState(theme, loc)
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: _buildCategorySummary(theme, loc),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 100),
+                    sliver: SliverReorderableList(
+                      itemCount: _exercises.length,
+                      proxyDecorator: _dragProxyDecorator,
+                      onReorderStart: (_) => HapticFeedback.mediumImpact(),
+                      onReorderItem: _onReorderExercises,
+                      itemBuilder: (ctx, i) =>
+                          ReorderableDelayedDragStartListener(
                             key: ValueKey(_exercises[i]['id'] as String),
                             index: i,
                             child: _buildExerciseCard(
@@ -1084,11 +1179,11 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                               loc,
                             ),
                           ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                ],
+              ),
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openExercisePicker,
         icon: const Icon(Icons.add),
@@ -1108,14 +1203,13 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       final catId = ex['category_id'] as String? ?? '';
       final catName = ExerciseLocaleHelper.categoryName(loc, ex);
       final colorVal = ex['category_color'] as int? ?? 0xFF757575;
-      final exerciseType =
-          ex['exercise_type'] as String? ?? 'weightReps';
+      final exerciseType = ex['exercise_type'] as String? ?? 'weightReps';
       final sets = _predefinedSets[ex['id'] as String] ?? [];
 
-      statMap.putIfAbsent(catId, () => _CategoryStat(
-            name: catName,
-            color: Color(colorVal),
-          ));
+      statMap.putIfAbsent(
+        catId,
+        () => _CategoryStat(name: catName, color: Color(colorVal)),
+      );
 
       for (final s in sets) {
         final isWarmup = (s['is_warmup'] as int?) == 1;
@@ -1133,10 +1227,8 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     if (stats.isEmpty) return const SizedBox.shrink();
 
     final totalSets = stats.fold<int>(0, (a, s) => a + s.sets);
-    final totalVolume =
-        stats.fold<double>(0, (a, s) => a + s.volume);
-    final maxSets = stats
-        .fold<int>(0, (a, s) => s.sets > a ? s.sets : a);
+    final totalVolume = stats.fold<double>(0, (a, s) => a + s.volume);
+    final maxSets = stats.fold<int>(0, (a, s) => s.sets > a ? s.sets : a);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -1145,15 +1237,31 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(
-              color: theme.colorScheme.outlineVariant.withAlpha(80)),
+            color: theme.colorScheme.outlineVariant.withAlpha(80),
+          ),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: () => setState(() => _dashboardExpanded = !_dashboardExpanded),
           child: AnimatedCrossFade(
-            firstChild: _buildDayDashboardCollapsed(theme, loc, stats, totalSets, totalVolume),
-            secondChild: _buildDayDashboardExpanded(theme, loc, stats, totalSets, totalVolume, maxSets),
-            crossFadeState: _dashboardExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            firstChild: _buildDayDashboardCollapsed(
+              theme,
+              loc,
+              stats,
+              totalSets,
+              totalVolume,
+            ),
+            secondChild: _buildDayDashboardExpanded(
+              theme,
+              loc,
+              stats,
+              totalSets,
+              totalVolume,
+              maxSets,
+            ),
+            crossFadeState: _dashboardExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
             duration: const Duration(milliseconds: 250),
           ),
         ),
@@ -1161,7 +1269,13 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     );
   }
 
-  Widget _buildDayDashboardCollapsed(ThemeData theme, AppLocalizations loc, List<_CategoryStat> stats, int totalSets, double totalVolume) {
+  Widget _buildDayDashboardCollapsed(
+    ThemeData theme,
+    AppLocalizations loc,
+    List<_CategoryStat> stats,
+    int totalSets,
+    double totalVolume,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Column(
@@ -1174,18 +1288,21 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
               Expanded(
                 child: Text(
                   '${loc.routinesDayDashboard} — '
-                  '${totalSets} ${loc.routinesDayDashboardSets}' +
-                  (totalVolume > 0
-                      ? ' · ${totalVolume.toStringAsFixed(0)} ${loc.routinesDayDashboardVolume}'
-                      : '') +
+                  '$totalSets ${loc.routinesDayDashboardSets}'
+                  '${totalVolume > 0 ? ' · ${totalVolume.toStringAsFixed(0)} ${loc.routinesDayDashboardVolume}' : ''}'
                   ' · ${stats.length} ${loc.routinesDayDashboardGroups}',
-                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 4),
-              Icon(_dashboardExpanded ? Icons.expand_less : Icons.expand_more,
-                  size: 20, color: theme.colorScheme.onSurfaceVariant),
+              Icon(
+                _dashboardExpanded ? Icons.expand_less : Icons.expand_more,
+                size: 20,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
           if (stats.isNotEmpty) ...[
@@ -1205,7 +1322,14 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     );
   }
 
-  Widget _buildDayDashboardExpanded(ThemeData theme, AppLocalizations loc, List<_CategoryStat> stats, int totalSets, double totalVolume, int maxSets) {
+  Widget _buildDayDashboardExpanded(
+    ThemeData theme,
+    AppLocalizations loc,
+    List<_CategoryStat> stats,
+    int totalSets,
+    double totalVolume,
+    int maxSets,
+  ) {
     return Padding(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -1214,15 +1338,20 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
           // Header
           Row(
             children: [
-              Icon(Icons.bar_chart, size: 16,
-                  color: theme.colorScheme.primary),
+              Icon(Icons.bar_chart, size: 16, color: theme.colorScheme.primary),
               const SizedBox(width: 6),
-              Text(loc.routinesDayDashboard,
-                  style: theme.textTheme.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                loc.routinesDayDashboard,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const Spacer(),
-              Icon(_dashboardExpanded ? Icons.expand_less : Icons.expand_more,
-                  size: 20, color: theme.colorScheme.onSurfaceVariant),
+              Icon(
+                _dashboardExpanded ? Icons.expand_less : Icons.expand_more,
+                size: 20,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -1238,7 +1367,8 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                   Row(
                     children: [
                       Container(
-                        width: 10, height: 10,
+                        width: 10,
+                        height: 10,
                         decoration: BoxDecoration(
                           color: stat.color,
                           shape: BoxShape.circle,
@@ -1246,26 +1376,27 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(stat.name,
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(
-                                    fontWeight:
-                                        FontWeight.w600)),
+                        child: Text(
+                          stat.name,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
-                      Text('${stat.sets}s',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(
-                                  fontWeight:
-                                      FontWeight.bold)),
+                      Text(
+                        '${stat.sets}s',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       if (stat.volume > 0) ...[
                         const SizedBox(width: 4),
                         Text(
-                            '${stat.volume.toStringAsFixed(0)}kg',
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(
-                                    color: theme
-                                        .colorScheme
-                                        .onSurfaceVariant)),
+                          '${stat.volume.toStringAsFixed(0)}kg',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -1276,10 +1407,11 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                     child: LinearProgressIndicator(
                       value: pct.clamp(0.0, 1.0),
                       minHeight: 6,
-                      backgroundColor: theme.colorScheme
-                          .surfaceContainerHighest,
+                      backgroundColor:
+                          theme.colorScheme.surfaceContainerHighest,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                          stat.color.withAlpha(200)),
+                        stat.color.withAlpha(200),
+                      ),
                     ),
                   ),
                 ],
@@ -1296,14 +1428,16 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
               const SizedBox(width: 12),
               if (totalVolume > 0)
                 _buildStatChip(
-                    theme,
-                    totalVolume.toStringAsFixed(0),
-                    loc.routinesDayDashboardVolume),
+                  theme,
+                  totalVolume.toStringAsFixed(0),
+                  loc.routinesDayDashboardVolume,
+                ),
               const SizedBox(width: 12),
               _buildStatChip(
-                  theme,
-                  '${stats.length}',
-                  loc.routinesDayDashboardGroups),
+                theme,
+                '${stats.length}',
+                loc.routinesDayDashboardGroups,
+              ),
             ],
           ),
         ],
@@ -1311,8 +1445,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     );
   }
 
-  Widget _buildStatChip(
-      ThemeData theme, String value, String label) {
+  Widget _buildStatChip(ThemeData theme, String value, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -1322,17 +1455,21 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(value,
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              )),
+          Text(
+            value,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
           const SizedBox(width: 3),
-          Text(label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontSize: 11,
-              )),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontSize: 11,
+            ),
+          ),
         ],
       ),
     );
@@ -1345,16 +1482,20 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.fitness_center,
-                size: 80,
-                color: theme.colorScheme.primary.withAlpha(80)),
+            Icon(
+              Icons.fitness_center,
+              size: 80,
+              color: theme.colorScheme.primary.withAlpha(80),
+            ),
             const SizedBox(height: 24),
-            Text(loc.routinesNoExercises,
-                style: theme.textTheme.titleLarge),
+            Text(loc.routinesNoExercises, style: theme.textTheme.titleLarge),
             const SizedBox(height: 8),
-            Text(loc.routinesNoExercisesHint,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant)),
+            Text(
+              loc.routinesNoExercisesHint,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: _openExercisePicker,
@@ -1368,24 +1509,22 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
   }
 
   Widget _buildExerciseCard(
-      Map<String, dynamic> ex, ThemeData theme, AppLocalizations loc) {
-    final sets =
-        _predefinedSets[ex['id'] as String] ?? [];
-    final exerciseType =
-        ex['exercise_type'] as String? ?? 'weightReps';
+    Map<String, dynamic> ex,
+    ThemeData theme,
+    AppLocalizations loc,
+  ) {
+    final sets = _predefinedSets[ex['id'] as String] ?? [];
+    final exerciseType = ex['exercise_type'] as String? ?? 'weightReps';
     final fields = getFieldsForType(exerciseType);
     final keys = fields.keys.toList();
-    final catColor =
-        Color(ex['category_color'] as int? ?? 0xFF757575);
+    final catColor = Color(ex['category_color'] as int? ?? 0xFF757575);
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant
-                .withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -1402,8 +1541,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                   child: Icon(
                     Icons.drag_indicator,
                     size: 20,
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withAlpha(140),
+                    color: theme.colorScheme.onSurfaceVariant.withAlpha(140),
                   ),
                 ),
                 Container(
@@ -1418,8 +1556,9 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                 Expanded(
                   child: Text(
                     _resolveExerciseName(ex),
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 // Rest time badge
@@ -1427,24 +1566,27 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                   onTap: () => _changeRestTime(ex),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: theme
-                          .colorScheme.surfaceContainerHighest,
+                      color: theme.colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.timer_outlined,
-                            size: 14,
-                            color: theme.colorScheme.primary),
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 14,
+                          color: theme.colorScheme.primary,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           '${ex['rest_time_seconds'] ?? 90}s',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(
-                                  fontWeight: FontWeight.w600),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -1457,13 +1599,14 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer
-                          .withAlpha(80),
+                      color: theme.colorScheme.primaryContainer.withAlpha(80),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(Icons.info_outline,
-                        size: 16,
-                        color: theme.colorScheme.onPrimaryContainer),
+                    child: Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -1473,13 +1616,14 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.error
-                          .withAlpha(20),
+                      color: theme.colorScheme.error.withAlpha(20),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(Icons.close,
-                        size: 16,
-                        color: theme.colorScheme.error),
+                    child: Icon(
+                      Icons.close,
+                      size: 16,
+                      color: theme.colorScheme.error,
+                    ),
                   ),
                 ),
               ],
@@ -1489,48 +1633,57 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
             // Sets header
             if (sets.isNotEmpty)
               Padding(
-                padding:
-                    const EdgeInsets.only(left: 24, bottom: 4),
+                padding: const EdgeInsets.only(left: 24, bottom: 4),
                 child: Row(
                   children: [
-                    Text('#',
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 11)),
+                    Text(
+                      '#',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     if (keys.contains('weight'))
                       Expanded(
-                          child: Text(fields['weight'] ?? 'Peso',
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(
-                                      fontWeight:
-                                          FontWeight.w600,
-                                      fontSize: 11))),
+                        child: Text(
+                          fields['weight'] ?? 'Peso',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
                     if (keys.contains('reps'))
                       Expanded(
-                          child: Text(fields['reps'] ?? 'Reps',
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(
-                                      fontWeight:
-                                          FontWeight.w600,
-                                      fontSize: 11))),
+                        child: Text(
+                          fields['reps'] ?? 'Reps',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
                     if (keys.contains('distance'))
                       Expanded(
-                          child: Text(fields['distance'] ?? 'Dist.',
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(
-                                      fontWeight:
-                                          FontWeight.w600,
-                                      fontSize: 11))),
+                        child: Text(
+                          fields['distance'] ?? 'Dist.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
                     if (keys.contains('time_seconds'))
                       Expanded(
-                          child: Text(fields['time_seconds'] ?? 'Tempo',
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(
-                                      fontWeight:
-                                          FontWeight.w600,
-                                      fontSize: 11))),
+                        child: Text(
+                          fields['time_seconds'] ?? 'Tempo',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
                     const SizedBox(width: 24),
                   ],
                 ),
@@ -1540,66 +1693,59 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
             ...sets.asMap().entries.map((setEntry) {
               final idx = setEntry.key;
               final s = setEntry.value;
-              final isWarmupSet =
-                  (s['is_warmup'] as int?) == 1;
+              final isWarmupSet = (s['is_warmup'] as int?) == 1;
 
               return GestureDetector(
-                onTap: () => _editPredefinedSet(
-                    ex, s, idx + 1),
+                onTap: () => _editPredefinedSet(ex, s, idx + 1),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 3),
+                  padding: const EdgeInsets.symmetric(vertical: 3),
                   child: Row(
                     children: [
                       SizedBox(
                         width: 24,
                         child: Text(
                           isWarmupSet ? 'W' : '${idx + 1}',
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(
+                          style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: isWarmupSet
-                                ? Colors.orange
-                                : null,
+                            color: isWarmupSet ? Colors.orange : null,
                           ),
                         ),
                       ),
                       if (keys.contains('weight'))
                         Expanded(
-                            child: Text(
-                                formatFieldValue(
-                                    s, 'weight'),
-                                style: theme.textTheme
-                                    .bodyMedium)),
+                          child: Text(
+                            formatFieldValue(s, 'weight'),
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
                       if (keys.contains('reps'))
                         Expanded(
-                            child: Text(
-                                formatFieldValue(
-                                    s, 'reps'),
-                                style: theme.textTheme
-                                    .bodyMedium)),
+                          child: Text(
+                            formatFieldValue(s, 'reps'),
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
                       if (keys.contains('distance'))
                         Expanded(
-                            child: Text(
-                                formatFieldValue(
-                                    s, 'distance'),
-                                style: theme.textTheme
-                                    .bodyMedium)),
+                          child: Text(
+                            formatFieldValue(s, 'distance'),
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
                       if (keys.contains('time_seconds'))
                         Expanded(
-                            child: Text(
-                                formatFieldValue(
-                                    s, 'time_seconds'),
-                                style: theme.textTheme
-                                    .bodyMedium)),
+                          child: Text(
+                            formatFieldValue(s, 'time_seconds'),
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ),
                       GestureDetector(
-                        onTap: () =>
-                            _deletePredefinedSet(
-                                s['id'] as String),
-                        child: Icon(Icons.close,
-                            size: 16,
-                            color: theme.colorScheme.error
-                                .withAlpha(180)),
+                        onTap: () => _deletePredefinedSet(s['id'] as String),
+                        child: Icon(
+                          Icons.close,
+                          size: 16,
+                          color: theme.colorScheme.error.withAlpha(180),
+                        ),
                       ),
                     ],
                   ),
@@ -1613,8 +1759,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
               onPressed: () => _addPredefinedSet(ex),
               icon: const Icon(Icons.add, size: 18),
               label: Text(loc.activeWorkoutAddSet),
-              style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact),
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
             ),
           ],
         ),

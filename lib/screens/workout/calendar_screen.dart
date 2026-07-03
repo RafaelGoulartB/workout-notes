@@ -32,17 +32,24 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Future<void> _loadMonth() async {
     setState(() => _isLoading = true);
-    final workouts = await _workoutRepo.getWorkoutsByMonth(_currentYear, _currentMonth);
-    
+    final workouts = await _workoutRepo.getWorkoutsByMonth(
+      _currentYear,
+      _currentMonth,
+    );
+
     final Map<String, List<Map<String, dynamic>>> grouped = {};
     for (final w in workouts) {
       final date = w['date'] as String? ?? '';
       grouped.putIfAbsent(date, () => []).add(w);
     }
 
-    final categories = await _workoutRepo.getWorkoutCategoriesByDate(_currentYear, _currentMonth);
+    final categories = await _workoutRepo.getWorkoutCategoriesByDate(
+      _currentYear,
+      _currentMonth,
+    );
 
-    _selectedDayWorkouts = grouped[_selectedDate.toIso8601String().substring(0, 10)] ?? [];
+    _selectedDayWorkouts =
+        grouped[_selectedDate.toIso8601String().substring(0, 10)] ?? [];
 
     if (mounted) {
       setState(() {
@@ -80,8 +87,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final dateLocale = Localizations.localeOf(context).toString().startsWith('pt') ? 'pt_BR' : 'en_US';
-    final monthName = DateFormat('MMMM yyyy', dateLocale).format(DateTime(_currentYear, _currentMonth));
+    final dateLocale =
+        Localizations.localeOf(context).toString().startsWith('pt')
+        ? 'pt_BR'
+        : 'en_US';
+    final monthName = DateFormat(
+      'MMMM yyyy',
+      dateLocale,
+    ).format(DateTime(_currentYear, _currentMonth));
 
     return Scaffold(
       appBar: AppBar(
@@ -94,13 +107,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
               children: [
                 // Month selector
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      IconButton(icon: const Icon(Icons.chevron_left), onPressed: _previousMonth),
-                      Text(monthName[0].toUpperCase() + monthName.substring(1), style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                      IconButton(icon: const Icon(Icons.chevron_right), onPressed: _nextMonth),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: _previousMonth,
+                      ),
+                      Text(
+                        monthName[0].toUpperCase() + monthName.substring(1),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: _nextMonth,
+                      ),
                     ],
                   ),
                 ),
@@ -109,21 +136,30 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Row(
-                    children: [
-                        AppLocalizations.of(context)!.calendarSun,
-                        AppLocalizations.of(context)!.calendarMon,
-                        AppLocalizations.of(context)!.calendarTue,
-                        AppLocalizations.of(context)!.calendarWed,
-                        AppLocalizations.of(context)!.calendarThu,
-                        AppLocalizations.of(context)!.calendarFri,
-                        AppLocalizations.of(context)!.calendarSat,
-                      ].map((d) => Expanded(
-                              child: Center(
-                                child: Text(d, style: theme.textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.w600, color: theme.colorScheme.onSurfaceVariant)),
+                    children:
+                        [
+                              AppLocalizations.of(context)!.calendarSun,
+                              AppLocalizations.of(context)!.calendarMon,
+                              AppLocalizations.of(context)!.calendarTue,
+                              AppLocalizations.of(context)!.calendarWed,
+                              AppLocalizations.of(context)!.calendarThu,
+                              AppLocalizations.of(context)!.calendarFri,
+                              AppLocalizations.of(context)!.calendarSat,
+                            ]
+                            .map(
+                              (d) => Expanded(
+                                child: Center(
+                                  child: Text(
+                                    d,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
                               ),
-                            ))
-                        .toList(),
+                            )
+                            .toList(),
                   ),
                 ),
 
@@ -144,23 +180,42 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.fitness_center_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
+                                Icon(
+                                  Icons.fitness_center_outlined,
+                                  size: 48,
+                                  color: theme.colorScheme.onSurfaceVariant
+                                      .withAlpha(80),
+                                ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  AppLocalizations.of(context)!.calendarNoWorkouts(DateFormat('d/M').format(_selectedDate)),
-                                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                                  AppLocalizations.of(
+                                    context,
+                                  )!.calendarNoWorkouts(
+                                    DateFormat('d/M').format(_selectedDate),
+                                  ),
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
                                 const SizedBox(height: 16),
                                 FilledButton.icon(
                                   onPressed: _createWorkoutForSelectedDate,
                                   icon: const Icon(Icons.add, size: 18),
-                                  label: Text(AppLocalizations.of(context)!.calendarCreateWorkout),
+                                  label: Text(
+                                    AppLocalizations.of(
+                                      context,
+                                    )!.calendarCreateWorkout,
+                                  ),
                                 ),
                                 const SizedBox(height: 8),
                                 OutlinedButton.icon(
                                   onPressed: _importFromRoutine,
                                   icon: const Icon(Icons.repeat, size: 18),
-                                  label: Text(AppLocalizations.of(context)!.activeWorkoutImportRoutine),
+                                  label: Text(
+                                    AppLocalizations.of(
+                                      context,
+                                    )!.activeWorkoutImportRoutine,
+                                  ),
                                 ),
                               ],
                             ),
@@ -171,13 +226,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
                           itemCount: _selectedDayWorkouts.length,
                           itemBuilder: (ctx, i) {
                             final w = _selectedDayWorkouts[i];
-                            final duration = (w['duration_seconds'] as int?) ?? 0;
-                            final durStr = duration > 0 ? '${duration ~/ 60}min' : AppLocalizations.of(context)!.calendarInProgress;
+                            final duration =
+                                (w['duration_seconds'] as int?) ?? 0;
+                            final durStr = duration > 0
+                                ? '${duration ~/ 60}min'
+                                : AppLocalizations.of(
+                                    context,
+                                  )!.calendarInProgress;
                             return Card(
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+                                side: BorderSide(
+                                  color: theme.colorScheme.outlineVariant
+                                      .withAlpha(80),
+                                ),
                               ),
                               child: ListTile(
                                 leading: Container(
@@ -186,22 +249,42 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                     color: theme.colorScheme.primaryContainer,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: Icon(Icons.fitness_center, color: theme.colorScheme.onPrimaryContainer, size: 20),
+                                  child: Icon(
+                                    Icons.fitness_center,
+                                    color: theme.colorScheme.onPrimaryContainer,
+                                    size: 20,
+                                  ),
                                 ),
-                                title: Text(w['start_time'] != null
-                                    ? DateFormat('HH:mm').format(DateTime.parse(w['start_time'] as String))
-                                    : AppLocalizations.of(context)!.calendarNoTime),
+                                title: Text(
+                                  w['start_time'] != null
+                                      ? DateFormat('HH:mm').format(
+                                          DateTime.parse(
+                                            w['start_time'] as String,
+                                          ),
+                                        )
+                                      : AppLocalizations.of(
+                                          context,
+                                        )!.calendarNoTime,
+                                ),
                                 subtitle: Text(durStr),
                                 trailing: const Icon(Icons.chevron_right),
                                 onTap: () async {
-                                  final today = DateTime.now().toIso8601String().substring(0, 10);
-                                  final workoutDate = w['date'] as String? ?? '';
-                                  final isFuture = workoutDate.compareTo(today) > 0;
+                                  final today = DateTime.now()
+                                      .toIso8601String()
+                                      .substring(0, 10);
+                                  final workoutDate =
+                                      w['date'] as String? ?? '';
+                                  final isFuture =
+                                      workoutDate.compareTo(today) > 0;
                                   Widget target;
                                   if (isFuture) {
-                                    target = FutureWorkoutPlannerScreen(workoutId: w['id'] as String);
+                                    target = FutureWorkoutPlannerScreen(
+                                      workoutId: w['id'] as String,
+                                    );
                                   } else {
-                                    target = WorkoutDetailScreen(workoutId: w['id'] as String);
+                                    target = WorkoutDetailScreen(
+                                      workoutId: w['id'] as String,
+                                    );
                                   }
                                   final result = await Navigator.push(
                                     context,
@@ -236,7 +319,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     // Day cells
     for (int day = 1; day <= daysInMonth; day++) {
-      final dateStr = '$_currentYear-${_currentMonth.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+      final dateStr =
+          '$_currentYear-${_currentMonth.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
       final cats = _categoriesByDate[dateStr] ?? [];
       final hasWorkout = cats.isNotEmpty;
       final isToday = dateStr == today;
@@ -266,8 +350,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                     color: isSelected
                         ? theme.colorScheme.onPrimaryContainer
                         : isToday
-                            ? theme.colorScheme.primary
-                            : null,
+                        ? theme.colorScheme.primary
+                        : null,
                   ),
                 ),
                 if (hasWorkout)
@@ -308,10 +392,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
             child: Container(
               width: 5,
               height: 5,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
           );
         }),
@@ -334,30 +415,32 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Future<void> _createWorkoutForSelectedDate() async {
     await _workoutRepo.createWorkout(date: _selectedDate);
     _loadMonth();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.calendarWorkoutCreated), behavior: SnackBarBehavior.floating),
-      );
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(AppLocalizations.of(context)!.calendarWorkoutCreated),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _importFromRoutine() async {
-    final ctx = context;
-    final scaffoldMessenger = ScaffoldMessenger.of(ctx);
-    final loc = AppLocalizations.of(ctx)!;
+    final loc = AppLocalizations.of(context)!;
     final routines = await _routineRepo.getRoutines();
+    if (!mounted) return;
     if (routines.isEmpty) {
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text(loc.activeWorkoutNoRoutineFound), behavior: SnackBarBehavior.floating),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(loc.activeWorkoutNoRoutineFound),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
-    final theme = Theme.of(ctx);
+    final theme = Theme.of(context);
     final routineId = await showModalBottomSheet<String>(
-      context: ctx,
+      context: context,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (ctx) => Padding(
@@ -366,12 +449,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(
-              color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
-              borderRadius: BorderRadius.circular(2),
-            ))),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
-            Text(loc.activeWorkoutSelectRoutine, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              loc.activeWorkoutSelectRoutine,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 16),
             SizedBox(
               height: 300,
@@ -387,9 +481,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         color: theme.colorScheme.secondaryContainer,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.repeat, color: theme.colorScheme.onSecondaryContainer, size: 20),
+                      child: Icon(
+                        Icons.repeat,
+                        color: theme.colorScheme.onSecondaryContainer,
+                        size: 20,
+                      ),
                     ),
-                    title: Text(routine['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(
+                      routine['name'] as String,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pop(ctx, routine['id'] as String),
                   );
@@ -403,18 +504,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
     if (routineId == null || !mounted) return;
 
     final days = await _routineRepo.getRoutineDays(routineId);
+    if (!mounted) return;
     if (days.isEmpty) {
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(content: Text(loc.activeWorkoutNoRoutineDays), behavior: SnackBarBehavior.floating),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(loc.activeWorkoutNoRoutineDays),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
-    final routineName = routines.firstWhere((r) => r['id'] == routineId)['name'] as String;
+    final routineName =
+        routines.firstWhere((r) => r['id'] == routineId)['name'] as String;
     final dayId = await showModalBottomSheet<String>(
-      context: ctx,
+      context: context,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (ctx) => Padding(
@@ -423,10 +527,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(
-              color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
-              borderRadius: BorderRadius.circular(2),
-            ))),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -437,9 +547,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 ),
               ],
             ),
-            Text(routineName, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              routineName,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(loc.activeWorkoutSelectDay, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text(
+              loc.activeWorkoutSelectDay,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 16),
             SizedBox(
               height: 300,
@@ -455,9 +575,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         color: theme.colorScheme.primaryContainer,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.today, color: theme.colorScheme.onPrimaryContainer, size: 20),
+                      child: Icon(
+                        Icons.today,
+                        color: theme.colorScheme.onPrimaryContainer,
+                        size: 20,
+                      ),
                     ),
-                    title: Text(day['name'] as String? ?? 'Dia ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(
+                      day['name'] as String? ?? 'Dia ${i + 1}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     trailing: const Icon(Icons.download),
                     onTap: () => Navigator.pop(ctx, day['id'] as String),
                   );
@@ -474,10 +601,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final newWorkoutId = await _workoutRepo.createWorkout(date: _selectedDate);
     await _workoutRepo.importRoutineDayToWorkout(newWorkoutId, dayId);
     _loadMonth();
-    if (mounted) {
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(loc.activeWorkoutRoutineImported), behavior: SnackBarBehavior.floating),
-      );
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(loc.activeWorkoutRoutineImported),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 }

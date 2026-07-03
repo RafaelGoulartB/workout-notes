@@ -43,21 +43,21 @@ class _FutureWorkoutPlannerScreenState
     final entries = await _workoutRepo.getWorkoutExercises(widget.workoutId);
     final exercises = <ExerciseWithSets>[];
     for (final entry in entries) {
-      final sets =
-          await _workoutRepo.getExerciseSets(entry['id'] as String);
-      exercises.add(ExerciseWithSets(
-        entryId: entry['id'] as String,
-        exerciseId: entry['exercise_id'] as String? ?? '',
-        name: entry['exercise_name'] as String? ?? '',
-        localeKey: entry['exercise_locale_key'] as String?,
-        exerciseType: entry['exercise_type'] as String? ?? 'weightReps',
-        categoryId: entry['category_id'] as String?,
-        categoryName: entry['category_name'] as String? ?? '',
-        categoryColor:
-            Color(entry['category_color'] as int? ?? 0xFF757575),
-        sets: sets,
-        restTimeSeconds: (entry['rest_time_seconds'] as int?) ?? 90,
-      ));
+      final sets = await _workoutRepo.getExerciseSets(entry['id'] as String);
+      exercises.add(
+        ExerciseWithSets(
+          entryId: entry['id'] as String,
+          exerciseId: entry['exercise_id'] as String? ?? '',
+          name: entry['exercise_name'] as String? ?? '',
+          localeKey: entry['exercise_locale_key'] as String?,
+          exerciseType: entry['exercise_type'] as String? ?? 'weightReps',
+          categoryId: entry['category_id'] as String?,
+          categoryName: entry['category_name'] as String? ?? '',
+          categoryColor: Color(entry['category_color'] as int? ?? 0xFF757575),
+          sets: sets,
+          restTimeSeconds: (entry['rest_time_seconds'] as int?) ?? 90,
+        ),
+      );
     }
 
     if (mounted) {
@@ -78,14 +78,16 @@ class _FutureWorkoutPlannerScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_workout != null
-            ? DateFormat(
-                    Intl.defaultLocale?.startsWith('pt') == true
-                        ? "d 'de' MMMM"
-                        : 'MMMM d',
-                    Intl.defaultLocale)
-                .format(DateTime.parse(_workout!['date'] as String))
-            : ''),
+        title: Text(
+          _workout != null
+              ? DateFormat(
+                  Intl.defaultLocale?.startsWith('pt') == true
+                      ? "d 'de' MMMM"
+                      : 'MMMM d',
+                  Intl.defaultLocale,
+                ).format(DateTime.parse(_workout!['date'] as String))
+              : '',
+        ),
         centerTitle: true,
         actions: [
           IconButton(
@@ -129,11 +131,12 @@ class _FutureWorkoutPlannerScreenState
                 value: 'delete',
                 child: Row(
                   children: [
-                    Icon(Icons.delete_outline,
-                        size: 18, color: Colors.red),
+                    Icon(Icons.delete_outline, size: 18, color: Colors.red),
                     const SizedBox(width: 8),
-                    Text(loc.workoutDetailDelete,
-                        style: const TextStyle(color: Colors.red)),
+                    Text(
+                      loc.workoutDetailDelete,
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   ],
                 ),
               ),
@@ -186,11 +189,11 @@ class _FutureWorkoutPlannerScreenState
   Widget _buildHeader(ThemeData theme, AppLocalizations loc) {
     if (_workout == null) return const SizedBox.shrink();
     final dateStr = DateFormat(
-            Intl.defaultLocale?.startsWith('pt') == true
-                ? "EEEE, d 'de' MMMM 'de' yyyy"
-                : 'EEEE, MMMM d, yyyy',
-            Intl.defaultLocale)
-        .format(DateTime.parse(_workout!['date'] as String));
+      Intl.defaultLocale?.startsWith('pt') == true
+          ? "EEEE, d 'de' MMMM 'de' yyyy"
+          : 'EEEE, MMMM d, yyyy',
+      Intl.defaultLocale,
+    ).format(DateTime.parse(_workout!['date'] as String));
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -202,8 +205,11 @@ class _FutureWorkoutPlannerScreenState
               color: theme.colorScheme.tertiaryContainer,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.edit_calendar,
-                color: theme.colorScheme.onTertiaryContainer, size: 24),
+            child: Icon(
+              Icons.edit_calendar,
+              color: theme.colorScheme.onTertiaryContainer,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -212,14 +218,16 @@ class _FutureWorkoutPlannerScreenState
               children: [
                 Text(
                   '${_exercises.length} ${loc.commonExercises}',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   '$_totalSets ${loc.commonSets}',
                   style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant),
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -242,20 +250,24 @@ class _FutureWorkoutPlannerScreenState
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.fitness_center_outlined,
-                size: 48,
-                color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
+            Icon(
+              Icons.fitness_center_outlined,
+              size: 48,
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+            ),
             const SizedBox(height: 16),
             Text(
               loc.activeWorkoutEmptyTitle,
               style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant),
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               loc.activeWorkoutEmptySubtitle,
               style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant),
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -296,15 +308,18 @@ class _FutureWorkoutPlannerScreenState
   }
 
   Widget _buildExerciseCard(
-      ExerciseWithSets ex, int index, ThemeData theme, AppLocalizations loc) {
+    ExerciseWithSets ex,
+    int index,
+    ThemeData theme,
+    AppLocalizations loc,
+  ) {
     return Card(
       key: ValueKey(ex.entryId),
       margin: const EdgeInsets.symmetric(vertical: 4),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side:
-            BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -326,13 +341,16 @@ class _FutureWorkoutPlannerScreenState
                 Expanded(
                   child: Text(
                     ex.localizedName(loc),
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(6),
@@ -352,8 +370,11 @@ class _FutureWorkoutPlannerScreenState
                   onTap: () => _removeExercise(ex),
                   child: Padding(
                     padding: const EdgeInsets.all(4),
-                    child: Icon(Icons.close,
-                        size: 18, color: theme.colorScheme.error),
+                    child: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: theme.colorScheme.error,
+                    ),
                   ),
                 ),
                 // Drag handle
@@ -375,27 +396,39 @@ class _FutureWorkoutPlannerScreenState
                   const SizedBox(width: 28),
                   Expanded(
                     flex: 2,
-                    child: Text(loc.workoutDetailSetNumber,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    child: Text(
+                      loc.workoutDetailSetNumber,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                   Expanded(
                     flex: 3,
-                    child: Text(loc.workoutDetailWeight,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    child: Text(
+                      loc.workoutDetailWeight,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                   Expanded(
                     flex: 3,
-                    child: Text(loc.commonReps,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    child: Text(
+                      loc.commonReps,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                   Expanded(
                     flex: 3,
-                    child: Text(loc.workoutDetailRpe,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    child: Text(
+                      loc.workoutDetailRpe,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -495,7 +528,9 @@ class _FutureWorkoutPlannerScreenState
         onExerciseRemoved: (exercise) async {
           final exerciseId = exercise['id'] as String;
           await _workoutRepo.removeExerciseEntryFromWorkout(
-              widget.workoutId, exerciseId);
+            widget.workoutId,
+            exerciseId,
+          );
           if (mounted) {
             setState(() {
               _exercises.removeWhere((e) => e.exerciseId == exerciseId);
@@ -512,26 +547,30 @@ class _FutureWorkoutPlannerScreenState
     final rt = exercise['default_rest_time'] as int?;
 
     final entryId = await _workoutRepo.addExerciseToWorkout(
-        widget.workoutId, exerciseId,
-        restTimeSeconds: rt);
+      widget.workoutId,
+      exerciseId,
+      restTimeSeconds: rt,
+    );
 
     final sets = await _workoutRepo.getExerciseSets(entryId);
     if (mounted) {
       setState(() {
-        _exercises.add(ExerciseWithSets(
-          entryId: entryId,
-          exerciseId: exerciseId,
-          name: ExerciseLocaleHelper.exerciseName(loc, exercise),
-          localeKey: exercise['locale_key'] as String?,
-          exerciseType: exercise['type'] as String? ?? 'weightReps',
-          categoryId: exercise['category_id'] as String?,
-          categoryName:
-              ExerciseLocaleHelper.categoryName(loc, exercise),
-          categoryColor: Color(
-              exercise['category_color'] as int? ?? 0xFF757575),
-          sets: sets,
-          restTimeSeconds: rt ?? 90,
-        ));
+        _exercises.add(
+          ExerciseWithSets(
+            entryId: entryId,
+            exerciseId: exerciseId,
+            name: ExerciseLocaleHelper.exerciseName(loc, exercise),
+            localeKey: exercise['locale_key'] as String?,
+            exerciseType: exercise['type'] as String? ?? 'weightReps',
+            categoryId: exercise['category_id'] as String?,
+            categoryName: ExerciseLocaleHelper.categoryName(loc, exercise),
+            categoryColor: Color(
+              exercise['category_color'] as int? ?? 0xFF757575,
+            ),
+            sets: sets,
+            restTimeSeconds: rt ?? 90,
+          ),
+        );
       });
     }
   }
@@ -543,7 +582,8 @@ class _FutureWorkoutPlannerScreenState
       builder: (ctx) => AlertDialog(
         title: Text(loc.activeWorkoutRemoveExercise),
         content: Text(
-            loc.activeWorkoutRemoveExerciseContent(ex.localizedName(loc))),
+          loc.activeWorkoutRemoveExerciseContent(ex.localizedName(loc)),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -551,8 +591,10 @@ class _FutureWorkoutPlannerScreenState
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete,
-                style: const TextStyle(color: Colors.red)),
+            child: Text(
+              loc.commonDelete,
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -598,11 +640,14 @@ class _FutureWorkoutPlannerScreenState
     final loc = AppLocalizations.of(context)!;
     final set = exercise.sets[setIndex];
     final weightCtl = TextEditingController(
-        text: (set['weight'] as num?)?.toStringAsFixed(1) ?? '');
+      text: (set['weight'] as num?)?.toStringAsFixed(1) ?? '',
+    );
     final repsCtl = TextEditingController(
-        text: (set['reps'] as int?)?.toString() ?? '');
+      text: (set['reps'] as int?)?.toString() ?? '',
+    );
     final rpeCtl = TextEditingController(
-        text: (set['rpe'] as num?)?.toStringAsFixed(1) ?? '');
+      text: (set['rpe'] as num?)?.toStringAsFixed(1) ?? '',
+    );
 
     final result = await showDialog<bool>(
       context: context,
@@ -619,7 +664,8 @@ class _FutureWorkoutPlannerScreenState
                 isDense: true,
               ),
               keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true),
+                decimal: true,
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -640,7 +686,8 @@ class _FutureWorkoutPlannerScreenState
                 isDense: true,
               ),
               keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true),
+                decimal: true,
+              ),
             ),
           ],
         ),
@@ -658,10 +705,12 @@ class _FutureWorkoutPlannerScreenState
     );
 
     if (result == true) {
-      await _workoutRepo.updateSet(set['id'] as String,
-          weight: double.tryParse(weightCtl.text),
-          reps: int.tryParse(repsCtl.text),
-          rpe: double.tryParse(rpeCtl.text));
+      await _workoutRepo.updateSet(
+        set['id'] as String,
+        weight: double.tryParse(weightCtl.text),
+        reps: int.tryParse(repsCtl.text),
+        rpe: double.tryParse(rpeCtl.text),
+      );
       await _load();
       if (mounted) setState(() {});
     }
@@ -678,23 +727,21 @@ class _FutureWorkoutPlannerScreenState
   }
 
   Future<void> _importFromRoutine() async {
-    final ctx = context;
-    final scaffoldMessenger = ScaffoldMessenger.of(ctx);
-    final loc = AppLocalizations.of(ctx)!;
+    final loc = AppLocalizations.of(context)!;
     final routines = await _routineRepo.getRoutines();
+    if (!mounted) return;
     if (routines.isEmpty) {
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-              content: Text(loc.activeWorkoutNoRoutineFound),
-              behavior: SnackBarBehavior.floating),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(loc.activeWorkoutNoRoutineFound),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
     final routineId = await showModalBottomSheet<String>(
-      context: ctx,
+      context: context,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (ctx) => _buildRoutinePicker(routines),
@@ -702,21 +749,21 @@ class _FutureWorkoutPlannerScreenState
     if (routineId == null || !mounted) return;
 
     final days = await _routineRepo.getRoutineDays(routineId);
+    if (!mounted) return;
     if (days.isEmpty) {
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-              content: Text(loc.activeWorkoutNoRoutineDays),
-              behavior: SnackBarBehavior.floating),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(loc.activeWorkoutNoRoutineDays),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
     final routineName =
         routines.firstWhere((r) => r['id'] == routineId)['name'] as String;
     final dayId = await showModalBottomSheet<String>(
-      context: ctx,
+      context: context,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (ctx) => _buildDayPicker(ctx, days, routineName),
@@ -727,11 +774,11 @@ class _FutureWorkoutPlannerScreenState
     await _load();
     if (!mounted) return;
     setState(() {});
-    if (!mounted) return;
-    scaffoldMessenger.showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-          content: Text(loc.activeWorkoutRoutineImported),
-          behavior: SnackBarBehavior.floating),
+        content: Text(loc.activeWorkoutRoutineImported),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -755,9 +802,12 @@ class _FutureWorkoutPlannerScreenState
             ),
           ),
           const SizedBox(height: 16),
-          Text(loc.activeWorkoutSelectRoutine,
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            loc.activeWorkoutSelectRoutine,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 16),
           SizedBox(
             height: 300,
@@ -773,15 +823,18 @@ class _FutureWorkoutPlannerScreenState
                       color: theme.colorScheme.secondaryContainer,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(Icons.repeat,
-                        color: theme.colorScheme.onSecondaryContainer,
-                        size: 20),
+                    child: Icon(
+                      Icons.repeat,
+                      color: theme.colorScheme.onSecondaryContainer,
+                      size: 20,
+                    ),
                   ),
-                  title: Text(routine['name'] as String,
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                  title: Text(
+                    routine['name'] as String,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () =>
-                      Navigator.pop(ctx, routine['id'] as String),
+                  onTap: () => Navigator.pop(ctx, routine['id'] as String),
                 );
               },
             ),
@@ -791,8 +844,11 @@ class _FutureWorkoutPlannerScreenState
     );
   }
 
-  Widget _buildDayPicker(BuildContext sheetContext,
-      List<Map<String, dynamic>> days, String routineName) {
+  Widget _buildDayPicker(
+    BuildContext sheetContext,
+    List<Map<String, dynamic>> days,
+    String routineName,
+  ) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
     return Padding(
@@ -821,13 +877,19 @@ class _FutureWorkoutPlannerScreenState
               ),
             ],
           ),
-          Text(routineName,
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            routineName,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(loc.activeWorkoutSelectDay,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant)),
+          Text(
+            loc.activeWorkoutSelectDay,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 16),
           SizedBox(
             height: 300,
@@ -843,16 +905,18 @@ class _FutureWorkoutPlannerScreenState
                       color: theme.colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(Icons.today,
-                        color: theme.colorScheme.onPrimaryContainer,
-                        size: 20),
+                    child: Icon(
+                      Icons.today,
+                      color: theme.colorScheme.onPrimaryContainer,
+                      size: 20,
+                    ),
                   ),
-                  title: Text(day['name'] as String? ?? 'Dia ${i + 1}',
-                      style:
-                          const TextStyle(fontWeight: FontWeight.w600)),
+                  title: Text(
+                    day['name'] as String? ?? 'Dia ${i + 1}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
                   trailing: const Icon(Icons.download),
-                  onTap: () =>
-                      Navigator.pop(ctx, day['id'] as String),
+                  onTap: () => Navigator.pop(ctx, day['id'] as String),
                 );
               },
             ),
@@ -865,8 +929,7 @@ class _FutureWorkoutPlannerScreenState
   Future<void> _editDate() async {
     if (_workout == null) return;
     final loc = AppLocalizations.of(context)!;
-    final currentDate =
-        DateTime.parse(_workout!['date'] as String);
+    final currentDate = DateTime.parse(_workout!['date'] as String);
     final newDate = await showDatePicker(
       context: context,
       initialDate: currentDate,
@@ -874,24 +937,23 @@ class _FutureWorkoutPlannerScreenState
       lastDate: DateTime(2030),
       helpText: loc.workoutDetailSelectDate,
     );
-    if (newDate != null && mounted) {
-      await _workoutRepo.updateWorkoutDate(widget.workoutId, newDate);
-      _load();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(loc.workoutDetailDateChanged),
-              behavior: SnackBarBehavior.floating),
-        );
-      }
-    }
+    if (newDate == null || !mounted) return;
+
+    await _workoutRepo.updateWorkoutDate(widget.workoutId, newDate);
+    _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(loc.workoutDetailDateChanged),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _copyWorkout() async {
     if (_workout == null) return;
     final loc = AppLocalizations.of(context)!;
-    final currentDate =
-        DateTime.parse(_workout!['date'] as String);
+    final currentDate = DateTime.parse(_workout!['date'] as String);
     final newDate = await showDatePicker(
       context: context,
       initialDate: currentDate,
@@ -899,30 +961,32 @@ class _FutureWorkoutPlannerScreenState
       lastDate: DateTime(2030),
       helpText: loc.workoutDetailCopy,
     );
-    if (newDate != null && mounted) {
-      final newWorkoutId = await _workoutRepo.copyWorkoutToDate(
-          widget.workoutId, newDate);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(loc.workoutDetailCopyDateChanged),
-            behavior: SnackBarBehavior.floating,
-            action: SnackBarAction(
-              label: loc.workoutDetailGoToWorkout,
-              onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => FutureWorkoutPlannerScreen(
-                        workoutId: newWorkoutId),
-                  ),
-                );
-              },
-            ),
-          ),
-        );
-      }
-    }
+    if (newDate == null || !mounted) return;
+
+    final newWorkoutId = await _workoutRepo.copyWorkoutToDate(
+      widget.workoutId,
+      newDate,
+    );
+    if (!mounted) return;
+
+    final navigator = Navigator.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(loc.workoutDetailCopyDateChanged),
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: loc.workoutDetailGoToWorkout,
+          onPressed: () {
+            navigator.pushReplacement(
+              MaterialPageRoute(
+                builder: (_) =>
+                    FutureWorkoutPlannerScreen(workoutId: newWorkoutId),
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _deleteWorkout() async {
@@ -939,15 +1003,18 @@ class _FutureWorkoutPlannerScreenState
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete,
-                style: const TextStyle(color: Colors.red)),
+            child: Text(
+              loc.commonDelete,
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
     );
     if (confirm == true) {
       await _workoutRepo.deleteWorkout(widget.workoutId);
-      if (mounted) Navigator.pop(context, true);
+      if (!mounted) return;
+      Navigator.pop(context, true);
     }
   }
 }

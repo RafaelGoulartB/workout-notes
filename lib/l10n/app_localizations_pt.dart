@@ -1580,6 +1580,19 @@ class AppLocalizationsPt extends AppLocalizations {
       'Notificações do temporizador de treino ativo';
 
   @override
+  String get notificationRestTimerTitle => 'Descanso';
+
+  @override
+  String get notificationRestCompleteTitle => 'Descanso Concluído';
+
+  @override
+  String get notificationRestCompleteBody =>
+      'O tempo de descanso acabou - hora da próxima série!';
+
+  @override
+  String get notificationWorkoutTimerTitle => 'Treino ativo';
+
+  @override
   String get exportServiceBackupText => 'Workout Notes - Backup de Treinos';
 
   @override

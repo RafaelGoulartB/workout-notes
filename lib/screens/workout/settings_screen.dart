@@ -46,6 +46,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   // ===================== DATA =====================
   Future<void> _load() async {
     _settings = await _settingsRepo.getAllSettings();
+    if (!mounted) return;
     setState(() => _isLoading = false);
   }
 
@@ -69,6 +70,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     final color = AccentColors.options[index];
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('accent_color', color.toARGB32());
+    if (!mounted) return;
     setState(() => _selectedAccentIndex = index);
     WorkoutNotesApp.themeNotifier.setSeedColor(color);
   }
@@ -88,6 +90,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     }
     await prefs.setString('theme_mode', value);
     await _update('theme_mode', value);
+    if (!mounted) return;
     setState(() => _selectedThemeMode = mode);
     WorkoutNotesApp.themeNotifier.setThemeMode(mode);
   }
@@ -102,6 +105,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     Intl.defaultLocale = localeStr == 'pt' ? 'pt_BR' : 'en_US';
 
     WorkoutNotesApp.localeNotifier.setLocale(newLocale);
+    await NotificationService.instance.loadSettings();
   }
 
   Future<void> _exportBackup() async {
@@ -131,18 +135,18 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   }
 
   Future<void> _importBackup() async {
-    final ctx = context;
-    final loc = AppLocalizations.of(ctx)!;
-    final scaffoldMessenger = ScaffoldMessenger.of(ctx);
+    final loc = AppLocalizations.of(context)!;
     final service = ExportService();
 
     // Get path description to show user
     final backupsPath = await service.getBackupsPathDescription();
+    if (!mounted) return;
 
     // ----- Helper: show confirmation dialog + restore from file -----
     Future<void> confirmAndRestoreFromFile(String path) async {
+      if (!mounted) return;
       final confirmed = await showDialog<bool>(
-        context: ctx,
+        context: context,
         builder: (ctx) => AlertDialog(
           title: Text(loc.settingsImportBackup),
           content: Column(
@@ -179,31 +183,30 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
 
       try {
         final count = await service.restoreFromFile(path);
-        if (mounted) {
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-              content: Text(loc.settingsImportSuccess(count)),
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 5),
-            ),
-          );
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.settingsImportSuccess(count)),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       } catch (e) {
-        if (mounted) {
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-              content: Text(loc.settingsImportError(e.toString())),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.settingsImportError(e.toString())),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
 
     // ----- Helper: confirm + restore from pasted JSON string -----
     Future<void> confirmAndRestoreFromString(String jsonString) async {
+      if (!mounted) return;
       final confirmed = await showDialog<bool>(
-        context: ctx,
+        context: context,
         builder: (ctx) => AlertDialog(
           title: Text(loc.settingsImportBackup),
           content: Column(
@@ -240,24 +243,22 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
 
       try {
         final count = await service.restoreFromJsonString(jsonString);
-        if (mounted) {
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-              content: Text(loc.settingsImportSuccess(count)),
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 5),
-            ),
-          );
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.settingsImportSuccess(count)),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+          ),
+        );
       } catch (e) {
-        if (mounted) {
-          scaffoldMessenger.showSnackBar(
-            SnackBar(
-              content: Text(loc.settingsImportError(e.toString())),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.settingsImportError(e.toString())),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
 
@@ -268,7 +269,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       if (localBackups.isEmpty) {
         if (!mounted) return;
         await showDialog<void>(
-          context: ctx,
+          context: context,
           builder: (ctx) => AlertDialog(
             title: Text(loc.settingsImportBackup),
             content: Column(
@@ -305,7 +306,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
 
       if (!mounted) return;
       final selectedPath = await showModalBottomSheet<String>(
-        context: ctx,
+        context: context,
         showDragHandle: true,
         builder: (ctx) {
           final t = Theme.of(ctx);
@@ -425,8 +426,9 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     // ----- Option B: paste JSON text -----
     Future<void> pasteFromClipboard() async {
       final controller = TextEditingController();
+      if (!mounted) return;
       final text = await showDialog<String>(
-        context: ctx,
+        context: context,
         builder: (ctx) => AlertDialog(
           title: Row(
             children: [
@@ -473,7 +475,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     // ----- Main menu -----
     if (!mounted) return;
     final choice = await showModalBottomSheet<String>(
-      context: ctx,
+      context: context,
       showDragHandle: true,
       builder: (ctx) {
         final t = Theme.of(ctx);
@@ -1544,6 +1546,7 @@ class _ValuePickerTile extends StatelessWidget {
         );
       },
     );
+    if (!context.mounted) return;
     if (selected != null) onChanged(selected);
   }
 

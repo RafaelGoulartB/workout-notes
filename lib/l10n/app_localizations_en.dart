@@ -1573,6 +1573,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Active workout timer notifications';
 
   @override
+  String get notificationRestTimerTitle => 'Rest';
+
+  @override
+  String get notificationRestCompleteTitle => 'Rest Complete';
+
+  @override
+  String get notificationRestCompleteBody =>
+      'Rest time is over - time for the next set!';
+
+  @override
+  String get notificationWorkoutTimerTitle => 'Active workout';
+
+  @override
   String get exportServiceBackupText => 'Workout Notes - Workout Backup';
 
   @override

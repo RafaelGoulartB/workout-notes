@@ -1,5 +1,9 @@
 import 'dart:typed_data';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/app_localizations_en.dart';
+import 'package:workout_notes/l10n/app_localizations_pt.dart';
 import '../repositories/settings_repository.dart';
 
 /// Centralized notification service for timer notifications.
@@ -19,23 +23,17 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
   bool? _notificationsAllowed;
+  String _localeCode = 'en';
 
-  // ── Notification IDs ──
+  // Notification IDs
   static const int _restTimerId = 1001;
   static const int _workoutTimerId = 1002;
 
-  // ── Android Channels ──
+  // Android Channels
   static const String _restChannelId = 'rest_timer';
-  static const String _restChannelName = 'Timer de Descanso';
-  static const String _restChannelDesc =
-      'Notificações do temporizador de descanso entre séries';
-
   static const String _workoutChannelId = 'workout_timer';
-  static const String _workoutChannelName = 'Timer de Treino';
-  static const String _workoutChannelDesc =
-      'Notificações do temporizador de treino ativo';
 
-  // ── Cached settings ──
+  // Cached settings
   bool _restEnabled = true;
   bool _restSound = true;
   bool _restVibration = true;
@@ -46,7 +44,10 @@ class NotificationService {
   /// Whether the plugin has been initialized.
   bool get isInitialized => _initialized;
 
-  // ── Initialization ──
+  AppLocalizations get _loc =>
+      _localeCode == 'pt' ? AppLocalizationsPt() : AppLocalizationsEn();
+
+  // Initialization
 
   /// Initialize the plugin and create notification channels.
   Future<void> init() async {
@@ -67,6 +68,7 @@ class NotificationService {
     );
 
     await _plugin.initialize(initSettings);
+    await _loadLocale();
 
     // Create/update channels with current settings
     await _updateRestChannel();
@@ -87,6 +89,7 @@ class NotificationService {
     _workoutSound = settings['notification_workout_timer_sound'] == 'true';
     _workoutVibration =
         settings['notification_workout_timer_vibration'] == 'true';
+    await _loadLocale();
 
     if (_initialized) {
       await _updateRestChannel();
@@ -115,7 +118,12 @@ class NotificationService {
     return requestPermission();
   }
 
-  // ── Channel updates ──
+  Future<void> _loadLocale() async {
+    final prefs = await SharedPreferences.getInstance();
+    _localeCode = prefs.getString('app_locale') == 'pt' ? 'pt' : 'en';
+  }
+
+  // Channel updates
 
   Future<void> _updateRestChannel() async {
     final android = _plugin
@@ -127,8 +135,8 @@ class NotificationService {
     await android.createNotificationChannel(
       AndroidNotificationChannel(
         _restChannelId,
-        _restChannelName,
-        description: _restChannelDesc,
+        _loc.notificationRestChannelName,
+        description: _loc.notificationRestChannelDesc,
         importance: Importance.high,
         playSound: _restSound,
         enableVibration: _restVibration,
@@ -146,8 +154,8 @@ class NotificationService {
     await android.createNotificationChannel(
       AndroidNotificationChannel(
         _workoutChannelId,
-        _workoutChannelName,
-        description: _workoutChannelDesc,
+        _loc.notificationWorkoutChannelName,
+        description: _loc.notificationWorkoutChannelDesc,
         importance: Importance.defaultImportance,
         playSound: _workoutSound,
         enableVibration: _workoutVibration,
@@ -155,7 +163,7 @@ class NotificationService {
     );
   }
 
-  // ── Rest Timer Notifications ──
+  // Rest Timer Notifications
 
   /// Show or update the rest timer countdown notification.
   Future<void> showRestTimer(int remainingSeconds) async {
@@ -164,13 +172,13 @@ class NotificationService {
 
     await _plugin.show(
       _restTimerId,
-      '⏱ Descanso',
+      _loc.notificationRestTimerTitle,
       _formatCountdown(remainingSeconds),
       NotificationDetails(
         android: AndroidNotificationDetails(
           _restChannelId,
-          _restChannelName,
-          channelDescription: _restChannelDesc,
+          _loc.notificationRestChannelName,
+          channelDescription: _loc.notificationRestChannelDesc,
           importance: Importance.high,
           priority: Priority.high,
           ongoing: true,
@@ -193,13 +201,13 @@ class NotificationService {
 
     await _plugin.show(
       _restTimerId,
-      '✅ Descanso Concluído',
-      'O tempo de descanso acabou — hora da próxima série! 💪',
+      _loc.notificationRestCompleteTitle,
+      _loc.notificationRestCompleteBody,
       NotificationDetails(
         android: AndroidNotificationDetails(
           _restChannelId,
-          _restChannelName,
-          channelDescription: _restChannelDesc,
+          _loc.notificationRestChannelName,
+          channelDescription: _loc.notificationRestChannelDesc,
           importance: Importance.high,
           priority: Priority.high,
           ongoing: false,
@@ -221,7 +229,7 @@ class NotificationService {
     await _plugin.cancel(_restTimerId);
   }
 
-  // ── Workout Timer Notifications ──
+  // Workout Timer Notifications
 
   /// Show or update the workout timer notification.
   /// The elapsed time is shown in the notification body only (no header timer).
@@ -231,13 +239,13 @@ class NotificationService {
 
     await _plugin.show(
       _workoutTimerId,
-      '🏋️ Treino ativo',
+      _loc.notificationWorkoutTimerTitle,
       elapsedFormatted,
       NotificationDetails(
         android: AndroidNotificationDetails(
           _workoutChannelId,
-          _workoutChannelName,
-          channelDescription: _workoutChannelDesc,
+          _loc.notificationWorkoutChannelName,
+          channelDescription: _loc.notificationWorkoutChannelDesc,
           importance: Importance.defaultImportance,
           priority: Priority.defaultPriority,
           ongoing: true,
@@ -260,7 +268,7 @@ class NotificationService {
     await _plugin.cancel(_workoutTimerId);
   }
 
-  // ── Helpers ──
+  // Helpers
 
   String _formatCountdown(int seconds) {
     final min = seconds ~/ 60;

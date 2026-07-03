@@ -3020,6 +3020,30 @@ abstract class AppLocalizations {
   /// **'Active workout timer notifications'**
   String get notificationWorkoutChannelDesc;
 
+  /// No description provided for @notificationRestTimerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest'**
+  String get notificationRestTimerTitle;
+
+  /// No description provided for @notificationRestCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest Complete'**
+  String get notificationRestCompleteTitle;
+
+  /// No description provided for @notificationRestCompleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest time is over - time for the next set!'**
+  String get notificationRestCompleteBody;
+
+  /// No description provided for @notificationWorkoutTimerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Active workout'**
+  String get notificationWorkoutTimerTitle;
+
   /// No description provided for @exportServiceBackupText.
   ///
   /// In en, this message translates to:

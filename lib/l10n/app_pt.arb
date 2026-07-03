@@ -510,6 +510,10 @@
   "notificationRestChannelDesc": "Notificações do temporizador de descanso entre séries",
   "notificationWorkoutChannelName": "Timer de Treino",
   "notificationWorkoutChannelDesc": "Notificações do temporizador de treino ativo",
+  "notificationRestTimerTitle": "Descanso",
+  "notificationRestCompleteTitle": "Descanso Conclu\u00eddo",
+  "notificationRestCompleteBody": "O tempo de descanso acabou - hora da pr\u00f3xima s\u00e9rie!",
+  "notificationWorkoutTimerTitle": "Treino ativo",
 
   "exportServiceBackupText": "Workout Notes - Backup de Treinos",
   "exportServiceCsvText": "Workout Notes - Exportação de Treinos",
