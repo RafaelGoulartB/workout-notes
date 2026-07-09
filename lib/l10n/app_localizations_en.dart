@@ -436,6 +436,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Copy the JSON from another device and paste here';
 
   @override
+  String get settingsImportLocalOption => 'Backups saved on this device';
+
+  @override
+  String get settingsImportPickFileOption => 'Select file from device';
+
+  @override
+  String get settingsImportPickFileSubtitle =>
+      'Choose a .json backup from Downloads, Drive, or storage';
+
+  @override
+  String settingsImportPickerError(Object error) {
+    return 'Could not open the file picker: $error';
+  }
+
+  @override
   String get settingsLanguage => 'Language';
 
   @override

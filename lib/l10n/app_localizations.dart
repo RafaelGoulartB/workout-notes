@@ -896,6 +896,30 @@ abstract class AppLocalizations {
   /// **'Copy the JSON from another device and paste here'**
   String get settingsImportPasteSubtitle;
 
+  /// No description provided for @settingsImportLocalOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups saved on this device'**
+  String get settingsImportLocalOption;
+
+  /// No description provided for @settingsImportPickFileOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Select file from device'**
+  String get settingsImportPickFileOption;
+
+  /// No description provided for @settingsImportPickFileSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a .json backup from Downloads, Drive, or storage'**
+  String get settingsImportPickFileSubtitle;
+
+  /// No description provided for @settingsImportPickerError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the file picker: {error}'**
+  String settingsImportPickerError(Object error);
+
   /// No description provided for @settingsLanguage.
   ///
   /// In en, this message translates to:

@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
@@ -262,6 +265,66 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       }
     }
 
+    // ----- Helper: confirm + restore from picked file bytes -----
+    Future<void> confirmAndRestoreFromBytes(Uint8List bytes) async {
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(loc.settingsImportBackup),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                size: 48,
+                color: Theme.of(ctx).colorScheme.error,
+              ),
+              const SizedBox(height: 16),
+              Text(loc.settingsImportWarning),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(loc.commonCancel),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+                foregroundColor: Theme.of(ctx).colorScheme.onError,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(loc.settingsImport),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true || !mounted) return;
+
+      try {
+        final count = await service.restoreFromBytes(bytes);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.settingsImportSuccess(count)),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.settingsImportError(e.toString())),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+
     // ----- Option A: pick from local backups -----
     Future<void> pickFromLocal() async {
       final localBackups = await service.listLocalBackups();
@@ -472,6 +535,44 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       await confirmAndRestoreFromString(text.trim());
     }
 
+    // ----- Option C: pick a JSON file through Android's native picker -----
+    Future<void> pickFromDevice() async {
+      FilePickerResult? result;
+      try {
+        result = await FilePicker.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['json'],
+          allowMultiple: false,
+          withData: true,
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.settingsImportPickerError(e.toString())),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      if (result == null || !mounted) return;
+
+      final file = result.files.single;
+      if (file.bytes != null) {
+        await confirmAndRestoreFromBytes(file.bytes!);
+      } else if (file.path != null) {
+        await confirmAndRestoreFromFile(file.path!);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.settingsImportPickerError(loc.settingsNoBackupFile)),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+
     // ----- Main menu -----
     if (!mounted) return;
     final choice = await showModalBottomSheet<String>(
@@ -506,7 +607,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
               const Divider(height: 1, thickness: 1),
               _ImportOptionTile(
                 icon: Icons.folder_open_outlined,
-                title: 'Backups salvos no dispositivo',
+                title: loc.settingsImportLocalOption,
                 subtitle: backupsPath,
                 onTap: () => Navigator.pop(ctx, 'local'),
               ),
@@ -515,6 +616,12 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                 title: loc.settingsImportPasteOption,
                 subtitle: loc.settingsImportPasteSubtitle,
                 onTap: () => Navigator.pop(ctx, 'paste'),
+              ),
+              _ImportOptionTile(
+                icon: Icons.attach_file,
+                title: loc.settingsImportPickFileOption,
+                subtitle: loc.settingsImportPickFileSubtitle,
+                onTap: () => Navigator.pop(ctx, 'device'),
               ),
             ],
           ),
@@ -528,6 +635,8 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       await pickFromLocal();
     } else if (choice == 'paste') {
       await pasteFromClipboard();
+    } else if (choice == 'device') {
+      await pickFromDevice();
     }
   }
 

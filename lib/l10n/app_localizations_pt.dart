@@ -438,6 +438,22 @@ class AppLocalizationsPt extends AppLocalizations {
       'Copie o JSON de outro dispositivo e cole aqui';
 
   @override
+  String get settingsImportLocalOption => 'Backups salvos neste dispositivo';
+
+  @override
+  String get settingsImportPickFileOption =>
+      'Selecionar arquivo do dispositivo';
+
+  @override
+  String get settingsImportPickFileSubtitle =>
+      'Escolha um backup .json dos Downloads, Drive ou armazenamento';
+
+  @override
+  String settingsImportPickerError(Object error) {
+    return 'Não foi possível abrir o seletor de arquivos: $error';
+  }
+
+  @override
   String get settingsLanguage => 'Idioma / Language';
 
   @override

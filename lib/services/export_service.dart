@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:csv/csv.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -34,7 +35,10 @@ class BackupFileInfo {
 
 class ExportService {
   final _workoutRepo = WorkoutRepository();
-  final _exportRepo = ExportImportRepository();
+  final ExportImportRepository _exportRepo;
+
+  ExportService({ExportImportRepository? exportRepo})
+      : _exportRepo = exportRepo ?? ExportImportRepository();
 
   static const _backupFolderName = 'WorkoutNotes';
 
@@ -143,6 +147,11 @@ class ExportService {
     return _restoreFromJsonString(jsonString);
   }
 
+  /// Restores all data from the bytes returned by a file picker.
+  Future<int> restoreFromBytes(Uint8List bytes) async {
+    return _restoreFromJsonString(utf8.decode(bytes, allowMalformed: false));
+  }
+
   Future<int> _restoreFromJsonString(String content) async {
     final data = jsonDecode(content);
     if (data is! Map<String, dynamic>) {
@@ -153,6 +162,13 @@ class ExportService {
     if (!data.containsKey('version')) {
       throw const FormatException(
         'Arquivo de backup inválido: campo version ausente.',
+      );
+    }
+    final version = data['version'];
+    if (version != ExportImportRepository.currentBackupVersion) {
+      throw FormatException(
+        'Versão de backup incompatível: $version. '
+        'Versão esperada: ${ExportImportRepository.currentBackupVersion}.',
       );
     }
     return _exportRepo.restoreFromBackup(data);

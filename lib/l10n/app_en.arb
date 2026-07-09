@@ -141,6 +141,10 @@
   "settingsImportPasteHint": "Copy the .json file content and paste here",
   "settingsImportPasteOption": "Paste backup content",
   "settingsImportPasteSubtitle": "Copy the JSON from another device and paste here",
+  "settingsImportLocalOption": "Backups saved on this device",
+  "settingsImportPickFileOption": "Select file from device",
+  "settingsImportPickFileSubtitle": "Choose a .json backup from Downloads, Drive, or storage",
+  "settingsImportPickerError": "Could not open the file picker: {error}",
 
   "settingsLanguage": "Language",
   "settingsEnglish": "English",
