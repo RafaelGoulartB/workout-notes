@@ -395,6 +395,35 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsExportOptionsTitle => 'Export backup';
+
+  @override
+  String get settingsExportShareOption => 'Share file';
+
+  @override
+  String get settingsExportShareSubtitle => 'Open the system share sheet';
+
+  @override
+  String get settingsExportSaveOption => 'Save on device';
+
+  @override
+  String get settingsExportSaveSubtitle =>
+      'Choose Downloads, Drive, or another location';
+
+  @override
+  String get settingsExportSaveDialogTitle => 'Save JSON backup';
+
+  @override
+  String settingsExportSaveSuccess(Object path) {
+    return 'Backup saved successfully!\n$path';
+  }
+
+  @override
+  String settingsExportSaveError(Object error) {
+    return 'Could not save backup: $error';
+  }
+
+  @override
   String get settingsImportBackup => 'Import Backup';
 
   @override

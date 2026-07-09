@@ -830,6 +830,54 @@ abstract class AppLocalizations {
   /// **'Error: {error}'**
   String settingsExportError(Object error);
 
+  /// No description provided for @settingsExportOptionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export backup'**
+  String get settingsExportOptionsTitle;
+
+  /// No description provided for @settingsExportShareOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Share file'**
+  String get settingsExportShareOption;
+
+  /// No description provided for @settingsExportShareSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the system share sheet'**
+  String get settingsExportShareSubtitle;
+
+  /// No description provided for @settingsExportSaveOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Save on device'**
+  String get settingsExportSaveOption;
+
+  /// No description provided for @settingsExportSaveSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Downloads, Drive, or another location'**
+  String get settingsExportSaveSubtitle;
+
+  /// No description provided for @settingsExportSaveDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save JSON backup'**
+  String get settingsExportSaveDialogTitle;
+
+  /// No description provided for @settingsExportSaveSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup saved successfully!\n{path}'**
+  String settingsExportSaveSuccess(Object path);
+
+  /// No description provided for @settingsExportSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save backup: {error}'**
+  String settingsExportSaveError(Object error);
+
   /// No description provided for @settingsImportBackup.
   ///
   /// In en, this message translates to:

@@ -113,6 +113,66 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
 
   Future<void> _exportBackup() async {
     final loc = AppLocalizations.of(context)!;
+    if (!mounted) return;
+
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.download_outlined,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      loc.settingsExportOptionsTitle,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, thickness: 1),
+              _OptionTile(
+                icon: Icons.share_outlined,
+                title: loc.settingsExportShareOption,
+                subtitle: loc.settingsExportShareSubtitle,
+                onTap: () => Navigator.pop(ctx, 'share'),
+              ),
+              _OptionTile(
+                icon: Icons.save_alt_outlined,
+                title: loc.settingsExportSaveOption,
+                subtitle: loc.settingsExportSaveSubtitle,
+                onTap: () => Navigator.pop(ctx, 'save'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (choice == null || !mounted) return;
+    if (choice == 'share') {
+      await _shareBackup();
+    } else if (choice == 'save') {
+      await _saveBackup();
+    }
+  }
+
+  Future<void> _shareBackup() async {
+    final loc = AppLocalizations.of(context)!;
     final exportService = ExportService();
     try {
       final savedPath = await exportService.shareJsonBackup();
@@ -130,6 +190,33 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(loc.settingsExportError(e.toString())),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveBackup() async {
+    final loc = AppLocalizations.of(context)!;
+    final exportService = ExportService();
+    try {
+      final savedPath = await exportService.saveJsonBackup(
+        dialogTitle: loc.settingsExportSaveDialogTitle,
+      );
+      if (savedPath == null || !mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(loc.settingsExportSaveSuccess(savedPath)),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.settingsExportSaveError(e.toString())),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -605,19 +692,19 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                 ),
               ),
               const Divider(height: 1, thickness: 1),
-              _ImportOptionTile(
+              _OptionTile(
                 icon: Icons.folder_open_outlined,
                 title: loc.settingsImportLocalOption,
                 subtitle: backupsPath,
                 onTap: () => Navigator.pop(ctx, 'local'),
               ),
-              _ImportOptionTile(
+              _OptionTile(
                 icon: Icons.content_paste_go,
                 title: loc.settingsImportPasteOption,
                 subtitle: loc.settingsImportPasteSubtitle,
                 onTap: () => Navigator.pop(ctx, 'paste'),
               ),
-              _ImportOptionTile(
+              _OptionTile(
                 icon: Icons.attach_file,
                 title: loc.settingsImportPickFileOption,
                 subtitle: loc.settingsImportPickFileSubtitle,
@@ -1711,14 +1798,14 @@ class _ValuePickerTile extends StatelessWidget {
   }
 }
 
-/// Tile used in the import source-picker bottom sheet.
-class _ImportOptionTile extends StatelessWidget {
+/// Tile used in source-picker bottom sheets.
+class _OptionTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
 
-  const _ImportOptionTile({
+  const _OptionTile({
     required this.icon,
     required this.title,
     required this.subtitle,

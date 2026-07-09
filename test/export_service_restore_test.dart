@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,7 @@ import 'package:workout_notes/services/export_service.dart';
 
 void main() {
   late Database database;
+  late Directory backupsDirectory;
   late ExportService service;
 
   setUpAll(() {
@@ -16,6 +18,7 @@ void main() {
   });
 
   setUp(() async {
+    backupsDirectory = await Directory.systemTemp.createTemp('workout_notes_export_test_');
     database = await databaseFactory.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
@@ -49,10 +52,14 @@ void main() {
       exportRepo: ExportImportRepository(
         databaseProvider: () async => database,
       ),
+      backupsDirectoryProvider: () async => backupsDirectory,
     );
   });
 
-  tearDown(() => database.close());
+  tearDown(() async {
+    await database.close();
+    await backupsDirectory.delete(recursive: true);
+  });
 
   Future<void> expectInvalidAndUnchanged(
     Future<int> Function() restore,
@@ -76,6 +83,70 @@ void main() {
         {'key': 'restored', 'value': 'yes'},
       ],
     );
+  });
+
+  test('exports valid JSON using UTF-8 bytes in the current backup format', () async {
+    final bytes = await service.exportBackupBytes();
+    final data = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+
+    expect(data['version'], ExportImportRepository.currentBackupVersion);
+    expect(
+      data['settings'],
+      [
+        {'key': 'current', 'value': 'unchanged'},
+      ],
+    );
+  });
+
+  test('passes bytes to the save picker and handles cancellation', () async {
+    Uint8List? receivedBytes;
+    String? receivedFileName;
+    String? receivedDialogTitle;
+    final saveService = ExportService(
+      exportRepo: ExportImportRepository(
+        databaseProvider: () async => database,
+      ),
+      saveFile: ({
+        required dialogTitle,
+        required fileName,
+        required bytes,
+      }) async {
+        receivedDialogTitle = dialogTitle;
+        receivedFileName = fileName;
+        receivedBytes = bytes;
+        return null;
+      },
+    );
+
+    final selectedPath = await saveService.saveJsonBackup(
+      dialogTitle: 'Salvar backup JSON',
+    );
+
+    expect(selectedPath, isNull);
+    expect(receivedDialogTitle, 'Salvar backup JSON');
+    expect(receivedFileName, matches(RegExp(r'^backup_\d{4}-\d{2}-\d{2}_\d{6}\.json$')));
+    expect(jsonDecode(utf8.decode(receivedBytes!)), isA<Map<String, dynamic>>());
+  });
+
+  test('keeps the existing share flow and shares the generated JSON file', () async {
+    String? sharedPath;
+    String? sharedText;
+    final sharingService = ExportService(
+      exportRepo: ExportImportRepository(
+        databaseProvider: () async => database,
+      ),
+      backupsDirectoryProvider: () async => backupsDirectory,
+      shareFile: (file, text) async {
+        sharedPath = file.path;
+        sharedText = text;
+      },
+    );
+
+    final exportedPath = await sharingService.shareJsonBackup();
+
+    expect(sharedPath, exportedPath);
+    expect(sharedText, 'Workout Notes - Backup');
+    expect(jsonDecode(await File(exportedPath).readAsString()), isA<Map<String, dynamic>>());
   });
 
   test('rejects invalid JSON without changing current data', () async {

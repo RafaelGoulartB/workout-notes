@@ -397,6 +397,36 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String get settingsExportOptionsTitle => 'Exportar backup';
+
+  @override
+  String get settingsExportShareOption => 'Compartilhar arquivo';
+
+  @override
+  String get settingsExportShareSubtitle =>
+      'Abrir o compartilhamento do sistema';
+
+  @override
+  String get settingsExportSaveOption => 'Salvar no dispositivo';
+
+  @override
+  String get settingsExportSaveSubtitle =>
+      'Escolha Downloads, Drive ou outro local';
+
+  @override
+  String get settingsExportSaveDialogTitle => 'Salvar backup JSON';
+
+  @override
+  String settingsExportSaveSuccess(Object path) {
+    return 'Backup salvo com sucesso!\n$path';
+  }
+
+  @override
+  String settingsExportSaveError(Object error) {
+    return 'Não foi possível salvar o backup: $error';
+  }
+
+  @override
   String get settingsImportBackup => 'Importar Backup';
 
   @override
