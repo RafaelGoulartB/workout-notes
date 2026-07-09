@@ -395,6 +395,35 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsExportOptionsTitle => 'Export backup';
+
+  @override
+  String get settingsExportShareOption => 'Share file';
+
+  @override
+  String get settingsExportShareSubtitle => 'Open the system share sheet';
+
+  @override
+  String get settingsExportSaveOption => 'Save on device';
+
+  @override
+  String get settingsExportSaveSubtitle =>
+      'Choose Downloads, Drive, or another location';
+
+  @override
+  String get settingsExportSaveDialogTitle => 'Save JSON backup';
+
+  @override
+  String settingsExportSaveSuccess(Object path) {
+    return 'Backup saved successfully!\n$path';
+  }
+
+  @override
+  String settingsExportSaveError(Object error) {
+    return 'Could not save backup: $error';
+  }
+
+  @override
   String get settingsImportBackup => 'Import Backup';
 
   @override
@@ -434,6 +463,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsImportPasteSubtitle =>
       'Copy the JSON from another device and paste here';
+
+  @override
+  String get settingsImportLocalOption => 'Backups saved on this device';
+
+  @override
+  String get settingsImportPickFileOption => 'Select file from device';
+
+  @override
+  String get settingsImportPickFileSubtitle =>
+      'Choose a .json backup from Downloads, Drive, or storage';
+
+  @override
+  String settingsImportPickerError(Object error) {
+    return 'Could not open the file picker: $error';
+  }
 
   @override
   String get settingsLanguage => 'Language';
@@ -1464,6 +1508,42 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get activeWorkoutCurrent => 'Current';
+
+  @override
+  String get activeWorkoutLast => 'Last';
+
+  @override
+  String get activeWorkoutByMuscleGroup => 'By muscle group';
+
+  @override
+  String get workoutStatsDensity => 'Density';
+
+  @override
+  String get workoutStatsKgPerMin => 'kg/min';
+
+  @override
+  String get workoutStatsEvolution => 'Evolution';
+
+  @override
+  String get workoutStatsHighlights => 'Highlights';
+
+  @override
+  String get workoutStatsTopSet => 'Top set';
+
+  @override
+  String get workoutStatsHighestVolume => 'Highest volume';
+
+  @override
+  String get workoutStatsAverageRpe => 'Average RPE';
+
+  @override
+  String get workoutStatsVsSimilarWorkout => 'vs similar workout';
+
+  @override
+  String get workoutStatsMuscleVolume => 'Muscle volume';
+
+  @override
   String get activeWorkoutOK => 'OK';
 
   @override
@@ -1535,6 +1615,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get notificationWorkoutChannelDesc =>
       'Active workout timer notifications';
+
+  @override
+  String get notificationRestTimerTitle => 'Rest';
+
+  @override
+  String get notificationRestCompleteTitle => 'Rest Complete';
+
+  @override
+  String get notificationRestCompleteBody =>
+      'Rest time is over - time for the next set!';
+
+  @override
+  String get notificationWorkoutTimerTitle => 'Active workout';
 
   @override
   String get exportServiceBackupText => 'Workout Notes - Workout Backup';

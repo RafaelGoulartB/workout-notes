@@ -73,11 +73,11 @@ void main() async {
   final notif = NotificationService.instance;
   await notif.init();
   await notif.loadSettings();
-  await notif.requestPermission();
 
   // Load saved settings
   final prefs = await SharedPreferences.getInstance();
-  final savedColor = prefs.getInt('accent_color') ?? AccentColors.defaultColor.toARGB32();
+  final savedColor =
+      prefs.getInt('accent_color') ?? AccentColors.defaultColor.toARGB32();
   final initialColor = Color(savedColor);
 
   final themeModeStr = prefs.getString('theme_mode') ?? 'system';
@@ -96,11 +96,13 @@ void main() async {
   WorkoutNotesApp.themeNotifier = ThemeNotifier(initialColor, initialThemeMode);
   WorkoutNotesApp.localeNotifier = LocaleNotifier(initialLocale);
 
-  runApp(WorkoutNotesApp(
-    initialColor: initialColor,
-    initialThemeMode: initialThemeMode,
-    initialLocale: initialLocale,
-  ));
+  runApp(
+    WorkoutNotesApp(
+      initialColor: initialColor,
+      initialThemeMode: initialThemeMode,
+      initialLocale: initialLocale,
+    ),
+  );
 }
 
 Locale _parseLocale(String value) {
@@ -194,9 +196,7 @@ class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -207,9 +207,7 @@ class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
       ),
     );

@@ -8,6 +8,15 @@ import 'base_repository.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
+  static const int currentBackupVersion = 2;
+
+  final Future<Database> Function()? _databaseProvider;
+
+  ExportImportRepository({this._databaseProvider});
+
+  @override
+  Future<Database> get db => _databaseProvider?.call() ?? super.db;
+
   // ------------------------------------------------------------------
   // Export
   // ------------------------------------------------------------------
@@ -16,7 +25,7 @@ class ExportImportRepository extends BaseRepository {
   Future<Map<String, dynamic>> exportAllData() async {
     final db = await this.db;
     return {
-      'version': 2,
+      'version': currentBackupVersion,
       'exported_at': DateTime.now().toIso8601String(),
       'categories': await db.query('exercise_categories'),
       'exercises': await db.query('exercises'),

@@ -112,10 +112,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
       if (!mounted) return;
 
-      _overviewStats = results[0] as Map<String, dynamic>;
-      _monthReport = results[1] as Map<String, dynamic>;
-      _monthComparison = results[2] as Map<String, dynamic>;
-      _monthlyCardioStats = results[3] as Map<String, dynamic>;
+      _overviewStats = results[0];
+      _monthReport = results[1];
+      _monthComparison = results[2];
+      _monthlyCardioStats = results[3];
 
       setState(() => _isLoading = false);
     } catch (e) {
@@ -261,7 +261,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
   }
 
   /// Loads pace trend for a specific cardio exercise.
-  Future<void> _loadPaceForExercise(String exerciseId, String exerciseName) async {
+  Future<void> _loadPaceForExercise(
+    String exerciseId,
+    String exerciseName,
+  ) async {
     _selectedPaceExerciseId = exerciseId;
     _selectedPaceExerciseName = exerciseName;
     try {
@@ -275,7 +278,6 @@ class _ProgressScreenState extends State<ProgressScreen> {
   // =======================================================================
   // HELPERS
   // =======================================================================
-
 
   Widget _sectionLoading(ThemeData theme) {
     return const Center(
@@ -292,7 +294,10 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   /// Shows a modal bottom sheet with full exercise history/charts.
   Future<void> _showExercisePopup(
-      String exerciseId, String exerciseName, ThemeData theme) async {
+    String exerciseId,
+    String exerciseName,
+    ThemeData theme,
+  ) async {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -318,22 +323,21 @@ class _ProgressScreenState extends State<ProgressScreen> {
           _showingOverview
               ? AppLocalizations.of(context)!.progressTitle
               : (_selectedHistory?['exercise_name'] as String? ??
-                  AppLocalizations.of(context)!.progressTitle),
+                    AppLocalizations.of(context)!.progressTitle),
         ),
         centerTitle: true,
         leading: _showingOverview
             ? null
             : IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: () =>
-                    setState(() => _showingOverview = true),
+                onPressed: () => setState(() => _showingOverview = true),
               ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _showingOverview
-              ? _buildOverview(theme)
-              : _buildExerciseDetail(theme),
+          ? _buildOverview(theme)
+          : _buildExerciseDetail(theme),
     );
   }
 
@@ -348,10 +352,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Monthly report card
-          MonthlyReportCard(
-            report: _monthReport,
-            comparison: _monthComparison,
-          ),
+          MonthlyReportCard(report: _monthReport, comparison: _monthComparison),
           const SizedBox(height: 12),
 
           // Enhanced stats row
@@ -440,8 +441,9 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
   Widget _buildDivider(ThemeData theme) {
     return Divider(
-        height: 1,
-        color: theme.colorScheme.outlineVariant.withAlpha(60));
+      height: 1,
+      color: theme.colorScheme.outlineVariant.withAlpha(60),
+    );
   }
 
   // ===================== STATS ROW =====================
@@ -454,7 +456,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final streak = (stats?['current_streak'] as int?) ?? 0;
 
     final cardioStats = _monthlyCardioStats;
-    final cardioDist = (cardioStats?['total_distance'] as num?)?.toDouble() ?? 0;
+    final cardioDist =
+        (cardioStats?['total_distance'] as num?)?.toDouble() ?? 0;
     final cardioTime = (cardioStats?['total_time'] as int?) ?? 0;
     final cardioTimeMin = cardioTime ~/ 60;
 
@@ -484,7 +487,8 @@ class _ProgressScreenState extends State<ProgressScreen> {
             Expanded(
               child: ProgressStatCard(
                 label: AppLocalizations.of(context)!.progressStreak,
-                value: '$streak ${streak == 1 ? AppLocalizations.of(context)!.workoutHomeDay : AppLocalizations.of(context)!.workoutHomeDays}',
+                value:
+                    '$streak ${streak == 1 ? AppLocalizations.of(context)!.workoutHomeDay : AppLocalizations.of(context)!.workoutHomeDays}',
                 icon: Icons.local_fire_department,
                 color: Colors.orange,
               ),
@@ -640,7 +644,11 @@ class _ProgressScreenState extends State<ProgressScreen> {
     );
   }
 
-  Widget _buildPaceSelector(ThemeData theme, AppLocalizations loc, List<Map<String, dynamic>> exercises) {
+  Widget _buildPaceSelector(
+    ThemeData theme,
+    AppLocalizations loc,
+    List<Map<String, dynamic>> exercises,
+  ) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -651,18 +659,28 @@ class _ProgressScreenState extends State<ProgressScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
-            Icon(Icons.search, size: 16, color: theme.colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.search,
+              size: 16,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   isExpanded: true,
-                  hint: Text(loc.progressSelectExercise, style: theme.textTheme.bodySmall),
+                  hint: Text(
+                    loc.progressSelectExercise,
+                    style: theme.textTheme.bodySmall,
+                  ),
                   value: _selectedPaceExerciseId,
                   items: exercises.map((e) {
                     final id = e['id'] as String? ?? '';
                     final name = e['name'] as String? ?? '';
-                    return DropdownMenuItem(value: id, child: Text(name, style: theme.textTheme.bodySmall));
+                    return DropdownMenuItem(
+                      value: id,
+                      child: Text(name, style: theme.textTheme.bodySmall),
+                    );
                   }).toList(),
                   onChanged: (id) {
                     if (id != null) {
@@ -698,10 +716,14 @@ class _ProgressScreenState extends State<ProgressScreen> {
     List<Map<String, dynamic>> filtered;
     switch (_exerciseFilter) {
       case 1: // strength only
-        filtered = _allExercises.where((e) => (e['category_energy'] as String?) != 'aerobic').toList();
+        filtered = _allExercises
+            .where((e) => (e['category_energy'] as String?) != 'aerobic')
+            .toList();
         break;
       case 2: // cardio only
-        filtered = _allExercises.where((e) => (e['category_energy'] as String?) == 'aerobic').toList();
+        filtered = _allExercises
+            .where((e) => (e['category_energy'] as String?) == 'aerobic')
+            .toList();
         break;
       default:
         filtered = _allExercises;
@@ -738,17 +760,23 @@ class _ProgressScreenState extends State<ProgressScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest.withAlpha(100),
+          color: isSelected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.surfaceContainerHighest.withAlpha(100),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outlineVariant.withAlpha(80),
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outlineVariant.withAlpha(80),
           ),
         ),
         child: Text(
           label,
           style: theme.textTheme.bodySmall?.copyWith(
             fontWeight: FontWeight.w600,
-            color: isSelected ? theme.colorScheme.onPrimary : theme.colorScheme.onSurfaceVariant,
+            color: isSelected
+                ? theme.colorScheme.onPrimary
+                : theme.colorScheme.onSurfaceVariant,
           ),
         ),
       ),

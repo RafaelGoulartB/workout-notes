@@ -830,6 +830,54 @@ abstract class AppLocalizations {
   /// **'Error: {error}'**
   String settingsExportError(Object error);
 
+  /// No description provided for @settingsExportOptionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export backup'**
+  String get settingsExportOptionsTitle;
+
+  /// No description provided for @settingsExportShareOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Share file'**
+  String get settingsExportShareOption;
+
+  /// No description provided for @settingsExportShareSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the system share sheet'**
+  String get settingsExportShareSubtitle;
+
+  /// No description provided for @settingsExportSaveOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Save on device'**
+  String get settingsExportSaveOption;
+
+  /// No description provided for @settingsExportSaveSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Downloads, Drive, or another location'**
+  String get settingsExportSaveSubtitle;
+
+  /// No description provided for @settingsExportSaveDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save JSON backup'**
+  String get settingsExportSaveDialogTitle;
+
+  /// No description provided for @settingsExportSaveSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup saved successfully!\n{path}'**
+  String settingsExportSaveSuccess(Object path);
+
+  /// No description provided for @settingsExportSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save backup: {error}'**
+  String settingsExportSaveError(Object error);
+
   /// No description provided for @settingsImportBackup.
   ///
   /// In en, this message translates to:
@@ -895,6 +943,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copy the JSON from another device and paste here'**
   String get settingsImportPasteSubtitle;
+
+  /// No description provided for @settingsImportLocalOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Backups saved on this device'**
+  String get settingsImportLocalOption;
+
+  /// No description provided for @settingsImportPickFileOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Select file from device'**
+  String get settingsImportPickFileOption;
+
+  /// No description provided for @settingsImportPickFileSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a .json backup from Downloads, Drive, or storage'**
+  String get settingsImportPickFileSubtitle;
+
+  /// No description provided for @settingsImportPickerError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the file picker: {error}'**
+  String settingsImportPickerError(Object error);
 
   /// No description provided for @settingsLanguage.
   ///
@@ -2810,6 +2882,78 @@ abstract class AppLocalizations {
   /// **'{completed}/{total} sets'**
   String activeWorkoutSetsSummary(Object completed, Object total);
 
+  /// No description provided for @activeWorkoutCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get activeWorkoutCurrent;
+
+  /// No description provided for @activeWorkoutLast.
+  ///
+  /// In en, this message translates to:
+  /// **'Last'**
+  String get activeWorkoutLast;
+
+  /// No description provided for @activeWorkoutByMuscleGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'By muscle group'**
+  String get activeWorkoutByMuscleGroup;
+
+  /// No description provided for @workoutStatsDensity.
+  ///
+  /// In en, this message translates to:
+  /// **'Density'**
+  String get workoutStatsDensity;
+
+  /// No description provided for @workoutStatsKgPerMin.
+  ///
+  /// In en, this message translates to:
+  /// **'kg/min'**
+  String get workoutStatsKgPerMin;
+
+  /// No description provided for @workoutStatsEvolution.
+  ///
+  /// In en, this message translates to:
+  /// **'Evolution'**
+  String get workoutStatsEvolution;
+
+  /// No description provided for @workoutStatsHighlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights'**
+  String get workoutStatsHighlights;
+
+  /// No description provided for @workoutStatsTopSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Top set'**
+  String get workoutStatsTopSet;
+
+  /// No description provided for @workoutStatsHighestVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Highest volume'**
+  String get workoutStatsHighestVolume;
+
+  /// No description provided for @workoutStatsAverageRpe.
+  ///
+  /// In en, this message translates to:
+  /// **'Average RPE'**
+  String get workoutStatsAverageRpe;
+
+  /// No description provided for @workoutStatsVsSimilarWorkout.
+  ///
+  /// In en, this message translates to:
+  /// **'vs similar workout'**
+  String get workoutStatsVsSimilarWorkout;
+
+  /// No description provided for @workoutStatsMuscleVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Muscle volume'**
+  String get workoutStatsMuscleVolume;
+
   /// No description provided for @activeWorkoutOK.
   ///
   /// In en, this message translates to:
@@ -2947,6 +3091,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Active workout timer notifications'**
   String get notificationWorkoutChannelDesc;
+
+  /// No description provided for @notificationRestTimerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest'**
+  String get notificationRestTimerTitle;
+
+  /// No description provided for @notificationRestCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest Complete'**
+  String get notificationRestCompleteTitle;
+
+  /// No description provided for @notificationRestCompleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Rest time is over - time for the next set!'**
+  String get notificationRestCompleteBody;
+
+  /// No description provided for @notificationWorkoutTimerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Active workout'**
+  String get notificationWorkoutTimerTitle;
 
   /// No description provided for @exportServiceBackupText.
   ///

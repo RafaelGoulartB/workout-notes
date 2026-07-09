@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_background">#090E10</color>
+    <color name="brand_surface">#151B1E</color>
+    <color name="brand_primary_cyan">#6CCFF6</color>
+</resources>

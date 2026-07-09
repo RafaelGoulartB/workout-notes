@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -8,6 +10,14 @@ import '../l10n/app_localizations.dart';
 import '../l10n/l10n_exercises.dart';
 import '../repositories/workout_repository.dart';
 import '../repositories/export_import_repository.dart';
+
+typedef SaveFileCallback = Future<String?> Function({
+  required String dialogTitle,
+  required String fileName,
+  required Uint8List bytes,
+});
+
+typedef ShareFileCallback = Future<void> Function(XFile file, String text);
 
 /// Information about a local backup file.
 class BackupFileInfo {
@@ -34,7 +44,19 @@ class BackupFileInfo {
 
 class ExportService {
   final _workoutRepo = WorkoutRepository();
-  final _exportRepo = ExportImportRepository();
+  final ExportImportRepository _exportRepo;
+  final SaveFileCallback _saveFile;
+  final ShareFileCallback _shareFile;
+  final Future<Directory> Function()? backupsDirectoryProvider;
+
+  ExportService({
+    ExportImportRepository? exportRepo,
+    SaveFileCallback? saveFile,
+    ShareFileCallback? shareFile,
+    this.backupsDirectoryProvider,
+  })  : _exportRepo = exportRepo ?? ExportImportRepository(),
+        _saveFile = saveFile ?? _saveFileWithPicker,
+        _shareFile = shareFile ?? _shareFileWithSheet;
 
   static const _backupFolderName = 'WorkoutNotes';
 
@@ -49,6 +71,11 @@ class ExportService {
   /// directory if Downloads is not accessible (Android 11+ scoped
   /// storage).
   Future<Directory> getBackupsDirectory() async {
+    final provider = backupsDirectoryProvider;
+    if (provider != null) {
+      return provider();
+    }
+
     // Try public Downloads (Android 10-)
     try {
       final dirs = await getExternalStorageDirectories(
@@ -104,14 +131,20 @@ class ExportService {
   // JSON Backup – Export
   // ===================================================================
 
-  /// Exports all data to JSON and returns the file path.
-  Future<String> exportToJson() async {
+  /// Generates the current backup format as UTF-8 JSON bytes.
+  Future<Uint8List> exportBackupBytes() async {
     final data = await _exportRepo.exportAllData();
     final json = const JsonEncoder.withIndent('  ').convert(data);
+    return Uint8List.fromList(utf8.encode(json));
+  }
+
+  /// Exports all data to JSON and returns the file path.
+  Future<String> exportToJson() async {
+    final bytes = await exportBackupBytes();
     final dir = await getBackupsDirectory();
     final dateStr = DateFormat('yyyy-MM-dd_HHmmss').format(DateTime.now());
     final file = File('${dir.path}/workout_notes_backup_$dateStr.json');
-    await file.writeAsString(json);
+    await file.writeAsBytes(bytes);
     return file.path;
   }
 
@@ -120,8 +153,39 @@ class ExportService {
   Future<String> shareJsonBackup() async {
     final path = await exportToJson();
     final xfile = XFile(path, mimeType: 'application/json');
-    await Share.shareXFiles([xfile], text: 'Workout Notes - Backup');
+    await _shareFile(xfile, 'Workout Notes - Backup');
     return path;
+  }
+
+  /// Opens the native save dialog with the backup bytes.
+  ///
+  /// Returns the selected path, or `null` when the user cancels.
+  Future<String?> saveJsonBackup({required String dialogTitle}) async {
+    final bytes = await exportBackupBytes();
+    final dateStr = DateFormat('yyyy-MM-dd_HHmmss').format(DateTime.now());
+    return _saveFile(
+      dialogTitle: dialogTitle,
+      fileName: 'backup_$dateStr.json',
+      bytes: bytes,
+    );
+  }
+
+  static Future<String?> _saveFileWithPicker({
+    required String dialogTitle,
+    required String fileName,
+    required Uint8List bytes,
+  }) {
+    return FilePicker.saveFile(
+      dialogTitle: dialogTitle,
+      fileName: fileName,
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+      bytes: bytes,
+    );
+  }
+
+  static Future<void> _shareFileWithSheet(XFile file, String text) async {
+    await Share.shareXFiles([file], text: text);
   }
 
   // ===================================================================
@@ -143,6 +207,11 @@ class ExportService {
     return _restoreFromJsonString(jsonString);
   }
 
+  /// Restores all data from the bytes returned by a file picker.
+  Future<int> restoreFromBytes(Uint8List bytes) async {
+    return _restoreFromJsonString(utf8.decode(bytes, allowMalformed: false));
+  }
+
   Future<int> _restoreFromJsonString(String content) async {
     final data = jsonDecode(content);
     if (data is! Map<String, dynamic>) {
@@ -153,6 +222,13 @@ class ExportService {
     if (!data.containsKey('version')) {
       throw const FormatException(
         'Arquivo de backup inválido: campo version ausente.',
+      );
+    }
+    final version = data['version'];
+    if (version != ExportImportRepository.currentBackupVersion) {
+      throw FormatException(
+        'Versão de backup incompatível: $version. '
+        'Versão esperada: ${ExportImportRepository.currentBackupVersion}.',
       );
     }
     return _exportRepo.restoreFromBackup(data);
