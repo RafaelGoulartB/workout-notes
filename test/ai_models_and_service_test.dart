@@ -309,6 +309,10 @@ void main() {
     expect(kDefaultAiCoachSystemPrompt, isNot(contains(r'$1')));
     expect(kDefaultAiCoachSystemPrompt, isNot(contains('[1]')));
     expect(kDefaultAiCoachSystemPrompt, isNot(contains('placeholders')));
+    expect(kDefaultAiCoachSystemPrompt, contains('<workout_data>'));
+    expect(kDefaultAiCoachSystemPrompt, contains('tool_call_id'));
+    expect(kDefaultAiCoachSystemPrompt, contains('Markdown válido'));
+    expect(kDefaultAiCoachSystemPrompt, contains('somente de leitura'));
   });
 }
 

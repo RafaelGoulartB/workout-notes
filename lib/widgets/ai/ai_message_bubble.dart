@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../models/ai_chat_message.dart';
 
@@ -139,25 +140,56 @@ class _MarkdownBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SelectionArea(
-      child: Text(
-        _stripMarkdown(text),
-        style: TextStyle(color: textColor, fontSize: 15, height: 1.35),
+    final theme = Theme.of(context);
+    final body = TextStyle(color: textColor, fontSize: 15, height: 1.35);
+    return MarkdownBody(
+      data: text,
+      selectable: true,
+      softLineBreak: true,
+      shrinkWrap: true,
+      styleSheet: MarkdownStyleSheet(
+        p: body,
+        strong: body.copyWith(fontWeight: FontWeight.w700),
+        em: body.copyWith(fontStyle: FontStyle.italic),
+        h1: theme.textTheme.titleLarge?.copyWith(
+          color: textColor,
+          fontWeight: FontWeight.w700,
+        ),
+        h2: theme.textTheme.titleMedium?.copyWith(
+          color: textColor,
+          fontWeight: FontWeight.w700,
+        ),
+        h3: theme.textTheme.titleSmall?.copyWith(
+          color: textColor,
+          fontWeight: FontWeight.w700,
+        ),
+        listBullet: body.copyWith(fontWeight: FontWeight.w700),
+        blockquote: body.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        blockquoteDecoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          border: Border(
+            left: BorderSide(color: theme.colorScheme.primary, width: 3),
+          ),
+        ),
+        code: body.copyWith(
+          fontFamily: 'monospace',
+          fontSize: 13,
+          backgroundColor: theme.colorScheme.surfaceContainerHighest,
+        ),
+        codeblockDecoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        horizontalRuleDecoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: theme.colorScheme.outlineVariant),
+          ),
+        ),
+        pPadding: const EdgeInsets.only(bottom: 6),
+        listIndent: 20,
+        blockSpacing: 8,
       ),
     );
-  }
-
-  String _stripMarkdown(String s) {
-    return s
-        .replaceAll(RegExp(r'```[\s\S]*?```'), '')
-        .replaceAllMapped(RegExp(r'`([^`]+)`'), (match) => match.group(1)!)
-        .replaceAllMapped(
-          RegExp(r'\*\*([^*]+)\*\*'),
-          (match) => match.group(1)!,
-        )
-        .replaceAllMapped(RegExp(r'\*([^*]+)\*'), (match) => match.group(1)!)
-        .replaceAll(RegExp(r'^#+\s*', multiLine: true), '')
-        .replaceAll(RegExp(r'^\s*[-*]\s+', multiLine: true), '• ');
   }
 }
 
