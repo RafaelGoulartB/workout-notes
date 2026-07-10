@@ -12,10 +12,11 @@ import '../repositories/goal_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 14;
+  static const _dbVersion = 15;
 
   static DatabaseHelper? _instance;
   static Database? _database;
+  static Database? _overrideDatabase;
 
   /// Repository instances (lazy-loaded)
   late final SettingsRepository settingsRepo = SettingsRepository();
@@ -35,8 +36,15 @@ class DatabaseHelper {
   }
 
   Future<Database> get database async {
+    if (_overrideDatabase != null) return _overrideDatabase!;
     _database ??= await _initDatabase();
     return _database!;
+  }
+
+  /// Test-only hook. Sets an external [Database] to be returned by
+  /// [database] instead of the singleton. Pass `null` to clear.
+  static set overrideDatabase(Database? db) {
+    _overrideDatabase = db;
   }
 
   Future<Database> _initDatabase() async {
@@ -220,12 +228,41 @@ class DatabaseHelper {
       )
     ''');
 
+    // AI chat threads (v15)
+    await db.execute('''
+      CREATE TABLE ai_chat_threads (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_message_preview TEXT,
+        archived INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    // AI chat messages (v15)
+    await db.execute('''
+      CREATE TABLE ai_chat_messages (
+        id TEXT PRIMARY KEY,
+        thread_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT,
+        tool_call_id TEXT,
+        tool_name TEXT,
+        tool_calls_json TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
+      )
+    ''');
+
     // Indexes
     await db.execute('CREATE INDEX idx_workouts_date ON workouts(date)');
     await db.execute('CREATE INDEX idx_exercise_entries_workout ON exercise_entries(workout_id)');
     await db.execute('CREATE INDEX idx_sets_entry ON sets(exercise_entry_id)');
     await db.execute('CREATE INDEX idx_measurements_date ON body_measurements(date)');
     await db.execute('CREATE INDEX idx_measurements_type ON body_measurements(type)');
+    await db.execute('CREATE INDEX idx_ai_chat_messages_thread ON ai_chat_messages(thread_id, created_at ASC)');
+    await db.execute('CREATE INDEX idx_ai_chat_threads_updated ON ai_chat_threads(updated_at DESC)');
 
     // Seed data
     await _seedData(db);
@@ -510,6 +547,41 @@ class DatabaseHelper {
         );
       } catch (_) {}
     }
+    if (oldVersion < 15) {
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS ai_chat_threads (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            last_message_preview TEXT,
+            archived INTEGER NOT NULL DEFAULT 0
+          )
+        ''');
+      } catch (_) {}
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS ai_chat_messages (
+            id TEXT PRIMARY KEY,
+            thread_id TEXT NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT,
+            tool_call_id TEXT,
+            tool_name TEXT,
+            tool_calls_json TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
+          )
+        ''');
+      } catch (_) {}
+      try {
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_ai_chat_messages_thread ON ai_chat_messages(thread_id, created_at ASC)');
+      } catch (_) {}
+      try {
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_ai_chat_threads_updated ON ai_chat_threads(updated_at DESC)');
+      } catch (_) {}
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -727,6 +799,10 @@ class DatabaseHelper {
       analyticsRepo.getMonthComparison(year, month);
   Future<Map<String, dynamic>> getWorkoutOverviewStats() =>
       analyticsRepo.getWorkoutOverviewStats();
+  Future<List<Map<String, dynamic>>> getCardioWeeklyDistance({int weeks = 12}) =>
+      analyticsRepo.getCardioWeeklyDistance(weeks: weeks);
+  Future<List<Map<String, dynamic>>> getCardioDistanceByModality() =>
+      analyticsRepo.getCardioDistanceByModality();
 
   // -- EXPORT / IMPORT --
   Future<Map<String, dynamic>> exportAllData() => exportImportRepo.exportAllData();
@@ -734,4 +810,76 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> exportWorkoutsCsvData({String? exerciseId, DateTime? startDate, DateTime? endDate}) =>
       exportImportRepo.exportWorkoutsCsvData(exerciseId: exerciseId, startDate: startDate, endDate: endDate);
   Future<void> deleteAllWorkoutData() => exportImportRepo.deleteAllWorkoutData();
+
+  // -- AI CHAT --
+  Future<String> upsertAiChatThread({
+    required String id,
+    required String title,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    String? lastMessagePreview,
+    bool archived = false,
+  }) async {
+    final db = await database;
+    await db.insert(
+      'ai_chat_threads',
+      {
+        'id': id,
+        'title': title,
+        'created_at': createdAt.toIso8601String(),
+        'updated_at': updatedAt.toIso8601String(),
+        'last_message_preview': lastMessagePreview,
+        'archived': archived ? 1 : 0,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    return id;
+  }
+
+  Future<void> replaceAiChatMessages(
+    String threadId,
+    List<Map<String, dynamic>> messages,
+  ) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete('ai_chat_messages', where: 'thread_id = ?', whereArgs: [threadId]);
+      for (final m in messages) {
+        await txn.insert('ai_chat_messages', m);
+      }
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getAiChatThreads() async {
+    final db = await database;
+    return db.query(
+      'ai_chat_threads',
+      where: 'archived = 0',
+      orderBy: 'updated_at DESC',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getAiChatMessagesThread(String threadId) async {
+    final db = await database;
+    return db.query(
+      'ai_chat_messages',
+      where: 'thread_id = ?',
+      whereArgs: [threadId],
+      orderBy: 'created_at ASC',
+    );
+  }
+
+  Future<void> renameAiChatThread(String threadId, String title) async {
+    final db = await database;
+    await db.update(
+      'ai_chat_threads',
+      {'title': title},
+      where: 'id = ?',
+      whereArgs: [threadId],
+    );
+  }
+
+  Future<void> deleteAiChatThread(String threadId) async {
+    final db = await database;
+    await db.delete('ai_chat_threads', where: 'id = ?', whereArgs: [threadId]);
+  }
 }

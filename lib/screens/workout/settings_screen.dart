@@ -12,6 +12,8 @@ import '../../services/export_service.dart';
 import '../../database/test_seed_data.dart';
 import '../../services/notification_service.dart';
 import '../../main.dart';
+import 'ai_chat_screen.dart';
+import 'ai_settings_screen.dart';
 
 class WorkoutSettingsScreen extends StatefulWidget {
   const WorkoutSettingsScreen({super.key});
@@ -811,6 +813,25 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     }
   }
 
+  void _openAiCoach() {
+    final settings = WorkoutNotesApp.aiSettings;
+    if (!settings.isConfigured) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Configure um provedor de IA antes de abrir o chat.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const AiSettingsScreen()),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AiChatScreen()),
+    );
+  }
+
   void _showAbout() {
     final now = DateTime.now();
 
@@ -1209,6 +1230,32 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         },
                       ),
                     ],
+                  ],
+                ),
+
+                // ===== DADOS =====
+                const _SectionHeader(text: 'AI COACH'),
+                _SettingsCard(
+                  children: [
+                    _LinkTile(
+                      icon: Icons.smart_toy_rounded,
+                      iconColor: theme.colorScheme.primary,
+                      title: 'Treinador IA',
+                      subtitle: 'Converse com um personal trainer de IA.',
+                      onTap: _openAiCoach,
+                    ),
+                    const _CardDivider(),
+                    _LinkTile(
+                      icon: Icons.tune_rounded,
+                      iconColor: theme.colorScheme.onSurfaceVariant,
+                      title: 'Configurar IA',
+                      subtitle: 'Provedores, modelo, prompt do sistema.',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const AiSettingsScreen()),
+                        );
+                      },
+                    ),
                   ],
                 ),
 

@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'l10n/app_localizations.dart';
 import 'services/notification_service.dart';
 import 'screens/workout/workout_home_screen.dart';
+import 'state/ai_chat_service.dart';
+import 'state/ai_settings_notifier.dart';
 
 /// List of accent seed colors available in settings.
 class AccentColors {
@@ -96,6 +98,11 @@ void main() async {
   WorkoutNotesApp.themeNotifier = ThemeNotifier(initialColor, initialThemeMode);
   WorkoutNotesApp.localeNotifier = LocaleNotifier(initialLocale);
 
+  // Initialize AI Coach (settings + chat service).
+  WorkoutNotesApp.aiSettings = AiSettingsNotifier(prefs: prefs);
+  await WorkoutNotesApp.aiSettings.load();
+  await AiChatService.bootstrap(settings: WorkoutNotesApp.aiSettings);
+
   runApp(
     WorkoutNotesApp(
       initialColor: initialColor,
@@ -137,6 +144,7 @@ class WorkoutNotesApp extends StatefulWidget {
 
   static late ThemeNotifier themeNotifier;
   static late LocaleNotifier localeNotifier;
+  static late AiSettingsNotifier aiSettings;
 
   @override
   State<WorkoutNotesApp> createState() => _WorkoutNotesAppState();

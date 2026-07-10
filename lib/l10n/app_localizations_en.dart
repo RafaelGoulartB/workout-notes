@@ -2062,4 +2062,239 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get progressVolumeTotal => 'Total';
+
+  @override
+  String get aiCoachSection => 'AI COACH';
+
+  @override
+  String get aiCoachEntry => 'AI Coach';
+
+  @override
+  String get aiCoachEntrySubtitle => 'Chat with a personal-trainer AI.';
+
+  @override
+  String get aiCoachConfigureEntry => 'Configure AI';
+
+  @override
+  String get aiCoachConfigureEntrySubtitle =>
+      'Providers, model, system prompt.';
+
+  @override
+  String get aiChatTitle => 'AI Coach';
+
+  @override
+  String get aiChatInputHint => 'Ask your trainer something…';
+
+  @override
+  String get aiChatInputHintDisabled => 'Configure a provider to start';
+
+  @override
+  String get aiChatNewChat => 'New conversation';
+
+  @override
+  String get aiChatHistory => 'History';
+
+  @override
+  String get aiChatSettings => 'Settings';
+
+  @override
+  String get aiChatChooseProvider => 'Switch provider';
+
+  @override
+  String get aiChatRetry => 'Retry';
+
+  @override
+  String get aiChatCopy => 'Copy';
+
+  @override
+  String get aiChatCopied => 'Message copied';
+
+  @override
+  String get aiChatErrorGeneric => 'Something went wrong.';
+
+  @override
+  String get aiChatErrorTimeout => 'The AI took too long to respond.';
+
+  @override
+  String get aiChatErrorNoProvider => 'No AI provider configured.';
+
+  @override
+  String get aiChatErrorInvalidToken => 'Invalid or missing API token.';
+
+  @override
+  String get aiChatErrorMissingModel =>
+      'Select a model in Settings → AI Coach.';
+
+  @override
+  String get aiChatWelcomeTitle => 'Hi! I\'m your AI Coach.';
+
+  @override
+  String get aiChatWelcomeSubtitle =>
+      'Ask about your progress, request a workout analysis, or ask for progression suggestions.';
+
+  @override
+  String get aiChatSending => 'Sending…';
+
+  @override
+  String aiChatReading(Object count) {
+    return 'Reading $count source(s)…';
+  }
+
+  @override
+  String get aiChatFinalising => 'Finalising…';
+
+  @override
+  String aiChatActiveModel(Object model, Object provider) {
+    return '$provider • $model';
+  }
+
+  @override
+  String aiChatNoModel(Object provider) {
+    return '$provider • (no model)';
+  }
+
+  @override
+  String get aiHistoryTitle => 'Conversation history';
+
+  @override
+  String get aiHistoryEmpty => 'No conversations yet';
+
+  @override
+  String get aiHistoryEmptySubtitle =>
+      'Start a new conversation in the AI Coach chat.';
+
+  @override
+  String get aiHistoryDeleteTitle => 'Delete conversation?';
+
+  @override
+  String aiHistoryDeleteBody(Object title) {
+    return 'This cannot be undone. \"$title\" will be removed.';
+  }
+
+  @override
+  String get aiSettingsTitle => 'AI Coach settings';
+
+  @override
+  String get aiSettingsProvidersCard => 'Providers';
+
+  @override
+  String get aiSettingsProvidersHelp =>
+      'Add any OpenAI-compatible endpoint (OpenAI, Ollama, OpenRouter, Groq, LM Studio…).';
+
+  @override
+  String get aiSettingsAddProvider => 'Add provider';
+
+  @override
+  String get aiSettingsNoProviders => 'No providers';
+
+  @override
+  String get aiSettingsNoProvidersSubtitle =>
+      'Add a provider to start using the AI Coach.';
+
+  @override
+  String get aiSettingsActivate => 'Activate';
+
+  @override
+  String get aiSettingsEdit => 'Edit';
+
+  @override
+  String get aiSettingsRemove => 'Remove';
+
+  @override
+  String aiSettingsRemoveConfirmTitle(Object name) {
+    return 'Remove $name?';
+  }
+
+  @override
+  String get aiSettingsRemoveConfirmBody => 'The token will also be deleted.';
+
+  @override
+  String get aiSettingsBaseUrl => 'Base URL';
+
+  @override
+  String get aiSettingsModel => 'Model';
+
+  @override
+  String get aiSettingsToken => 'API token';
+
+  @override
+  String get aiSettingsTokenHint => 'Leave empty to keep the current token';
+
+  @override
+  String get aiSettingsNameHint => 'OpenAI, Ollama local, OpenRouter…';
+
+  @override
+  String get aiSettingsBaseUrlHint => 'https://api.openai.com/v1';
+
+  @override
+  String get aiSettingsNewProvider => 'New provider';
+
+  @override
+  String get aiSettingsEditProvider => 'Edit provider';
+
+  @override
+  String get aiSettingsFetchModels => 'Fetch models';
+
+  @override
+  String aiSettingsNoModels(Object url) {
+    return 'No models loaded. Tap \"Fetch models\" to list the available ones for $url.';
+  }
+
+  @override
+  String get aiSettingsContextMode => 'Context mode';
+
+  @override
+  String get aiSettingsContextModeHelp =>
+      'How much data is sent to the AI each turn. More context = better answers, more tokens.';
+
+  @override
+  String get aiSettingsContextModeMinimal => 'Minimal';
+
+  @override
+  String get aiSettingsContextModeMinimalSubtitle =>
+      'Only totals and streak. AI uses tools for details.';
+
+  @override
+  String get aiSettingsContextModeStandard => 'Standard';
+
+  @override
+  String get aiSettingsContextModeStandardSubtitle =>
+      'Summary + goals + top exercises. Good balance.';
+
+  @override
+  String get aiSettingsContextModeFull => 'Full';
+
+  @override
+  String get aiSettingsContextModeFullSubtitle =>
+      'Everything: categories, body trend, detailed volume.';
+
+  @override
+  String get aiSettingsSystemPrompt => 'System prompt';
+
+  @override
+  String get aiSettingsSystemPromptHelp =>
+      'Defines the personality and behaviour of the AI Coach.';
+
+  @override
+  String get aiSettingsRestoreDefault => 'Restore default';
+
+  @override
+  String get aiSettingsSaved => 'Saved';
+
+  @override
+  String get aiSettingsAbout => 'About';
+
+  @override
+  String get aiSettingsAboutBody =>
+      'The AI Coach sends a summary of your data each turn and has access to 13 read tools. It cannot edit your data. Conversations are stored locally.';
+
+  @override
+  String get aiEmptyTitle => 'Configure an AI provider';
+
+  @override
+  String get aiEmptySubtitle =>
+      'Add an OpenAI-compatible endpoint (OpenAI, Ollama, OpenRouter…) to start using the AI Coach.';
+
+  @override
+  String get aiEmptyConfigure => 'Configure provider';
 }
