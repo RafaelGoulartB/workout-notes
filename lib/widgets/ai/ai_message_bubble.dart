@@ -114,7 +114,11 @@ class _BodyText extends StatelessWidget {
   final bool isUser;
   final Color textColor;
 
-  const _BodyText({required this.text, required this.isUser, required this.textColor});
+  const _BodyText({
+    required this.text,
+    required this.isUser,
+    required this.textColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -146,9 +150,12 @@ class _MarkdownBody extends StatelessWidget {
   String _stripMarkdown(String s) {
     return s
         .replaceAll(RegExp(r'```[\s\S]*?```'), '')
-        .replaceAll(RegExp(r'`([^`]+)`'), r'$1')
-        .replaceAll(RegExp(r'\*\*([^*]+)\*\*'), r'$1')
-        .replaceAll(RegExp(r'\*([^*]+)\*'), r'$1')
+        .replaceAllMapped(RegExp(r'`([^`]+)`'), (match) => match.group(1)!)
+        .replaceAllMapped(
+          RegExp(r'\*\*([^*]+)\*\*'),
+          (match) => match.group(1)!,
+        )
+        .replaceAllMapped(RegExp(r'\*([^*]+)\*'), (match) => match.group(1)!)
         .replaceAll(RegExp(r'^#+\s*', multiLine: true), '')
         .replaceAll(RegExp(r'^\s*[-*]\s+', multiLine: true), '• ');
   }
@@ -165,26 +172,32 @@ class _ToolCallSummary extends StatelessWidget {
       spacing: 6,
       runSpacing: 4,
       children: message.toolCalls
-          .map((c) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.build_circle_outlined, size: 14, color: theme.colorScheme.onSurfaceVariant),
-                    const SizedBox(width: 4),
-                    Text(
-                      c.name,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+          .map(
+            (c) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.build_circle_outlined,
+                    size: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    c.name,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
-                  ],
-                ),
-              ))
+                  ),
+                ],
+              ),
+            ),
+          )
           .toList(),
     );
   }
@@ -201,7 +214,10 @@ class MessageCopyAction {
     await Clipboard.setData(ClipboardData(text: text));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mensagem copiada'), duration: Duration(seconds: 1)),
+        const SnackBar(
+          content: Text('Mensagem copiada'),
+          duration: Duration(seconds: 1),
+        ),
       );
     }
   }

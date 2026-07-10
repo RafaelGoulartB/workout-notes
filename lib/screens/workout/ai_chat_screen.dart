@@ -75,7 +75,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Treinador IA'),
+        title: const SizedBox.shrink(),
         actions: [
           IconButton(
             tooltip: 'Nova conversa',
@@ -132,7 +132,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           itemCount: state.messages.length,
                           itemBuilder: (_, i) {
-                            return _buildMessageTile(state.messages[i], i, l10n);
+                            return _buildMessageTile(
+                              state.messages[i],
+                              i,
+                              l10n,
+                            );
                           },
                         ),
                 ),
@@ -159,7 +163,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              Icon(Icons.cloud_outlined, size: 16, color: theme.colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.cloud_outlined,
+                size: 16,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -209,7 +217,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.fitness_center_rounded, size: 64, color: theme.colorScheme.primary.withAlpha(120)),
+            Icon(
+              Icons.fitness_center_rounded,
+              size: 64,
+              color: theme.colorScheme.primary.withAlpha(120),
+            ),
             const SizedBox(height: 16),
             Text(
               'Olá! Sou o seu Treinador IA.',
@@ -237,7 +249,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
       color: theme.colorScheme.errorContainer,
       child: Row(
         children: [
-          Icon(Icons.error_outline_rounded, color: theme.colorScheme.onErrorContainer),
+          Icon(
+            Icons.error_outline_rounded,
+            color: theme.colorScheme.onErrorContainer,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -276,22 +291,25 @@ class _AiChatScreenState extends State<AiChatScreen> {
       while (j < AiChatService.instance.state.messages.length) {
         final n = AiChatService.instance.state.messages[j];
         if (n.isTool) {
-          children.add(AiToolResultBubble(
-            message: n,
-            toolLabel: _toolLabels.humanLabel(n.toolName ?? ''),
-          ));
+          children.add(
+            AiToolResultBubble(
+              message: n,
+              toolLabel: _toolLabels.humanLabel(n.toolName ?? ''),
+            ),
+          );
           j++;
         } else {
           break;
         }
       }
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      );
     }
     if (m.isTool) {
-      return AiToolResultBubble(
-        message: m,
-        toolLabel: _toolLabels.humanLabel(m.toolName ?? ''),
-      );
+      // Already rendered below the assistant that requested this tool.
+      return const SizedBox.shrink();
     }
     return const SizedBox.shrink();
   }
@@ -300,9 +318,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => AiProviderPickerSheet(
-        notifier: _settings,
-      ),
+      builder: (_) => AiProviderPickerSheet(notifier: _settings),
     );
   }
 }

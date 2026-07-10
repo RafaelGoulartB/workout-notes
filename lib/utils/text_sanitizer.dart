@@ -38,15 +38,17 @@ class TextSanitizer {
   /// Each step has an early-out (cheap `contains` check) so clean text
   /// doesn't pay the regex cost.
   static String sanitize(String input) {
-    var result = input;
-    if (result.contains('<think>')) {
-      result = result.replaceAll(_thinkBlock, '');
-    }
+    var result = stripReasoning(input);
     if (result.contains(r'$')) {
       result = result.replaceAll(_dollarDigit, '');
     }
     return result;
   }
+
+  /// Removes private reasoning while preserving the response verbatim enough
+  /// for the chat orchestrator to validate and, when necessary, regenerate it.
+  static String stripReasoning(String input) =>
+      input.contains('<think>') ? input.replaceAll(_thinkBlock, '') : input;
 
   /// Whether [input] contains a reference marker emitted instead of data.
   /// The optional invisible characters account for provider-specific output

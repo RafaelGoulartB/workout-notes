@@ -161,7 +161,11 @@ class AiService {
     }
 
     final rawText = _extractText(message['content']);
-    final text = rawText == null ? null : _sanitize(rawText);
+    // Keep reference placeholders intact. The orchestrator must be able to
+    // reject and regenerate an invalid answer with the complete tool context;
+    // deleting markers here loses both their position and the evidence that
+    // the model failed to materialise the data.
+    final text = rawText == null ? null : _sanitizeReasoning(rawText);
     final calls = <AiToolCall>[];
     final rawCalls = message['tool_calls'];
     if (rawCalls is List) {
@@ -219,7 +223,8 @@ class AiService {
     return null;
   }
 
-  String _sanitize(String input) => TextSanitizer.sanitize(input);
+  String _sanitizeReasoning(String input) =>
+      TextSanitizer.stripReasoning(input);
 
   String _truncate(String s) => s.length > 200 ? '${s.substring(0, 200)}…' : s;
 }

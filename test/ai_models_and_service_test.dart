@@ -2,14 +2,11 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:workout_notes/models/ai_chat_message.dart';
-import 'package:workout_notes/models/ai_message_role.dart';
 import 'package:workout_notes/models/ai_provider.dart';
 import 'package:workout_notes/models/ai_settings.dart';
 import 'package:workout_notes/models/ai_tool_call.dart';
 import 'package:workout_notes/services/ai_service.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
-import 'package:workout_notes/utils/ai_response_repair.dart';
 import 'package:workout_notes/utils/text_sanitizer.dart';
 import 'package:workout_notes/utils/token_estimator.dart';
 
@@ -244,58 +241,8 @@ void main() {
     });
   });
 
-  group('AiResponseRepair', () {
-    test(
-      'uses workout-detail data when the model response has placeholders',
-      () {
-        final toolMessage = AiChatMessage(
-          id: 'tool-1',
-          threadId: 'thread-1',
-          role: AiMessageRole.tool,
-          toolName: 'get_workout_detail',
-          toolCallId: 'call-1',
-          createdAt: DateTime.utc(2026, 6, 30),
-          toolResult: const AiToolResult(
-            ok: true,
-            data: {
-              'date': '2026-06-30',
-              'durationSeconds': 3600,
-              'exercises': [
-                {
-                  'exerciseName': 'Agachamento',
-                  'sets': [
-                    {'weight': 60.0, 'reps': 10, 'isWarmup': false},
-                    {'weight': 80.0, 'reps': 8, 'isWarmup': false},
-                  ],
-                },
-                {
-                  'exerciseName': 'Supino Reto',
-                  'sets': [
-                    {'weight': 50.0, 'reps': 10, 'isWarmup': false},
-                  ],
-                },
-              ],
-            },
-          ),
-        );
-
-        final repaired = AiResponseRepair.repair(
-          response: r'Resumo: $1',
-          hadReferencePlaceholders: true,
-          messages: [toolMessage],
-        );
-
-        expect(repaired, contains('30/06/2026'));
-        expect(repaired, contains('Agachamento'));
-        expect(repaired, contains('Supino Reto'));
-        expect(repaired, contains('1.740 kg'));
-        expect(repaired, isNot(contains(r'$1')));
-      },
-    );
-  });
-
   group('AiService sanitisation', () {
-    test(r'strips $1 citation placeholders via sendChat end-to-end', () async {
+    test(r'preserves $1 so the orchestrator can reject it', () async {
       final fakeClient = _StubHttpClient((req) {
         return r'''
 {
@@ -321,8 +268,8 @@ void main() {
           {'role': 'user', 'content': 'oi'},
         ],
       );
-      expect(completion.text!.contains('\$1'), isFalse);
-      expect(completion.text!.contains('\$2'), isFalse);
+      expect(completion.text!.contains('\$1'), isTrue);
+      expect(completion.text!.contains('\$2'), isTrue);
       expect(completion.hadReferencePlaceholders, isTrue);
       expect(completion.text, contains('volume total'));
       expect(completion.text, contains('7.070 kg'));

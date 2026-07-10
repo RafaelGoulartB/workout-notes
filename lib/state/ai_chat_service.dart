@@ -13,14 +13,15 @@ import '../models/ai_provider.dart';
 import '../services/ai_context_service.dart';
 import '../services/ai_service.dart';
 import '../services/ai_tool_registry.dart';
-import '../utils/ai_response_repair.dart';
 import '../utils/token_estimator.dart';
+import '../utils/text_sanitizer.dart';
 import 'ai_settings_notifier.dart';
 
 const _uuid = Uuid();
 
 const int kMaxToolRounds = 3;
 const int kHistoryTokenBudget = 8000;
+const int kMaxInvalidAnswerRegenerations = 2;
 
 /// Singleton orchestrator for AI chat turns. Owns the chat state.
 ///
@@ -273,7 +274,20 @@ class AiChatService extends ChangeNotifier {
       notifyListeners();
 
       if (!completion.hasToolCalls) {
-        // Done.
+        final accepted = await _regenerateInvalidAnswer(
+          completion: completion,
+          current: current,
+          baseUrl: baseUrl,
+          token: token,
+          model: model,
+          systemPrompt: systemPrompt,
+          contextJson: contextJson,
+        );
+        if (accepted != null) {
+          current = [...current.sublist(0, current.length - 1), accepted];
+          _state = _state.copyWith(messages: current);
+        }
+        // Done only after the answer has passed output validation.
         _state = _state.copyWith(phase: AiTurnPhase.idle, phaseMessage: null);
         notifyListeners();
         await _persistCurrentThread();
@@ -325,14 +339,31 @@ class AiChatService extends ChangeNotifier {
           model: model,
           messages: finalWire,
         );
-        final finalAssistant = AiChatMessage(
+        final candidate = AiChatMessage(
           id: _uuid.v4(),
           threadId: _state.activeThreadId ?? '',
           role: AiMessageRole.assistant,
-          content: _formatCompletion(finalCompletion, current),
+          content: finalCompletion.text,
           createdAt: DateTime.now(),
         );
-        current = [...current, finalAssistant];
+        current = [...current, candidate];
+        final accepted = await _regenerateInvalidAnswer(
+          completion: finalCompletion,
+          current: current,
+          baseUrl: baseUrl,
+          token: token,
+          model: model,
+          systemPrompt: systemPrompt,
+          contextJson: contextJson,
+        );
+        final finalAssistant = AiChatMessage(
+          id: accepted?.id ?? candidate.id,
+          threadId: _state.activeThreadId ?? '',
+          role: AiMessageRole.assistant,
+          content: accepted?.content ?? finalCompletion.text,
+          createdAt: DateTime.now(),
+        );
+        current = [...current.sublist(0, current.length - 1), finalAssistant];
         _state = _state.copyWith(
           messages: current,
           phase: AiTurnPhase.idle,
@@ -343,6 +374,78 @@ class AiChatService extends ChangeNotifier {
         return;
       }
     }
+  }
+
+  Future<AiChatMessage?> _regenerateInvalidAnswer({
+    required AiChatCompletion completion,
+    required List<AiChatMessage> current,
+    required String baseUrl,
+    required String token,
+    required String model,
+    required String systemPrompt,
+    required Map<String, dynamic> contextJson,
+  }) async {
+    var text = completion.text;
+    if (text == null || !TextSanitizer.containsReferencePlaceholder(text)) {
+      return null;
+    }
+
+    // The rejected answer remains in the wire transcript so the model can see
+    // exactly what it must rewrite. Tool messages are also preserved in full.
+    var transcript = [...current];
+    for (var attempt = 0; attempt < kMaxInvalidAnswerRegenerations; attempt++) {
+      transcript = [
+        ...transcript,
+        AiChatMessage(
+          id: _uuid.v4(),
+          threadId: _state.activeThreadId ?? '',
+          role: AiMessageRole.user,
+          content:
+              'A resposta anterior foi rejeitada porque deixou marcadores '
+              'no lugar de valores reais. Reescreva a resposta completa agora. '
+              'Copie literalmente dos resultados das ferramentas os nomes, '
+              'datas e números correspondentes. Não explique a correção e não '
+              'use marcadores de referência.',
+          createdAt: DateTime.now(),
+        ),
+      ];
+      final regenerated = await _service.sendChat(
+        baseUrl: baseUrl,
+        token: token,
+        model: model,
+        messages: _buildWireMessages(
+          transcript,
+          systemPrompt: systemPrompt,
+          contextJson: contextJson,
+        ),
+      );
+      text = regenerated.text;
+      if (text != null && !TextSanitizer.containsReferencePlaceholder(text)) {
+        return AiChatMessage(
+          id: _uuid.v4(),
+          threadId: _state.activeThreadId ?? '',
+          role: AiMessageRole.assistant,
+          content: text,
+          createdAt: DateTime.now(),
+        );
+      }
+      transcript = [
+        ...transcript,
+        AiChatMessage(
+          id: _uuid.v4(),
+          threadId: _state.activeThreadId ?? '',
+          role: AiMessageRole.assistant,
+          content: text,
+          createdAt: DateTime.now(),
+        ),
+      ];
+    }
+    // Do not silently erase placeholders or fabricate a local summary.
+    throw const AiServiceException(
+      'A IA não conseguiu preencher os dados retornados pelas ferramentas. '
+      'Tente novamente.',
+      code: 'invalid_grounded_answer',
+    );
   }
 
   // ===========================================================================
@@ -373,8 +476,9 @@ class AiChatService extends ChangeNotifier {
           break;
         case AiMessageRole.assistant:
           final entry = <String, dynamic>{'role': 'assistant'};
-          if (m.content != null && m.content!.isNotEmpty)
+          if (m.content != null && m.content!.isNotEmpty) {
             entry['content'] = m.content;
+          }
           if (m.toolCalls.isNotEmpty) {
             entry['tool_calls'] = m.toolCalls.map((c) => c.toJson()).toList();
           }
@@ -397,20 +501,28 @@ class AiChatService extends ChangeNotifier {
     final total = _estimateTokens(messages);
     if (total <= kHistoryTokenBudget) return messages;
 
+    // Compact whole user turns. A tool result without its preceding assistant
+    // tool_call is an invalid transcript and prevents the model from reliably
+    // grounding its answer in that result.
+    final turns = <List<AiChatMessage>>[];
+    List<AiChatMessage>? turn;
+    for (final message in messages) {
+      if (message.isUser) {
+        turn = <AiChatMessage>[];
+        turns.add(turn);
+      }
+      turn?.add(message);
+    }
+    if (turns.isEmpty) return messages;
+
     final keep = <AiChatMessage>[];
     var running = 0;
-    for (var i = messages.length - 1; i >= 0; i--) {
-      final m = messages[i];
-      final est = _estimateMessageTokens(m);
+    for (var i = turns.length - 1; i >= 0; i--) {
+      final candidate = turns[i];
+      final est = _estimateTokens(candidate);
       if (running + est > kHistoryTokenBudget && keep.isNotEmpty) break;
-      keep.insert(0, m);
+      keep.insertAll(0, candidate);
       running += est;
-    }
-    if (keep.length == messages.length) return keep;
-    // Always keep the last user message.
-    if (keep.isEmpty || !keep.first.isUser) {
-      final lastUser = messages.lastWhere((m) => m.isUser);
-      if (!keep.contains(lastUser)) keep.insert(0, lastUser);
     }
     return keep;
   }
@@ -548,10 +660,6 @@ class AiChatService extends ChangeNotifier {
     AiChatCompletion completion,
     Iterable<AiChatMessage> messages,
   ) {
-    return AiResponseRepair.repair(
-      response: completion.text,
-      hadReferencePlaceholders: completion.hadReferencePlaceholders,
-      messages: messages,
-    );
+    return completion.text;
   }
 }
