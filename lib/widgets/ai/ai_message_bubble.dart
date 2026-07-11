@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../models/ai_chat_message.dart';
+import '../../l10n/app_localizations.dart';
 
 class AiMessageBubble extends StatelessWidget {
   final AiChatMessage message;
@@ -102,11 +103,11 @@ class AiMessageBubble extends StatelessWidget {
                       children: [
                         if (onCopy != null)
                           IconButton(
-                            tooltip: 'Copiar',
+                            tooltip: AppLocalizations.of(context)!.aiChatCopy,
                             icon: const Icon(Icons.copy_rounded, size: 16),
                             visualDensity: VisualDensity.compact,
                             constraints: const BoxConstraints.tightFor(
-                            width: 22,
+                              width: 22,
                               height: 24,
                             ),
                             padding: EdgeInsets.zero,
@@ -114,11 +115,11 @@ class AiMessageBubble extends StatelessWidget {
                           ),
                         if (onRetry != null)
                           IconButton(
-                            tooltip: 'Tentar de novo',
+                            tooltip: AppLocalizations.of(context)!.aiChatRetry,
                             icon: const Icon(Icons.refresh_rounded, size: 16),
                             visualDensity: VisualDensity.compact,
                             constraints: const BoxConstraints.tightFor(
-                            width: 22,
+                              width: 22,
                               height: 24,
                             ),
                             padding: EdgeInsets.zero,
@@ -134,7 +135,7 @@ class AiMessageBubble extends StatelessWidget {
                   child: Transform.translate(
                     offset: const Offset(0, -4),
                     child: IconButton(
-                      tooltip: 'Copiar',
+                      tooltip: AppLocalizations.of(context)!.aiChatCopy,
                       icon: const Icon(Icons.copy_rounded, size: 16),
                       visualDensity: VisualDensity.compact,
                       constraints: const BoxConstraints.tightFor(
@@ -248,8 +249,8 @@ class MessageCopyAction {
     await Clipboard.setData(ClipboardData(text: text));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Mensagem copiada'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.aiChatCopied),
           duration: Duration(seconds: 1),
         ),
       );

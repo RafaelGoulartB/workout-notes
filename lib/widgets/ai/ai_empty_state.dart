@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../screens/workout/ai_settings_screen.dart';
 import '../../navigation/ai_coach_navigation.dart';
+import '../../l10n/app_localizations.dart';
 
 class AiEmptyState extends StatelessWidget {
   final String title;
@@ -18,6 +19,7 @@ class AiEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -61,7 +63,7 @@ class AiEmptyState extends StatelessWidget {
                     );
                   },
                   icon: const Icon(Icons.settings_rounded),
-                  label: const Text('Configurar provedor'),
+                  label: Text(l10n.aiEmptyConfigure),
                 ),
               ],
             ),

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../main.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/ai_provider.dart';
 import '../../models/ai_settings.dart';
 import '../../services/ai_service.dart';
 import '../../state/ai_settings_notifier.dart';
+import '../../utils/ai_error_localizer.dart';
 import '../../widgets/empty_state_placeholder.dart';
 
 class AiSettingsScreen extends StatefulWidget {
@@ -37,11 +39,10 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final settings = _notifier.settings;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Configurações do AI Coach'),
-      ),
+      appBar: AppBar(title: Text(l10n.aiSettingsTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -58,6 +59,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
   }
 
   Widget _buildProvidersCard(ThemeData theme, AiSettings settings) {
+    final l10n = AppLocalizations.of(context)!;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -68,22 +70,25 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
               children: [
                 Icon(Icons.cloud_outlined, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('Provedores', style: theme.textTheme.titleMedium),
+                Text(
+                  l10n.aiSettingsProvidersCard,
+                  style: theme.textTheme.titleMedium,
+                ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              'Adicione um endpoint compatível com OpenAI (OpenAI, Ollama, OpenRouter, Groq, LM Studio…).',
+              l10n.aiSettingsProvidersHelp,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 12),
             if (settings.providers.isEmpty)
-              const EmptyStatePlaceholder(
+              EmptyStatePlaceholder(
                 icon: Icons.cloud_off_rounded,
-                title: 'Nenhum provedor',
-                subtitle: 'Adicione um provedor para começar a usar o Treinador IA.',
+                title: l10n.aiSettingsNoProviders,
+                subtitle: l10n.aiSettingsNoProvidersSubtitle,
               )
             else
               ...settings.providers.map((p) => _buildProviderTile(p, settings)),
@@ -93,7 +98,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
               child: FilledButton.icon(
                 onPressed: () => _showAddProviderSheet(),
                 icon: const Icon(Icons.add_rounded),
-                label: const Text('Adicionar provedor'),
+                label: Text(l10n.aiSettingsAddProvider),
               ),
             ),
           ],
@@ -104,6 +109,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
 
   Widget _buildProviderTile(AiProvider p, AiSettings settings) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final isActive = p.id == settings.activeProviderId;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -114,7 +120,9 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
             : theme.colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isActive ? theme.colorScheme.primary : theme.colorScheme.outlineVariant,
+          color: isActive
+              ? theme.colorScheme.primary
+              : theme.colorScheme.outlineVariant,
           width: isActive ? 1.5 : 0.5,
         ),
       ),
@@ -126,7 +134,9 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
               Icon(
                 isActive ? Icons.check_circle_rounded : Icons.cloud_outlined,
                 size: 18,
-                color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                color: isActive
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -139,7 +149,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
               if (!isActive)
                 TextButton(
                   onPressed: () => _notifier.setActiveProvider(p.id),
-                  child: const Text('Ativar'),
+                  child: Text(l10n.aiSettingsActivate),
                 ),
             ],
           ),
@@ -153,7 +163,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                'Modelo: ${p.selectedModel}',
+                l10n.aiSettingsModelValue(p.selectedModel),
                 style: theme.textTheme.bodySmall,
               ),
             ),
@@ -164,23 +174,23 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
               TextButton.icon(
                 onPressed: () => _showEditProviderSheet(p),
                 icon: const Icon(Icons.edit_rounded, size: 16),
-                label: const Text('Editar'),
+                label: Text(l10n.aiSettingsEdit),
               ),
               TextButton.icon(
                 onPressed: () async {
                   final confirm = await showDialog<bool>(
                     context: context,
                     builder: (_) => AlertDialog(
-                      title: Text('Remover ${p.name}?'),
-                      content: const Text('O token será removido também.'),
+                      title: Text(l10n.aiSettingsRemoveConfirmTitle(p.name)),
+                      content: Text(l10n.aiSettingsRemoveConfirmBody),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancelar'),
+                          child: Text(l10n.commonCancel),
                         ),
                         FilledButton.tonal(
                           onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Remover'),
+                          child: Text(l10n.aiSettingsRemove),
                         ),
                       ],
                     ),
@@ -190,7 +200,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
                   }
                 },
                 icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                label: const Text('Remover'),
+                label: Text(l10n.aiSettingsRemove),
               ),
             ],
           ),
@@ -200,6 +210,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
   }
 
   Widget _buildContextModeCard(ThemeData theme, AiSettings settings) {
+    final l10n = AppLocalizations.of(context)!;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -210,12 +221,15 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
               children: [
                 Icon(Icons.tune_rounded, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('Modo de contexto', style: theme.textTheme.titleMedium),
+                Text(
+                  l10n.aiSettingsContextMode,
+                  style: theme.textTheme.titleMedium,
+                ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              'Quantos dados são enviados à IA em cada turno. Mais contexto = respostas melhores, porém mais tokens.',
+              l10n.aiSettingsContextModeHelp,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -225,8 +239,8 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
               RadioListTile<AiContextMode>(
                 value: mode,
                 groupValue: settings.contextMode,
-                title: Text(_modeLabel(mode)),
-                subtitle: Text(_modeSubtitle(mode)),
+                title: Text(_modeLabel(mode, l10n)),
+                subtitle: Text(_modeSubtitle(mode, l10n)),
                 onChanged: (v) {
                   if (v != null) _notifier.setContextMode(v);
                 },
@@ -237,29 +251,30 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     );
   }
 
-  String _modeLabel(AiContextMode mode) {
+  String _modeLabel(AiContextMode mode, AppLocalizations l10n) {
     switch (mode) {
       case AiContextMode.minimal:
-        return 'Mínimo';
+        return l10n.aiSettingsContextModeMinimal;
       case AiContextMode.standard:
-        return 'Padrão';
+        return l10n.aiSettingsContextModeStandard;
       case AiContextMode.full:
-        return 'Completo';
+        return l10n.aiSettingsContextModeFull;
     }
   }
 
-  String _modeSubtitle(AiContextMode mode) {
+  String _modeSubtitle(AiContextMode mode, AppLocalizations l10n) {
     switch (mode) {
       case AiContextMode.minimal:
-        return 'Apenas totais e streak. IA usa ferramentas para detalhes.';
+        return l10n.aiSettingsContextModeMinimalSubtitle;
       case AiContextMode.standard:
-        return 'Resumo + metas + top exercícios. Bom equilíbrio.';
+        return l10n.aiSettingsContextModeStandardSubtitle;
       case AiContextMode.full:
-        return 'Tudo: categorias, tendência corporal, volume detalhado.';
+        return l10n.aiSettingsContextModeFullSubtitle;
     }
   }
 
   Widget _buildSystemPromptCard(ThemeData theme) {
+    final l10n = AppLocalizations.of(context)!;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -270,12 +285,15 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
               children: [
                 Icon(Icons.edit_note_rounded, color: theme.colorScheme.primary),
                 const SizedBox(width: 8),
-                Text('Prompt do sistema', style: theme.textTheme.titleMedium),
+                Text(
+                  l10n.aiSettingsSystemPrompt,
+                  style: theme.textTheme.titleMedium,
+                ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              'Define a personalidade e o comportamento do Treinador IA.',
+              l10n.aiSettingsSystemPromptHelp,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -289,6 +307,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
   }
 
   Widget _buildAboutCard(ThemeData theme) {
+    final l10n = AppLocalizations.of(context)!;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -297,15 +316,16 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.info_outline_rounded, color: theme.colorScheme.primary),
+                Icon(
+                  Icons.info_outline_rounded,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
-                Text('Sobre', style: theme.textTheme.titleMedium),
+                Text(l10n.aiSettingsAbout, style: theme.textTheme.titleMedium),
               ],
             ),
             const SizedBox(height: 8),
-            const Text(
-              'O Treinador IA envia um resumo dos seus dados a cada turno e tem acesso a 13 ferramentas de leitura. Não consegue editar seus dados. As conversas são salvas localmente.',
-            ),
+            Text(l10n.aiSettingsAboutBody),
           ],
         ),
       ),
@@ -327,7 +347,9 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
       context: context,
       isScrollControlled: true,
       builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
         child: _ProviderEditorSheet(notifier: _notifier, existing: existing),
       ),
     );
@@ -354,8 +376,9 @@ class _ProviderEditorSheetState extends State<_ProviderEditorSheet> {
   void initState() {
     super.initState();
     _name = TextEditingController(text: widget.existing?.name ?? '');
-    _baseUrl =
-        TextEditingController(text: widget.existing?.baseUrl ?? 'https://api.openai.com/v1');
+    _baseUrl = TextEditingController(
+      text: widget.existing?.baseUrl ?? 'https://api.openai.com/v1',
+    );
     _token = TextEditingController();
   }
 
@@ -370,6 +393,7 @@ class _ProviderEditorSheetState extends State<_ProviderEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -377,23 +401,25 @@ class _ProviderEditorSheetState extends State<_ProviderEditorSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            widget.existing == null ? 'Novo provedor' : 'Editar provedor',
+            widget.existing == null
+                ? l10n.aiSettingsNewProvider
+                : l10n.aiSettingsEditProvider,
             style: theme.textTheme.titleLarge,
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _name,
-            decoration: const InputDecoration(
-              labelText: 'Nome',
-              hintText: 'OpenAI, Ollama local, OpenRouter…',
+            decoration: InputDecoration(
+              labelText: l10n.aiSettingsProviderName,
+              hintText: l10n.aiSettingsNameHint,
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _baseUrl,
-            decoration: const InputDecoration(
-              labelText: 'Base URL',
-              hintText: 'https://api.openai.com/v1',
+            decoration: InputDecoration(
+              labelText: l10n.aiSettingsBaseUrl,
+              hintText: l10n.aiSettingsBaseUrlHint,
             ),
           ),
           const SizedBox(height: 12),
@@ -402,8 +428,8 @@ class _ProviderEditorSheetState extends State<_ProviderEditorSheet> {
             obscureText: true,
             decoration: InputDecoration(
               labelText: widget.existing == null
-                  ? 'API token'
-                  : 'Novo token (vazio para manter o atual)',
+                  ? l10n.aiSettingsToken
+                  : l10n.aiSettingsTokenHint,
             ),
           ),
           if (_error != null) ...[
@@ -416,7 +442,7 @@ class _ProviderEditorSheetState extends State<_ProviderEditorSheet> {
             children: [
               TextButton(
                 onPressed: _saving ? null : () => Navigator.of(context).pop(),
-                child: const Text('Cancelar'),
+                child: Text(l10n.commonCancel),
               ),
               const SizedBox(width: 8),
               FilledButton(
@@ -427,7 +453,7 @@ class _ProviderEditorSheetState extends State<_ProviderEditorSheet> {
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Salvar'),
+                    : Text(l10n.commonSave),
               ),
             ],
           ),
@@ -441,11 +467,15 @@ class _ProviderEditorSheetState extends State<_ProviderEditorSheet> {
     final baseUrl = AiService.normalizeBaseUri(_baseUrl.text.trim());
     final token = _token.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = 'Informe um nome.');
+      setState(
+        () => _error = AppLocalizations.of(context)!.aiSettingsNameRequired,
+      );
       return;
     }
     if (baseUrl.isEmpty) {
-      setState(() => _error = 'Informe uma URL base.');
+      setState(
+        () => _error = AppLocalizations.of(context)!.aiSettingsBaseUrlRequired,
+      );
       return;
     }
     setState(() {
@@ -470,7 +500,7 @@ class _ProviderEditorSheetState extends State<_ProviderEditorSheet> {
     } catch (e) {
       setState(() {
         _saving = false;
-        _error = e.toString();
+        _error = localizeAiError(e, AppLocalizations.of(context)!);
       });
     }
   }
@@ -505,6 +535,7 @@ class _SystemPromptFieldState extends State<_SystemPromptField> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -528,7 +559,7 @@ class _SystemPromptFieldState extends State<_SystemPromptField> {
                 setState(() => _dirty = false);
               },
               icon: const Icon(Icons.restart_alt_rounded, size: 16),
-              label: const Text('Restaurar padrão'),
+              label: Text(l10n.aiSettingsRestoreDefault),
             ),
             const SizedBox(width: 8),
             FilledButton.tonal(
@@ -539,10 +570,10 @@ class _SystemPromptFieldState extends State<_SystemPromptField> {
                       if (!mounted) return;
                       setState(() => _dirty = false);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Prompt salvo')),
+                        SnackBar(content: Text(l10n.aiSettingsSaved)),
                       );
                     },
-              child: const Text('Salvar'),
+              child: Text(l10n.commonSave),
             ),
           ],
         ),

@@ -2138,6 +2138,23 @@ class AppLocalizationsPt extends AppLocalizations {
       'Selecione um modelo em Configurações → AI Coach.';
 
   @override
+  String get aiChatErrorNotFound => 'Modelo ou endpoint não encontrado.';
+
+  @override
+  String get aiChatErrorInvalidResponse =>
+      'A resposta do provedor de IA é inválida.';
+
+  @override
+  String get aiChatErrorRequest =>
+      'Não foi possível concluir a solicitação à IA.';
+
+  @override
+  String get aiChatErrorUserMessage => 'Mensagem do usuário não encontrada.';
+
+  @override
+  String get aiChatProcessing => 'Processando…';
+
+  @override
   String get aiChatWelcomeTitle => 'Olá! Sou o seu Treinador IA.';
 
   @override
@@ -2164,6 +2181,63 @@ class AppLocalizationsPt extends AppLocalizations {
   String aiChatNoModel(Object provider) {
     return '$provider • (sem modelo)';
   }
+
+  @override
+  String get aiToolApplied => 'Ferramenta aplicada';
+
+  @override
+  String get aiToolNoContent => '(sem conteúdo)';
+
+  @override
+  String get aiToolError => 'Erro';
+
+  @override
+  String get aiToolUnknown => 'desconhecido';
+
+  @override
+  String get aiToolListRecentWorkouts => 'Listando treinos recentes';
+
+  @override
+  String get aiToolGetWorkoutDetail => 'Detalhando treino';
+
+  @override
+  String get aiToolListExercises => 'Buscando exercícios';
+
+  @override
+  String get aiToolGetExerciseHistory => 'Histórico do exercício';
+
+  @override
+  String get aiToolGetExerciseRecords => 'Recordes pessoais';
+
+  @override
+  String get aiToolWeeklyVolume => 'Volume semanal';
+
+  @override
+  String get aiToolProgressTrend => 'Tendência de progressão';
+
+  @override
+  String get aiToolListRoutines => 'Listando rotinas';
+
+  @override
+  String get aiToolGetRoutineDetail => 'Detalhando rotina';
+
+  @override
+  String get aiToolBodyMeasurements => 'Medidas corporais';
+
+  @override
+  String get aiToolCardioSummary => 'Resumo de cardio';
+
+  @override
+  String get aiToolListGoals => 'Metas ativas';
+
+  @override
+  String get aiToolGoalHistory => 'Histórico da meta';
+
+  @override
+  String get aiProviderPickerTitle => 'Provedor e modelo';
+
+  @override
+  String get aiProviderPickerSearch => 'Buscar modelo';
 
   @override
   String get aiHistoryTitle => 'Histórico de conversas';
@@ -2224,6 +2298,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get aiCoachFabTooltip => 'Abrir Treinador IA';
 
   @override
+  String get aiCoachConfigureBeforeChat =>
+      'Configure um provedor de IA antes de abrir o chat.';
+
+  @override
   String get aiSettingsTitle => 'Configurações do AI Coach';
 
   @override
@@ -2272,6 +2350,23 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get aiSettingsModel => 'Modelo';
+
+  @override
+  String aiSettingsModelValue(Object model) {
+    return 'Modelo: $model';
+  }
+
+  @override
+  String get aiSettingsProviderName => 'Nome';
+
+  @override
+  String get aiSettingsNameRequired => 'Informe um nome.';
+
+  @override
+  String get aiSettingsBaseUrlRequired => 'Informe uma URL base.';
+
+  @override
+  String get aiSettingsNoModelsEmpty => 'Nenhum modelo disponível';
 
   @override
   String get aiSettingsToken => 'Token de API';

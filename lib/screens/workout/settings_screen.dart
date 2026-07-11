@@ -829,10 +829,11 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
 
   void _openAiCoach() {
     final settings = WorkoutNotesApp.aiSettings;
+    final loc = AppLocalizations.of(context)!;
     if (!settings.isConfigured) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Configure um provedor de IA antes de abrir o chat.'),
+        SnackBar(
+          content: Text(loc.aiCoachConfigureBeforeChat),
           duration: Duration(seconds: 2),
         ),
       );
@@ -1254,22 +1255,22 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                 ),
 
                 // ===== DADOS =====
-                const _SectionHeader(text: 'AI COACH'),
+                _SectionHeader(text: loc.aiCoachSection),
                 _SettingsCard(
                   children: [
                     _LinkTile(
                       icon: Icons.smart_toy_rounded,
                       iconColor: theme.colorScheme.primary,
-                      title: 'Treinador IA',
-                      subtitle: 'Converse com um personal trainer de IA.',
+                      title: loc.aiCoachEntry,
+                      subtitle: loc.aiCoachEntrySubtitle,
                       onTap: _openAiCoach,
                     ),
                     const _CardDivider(),
                     _LinkTile(
                       icon: Icons.tune_rounded,
                       iconColor: theme.colorScheme.onSurfaceVariant,
-                      title: 'Configurar IA',
-                      subtitle: 'Provedores, modelo, prompt do sistema.',
+                      title: loc.aiCoachConfigureEntry,
+                      subtitle: loc.aiCoachConfigureEntrySubtitle,
                       onTap: () {
                         Navigator.of(context).push(
                           AiCoachNavigation.route(

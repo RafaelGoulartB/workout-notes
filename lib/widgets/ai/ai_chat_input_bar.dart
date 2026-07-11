@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
+
 class AiChatInputBar extends StatefulWidget {
   final TextEditingController controller;
   final bool enabled;
@@ -33,6 +35,7 @@ class _AiChatInputBarState extends State<AiChatInputBar> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final dark = theme.brightness == Brightness.dark;
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -58,8 +61,8 @@ class _AiChatInputBarState extends State<AiChatInputBar> {
                   textInputAction: TextInputAction.newline,
                   decoration: InputDecoration(
                     hintText: widget.enabled
-                        ? 'Pergunte sobre seu treino'
-                        : 'Configure um provedor para começar',
+                        ? l10n.aiChatInputHint
+                        : l10n.aiChatInputHintDisabled,
                     filled: true,
                     fillColor: dark
                         ? const Color(0xFF1B1C22)
@@ -129,7 +132,12 @@ class _AiChatInputBarState extends State<AiChatInputBar> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '${widget.providerName}  ·  ${widget.modelName?.isNotEmpty == true ? widget.modelName : 'sem modelo'}',
+                        widget.modelName?.isNotEmpty == true
+                            ? l10n.aiChatActiveModel(
+                                widget.providerName!,
+                                widget.modelName!,
+                              )
+                            : l10n.aiChatNoModel(widget.providerName!),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(

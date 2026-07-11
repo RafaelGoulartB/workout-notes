@@ -165,23 +165,19 @@ class AiChatService extends ChangeNotifier {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
     if (_settings == null || !_settings!.isConfigured) {
-      _state = _state.copyWith(error: 'Nenhum provedor de IA configurado.');
+      _state = _state.copyWith(error: 'ai_error:missing_provider');
       notifyListeners();
       return;
     }
     final provider = _settings!.activeProvider!;
     final token = await _settings!.getToken(provider.id);
     if (token == null || token.isEmpty) {
-      _state = _state.copyWith(
-        error: 'Token ausente. Configure em Configurações → AI Coach.',
-      );
+      _state = _state.copyWith(error: 'ai_error:missing_token');
       notifyListeners();
       return;
     }
     if (provider.selectedModel.isEmpty) {
-      _state = _state.copyWith(
-        error: 'Selecione um modelo em Configurações → AI Coach.',
-      );
+      _state = _state.copyWith(error: 'ai_error:missing_model');
       notifyListeners();
       return;
     }
@@ -203,7 +199,7 @@ class AiChatService extends ChangeNotifier {
       messages: messages,
       phase: AiTurnPhase.sending,
       clearError: true,
-      phaseMessage: 'Enviando…',
+      phaseMessage: 'sending',
     );
     notifyListeners();
 
@@ -236,7 +232,7 @@ class AiChatService extends ChangeNotifier {
       orElse: () => remaining.isEmpty ? _state.messages.first : remaining.last,
     );
     if (!lastUser.isUser) {
-      _state = _state.copyWith(error: 'Mensagem do usuário não encontrada.');
+      _state = _state.copyWith(error: 'ai_error:user_message_missing');
       notifyListeners();
       return;
     }
@@ -277,7 +273,7 @@ class AiChatService extends ChangeNotifier {
 
       _state = _state.copyWith(
         phase: round == 0 ? AiTurnPhase.sending : AiTurnPhase.executingReads,
-        phaseMessage: round == 0 ? 'Enviando…' : 'Processando leitura…',
+        phaseMessage: round == 0 ? 'sending' : 'reading',
       );
       notifyListeners();
 
@@ -327,7 +323,8 @@ class AiChatService extends ChangeNotifier {
       // Execute reads sequentially; tool-call order is preserved.
       _state = _state.copyWith(
         phase: AiTurnPhase.executingReads,
-        phaseMessage: 'Lendo ${completion.toolCalls.length} fonte(s)…',
+        phaseMessage: 'reading',
+        phaseToolCount: completion.toolCalls.length,
       );
       notifyListeners();
 
@@ -355,7 +352,7 @@ class AiChatService extends ChangeNotifier {
         // Force final answer with no tools.
         _state = _state.copyWith(
           phase: AiTurnPhase.sending,
-          phaseMessage: 'Finalizando…',
+          phaseMessage: 'finalising',
         );
         notifyListeners();
         final finalWire = _buildWireMessages(
@@ -684,8 +681,11 @@ class AiChatService extends ChangeNotifier {
   // ===========================================================================
 
   String _readableError(Object e) {
-    if (e is AiServiceException) return e.message;
-    return e.toString();
+    if (e is TimeoutException) return 'ai_error:timeout';
+    if (e is AiServiceException) {
+      return 'ai_error:${e.code ?? 'generic'}';
+    }
+    return 'ai_error:generic';
   }
 
   String? _formatCompletion(

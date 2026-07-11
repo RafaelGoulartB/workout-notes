@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../models/ai_chat_message.dart';
+import '../../l10n/app_localizations.dart';
 
 class AiToolResultBubble extends StatefulWidget {
   final AiChatMessage message;
@@ -24,6 +25,7 @@ class _AiToolResultBubbleState extends State<AiToolResultBubble> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final isOk = widget.message.toolResult?.ok ?? true;
     final color = isOk
         ? (theme.brightness == Brightness.dark
@@ -71,7 +73,7 @@ class _AiToolResultBubbleState extends State<AiToolResultBubble> {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            isOk ? 'Ferramenta aplicada' : widget.toolLabel,
+                            isOk ? l10n.aiToolApplied : widget.toolLabel,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: fg,
                             ),
@@ -96,7 +98,7 @@ class _AiToolResultBubbleState extends State<AiToolResultBubble> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          _previewJson(),
+                          _previewJson(l10n),
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontFamily: 'monospace',
                             fontSize: 11,
@@ -115,13 +117,15 @@ class _AiToolResultBubbleState extends State<AiToolResultBubble> {
     );
   }
 
-  String _previewJson() {
+  String _previewJson(AppLocalizations l10n) {
     final raw = widget.message.content;
-    if (raw == null || raw.isEmpty) return '(sem conteúdo)';
+    if (raw == null || raw.isEmpty) {
+      return l10n.aiToolNoContent;
+    }
     try {
       final decoded = jsonDecode(raw);
       if (decoded is Map && decoded['ok'] == false) {
-        return 'Erro: ${decoded['code'] ?? 'desconhecido'}\n${decoded['message'] ?? ''}';
+        return '${l10n.aiToolError}: ${decoded['code'] ?? l10n.aiToolUnknown}';
       }
       final pretty = const JsonEncoder.withIndent('  ').convert(decoded);
       return pretty.length > 1200 ? '${pretty.substring(0, 1200)}…' : pretty;

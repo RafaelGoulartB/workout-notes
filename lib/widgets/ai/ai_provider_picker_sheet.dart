@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../models/ai_provider.dart';
 import '../../state/ai_settings_notifier.dart';
+import '../../utils/ai_error_localizer.dart';
 
 class AiProviderPickerSheet extends StatefulWidget {
   final AiSettingsNotifier notifier;
@@ -46,6 +48,7 @@ class _AiProviderPickerSheetState extends State<AiProviderPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final selected = _selectedProvider;
     final models =
         selected?.availableModels
@@ -79,7 +82,7 @@ class _AiProviderPickerSheetState extends State<AiProviderPickerSheet> {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    'Provedor e modelo',
+                    l10n.aiProviderPickerTitle,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -87,7 +90,7 @@ class _AiProviderPickerSheetState extends State<AiProviderPickerSheet> {
                   const Spacer(),
                   if (selected != null)
                     IconButton(
-                      tooltip: 'Atualizar modelos',
+                      tooltip: l10n.aiSettingsFetchModels,
                       onPressed: _fetching ? null : _fetchModels,
                       icon: _fetching
                           ? const SizedBox(
@@ -130,7 +133,7 @@ class _AiProviderPickerSheetState extends State<AiProviderPickerSheet> {
                 TextField(
                   controller: _search,
                   decoration: InputDecoration(
-                    hintText: 'Buscar modelo',
+                    hintText: l10n.aiProviderPickerSearch,
                     prefixIcon: const Icon(Icons.search_rounded),
                     suffixIcon: _query.isEmpty
                         ? null
@@ -149,7 +152,7 @@ class _AiProviderPickerSheetState extends State<AiProviderPickerSheet> {
                   child: models.isEmpty
                       ? Center(
                           child: Text(
-                            'Nenhum modelo disponível',
+                            l10n.aiSettingsNoModelsEmpty,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -187,8 +190,8 @@ class _AiProviderPickerSheetState extends State<AiProviderPickerSheet> {
                         ),
                 ),
               ] else
-                const Expanded(
-                  child: Center(child: Text('Nenhum provedor configurado')),
+                Expanded(
+                  child: Center(child: Text(l10n.aiSettingsNoProviders)),
                 ),
             ],
           ),
@@ -207,7 +210,11 @@ class _AiProviderPickerSheetState extends State<AiProviderPickerSheet> {
     try {
       await widget.notifier.fetchModels(provider.id);
     } catch (e) {
-      if (mounted) setState(() => _fetchError = e.toString());
+      if (mounted) {
+        setState(
+          () => _fetchError = localizeAiError(e, AppLocalizations.of(context)!),
+        );
+      }
     } finally {
       if (mounted) setState(() => _fetching = false);
     }

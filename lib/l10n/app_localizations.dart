@@ -4002,6 +4002,36 @@ abstract class AppLocalizations {
   /// **'Select a model in Settings → AI Coach.'**
   String get aiChatErrorMissingModel;
 
+  /// No description provided for @aiChatErrorNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Model or endpoint not found.'**
+  String get aiChatErrorNotFound;
+
+  /// No description provided for @aiChatErrorInvalidResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'The AI provider returned an invalid response.'**
+  String get aiChatErrorInvalidResponse;
+
+  /// No description provided for @aiChatErrorRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'The request to the AI could not be completed.'**
+  String get aiChatErrorRequest;
+
+  /// No description provided for @aiChatErrorUserMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The user message could not be found.'**
+  String get aiChatErrorUserMessage;
+
+  /// No description provided for @aiChatProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing…'**
+  String get aiChatProcessing;
+
   /// No description provided for @aiChatWelcomeTitle.
   ///
   /// In en, this message translates to:
@@ -4043,6 +4073,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{provider} • (no model)'**
   String aiChatNoModel(Object provider);
+
+  /// No description provided for @aiToolApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool applied'**
+  String get aiToolApplied;
+
+  /// No description provided for @aiToolNoContent.
+  ///
+  /// In en, this message translates to:
+  /// **'(no content)'**
+  String get aiToolNoContent;
+
+  /// No description provided for @aiToolError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get aiToolError;
+
+  /// No description provided for @aiToolUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'unknown'**
+  String get aiToolUnknown;
+
+  /// No description provided for @aiToolListRecentWorkouts.
+  ///
+  /// In en, this message translates to:
+  /// **'Listing recent workouts'**
+  String get aiToolListRecentWorkouts;
+
+  /// No description provided for @aiToolGetWorkoutDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading workout details'**
+  String get aiToolGetWorkoutDetail;
+
+  /// No description provided for @aiToolListExercises.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching exercises'**
+  String get aiToolListExercises;
+
+  /// No description provided for @aiToolGetExerciseHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Exercise history'**
+  String get aiToolGetExerciseHistory;
+
+  /// No description provided for @aiToolGetExerciseRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal records'**
+  String get aiToolGetExerciseRecords;
+
+  /// No description provided for @aiToolWeeklyVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly volume'**
+  String get aiToolWeeklyVolume;
+
+  /// No description provided for @aiToolProgressTrend.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress trend'**
+  String get aiToolProgressTrend;
+
+  /// No description provided for @aiToolListRoutines.
+  ///
+  /// In en, this message translates to:
+  /// **'Listing routines'**
+  String get aiToolListRoutines;
+
+  /// No description provided for @aiToolGetRoutineDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading routine details'**
+  String get aiToolGetRoutineDetail;
+
+  /// No description provided for @aiToolBodyMeasurements.
+  ///
+  /// In en, this message translates to:
+  /// **'Body measurements'**
+  String get aiToolBodyMeasurements;
+
+  /// No description provided for @aiToolCardioSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio summary'**
+  String get aiToolCardioSummary;
+
+  /// No description provided for @aiToolListGoals.
+  ///
+  /// In en, this message translates to:
+  /// **'Active goals'**
+  String get aiToolListGoals;
+
+  /// No description provided for @aiToolGoalHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal history'**
+  String get aiToolGoalHistory;
+
+  /// No description provided for @aiProviderPickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider and model'**
+  String get aiProviderPickerTitle;
+
+  /// No description provided for @aiProviderPickerSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search model'**
+  String get aiProviderPickerSearch;
 
   /// No description provided for @aiHistoryTitle.
   ///
@@ -4152,6 +4296,12 @@ abstract class AppLocalizations {
   /// **'Open AI Coach'**
   String get aiCoachFabTooltip;
 
+  /// No description provided for @aiCoachConfigureBeforeChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure an AI provider before opening the chat.'**
+  String get aiCoachConfigureBeforeChat;
+
   /// No description provided for @aiSettingsTitle.
   ///
   /// In en, this message translates to:
@@ -4241,6 +4391,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Model'**
   String get aiSettingsModel;
+
+  /// No description provided for @aiSettingsModelValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Model: {model}'**
+  String aiSettingsModelValue(Object model);
+
+  /// No description provided for @aiSettingsProviderName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get aiSettingsProviderName;
+
+  /// No description provided for @aiSettingsNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name.'**
+  String get aiSettingsNameRequired;
+
+  /// No description provided for @aiSettingsBaseUrlRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a base URL.'**
+  String get aiSettingsBaseUrlRequired;
+
+  /// No description provided for @aiSettingsNoModelsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No models available'**
+  String get aiSettingsNoModelsEmpty;
 
   /// No description provided for @aiSettingsToken.
   ///

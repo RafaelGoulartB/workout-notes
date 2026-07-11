@@ -8,6 +8,7 @@ import '../../models/ai_chat_state.dart';
 import '../../services/ai_tool_registry.dart';
 import '../../state/ai_chat_service.dart';
 import '../../state/ai_settings_notifier.dart';
+import '../../utils/ai_error_localizer.dart';
 import '../../widgets/ai/ai_chat_input_bar.dart';
 import '../../widgets/ai/ai_empty_state.dart';
 import '../../widgets/ai/ai_message_bubble.dart';
@@ -85,14 +86,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
         title: const SizedBox.shrink(),
         actions: [
           IconButton(
-            tooltip: 'Nova conversa',
+            tooltip: l10n.aiChatNewChat,
             icon: const Icon(Icons.add_comment_rounded),
             onPressed: state.isSending
                 ? null
                 : () => AiChatService.instance.newChat(),
           ),
           IconButton(
-            tooltip: 'Histórico',
+            tooltip: l10n.aiChatHistory,
             icon: const Icon(Icons.history_rounded),
             onPressed: () {
               Navigator.of(context).push(
@@ -119,26 +120,31 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   break;
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'provider', child: Text('Trocar provedor')),
-              PopupMenuItem(value: 'settings', child: Text('Configurações')),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'provider',
+                child: Text(l10n.aiChatChooseProvider),
+              ),
+              PopupMenuItem(
+                value: 'settings',
+                child: Text(l10n.aiChatSettings),
+              ),
             ],
           ),
         ],
       ),
       body: !configured
-          ? const AiEmptyState(
-              title: 'Configure um provedor de IA',
-              subtitle:
-                  'Adicione um endpoint OpenAI-compatible (OpenAI, Ollama, OpenRouter…) para começar a usar o Treinador IA.',
+          ? AiEmptyState(
+              title: l10n.aiEmptyTitle,
+              subtitle: l10n.aiEmptySubtitle,
             )
           : Column(
               children: [
                 if (state.phase != AiTurnPhase.idle)
-                  _buildPhaseBanner(theme, state),
+                  _buildPhaseBanner(theme, state, l10n),
                 Expanded(
                   child: state.messages.isEmpty
-                      ? _buildWelcome(theme)
+                      ? _buildWelcome(theme, l10n)
                       : ListView.builder(
                           controller: _scroll,
                           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -152,7 +158,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                           },
                         ),
                 ),
-                if (state.error != null) _buildErrorBanner(theme, state.error!),
+                if (state.error != null)
+                  _buildErrorBanner(theme, state.error!, l10n),
                 AiChatInputBar(
                   controller: _controller,
                   enabled: configured,
@@ -171,6 +178,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   // ignore: unused_element
   Widget _buildProviderHeader(ThemeData theme) {
     final active = _settings.activeProvider;
+    final l10n = AppLocalizations.of(context)!;
     if (active == null) return const SizedBox.shrink();
     return Material(
       color: theme.colorScheme.surfaceContainerHigh,
@@ -188,7 +196,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '${active.name} • ${active.selectedModel.isEmpty ? "(sem modelo)" : active.selectedModel}',
+                  active.selectedModel.isEmpty
+                      ? l10n.aiChatNoModel(active.name)
+                      : l10n.aiChatActiveModel(
+                          active.name,
+                          active.selectedModel,
+                        ),
                   style: theme.textTheme.bodySmall,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -201,7 +214,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
-  Widget _buildPhaseBanner(ThemeData theme, AiChatState state) {
+  Widget _buildPhaseBanner(
+    ThemeData theme,
+    AiChatState state,
+    AppLocalizations l10n,
+  ) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -216,7 +233,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              state.phaseMessage ?? 'Processando…',
+              _phaseText(state, l10n),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSecondaryContainer,
               ),
@@ -227,7 +244,20 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
-  Widget _buildWelcome(ThemeData theme) {
+  String _phaseText(AiChatState state, AppLocalizations l10n) {
+    switch (state.phaseMessage) {
+      case 'sending':
+        return l10n.aiChatSending;
+      case 'reading':
+        return l10n.aiChatReading(state.phaseToolCount ?? 0);
+      case 'finalising':
+        return l10n.aiChatFinalising;
+      default:
+        return l10n.aiChatProcessing;
+    }
+  }
+
+  Widget _buildWelcome(ThemeData theme, AppLocalizations l10n) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -241,13 +271,13 @@ class _AiChatScreenState extends State<AiChatScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Olá! Sou o seu Treinador IA.',
+              l10n.aiChatWelcomeTitle,
               style: theme.textTheme.titleLarge,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              'Pergunte sobre seu progresso, peça uma análise do seu treino, ou peça sugestões de progressão.',
+              l10n.aiChatWelcomeSubtitle,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -259,7 +289,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
-  Widget _buildErrorBanner(ThemeData theme, String error) {
+  Widget _buildErrorBanner(
+    ThemeData theme,
+    String error,
+    AppLocalizations l10n,
+  ) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -273,7 +307,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              error,
+              localizeAiError(error, l10n),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onErrorContainer,
               ),
@@ -314,7 +348,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
           children.add(
             AiToolResultBubble(
               message: n,
-              toolLabel: _toolLabels.humanLabel(n.toolName ?? ''),
+              toolLabel: _toolLabels.humanLabel(n.toolName ?? '', l10n),
             ),
           );
           j++;

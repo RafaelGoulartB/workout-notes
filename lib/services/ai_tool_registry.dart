@@ -1,4 +1,5 @@
 import '../database/database_helper.dart';
+import '../l10n/app_localizations.dart';
 import '../models/ai_message_role.dart';
 import '../repositories/goal_repository.dart';
 
@@ -6,8 +7,8 @@ class AiToolRegistry {
   final DatabaseHelper db;
   final GoalRepository goalRepo;
   AiToolRegistry({DatabaseHelper? db, GoalRepository? goalRepo})
-      : db = db ?? DatabaseHelper.instance,
-        goalRepo = goalRepo ?? GoalRepository();
+    : db = db ?? DatabaseHelper.instance,
+      goalRepo = goalRepo ?? GoalRepository();
 
   /// OpenAI function-calling JSON schemas for all read tools.
   List<Map<String, dynamic>> openAiReadToolsSchema() {
@@ -15,7 +16,37 @@ class AiToolRegistry {
   }
 
   /// Human-friendly label for a tool name (used in chat bubbles).
-  String humanLabel(String toolName) {
+  String humanLabel(String toolName, [AppLocalizations? l10n]) {
+    if (l10n != null) {
+      switch (toolName) {
+        case 'list_recent_workouts':
+          return l10n.aiToolListRecentWorkouts;
+        case 'get_workout_detail':
+          return l10n.aiToolGetWorkoutDetail;
+        case 'list_exercises':
+          return l10n.aiToolListExercises;
+        case 'get_exercise_history':
+          return l10n.aiToolGetExerciseHistory;
+        case 'get_exercise_personal_records':
+          return l10n.aiToolGetExerciseRecords;
+        case 'get_weekly_volume_breakdown':
+          return l10n.aiToolWeeklyVolume;
+        case 'get_progress_trend':
+          return l10n.aiToolProgressTrend;
+        case 'list_routines':
+          return l10n.aiToolListRoutines;
+        case 'get_routine_detail':
+          return l10n.aiToolGetRoutineDetail;
+        case 'list_body_measurements':
+          return l10n.aiToolBodyMeasurements;
+        case 'get_cardio_summary':
+          return l10n.aiToolCardioSummary;
+        case 'list_goals':
+          return l10n.aiToolListGoals;
+        case 'get_goal_progress_history':
+          return l10n.aiToolGoalHistory;
+      }
+    }
     switch (toolName) {
       case 'list_recent_workouts':
         return 'Listando treinos recentes';
@@ -82,7 +113,11 @@ class AiToolRegistry {
         case 'get_goal_progress_history':
           return _ok(await _getGoalProgressHistory(args));
         default:
-          return AiToolResult(ok: false, code: 'unknown_tool', message: 'Tool "$toolName" não reconhecida.');
+          return AiToolResult(
+            ok: false,
+            code: 'unknown_tool',
+            message: 'Tool "$toolName" não reconhecida.',
+          );
       }
     } catch (e) {
       return AiToolResult(ok: false, code: 'error', message: e.toString());
@@ -93,7 +128,9 @@ class AiToolRegistry {
   // TOOL IMPLEMENTATIONS
   // ===========================================================================
 
-  Future<Map<String, dynamic>> _listRecentWorkouts(Map<String, dynamic> args) async {
+  Future<Map<String, dynamic>> _listRecentWorkouts(
+    Map<String, dynamic> args,
+  ) async {
     final limit = (args['limit'] as int?) ?? 10;
     final rows = await db.getWorkouts(limit: limit);
     final out = <Map<String, dynamic>>[];
@@ -123,8 +160,11 @@ class AiToolRegistry {
     return {'workouts': out};
   }
 
-  Future<Map<String, dynamic>> _getWorkoutDetail(Map<String, dynamic> args) async {
-    final id = (args['workout_id'] as String?) ?? (args['workoutId'] as String?);
+  Future<Map<String, dynamic>> _getWorkoutDetail(
+    Map<String, dynamic> args,
+  ) async {
+    final id =
+        (args['workout_id'] as String?) ?? (args['workoutId'] as String?);
     if (id == null) {
       return {'error': 'workout_id é obrigatório'};
     }
@@ -138,16 +178,20 @@ class AiToolRegistry {
         'exerciseId': e['exercise_id'],
         'exerciseName': e['exercise_name'],
         'order': e['order_index'],
-        'sets': sets.map((s) => {
-          'weight': s['weight'],
-          'reps': s['reps'],
-          'distance': s['distance'],
-          'timeSeconds': s['time_seconds'],
-          'isWarmup': (s['is_warmup'] as int? ?? 0) == 1,
-          'isComplete': (s['is_complete'] as int? ?? 0) == 1,
-          'rpe': s['rpe'],
-          'comment': s['comment'],
-        }).toList(),
+        'sets': sets
+            .map(
+              (s) => {
+                'weight': s['weight'],
+                'reps': s['reps'],
+                'distance': s['distance'],
+                'timeSeconds': s['time_seconds'],
+                'isWarmup': (s['is_warmup'] as int? ?? 0) == 1,
+                'isComplete': (s['is_complete'] as int? ?? 0) == 1,
+                'rpe': s['rpe'],
+                'comment': s['comment'],
+              },
+            )
+            .toList(),
       });
     }
     return {
@@ -166,18 +210,25 @@ class AiToolRegistry {
       search: args['name_contains'] as String?,
       favorites: args['is_favorite'] as bool?,
     );
-    final compact = rows.map((e) => {
-          'id': e['id'],
-          'name': e['name'],
-          'categoryId': e['category_id'],
-          'type': e['type'],
-          'isFavorite': (e['is_favorite'] as int? ?? 0) == 1,
-        }).toList();
+    final compact = rows
+        .map(
+          (e) => {
+            'id': e['id'],
+            'name': e['name'],
+            'categoryId': e['category_id'],
+            'type': e['type'],
+            'isFavorite': (e['is_favorite'] as int? ?? 0) == 1,
+          },
+        )
+        .toList();
     return {'exercises': compact};
   }
 
-  Future<Map<String, dynamic>> _getExerciseHistory(Map<String, dynamic> args) async {
-    final id = (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
+  Future<Map<String, dynamic>> _getExerciseHistory(
+    Map<String, dynamic> args,
+  ) async {
+    final id =
+        (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
     if (id == null) return {'error': 'exercise_id é obrigatório'};
     final limit = (args['limit'] as int?) ?? 20;
     final history = await db.getExerciseHistory(id, limit: limit);
@@ -191,24 +242,34 @@ class AiToolRegistry {
     };
   }
 
-  Future<Map<String, dynamic>> _getExercisePRs(Map<String, dynamic> args) async {
-    final id = (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
+  Future<Map<String, dynamic>> _getExercisePRs(
+    Map<String, dynamic> args,
+  ) async {
+    final id =
+        (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
     if (id == null) return {'error': 'exercise_id é obrigatório'};
     final prs = await db.getPersonalRecords(limit: 50);
     final filtered = prs.where((p) => p['exercise_id'] == id).toList();
     return {'exerciseId': id, 'records': filtered};
   }
 
-  Future<Map<String, dynamic>> _getWeeklyVolumeBreakdown(Map<String, dynamic> args) async {
-    final weeks = (args['weeks_back'] as int?) ?? (args['weeksBack'] as int?) ?? 8;
+  Future<Map<String, dynamic>> _getWeeklyVolumeBreakdown(
+    Map<String, dynamic> args,
+  ) async {
+    final weeks =
+        (args['weeks_back'] as int?) ?? (args['weeksBack'] as int?) ?? 8;
     final byCategory = await db.getWeeklyVolumeByCategory(weeks: weeks);
     return {'weeksBack': weeks, 'byCategory': byCategory};
   }
 
-  Future<Map<String, dynamic>> _getProgressTrend(Map<String, dynamic> args) async {
-    final id = (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
+  Future<Map<String, dynamic>> _getProgressTrend(
+    Map<String, dynamic> args,
+  ) async {
+    final id =
+        (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
     if (id == null) return {'error': 'exercise_id é obrigatório'};
-    final weeks = (args['weeks_back'] as int?) ?? (args['weeksBack'] as int?) ?? 8;
+    final weeks =
+        (args['weeks_back'] as int?) ?? (args['weeksBack'] as int?) ?? 8;
     final history = await db.getExerciseHistory(id, limit: weeks * 5);
     return {
       'exerciseId': id,
@@ -222,7 +283,10 @@ class AiToolRegistry {
     final search = (args['name_contains'] as String?)?.toLowerCase();
     final out = <Map<String, dynamic>>[];
     for (final r in routines) {
-      if (search != null && !(r['name'] as String).toLowerCase().contains(search)) continue;
+      if (search != null &&
+          !(r['name'] as String).toLowerCase().contains(search)) {
+        continue;
+      }
       final days = await db.getRoutineDays(r['id'] as String);
       int exCount = 0;
       for (final d in days) {
@@ -240,8 +304,11 @@ class AiToolRegistry {
     return {'routines': out};
   }
 
-  Future<Map<String, dynamic>> _getRoutineDetail(Map<String, dynamic> args) async {
-    final id = (args['routine_id'] as String?) ?? (args['routineId'] as String?);
+  Future<Map<String, dynamic>> _getRoutineDetail(
+    Map<String, dynamic> args,
+  ) async {
+    final id =
+        (args['routine_id'] as String?) ?? (args['routineId'] as String?);
     if (id == null) return {'error': 'routine_id é obrigatório'};
     final r = await db.getRoutine(id);
     if (r == null) return {'error': 'rotina não encontrada'};
@@ -256,13 +323,17 @@ class AiToolRegistry {
           'exerciseId': e['exercise_id'],
           'order': e['order_index'],
           'restTimeSeconds': e['rest_time_seconds'],
-          'predefinedSets': sets.map((s) => {
-            'weight': s['weight'],
-            'reps': s['reps'],
-            'distance': s['distance'],
-            'timeSeconds': s['time_seconds'],
-            'isWarmup': (s['is_warmup'] as int? ?? 0) == 1,
-          }).toList(),
+          'predefinedSets': sets
+              .map(
+                (s) => {
+                  'weight': s['weight'],
+                  'reps': s['reps'],
+                  'distance': s['distance'],
+                  'timeSeconds': s['time_seconds'],
+                  'isWarmup': (s['is_warmup'] as int? ?? 0) == 1,
+                },
+              )
+              .toList(),
         });
       }
       daysOut.add({
@@ -273,34 +344,38 @@ class AiToolRegistry {
         'exercises': exsOut,
       });
     }
-    return {
-      'id': id,
-      'name': r['name'],
-      'notes': r['notes'],
-      'days': daysOut,
-    };
+    return {'id': id, 'name': r['name'], 'notes': r['notes'], 'days': daysOut};
   }
 
-  Future<Map<String, dynamic>> _listBodyMeasurements(Map<String, dynamic> args) async {
+  Future<Map<String, dynamic>> _listBodyMeasurements(
+    Map<String, dynamic> args,
+  ) async {
     final type = args['type'] as String?;
     final limit = (args['limit'] as int?) ?? 30;
     final rows = await db.getBodyMeasurements(type: type, limit: limit);
     return {
       'type': type,
-      'measurements': rows.map((m) => {
-        'id': m['id'],
-        'type': m['type'],
-        'value': m['value'],
-        'unit': m['unit'],
-        'date': m['date'],
-        'timeOfDay': m['time_of_day'],
-        'comment': m['comment'],
-      }).toList(),
+      'measurements': rows
+          .map(
+            (m) => {
+              'id': m['id'],
+              'type': m['type'],
+              'value': m['value'],
+              'unit': m['unit'],
+              'date': m['date'],
+              'timeOfDay': m['time_of_day'],
+              'comment': m['comment'],
+            },
+          )
+          .toList(),
     };
   }
 
-  Future<Map<String, dynamic>> _getCardioSummary(Map<String, dynamic> args) async {
-    final weeks = (args['weeks_back'] as int?) ?? (args['weeksBack'] as int?) ?? 4;
+  Future<Map<String, dynamic>> _getCardioSummary(
+    Map<String, dynamic> args,
+  ) async {
+    final weeks =
+        (args['weeks_back'] as int?) ?? (args['weeksBack'] as int?) ?? 4;
     final weekly = await db.getCardioWeeklyDistance(weeks: weeks);
     final byModality = await db.getCardioDistanceByModality();
     return {
@@ -347,13 +422,18 @@ class AiToolRegistry {
     return {'goals': out};
   }
 
-  Future<Map<String, dynamic>> _getGoalProgressHistory(Map<String, dynamic> args) async {
+  Future<Map<String, dynamic>> _getGoalProgressHistory(
+    Map<String, dynamic> args,
+  ) async {
     final id = (args['goal_id'] as String?) ?? (args['goalId'] as String?);
     if (id == null) return {'error': 'goal_id é obrigatório'};
     final periods = (args['periods_back'] as int?) ?? 6;
     final goal = await goalRepo.getById(id);
     if (goal == null) return {'error': 'meta não encontrada'};
-    final (current, history) = await goalRepo.getProgressWithHistory(goal, historyCount: periods);
+    final (current, history) = await goalRepo.getProgressWithHistory(
+      goal,
+      historyCount: periods,
+    );
     return {
       'goalId': id,
       'title': goal.title,
@@ -364,13 +444,17 @@ class AiToolRegistry {
         'isComplete': current.isComplete,
         'daysRemaining': current.daysRemaining,
       },
-      'history': history.map((r) => {
-        'start': r.start.toIso8601String().substring(0, 10),
-        'end': r.end.toIso8601String().substring(0, 10),
-        'value': r.value,
-        'targetValue': r.targetValue,
-        'wasCompleted': r.wasCompleted,
-      }).toList(),
+      'history': history
+          .map(
+            (r) => {
+              'start': r.start.toIso8601String().substring(0, 10),
+              'end': r.end.toIso8601String().substring(0, 10),
+              'value': r.value,
+              'targetValue': r.targetValue,
+              'wasCompleted': r.wasCompleted,
+            },
+          )
+          .toList(),
     };
   }
 
@@ -385,11 +469,16 @@ class AiToolRegistry {
           'type': 'function',
           'function': {
             'name': name,
-            'description': 'Lista os treinos mais recentes com volume, sensação e contagem de exercícios.',
+            'description':
+                'Lista os treinos mais recentes com volume, sensação e contagem de exercícios.',
             'parameters': {
               'type': 'object',
               'properties': {
-                'limit': {'type': 'integer', 'description': 'Quantos treinos retornar (padrão 10).', 'default': 10},
+                'limit': {
+                  'type': 'integer',
+                  'description': 'Quantos treinos retornar (padrão 10).',
+                  'default': 10,
+                },
               },
               'required': const [],
             },
@@ -400,11 +489,15 @@ class AiToolRegistry {
           'type': 'function',
           'function': {
             'name': name,
-            'description': 'Retorna todos os exercícios e séries de um treino específico.',
+            'description':
+                'Retorna todos os exercícios e séries de um treino específico.',
             'parameters': {
               'type': 'object',
               'properties': {
-                'workout_id': {'type': 'string', 'description': 'UUID do treino.'},
+                'workout_id': {
+                  'type': 'string',
+                  'description': 'UUID do treino.',
+                },
               },
               'required': ['workout_id'],
             },
@@ -415,7 +508,8 @@ class AiToolRegistry {
           'type': 'function',
           'function': {
             'name': name,
-            'description': 'Lista os exercícios cadastrados, opcionalmente filtrando por categoria, nome ou favoritos.',
+            'description':
+                'Lista os exercícios cadastrados, opcionalmente filtrando por categoria, nome ou favoritos.',
             'parameters': {
               'type': 'object',
               'properties': {
@@ -432,7 +526,8 @@ class AiToolRegistry {
           'type': 'function',
           'function': {
             'name': name,
-            'description': 'Histórico de séries de um exercício, com top sets, médias e totais.',
+            'description':
+                'Histórico de séries de um exercício, com top sets, médias e totais.',
             'parameters': {
               'type': 'object',
               'properties': {
@@ -463,7 +558,8 @@ class AiToolRegistry {
           'type': 'function',
           'function': {
             'name': name,
-            'description': 'Volume semanal agrupado por categoria, nas últimas N semanas.',
+            'description':
+                'Volume semanal agrupado por categoria, nas últimas N semanas.',
             'parameters': {
               'type': 'object',
               'properties': {
@@ -478,7 +574,8 @@ class AiToolRegistry {
           'type': 'function',
           'function': {
             'name': name,
-            'description': 'Tendência de progressão (peso, reps, volume) de um exercício nas últimas N semanas.',
+            'description':
+                'Tendência de progressão (peso, reps, volume) de um exercício nas últimas N semanas.',
             'parameters': {
               'type': 'object',
               'properties': {
@@ -494,7 +591,8 @@ class AiToolRegistry {
           'type': 'function',
           'function': {
             'name': name,
-            'description': 'Lista todas as rotinas com contagem de dias e exercícios.',
+            'description':
+                'Lista todas as rotinas com contagem de dias e exercícios.',
             'parameters': {
               'type': 'object',
               'properties': {
@@ -509,7 +607,8 @@ class AiToolRegistry {
           'type': 'function',
           'function': {
             'name': name,
-            'description': 'Detalha uma rotina: dias, exercícios e séries predefinidas.',
+            'description':
+                'Detalha uma rotina: dias, exercícios e séries predefinidas.',
             'parameters': {
               'type': 'object',
               'properties': {
@@ -524,11 +623,15 @@ class AiToolRegistry {
           'type': 'function',
           'function': {
             'name': name,
-            'description': 'Lista medidas corporais (peso, circunferências, etc.) com data e valor.',
+            'description':
+                'Lista medidas corporais (peso, circunferências, etc.) com data e valor.',
             'parameters': {
               'type': 'object',
               'properties': {
-                'type': {'type': 'string', 'description': 'Tipo de medida. Vazio = todas.'},
+                'type': {
+                  'type': 'string',
+                  'description': 'Tipo de medida. Vazio = todas.',
+                },
                 'limit': {'type': 'integer', 'default': 30},
               },
               'required': const [],
@@ -540,7 +643,8 @@ class AiToolRegistry {
           'type': 'function',
           'function': {
             'name': name,
-            'description': 'Resumo de cardio: distância semanal por modalidade.',
+            'description':
+                'Resumo de cardio: distância semanal por modalidade.',
             'parameters': {
               'type': 'object',
               'properties': {
@@ -559,8 +663,14 @@ class AiToolRegistry {
             'parameters': {
               'type': 'object',
               'properties': {
-                'scope': {'type': 'string', 'description': 'anaerobic ou aerobic.'},
-                'metric': {'type': 'string', 'description': 'volume, days, distance ou time.'},
+                'scope': {
+                  'type': 'string',
+                  'description': 'anaerobic ou aerobic.',
+                },
+                'metric': {
+                  'type': 'string',
+                  'description': 'volume, days, distance ou time.',
+                },
                 'is_active': {'type': 'boolean', 'default': true},
               },
               'required': const [],
@@ -589,13 +699,18 @@ class AiToolRegistry {
           'function': {
             'name': name,
             'description': 'Tool sem schema definido.',
-            'parameters': {'type': 'object', 'properties': const {}, 'required': const []},
+            'parameters': {
+              'type': 'object',
+              'properties': const {},
+              'required': const [],
+            },
           },
         };
     }
   }
 
-  AiToolResult _ok(Map<String, dynamic> data) => AiToolResult(ok: true, data: data);
+  AiToolResult _ok(Map<String, dynamic> data) =>
+      AiToolResult(ok: true, data: data);
 
   // ===========================================================================
   // TOOL CATALOG
@@ -607,13 +722,19 @@ class AiToolRegistry {
     {'name': 'list_exercises', 'description': 'List exercises'},
     {'name': 'get_exercise_history', 'description': 'Exercise history'},
     {'name': 'get_exercise_personal_records', 'description': 'Exercise PRs'},
-    {'name': 'get_weekly_volume_breakdown', 'description': 'Weekly volume by category'},
+    {
+      'name': 'get_weekly_volume_breakdown',
+      'description': 'Weekly volume by category',
+    },
     {'name': 'get_progress_trend', 'description': 'Exercise progress trend'},
     {'name': 'list_routines', 'description': 'List routines'},
     {'name': 'get_routine_detail', 'description': 'Routine details'},
     {'name': 'list_body_measurements', 'description': 'List body measurements'},
     {'name': 'get_cardio_summary', 'description': 'Cardio summary'},
     {'name': 'list_goals', 'description': 'List active goals'},
-    {'name': 'get_goal_progress_history', 'description': 'Goal progress history'},
+    {
+      'name': 'get_goal_progress_history',
+      'description': 'Goal progress history',
+    },
   ];
 }
