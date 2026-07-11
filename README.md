@@ -144,4 +144,3 @@ When submitting a change:
 3. Include migrations for database schema changes.
 4. Run `flutter analyze` and `flutter test`.
 5. Add or update tests when changing repositories, services, or database behavior.
-

@@ -1,0 +1,140 @@
+name: Release Android APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run static analysis
+        run: flutter analyze --no-pub
+
+      - name: Run tests
+        run: flutter test --no-pub
+
+      - name: Calculate release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          pubspec_version="$(awk '/^version:/ { print $2; exit }' pubspec.yaml)"
+          base_version="${pubspec_version%%+*}"
+          latest_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n 1)"
+
+          if [[ -n "$latest_tag" ]]; then
+            current_version="${latest_tag#v}"
+          else
+            current_version="$base_version"
+          fi
+
+          IFS='.' read -r major minor patch <<< "$current_version"
+          if [[ ! "$major" =~ ^[0-9]+$ || ! "$minor" =~ ^[0-9]+$ || ! "$patch" =~ ^[0-9]+$ ]]; then
+            echo "Cannot calculate a patch release from version: $current_version" >&2
+            exit 1
+          fi
+
+          version="$major.$minor.$((patch + 1))"
+          build_number="$((10000 + GITHUB_RUN_NUMBER))"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "build_number=$build_number" >> "$GITHUB_OUTPUT"
+
+      - name: Validate signing secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for value in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [[ -z "${!value}" ]]; then
+              echo "Required GitHub Actions secret is missing: $value" >&2
+              exit 1
+            fi
+          done
+
+      - name: Configure Android signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          keystore_path="$RUNNER_TEMP/upload-keystore.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+          chmod 600 "$keystore_path"
+
+          {
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyPassword=$KEY_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "storeFile=$keystore_path"
+          } > android/key.properties
+
+      - name: Build signed release APK
+        run: >-
+          flutter build apk
+          --release
+          --build-name=${{ steps.version.outputs.version }}
+          --build-number=${{ steps.version.outputs.build_number }}
+
+      - name: Prepare release asset
+        id: asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset="workout-notes-${{ steps.version.outputs.version }}-android.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "$asset"
+          sha256sum "$asset" > "$asset.sha256"
+          echo "path=$asset" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${{ steps.version.outputs.tag }}"
+          "${{ steps.asset.outputs.path }}"
+          "${{ steps.asset.outputs.path }}.sha256"
+          --target "${{ github.sha }}"
+          --title "Workout Notes ${{ steps.version.outputs.version }}"
+          --generate-notes
