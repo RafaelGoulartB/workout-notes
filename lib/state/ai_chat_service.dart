@@ -10,7 +10,9 @@ import '../models/ai_chat_state.dart';
 import '../models/ai_chat_thread.dart';
 import '../models/ai_message_role.dart';
 import '../models/ai_provider.dart';
+import '../models/ai_routine_proposal.dart';
 import '../services/ai_context_service.dart';
+import '../services/ai_routine_mutation_service.dart';
 import '../services/ai_service.dart';
 import '../services/ai_tool_registry.dart';
 import '../utils/token_estimator.dart';
@@ -22,6 +24,16 @@ const _uuid = Uuid();
 const int kMaxToolRounds = 3;
 const int kHistoryTokenBudget = 8000;
 const int kMaxInvalidAnswerRegenerations = 2;
+const String _routineMutationPolicy = r'''# Propostas de rotina (política fixa)
+Você pode preparar uma proposta de rotina somente quando o usuário pedir explicitamente para criar, montar, editar, alterar, adicionar ou remover conteúdo de uma rotina. Nunca proponha alterações apenas por sugestão, análise ou pergunta hipotética.
+
+Quando houver esse pedido, você DEVE usar ferramentas; não responda dizendo que não consegue criar a rotina. Siga este fluxo:
+1. Para criação, chame `list_exercises` para obter IDs reais dos exercícios necessários.
+2. Para edição, chame `list_routines` e depois `get_routine_detail`; preserve os campos `source_*_id` retornados.
+3. Chame `propose_routine_change` com a árvore final completa. Campos opcionais podem ser omitidos; não escreva null se não precisar do campo.
+4. Depois do resultado da ferramenta, explique que a prévia está disponível para aprovação.
+
+`propose_routine_change` apenas prepara a prévia: ela não aplica nada. Nunca diga que criou ou editou uma rotina antes da aprovação e do resultado confirmado pelo app. Após uma aprovação, resuma somente os fatos retornados pelo app.''';
 
 /// Singleton orchestrator for AI chat turns. Owns the chat state.
 ///
@@ -37,6 +49,7 @@ class AiChatService extends ChangeNotifier {
   AiService _service = AiService();
   AiToolRegistry _tools = AiToolRegistry();
   AiContextService _context = AiContextService();
+  AiRoutineMutationService _routineMutations = AiRoutineMutationService();
   AiSettingsNotifier? _settings;
 
   AiChatState _state = const AiChatState();
@@ -49,10 +62,12 @@ class AiChatService extends ChangeNotifier {
     AiService? service,
     AiToolRegistry? tools,
     AiContextService? context,
+    AiRoutineMutationService? routineMutations,
   }) {
     if (service != null) _service = service;
     if (tools != null) _tools = tools;
     if (context != null) _context = context;
+    if (routineMutations != null) _routineMutations = routineMutations;
   }
 
   /// Wires the settings notifier. Must be called once at app boot
@@ -96,11 +111,13 @@ class AiChatService extends ChangeNotifier {
     try {
       final rows = await _db.getAiChatMessagesThread(threadId);
       final messages = rows.map(AiChatMessage.fromRow).toList();
+      final proposals = await _routineMutations.getThreadProposals(threadId);
       _state = _state.copyWith(
         activeThreadId: threadId,
         messages: messages,
         clearError: true,
         phase: AiTurnPhase.idle,
+        routineProposals: proposals,
       );
       _recoverInterruptedTurn(messages);
       notifyListeners();
@@ -164,6 +181,7 @@ class AiChatService extends ChangeNotifier {
   Future<void> send(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
+    if (isSending) return;
     if (_settings == null || !_settings!.isConfigured) {
       _state = _state.copyWith(error: 'ai_error:missing_provider');
       notifyListeners();
@@ -223,6 +241,55 @@ class AiChatService extends ChangeNotifier {
     }
   }
 
+  Future<void> rejectRoutineProposal(String proposalId) async {
+    try {
+      final proposal = await _routineMutations.reject(proposalId);
+      _replaceProposal(proposal);
+      await _persistCurrentThread();
+    } catch (e) {
+      _state = _state.copyWith(error: _readableError(e));
+      notifyListeners();
+    }
+  }
+
+  Future<void> approveRoutineProposal(String proposalId) async {
+    if (isSending) return;
+    _state = _state.copyWith(
+      phase: AiTurnPhase.applyingProposal,
+      phaseMessage: 'applying_proposal',
+      clearError: true,
+    );
+    notifyListeners();
+    try {
+      final proposal = await _routineMutations.approve(proposalId);
+      _replaceProposal(proposal, notify: false);
+      await _persistCurrentThread();
+      if (proposal.status != AiRoutineProposalStatus.applied) {
+        _state = _state.copyWith(phase: AiTurnPhase.idle, phaseMessage: null);
+        notifyListeners();
+        return;
+      }
+      await _sendAppliedProposalSummary(proposal);
+    } catch (e) {
+      _state = _state.copyWith(
+        phase: AiTurnPhase.failed,
+        phaseMessage: null,
+        error: _readableError(e),
+      );
+      notifyListeners();
+    }
+  }
+
+  Future<void> retryAppliedProposalSummary(String proposalId) async {
+    final proposal =
+        _state.proposalById(proposalId) ??
+        await _routineMutations.getProposal(proposalId);
+    if (proposal?.status != AiRoutineProposalStatus.applied || isSending) {
+      return;
+    }
+    await _sendAppliedProposalSummary(proposal!);
+  }
+
   /// Truncates messages after [fromIndex] and resends from that point.
   Future<void> retryFromMessage(int fromIndex) async {
     if (fromIndex < 0 || fromIndex >= _state.messages.length) return;
@@ -258,7 +325,8 @@ class AiChatService extends ChangeNotifier {
     required AiContextMode contextMode,
   }) async {
     var current = [...messages];
-    final toolsSchema = _tools.openAiReadToolsSchema();
+    final toolsSchema = _tools.openAiChatToolsSchema();
+    final explicitRoutineTurn = _hasExplicitRoutineIntent(current);
 
     for (var round = 0; round < kMaxToolRounds + 1; round++) {
       // Refresh context cache at the start of a turn.
@@ -283,7 +351,10 @@ class AiChatService extends ChangeNotifier {
         model: model,
         messages: wire,
         tools: toolsSchema,
-        toolChoice: 'auto',
+        // Compatible providers sometimes default to a text-only answer even
+        // when tools are present. An explicit mutation request must begin by
+        // reading the required app data, so require one tool on its first turn.
+        toolChoice: round == 0 && explicitRoutineTurn ? 'required' : 'auto',
       );
 
       // Persist the assistant message (may be empty if only tool calls).
@@ -321,18 +392,38 @@ class AiChatService extends ChangeNotifier {
       }
 
       // Execute reads sequentially; tool-call order is preserved.
+      final hasProposal = completion.toolCalls.any(
+        (call) => call.name == 'propose_routine_change',
+      );
       _state = _state.copyWith(
-        phase: AiTurnPhase.executingReads,
-        phaseMessage: 'reading',
+        phase: hasProposal
+            ? AiTurnPhase.preparingProposal
+            : AiTurnPhase.executingReads,
+        phaseMessage: hasProposal ? 'preparing_proposal' : 'reading',
         phaseToolCount: completion.toolCalls.length,
       );
       notifyListeners();
 
       for (final call in completion.toolCalls) {
-        final result = await _tools.executeRead(
-          toolName: call.name,
-          args: call.arguments,
-        );
+        final result = call.name == 'propose_routine_change'
+            ? await _routineMutations.prepareProposal(
+                threadId: _state.activeThreadId ?? '',
+                toolCallId: call.id,
+                args: call.arguments,
+                explicitRequest: _hasExplicitRoutineIntent(current),
+              )
+            : await _tools.executeRead(
+                toolName: call.name,
+                args: call.arguments,
+              );
+        if (call.name == 'propose_routine_change' && result.ok) {
+          final data = result.data as Map?;
+          final proposalId = data?['proposalId'] as String?;
+          if (proposalId != null) {
+            final proposal = await _routineMutations.getProposal(proposalId);
+            if (proposal != null) _replaceProposal(proposal, notify: false);
+          }
+        }
         final toolMsg = AiChatMessage(
           id: _uuid.v4(),
           threadId: _state.activeThreadId ?? '',
@@ -490,6 +581,9 @@ class AiChatService extends ChangeNotifier {
       'content':
           '$systemPrompt\n\n<workout_data>${jsonEncode(contextJson)}</workout_data>',
     });
+    // This product safety policy is intentionally separate from the editable
+    // prompt so a custom personality cannot bypass approval requirements.
+    out.add({'role': 'system', 'content': _routineMutationPolicy});
 
     // Compact history if too long.
     final compacted = _compactHistory(messages);
@@ -664,6 +758,112 @@ class AiChatService extends ChangeNotifier {
       await _db.replaceAiChatMessages(id, rows);
       await refreshThreads();
     } catch (_) {}
+  }
+
+  bool _hasExplicitRoutineIntent(List<AiChatMessage> messages) {
+    AiChatMessage? lastUser;
+    for (final message in messages.reversed) {
+      if (message.isUser) {
+        lastUser = message;
+        break;
+      }
+    }
+    if (lastUser == null) return false;
+    final text = (lastUser.content ?? '').toLowerCase();
+    if (!RegExp(
+      r'\b(rotina|routine|treino)\b',
+      caseSensitive: false,
+    ).hasMatch(text)) {
+      return false;
+    }
+    return RegExp(
+      r'\b(cria|crie|criar|monta|monte|montar|edita|edite|editar|altera|altere|alterar|adiciona|adicione|adicionar|remove|remova|remover|troca|troque|substitua|faça|faca|make|create|edit|change|add)\b',
+      caseSensitive: false,
+    ).hasMatch(text);
+  }
+
+  void _replaceProposal(AiRoutineProposal proposal, {bool notify = true}) {
+    final proposals = [..._state.routineProposals];
+    final index = proposals.indexWhere((item) => item.id == proposal.id);
+    if (index == -1) {
+      proposals.add(proposal);
+    } else {
+      proposals[index] = proposal;
+    }
+    _state = _state.copyWith(routineProposals: proposals);
+    if (notify) notifyListeners();
+  }
+
+  Future<void> _sendAppliedProposalSummary(AiRoutineProposal proposal) async {
+    if (_settings == null || !_settings!.isConfigured) return;
+    final provider = _settings!.activeProvider!;
+    final token = await _settings!.getToken(provider.id);
+    if (token == null || token.isEmpty || provider.selectedModel.isEmpty) {
+      return;
+    }
+    _state = _state.copyWith(
+      phase: AiTurnPhase.sending,
+      phaseMessage: 'finalising',
+      clearError: true,
+    );
+    notifyListeners();
+    try {
+      final context = await _context.build(mode: _settings!.contextMode);
+      final wire = _buildWireMessages(
+        _state.messages,
+        systemPrompt: _settings!.systemPrompt,
+        contextJson: context,
+      );
+      wire.add({
+        'role': 'user',
+        'content':
+            'EVENTO INTERNO DO APP: a proposta foi aplicada com sucesso. Responda agora, em português brasileiro, com um resumo breve e factual do que foi feito. Não use ferramentas e não diga que houve aprovação pendente. Dados confirmados: ${jsonEncode({'action': proposal.action.storageValue, 'routineName': proposal.routineName, 'routineId': proposal.appliedRoutineId, 'diff': proposal.diff})}',
+      });
+      final completion = await _service.sendChat(
+        baseUrl: provider.baseUrl,
+        token: token,
+        model: provider.selectedModel,
+        messages: wire,
+      );
+      final text = completion.text?.trim();
+      if (text == null || text.isEmpty) {
+        throw const AiServiceException(
+          'Resumo vazio.',
+          code: 'invalid_response',
+        );
+      }
+      final summary = AiChatMessage(
+        id: _uuid.v4(),
+        threadId: _state.activeThreadId ?? '',
+        role: AiMessageRole.assistant,
+        content: text,
+        createdAt: DateTime.now(),
+      );
+      _state = _state.copyWith(
+        messages: [..._state.messages, summary],
+        phase: AiTurnPhase.idle,
+        phaseMessage: null,
+      );
+      await _db.updateAiRoutineProposal(proposal.id, {
+        'error_code': null,
+        'error_message': null,
+      });
+      final refreshed = await _routineMutations.getProposal(proposal.id);
+      if (refreshed != null) _replaceProposal(refreshed, notify: false);
+      notifyListeners();
+      await _persistCurrentThread();
+    } catch (_) {
+      // The routine is already committed. Keep it applied and expose a retry
+      // on the proposal card instead of risking a second mutation.
+      await _db.updateAiRoutineProposal(proposal.id, {
+        'error_code': 'summary_pending',
+        'error_message': 'Resumo da IA pendente.',
+      });
+      final refreshed = await _routineMutations.getProposal(proposal.id);
+      if (refreshed != null) _replaceProposal(refreshed, notify: false);
+      _state = _state.copyWith(phase: AiTurnPhase.idle, phaseMessage: null);
+      notifyListeners();
+    }
   }
 
   String? _lastUserOrAssistantPreview() {

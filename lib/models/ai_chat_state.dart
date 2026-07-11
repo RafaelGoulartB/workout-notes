@@ -1,7 +1,15 @@
 import 'ai_chat_message.dart';
 import 'ai_chat_thread.dart';
+import 'ai_routine_proposal.dart';
 
-enum AiTurnPhase { idle, sending, executingReads, failed }
+enum AiTurnPhase {
+  idle,
+  sending,
+  executingReads,
+  preparingProposal,
+  applyingProposal,
+  failed,
+}
 
 class AiChatState {
   final List<AiChatThread> threads;
@@ -11,6 +19,7 @@ class AiChatState {
   final String? error;
   final String? phaseMessage;
   final int? phaseToolCount;
+  final List<AiRoutineProposal> routineProposals;
 
   const AiChatState({
     this.threads = const [],
@@ -20,10 +29,21 @@ class AiChatState {
     this.error,
     this.phaseMessage,
     this.phaseToolCount,
+    this.routineProposals = const [],
   });
 
   bool get isSending =>
-      phase == AiTurnPhase.sending || phase == AiTurnPhase.executingReads;
+      phase == AiTurnPhase.sending ||
+      phase == AiTurnPhase.executingReads ||
+      phase == AiTurnPhase.preparingProposal ||
+      phase == AiTurnPhase.applyingProposal;
+  AiRoutineProposal? proposalById(String id) {
+    for (final proposal in routineProposals) {
+      if (proposal.id == id) return proposal;
+    }
+    return null;
+  }
+
   bool get isEmpty => messages.isEmpty;
   AiChatThread? get activeThread {
     if (activeThreadId == null) return null;
@@ -44,6 +64,7 @@ class AiChatState {
     String? phaseMessage,
     bool clearPhaseMessage = false,
     int? phaseToolCount,
+    List<AiRoutineProposal>? routineProposals,
   }) {
     return AiChatState(
       threads: threads ?? this.threads,
@@ -57,6 +78,7 @@ class AiChatState {
           ? null
           : (phaseMessage ?? this.phaseMessage),
       phaseToolCount: phaseToolCount ?? this.phaseToolCount,
+      routineProposals: routineProposals ?? this.routineProposals,
     );
   }
 }

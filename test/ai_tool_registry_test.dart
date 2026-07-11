@@ -29,6 +29,39 @@ void main() {
     }
   });
 
+  test('openAiChatToolsSchema includes the guarded routine proposal tool', () {
+    final tools = registry.openAiChatToolsSchema();
+    expect(tools, hasLength(14));
+    final proposal = tools.firstWhere(
+      (tool) => (tool['function'] as Map)['name'] == 'propose_routine_change',
+    );
+    final parameters = (proposal['function'] as Map)['parameters'] as Map;
+    expect(parameters['required'], containsAll(<String>['action', 'routine']));
+  });
+
+  test('routine proposal schema uses portable scalar property types', () {
+    final proposal = registry.openAiChatToolsSchema().firstWhere(
+      (tool) => (tool['function'] as Map)['name'] == 'propose_routine_change',
+    );
+
+    void visit(dynamic value) {
+      if (value is Map) {
+        if (value.containsKey('type')) {
+          expect(value['type'], isNot(isA<List>()));
+        }
+        for (final child in value.values) {
+          visit(child);
+        }
+      } else if (value is List) {
+        for (final child in value) {
+          visit(child);
+        }
+      }
+    }
+
+    visit(proposal);
+  });
+
   test('humanLabel returns a label for every registered tool', () {
     for (final t in registry.openAiReadToolsSchema()) {
       final name = (t['function'] as Map)['name'] as String;
@@ -37,7 +70,10 @@ void main() {
   });
 
   test('executeRead on unknown tool returns unknown_tool', () async {
-    final r = await registry.executeRead(toolName: 'no_such_tool', args: const {});
+    final r = await registry.executeRead(
+      toolName: 'no_such_tool',
+      args: const {},
+    );
     expect(r.ok, isFalse);
     expect(r.code, 'unknown_tool');
   });

@@ -2222,6 +2222,97 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiToolGoalHistory => 'Goal history';
 
   @override
+  String get aiToolProposeRoutineChange => 'Preparing routine proposal';
+
+  @override
+  String get aiChatPreparingProposal => 'Preparing routine preview…';
+
+  @override
+  String get aiChatApplyingProposal => 'Applying approved changes…';
+
+  @override
+  String get aiRoutineProposalCreate => 'New routine';
+
+  @override
+  String get aiRoutineProposalUpdate => 'Update routine';
+
+  @override
+  String get aiRoutineProposalAwaiting => 'Awaiting approval';
+
+  @override
+  String get aiRoutineProposalApplying => 'Applying';
+
+  @override
+  String get aiRoutineProposalApplied => 'Applied';
+
+  @override
+  String get aiRoutineProposalRejected => 'Rejected';
+
+  @override
+  String get aiRoutineProposalStale => 'Outdated';
+
+  @override
+  String get aiRoutineProposalFailed => 'Failed';
+
+  @override
+  String get aiRoutineProposalPreview =>
+      'Review the changes before applying them.';
+
+  @override
+  String get aiRoutineProposalApprove => 'Approve and apply';
+
+  @override
+  String get aiRoutineProposalReject => 'Reject';
+
+  @override
+  String get aiRoutineProposalView => 'View routine';
+
+  @override
+  String get aiRoutineProposalDetails => 'View details';
+
+  @override
+  String get aiRoutineProposalHideDetails => 'Hide details';
+
+  @override
+  String get aiRoutineProposalAdded => 'Added';
+
+  @override
+  String get aiRoutineProposalRemoved => 'Removed';
+
+  @override
+  String get aiRoutineProposalChanges => 'Proposed changes';
+
+  @override
+  String aiRoutineProposalRemovalWarning(Object count) {
+    return 'This proposal removes $count item(s).';
+  }
+
+  @override
+  String get aiRoutineProposalConfirmTitle => 'Apply removals?';
+
+  @override
+  String aiRoutineProposalConfirmBody(Object count) {
+    return '$count item(s) will be removed from the routine. This cannot be undone automatically.';
+  }
+
+  @override
+  String get aiRoutineProposalConfirmApply => 'Apply changes';
+
+  @override
+  String get aiRoutineProposalStaleBody =>
+      'The routine changed since this preview. Ask the AI to create a new proposal.';
+
+  @override
+  String get aiRoutineProposalRejectedBody => 'No changes were applied.';
+
+  @override
+  String get aiRoutineProposalAppliedBody =>
+      'Changes were applied successfully.';
+
+  @override
+  String get aiRoutineProposalRetrySummary => 'Generate summary';
+
+  @override
   String get aiProviderPickerTitle => 'Provider and model';
 
   @override

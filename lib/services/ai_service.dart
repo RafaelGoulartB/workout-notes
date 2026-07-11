@@ -97,7 +97,7 @@ class AiService {
     required String model,
     required List<Map<String, dynamic>> messages,
     List<Map<String, dynamic>>? tools,
-    String? toolChoice,
+    Object? toolChoice,
     double temperature = 0.3,
   }) async {
     final uri = Uri.parse('$baseUrl/chat/completions');

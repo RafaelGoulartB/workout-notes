@@ -15,6 +15,12 @@ class AiToolRegistry {
     return _tools.map((t) => _schemaFor(t['name'] as String)).toList();
   }
 
+  /// All tools available during a chat turn, including guarded proposals.
+  List<Map<String, dynamic>> openAiChatToolsSchema() => [
+    ...openAiReadToolsSchema(),
+    _schemaFor('propose_routine_change'),
+  ];
+
   /// Human-friendly label for a tool name (used in chat bubbles).
   String humanLabel(String toolName, [AppLocalizations? l10n]) {
     if (l10n != null) {
@@ -45,6 +51,8 @@ class AiToolRegistry {
           return l10n.aiToolListGoals;
         case 'get_goal_progress_history':
           return l10n.aiToolGoalHistory;
+        case 'propose_routine_change':
+          return l10n.aiToolProposeRoutineChange;
       }
     }
     switch (toolName) {
@@ -74,6 +82,8 @@ class AiToolRegistry {
         return 'Metas ativas';
       case 'get_goal_progress_history':
         return 'Histórico da meta';
+      case 'propose_routine_change':
+        return 'Preparando proposta de rotina';
       default:
         return toolName;
     }
@@ -320,12 +330,17 @@ class AiToolRegistry {
       for (final e in exs) {
         final sets = await db.getPredefinedSets(e['id'] as String);
         exsOut.add({
+          'routineExerciseId': e['id'],
+          'source_routine_exercise_id': e['id'],
           'exerciseId': e['exercise_id'],
           'order': e['order_index'],
           'restTimeSeconds': e['rest_time_seconds'],
+          'supersetGroupId': e['superset_group_id'],
           'predefinedSets': sets
               .map(
                 (s) => {
+                  'id': s['id'],
+                  'source_set_id': s['id'],
                   'weight': s['weight'],
                   'reps': s['reps'],
                   'distance': s['distance'],
@@ -338,6 +353,7 @@ class AiToolRegistry {
       }
       daysOut.add({
         'id': d['id'],
+        'source_day_id': d['id'],
         'name': d['name'],
         'order': d['order_index'],
         'notes': d['notes'],
@@ -690,6 +706,76 @@ class AiToolRegistry {
                 'periods_back': {'type': 'integer', 'default': 6},
               },
               'required': ['goal_id'],
+            },
+          },
+        };
+      case 'propose_routine_change':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'PREPARE A PROPOSTA quando o usuário pedir explicitamente para criar ou editar uma rotina. Não aplica dados: o app mostrará a prévia para aprovação. Para criar, primeiro use list_exercises e use IDs retornados. Para editar, primeiro use list_routines e get_routine_detail; mantenha os source_*_id retornados. Envie a árvore final inteira da rotina.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'action': {
+                  'type': 'string',
+                  'enum': ['create', 'update'],
+                },
+                'routine_id': {'type': 'string'},
+                'routine': {
+                  'type': 'object',
+                  'properties': {
+                    'name': {'type': 'string'},
+                    'notes': {'type': 'string'},
+                    'days': {
+                      'type': 'array',
+                      'items': {
+                        'type': 'object',
+                        'properties': {
+                          'source_day_id': {'type': 'string'},
+                          'name': {'type': 'string'},
+                          'notes': {'type': 'string'},
+                          'exercises': {
+                            'type': 'array',
+                            'items': {
+                              'type': 'object',
+                              'properties': {
+                                'source_routine_exercise_id': {
+                                  'type': 'string',
+                                },
+                                'exercise_id': {'type': 'string'},
+                                'rest_time_seconds': {'type': 'integer'},
+                                'superset_group_id': {'type': 'string'},
+                                'sets': {
+                                  'type': 'array',
+                                  'items': {
+                                    'type': 'object',
+                                    'properties': {
+                                      'source_set_id': {'type': 'string'},
+                                      'weight': {'type': 'number'},
+                                      'reps': {'type': 'integer'},
+                                      'distance': {'type': 'number'},
+                                      'time_seconds': {'type': 'integer'},
+                                      'is_warmup': {'type': 'boolean'},
+                                    },
+                                    'required': const [],
+                                  },
+                                },
+                              },
+                              'required': ['exercise_id', 'sets'],
+                            },
+                          },
+                        },
+                        'required': ['name', 'exercises'],
+                      },
+                    },
+                  },
+                  'required': ['name', 'days'],
+                },
+              },
+              'required': ['action', 'routine'],
             },
           },
         };

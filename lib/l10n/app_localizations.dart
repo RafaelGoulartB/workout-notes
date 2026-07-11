@@ -4176,6 +4176,174 @@ abstract class AppLocalizations {
   /// **'Goal history'**
   String get aiToolGoalHistory;
 
+  /// No description provided for @aiToolProposeRoutineChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing routine proposal'**
+  String get aiToolProposeRoutineChange;
+
+  /// No description provided for @aiChatPreparingProposal.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing routine preview…'**
+  String get aiChatPreparingProposal;
+
+  /// No description provided for @aiChatApplyingProposal.
+  ///
+  /// In en, this message translates to:
+  /// **'Applying approved changes…'**
+  String get aiChatApplyingProposal;
+
+  /// No description provided for @aiRoutineProposalCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New routine'**
+  String get aiRoutineProposalCreate;
+
+  /// No description provided for @aiRoutineProposalUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Update routine'**
+  String get aiRoutineProposalUpdate;
+
+  /// No description provided for @aiRoutineProposalAwaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting approval'**
+  String get aiRoutineProposalAwaiting;
+
+  /// No description provided for @aiRoutineProposalApplying.
+  ///
+  /// In en, this message translates to:
+  /// **'Applying'**
+  String get aiRoutineProposalApplying;
+
+  /// No description provided for @aiRoutineProposalApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied'**
+  String get aiRoutineProposalApplied;
+
+  /// No description provided for @aiRoutineProposalRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get aiRoutineProposalRejected;
+
+  /// No description provided for @aiRoutineProposalStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Outdated'**
+  String get aiRoutineProposalStale;
+
+  /// No description provided for @aiRoutineProposalFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get aiRoutineProposalFailed;
+
+  /// No description provided for @aiRoutineProposalPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review the changes before applying them.'**
+  String get aiRoutineProposalPreview;
+
+  /// No description provided for @aiRoutineProposalApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve and apply'**
+  String get aiRoutineProposalApprove;
+
+  /// No description provided for @aiRoutineProposalReject.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get aiRoutineProposalReject;
+
+  /// No description provided for @aiRoutineProposalView.
+  ///
+  /// In en, this message translates to:
+  /// **'View routine'**
+  String get aiRoutineProposalView;
+
+  /// No description provided for @aiRoutineProposalDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'View details'**
+  String get aiRoutineProposalDetails;
+
+  /// No description provided for @aiRoutineProposalHideDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide details'**
+  String get aiRoutineProposalHideDetails;
+
+  /// No description provided for @aiRoutineProposalAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Added'**
+  String get aiRoutineProposalAdded;
+
+  /// No description provided for @aiRoutineProposalRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed'**
+  String get aiRoutineProposalRemoved;
+
+  /// No description provided for @aiRoutineProposalChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed changes'**
+  String get aiRoutineProposalChanges;
+
+  /// No description provided for @aiRoutineProposalRemovalWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This proposal removes {count} item(s).'**
+  String aiRoutineProposalRemovalWarning(Object count);
+
+  /// No description provided for @aiRoutineProposalConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply removals?'**
+  String get aiRoutineProposalConfirmTitle;
+
+  /// No description provided for @aiRoutineProposalConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} item(s) will be removed from the routine. This cannot be undone automatically.'**
+  String aiRoutineProposalConfirmBody(Object count);
+
+  /// No description provided for @aiRoutineProposalConfirmApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply changes'**
+  String get aiRoutineProposalConfirmApply;
+
+  /// No description provided for @aiRoutineProposalStaleBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The routine changed since this preview. Ask the AI to create a new proposal.'**
+  String get aiRoutineProposalStaleBody;
+
+  /// No description provided for @aiRoutineProposalRejectedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'No changes were applied.'**
+  String get aiRoutineProposalRejectedBody;
+
+  /// No description provided for @aiRoutineProposalAppliedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes were applied successfully.'**
+  String get aiRoutineProposalAppliedBody;
+
+  /// No description provided for @aiRoutineProposalRetrySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate summary'**
+  String get aiRoutineProposalRetrySummary;
+
   /// No description provided for @aiProviderPickerTitle.
   ///
   /// In en, this message translates to:

@@ -13,9 +13,12 @@ import '../../widgets/ai/ai_chat_input_bar.dart';
 import '../../widgets/ai/ai_empty_state.dart';
 import '../../widgets/ai/ai_message_bubble.dart';
 import '../../widgets/ai/ai_provider_picker_sheet.dart';
+import '../../widgets/ai/ai_routine_proposal_card.dart';
 import '../../widgets/ai/ai_tool_result_bubble.dart';
 import 'ai_chat_history_screen.dart';
 import 'ai_settings_screen.dart';
+import 'routines_screen.dart';
+import 'dart:convert';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -252,6 +255,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
         return l10n.aiChatReading(state.phaseToolCount ?? 0);
       case 'finalising':
         return l10n.aiChatFinalising;
+      case 'preparing_proposal':
+        return l10n.aiChatPreparingProposal;
+      case 'applying_proposal':
+        return l10n.aiChatApplyingProposal;
       default:
         return l10n.aiChatProcessing;
     }
@@ -345,12 +352,44 @@ class _AiChatScreenState extends State<AiChatScreen> {
       while (j < AiChatService.instance.state.messages.length) {
         final n = AiChatService.instance.state.messages[j];
         if (n.isTool) {
-          children.add(
-            AiToolResultBubble(
-              message: n,
-              toolLabel: _toolLabels.humanLabel(n.toolName ?? '', l10n),
-            ),
-          );
+          final proposalId = _proposalIdFromTool(n);
+          final proposal = proposalId == null
+              ? null
+              : AiChatService.instance.state.proposalById(proposalId);
+          if (proposal != null) {
+            children.add(
+              AiRoutineProposalCard(
+                proposal: proposal,
+                onApprove: () =>
+                    AiChatService.instance.approveRoutineProposal(proposal.id),
+                onReject: () =>
+                    AiChatService.instance.rejectRoutineProposal(proposal.id),
+                onRetrySummary: proposal.errorCode == 'summary_pending'
+                    ? () => AiChatService.instance.retryAppliedProposalSummary(
+                        proposal.id,
+                      )
+                    : null,
+                onViewRoutine: proposal.appliedRoutineId == null
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => RoutineFormScreen(
+                              routineId: proposal.appliedRoutineId!,
+                            ),
+                          ),
+                        );
+                      },
+              ),
+            );
+          } else {
+            children.add(
+              AiToolResultBubble(
+                message: n,
+                toolLabel: _toolLabels.humanLabel(n.toolName ?? '', l10n),
+              ),
+            );
+          }
           j++;
         } else {
           break;
@@ -366,6 +405,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
       return const SizedBox.shrink();
     }
     return const SizedBox.shrink();
+  }
+
+  String? _proposalIdFromTool(AiChatMessage message) {
+    if (message.toolName != 'propose_routine_change') return null;
+    try {
+      final raw = jsonDecode(message.content ?? '');
+      final data = raw is Map ? raw['data'] : null;
+      return data is Map ? data['proposalId'] as String? : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   void _showProviderSheet() {

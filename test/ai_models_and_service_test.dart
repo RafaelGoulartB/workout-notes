@@ -312,7 +312,7 @@ void main() {
     expect(kDefaultAiCoachSystemPrompt, contains('<workout_data>'));
     expect(kDefaultAiCoachSystemPrompt, contains('tool_call_id'));
     expect(kDefaultAiCoachSystemPrompt, contains('Markdown válido'));
-    expect(kDefaultAiCoachSystemPrompt, contains('somente de leitura'));
+    expect(kDefaultAiCoachSystemPrompt, contains('propose_routine_change'));
   });
 }
 

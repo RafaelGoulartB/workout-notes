@@ -12,7 +12,7 @@ import '../repositories/goal_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 16;
+  static const _dbVersion = 17;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -257,6 +257,27 @@ class DatabaseHelper {
       )
     ''');
 
+    // AI routine proposals (v17). These are drafts only until user approval.
+    await db.execute('''
+      CREATE TABLE ai_routine_proposals (
+        id TEXT PRIMARY KEY,
+        thread_id TEXT NOT NULL,
+        tool_call_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        routine_id TEXT,
+        before_json TEXT,
+        target_json TEXT NOT NULL,
+        diff_json TEXT NOT NULL,
+        status TEXT NOT NULL,
+        applied_routine_id TEXT,
+        error_code TEXT,
+        error_message TEXT,
+        created_at TEXT NOT NULL,
+        resolved_at TEXT,
+        FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
+      )
+    ''');
+
     // Indexes
     await db.execute('CREATE INDEX idx_workouts_date ON workouts(date)');
     await db.execute(
@@ -277,6 +298,9 @@ class DatabaseHelper {
     );
     await db.execute(
       'CREATE INDEX idx_ai_chat_threads_pinned_updated ON ai_chat_threads(is_pinned DESC, updated_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_ai_routine_proposals_thread_status ON ai_routine_proposals(thread_id, status, created_at ASC)',
     );
 
     // Seed data
@@ -1444,6 +1468,34 @@ class DatabaseHelper {
         );
       } catch (_) {}
     }
+    if (oldVersion < 17) {
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS ai_routine_proposals (
+            id TEXT PRIMARY KEY,
+            thread_id TEXT NOT NULL,
+            tool_call_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            routine_id TEXT,
+            before_json TEXT,
+            target_json TEXT NOT NULL,
+            diff_json TEXT NOT NULL,
+            status TEXT NOT NULL,
+            applied_routine_id TEXT,
+            error_code TEXT,
+            error_message TEXT,
+            created_at TEXT NOT NULL,
+            resolved_at TEXT,
+            FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
+          )
+        ''');
+      } catch (_) {}
+      try {
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_ai_routine_proposals_thread_status ON ai_routine_proposals(thread_id, status, created_at ASC)',
+        );
+      } catch (_) {}
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -1792,6 +1844,47 @@ class DatabaseHelper {
   );
   Future<void> deletePredefinedSet(String id) =>
       routineRepo.deletePredefinedSet(id);
+
+  // -- AI ROUTINE PROPOSALS --
+  Future<void> insertAiRoutineProposal(Map<String, dynamic> row) async {
+    final db = await database;
+    await db.insert('ai_routine_proposals', row);
+  }
+
+  Future<Map<String, dynamic>?> getAiRoutineProposal(String id) async {
+    final db = await database;
+    final rows = await db.query(
+      'ai_routine_proposals',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  Future<List<Map<String, dynamic>>> getAiRoutineProposalsThread(
+    String threadId,
+  ) async {
+    final db = await database;
+    return db.query(
+      'ai_routine_proposals',
+      where: 'thread_id = ?',
+      whereArgs: [threadId],
+      orderBy: 'created_at ASC',
+    );
+  }
+
+  Future<void> updateAiRoutineProposal(
+    String id,
+    Map<String, dynamic> values,
+  ) async {
+    final db = await database;
+    await db.update(
+      'ai_routine_proposals',
+      values,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 
   // -- BODY MEASUREMENTS --
   Future<void> addBodyMeasurement(
