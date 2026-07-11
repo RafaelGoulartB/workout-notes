@@ -238,11 +238,14 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
             for (final mode in AiContextMode.values)
               RadioListTile<AiContextMode>(
                 value: mode,
+                // Kept for compatibility with the minimum Flutter SDK.
+                // ignore: deprecated_member_use
                 groupValue: settings.contextMode,
                 title: Text(_modeLabel(mode, l10n)),
                 subtitle: Text(_modeSubtitle(mode, l10n)),
-                onChanged: (v) {
-                  if (v != null) _notifier.setContextMode(v);
+                // ignore: deprecated_member_use
+                onChanged: (value) {
+                  if (value != null) _notifier.setContextMode(value);
                 },
               ),
           ],
@@ -555,6 +558,7 @@ class _SystemPromptFieldState extends State<_SystemPromptField> {
             TextButton.icon(
               onPressed: () async {
                 await widget.notifier.resetSystemPrompt();
+                if (!mounted) return;
                 _controller.text = widget.notifier.systemPrompt;
                 setState(() => _dirty = false);
               },
@@ -567,9 +571,10 @@ class _SystemPromptFieldState extends State<_SystemPromptField> {
                   ? null
                   : () async {
                       await widget.notifier.setSystemPrompt(_controller.text);
-                      if (!mounted) return;
+                      if (!context.mounted) return;
+                      final messenger = ScaffoldMessenger.of(context);
                       setState(() => _dirty = false);
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      messenger.showSnackBar(
                         SnackBar(content: Text(l10n.aiSettingsSaved)),
                       );
                     },
