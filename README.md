@@ -1,6 +1,29 @@
-# Workout Notes
+<h1 align="center">Workout Notes</h1>
 
-Workout Notes is a local-first workout journal built with Flutter. It is designed for recording strength and cardio sessions, following routines, and understanding progress without sending workout data to a hosted account.
+<p align="center">
+  <a href="https://www.linkedin.com/in/rafael-goulartb/">
+    <img alt="Rafael Goulart" src="https://img.shields.io/badge/-Rafael%20Goulart-0B7285?style=flat&logo=Linkedin&logoColor=white" />
+  </a>
+  <a href="https://github.com/RafaelGoulartB/workout-notes#readme">
+    <img alt="Documentation" src="https://img.shields.io/badge/documentation-yes-0B7285.svg" />
+  </a>
+  <a href="https://github.com/RafaelGoulartB/workout-notes/graphs/commit-activity">
+    <img alt="Maintenance" src="https://img.shields.io/badge/Maintained%3F-yes-0B7285.svg" />
+  </a>
+  <a href="https://github.com/RafaelGoulartB/workout-notes/blob/main/LICENSE">
+    <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-0B7285.svg" />
+  </a>
+  <a href="https://github.com/RafaelGoulartB/workout-notes/actions/workflows/release-android.yml">
+    <img alt="Android release" src="https://img.shields.io/github/actions/workflow/status/RafaelGoulartB/workout-notes/release-android.yml?branch=main&label=Android%20release&color=0B7285" />
+  </a>
+  <img alt="GitHub Pull Requests" src="https://img.shields.io/github/issues-pr/RafaelGoulartB/workout-notes?color=0B7285" />
+  <img alt="GitHub Contributors" src="https://img.shields.io/github/contributors/RafaelGoulartB/workout-notes?color=0B7285" />
+  <img alt="GitHub repository size" src="https://img.shields.io/github/repo-size/RafaelGoulartB/workout-notes?color=0B7285" />
+</p>
+
+> A local-first workout journal built with Flutter for logging training, routines, progress, goals, and body measurements.
+
+It is designed for recording strength and cardio sessions, following routines, and understanding progress without sending workout data to a hosted account.
 
 The app combines a practical workout logger with history, goals, body measurements, detailed charts, and an optional AI coach that connects to an OpenAI-compatible provider chosen by the user.
 
@@ -144,3 +167,7 @@ When submitting a change:
 3. Include migrations for database schema changes.
 4. Run `flutter analyze` and `flutter test`.
 5. Add or update tests when changing repositories, services, or database behavior.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
