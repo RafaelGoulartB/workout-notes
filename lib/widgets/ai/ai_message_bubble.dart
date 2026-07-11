@@ -24,8 +24,12 @@ class AiMessageBubble extends StatelessWidget {
     final isUser = message.isUser;
 
     final color = isUser
-        ? theme.colorScheme.primaryContainer
-        : theme.colorScheme.surfaceContainerHigh;
+        ? (theme.brightness == Brightness.dark
+              ? const Color(0xFF304C86)
+              : theme.colorScheme.primaryContainer)
+        : (theme.brightness == Brightness.dark
+              ? const Color(0xFF27282E)
+              : theme.colorScheme.surfaceContainerHigh);
     final textColor = isUser
         ? theme.colorScheme.onPrimaryContainer
         : theme.colorScheme.onSurface;
@@ -46,7 +50,7 @@ class AiMessageBubble extends StatelessWidget {
           );
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 19, vertical: 5),
       child: Align(
         alignment: align,
         child: ConstrainedBox(
@@ -55,7 +59,7 @@ class AiMessageBubble extends StatelessWidget {
           ),
           child: Container(
             decoration: BoxDecoration(color: color, borderRadius: radius),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

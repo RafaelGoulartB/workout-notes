@@ -74,8 +74,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final configured = _settings.isConfigured;
 
     return Scaffold(
+      backgroundColor: theme.brightness == Brightness.dark
+          ? const Color(0xFF0D0E12)
+          : theme.colorScheme.surface,
       appBar: AppBar(
-        title: const SizedBox.shrink(),
+        backgroundColor: theme.brightness == Brightness.dark
+            ? const Color(0xFF17181F)
+            : theme.colorScheme.surface,
+        title: const Text('Treinador IA'),
         actions: [
           IconButton(
             tooltip: 'Nova conversa',
@@ -121,7 +127,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
             )
           : Column(
               children: [
-                _buildProviderHeader(theme),
                 if (state.phase != AiTurnPhase.idle)
                   _buildPhaseBanner(theme, state),
                 Expanded(
@@ -145,6 +150,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   controller: _controller,
                   enabled: configured,
                   sending: state.isSending,
+                  providerName: _settings.activeProvider?.name,
+                  modelName: _settings.activeProvider?.selectedModel,
+                  onChooseProvider: _showProviderSheet,
                   onSend: _send,
                 ),
               ],
@@ -152,6 +160,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
+  // Kept as a compatibility helper for callers using the older chat layout.
+  // ignore: unused_element
   Widget _buildProviderHeader(ThemeData theme) {
     final active = _settings.activeProvider;
     if (active == null) return const SizedBox.shrink();

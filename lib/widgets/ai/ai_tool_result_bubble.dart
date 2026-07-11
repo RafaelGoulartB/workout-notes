@@ -26,14 +26,16 @@ class _AiToolResultBubbleState extends State<AiToolResultBubble> {
     final theme = Theme.of(context);
     final isOk = widget.message.toolResult?.ok ?? true;
     final color = isOk
-        ? theme.colorScheme.tertiaryContainer
+        ? (theme.brightness == Brightness.dark
+              ? const Color(0xFF27282E)
+              : theme.colorScheme.tertiaryContainer)
         : theme.colorScheme.errorContainer;
     final fg = isOk
         ? theme.colorScheme.onTertiaryContainer
         : theme.colorScheme.onErrorContainer;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 19, vertical: 4),
       child: Align(
         alignment: Alignment.centerLeft,
         child: ConstrainedBox(
@@ -42,12 +44,18 @@ class _AiToolResultBubbleState extends State<AiToolResultBubble> {
           ),
           child: Material(
             color: color,
-            borderRadius: BorderRadius.circular(10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
             child: InkWell(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(18),
               onTap: () => setState(() => _expanded = !_expanded),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -63,12 +71,16 @@ class _AiToolResultBubbleState extends State<AiToolResultBubble> {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            widget.toolLabel,
-                            style: theme.textTheme.bodySmall?.copyWith(color: fg),
+                            isOk ? 'Ferramenta aplicada' : widget.toolLabel,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: fg,
+                            ),
                           ),
                         ),
                         Icon(
-                          _expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                          _expanded
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
                           size: 18,
                           color: fg,
                         ),
