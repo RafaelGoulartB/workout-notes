@@ -1,4 +1,4 @@
-# Workout Notes
+<h1 align="center">Workout Notes</h1>
 
 <p align="center">
   <a href="https://www.linkedin.com/in/rafael-goulartb/">
