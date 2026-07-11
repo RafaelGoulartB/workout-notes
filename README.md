@@ -138,6 +138,8 @@ Build an Android APK with:
 flutter build apk
 ```
 
+The Android release workflow runs for app-related changes that reach `main`. Documentation-only changes such as `README.md` and `LICENSE` do not start a new APK build. The workflow can still be started manually from the Actions tab.
+
 ## Project structure
 
 ```text
