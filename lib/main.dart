@@ -4,8 +4,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'l10n/app_localizations.dart';
+import 'navigation/ai_coach_navigation.dart';
 import 'services/notification_service.dart';
+import 'screens/workout/ai_chat_screen.dart';
 import 'screens/workout/workout_home_screen.dart';
+import 'state/ai_chat_service.dart';
+import 'state/ai_settings_notifier.dart';
+import 'widgets/ai/ai_coach_fab.dart';
 
 /// List of accent seed colors available in settings.
 class AccentColors {
@@ -96,6 +101,11 @@ void main() async {
   WorkoutNotesApp.themeNotifier = ThemeNotifier(initialColor, initialThemeMode);
   WorkoutNotesApp.localeNotifier = LocaleNotifier(initialLocale);
 
+  // Initialize AI Coach (settings + chat service).
+  WorkoutNotesApp.aiSettings = AiSettingsNotifier(prefs: prefs);
+  await WorkoutNotesApp.aiSettings.load();
+  await AiChatService.bootstrap(settings: WorkoutNotesApp.aiSettings);
+
   runApp(
     WorkoutNotesApp(
       initialColor: initialColor,
@@ -137,6 +147,7 @@ class WorkoutNotesApp extends StatefulWidget {
 
   static late ThemeNotifier themeNotifier;
   static late LocaleNotifier localeNotifier;
+  static late AiSettingsNotifier aiSettings;
 
   @override
   State<WorkoutNotesApp> createState() => _WorkoutNotesAppState();
@@ -226,6 +237,30 @@ class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
+      navigatorKey: AiCoachNavigation.navigatorKey,
+      navigatorObservers: [AiCoachNavigation.observer],
+      builder: (context, child) => Overlay(
+        initialEntries: [
+          OverlayEntry(
+            builder: (_) => Stack(
+              children: [
+                child ?? const SizedBox.shrink(),
+                AiCoachFab(
+                  settings: WorkoutNotesApp.aiSettings,
+                  onPressed: () {
+                    AiCoachNavigation.navigatorKey.currentState!.push(
+                      AiCoachNavigation.route(
+                        kind: AiCoachRouteKind.aiFlow,
+                        builder: (_) => const AiChatScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
       theme: _buildTheme(_seedColor, Brightness.light),
       darkTheme: _buildTheme(_seedColor, Brightness.dark),
       themeMode: _themeMode,

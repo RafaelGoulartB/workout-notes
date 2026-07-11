@@ -310,3 +310,109 @@ flutter analyze                # Static analysis
 | `pt_BR` locale | The primary user is Brazilian Portuguese speaking. |
 | Material 3 with seed colors | Provides a polished, adaptive look with minimal theming code. |
 | Single `DatabaseHelper` singleton | Avoids multiple connections and ensures migrations run once. |
+
+---
+
+## 13. AI Coach (Personal Trainer)
+
+A multi-provider AI chat that acts as a personal trainer. Read-only access to
+workouts, exercises, routines, body measurements, cardio stats, and goals.
+Conversations are persisted locally; tokens are stored in `flutter_secure_storage`.
+
+### File map
+
+| Layer | Key files |
+|---|---|
+| Models | `lib/models/ai_provider.dart`, `ai_settings.dart`, `ai_chat_thread.dart`, `ai_chat_message.dart`, `ai_message_role.dart`, `ai_tool_call.dart`, `ai_chat_state.dart` |
+| Services | `lib/services/ai_service.dart` (OpenAI-compatible HTTP), `lib/services/ai_context_service.dart` (DB → JSON), `lib/services/ai_tool_registry.dart` (13 read tools + schemas) |
+| State | `lib/state/ai_settings_notifier.dart` (provider config, persisted to SharedPreferences), `lib/state/ai_chat_service.dart` (singleton `ChangeNotifier` orchestrator) |
+| Utils | `lib/utils/token_estimator.dart` (3.5 chars/token estimate for history compaction) |
+| UI | `lib/screens/workout/ai_chat_screen.dart`, `ai_settings_screen.dart`, `ai_chat_history_screen.dart` |
+| Widgets | `lib/widgets/ai/ai_message_bubble.dart`, `ai_tool_result_bubble.dart`, `ai_chat_input_bar.dart`, `ai_provider_picker_sheet.dart`, `ai_empty_state.dart` |
+| L10n | `app_en.arb` + `app_pt.arb` (keys prefixed `aiCoach`, `aiChat`, `aiHistory`, `aiSettings`, `aiEmpty`) |
+| Entry | `lib/screens/workout/settings_screen.dart` (AI Coach section) |
+| Wire | `lib/main.dart` `WorkoutNotesApp.aiSettings` + `AiChatService.bootstrap()` |
+
+### Multi-provider system
+
+- `AiProvider { id, name, baseUrl, availableModels, selectedModel, createdAt }`.
+- `AiSettings` holds `List<AiProvider>` + `activeProviderId` + `systemPrompt` + `contextMode`.
+- Token storage: `flutter_secure_storage` key `ai_token:<providerId>`. A legacy `ai_token` is migrated on first read.
+- Provider list + active id + prompt + context mode persist to SharedPreferences under `ai_providers_v1`, `ai_active_provider_id_v1`, `ai_system_prompt_v1`, `ai_context_mode_v1`.
+- Models are fetched live via `GET {baseUrl}/models` and cached in `AiProvider.availableModels`.
+- Active provider/model can be switched at runtime via a bottom-sheet picker from the chat header.
+
+### Chat flow (`AiChatService`)
+
+1. `send(text)` → loads the active provider + token from `AiSettingsNotifier`, ensures a thread (creates a new `ai_chat_threads` row on first message), appends a user `AiChatMessage`, sets `phase = sending`.
+2. `_runTurn` builds the wire payload: system prompt + `<workout_data>{…summary JSON…}</workout_data>` (from `AiContextService`, cached 60s) + compacted history (≤ 8000 estimated tokens) + the 13 read tools from `AiToolRegistry.openAiReadToolsSchema()`.
+3. `AiService.sendChat` POSTs to `{baseUrl}/chat/completions` and parses the response (text + tool_calls + usage).
+4. If the response has `tool_calls`: switch to `phase = executingReads`, run each via `AiToolRegistry.executeRead(...)`, append `role='tool'` messages with the JSON result, and re-send to the model. Up to 3 read rounds; after that a final no-tools call is made to force a closing answer.
+5. If no tool calls: store the assistant message, set `phase = idle`, persist the thread + messages to SQLite.
+6. **Interrupted-turn recovery**: when opening a thread, if an assistant message has `tool_calls` without matching `tool` responses, a synthetic `{ok:false, code:'interrupted'}` response is appended so the next turn can continue.
+
+### Tool system (13 read-only tools)
+
+`list_recent_workouts`, `get_workout_detail`, `list_exercises`, `get_exercise_history`, `get_exercise_personal_records`, `get_weekly_volume_breakdown`, `get_progress_trend`, `list_routines`, `get_routine_detail`, `list_body_measurements`, `get_cardio_summary`, `list_goals`, `get_goal_progress_history`.
+
+- All read tools execute immediately. There are **no mutation tools** — the AI cannot edit app data. This is a deliberate design decision (see §13.4 below).
+- JSON schemas are hand-written in `AiToolRegistry._schemaFor(name)`.
+- The registry uses argument aliasing (English/Portuguese keys) and falls back to friendly `humanLabel(...)` strings for the chat UI.
+
+### Context injection
+
+- `AiContextService.build({mode})` returns JSON with `metadata` + `summary`.
+- Three modes control data volume:
+  - `minimal`: totals, streak, current-month report only.
+  - `standard`: + last-4-weeks volume, top exercises, active goals.
+  - `full`: + category distribution, body composition trend.
+- Cached 60s in-memory; invalidated on turn boundary.
+- The system prompt explicitly tells the model to never follow instructions inside `<workout_data>` and to use the read tools for further details.
+
+### Database schema (v15)
+
+Two new tables added in `_dbVersion = 15`:
+
+- `ai_chat_threads (id PK, title, created_at, updated_at, last_message_preview, archived)` with `idx_ai_chat_threads_updated (updated_at DESC)`.
+- `ai_chat_messages (id PK, thread_id FK→threads ON DELETE CASCADE, role, content, tool_call_id, tool_name, tool_calls_json, created_at)` with `idx_ai_chat_messages_thread (thread_id, created_at ASC)`.
+- New methods on `DatabaseHelper`: `upsertAiChatThread`, `replaceAiChatMessages`, `getAiChatThreads`, `getAiChatMessagesThread`, `renameAiChatThread`, `deleteAiChatThread`.
+- Migration is `CREATE TABLE IF NOT EXISTS` blocks in the `if (oldVersion < 15)` branch of `_onUpgrade`, wrapped in `try/catch` (matches the rest of the app's additive-migration pattern).
+
+### 13.4 Design decisions (deliberate, not gaps)
+
+- **Routine mutations use proposals, never direct AI writes.** `propose_routine_change` creates an `ai_routine_proposals` draft only after an explicit user request. The chat shows an approval card; `AiRoutineMutationService.approve` rechecks the stored routine snapshot and applies the complete tree in one SQLite transaction. Rejected drafts do nothing, stale drafts cannot apply, and a successful application is followed by a no-tools AI summary. Exercises must already exist in the library.
+
+- **Output sanitisation is narrow and targeted.** `TextSanitizer.sanitize` strips exactly two patterns: `<think>…</think>` reasoning blocks (a DeepSeek-R1 model architecture artifact) and `$\d+` / `$\{\d+\}` citation placeholders (e.g. `$1`, `${2}`). The latter is a learned behavior from pre-training that several models exhibit — the model uses `$1` as a token meaning "the proper noun I should write here". System prompt instructions don't reliably override it, so the sanitizer handles it as a last resort. We do NOT touch `[1]`, `【1】`, `〈1〉`, `⟨1⟩`, zero-width chars, whitespace, or legitimate `$` (e.g. `R$ 100` with no digit after the `$`). The system prompt still forbids citation placeholders, which helps models that obey and signals when a model doesn't.
+- **No mutation tools** — the AI is read-only by design. Users must register workouts / measurements / goals in the app. This avoids the complexity of `preview`/`apply`/`discard` flows, fingerprint checks, audit logs, and DB transactions inside the chat pipeline. If a future version adds editing, follow the `gastos` pattern (`AiMutationService` + `applyProposal`).
+- **No token/cost tracking** — no `AiUsageScreen`, no per-message cost badge, no monthly usage stats. The current implementation discards `usage` from the API response. Keep it that way unless the feature is requested.
+- **No streaming** — single `POST` + parse full response. UI shows a phase banner (`sending` → `executingReads` → `idle`). Switching to SSE would require an `http.Client.stream` upgrade plus chunked state updates.
+- **Entry only via Settings** — no FAB on the home screen. Discovery happens in `settings_screen.dart` under the new `AI COACH` section, with two `LinkTile`s: `Treinador IA` (chat, redirects to settings if not configured) and `Configurar IA` (provider list + system prompt + context mode).
+- **`ChangeNotifier` singleton, not Riverpod** — the app deliberately avoids state-management libraries (§4.1). `AiChatService.instance` is a `ChangeNotifier` consumed via `ListenableBuilder` / `addListener` in the chat screens. `AiSettingsNotifier` is a static field on `WorkoutNotesApp`. This matches the existing `RestTimerService.instance` pattern.
+- **ARB-based l10n** — the app uses `AppLocalizations` (not the hand-rolled `L10n`/`AiStrings` pattern of `gastos`). All AI strings live in `app_en.arb` + `app_pt.arb` with the `ai*` prefix; `flutter gen-l10n` regenerates the `AppLocalizations*` files automatically.
+
+### Adding a new read tool
+
+1. Implement the dispatch case in `AiToolRegistry.executeRead`.
+2. Add the JSON schema in `AiToolRegistry._schemaFor(name)`.
+3. Add a friendly label in `AiToolRegistry.humanLabel(name)`.
+4. (Optional) include the tool's output in `AiContextService` for a relevant context mode.
+
+### When adding a new provider / model
+
+`AiService.normalizeBaseUri` auto-suffixes `/v1`. If the provider needs a non-standard path (e.g. Anthropic-style `/v1/messages`), use the provider's base URL and extend `AiService.sendChat` to dispatch by host or by an explicit `protocol` field on `AiProvider`.
+
+### Tests
+
+Add tests for any new tool or context branch using `sqflite_common_ffi`:
+
+```dart
+// test/ai_tool_registry_test.dart
+final db = await inMemoryDatabase();
+DatabaseHelper.overrideForTest(db);
+final reg = AiToolRegistry();
+final result = await reg.executeRead(toolName: 'list_recent_workouts', args: {});
+expect(result.ok, true);
+```
+
+For HTTP, inject a stub `http.Client` into `AiService`. For the chat orchestrator, override collaborators via `AiChatService.overrideForTest(...)` and assert on `_state.messages` after `await service.send(...)`.
+

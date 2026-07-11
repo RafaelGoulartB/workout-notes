@@ -3881,6 +3881,864 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Total'**
   String get progressVolumeTotal;
+
+  /// No description provided for @aiCoachSection.
+  ///
+  /// In en, this message translates to:
+  /// **'AI COACH'**
+  String get aiCoachSection;
+
+  /// No description provided for @aiCoachEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Coach'**
+  String get aiCoachEntry;
+
+  /// No description provided for @aiCoachEntrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat with a personal-trainer AI.'**
+  String get aiCoachEntrySubtitle;
+
+  /// No description provided for @aiCoachConfigureEntry.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure AI'**
+  String get aiCoachConfigureEntry;
+
+  /// No description provided for @aiCoachConfigureEntrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Providers, model, system prompt.'**
+  String get aiCoachConfigureEntrySubtitle;
+
+  /// No description provided for @aiChatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Coach'**
+  String get aiChatTitle;
+
+  /// No description provided for @aiChatInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask your trainer something…'**
+  String get aiChatInputHint;
+
+  /// No description provided for @aiChatInputHintDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure a provider to start'**
+  String get aiChatInputHintDisabled;
+
+  /// No description provided for @aiChatNewChat.
+  ///
+  /// In en, this message translates to:
+  /// **'New conversation'**
+  String get aiChatNewChat;
+
+  /// No description provided for @aiChatHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get aiChatHistory;
+
+  /// No description provided for @aiChatSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get aiChatSettings;
+
+  /// No description provided for @aiChatChooseProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch provider'**
+  String get aiChatChooseProvider;
+
+  /// No description provided for @aiChatRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get aiChatRetry;
+
+  /// No description provided for @aiChatCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get aiChatCopy;
+
+  /// No description provided for @aiChatCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Message copied'**
+  String get aiChatCopied;
+
+  /// No description provided for @aiChatErrorGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong.'**
+  String get aiChatErrorGeneric;
+
+  /// No description provided for @aiChatErrorTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'The AI took too long to respond.'**
+  String get aiChatErrorTimeout;
+
+  /// No description provided for @aiChatErrorNoProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'No AI provider configured.'**
+  String get aiChatErrorNoProvider;
+
+  /// No description provided for @aiChatErrorInvalidToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid or missing API token.'**
+  String get aiChatErrorInvalidToken;
+
+  /// No description provided for @aiChatErrorMissingModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a model in Settings → AI Coach.'**
+  String get aiChatErrorMissingModel;
+
+  /// No description provided for @aiChatErrorNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Model or endpoint not found.'**
+  String get aiChatErrorNotFound;
+
+  /// No description provided for @aiChatErrorInvalidResponse.
+  ///
+  /// In en, this message translates to:
+  /// **'The AI provider returned an invalid response.'**
+  String get aiChatErrorInvalidResponse;
+
+  /// No description provided for @aiChatErrorRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'The request to the AI could not be completed.'**
+  String get aiChatErrorRequest;
+
+  /// No description provided for @aiChatErrorUserMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The user message could not be found.'**
+  String get aiChatErrorUserMessage;
+
+  /// No description provided for @aiChatProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing…'**
+  String get aiChatProcessing;
+
+  /// No description provided for @aiChatWelcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hi! I\'m your AI Coach.'**
+  String get aiChatWelcomeTitle;
+
+  /// No description provided for @aiChatWelcomeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask about your progress, request a workout analysis, or ask for progression suggestions.'**
+  String get aiChatWelcomeSubtitle;
+
+  /// No description provided for @aiChatSending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending…'**
+  String get aiChatSending;
+
+  /// No description provided for @aiChatReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading {count} source(s)…'**
+  String aiChatReading(Object count);
+
+  /// No description provided for @aiChatFinalising.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalising…'**
+  String get aiChatFinalising;
+
+  /// No description provided for @aiChatActiveModel.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} • {model}'**
+  String aiChatActiveModel(Object model, Object provider);
+
+  /// No description provided for @aiChatNoModel.
+  ///
+  /// In en, this message translates to:
+  /// **'{provider} • (no model)'**
+  String aiChatNoModel(Object provider);
+
+  /// No description provided for @aiToolApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool applied'**
+  String get aiToolApplied;
+
+  /// No description provided for @aiToolNoContent.
+  ///
+  /// In en, this message translates to:
+  /// **'(no content)'**
+  String get aiToolNoContent;
+
+  /// No description provided for @aiToolError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get aiToolError;
+
+  /// No description provided for @aiToolUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'unknown'**
+  String get aiToolUnknown;
+
+  /// No description provided for @aiToolListRecentWorkouts.
+  ///
+  /// In en, this message translates to:
+  /// **'Listing recent workouts'**
+  String get aiToolListRecentWorkouts;
+
+  /// No description provided for @aiToolGetWorkoutDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading workout details'**
+  String get aiToolGetWorkoutDetail;
+
+  /// No description provided for @aiToolListExercises.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching exercises'**
+  String get aiToolListExercises;
+
+  /// No description provided for @aiToolGetExerciseHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Exercise history'**
+  String get aiToolGetExerciseHistory;
+
+  /// No description provided for @aiToolGetExerciseRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal records'**
+  String get aiToolGetExerciseRecords;
+
+  /// No description provided for @aiToolWeeklyVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly volume'**
+  String get aiToolWeeklyVolume;
+
+  /// No description provided for @aiToolProgressTrend.
+  ///
+  /// In en, this message translates to:
+  /// **'Progress trend'**
+  String get aiToolProgressTrend;
+
+  /// No description provided for @aiToolListRoutines.
+  ///
+  /// In en, this message translates to:
+  /// **'Listing routines'**
+  String get aiToolListRoutines;
+
+  /// No description provided for @aiToolGetRoutineDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading routine details'**
+  String get aiToolGetRoutineDetail;
+
+  /// No description provided for @aiToolBodyMeasurements.
+  ///
+  /// In en, this message translates to:
+  /// **'Body measurements'**
+  String get aiToolBodyMeasurements;
+
+  /// No description provided for @aiToolCardioSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Cardio summary'**
+  String get aiToolCardioSummary;
+
+  /// No description provided for @aiToolListGoals.
+  ///
+  /// In en, this message translates to:
+  /// **'Active goals'**
+  String get aiToolListGoals;
+
+  /// No description provided for @aiToolGoalHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal history'**
+  String get aiToolGoalHistory;
+
+  /// No description provided for @aiToolProposeRoutineChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing routine proposal'**
+  String get aiToolProposeRoutineChange;
+
+  /// No description provided for @aiChatPreparingProposal.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing routine preview…'**
+  String get aiChatPreparingProposal;
+
+  /// No description provided for @aiChatApplyingProposal.
+  ///
+  /// In en, this message translates to:
+  /// **'Applying approved changes…'**
+  String get aiChatApplyingProposal;
+
+  /// No description provided for @aiRoutineProposalCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New routine'**
+  String get aiRoutineProposalCreate;
+
+  /// No description provided for @aiRoutineProposalUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Update routine'**
+  String get aiRoutineProposalUpdate;
+
+  /// No description provided for @aiRoutineProposalAwaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Awaiting approval'**
+  String get aiRoutineProposalAwaiting;
+
+  /// No description provided for @aiRoutineProposalApplying.
+  ///
+  /// In en, this message translates to:
+  /// **'Applying'**
+  String get aiRoutineProposalApplying;
+
+  /// No description provided for @aiRoutineProposalApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied'**
+  String get aiRoutineProposalApplied;
+
+  /// No description provided for @aiRoutineProposalRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get aiRoutineProposalRejected;
+
+  /// No description provided for @aiRoutineProposalStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Outdated'**
+  String get aiRoutineProposalStale;
+
+  /// No description provided for @aiRoutineProposalFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get aiRoutineProposalFailed;
+
+  /// No description provided for @aiRoutineProposalPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review the changes before applying them.'**
+  String get aiRoutineProposalPreview;
+
+  /// No description provided for @aiRoutineProposalApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve and apply'**
+  String get aiRoutineProposalApprove;
+
+  /// No description provided for @aiRoutineProposalReject.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get aiRoutineProposalReject;
+
+  /// No description provided for @aiRoutineProposalView.
+  ///
+  /// In en, this message translates to:
+  /// **'View routine'**
+  String get aiRoutineProposalView;
+
+  /// No description provided for @aiRoutineProposalDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'View details'**
+  String get aiRoutineProposalDetails;
+
+  /// No description provided for @aiRoutineProposalHideDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide details'**
+  String get aiRoutineProposalHideDetails;
+
+  /// No description provided for @aiRoutineProposalAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Added'**
+  String get aiRoutineProposalAdded;
+
+  /// No description provided for @aiRoutineProposalRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed'**
+  String get aiRoutineProposalRemoved;
+
+  /// No description provided for @aiRoutineProposalChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposed changes'**
+  String get aiRoutineProposalChanges;
+
+  /// No description provided for @aiRoutineProposalRemovalWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This proposal removes {count} item(s).'**
+  String aiRoutineProposalRemovalWarning(Object count);
+
+  /// No description provided for @aiRoutineProposalConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply removals?'**
+  String get aiRoutineProposalConfirmTitle;
+
+  /// No description provided for @aiRoutineProposalConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} item(s) will be removed from the routine. This cannot be undone automatically.'**
+  String aiRoutineProposalConfirmBody(Object count);
+
+  /// No description provided for @aiRoutineProposalConfirmApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply changes'**
+  String get aiRoutineProposalConfirmApply;
+
+  /// No description provided for @aiRoutineProposalStaleBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The routine changed since this preview. Ask the AI to create a new proposal.'**
+  String get aiRoutineProposalStaleBody;
+
+  /// No description provided for @aiRoutineProposalRejectedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'No changes were applied.'**
+  String get aiRoutineProposalRejectedBody;
+
+  /// No description provided for @aiRoutineProposalAppliedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes were applied successfully.'**
+  String get aiRoutineProposalAppliedBody;
+
+  /// No description provided for @aiRoutineProposalRetrySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate summary'**
+  String get aiRoutineProposalRetrySummary;
+
+  /// No description provided for @aiProviderPickerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider and model'**
+  String get aiProviderPickerTitle;
+
+  /// No description provided for @aiProviderPickerSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search model'**
+  String get aiProviderPickerSearch;
+
+  /// No description provided for @aiHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation history'**
+  String get aiHistoryTitle;
+
+  /// No description provided for @aiHistoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No conversations yet'**
+  String get aiHistoryEmpty;
+
+  /// No description provided for @aiHistoryEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a new conversation in the AI Coach chat.'**
+  String get aiHistoryEmptySubtitle;
+
+  /// No description provided for @aiHistoryDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete conversation?'**
+  String get aiHistoryDeleteTitle;
+
+  /// No description provided for @aiHistoryDeleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This cannot be undone. \"{title}\" will be removed.'**
+  String aiHistoryDeleteBody(Object title);
+
+  /// No description provided for @aiHistoryPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get aiHistoryPinned;
+
+  /// No description provided for @aiHistoryRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get aiHistoryRecent;
+
+  /// No description provided for @aiHistoryActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation actions'**
+  String get aiHistoryActions;
+
+  /// No description provided for @aiHistoryRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get aiHistoryRename;
+
+  /// No description provided for @aiHistoryPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get aiHistoryPin;
+
+  /// No description provided for @aiHistoryUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get aiHistoryUnpin;
+
+  /// No description provided for @aiHistoryRenameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename conversation'**
+  String get aiHistoryRenameTitle;
+
+  /// No description provided for @aiHistoryRenameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation name'**
+  String get aiHistoryRenameLabel;
+
+  /// No description provided for @aiHistoryRenameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name'**
+  String get aiHistoryRenameHint;
+
+  /// No description provided for @aiHistoryRenameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a conversation name'**
+  String get aiHistoryRenameRequired;
+
+  /// No description provided for @aiHistoryActionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update the conversation. Try again.'**
+  String get aiHistoryActionError;
+
+  /// No description provided for @aiHistoryYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'yesterday'**
+  String get aiHistoryYesterday;
+
+  /// No description provided for @aiCoachFabTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Open AI Coach'**
+  String get aiCoachFabTooltip;
+
+  /// No description provided for @aiCoachConfigureBeforeChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure an AI provider before opening the chat.'**
+  String get aiCoachConfigureBeforeChat;
+
+  /// No description provided for @aiSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Coach settings'**
+  String get aiSettingsTitle;
+
+  /// No description provided for @aiSettingsFabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show AI Coach button'**
+  String get aiSettingsFabTitle;
+
+  /// No description provided for @aiSettingsFabSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Display the AI Coach shortcut on app screens.'**
+  String get aiSettingsFabSubtitle;
+
+  /// No description provided for @aiSettingsProvidersCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Providers'**
+  String get aiSettingsProvidersCard;
+
+  /// No description provided for @aiSettingsProvidersHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Add any OpenAI-compatible endpoint (OpenAI, Ollama, OpenRouter, Groq, LM Studio…).'**
+  String get aiSettingsProvidersHelp;
+
+  /// No description provided for @aiSettingsAddProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Add provider'**
+  String get aiSettingsAddProvider;
+
+  /// No description provided for @aiSettingsNoProviders.
+  ///
+  /// In en, this message translates to:
+  /// **'No providers'**
+  String get aiSettingsNoProviders;
+
+  /// No description provided for @aiSettingsNoProvidersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a provider to start using the AI Coach.'**
+  String get aiSettingsNoProvidersSubtitle;
+
+  /// No description provided for @aiSettingsActivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate'**
+  String get aiSettingsActivate;
+
+  /// No description provided for @aiSettingsEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get aiSettingsEdit;
+
+  /// No description provided for @aiSettingsRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get aiSettingsRemove;
+
+  /// No description provided for @aiSettingsRemoveConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}?'**
+  String aiSettingsRemoveConfirmTitle(Object name);
+
+  /// No description provided for @aiSettingsRemoveConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The token will also be deleted.'**
+  String get aiSettingsRemoveConfirmBody;
+
+  /// No description provided for @aiSettingsBaseUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Base URL'**
+  String get aiSettingsBaseUrl;
+
+  /// No description provided for @aiSettingsModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model'**
+  String get aiSettingsModel;
+
+  /// No description provided for @aiSettingsModelValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Model: {model}'**
+  String aiSettingsModelValue(Object model);
+
+  /// No description provided for @aiSettingsProviderName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get aiSettingsProviderName;
+
+  /// No description provided for @aiSettingsNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name.'**
+  String get aiSettingsNameRequired;
+
+  /// No description provided for @aiSettingsBaseUrlRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a base URL.'**
+  String get aiSettingsBaseUrlRequired;
+
+  /// No description provided for @aiSettingsNoModelsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No models available'**
+  String get aiSettingsNoModelsEmpty;
+
+  /// No description provided for @aiSettingsToken.
+  ///
+  /// In en, this message translates to:
+  /// **'API token'**
+  String get aiSettingsToken;
+
+  /// No description provided for @aiSettingsTokenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to keep the current token'**
+  String get aiSettingsTokenHint;
+
+  /// No description provided for @aiSettingsNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenAI, Ollama local, OpenRouter…'**
+  String get aiSettingsNameHint;
+
+  /// No description provided for @aiSettingsBaseUrlHint.
+  ///
+  /// In en, this message translates to:
+  /// **'https://api.openai.com/v1'**
+  String get aiSettingsBaseUrlHint;
+
+  /// No description provided for @aiSettingsNewProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'New provider'**
+  String get aiSettingsNewProvider;
+
+  /// No description provided for @aiSettingsEditProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit provider'**
+  String get aiSettingsEditProvider;
+
+  /// No description provided for @aiSettingsFetchModels.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetch models'**
+  String get aiSettingsFetchModels;
+
+  /// No description provided for @aiSettingsNoModels.
+  ///
+  /// In en, this message translates to:
+  /// **'No models loaded. Tap \"Fetch models\" to list the available ones for {url}.'**
+  String aiSettingsNoModels(Object url);
+
+  /// No description provided for @aiSettingsContextMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Context mode'**
+  String get aiSettingsContextMode;
+
+  /// No description provided for @aiSettingsContextModeHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'How much data is sent to the AI each turn. More context = better answers, more tokens.'**
+  String get aiSettingsContextModeHelp;
+
+  /// No description provided for @aiSettingsContextModeMinimal.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimal'**
+  String get aiSettingsContextModeMinimal;
+
+  /// No description provided for @aiSettingsContextModeMinimalSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Only totals and streak. AI uses tools for details.'**
+  String get aiSettingsContextModeMinimalSubtitle;
+
+  /// No description provided for @aiSettingsContextModeStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get aiSettingsContextModeStandard;
+
+  /// No description provided for @aiSettingsContextModeStandardSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary + goals + top exercises. Good balance.'**
+  String get aiSettingsContextModeStandardSubtitle;
+
+  /// No description provided for @aiSettingsContextModeFull.
+  ///
+  /// In en, this message translates to:
+  /// **'Full'**
+  String get aiSettingsContextModeFull;
+
+  /// No description provided for @aiSettingsContextModeFullSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything: categories, body trend, detailed volume.'**
+  String get aiSettingsContextModeFullSubtitle;
+
+  /// No description provided for @aiSettingsSystemPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'System prompt'**
+  String get aiSettingsSystemPrompt;
+
+  /// No description provided for @aiSettingsSystemPromptHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Defines the personality and behaviour of the AI Coach.'**
+  String get aiSettingsSystemPromptHelp;
+
+  /// No description provided for @aiSettingsRestoreDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore default'**
+  String get aiSettingsRestoreDefault;
+
+  /// No description provided for @aiSettingsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get aiSettingsSaved;
+
+  /// No description provided for @aiSettingsAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get aiSettingsAbout;
+
+  /// No description provided for @aiSettingsAboutBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The AI Coach sends a summary of your data each turn and has access to 13 read tools. It cannot edit your data. Conversations are stored locally.'**
+  String get aiSettingsAboutBody;
+
+  /// No description provided for @aiEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure an AI provider'**
+  String get aiEmptyTitle;
+
+  /// No description provided for @aiEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add an OpenAI-compatible endpoint (OpenAI, Ollama, OpenRouter…) to start using the AI Coach.'**
+  String get aiEmptySubtitle;
+
+  /// No description provided for @aiEmptyConfigure.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure provider'**
+  String get aiEmptyConfigure;
 }
 
 class _AppLocalizationsDelegate

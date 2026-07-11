@@ -2074,4 +2074,472 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get progressVolumeTotal => 'Total';
+
+  @override
+  String get aiCoachSection => 'AI COACH';
+
+  @override
+  String get aiCoachEntry => 'Treinador IA';
+
+  @override
+  String get aiCoachEntrySubtitle => 'Converse com um personal trainer de IA.';
+
+  @override
+  String get aiCoachConfigureEntry => 'Configurar IA';
+
+  @override
+  String get aiCoachConfigureEntrySubtitle =>
+      'Provedores, modelo, prompt do sistema.';
+
+  @override
+  String get aiChatTitle => 'Treinador IA';
+
+  @override
+  String get aiChatInputHint => 'Pergunte algo ao seu treinador…';
+
+  @override
+  String get aiChatInputHintDisabled => 'Configure um provedor para começar';
+
+  @override
+  String get aiChatNewChat => 'Nova conversa';
+
+  @override
+  String get aiChatHistory => 'Histórico';
+
+  @override
+  String get aiChatSettings => 'Configurações';
+
+  @override
+  String get aiChatChooseProvider => 'Trocar provedor';
+
+  @override
+  String get aiChatRetry => 'Tentar de novo';
+
+  @override
+  String get aiChatCopy => 'Copiar';
+
+  @override
+  String get aiChatCopied => 'Mensagem copiada';
+
+  @override
+  String get aiChatErrorGeneric => 'Algo deu errado.';
+
+  @override
+  String get aiChatErrorTimeout => 'A IA demorou demais para responder.';
+
+  @override
+  String get aiChatErrorNoProvider => 'Nenhum provedor de IA configurado.';
+
+  @override
+  String get aiChatErrorInvalidToken => 'Token de API inválido ou ausente.';
+
+  @override
+  String get aiChatErrorMissingModel =>
+      'Selecione um modelo em Configurações → AI Coach.';
+
+  @override
+  String get aiChatErrorNotFound => 'Modelo ou endpoint não encontrado.';
+
+  @override
+  String get aiChatErrorInvalidResponse =>
+      'A resposta do provedor de IA é inválida.';
+
+  @override
+  String get aiChatErrorRequest =>
+      'Não foi possível concluir a solicitação à IA.';
+
+  @override
+  String get aiChatErrorUserMessage => 'Mensagem do usuário não encontrada.';
+
+  @override
+  String get aiChatProcessing => 'Processando…';
+
+  @override
+  String get aiChatWelcomeTitle => 'Olá! Sou o seu Treinador IA.';
+
+  @override
+  String get aiChatWelcomeSubtitle =>
+      'Pergunte sobre seu progresso, peça uma análise do seu treino, ou peça sugestões de progressão.';
+
+  @override
+  String get aiChatSending => 'Enviando…';
+
+  @override
+  String aiChatReading(Object count) {
+    return 'Lendo $count fonte(s)…';
+  }
+
+  @override
+  String get aiChatFinalising => 'Finalizando…';
+
+  @override
+  String aiChatActiveModel(Object model, Object provider) {
+    return '$provider • $model';
+  }
+
+  @override
+  String aiChatNoModel(Object provider) {
+    return '$provider • (sem modelo)';
+  }
+
+  @override
+  String get aiToolApplied => 'Ferramenta aplicada';
+
+  @override
+  String get aiToolNoContent => '(sem conteúdo)';
+
+  @override
+  String get aiToolError => 'Erro';
+
+  @override
+  String get aiToolUnknown => 'desconhecido';
+
+  @override
+  String get aiToolListRecentWorkouts => 'Listando treinos recentes';
+
+  @override
+  String get aiToolGetWorkoutDetail => 'Detalhando treino';
+
+  @override
+  String get aiToolListExercises => 'Buscando exercícios';
+
+  @override
+  String get aiToolGetExerciseHistory => 'Histórico do exercício';
+
+  @override
+  String get aiToolGetExerciseRecords => 'Recordes pessoais';
+
+  @override
+  String get aiToolWeeklyVolume => 'Volume semanal';
+
+  @override
+  String get aiToolProgressTrend => 'Tendência de progressão';
+
+  @override
+  String get aiToolListRoutines => 'Listando rotinas';
+
+  @override
+  String get aiToolGetRoutineDetail => 'Detalhando rotina';
+
+  @override
+  String get aiToolBodyMeasurements => 'Medidas corporais';
+
+  @override
+  String get aiToolCardioSummary => 'Resumo de cardio';
+
+  @override
+  String get aiToolListGoals => 'Metas ativas';
+
+  @override
+  String get aiToolGoalHistory => 'Histórico da meta';
+
+  @override
+  String get aiToolProposeRoutineChange => 'Preparando proposta de rotina';
+
+  @override
+  String get aiChatPreparingProposal => 'Preparando prévia da rotina…';
+
+  @override
+  String get aiChatApplyingProposal => 'Aplicando alterações aprovadas…';
+
+  @override
+  String get aiRoutineProposalCreate => 'Nova rotina';
+
+  @override
+  String get aiRoutineProposalUpdate => 'Alterar rotina';
+
+  @override
+  String get aiRoutineProposalAwaiting => 'Aguardando aprovação';
+
+  @override
+  String get aiRoutineProposalApplying => 'Aplicando';
+
+  @override
+  String get aiRoutineProposalApplied => 'Aplicada';
+
+  @override
+  String get aiRoutineProposalRejected => 'Recusada';
+
+  @override
+  String get aiRoutineProposalStale => 'Desatualizada';
+
+  @override
+  String get aiRoutineProposalFailed => 'Falhou';
+
+  @override
+  String get aiRoutineProposalPreview =>
+      'Revise as alterações antes de aplicar.';
+
+  @override
+  String get aiRoutineProposalApprove => 'Aprovar e aplicar';
+
+  @override
+  String get aiRoutineProposalReject => 'Recusar';
+
+  @override
+  String get aiRoutineProposalView => 'Ver rotina';
+
+  @override
+  String get aiRoutineProposalDetails => 'Ver detalhes';
+
+  @override
+  String get aiRoutineProposalHideDetails => 'Ocultar detalhes';
+
+  @override
+  String get aiRoutineProposalAdded => 'Adicionados';
+
+  @override
+  String get aiRoutineProposalRemoved => 'Removidos';
+
+  @override
+  String get aiRoutineProposalChanges => 'Alterações propostas';
+
+  @override
+  String aiRoutineProposalRemovalWarning(Object count) {
+    return 'Esta proposta remove $count item(ns).';
+  }
+
+  @override
+  String get aiRoutineProposalConfirmTitle => 'Aplicar remoções?';
+
+  @override
+  String aiRoutineProposalConfirmBody(Object count) {
+    return '$count item(ns) serão removidos da rotina. Esta ação não pode ser desfeita automaticamente.';
+  }
+
+  @override
+  String get aiRoutineProposalConfirmApply => 'Aplicar alterações';
+
+  @override
+  String get aiRoutineProposalStaleBody =>
+      'A rotina mudou desde a prévia. Peça para a IA gerar uma nova proposta.';
+
+  @override
+  String get aiRoutineProposalRejectedBody => 'Nenhuma alteração foi aplicada.';
+
+  @override
+  String get aiRoutineProposalAppliedBody =>
+      'Alterações aplicadas com sucesso.';
+
+  @override
+  String get aiRoutineProposalRetrySummary => 'Gerar resumo';
+
+  @override
+  String get aiProviderPickerTitle => 'Provedor e modelo';
+
+  @override
+  String get aiProviderPickerSearch => 'Buscar modelo';
+
+  @override
+  String get aiHistoryTitle => 'Histórico de conversas';
+
+  @override
+  String get aiHistoryEmpty => 'Nenhuma conversa ainda';
+
+  @override
+  String get aiHistoryEmptySubtitle =>
+      'Comece uma nova conversa no chat do Treinador IA.';
+
+  @override
+  String get aiHistoryDeleteTitle => 'Apagar conversa?';
+
+  @override
+  String aiHistoryDeleteBody(Object title) {
+    return 'Esta ação não pode ser desfeita. \"$title\" será removida.';
+  }
+
+  @override
+  String get aiHistoryPinned => 'Fixadas';
+
+  @override
+  String get aiHistoryRecent => 'Recentes';
+
+  @override
+  String get aiHistoryActions => 'Ações da conversa';
+
+  @override
+  String get aiHistoryRename => 'Renomear';
+
+  @override
+  String get aiHistoryPin => 'Fixar';
+
+  @override
+  String get aiHistoryUnpin => 'Desafixar';
+
+  @override
+  String get aiHistoryRenameTitle => 'Renomear conversa';
+
+  @override
+  String get aiHistoryRenameLabel => 'Nome da conversa';
+
+  @override
+  String get aiHistoryRenameHint => 'Digite um nome';
+
+  @override
+  String get aiHistoryRenameRequired => 'Digite um nome para a conversa';
+
+  @override
+  String get aiHistoryActionError =>
+      'Não foi possível atualizar a conversa. Tente novamente.';
+
+  @override
+  String get aiHistoryYesterday => 'ontem';
+
+  @override
+  String get aiCoachFabTooltip => 'Abrir Treinador IA';
+
+  @override
+  String get aiCoachConfigureBeforeChat =>
+      'Configure um provedor de IA antes de abrir o chat.';
+
+  @override
+  String get aiSettingsTitle => 'Configurações do AI Coach';
+
+  @override
+  String get aiSettingsFabTitle => 'Mostrar botão do Treinador IA';
+
+  @override
+  String get aiSettingsFabSubtitle =>
+      'Exibe o atalho do Treinador IA nas telas do app.';
+
+  @override
+  String get aiSettingsProvidersCard => 'Provedores';
+
+  @override
+  String get aiSettingsProvidersHelp =>
+      'Adicione um endpoint compatível com OpenAI (OpenAI, Ollama, OpenRouter, Groq, LM Studio…).';
+
+  @override
+  String get aiSettingsAddProvider => 'Adicionar provedor';
+
+  @override
+  String get aiSettingsNoProviders => 'Nenhum provedor';
+
+  @override
+  String get aiSettingsNoProvidersSubtitle =>
+      'Adicione um provedor para começar a usar o Treinador IA.';
+
+  @override
+  String get aiSettingsActivate => 'Ativar';
+
+  @override
+  String get aiSettingsEdit => 'Editar';
+
+  @override
+  String get aiSettingsRemove => 'Remover';
+
+  @override
+  String aiSettingsRemoveConfirmTitle(Object name) {
+    return 'Remover $name?';
+  }
+
+  @override
+  String get aiSettingsRemoveConfirmBody => 'O token será removido também.';
+
+  @override
+  String get aiSettingsBaseUrl => 'URL base';
+
+  @override
+  String get aiSettingsModel => 'Modelo';
+
+  @override
+  String aiSettingsModelValue(Object model) {
+    return 'Modelo: $model';
+  }
+
+  @override
+  String get aiSettingsProviderName => 'Nome';
+
+  @override
+  String get aiSettingsNameRequired => 'Informe um nome.';
+
+  @override
+  String get aiSettingsBaseUrlRequired => 'Informe uma URL base.';
+
+  @override
+  String get aiSettingsNoModelsEmpty => 'Nenhum modelo disponível';
+
+  @override
+  String get aiSettingsToken => 'Token de API';
+
+  @override
+  String get aiSettingsTokenHint => 'Vazio para manter o token atual';
+
+  @override
+  String get aiSettingsNameHint => 'OpenAI, Ollama local, OpenRouter…';
+
+  @override
+  String get aiSettingsBaseUrlHint => 'https://api.openai.com/v1';
+
+  @override
+  String get aiSettingsNewProvider => 'Novo provedor';
+
+  @override
+  String get aiSettingsEditProvider => 'Editar provedor';
+
+  @override
+  String get aiSettingsFetchModels => 'Buscar modelos';
+
+  @override
+  String aiSettingsNoModels(Object url) {
+    return 'Nenhum modelo carregado. Toque em \"Buscar modelos\" para listar os disponíveis em $url.';
+  }
+
+  @override
+  String get aiSettingsContextMode => 'Modo de contexto';
+
+  @override
+  String get aiSettingsContextModeHelp =>
+      'Quantos dados são enviados à IA em cada turno. Mais contexto = respostas melhores, porém mais tokens.';
+
+  @override
+  String get aiSettingsContextModeMinimal => 'Mínimo';
+
+  @override
+  String get aiSettingsContextModeMinimalSubtitle =>
+      'Apenas totais e streak. IA usa ferramentas para detalhes.';
+
+  @override
+  String get aiSettingsContextModeStandard => 'Padrão';
+
+  @override
+  String get aiSettingsContextModeStandardSubtitle =>
+      'Resumo + metas + top exercícios. Bom equilíbrio.';
+
+  @override
+  String get aiSettingsContextModeFull => 'Completo';
+
+  @override
+  String get aiSettingsContextModeFullSubtitle =>
+      'Tudo: categorias, tendência corporal, volume detalhado.';
+
+  @override
+  String get aiSettingsSystemPrompt => 'Prompt do sistema';
+
+  @override
+  String get aiSettingsSystemPromptHelp =>
+      'Define a personalidade e o comportamento do Treinador IA.';
+
+  @override
+  String get aiSettingsRestoreDefault => 'Restaurar padrão';
+
+  @override
+  String get aiSettingsSaved => 'Salvo';
+
+  @override
+  String get aiSettingsAbout => 'Sobre';
+
+  @override
+  String get aiSettingsAboutBody =>
+      'O Treinador IA envia um resumo dos seus dados a cada turno e tem acesso a 13 ferramentas de leitura. Não consegue editar seus dados. As conversas são salvas localmente.';
+
+  @override
+  String get aiEmptyTitle => 'Configure um provedor de IA';
+
+  @override
+  String get aiEmptySubtitle =>
+      'Adicione um endpoint OpenAI-compatible (OpenAI, Ollama, OpenRouter…) para começar a usar o Treinador IA.';
+
+  @override
+  String get aiEmptyConfigure => 'Configurar provedor';
 }

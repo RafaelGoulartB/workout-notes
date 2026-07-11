@@ -12,6 +12,9 @@ import '../../services/export_service.dart';
 import '../../database/test_seed_data.dart';
 import '../../services/notification_service.dart';
 import '../../main.dart';
+import '../../navigation/ai_coach_navigation.dart';
+import 'ai_chat_screen.dart';
+import 'ai_settings_screen.dart';
 
 class WorkoutSettingsScreen extends StatefulWidget {
   const WorkoutSettingsScreen({super.key});
@@ -39,11 +42,22 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   @override
   void initState() {
     super.initState();
+    WorkoutNotesApp.aiSettings.addListener(_onAiSettingsChanged);
     _selectedAccentIndex = AccentColors.indexOf(
       WorkoutNotesApp.themeNotifier.seedColor,
     );
     _selectedThemeMode = WorkoutNotesApp.themeNotifier.themeMode;
     _load();
+  }
+
+  @override
+  void dispose() {
+    WorkoutNotesApp.aiSettings.removeListener(_onAiSettingsChanged);
+    super.dispose();
+  }
+
+  void _onAiSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   // ===================== DATA =====================
@@ -653,7 +667,9 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.settingsImportPickerError(loc.settingsNoBackupFile)),
+            content: Text(
+              loc.settingsImportPickerError(loc.settingsNoBackupFile),
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -809,6 +825,32 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
         );
       }
     }
+  }
+
+  void _openAiCoach() {
+    final settings = WorkoutNotesApp.aiSettings;
+    final loc = AppLocalizations.of(context)!;
+    if (!settings.isConfigured) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(loc.aiCoachConfigureBeforeChat),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      Navigator.of(context).push(
+        AiCoachNavigation.route(
+          kind: AiCoachRouteKind.aiFlow,
+          builder: (_) => const AiSettingsScreen(),
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      AiCoachNavigation.route(
+        kind: AiCoachRouteKind.aiFlow,
+        builder: (_) => const AiChatScreen(),
+      ),
+    );
   }
 
   void _showAbout() {
@@ -1209,6 +1251,45 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                         },
                       ),
                     ],
+                  ],
+                ),
+
+                // ===== DADOS =====
+                _SectionHeader(text: loc.aiCoachSection),
+                _SettingsCard(
+                  children: [
+                    _LinkTile(
+                      icon: Icons.smart_toy_rounded,
+                      iconColor: theme.colorScheme.primary,
+                      title: loc.aiCoachEntry,
+                      subtitle: loc.aiCoachEntrySubtitle,
+                      onTap: _openAiCoach,
+                    ),
+                    const _CardDivider(),
+                    _LinkTile(
+                      icon: Icons.tune_rounded,
+                      iconColor: theme.colorScheme.onSurfaceVariant,
+                      title: loc.aiCoachConfigureEntry,
+                      subtitle: loc.aiCoachConfigureEntrySubtitle,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          AiCoachNavigation.route(
+                            kind: AiCoachRouteKind.aiFlow,
+                            builder: (_) => const AiSettingsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const _CardDivider(),
+                    _SwitchTile(
+                      icon: Icons.smart_toy_outlined,
+                      title: loc.aiSettingsFabTitle,
+                      subtitle: loc.aiSettingsFabSubtitle,
+                      value: WorkoutNotesApp.aiSettings.fabEnabled,
+                      onChanged: (value) {
+                        WorkoutNotesApp.aiSettings.setFabEnabled(value);
+                      },
+                    ),
                   ],
                 ),
 

@@ -1,192 +1,146 @@
-# Workout Notes 🏋️
+# Workout Notes
 
-> A beautiful workout tracker built with Flutter.
+Workout Notes is a local-first workout journal built with Flutter. It is designed for recording strength and cardio sessions, following routines, and understanding progress without sending workout data to a hosted account.
 
-**Workout Notes** helps you track your workouts, log sets, monitor progress, and stay motivated — all with a clean Material 3 design and automatic dark mode.
+The app combines a practical workout logger with history, goals, body measurements, detailed charts, and an optional AI coach that connects to an OpenAI-compatible provider chosen by the user.
 
----
+## Screenshots
 
-## ✨ Features
+<p align="center">
+  <img src="assets/screenshots/home.png" width="30%" alt="Workout Notes home screen" />
+  <img src="assets/screenshots/workout-progress.png" width="30%" alt="Active workout with exercises and sets" />
+  <img src="assets/screenshots/workout-finish.png" width="30%" alt="Completed workout summary" />
+</p>
 
-### 🏋️ Workout Tracker
+<p align="center">
+  <img src="assets/screenshots/progress.png" width="30%" alt="Training progress and goals dashboard" />
+  <img src="assets/screenshots/body-measurements.png" width="30%" alt="Body measurement history and chart" />
+</p>
 
-| Feature | Description |
-|---|---|
-| 📚 **Exercise Library** | Browse exercises organized by category and energy system (aerobic / anaerobic) |
-| ▶️ **Active Workout** | Start a live session with timer, set logging, and real-time tracking |
-| 🔢 **Set Tracking** | Log weight, reps, distance, time, RPE, warmup sets, and notes per exercise |
-| 📅 **Workout History** | Review past workouts with full details |
-| 📈 **Progress Charts** | Visualize your progress over time with animated charts (`fl_chart`) |
-| 📆 **Calendar View** | See your workout history on a calendar with heatmap |
-| 🔁 **Routines** | Create, save, and reuse workout routines |
-| 📏 **Body Measurements** | Track weight, measurements, and body stats over time |
-| ⏱️ **Rest Timer** | Built-in rest timer between sets with notifications |
-| ⚡ **Quick Add** | Rapidly log a workout without full session setup |
-| 📤 **CSV Export** | Export your workout data as CSV files |
-| 🏷️ **Exercise Detail** | View exercise info, history, and stats in tabbed detail screens |
-| ⭐ **Favorites** | Mark exercises as favorites for quick access |
+## Features
 
-### 🎨 App Experience
+### Workout logging
 
-| Feature | Description |
-|---|---|
-| 🌗 **Dark Mode** | Automatically adapts to your system theme |
-| 🎨 **Custom Accent Colors** | 8 hand-picked seed colors to personalize your app |
-| ✨ **Smooth Animations** | Animated transitions powered by `flutter_animate` |
-| 🔔 **Notifications** | Rest timer alerts and reminders |
-| 📱 **Cross-Platform** | Android, iOS, Web, Linux, macOS, Windows |
+- Record strength and cardio workouts with a live session timer.
+- Track weight, repetitions, distance, time, warm-up sets, RPE, and notes.
+- Configure rest times per exercise and use automatic rest-timer notifications.
+- Reorder exercises, group supersets, pause a session, or return to a workout already in progress.
+- Add a past workout quickly when a live session is not needed.
+- Review each completed session with volume, density, highlights, muscle-group distribution, and comparison with a similar workout.
 
----
+### Exercises and routines
 
-## 🚀 Getting Started
+- Browse, search, favorite, and create exercises.
+- Organize exercises by category, equipment, and training type.
+- Build reusable multi-day routines with predefined sets and rest periods.
+- Plan workouts for future dates and review training history from the calendar.
 
-### Prerequisites
+### Progress and goals
 
-- **Flutter SDK** 3.44+
-- **Dart** 3.12+
+- See monthly reports, training streaks, total volume, workout frequency, and an annual heatmap.
+- Follow strength, cardio, duration, recovery, and body-composition trends.
+- Inspect exercise history and personal records.
+- Create measurable goals and track the workouts that contribute to them.
 
-### Installation
+### Body measurements
+
+- Track weight, body composition, circumferences, and other measurements over time.
+- Compare left and right measurements for bilateral entries.
+- View trends, summaries, averages, and measurement history.
+- Attach progress photos to measurement entries.
+
+### AI Coach
+
+The optional AI Coach can discuss training history and help with routine planning. It supports user-configured OpenAI-compatible providers, models, and system prompts.
+
+The coach receives workout context only when used. API credentials are stored with the platform's secure storage, and the app does not include a hosted AI service or bundled API key. Read tools let the coach inspect local training data; routine changes are created as proposals and are applied only after explicit approval in the app.
+
+### Data and customization
+
+- Store workout data locally in SQLite; no account is required.
+- Export and restore a complete JSON backup.
+- Export workout data as CSV and share completed sessions.
+- Switch between metric and imperial units.
+- Choose English or Brazilian Portuguese.
+- Use light, dark, or system theme with a selectable accent color.
+
+## Tech stack
+
+- [Flutter](https://flutter.dev/) and Dart
+- Material 3
+- SQLite with `sqflite`
+- `fl_chart` for analytics and progress charts
+- `flutter_local_notifications` for workout and rest timers
+- `shared_preferences` and `flutter_secure_storage` for settings and credentials
+- `http` for OpenAI-compatible AI providers
+
+The project intentionally uses lightweight state management: local `setState` for screen state and `ChangeNotifier` for shared services and settings.
+
+## Getting started
+
+### Requirements
+
+- Flutter SDK compatible with Dart 3.12 or newer
+- Android Studio or Xcode, depending on the target platform
+- A configured emulator or physical device
+
+Check your environment before installing dependencies:
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/workout_notes.git
-
-# Navigate to the project
-cd workout_notes
-
-# Get dependencies
+flutter doctor
 flutter pub get
+```
 
-# Run the app
+Run the app:
+
+```bash
 flutter run
 ```
 
-### Building for Release
+To use the AI Coach, open **Settings > Configure AI** and add the base URL, API token, and model for an OpenAI-compatible provider. The rest of the app works without AI configuration.
+
+## Development
+
+Generate localization files, run static analysis, and execute the test suite with:
 
 ```bash
-# Android
-flutter build apk --release
-
-# iOS
-flutter build ios --release
-
-# Web
-flutter build web --release
-
-# Linux / macOS / Windows
-flutter build linux --release   # or macos / windows
-```
-
----
-
-## 🧱 Tech Stack
-
-| Layer | Technology |
-|---|---|
-| **Language** | Dart 3.12+ |
-| **UI Framework** | Flutter — Material 3 |
-| **State Management** | `setState` + `ChangeNotifier` (lightweight) |
-| **Storage** | `sqflite` (SQLite) |
-| **Charts** | `fl_chart` |
-| **Animations** | `flutter_animate` |
-| **Export** | `share_plus` + `csv` |
-| **Notifications** | `flutter_local_notifications` |
-| **UUID** | `uuid` (v4) |
-| **Date/Time** | `intl` with `pt_BR` locale |
-
----
-
-## 🏛️ Architecture
-
-```
-lib/
-├── main.dart                       # App entry, theme shell, navigation
-├── database/
-│   ├── database_helper.dart        # SQLite singleton & migrations
-│   ├── seed_data.dart              # Default exercise categories & exercises
-│   └── test_seed_data.dart         # Sample data for development
-├── services/
-│   ├── export_service.dart         # CSV data export
-│   ├── notification_service.dart   # Notification setup & scheduling
-│   └── rest_timer_service.dart     # Rest timer logic
-├── screens/
-│   └── workout/
-│       ├── workout_home_screen.dart
-│       ├── active_workout_screen.dart
-│       ├── workout_detail_screen.dart
-│       ├── exercise_library_screen.dart
-│       ├── exercise_form_screen.dart
-│       ├── exercise_detail_tabs_screen.dart
-│       ├── routines_screen.dart
-│       ├── calendar_screen.dart
-│       ├── progress_screen.dart
-│       ├── body_tracker_screen.dart
-│       ├── settings_screen.dart
-│       ├── export_screen.dart
-│       ├── quick_add_screen.dart
-│       └── rest_timer_screen.dart
-└── widgets/
-    ├── empty_state_placeholder.dart
-    ├── exercise_picker_sheet.dart
-    ├── collapsible_section.dart
-    └── workout_heatmap.dart
-```
-
-### Data Model
-
-Full relational schema via SQLite:
-
-```
-exercise_categories (1) ──→ (N) exercises (1) ──→ (N) exercise_entries (1) ──→ (N) sets
-                                │
-routines (1) ──→ (N) routine_days (1) ──→ (N) routine_exercises (1) ──→ (N) predefined_sets
-                                │
-workouts (1) ──→ (N) exercise_entries
-                                │
-body_measurements (standalone)
-app_settings (key-value)
-```
-
-> Data is stored locally using **SQLite** — no internet required.
-
----
-
-## 📸 Screenshots
-
-> *Coming soon — add your app screenshots here.*
-
-| Workout Dashboard | Active Workout | Progress Charts |
-|---|---|---|
-| ![][screenshot-workout] | ![][screenshot-active] | ![][screenshot-charts] |
-
----
-
-## 🧪 Running Tests
-
-```bash
-# Run all tests
-flutter test
-
-# Static analysis
+flutter gen-l10n
 flutter analyze
+flutter test
 ```
 
----
+Build an Android APK with:
 
-## 🤝 Contributing
+```bash
+flutter build apk
+```
 
-Contributions are welcome! Feel free to open issues or submit pull requests.
+## Project structure
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+```text
+lib/
+├── database/       SQLite setup, migrations, and seed data
+├── l10n/           English and Brazilian Portuguese translations
+├── models/         Workout, goal, and AI chat models
+├── navigation/     Shared navigation helpers
+├── repositories/   Data access and domain queries
+├── screens/        App screens and workout flows
+├── services/       Timers, exports, notifications, and AI integrations
+├── state/          Shared ChangeNotifier services
+├── utils/          Formatting and calculation helpers
+└── widgets/        Reusable UI components
+```
 
----
+Workout data is persisted in SQLite. Settings use a mix of SQLite and `shared_preferences`, while AI provider tokens are kept in secure platform storage.
 
-## 📄 License
+## Contributing
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+Issues and pull requests are welcome. For larger changes, open an issue first so the approach can be discussed before implementation.
 
----
+When submitting a change:
+
+1. Keep the existing local-first architecture and Material 3 design conventions.
+2. Add visible text to both ARB localization files.
+3. Include migrations for database schema changes.
+4. Run `flutter analyze` and `flutter test`.
+5. Add or update tests when changing repositories, services, or database behavior.
