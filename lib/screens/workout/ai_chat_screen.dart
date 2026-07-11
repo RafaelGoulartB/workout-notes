@@ -30,6 +30,7 @@ class AiChatScreen extends StatefulWidget {
 class _AiChatScreenState extends State<AiChatScreen> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
+  String? _lastActiveThreadId;
   late final AiSettingsNotifier _settings;
   late final AiToolRegistry _toolLabels;
 
@@ -52,14 +53,34 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   void _onChange() {
+    final activeThreadId = AiChatService.instance.state.activeThreadId;
+    final openedThread = activeThreadId != _lastActiveThreadId;
+    _lastActiveThreadId = activeThreadId;
     if (mounted) setState(() {});
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _scrollToBottomAfterLayout(animated: !openedThread),
+    );
   }
 
-  void _scrollToBottom() {
+  Future<void> _scrollToBottomAfterLayout({required bool animated}) async {
+    // The first frame may not include the final height of every message
+    // bubble. Reposition again after the next frame so opening a thread is
+    // always exactly at the end of the list.
+    _scrollToBottom(animated: animated);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    _scrollToBottom(animated: false);
+  }
+
+  void _scrollToBottom({required bool animated}) {
     if (!_scroll.hasClients) return;
+    final offset = _scroll.position.maxScrollExtent;
+    if (!animated) {
+      _scroll.jumpTo(offset);
+      return;
+    }
     _scroll.animateTo(
-      _scroll.position.maxScrollExtent,
+      offset,
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
     );

@@ -313,6 +313,7 @@ void main() {
     expect(kDefaultAiCoachSystemPrompt, contains('tool_call_id'));
     expect(kDefaultAiCoachSystemPrompt, contains('Markdown válido'));
     expect(kDefaultAiCoachSystemPrompt, contains('propose_routine_change'));
+    expect(kDefaultAiCoachSystemPrompt, contains('seja proativo'));
   });
 }
 
