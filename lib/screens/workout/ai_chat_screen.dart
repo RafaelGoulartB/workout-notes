@@ -41,6 +41,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
     _toolLabels = AiToolRegistry();
     AiChatService.instance.addListener(_onChange);
     _settings.addListener(_onChange);
+    // The FAB can open this screen while an existing thread is already
+    // active, so no service notification is emitted to trigger the scroll.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _scrollToBottomAfterLayout(animated: false),
+    );
   }
 
   @override
