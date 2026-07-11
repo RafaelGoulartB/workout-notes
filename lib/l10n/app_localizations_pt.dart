@@ -2184,7 +2184,54 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String get aiHistoryPinned => 'Fixadas';
+
+  @override
+  String get aiHistoryRecent => 'Recentes';
+
+  @override
+  String get aiHistoryActions => 'Ações da conversa';
+
+  @override
+  String get aiHistoryRename => 'Renomear';
+
+  @override
+  String get aiHistoryPin => 'Fixar';
+
+  @override
+  String get aiHistoryUnpin => 'Desafixar';
+
+  @override
+  String get aiHistoryRenameTitle => 'Renomear conversa';
+
+  @override
+  String get aiHistoryRenameLabel => 'Nome da conversa';
+
+  @override
+  String get aiHistoryRenameHint => 'Digite um nome';
+
+  @override
+  String get aiHistoryRenameRequired => 'Digite um nome para a conversa';
+
+  @override
+  String get aiHistoryActionError =>
+      'Não foi possível atualizar a conversa. Tente novamente.';
+
+  @override
+  String get aiHistoryYesterday => 'ontem';
+
+  @override
+  String get aiCoachFabTooltip => 'Abrir Treinador IA';
+
+  @override
   String get aiSettingsTitle => 'Configurações do AI Coach';
+
+  @override
+  String get aiSettingsFabTitle => 'Mostrar botão do Treinador IA';
+
+  @override
+  String get aiSettingsFabSubtitle =>
+      'Exibe o atalho do Treinador IA nas telas do app.';
 
   @override
   String get aiSettingsProvidersCard => 'Provedores';

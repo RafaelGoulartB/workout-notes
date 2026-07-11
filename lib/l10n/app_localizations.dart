@@ -4074,11 +4074,101 @@ abstract class AppLocalizations {
   /// **'This cannot be undone. \"{title}\" will be removed.'**
   String aiHistoryDeleteBody(Object title);
 
+  /// No description provided for @aiHistoryPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned'**
+  String get aiHistoryPinned;
+
+  /// No description provided for @aiHistoryRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get aiHistoryRecent;
+
+  /// No description provided for @aiHistoryActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation actions'**
+  String get aiHistoryActions;
+
+  /// No description provided for @aiHistoryRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get aiHistoryRename;
+
+  /// No description provided for @aiHistoryPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get aiHistoryPin;
+
+  /// No description provided for @aiHistoryUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get aiHistoryUnpin;
+
+  /// No description provided for @aiHistoryRenameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename conversation'**
+  String get aiHistoryRenameTitle;
+
+  /// No description provided for @aiHistoryRenameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation name'**
+  String get aiHistoryRenameLabel;
+
+  /// No description provided for @aiHistoryRenameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name'**
+  String get aiHistoryRenameHint;
+
+  /// No description provided for @aiHistoryRenameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a conversation name'**
+  String get aiHistoryRenameRequired;
+
+  /// No description provided for @aiHistoryActionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update the conversation. Try again.'**
+  String get aiHistoryActionError;
+
+  /// No description provided for @aiHistoryYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'yesterday'**
+  String get aiHistoryYesterday;
+
+  /// No description provided for @aiCoachFabTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Open AI Coach'**
+  String get aiCoachFabTooltip;
+
   /// No description provided for @aiSettingsTitle.
   ///
   /// In en, this message translates to:
   /// **'AI Coach settings'**
   String get aiSettingsTitle;
+
+  /// No description provided for @aiSettingsFabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show AI Coach button'**
+  String get aiSettingsFabTitle;
+
+  /// No description provided for @aiSettingsFabSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Display the AI Coach shortcut on app screens.'**
+  String get aiSettingsFabSubtitle;
 
   /// No description provided for @aiSettingsProvidersCard.
   ///

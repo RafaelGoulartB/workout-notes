@@ -57,56 +57,96 @@ class AiMessageBubble extends StatelessWidget {
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.86,
           ),
-          child: Container(
-            decoration: BoxDecoration(color: color, borderRadius: radius),
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (message.content != null && message.content!.isNotEmpty)
-                  _BodyText(
-                    text: message.content!,
-                    isUser: isUser,
-                    textColor: textColor,
-                  ),
-                if (message.toolCalls.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  _ToolCallSummary(message: message),
-                ],
-                if (showTimestamp) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatTime(message.createdAt),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: textColor.withAlpha(160),
-                      fontSize: 10,
+          child: Column(
+            crossAxisAlignment: isUser
+                ? CrossAxisAlignment.end
+                : CrossAxisAlignment.start,
+            children: [
+              Container(
+                decoration: BoxDecoration(color: color, borderRadius: radius),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 13,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (message.content != null && message.content!.isNotEmpty)
+                      _BodyText(
+                        text: message.content!,
+                        isUser: isUser,
+                        textColor: textColor,
+                      ),
+                    // Tool calls are represented by the separate result bar below.
+                    // Do not duplicate the tool name inside the message bubble.
+                    if (showTimestamp) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _formatTime(message.createdAt),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: textColor.withAlpha(160),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (!isUser && (onRetry != null || onCopy != null))
+                Padding(
+                  padding: EdgeInsets.zero,
+                  child: Transform.translate(
+                    offset: const Offset(0, -4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (onCopy != null)
+                          IconButton(
+                            tooltip: 'Copiar',
+                            icon: const Icon(Icons.copy_rounded, size: 16),
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints.tightFor(
+                            width: 22,
+                              height: 24,
+                            ),
+                            padding: EdgeInsets.zero,
+                            onPressed: onCopy,
+                          ),
+                        if (onRetry != null)
+                          IconButton(
+                            tooltip: 'Tentar de novo',
+                            icon: const Icon(Icons.refresh_rounded, size: 16),
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints.tightFor(
+                            width: 22,
+                              height: 24,
+                            ),
+                            padding: EdgeInsets.zero,
+                            onPressed: onRetry,
+                          ),
+                      ],
                     ),
                   ),
-                ],
-                if (!isUser && (onRetry != null || onCopy != null)) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (onCopy != null)
-                        IconButton(
-                          tooltip: 'Copiar',
-                          icon: const Icon(Icons.copy_rounded, size: 16),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: onCopy,
-                        ),
-                      if (onRetry != null)
-                        IconButton(
-                          tooltip: 'Tentar de novo',
-                          icon: const Icon(Icons.refresh_rounded, size: 16),
-                          visualDensity: VisualDensity.compact,
-                          onPressed: onRetry,
-                        ),
-                    ],
+                ),
+              if (isUser && onCopy != null)
+                Padding(
+                  padding: EdgeInsets.zero,
+                  child: Transform.translate(
+                    offset: const Offset(0, -4),
+                    child: IconButton(
+                      tooltip: 'Copiar',
+                      icon: const Icon(Icons.copy_rounded, size: 16),
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 22,
+                        height: 24,
+                      ),
+                      padding: EdgeInsets.zero,
+                      onPressed: onCopy,
+                    ),
                   ),
-                ],
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),
@@ -193,48 +233,6 @@ class _MarkdownBody extends StatelessWidget {
         listIndent: 20,
         blockSpacing: 8,
       ),
-    );
-  }
-}
-
-class _ToolCallSummary extends StatelessWidget {
-  final AiChatMessage message;
-  const _ToolCallSummary({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Wrap(
-      spacing: 6,
-      runSpacing: 4,
-      children: message.toolCalls
-          .map(
-            (c) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.build_circle_outlined,
-                    size: 14,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    c.name,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          )
-          .toList(),
     );
   }
 }

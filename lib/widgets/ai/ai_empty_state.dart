@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../screens/workout/ai_settings_screen.dart';
+import '../../navigation/ai_coach_navigation.dart';
 
 class AiEmptyState extends StatelessWidget {
   final String title;
@@ -23,11 +24,17 @@ class AiEmptyState extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 80, color: theme.colorScheme.primary.withAlpha(80)),
+            Icon(
+              icon,
+              size: 80,
+              color: theme.colorScheme.primary.withAlpha(80),
+            ),
             const SizedBox(height: 24),
             Text(
               title,
-              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
@@ -47,7 +54,10 @@ class AiEmptyState extends StatelessWidget {
                 FilledButton.icon(
                   onPressed: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const AiSettingsScreen()),
+                      AiCoachNavigation.route(
+                        kind: AiCoachRouteKind.aiFlow,
+                        builder: (_) => const AiSettingsScreen(),
+                      ),
                     );
                   },
                   icon: const Icon(Icons.settings_rounded),

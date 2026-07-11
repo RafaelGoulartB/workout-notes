@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/progress_helpers.dart';
 import 'package:workout_notes/screens/workout/body_tracker_screen.dart';
+import 'package:workout_notes/navigation/ai_coach_navigation.dart';
 
 /// Displays body measurement section: summary grid, composition chart,
 /// weight-vs-volume chart, and link to body tracker.
@@ -39,8 +40,9 @@ class BodySectionCharts extends StatelessWidget {
         if (bodyComposition.isNotEmpty && bodyComposition.length >= 2) ...[
           Text(
             loc.progressBodyComposition,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 6),
           _BodyCompositionChart(data: bodyComposition),
@@ -51,8 +53,9 @@ class BodySectionCharts extends StatelessWidget {
         if (bodyData.isNotEmpty) ...[
           Text(
             loc.progressBodyWeightVsVolume,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 6),
           _BodyWeightChart(data: bodyData),
@@ -87,42 +90,42 @@ class _BodySummaryGrid extends StatelessWidget {
         'name': loc.bodyTrackerWeight,
         'unit': 'kg',
         'color': Colors.indigo,
-        'icon': Icons.monitor_weight
+        'icon': Icons.monitor_weight,
       },
       {
         'id': 'bodyFat',
         'name': loc.bodyTrackerBodyFat,
         'unit': '%',
         'color': Colors.orange,
-        'icon': Icons.water_drop
+        'icon': Icons.water_drop,
       },
       {
         'id': 'waist',
         'name': loc.bodyTrackerWaist,
         'unit': 'cm',
         'color': Colors.teal,
-        'icon': Icons.straighten
+        'icon': Icons.straighten,
       },
       {
         'id': 'chest',
         'name': loc.bodyTrackerChest,
         'unit': 'cm',
         'color': Colors.blue,
-        'icon': Icons.straighten
+        'icon': Icons.straighten,
       },
       {
         'id': 'arm',
         'name': loc.bodyTrackerArm,
         'unit': 'cm',
         'color': Colors.purple,
-        'icon': Icons.straighten
+        'icon': Icons.straighten,
       },
       {
         'id': 'hip',
         'name': loc.bodyTrackerHip,
         'unit': 'cm',
         'color': Colors.cyan,
-        'icon': Icons.straighten
+        'icon': Icons.straighten,
       },
     ];
 
@@ -160,15 +163,15 @@ class _BodySummaryGrid extends StatelessWidget {
           }
         }
 
-        final currentValue =
-            latest != null ? (latest['value'] as num?)?.toDouble() : null;
-        final prevValue =
-            previous != null ? (previous[typeId] as num?)?.toDouble() : null;
+        final currentValue = latest != null
+            ? (latest['value'] as num?)?.toDouble()
+            : null;
+        final prevValue = previous != null
+            ? (previous[typeId] as num?)?.toDouble()
+            : null;
 
         double? delta;
-        if (currentValue != null &&
-            prevValue != null &&
-            prevValue > 0) {
+        if (currentValue != null && prevValue != null && prevValue > 0) {
           delta = currentValue - prevValue;
         }
 
@@ -257,8 +260,7 @@ class _BodyCompositionChart extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -288,8 +290,7 @@ class _BodyCompositionChart extends StatelessWidget {
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval:
-                        niceInterval(maxWeight / 4),
+                    horizontalInterval: niceInterval(maxWeight / 4),
                   ),
                   titlesData: FlTitlesData(
                     leftTitles: AxisTitles(
@@ -300,8 +301,9 @@ class _BodyCompositionChart extends StatelessWidget {
                           v > 100
                               ? '${(v / 1000).toStringAsFixed(0)}k'
                               : v.toStringAsFixed(0),
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(fontSize: 8),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 8,
+                          ),
                         ),
                       ),
                     ),
@@ -309,44 +311,36 @@ class _BodyCompositionChart extends StatelessWidget {
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 20,
-                        interval: validData.length > 8
-                            ? 2
-                            : 1,
+                        interval: validData.length > 8 ? 2 : 1,
                         getTitlesWidget: (v, _) {
                           final idx = v.toInt();
-                          if (idx < 0 ||
-                              idx >= validData.length) {
+                          if (idx < 0 || idx >= validData.length) {
                             return const SizedBox.shrink();
                           }
-                          final d = validData[idx]['date']
-                                  as String? ??
-                              '';
+                          final d = validData[idx]['date'] as String? ?? '';
                           return Text(
-                            d.length >= 10
-                                ? d.substring(5)
-                                : d,
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(fontSize: 7),
+                            d.length >= 10 ? d.substring(5) : d,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 7,
+                            ),
                           );
                         },
                       ),
                     ),
                     topTitles: const AxisTitles(
-                        sideTitles:
-                            SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                     rightTitles: const AxisTitles(
-                        sideTitles:
-                            SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   lineBarsData: [
                     // Weight
                     LineChartBarData(
                       spots: validData.asMap().entries.map((e) {
-                        final w =
-                            (e.value['weight'] as num?)?.toDouble() ?? 0;
-                        return FlSpot(
-                            e.key.toDouble(), w);
+                        final w = (e.value['weight'] as num?)?.toDouble() ?? 0;
+                        return FlSpot(e.key.toDouble(), w);
                       }).toList(),
                       isCurved: true,
                       color: Colors.indigo,
@@ -354,13 +348,9 @@ class _BodyCompositionChart extends StatelessWidget {
                       dotData: FlDotData(
                         show: true,
                         getDotPainter: (s, p, b, i) =>
-                            FlDotCirclePainter(
-                          radius: 4,
-                          color: Colors.indigo,
-                        ),
+                            FlDotCirclePainter(radius: 4, color: Colors.indigo),
                       ),
-                      belowBarData:
-                          BarAreaData(show: false),
+                      belowBarData: BarAreaData(show: false),
                     ),
                     // Body fat
                     if (bodyFats.length >= 2)
@@ -369,20 +359,18 @@ class _BodyCompositionChart extends StatelessWidget {
                             .asMap()
                             .entries
                             .map((e) {
-                          final bf = (e.value['body_fat']
-                                  as num?)
-                              ?.toDouble();
-                          return FlSpot(e.key.toDouble(),
-                              bf ?? 0);
-                        }).where((s) => s.y > 0).toList(),
+                              final bf = (e.value['body_fat'] as num?)
+                                  ?.toDouble();
+                              return FlSpot(e.key.toDouble(), bf ?? 0);
+                            })
+                            .where((s) => s.y > 0)
+                            .toList(),
                         isCurved: true,
                         color: Colors.orange,
                         barWidth: 2,
                         dashArray: [6, 3],
-                        dotData:
-                            FlDotData(show: false),
-                        belowBarData:
-                            BarAreaData(show: false),
+                        dotData: FlDotData(show: false),
+                        belowBarData: BarAreaData(show: false),
                       ),
                     // Waist
                     if (waists.length >= 2)
@@ -391,32 +379,25 @@ class _BodyCompositionChart extends StatelessWidget {
                             .asMap()
                             .entries
                             .map((e) {
-                          final w =
-                              (e.value['waist'] as num?)
-                                  ?.toDouble();
-                          return FlSpot(e.key.toDouble(),
-                              w ?? 0);
-                        }).where((s) => s.y > 0).toList(),
+                              final w = (e.value['waist'] as num?)?.toDouble();
+                              return FlSpot(e.key.toDouble(), w ?? 0);
+                            })
+                            .where((s) => s.y > 0)
+                            .toList(),
                         isCurved: true,
                         color: Colors.teal,
                         barWidth: 2,
                         dashArray: [3, 3],
-                        dotData:
-                            FlDotData(show: false),
-                        belowBarData:
-                            BarAreaData(show: false),
+                        dotData: FlDotData(show: false),
+                        belowBarData: BarAreaData(show: false),
                       ),
                   ],
                   lineTouchData: LineTouchData(
-                    touchTooltipData:
-                        LineTouchTooltipData(
-                      getTooltipItems: (spots) =>
-                          spots.map((s) {
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipItems: (spots) => spots.map((s) {
                         final idx = s.spotIndex;
                         final d = idx < validData.length
-                            ? (validData[idx]['date']
-                                    as String? ??
-                                '')
+                            ? (validData[idx]['date'] as String? ?? '')
                             : '';
                         String label;
                         if (s.barIndex == 0) {
@@ -432,8 +413,7 @@ class _BodyCompositionChart extends StatelessWidget {
                         return LineTooltipItem(
                           '$d\n$label',
                           TextStyle(
-                            color: theme
-                                .colorScheme.onSurface,
+                            color: theme.colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
                             fontSize: 10,
                           ),
@@ -457,10 +437,7 @@ class _BodyCompositionChart extends StatelessWidget {
         Container(
           width: 8,
           height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
         Text(label, style: TextStyle(fontSize: 10)),
@@ -488,22 +465,18 @@ class _BodyWeightChart extends StatelessWidget {
     final volumes = data
         .map((d) => (d['volume'] as num?)?.toDouble() ?? 0)
         .toList();
-    final maxWeight =
-        weights.fold<double>(0, (a, b) => a > b ? a : b);
-    final maxVolume =
-        volumes.fold<double>(0, (a, b) => a > b ? a : b);
+    final maxWeight = weights.fold<double>(0, (a, b) => a > b ? a : b);
+    final maxVolume = volumes.fold<double>(0, (a, b) => a > b ? a : b);
 
     if (maxWeight <= 0) return const SizedBox.shrink();
 
-    final maxY =
-        maxWeight > maxVolume ? maxWeight * 1.15 : maxVolume * 1.15;
+    final maxY = maxWeight > maxVolume ? maxWeight * 1.15 : maxVolume * 1.15;
 
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -528,10 +501,8 @@ class _BodyWeightChart extends StatelessWidget {
                     show: true,
                     drawVerticalLine: false,
                     horizontalInterval: niceInterval(
-                        (maxWeight > maxVolume
-                                ? maxWeight
-                                : maxVolume) /
-                            4),
+                      (maxWeight > maxVolume ? maxWeight : maxVolume) / 4,
+                    ),
                   ),
                   titlesData: FlTitlesData(
                     leftTitles: AxisTitles(
@@ -542,8 +513,9 @@ class _BodyWeightChart extends StatelessWidget {
                           v > 100
                               ? '${(v / 1000).toStringAsFixed(0)}k'
                               : v.toStringAsFixed(0),
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(fontSize: 8),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 8,
+                          ),
                         ),
                       ),
                     ),
@@ -551,34 +523,28 @@ class _BodyWeightChart extends StatelessWidget {
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 20,
-                        interval: data.length > 8
-                            ? 2
-                            : 1,
+                        interval: data.length > 8 ? 2 : 1,
                         getTitlesWidget: (v, _) {
                           final idx = v.toInt();
-                          if (idx < 0 ||
-                              idx >= data.length) {
+                          if (idx < 0 || idx >= data.length) {
                             return const SizedBox.shrink();
                           }
-                          final d = data[idx]['date']
-                                  as String? ??
-                              '';
+                          final d = data[idx]['date'] as String? ?? '';
                           return Text(
-                            d.length >= 10
-                                ? d.substring(5)
-                                : d,
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(fontSize: 7),
+                            d.length >= 10 ? d.substring(5) : d,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 7,
+                            ),
                           );
                         },
                       ),
                     ),
                     topTitles: const AxisTitles(
-                        sideTitles:
-                            SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                     rightTitles: const AxisTitles(
-                        sideTitles:
-                            SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   lineBarsData: [
@@ -587,8 +553,7 @@ class _BodyWeightChart extends StatelessWidget {
                       spots: weights
                           .asMap()
                           .entries
-                          .map((e) => FlSpot(
-                              e.key.toDouble(), e.value))
+                          .map((e) => FlSpot(e.key.toDouble(), e.value))
                           .toList(),
                       isCurved: true,
                       color: Colors.indigo,
@@ -596,13 +561,9 @@ class _BodyWeightChart extends StatelessWidget {
                       dotData: FlDotData(
                         show: true,
                         getDotPainter: (s, p, b, i) =>
-                            FlDotCirclePainter(
-                          radius: 4,
-                          color: Colors.indigo,
-                        ),
+                            FlDotCirclePainter(radius: 4, color: Colors.indigo),
                       ),
-                      belowBarData:
-                          BarAreaData(show: false),
+                      belowBarData: BarAreaData(show: false),
                     ),
                     // Volume line
                     if (maxVolume > 0)
@@ -610,8 +571,7 @@ class _BodyWeightChart extends StatelessWidget {
                         spots: volumes
                             .asMap()
                             .entries
-                            .map((e) => FlSpot(e.key
-                                .toDouble(), e.value))
+                            .map((e) => FlSpot(e.key.toDouble(), e.value))
                             .toList(),
                         isCurved: true,
                         color: Colors.teal,
@@ -620,33 +580,23 @@ class _BodyWeightChart extends StatelessWidget {
                         dotData: FlDotData(
                           show: true,
                           getDotPainter: (s, p, b, i) =>
-                              FlDotCirclePainter(
-                            radius: 3,
-                            color: Colors.teal,
-                          ),
+                              FlDotCirclePainter(radius: 3, color: Colors.teal),
                         ),
-                        belowBarData:
-                            BarAreaData(show: false),
+                        belowBarData: BarAreaData(show: false),
                       ),
                   ],
                   lineTouchData: LineTouchData(
-                    touchTooltipData:
-                        LineTouchTooltipData(
-                      getTooltipItems: (spots) =>
-                          spots.map((s) {
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipItems: (spots) => spots.map((s) {
                         final idx = s.spotIndex;
                         final d = idx < data.length
-                            ? (data[idx]['date']
-                                    as String? ??
-                                '')
+                            ? (data[idx]['date'] as String? ?? '')
                             : '';
-                        final isWeight =
-                            s.barIndex == 0;
+                        final isWeight = s.barIndex == 0;
                         return LineTooltipItem(
                           '$d\n${isWeight ? '${loc.progressBodyWeight}: ${s.y.toStringAsFixed(1)}${loc.workoutDetailKg}' : '${loc.commonVolume}: ${formatVolume(s.y)}'}',
                           TextStyle(
-                            color: theme
-                                .colorScheme.onSurface,
+                            color: theme.colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
                             fontSize: 11,
                           ),
@@ -670,10 +620,7 @@ class _BodyWeightChart extends StatelessWidget {
         Container(
           width: 8,
           height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
         Text(label, style: TextStyle(fontSize: 10)),
@@ -693,15 +640,15 @@ class _BodyTrackerLink extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
+            AiCoachNavigation.route(
+              kind: AiCoachRouteKind.normalWithFab,
               builder: (_) => const BodyTrackerScreen(),
             ),
           );
@@ -716,36 +663,37 @@ class _BodyTrackerLink extends StatelessWidget {
                   color: Colors.indigo.withAlpha(20),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.accessibility_new,
-                    size: 20, color: Colors.indigo),
+                child: const Icon(
+                  Icons.accessibility_new,
+                  size: 20,
+                  color: Colors.indigo,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       loc.progressBodyMeasurements,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(
-                              fontWeight:
-                                  FontWeight.w600),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     Text(
                       loc.progressBodyMeasurementsSubtitle,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(
-                        color: theme
-                            .colorScheme.onSurfaceVariant,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                         fontSize: 11,
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right,
-                  color: theme.colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),

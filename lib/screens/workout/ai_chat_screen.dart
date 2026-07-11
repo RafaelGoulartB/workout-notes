@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../main.dart';
+import '../../navigation/ai_coach_navigation.dart';
 import '../../models/ai_chat_message.dart';
 import '../../models/ai_chat_state.dart';
 import '../../services/ai_tool_registry.dart';
@@ -81,7 +82,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
         backgroundColor: theme.brightness == Brightness.dark
             ? const Color(0xFF17181F)
             : theme.colorScheme.surface,
-        title: const Text('Treinador IA'),
+        title: const SizedBox.shrink(),
         actions: [
           IconButton(
             tooltip: 'Nova conversa',
@@ -95,7 +96,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
             icon: const Icon(Icons.history_rounded),
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AiChatHistoryScreen()),
+                AiCoachNavigation.route(
+                  kind: AiCoachRouteKind.aiFlow,
+                  builder: (_) => const AiChatHistoryScreen(),
+                ),
               );
             },
           ),
@@ -104,7 +108,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
               switch (v) {
                 case 'settings':
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const AiSettingsScreen()),
+                    AiCoachNavigation.route(
+                      kind: AiCoachRouteKind.aiFlow,
+                      builder: (_) => const AiSettingsScreen(),
+                    ),
                   );
                   break;
                 case 'provider':
@@ -287,15 +294,18 @@ class _AiChatScreenState extends State<AiChatScreen> {
     if (m.isAssistant) {
       // Build list with assistant bubble + tool result bubbles after it
       final children = <Widget>[];
-      children.add(
-        AiMessageBubble(
-          message: m,
-          onCopy: () => MessageCopyAction.copy(context, m.content ?? ''),
-          onRetry: m.content == null || m.content!.isEmpty
-              ? null
-              : () => AiChatService.instance.retryFromMessage(index - 1),
-        ),
-      );
+      final hasVisibleText = m.content?.trim().isNotEmpty == true;
+      if (hasVisibleText || m.toolCalls.isEmpty) {
+        children.add(
+          AiMessageBubble(
+            message: m,
+            onCopy: () => MessageCopyAction.copy(context, m.content ?? ''),
+            onRetry: hasVisibleText
+                ? () => AiChatService.instance.retryFromMessage(index - 1)
+                : null,
+          ),
+        );
+      }
       // Find consecutive tool messages that answer this assistant's tool calls
       var j = index + 1;
       while (j < AiChatService.instance.state.messages.length) {

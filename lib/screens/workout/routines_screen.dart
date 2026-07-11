@@ -3,6 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/widgets/category_timeline_bar.dart';
 import '../../repositories/routine_repository.dart';
+import '../../navigation/ai_coach_navigation.dart';
 import 'routine_day_editor_screen.dart';
 
 class RoutinesScreen extends StatefulWidget {
@@ -551,7 +552,8 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
         onTap: () async {
           final result = await Navigator.push(
             context,
-            MaterialPageRoute(
+            AiCoachNavigation.route(
+              kind: AiCoachRouteKind.normalWithFab,
               builder: (_) => RoutineDayEditorScreen(
                 routineDayId: day['id'] as String,
                 routineId: widget.routineId,

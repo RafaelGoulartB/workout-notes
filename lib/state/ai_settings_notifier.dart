@@ -12,6 +12,7 @@ const _kPrefsProviders = 'ai_providers_v1';
 const _kPrefsActiveId = 'ai_active_provider_id_v1';
 const _kPrefsSystemPrompt = 'ai_system_prompt_v1';
 const _kPrefsContextMode = 'ai_context_mode_v1';
+const _kPrefsFabEnabled = 'ai_fab_enabled_v1';
 const _kTokenPrefix = 'ai_token:';
 const _kLegacyTokenKey = 'ai_token';
 
@@ -95,6 +96,7 @@ class AiSettingsNotifier extends ChangeNotifier {
 
   AiSettings _settings;
   bool _loaded = false;
+  bool _fabEnabled = true;
 
   AiSettingsNotifier({
     required this.prefs,
@@ -109,6 +111,7 @@ class AiSettingsNotifier extends ChangeNotifier {
   bool get isConfigured => _settings.isConfigured;
   AiProvider? get activeProvider => _settings.activeProvider;
   AiContextMode get contextMode => _settings.contextMode;
+  bool get fabEnabled => _fabEnabled;
   String get systemPrompt => _settings.systemPrompt.isEmpty
       ? kDefaultAiCoachSystemPrompt
       : _settings.systemPrompt;
@@ -141,6 +144,7 @@ class AiSettingsNotifier extends ChangeNotifier {
     final mode = AiContextModeX.fromStorageKey(
       prefs.getString(_kPrefsContextMode),
     );
+    _fabEnabled = prefs.getBool(_kPrefsFabEnabled) ?? true;
 
     // Replace the prompts shipped by the previous AI implementation. They
     // contained literal reference-marker examples, which primes some models
@@ -315,6 +319,12 @@ class AiSettingsNotifier extends ChangeNotifier {
   Future<void> setContextMode(AiContextMode mode) async {
     _settings = _settings.copyWith(contextMode: mode);
     await prefs.setString(_kPrefsContextMode, mode.storageKey);
+    notifyListeners();
+  }
+
+  Future<void> setFabEnabled(bool enabled) async {
+    _fabEnabled = enabled;
+    await prefs.setBool(_kPrefsFabEnabled, enabled);
     notifyListeners();
   }
 

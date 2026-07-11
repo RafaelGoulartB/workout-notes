@@ -70,13 +70,13 @@ class AiChatService extends ChangeNotifier {
   // THREAD MANAGEMENT
   // ===========================================================================
 
-  Future<void> refreshThreads() async {
+  Future<void> refreshThreads({bool notify = true}) async {
     try {
       final rows = await _db.getAiChatThreads();
       _state = _state.copyWith(
         threads: rows.map(AiChatThread.fromRow).toList(),
       );
-      notifyListeners();
+      if (notify) notifyListeners();
     } catch (_) {}
   }
 
@@ -124,6 +124,36 @@ class AiChatService extends ChangeNotifier {
     } catch (e) {
       _state = _state.copyWith(error: _readableError(e));
       notifyListeners();
+    }
+  }
+
+  Future<bool> renameThread(String threadId, String title) async {
+    final trimmed = title.trim();
+    if (trimmed.isEmpty) return false;
+    try {
+      await _db.renameAiChatThread(threadId, trimmed);
+      await refreshThreads(notify: false);
+      _state = _state.copyWith(clearError: true);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _state = _state.copyWith(error: _readableError(e));
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> setThreadPinned(String threadId, bool isPinned) async {
+    try {
+      await _db.setAiChatThreadPinned(threadId, isPinned);
+      await refreshThreads(notify: false);
+      _state = _state.copyWith(clearError: true);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _state = _state.copyWith(error: _readableError(e));
+      notifyListeners();
+      return false;
     }
   }
 
@@ -612,6 +642,7 @@ class AiChatService extends ChangeNotifier {
       lastMessagePreview: firstUserText.length > 96
           ? '${firstUserText.substring(0, 93)}…'
           : firstUserText,
+      isPinned: false,
     );
     return id;
   }
@@ -627,6 +658,7 @@ class AiChatService extends ChangeNotifier {
         createdAt: _state.activeThread?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
         lastMessagePreview: preview,
+        isPinned: _state.activeThread?.isPinned ?? false,
       );
       final rows = _state.messages
           .where((m) => m.role != AiMessageRole.system)

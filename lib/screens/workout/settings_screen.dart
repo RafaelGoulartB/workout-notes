@@ -12,6 +12,7 @@ import '../../services/export_service.dart';
 import '../../database/test_seed_data.dart';
 import '../../services/notification_service.dart';
 import '../../main.dart';
+import '../../navigation/ai_coach_navigation.dart';
 import 'ai_chat_screen.dart';
 import 'ai_settings_screen.dart';
 
@@ -41,11 +42,22 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   @override
   void initState() {
     super.initState();
+    WorkoutNotesApp.aiSettings.addListener(_onAiSettingsChanged);
     _selectedAccentIndex = AccentColors.indexOf(
       WorkoutNotesApp.themeNotifier.seedColor,
     );
     _selectedThemeMode = WorkoutNotesApp.themeNotifier.themeMode;
     _load();
+  }
+
+  @override
+  void dispose() {
+    WorkoutNotesApp.aiSettings.removeListener(_onAiSettingsChanged);
+    super.dispose();
+  }
+
+  void _onAiSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   // ===================== DATA =====================
@@ -655,7 +667,9 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.settingsImportPickerError(loc.settingsNoBackupFile)),
+            content: Text(
+              loc.settingsImportPickerError(loc.settingsNoBackupFile),
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -823,12 +837,18 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
         ),
       );
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const AiSettingsScreen()),
+        AiCoachNavigation.route(
+          kind: AiCoachRouteKind.aiFlow,
+          builder: (_) => const AiSettingsScreen(),
+        ),
       );
       return;
     }
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const AiChatScreen()),
+      AiCoachNavigation.route(
+        kind: AiCoachRouteKind.aiFlow,
+        builder: (_) => const AiChatScreen(),
+      ),
     );
   }
 
@@ -1252,8 +1272,21 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                       subtitle: 'Provedores, modelo, prompt do sistema.',
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const AiSettingsScreen()),
+                          AiCoachNavigation.route(
+                            kind: AiCoachRouteKind.aiFlow,
+                            builder: (_) => const AiSettingsScreen(),
+                          ),
                         );
+                      },
+                    ),
+                    const _CardDivider(),
+                    _SwitchTile(
+                      icon: Icons.smart_toy_outlined,
+                      title: loc.aiSettingsFabTitle,
+                      subtitle: loc.aiSettingsFabSubtitle,
+                      value: WorkoutNotesApp.aiSettings.fabEnabled,
+                      onChanged: (value) {
+                        WorkoutNotesApp.aiSettings.setFabEnabled(value);
                       },
                     ),
                   ],

@@ -2172,7 +2172,54 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get aiHistoryPinned => 'Pinned';
+
+  @override
+  String get aiHistoryRecent => 'Recent';
+
+  @override
+  String get aiHistoryActions => 'Conversation actions';
+
+  @override
+  String get aiHistoryRename => 'Rename';
+
+  @override
+  String get aiHistoryPin => 'Pin';
+
+  @override
+  String get aiHistoryUnpin => 'Unpin';
+
+  @override
+  String get aiHistoryRenameTitle => 'Rename conversation';
+
+  @override
+  String get aiHistoryRenameLabel => 'Conversation name';
+
+  @override
+  String get aiHistoryRenameHint => 'Enter a name';
+
+  @override
+  String get aiHistoryRenameRequired => 'Enter a conversation name';
+
+  @override
+  String get aiHistoryActionError =>
+      'Could not update the conversation. Try again.';
+
+  @override
+  String get aiHistoryYesterday => 'yesterday';
+
+  @override
+  String get aiCoachFabTooltip => 'Open AI Coach';
+
+  @override
   String get aiSettingsTitle => 'AI Coach settings';
+
+  @override
+  String get aiSettingsFabTitle => 'Show AI Coach button';
+
+  @override
+  String get aiSettingsFabSubtitle =>
+      'Display the AI Coach shortcut on app screens.';
 
   @override
   String get aiSettingsProvidersCard => 'Providers';

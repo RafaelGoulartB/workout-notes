@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/models/workout_stats.dart';
+import '../../navigation/ai_coach_navigation.dart';
 import '../../repositories/workout_repository.dart';
 import '../../services/export_service.dart';
 import 'exercise_detail_tabs_screen.dart';
@@ -845,7 +846,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
             onPressed: () async {
               final result = await Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(
+                AiCoachNavigation.route(
+                  kind: AiCoachRouteKind.activeWorkout,
                   builder: (_) =>
                       ActiveWorkoutScreen(workoutId: widget.workoutId),
                 ),
@@ -962,7 +964,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     if (mounted) {
       final result = await Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
+        AiCoachNavigation.route(
+          kind: AiCoachRouteKind.activeWorkout,
           builder: (_) => ActiveWorkoutScreen(workoutId: widget.workoutId),
         ),
       );

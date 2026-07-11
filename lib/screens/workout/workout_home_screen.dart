@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import '../../navigation/ai_coach_navigation.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/analytics_repository.dart';
 import '../../services/rest_timer_service.dart';
@@ -88,8 +89,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       final monthStart = DateTime(now.year, now.month, 1);
 
       final allWorkouts = await _workoutRepo.getWorkouts(limit: 50);
-      final futureWorkouts =
-          await _workoutRepo.getWorkouts(startDate: tomorrow, limit: 20);
+      final futureWorkouts = await _workoutRepo.getWorkouts(
+        startDate: tomorrow,
+        limit: 20,
+      );
 
       // Load stats
       final overview = await _analyticsRepo.getWorkoutOverviewStats();
@@ -106,12 +109,15 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         if (wDate.startsWith(monthStr)) {
           monthCount++;
           // Get volume and cardio distance/time for this workout
-          final exercises = await _workoutRepo.getWorkoutExercises(w['id'] as String);
+          final exercises = await _workoutRepo.getWorkoutExercises(
+            w['id'] as String,
+          );
           for (final ee in exercises) {
             final sets = await _workoutRepo.getExerciseSets(ee['id'] as String);
             for (final s in sets) {
               if ((s['is_warmup'] as int? ?? 0) == 0) {
-                monthVol += ((s['weight'] as num?)?.toDouble() ?? 0) *
+                monthVol +=
+                    ((s['weight'] as num?)?.toDouble() ?? 0) *
                     ((s['reps'] as int?) ?? 0);
                 monthCardioDist += (s['distance'] as num?)?.toDouble() ?? 0;
                 monthCardioTime += (s['time_seconds'] as int?) ?? 0;
@@ -156,7 +162,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   Future<void> _startWorkout() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const ActiveWorkoutScreen()),
+      AiCoachNavigation.route(
+        kind: AiCoachRouteKind.activeWorkout,
+        builder: (_) => const ActiveWorkoutScreen(),
+      ),
     );
     _loadData();
   }
@@ -164,8 +173,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   Future<void> _openActiveWorkout(Map<String, dynamic> workout) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => ActiveWorkoutScreen(workoutId: workout['id'] as String?),
+      AiCoachNavigation.route(
+        kind: AiCoachRouteKind.activeWorkout,
+        builder: (_) =>
+            ActiveWorkoutScreen(workoutId: workout['id'] as String?),
       ),
     );
     _loadData();
@@ -199,8 +210,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   }
 
   String _formatHeaderDate(AppLocalizations loc) {
-    return DateFormat('EEEE, d MMMM', Intl.defaultLocale)
-        .format(DateTime.now());
+    return DateFormat(
+      'EEEE, d MMMM',
+      Intl.defaultLocale,
+    ).format(DateTime.now());
   }
 
   /// Returns a friendly "Last workout: `<when>`" string. Empty when there is
@@ -251,7 +264,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       appBar: AppBar(
         title: Text(
           _formatHeaderDate(loc),
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -268,27 +283,41 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 slivers: [
                   // First-time empty state replaces the stats card.
                   if (!_hasAnyHistory)
-                    SliverToBoxAdapter(
-                      child: _buildFirstTimeEmpty(theme, loc),
-                    )
+                    SliverToBoxAdapter(child: _buildFirstTimeEmpty(theme, loc))
                   else
-                    SliverToBoxAdapter(
-                      child: _buildHeaderStats(theme, loc),
-                    ),
+                    SliverToBoxAdapter(child: _buildHeaderStats(theme, loc)),
                   // Active workout banner — shown right after the stats
                   // card so the high-level summary still leads the page.
                   if (_activeWorkouts.isNotEmpty)
                     SliverToBoxAdapter(
-                      child: _buildActiveBanner(theme, loc, _activeWorkouts.first),
+                      child: _buildActiveBanner(
+                        theme,
+                        loc,
+                        _activeWorkouts.first,
+                      ),
                     ),
-                  SliverToBoxAdapter(child: _buildSectionHeader(loc.workoutHomeSectionQuickActions, theme)),
+                  SliverToBoxAdapter(
+                    child: _buildSectionHeader(
+                      loc.workoutHomeSectionQuickActions,
+                      theme,
+                    ),
+                  ),
                   SliverToBoxAdapter(child: _buildQuickActions(theme, loc)),
-                  SliverToBoxAdapter(child: _buildSectionHeader(loc.workoutHomeSectionTools, theme)),
+                  SliverToBoxAdapter(
+                    child: _buildSectionHeader(
+                      loc.workoutHomeSectionTools,
+                      theme,
+                    ),
+                  ),
                   SliverToBoxAdapter(child: _buildNavGrid(theme, loc)),
                   if (_upcomingWorkouts.isNotEmpty)
-                    SliverToBoxAdapter(child: _buildUpcomingSection(theme, loc)),
+                    SliverToBoxAdapter(
+                      child: _buildUpcomingSection(theme, loc),
+                    ),
                   if (_completedWorkouts.isNotEmpty)
-                    SliverToBoxAdapter(child: _buildCompletedSection(theme, loc)),
+                    SliverToBoxAdapter(
+                      child: _buildCompletedSection(theme, loc),
+                    ),
                   const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
               ),
@@ -332,7 +361,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
 
   // ===================== ACTIVE WORKOUT BANNER =====================
   Widget _buildActiveBanner(
-      ThemeData theme, AppLocalizations loc, Map<String, dynamic> workout) {
+    ThemeData theme,
+    AppLocalizations loc,
+    Map<String, dynamic> workout,
+  ) {
     final elapsed = _activeElapsed(workout) ?? '--';
 
     return Padding(
@@ -366,8 +398,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                       Text(
                         loc.workoutHomeActiveBannerSubtitle(elapsed),
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color:
-                              theme.colorScheme.onPrimary.withAlpha(220),
+                          color: theme.colorScheme.onPrimary.withAlpha(220),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -378,7 +409,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 8),
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.onPrimary,
                     borderRadius: BorderRadius.circular(999),
@@ -386,8 +419,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.play_arrow_rounded,
-                          size: 18, color: theme.colorScheme.primary),
+                      Icon(
+                        Icons.play_arrow_rounded,
+                        size: 18,
+                        color: theme.colorScheme.primary,
+                      ),
                       const SizedBox(width: 2),
                       Text(
                         loc.workoutHomeActiveBannerAction,
@@ -497,7 +533,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                   Expanded(
                     child: _StatItem(
                       label: loc.commonTotal,
-                      value: _monthCardioDistance > 0 && _monthCardioTime > 0 ? (_monthCardioTime / _monthCardioDistance).toStringAsFixed(0) : '--',
+                      value: _monthCardioDistance > 0 && _monthCardioTime > 0
+                          ? (_monthCardioTime / _monthCardioDistance)
+                                .toStringAsFixed(0)
+                          : '--',
                       unit: '/km',
                       icon: Icons.speed,
                       color: Colors.brown,
@@ -516,8 +555,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Icon(Icons.history,
-                      size: 14, color: theme.colorScheme.onSurfaceVariant),
+                  Icon(
+                    Icons.history,
+                    size: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     '${loc.workoutHomeLastWorkout}: ',
@@ -538,10 +580,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           ],
         ),
       ),
-    )
-        .animate()
-        .fadeIn(duration: 300.ms, delay: 120.ms)
-        .slideY(begin: 0.05);
+    ).animate().fadeIn(duration: 300.ms, delay: 120.ms).slideY(begin: 0.05);
   }
 
   // ===================== SECTION HEADER =====================
@@ -595,26 +634,43 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       _NavItemData(
         Icons.fitness_center,
         loc.workoutHomeExercises,
-        () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const ExerciseLibraryScreen())),
+        () => Navigator.push(
+          context,
+          AiCoachNavigation.route(
+            kind: AiCoachRouteKind.normalWithFab,
+            builder: (_) => const ExerciseLibraryScreen(),
+          ),
+        ),
       ),
       _NavItemData(
         Icons.repeat,
         loc.workoutHomeRoutines,
-        () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const RoutinesScreen())),
+        () => Navigator.push(
+          context,
+          AiCoachNavigation.route(
+            kind: AiCoachRouteKind.normalWithFab,
+            builder: (_) => const RoutinesScreen(),
+          ),
+        ),
       ),
       _NavItemData(
         Icons.bar_chart,
         loc.workoutHomeProgress,
-        () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const ProgressScreen())),
+        () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ProgressScreen()),
+        ),
       ),
       _NavItemData(
         Icons.monitor_weight_outlined,
         loc.workoutHomeBodyMeasurements,
-        () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const BodyTrackerScreen())),
+        () => Navigator.push(
+          context,
+          AiCoachNavigation.route(
+            kind: AiCoachRouteKind.normalWithFab,
+            builder: (_) => const BodyTrackerScreen(),
+          ),
+        ),
       ),
     ];
 
@@ -624,8 +680,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side:
-              BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+          side: BorderSide(
+            color: theme.colorScheme.outlineVariant.withAlpha(80),
+          ),
         ),
         clipBehavior: Clip.antiAlias,
         child: GridView.builder(
@@ -674,8 +731,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           ),
           if (_showUpcoming) ...[
             const SizedBox(height: 8),
-            ...(_upcomingWorkouts
-                .map((w) => _buildWorkoutCard(w, theme, isActive: false))),
+            ...(_upcomingWorkouts.map(
+              (w) => _buildWorkoutCard(w, theme, isActive: false),
+            )),
           ],
         ],
       ),
@@ -700,8 +758,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           ),
           if (_showCompleted) ...[
             const SizedBox(height: 8),
-            ...(_completedWorkouts
-                .map((w) => _buildWorkoutCard(w, theme, isActive: false))),
+            ...(_completedWorkouts.map(
+              (w) => _buildWorkoutCard(w, theme, isActive: false),
+            )),
           ],
         ],
       ),
@@ -757,15 +816,15 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           ],
         ),
       ),
-    )
-        .animate()
-        .fadeIn(duration: 300.ms, delay: 120.ms)
-        .slideY(begin: 0.05);
+    ).animate().fadeIn(duration: 300.ms, delay: 120.ms).slideY(begin: 0.05);
   }
 
   // ===================== WORKOUT CARD =====================
-  Widget _buildWorkoutCard(Map<String, dynamic> workout, ThemeData theme,
-      {required bool isActive}) {
+  Widget _buildWorkoutCard(
+    Map<String, dynamic> workout,
+    ThemeData theme, {
+    required bool isActive,
+  }) {
     final date = (workout['date'] as String?) ?? '';
     final formatted = date.isNotEmpty
         ? DateFormat(
@@ -779,9 +838,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     final durStr = isActive
         ? AppLocalizations.of(context)!.workoutHomeOngoing
         : duration > 0
-            ? AppLocalizations.of(context)!
-                .workoutDetailDuration(duration ~/ 60, duration % 60)
-            : '--';
+        ? AppLocalizations.of(
+            context,
+          )!.workoutDetailDuration(duration ~/ 60, duration % 60)
+        : '--';
     final feeling = (workout['feeling_rating'] as int?) ?? 0;
 
     return Padding(
@@ -821,9 +881,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    isActive
-                        ? Icons.play_circle_fill
-                        : Icons.fitness_center,
+                    isActive ? Icons.play_circle_fill : Icons.fitness_center,
                     color: isActive
                         ? theme.colorScheme.primary
                         : theme.colorScheme.onSurfaceVariant,
@@ -835,13 +893,19 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(formatted,
-                          style: theme.textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      Text(
+                        formatted,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(durStr,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant)),
+                      Text(
+                        durStr,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -858,8 +922,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                     ),
                   ),
                 const SizedBox(width: 4),
-                Icon(Icons.chevron_right,
-                    color: theme.colorScheme.onSurfaceVariant, size: 20),
+                Icon(
+                  Icons.chevron_right,
+                  color: theme.colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
               ],
             ),
           ),
@@ -880,15 +947,13 @@ class _LoadingSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = theme.colorScheme.surfaceContainerHighest;
-    BoxDecoration box({double r = 8}) => BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(r),
-        );
+    BoxDecoration box({double r = 8}) =>
+        BoxDecoration(color: color, borderRadius: BorderRadius.circular(r));
     Widget line({required double h, double? w, double r = 8}) => Container(
-          height: h,
-          width: w,
-          decoration: box(r: r),
-        );
+      height: h,
+      width: w,
+      decoration: box(r: r),
+    );
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -935,10 +1000,10 @@ class _PulsingDot extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           Container(
-            width: 16,
-            height: 16,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          )
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              )
               .animate(onPlay: (c) => c.repeat(reverse: true))
               .scale(
                 begin: const Offset(0.6, 0.6),
@@ -1078,13 +1143,20 @@ class _ActionCard extends StatelessWidget {
                 child: Icon(icon, color: color, size: 24),
               ),
               const SizedBox(height: 14),
-              Text(label,
-                  style: theme.textTheme.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                label,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text(subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
+              ),
             ],
           ),
         ),
@@ -1142,14 +1214,18 @@ class _NavTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Icon(Icons.chevron_right,
-                  size: 18, color: theme.colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),
@@ -1207,8 +1283,7 @@ class _CollapsibleSectionHeader extends StatelessWidget {
             const Spacer(),
             if (count > 0) ...[
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(999),
@@ -1271,11 +1346,7 @@ class _TimerPill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isPaused ? Icons.pause : Icons.timer,
-              size: 18,
-              color: fg,
-            ),
+            Icon(isPaused ? Icons.pause : Icons.timer, size: 18, color: fg),
             const SizedBox(width: 4),
             Text(
               shortTime,
