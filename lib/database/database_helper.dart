@@ -20,15 +20,17 @@ class DatabaseHelper implements DatabaseProvider {
   static Database? _overrideDatabase;
 
   /// Repository instances (lazy-loaded)
-  late final SettingsRepository settingsRepo = SettingsRepository();
-  late final ExerciseRepository exerciseRepo = ExerciseRepository();
-  late final WorkoutRepository workoutRepo = WorkoutRepository();
-  late final RoutineRepository routineRepo = RoutineRepository();
+  late final SettingsRepository settingsRepo = SettingsRepository(this);
+  late final ExerciseRepository exerciseRepo = ExerciseRepository(this);
+  late final WorkoutRepository workoutRepo = WorkoutRepository(this);
+  late final RoutineRepository routineRepo = RoutineRepository(this);
   late final BodyMeasurementRepository bodyMeasurementRepo =
-      BodyMeasurementRepository();
-  late final AnalyticsRepository analyticsRepo = AnalyticsRepository();
-  late final ExportImportRepository exportImportRepo = ExportImportRepository();
-  late final GoalRepository goalRepo = GoalRepository();
+      BodyMeasurementRepository(this);
+  late final AnalyticsRepository analyticsRepo = AnalyticsRepository(this);
+  late final ExportImportRepository exportImportRepo = ExportImportRepository(
+    databaseProvider: () => database,
+  );
+  late final GoalRepository goalRepo = GoalRepository(this);
 
   DatabaseHelper._();
 

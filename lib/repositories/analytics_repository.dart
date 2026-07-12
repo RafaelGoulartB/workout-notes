@@ -1,11 +1,14 @@
 import 'package:sqflite/sqflite.dart';
 import 'base_repository.dart';
+import '../database/database_provider.dart';
 
 /// Time bucketing used for the anaerobic volume trend chart.
 enum AnaerobicTrendBucket { week, month, year }
 
 /// Repository for statistics, progress charts, PRs, heatmap, and trends.
 class AnalyticsRepository extends BaseRepository {
+  AnalyticsRepository([DatabaseProvider? databaseProvider])
+    : super(databaseProvider);
   // ===================================================================
   // EXERCISE HISTORY
   // ===================================================================

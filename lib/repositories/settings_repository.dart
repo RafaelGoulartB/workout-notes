@@ -1,8 +1,11 @@
 import 'package:sqflite/sqflite.dart';
 import 'base_repository.dart';
+import '../database/database_provider.dart';
 
 /// Repository for app settings CRUD operations.
 class SettingsRepository extends BaseRepository {
+  SettingsRepository([DatabaseProvider? databaseProvider])
+    : super(databaseProvider);
   Future<String?> getSetting(String key) async {
     final db = await this.db;
     final result = await db.query(
