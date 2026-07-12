@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/l10n/l10n_exercises.dart';
+import 'package:workout_notes/models/workout_set_draft.dart';
 import '../../repositories/exercise_repository.dart';
 import '../../repositories/workout_repository.dart';
-import '../../database/database_helper.dart';
 
 class QuickAddScreen extends StatefulWidget {
   const QuickAddScreen({super.key});
@@ -230,28 +229,10 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
         return;
       }
 
-      // Create workout and add sets
-      final workoutId = await _workoutRepo.createWorkout();
-      final entryId = const Uuid().v4();
-
-      final database = await DatabaseHelper.instance.database;
-      await database.insert('exercise_entries', {
-        'id': entryId,
-        'workout_id': workoutId,
-        'exercise_id': exercise['id'],
-        'order_index': 0,
-      });
-
-      for (final set in _parsedSets) {
-        await _workoutRepo.addSet(
-          exerciseEntryId: entryId,
-          weight: set.weight,
-          reps: set.reps,
-        );
-      }
-
-      // Finish workout automatically
-      await _workoutRepo.finishWorkout(workoutId, feelingRating: 3);
+      await _workoutRepo.createCompletedQuickWorkout(
+        exerciseId: exercise['id'] as String,
+        sets: _toWorkoutSetDrafts(),
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -292,25 +273,10 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       categoryId: catId,
     );
 
-    final workoutId = await _workoutRepo.createWorkout();
-    final entryId = const Uuid().v4();
-    final database = await DatabaseHelper.instance.database;
-    await database.insert('exercise_entries', {
-      'id': entryId,
-      'workout_id': workoutId,
-      'exercise_id': exId,
-      'order_index': 0,
-    });
-
-    for (final set in _parsedSets) {
-      await _workoutRepo.addSet(
-        exerciseEntryId: entryId,
-        weight: set.weight,
-        reps: set.reps,
-      );
-    }
-
-    await _workoutRepo.finishWorkout(workoutId, feelingRating: 3);
+    await _workoutRepo.createCompletedQuickWorkout(
+      exerciseId: exId,
+      sets: _toWorkoutSetDrafts(),
+    );
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -324,6 +290,10 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       Navigator.pop(context, true);
     }
   }
+
+  List<WorkoutSetDraft> _toWorkoutSetDrafts() => _parsedSets
+      .map((set) => WorkoutSetDraft(weight: set.weight, reps: set.reps))
+      .toList(growable: false);
 
   @override
   void dispose() {

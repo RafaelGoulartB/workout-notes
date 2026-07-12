@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/models/workout_stats.dart';
+import 'package:workout_notes/models/workout_set_draft.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'base_repository.dart';
@@ -61,6 +62,63 @@ class WorkoutRepository extends BaseRepository {
     }
 
     return id;
+  }
+
+  /// Creates a completed one-exercise workout as a single transaction.
+  ///
+  /// Quick-add entries are complete by definition: the user is recording a
+  /// past workout rather than starting an active session.
+  Future<String> createCompletedQuickWorkout({
+    required String exerciseId,
+    required List<WorkoutSetDraft> sets,
+    int feelingRating = 3,
+  }) async {
+    if (sets.isEmpty) {
+      throw ArgumentError.value(sets, 'sets', 'must not be empty');
+    }
+
+    final db = await this.db;
+    final now = DateTime.now();
+    final nowIso = now.toIso8601String();
+    final workoutId = const Uuid().v4();
+    final entryId = const Uuid().v4();
+
+    await db.transaction((txn) async {
+      await txn.insert('workouts', {
+        'id': workoutId,
+        'date': nowIso.substring(0, 10),
+        'start_time': nowIso,
+        'end_time': nowIso,
+        'duration_seconds': 0,
+        'feeling_rating': feelingRating,
+        'is_from_routine': 0,
+        'created_at': nowIso,
+      });
+      await txn.insert('exercise_entries', {
+        'id': entryId,
+        'workout_id': workoutId,
+        'exercise_id': exerciseId,
+        'order_index': 0,
+      });
+      for (var index = 0; index < sets.length; index++) {
+        final set = sets[index];
+        await txn.insert('sets', {
+          'id': const Uuid().v4(),
+          'exercise_entry_id': entryId,
+          'weight': set.weight,
+          'reps': set.reps,
+          'distance': set.distance,
+          'time_seconds': set.timeSeconds,
+          'is_complete': 1,
+          'is_warmup': set.isWarmup ? 1 : 0,
+          'rpe': set.rpe,
+          'comment': set.comment,
+          'order_index': index,
+        });
+      }
+    });
+
+    return workoutId;
   }
 
   /// Adds an exercise entry to an existing workout.

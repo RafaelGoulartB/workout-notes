@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import 'package:uuid/uuid.dart';
 import '../../database/database_helper.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/routine_repository.dart';
@@ -40,7 +39,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   final _routineRepo = RoutineRepository();
   final _settingsRepo = SettingsRepository();
   final _timerService = RestTimerService.instance;
-  final _uuid = const Uuid();
   bool _isLoading = true;
   String? _workoutId;
 
@@ -872,32 +870,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     int? restTimeSeconds,
   }) async {
     if (_workoutId == null) return;
-    final entryId = _uuid.v4();
-    final db = await DatabaseHelper.instance.database;
-    final rt = restTimeSeconds ?? 90;
-    await db.insert('exercise_entries', {
-      'id': entryId,
-      'workout_id': _workoutId,
-      'exercise_id': exerciseId,
-      'order_index': _exercises.length,
-      'rest_time_seconds': rt,
-    });
-
-    // Auto-populate sets from last workout (excluding current workout)
-    if (_workoutId != null) {
-      final lastSets = await _workoutRepo.getLastWorkoutSets(
-        exerciseId,
-        excludeWorkoutId: _workoutId,
-      );
-      for (final s in lastSets) {
-        await _workoutRepo.addSet(
-          exerciseEntryId: entryId,
-          weight: (s['weight'] as num?)?.toDouble(),
-          reps: (s['reps'] as int?),
-          isWarmup: (s['is_warmup'] as int?) == 1,
-        );
-      }
-    }
+    await _workoutRepo.addExerciseToWorkout(
+      _workoutId!,
+      exerciseId,
+      restTimeSeconds: restTimeSeconds,
+    );
 
     await _loadExercises();
     setState(() {});
