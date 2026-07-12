@@ -1,101 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/workout_summary.dart';
 import 'package:workout_notes/widgets/workout/stat_tile.dart';
 import 'package:workout_notes/utils/pace_calculator.dart';
 
-/// Summary data class for finished workout.
-class WorkoutSummary {
-  final int durationSeconds;
-  final double totalVolume;
-  final int totalSets;
-  final int completedSets;
-  final List<PR> prs;
-  final double totalDistance;
-  final int totalCardioTime;
-
-  const WorkoutSummary({
-    required this.durationSeconds,
-    required this.totalVolume,
-    required this.totalSets,
-    required this.completedSets,
-    this.prs = const [],
-    this.totalDistance = 0,
-    this.totalCardioTime = 0,
-  });
-
-  String get formattedDuration {
-    if (durationSeconds <= 0) return '--';
-    final h = durationSeconds ~/ 3600;
-    final m = (durationSeconds % 3600) ~/ 60;
-    final s = durationSeconds % 60;
-    if (h >= 24) {
-      final d = h ~/ 24;
-      final restH = h % 24;
-      return restH > 0 ? '${d}d ${restH}h' : '${d}d';
-    }
-    if (h > 0) {
-      return '${h}h${m.toString().padLeft(2, '0')}min';
-    }
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
-
-  String get formattedVolume {
-    if (totalVolume >= 1000000) {
-      return '${(totalVolume / 1000000).toStringAsFixed(1)}M';
-    }
-    if (totalVolume >= 1000) {
-      return '${(totalVolume / 1000).toStringAsFixed(1)}k';
-    }
-    return totalVolume.toStringAsFixed(0);
-  }
-
-  double? get densityKgPerMinute {
-    if (durationSeconds <= 0 || totalVolume <= 0) return null;
-    return totalVolume / (durationSeconds / 60.0);
-  }
-
-  String get formattedDensity {
-    final density = densityKgPerMinute;
-    if (density == null) return '--';
-    return density.toStringAsFixed(density >= 10 ? 0 : 1);
-  }
-
-  String get formattedDistance {
-    if (totalDistance <= 0) return '--';
-    return '${totalDistance.toStringAsFixed(1)} km';
-  }
-
-  String get formattedCardioTime {
-    if (totalCardioTime <= 0) return '--';
-    final min = totalCardioTime ~/ 60;
-    if (min >= 60) {
-      return '${min ~/ 60}h${min % 60}min';
-    }
-    return '${min}min';
-  }
-}
-
-/// Personal record data class.
-class PR {
-  final String exerciseName;
-  final String type; // 'weight' or 'volume'
-  final String value;
-  final String previous;
-
-  const PR({
-    required this.exerciseName,
-    required this.type,
-    required this.value,
-    required this.previous,
-  });
-
-  String get label {
-    return type == 'weight' ? '🏋️ Peso Máximo' : '📦 Volume';
-  }
-
-  IconData get icon =>
-      type == 'weight' ? Icons.emoji_events : Icons.inventory_2;
-}
+export 'package:workout_notes/models/workout_summary.dart'
+    show PR, WorkoutSummary;
 
 /// Cardio bests data class for tracking distance/pace PRs.
 class CardioBests {
