@@ -173,51 +173,53 @@ class WorkoutRepository extends BaseRepository {
     String routineDayId,
   ) async {
     final db = await this.db;
-    final routineExercises = await _getRoutineExercises(db, routineDayId);
-
-    for (final re in routineExercises) {
-      final entryId = const Uuid().v4();
-      final count =
+    await db.transaction((txn) async {
+      final routineExercises = await _getRoutineExercises(txn, routineDayId);
+      var orderIndex =
           Sqflite.firstIntValue(
-            await db.rawQuery(
+            await txn.rawQuery(
               'SELECT COUNT(*) FROM exercise_entries WHERE workout_id = ?',
               [workoutId],
             ),
           ) ??
           0;
 
-      final exerciseId = re['exercise_id'] as String;
-      await db.insert('exercise_entries', {
-        'id': entryId,
-        'workout_id': workoutId,
-        'exercise_id': exerciseId,
-        'order_index': count,
-        'rest_time_seconds': re['rest_time_seconds'],
-      });
-
-      final lastSets = await getLastWorkoutSets(
-        exerciseId,
-        excludeWorkoutId: workoutId,
-      );
-      final sourceSets = lastSets.isNotEmpty
-          ? lastSets
-          : await _getPredefinedSets(db, re['id'] as String);
-
-      for (int j = 0; j < sourceSets.length; j++) {
-        final s = sourceSets[j];
-        await db.insert('sets', {
-          'id': const Uuid().v4(),
-          'exercise_entry_id': entryId,
-          'weight': s['weight'],
-          'reps': s['reps'],
-          'distance': s['distance'],
-          'time_seconds': s['time_seconds'],
-          'is_complete': 0,
-          'is_warmup': s['is_warmup'] ?? 0,
-          'order_index': j,
+      for (final routineExercise in routineExercises) {
+        final entryId = const Uuid().v4();
+        final exerciseId = routineExercise['exercise_id'] as String;
+        await txn.insert('exercise_entries', {
+          'id': entryId,
+          'workout_id': workoutId,
+          'exercise_id': exerciseId,
+          'order_index': orderIndex++,
+          'rest_time_seconds': routineExercise['rest_time_seconds'],
         });
+
+        final previousSets = await _getLastWorkoutSets(
+          txn,
+          exerciseId,
+          excludeWorkoutId: workoutId,
+        );
+        final sourceSets = previousSets.isNotEmpty
+            ? previousSets
+            : await _getPredefinedSets(txn, routineExercise['id'] as String);
+
+        for (var index = 0; index < sourceSets.length; index++) {
+          final set = sourceSets[index];
+          await txn.insert('sets', {
+            'id': const Uuid().v4(),
+            'exercise_entry_id': entryId,
+            'weight': set['weight'],
+            'reps': set['reps'],
+            'distance': set['distance'],
+            'time_seconds': set['time_seconds'],
+            'is_complete': 0,
+            'is_warmup': set['is_warmup'] ?? 0,
+            'order_index': index,
+          });
+        }
       }
-    }
+    });
   }
 
   Future<String> copyWorkoutToDate(
@@ -476,7 +478,7 @@ class WorkoutRepository extends BaseRepository {
   }
 
   Future<String?> _findComparableWorkoutId(
-    Database db,
+    DatabaseExecutor db,
     String workoutId,
   ) async {
     final workout = await _getWorkout(db, workoutId);
@@ -653,7 +655,7 @@ class WorkoutRepository extends BaseRepository {
   }
 
   Future<double> _getWorkoutExerciseVolume(
-    Database db,
+    DatabaseExecutor db,
     String workoutId,
     String exerciseId, {
     required bool completedOnly,
@@ -678,7 +680,7 @@ class WorkoutRepository extends BaseRepository {
   }
 
   Future<double> _getLastCompletedExerciseVolume(
-    Database db,
+    DatabaseExecutor db,
     String exerciseId,
     String excludeWorkoutId,
   ) async {
@@ -1068,7 +1070,7 @@ class WorkoutRepository extends BaseRepository {
   // ===================================================================
 
   Future<List<Map<String, dynamic>>> _getRoutineExercises(
-    Database db,
+    DatabaseExecutor db,
     String routineDayId,
   ) async {
     return db.rawQuery(
@@ -1086,7 +1088,7 @@ class WorkoutRepository extends BaseRepository {
   }
 
   Future<List<Map<String, dynamic>>> _getPredefinedSets(
-    Database db,
+    DatabaseExecutor db,
     String routineExerciseId,
   ) async {
     return db.query(
@@ -1097,7 +1099,10 @@ class WorkoutRepository extends BaseRepository {
     );
   }
 
-  Future<Map<String, dynamic>?> _getWorkout(Database db, String id) async {
+  Future<Map<String, dynamic>?> _getWorkout(
+    DatabaseExecutor db,
+    String id,
+  ) async {
     final results = await db.query(
       'workouts',
       where: 'id = ?',
