@@ -1,9 +1,4 @@
-enum AiMessageRole {
-  system,
-  user,
-  assistant,
-  tool,
-}
+enum AiMessageRole { system, user, assistant, tool }
 
 extension AiMessageRoleX on AiMessageRole {
   String get wireValue {
@@ -40,12 +35,7 @@ class AiToolResult {
   final String? code;
   final String? message;
 
-  const AiToolResult({
-    required this.ok,
-    this.data,
-    this.code,
-    this.message,
-  });
+  const AiToolResult({required this.ok, this.data, this.code, this.message});
 
   factory AiToolResult.fromMap(Map<String, dynamic> m) {
     return AiToolResult(
@@ -57,9 +47,9 @@ class AiToolResult {
   }
 
   Map<String, dynamic> toMap() => {
-        'ok': ok,
-        if (data != null) 'data': data,
-        if (code != null) 'code': code,
-        if (message != null) 'message': message,
-      };
+    'ok': ok,
+    if (data != null) 'data': data,
+    if (code != null) 'code': code,
+    if (message != null) 'message': message,
+  };
 }

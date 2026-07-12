@@ -24,10 +24,5 @@ class DerivedStat {
   final IconData icon;
   final Color color;
 
-  const DerivedStat(
-    this.label,
-    this.value,
-    this.icon,
-    this.color,
-  );
+  const DerivedStat(this.label, this.value, this.icon, this.color);
 }

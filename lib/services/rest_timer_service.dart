@@ -20,7 +20,8 @@ class RestTimerService extends ChangeNotifier {
   bool get isRunning => _isRunning;
   bool get isPaused => _isPaused;
   bool get isActive => _isRunning || _isPaused;
-  double get progress => _totalSeconds > 0 ? _remainingSeconds / _totalSeconds : 0;
+  double get progress =>
+      _totalSeconds > 0 ? _remainingSeconds / _totalSeconds : 0;
 
   String get formattedTime {
     final min = _remainingSeconds ~/ 60;

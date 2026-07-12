@@ -13,11 +13,7 @@ class GoalsSection extends StatefulWidget {
   final DatabaseHelper db;
   final SettingsRepository settingsRepo;
 
-  const GoalsSection({
-    super.key,
-    required this.db,
-    required this.settingsRepo,
-  });
+  const GoalsSection({super.key, required this.db, required this.settingsRepo});
 
   @override
   State<GoalsSection> createState() => _GoalsSectionState();
@@ -85,13 +81,21 @@ class _GoalsSectionState extends State<GoalsSection> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.commonError(e.toString()))),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)!.commonError(e.toString()),
+          ),
+        ),
       );
     }
   }
 
   Future<void> _editGoal(Goal goal) async {
-    final saved = await GoalFormSheet.show(context, widget.settingsRepo, existing: goal);
+    final saved = await GoalFormSheet.show(
+      context,
+      widget.settingsRepo,
+      existing: goal,
+    );
     if (saved == null) return;
     try {
       await _goalRepo.update(saved);
@@ -103,7 +107,11 @@ class _GoalsSectionState extends State<GoalsSection> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.commonError(e.toString()))),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)!.commonError(e.toString()),
+          ),
+        ),
       );
     }
   }
@@ -136,16 +144,20 @@ class _GoalsSectionState extends State<GoalsSection> {
     if (confirm != true) return;
     await _goalRepo.delete(goal.id);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.goalDeleted)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.goalDeleted)));
     await _load();
   }
 
   void _openDetail(Goal goal) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => GoalDetailScreen(goal: goal, db: widget.db),
-    )).then((_) => _load());
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => GoalDetailScreen(goal: goal, db: widget.db),
+          ),
+        )
+        .then((_) => _load());
   }
 
   @override
@@ -186,7 +198,8 @@ class _GoalsSectionState extends State<GoalsSection> {
           itemCount: _goals.length,
           itemBuilder: (context, i) {
             final goal = _goals[i];
-            final progress = _progressByGoal[goal.id] ?? GoalProgress.empty(DateTime.now());
+            final progress =
+                _progressByGoal[goal.id] ?? GoalProgress.empty(DateTime.now());
             return GoalCard(
               goal: goal,
               progress: progress,

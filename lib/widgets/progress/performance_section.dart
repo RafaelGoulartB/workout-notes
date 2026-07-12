@@ -6,7 +6,7 @@ import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 class PerformanceSection extends StatelessWidget {
   final List<Map<String, dynamic>> allExercises;
   final void Function(String exerciseId, String exerciseName, ThemeData theme)
-      onExerciseTap;
+  onExerciseTap;
 
   const PerformanceSection({
     super.key,
@@ -25,15 +25,17 @@ class PerformanceSection extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              Icon(Icons.fitness_center_outlined,
-                  size: 32,
-                  color: theme.colorScheme.onSurfaceVariant
-                      .withAlpha(80)),
+              Icon(
+                Icons.fitness_center_outlined,
+                size: 32,
+                color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+              ),
               const SizedBox(height: 8),
               Text(
                 loc.progressNoExercises,
                 style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant),
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -44,8 +46,7 @@ class PerformanceSection extends StatelessWidget {
     // Group exercises by category
     final Map<String, List<Map<String, dynamic>>> grouped = {};
     for (final ex in allExercises) {
-      final catName =
-          ExerciseLocaleHelper.categoryName(loc, ex);
+      final catName = ExerciseLocaleHelper.categoryName(loc, ex);
       grouped.putIfAbsent(catName, () => []).add(ex);
     }
     final sortedKeys = grouped.keys.toList()..sort();
@@ -63,13 +64,15 @@ class PerformanceSection extends StatelessWidget {
           const SizedBox(height: 12),
           ...sortedKeys.map((catName) {
             final exercises = grouped[catName]!;
-            final catColor = Color(exercises.first['category_color']
-                    as int? ??
-                0xFF757575);
+            final catColor = Color(
+              exercises.first['category_color'] as int? ?? 0xFF757575,
+            );
             return ExpansionTile(
               initiallyExpanded: false,
               tilePadding: const EdgeInsets.symmetric(
-                  horizontal: 4, vertical: 0),
+                horizontal: 4,
+                vertical: 0,
+              ),
               childrenPadding: EdgeInsets.zero,
               shape: const Border(),
               collapsedShape: const Border(),
@@ -98,7 +101,9 @@ class PerformanceSection extends StatelessWidget {
                   const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 1),
+                      horizontal: 6,
+                      vertical: 1,
+                    ),
                     decoration: BoxDecoration(
                       color: catColor.withAlpha(20),
                       borderRadius: BorderRadius.circular(8),
@@ -115,11 +120,12 @@ class PerformanceSection extends StatelessWidget {
                 ],
               ),
               children: exercises
-                  .map((ex) => _ExerciseCard(
-                        exercise: ex,
-                        onTap: (id, name) =>
-                            onExerciseTap(id, name, theme),
-                      ))
+                  .map(
+                    (ex) => _ExerciseCard(
+                      exercise: ex,
+                      onTap: (id, name) => onExerciseTap(id, name, theme),
+                    ),
+                  )
                   .toList(),
             );
           }),
@@ -134,42 +140,37 @@ class _ExerciseCard extends StatelessWidget {
   final Map<String, dynamic> exercise;
   final void Function(String id, String name) onTap;
 
-  const _ExerciseCard({
-    required this.exercise,
-    required this.onTap,
-  });
+  const _ExerciseCard({required this.exercise, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final catColor =
-        Color(exercise['category_color'] as int? ?? 0xFF757575);
-    final name =
-        ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, exercise);
+    final catColor = Color(exercise['category_color'] as int? ?? 0xFF757575);
+    final name = ExerciseLocaleHelper.exerciseName(
+      AppLocalizations.of(context)!,
+      exercise,
+    );
     final type = exercise['type'] as String? ?? 'weightReps';
     final icon = type == 'weightReps'
         ? Icons.fitness_center
         : type == 'cardio'
-            ? Icons.directions_run
-            : type == 'duration'
-                ? Icons.timer
-                : Icons.fitness_center;
+        ? Icons.directions_run
+        : type == 'duration'
+        ? Icons.timer
+        : Icons.fitness_center;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 2),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
-        onTap: () =>
-            onTap(exercise['id'] as String, name),
+        onTap: () => onTap(exercise['id'] as String, name),
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
               Container(
@@ -184,13 +185,16 @@ class _ExerciseCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   name,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.w500),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
-              Icon(Icons.chevron_right,
-                  size: 18,
-                  color: theme.colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ],
           ),
         ),

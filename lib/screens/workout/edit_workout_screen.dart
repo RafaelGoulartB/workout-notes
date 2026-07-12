@@ -52,21 +52,21 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     final entries = await _workoutRepo.getWorkoutExercises(widget.workoutId);
     final exercises = <ExerciseWithSets>[];
     for (final entry in entries) {
-      final sets =
-          await _workoutRepo.getExerciseSets(entry['id'] as String);
-      exercises.add(ExerciseWithSets(
-        entryId: entry['id'] as String,
-        exerciseId: entry['exercise_id'] as String? ?? '',
-        name: entry['exercise_name'] as String? ?? '',
-        localeKey: entry['exercise_locale_key'] as String?,
-        exerciseType: entry['exercise_type'] as String? ?? 'weightReps',
-        categoryId: entry['category_id'] as String?,
-        categoryName: entry['category_name'] as String? ?? '',
-        categoryColor:
-            Color(entry['category_color'] as int? ?? 0xFF757575),
-        sets: sets,
-        restTimeSeconds: (entry['rest_time_seconds'] as int?) ?? 90,
-      ));
+      final sets = await _workoutRepo.getExerciseSets(entry['id'] as String);
+      exercises.add(
+        ExerciseWithSets(
+          entryId: entry['id'] as String,
+          exerciseId: entry['exercise_id'] as String? ?? '',
+          name: entry['exercise_name'] as String? ?? '',
+          localeKey: entry['exercise_locale_key'] as String?,
+          exerciseType: entry['exercise_type'] as String? ?? 'weightReps',
+          categoryId: entry['category_id'] as String?,
+          categoryName: entry['category_name'] as String? ?? '',
+          categoryColor: Color(entry['category_color'] as int? ?? 0xFF757575),
+          sets: sets,
+          restTimeSeconds: (entry['rest_time_seconds'] as int?) ?? 90,
+        ),
+      );
     }
 
     final startStr = _workout!['start_time'] as String?;
@@ -145,14 +145,9 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
 
   Future<void> _pickStartDateTime() async {
     final loc = AppLocalizations.of(context)!;
-    final initial = _startTime ??
-        DateTime(
-          _workoutDate.year,
-          _workoutDate.month,
-          _workoutDate.day,
-          8,
-          0,
-        );
+    final initial =
+        _startTime ??
+        DateTime(_workoutDate.year, _workoutDate.month, _workoutDate.day, 8, 0);
     final pickedDate = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -267,7 +262,9 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
         onExerciseRemoved: (exercise) async {
           final exerciseId = exercise['id'] as String;
           await _workoutRepo.removeExerciseEntryFromWorkout(
-              widget.workoutId, exerciseId);
+            widget.workoutId,
+            exerciseId,
+          );
           if (mounted) {
             setState(() {
               _exercises.removeWhere((e) => e.exerciseId == exerciseId);
@@ -284,25 +281,30 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     final rt = exercise['default_rest_time'] as int?;
 
     final entryId = await _workoutRepo.addExerciseToWorkout(
-        widget.workoutId, exerciseId,
-        restTimeSeconds: rt);
+      widget.workoutId,
+      exerciseId,
+      restTimeSeconds: rt,
+    );
 
     final sets = await _workoutRepo.getExerciseSets(entryId);
     if (mounted) {
       setState(() {
-        _exercises.add(ExerciseWithSets(
-          entryId: entryId,
-          exerciseId: exerciseId,
-          name: ExerciseLocaleHelper.exerciseName(loc, exercise),
-          localeKey: exercise['locale_key'] as String?,
-          exerciseType: exercise['type'] as String? ?? 'weightReps',
-          categoryId: exercise['category_id'] as String?,
-          categoryName: ExerciseLocaleHelper.categoryName(loc, exercise),
-          categoryColor: Color(
-              exercise['category_color'] as int? ?? 0xFF757575),
-          sets: sets,
-          restTimeSeconds: rt ?? 90,
-        ));
+        _exercises.add(
+          ExerciseWithSets(
+            entryId: entryId,
+            exerciseId: exerciseId,
+            name: ExerciseLocaleHelper.exerciseName(loc, exercise),
+            localeKey: exercise['locale_key'] as String?,
+            exerciseType: exercise['type'] as String? ?? 'weightReps',
+            categoryId: exercise['category_id'] as String?,
+            categoryName: ExerciseLocaleHelper.categoryName(loc, exercise),
+            categoryColor: Color(
+              exercise['category_color'] as int? ?? 0xFF757575,
+            ),
+            sets: sets,
+            restTimeSeconds: rt ?? 90,
+          ),
+        );
       });
     }
   }
@@ -313,8 +315,9 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(loc.activeWorkoutRemoveExercise),
-        content: Text(loc
-            .activeWorkoutRemoveExerciseContent(ex.localizedName(loc))),
+        content: Text(
+          loc.activeWorkoutRemoveExerciseContent(ex.localizedName(loc)),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -322,8 +325,10 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete,
-                style: const TextStyle(color: Colors.red)),
+            child: Text(
+              loc.commonDelete,
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -381,11 +386,14 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     final loc = AppLocalizations.of(context)!;
     final set = exercise.sets[setIndex];
     final weightCtl = TextEditingController(
-        text: (set['weight'] as num?)?.toStringAsFixed(1) ?? '');
+      text: (set['weight'] as num?)?.toStringAsFixed(1) ?? '',
+    );
     final repsCtl = TextEditingController(
-        text: (set['reps'] as int?)?.toString() ?? '');
+      text: (set['reps'] as int?)?.toString() ?? '',
+    );
     final rpeCtl = TextEditingController(
-        text: (set['rpe'] as num?)?.toStringAsFixed(1) ?? '');
+      text: (set['rpe'] as num?)?.toStringAsFixed(1) ?? '',
+    );
 
     final result = await showDialog<bool>(
       context: context,
@@ -401,8 +409,9 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                 border: const OutlineInputBorder(),
                 isDense: true,
               ),
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -422,8 +431,9 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                 border: const OutlineInputBorder(),
                 isDense: true,
               ),
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
             ),
           ],
         ),
@@ -441,10 +451,12 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
     );
 
     if (result == true) {
-      await _workoutRepo.updateSet(set['id'] as String,
-          weight: double.tryParse(weightCtl.text),
-          reps: int.tryParse(repsCtl.text),
-          rpe: double.tryParse(rpeCtl.text));
+      await _workoutRepo.updateSet(
+        set['id'] as String,
+        weight: double.tryParse(weightCtl.text),
+        reps: int.tryParse(repsCtl.text),
+        rpe: double.tryParse(rpeCtl.text),
+      );
       await _load();
       if (mounted) setState(() {});
     }
@@ -475,7 +487,10 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
   }
 
   Widget _dragProxyDecorator(
-      Widget child, int index, Animation<double> animation) {
+    Widget child,
+    int index,
+    Animation<double> animation,
+  ) {
     return AnimatedBuilder(
       animation: animation,
       builder: (ctx, _) {
@@ -563,19 +578,16 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
 
   Widget _buildDateTimeCard(ThemeData theme, AppLocalizations loc) {
     final dateStr = DateFormat(
-            Intl.defaultLocale?.startsWith('pt') == true
-                ? "d 'de' MMMM 'de' yyyy"
-                : 'MMMM d, yyyy',
-            Intl.defaultLocale)
-        .format(_workoutDate);
+      Intl.defaultLocale?.startsWith('pt') == true
+          ? "d 'de' MMMM 'de' yyyy"
+          : 'MMMM d, yyyy',
+      Intl.defaultLocale,
+    ).format(_workoutDate);
     final timeStr = DateFormat('HH:mm', Intl.defaultLocale);
-    final startStr =
-        _startTime != null ? timeStr.format(_startTime!) : '—';
+    final startStr = _startTime != null ? timeStr.format(_startTime!) : '—';
     final endStr = _endTime != null ? timeStr.format(_endTime!) : '—';
     final durSec = _durationSeconds;
-    final durStr = durSec > 0
-        ? '${durSec ~/ 60}min ${durSec % 60}s'
-        : '—';
+    final durStr = durSec > 0 ? '${durSec ~/ 60}min ${durSec % 60}s' : '—';
 
     return Container(
       width: double.infinity,
@@ -586,13 +598,17 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.calendar_today,
-                  size: 16, color: theme.colorScheme.primary),
+              Icon(
+                Icons.calendar_today,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
               const SizedBox(width: 6),
               Text(
                 loc.editWorkoutDateTime,
-                style: theme.textTheme.labelLarge
-                    ?.copyWith(fontWeight: FontWeight.bold),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -601,24 +617,20 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
             onTap: _pickDate,
             borderRadius: BorderRadius.circular(10),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: theme.colorScheme.surface,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                    color: theme.colorScheme.outlineVariant.withAlpha(100)),
+                  color: theme.colorScheme.outlineVariant.withAlpha(100),
+                ),
               ),
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      dateStr,
-                      style: theme.textTheme.bodyLarge,
-                    ),
+                    child: Text(dateStr, style: theme.textTheme.bodyLarge),
                   ),
-                  Icon(Icons.edit,
-                      size: 16, color: theme.colorScheme.primary),
+                  Icon(Icons.edit, size: 16, color: theme.colorScheme.primary),
                 ],
               ),
             ),
@@ -652,19 +664,24 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(Icons.timer_outlined,
-                  size: 14, color: theme.colorScheme.onSurfaceVariant),
+              Icon(
+                Icons.timer_outlined,
+                size: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 4),
               Text(
                 '${loc.editWorkoutDuration}: ',
                 style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600),
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               Text(
                 durStr,
                 style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant),
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -691,20 +708,24 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.fitness_center_outlined,
-                size: 48,
-                color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
+            Icon(
+              Icons.fitness_center_outlined,
+              size: 48,
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+            ),
             const SizedBox(height: 16),
             Text(
               loc.activeWorkoutEmptyTitle,
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               loc.activeWorkoutEmptySubtitle,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -734,7 +755,11 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
   }
 
   Widget _buildExerciseCard(
-      ExerciseWithSets ex, int index, ThemeData theme, AppLocalizations loc) {
+    ExerciseWithSets ex,
+    int index,
+    ThemeData theme,
+    AppLocalizations loc,
+  ) {
     return Card(
       key: ValueKey(ex.entryId),
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -762,15 +787,18 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                 Expanded(
                   child: Text(
                     ex.localizedName(loc),
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(6),
@@ -789,8 +817,11 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                   onTap: () => _removeExercise(ex),
                   child: Padding(
                     padding: const EdgeInsets.all(4),
-                    child: Icon(Icons.close,
-                        size: 18, color: theme.colorScheme.error),
+                    child: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: theme.colorScheme.error,
+                    ),
                   ),
                 ),
                 ReorderableDragStartListener(
@@ -809,27 +840,39 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
                   const SizedBox(width: 28),
                   Expanded(
                     flex: 2,
-                    child: Text(loc.workoutDetailSetNumber,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    child: Text(
+                      loc.workoutDetailSetNumber,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                   Expanded(
                     flex: 3,
-                    child: Text(loc.workoutDetailWeight,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    child: Text(
+                      loc.workoutDetailWeight,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                   Expanded(
                     flex: 3,
-                    child: Text(loc.commonReps,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    child: Text(
+                      loc.commonReps,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                   Expanded(
                     flex: 3,
-                    child: Text(loc.workoutDetailRpe,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    child: Text(
+                      loc.workoutDetailRpe,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -944,7 +987,8 @@ class _TimeField extends StatelessWidget {
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-              color: theme.colorScheme.outlineVariant.withAlpha(100)),
+            color: theme.colorScheme.outlineVariant.withAlpha(100),
+          ),
         ),
         child: Row(
           children: [
@@ -964,14 +1008,14 @@ class _TimeField extends StatelessWidget {
                   ),
                   Text(
                     value,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.edit,
-                size: 14, color: theme.colorScheme.primary),
+            Icon(Icons.edit, size: 14, color: theme.colorScheme.primary),
           ],
         ),
       ),

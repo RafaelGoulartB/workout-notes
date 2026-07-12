@@ -28,7 +28,11 @@ class WorkoutHeatmap extends StatelessWidget {
     final firstDay = DateTime(year, 1, 1);
     final lastDay = DateTime(year, 12, 31);
 
-    for (var d = firstDay; d.isBefore(lastDay) || d == lastDay; d = d.add(const Duration(days: 1))) {
+    for (
+      var d = firstDay;
+      d.isBefore(lastDay) || d == lastDay;
+      d = d.add(const Duration(days: 1))
+    ) {
       final dateStr = d.toIso8601String().substring(0, 10);
       final volume = dailyData[dateStr] ?? 0;
 
@@ -47,10 +51,12 @@ class WorkoutHeatmap extends StatelessWidget {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Text(AppLocalizations.of(context)!.progressHeatmapNoData(year),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  )),
+          child: Text(
+            AppLocalizations.of(context)!.progressHeatmapNoData(year),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
       );
     }
@@ -83,7 +89,10 @@ class WorkoutHeatmap extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     dayLabels[e.key].substring(0, 1),
-                    style: TextStyle(fontSize: 8, color: theme.colorScheme.onSurfaceVariant.withAlpha(150)),
+                    style: TextStyle(
+                      fontSize: 8,
+                      color: theme.colorScheme.onSurfaceVariant.withAlpha(150),
+                    ),
                   ),
                 );
               }).toList(),

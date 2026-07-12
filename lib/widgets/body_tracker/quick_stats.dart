@@ -24,14 +24,30 @@ class BodyQuickStats extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
 
     final statItems = [
-      (loc.bodyTrackerMin, minValue?.toStringAsFixed(1) ?? '--',
-          Icons.trending_down, Colors.blueGrey),
-      (loc.bodyTrackerMax, maxValue?.toStringAsFixed(1) ?? '--',
-          Icons.trending_up, typeColor),
-      (loc.bodyTrackerAverage, avgValue?.toStringAsFixed(1) ?? '--',
-          Icons.show_chart, typeColor.withAlpha(200)),
-      (loc.bodyTrackerEntries, '$totalCount', Icons.receipt_long,
-          theme.colorScheme.secondary),
+      (
+        loc.bodyTrackerMin,
+        minValue?.toStringAsFixed(1) ?? '--',
+        Icons.trending_down,
+        Colors.blueGrey,
+      ),
+      (
+        loc.bodyTrackerMax,
+        maxValue?.toStringAsFixed(1) ?? '--',
+        Icons.trending_up,
+        typeColor,
+      ),
+      (
+        loc.bodyTrackerAverage,
+        avgValue?.toStringAsFixed(1) ?? '--',
+        Icons.show_chart,
+        typeColor.withAlpha(200),
+      ),
+      (
+        loc.bodyTrackerEntries,
+        '$totalCount',
+        Icons.receipt_long,
+        theme.colorScheme.secondary,
+      ),
     ];
 
     return Padding(

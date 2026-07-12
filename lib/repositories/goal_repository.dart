@@ -28,8 +28,11 @@ class GoalRepository extends BaseRepository {
 
   Future<void> insert(Goal goal) async {
     final db = await this.db;
-    await db.insert('user_goals', goal.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      'user_goals',
+      goal.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<void> update(Goal goal) async {
@@ -63,7 +66,10 @@ class GoalRepository extends BaseRepository {
 
   /// Returns [start, end] of the current period for the given [period].
   /// Weekly = Monday → Sunday. Monthly = day 1 → last day of month.
-  static (DateTime, DateTime) currentPeriod(GoalPeriod period, [DateTime? now]) {
+  static (DateTime, DateTime) currentPeriod(
+    GoalPeriod period, [
+    DateTime? now,
+  ]) {
     final n = now ?? DateTime.now();
     final today = DateTime(n.year, n.month, n.day);
     if (period == GoalPeriod.weekly) {
@@ -84,7 +90,11 @@ class GoalRepository extends BaseRepository {
 
   /// Returns list of (start, end) tuples for the past [count] periods,
   /// most recent first.
-  static List<(DateTime, DateTime)> pastPeriods(GoalPeriod period, int count, [DateTime? now]) {
+  static List<(DateTime, DateTime)> pastPeriods(
+    GoalPeriod period,
+    int count, [
+    DateTime? now,
+  ]) {
     final n = now ?? DateTime.now();
     final results = <(DateTime, DateTime)>[];
     if (period == GoalPeriod.weekly) {
@@ -129,13 +139,15 @@ class GoalRepository extends BaseRepository {
     final results = <GoalPeriodResult>[];
     for (final (start, end) in pastRanges) {
       final value = await _computeValueForRange(goal, start, end);
-      results.add(GoalPeriodResult(
-        start: start,
-        end: end,
-        value: value,
-        targetValue: goal.targetValue,
-        wasCompleted: value >= goal.targetValue,
-      ));
+      results.add(
+        GoalPeriodResult(
+          start: start,
+          end: end,
+          value: value,
+          targetValue: goal.targetValue,
+          wasCompleted: value >= goal.targetValue,
+        ),
+      );
     }
     return (current, results);
   }
@@ -153,7 +165,8 @@ class GoalRepository extends BaseRepository {
 
     switch (goal.metric) {
       case GoalMetric.volume:
-        final rows = await db.rawQuery('''
+        final rows = await db.rawQuery(
+          '''
           SELECT w.id as workout_id, w.date,
             SUM(s.weight * s.reps) as value,
             COUNT(s.id) as set_count
@@ -168,20 +181,25 @@ class GoalRepository extends BaseRepository {
             AND s.weight > 0 AND s.reps > 0
           GROUP BY w.id
           ORDER BY w.date DESC
-        ''', [startStr, endStr, energySystem]);
+        ''',
+          [startStr, endStr, energySystem],
+        );
         return rows
             .where((r) => ((r['value'] as num?) ?? 0) > 0)
-            .map((r) => ContributingWorkout(
-                  workoutId: r['workout_id'] as String,
-                  date: r['date'] as String,
-                  contributedValue: (r['value'] as num?)?.toDouble() ?? 0,
-                  setCount: (r['set_count'] as int?) ?? 0,
-                ))
+            .map(
+              (r) => ContributingWorkout(
+                workoutId: r['workout_id'] as String,
+                date: r['date'] as String,
+                contributedValue: (r['value'] as num?)?.toDouble() ?? 0,
+                setCount: (r['set_count'] as int?) ?? 0,
+              ),
+            )
             .toList();
 
       case GoalMetric.days:
         // Workouts that contain at least one exercise of the goal's scope.
-        final rows = await db.rawQuery('''
+        final rows = await db.rawQuery(
+          '''
           SELECT w.id as workout_id, w.date
           FROM workouts w
           WHERE w.date >= ? AND w.date <= ?
@@ -194,18 +212,23 @@ class GoalRepository extends BaseRepository {
                 AND ec.energy_system = ?
             )
           ORDER BY w.date DESC
-        ''', [startStr, endStr, energySystem]);
+        ''',
+          [startStr, endStr, energySystem],
+        );
         return rows
-            .map((r) => ContributingWorkout(
-                  workoutId: r['workout_id'] as String,
-                  date: r['date'] as String,
-                  contributedValue: 1.0,
-                  setCount: 0,
-                ))
+            .map(
+              (r) => ContributingWorkout(
+                workoutId: r['workout_id'] as String,
+                date: r['date'] as String,
+                contributedValue: 1.0,
+                setCount: 0,
+              ),
+            )
             .toList();
 
       case GoalMetric.distance:
-        final rows = await db.rawQuery('''
+        final rows = await db.rawQuery(
+          '''
           SELECT w.id as workout_id, w.date,
             SUM(s.distance) as value,
             COUNT(s.id) as set_count
@@ -219,19 +242,24 @@ class GoalRepository extends BaseRepository {
             AND s.distance IS NOT NULL AND s.distance > 0
           GROUP BY w.id
           ORDER BY w.date DESC
-        ''', [startStr, endStr]);
+        ''',
+          [startStr, endStr],
+        );
         return rows
             .where((r) => ((r['value'] as num?) ?? 0) > 0)
-            .map((r) => ContributingWorkout(
-                  workoutId: r['workout_id'] as String,
-                  date: r['date'] as String,
-                  contributedValue: (r['value'] as num?)?.toDouble() ?? 0,
-                  setCount: (r['set_count'] as int?) ?? 0,
-                ))
+            .map(
+              (r) => ContributingWorkout(
+                workoutId: r['workout_id'] as String,
+                date: r['date'] as String,
+                contributedValue: (r['value'] as num?)?.toDouble() ?? 0,
+                setCount: (r['set_count'] as int?) ?? 0,
+              ),
+            )
             .toList();
 
       case GoalMetric.time:
-        final rows = await db.rawQuery('''
+        final rows = await db.rawQuery(
+          '''
           SELECT w.id as workout_id, w.date,
             SUM(s.time_seconds) as value,
             COUNT(s.id) as set_count
@@ -245,24 +273,32 @@ class GoalRepository extends BaseRepository {
             AND s.time_seconds IS NOT NULL AND s.time_seconds > 0
           GROUP BY w.id
           ORDER BY w.date DESC
-        ''', [startStr, endStr]);
+        ''',
+          [startStr, endStr],
+        );
         return rows
             .where((r) => ((r['value'] as num?) ?? 0) > 0)
-            .map((r) => ContributingWorkout(
-                  workoutId: r['workout_id'] as String,
-                  date: r['date'] as String,
-                  contributedValue:
-                      ((r['value'] as int?) ?? 0).toDouble(),
-                  setCount: (r['set_count'] as int?) ?? 0,
-                ))
+            .map(
+              (r) => ContributingWorkout(
+                workoutId: r['workout_id'] as String,
+                date: r['date'] as String,
+                contributedValue: ((r['value'] as int?) ?? 0).toDouble(),
+                setCount: (r['set_count'] as int?) ?? 0,
+              ),
+            )
             .toList();
     }
   }
 
   /// Suggested target based on the average of the last [weeks] weeks (or months)
   /// of the same metric, multiplied by [multiplier].
-  Future<double?> suggestTarget(GoalScope scope, GoalMetric metric, GoalPeriod period,
-      {double multiplier = 1.10, int periods = 4}) async {
+  Future<double?> suggestTarget(
+    GoalScope scope,
+    GoalMetric metric,
+    GoalPeriod period, {
+    double multiplier = 1.10,
+    int periods = 4,
+  }) async {
     final ranges = pastPeriods(period, periods).reversed.toList();
     if (ranges.isEmpty) return null;
     final values = <double>[];
@@ -279,7 +315,12 @@ class GoalRepository extends BaseRepository {
   // INTERNAL
   // ===================================================================
 
-  GoalProgress _buildProgress(Goal goal, double value, DateTime start, DateTime end) {
+  GoalProgress _buildProgress(
+    Goal goal,
+    double value,
+    DateTime start,
+    DateTime end,
+  ) {
     final now = DateTime.now();
     final target = goal.targetValue;
     final percent = target > 0 ? (value / target).clamp(0.0, 1.5) : 0.0;
@@ -299,7 +340,11 @@ class GoalRepository extends BaseRepository {
     );
   }
 
-  Future<double> _computeValueForRange(Goal goal, DateTime start, DateTime end) {
+  Future<double> _computeValueForRange(
+    Goal goal,
+    DateTime start,
+    DateTime end,
+  ) {
     return _computeValueForRangeRaw(goal.scope, goal.metric, start, end);
   }
 
@@ -318,7 +363,8 @@ class GoalRepository extends BaseRepository {
       case GoalMetric.volume:
         // Sum of (weight * reps) only for sets whose exercise belongs to
         // a category of the goal's scope (anaerobic for strength).
-        final row = await db.rawQuery('''
+        final row = await db.rawQuery(
+          '''
           SELECT COALESCE(SUM(s.weight * s.reps), 0) as value
           FROM sets s
           JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
@@ -329,13 +375,16 @@ class GoalRepository extends BaseRepository {
             AND ec.energy_system = ?
             AND s.weight IS NOT NULL AND s.reps IS NOT NULL
             AND s.weight > 0 AND s.reps > 0
-        ''', [startStr, endStr, energySystem]);
+        ''',
+          [startStr, endStr, energySystem],
+        );
         return (row.first['value'] as num?)?.toDouble() ?? 0;
 
       case GoalMetric.days:
         // Distinct workout dates that contain at least one exercise
         // whose category matches the goal's scope.
-        final row = await db.rawQuery('''
+        final row = await db.rawQuery(
+          '''
           SELECT COUNT(DISTINCT w.date) as value
           FROM workouts w
           WHERE w.date >= ? AND w.date <= ?
@@ -347,12 +396,15 @@ class GoalRepository extends BaseRepository {
               WHERE ee.workout_id = w.id
                 AND ec.energy_system = ?
             )
-        ''', [startStr, endStr, energySystem]);
+        ''',
+          [startStr, endStr, energySystem],
+        );
         return ((row.first['value'] as int?) ?? 0).toDouble();
 
       case GoalMetric.distance:
         // Aerobic: sum of distance for cardio exercises
-        final row = await db.rawQuery('''
+        final row = await db.rawQuery(
+          '''
           SELECT COALESCE(SUM(s.distance), 0) as value
           FROM sets s
           JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
@@ -363,12 +415,15 @@ class GoalRepository extends BaseRepository {
             AND s.is_warmup = 0
             AND ec.energy_system = 'aerobic'
             AND s.distance IS NOT NULL AND s.distance > 0
-        ''', [startStr, endStr]);
+        ''',
+          [startStr, endStr],
+        );
         return (row.first['value'] as num?)?.toDouble() ?? 0;
 
       case GoalMetric.time:
         // Aerobic: sum of time_seconds for cardio exercises
-        final row = await db.rawQuery('''
+        final row = await db.rawQuery(
+          '''
           SELECT COALESCE(SUM(s.time_seconds), 0) as value
           FROM sets s
           JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
@@ -379,7 +434,9 @@ class GoalRepository extends BaseRepository {
             AND s.is_warmup = 0
             AND ec.energy_system = 'aerobic'
             AND s.time_seconds IS NOT NULL AND s.time_seconds > 0
-        ''', [startStr, endStr]);
+        ''',
+          [startStr, endStr],
+        );
         return ((row.first['value'] as int?) ?? 0).toDouble();
     }
   }

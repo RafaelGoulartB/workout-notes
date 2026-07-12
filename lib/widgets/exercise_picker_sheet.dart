@@ -40,7 +40,7 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
 
   Future<void> _load() async {
     _categories = await _exerciseRepo.getCategories();
-    
+
     // Load all exercises grouped by category
     final allExercises = await _exerciseRepo.getExercises();
     for (final cat in _categories) {
@@ -49,23 +49,23 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
           .where((e) => e['category_id'] == catId)
           .toList();
     }
-    
+
     setState(() => _isLoading = false);
   }
 
   List<Map<String, dynamic>> get _filteredExercises {
     if (_selectedCategoryId == null) return [];
-    
+
     final exercises = _exercisesByCategory[_selectedCategoryId] ?? [];
     if (_search.isEmpty) return exercises;
-    
+
     final loc = AppLocalizations.of(context);
     if (loc != null) {
       return exercises.where((e) {
         return ExerciseLocaleHelper.exerciseMatchesSearch(loc, e, _search);
       }).toList();
     }
-    
+
     return exercises.where((e) {
       final name = (e['name'] as String? ?? '').toLowerCase();
       return name.contains(_search.toLowerCase());
@@ -126,7 +126,9 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                 Expanded(
                   child: Text(
                     loc.routinesAddExercise,
-                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 if (_selectedCategoryId != null)
@@ -197,20 +199,29 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, cat),
-                                      style: theme.textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.w600,
+                                      ExerciseLocaleHelper.categoryName(
+                                        AppLocalizations.of(context)!,
+                                        cat,
                                       ),
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       '${exercises.length} ${loc.commonExercises.toLowerCase()}${selectedCount > 0 ? ' · $selectedCount' : ''}',
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: selectedCount > 0
-                                            ? theme.colorScheme.primary
-                                            : theme.colorScheme.onSurfaceVariant,
-                                        fontWeight: selectedCount > 0 ? FontWeight.w600 : null,
-                                      ),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: selectedCount > 0
+                                                ? theme.colorScheme.primary
+                                                : theme
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
+                                            fontWeight: selectedCount > 0
+                                                ? FontWeight.w600
+                                                : null,
+                                          ),
                                     ),
                                   ],
                                 ),
@@ -235,16 +246,26 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                   children: [
                     // Category header
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
-                        color: Color(selectedCategory['color'] as int? ?? 0xFF757575).withAlpha(20),
+                        color: Color(
+                          selectedCategory['color'] as int? ?? 0xFF757575,
+                        ).withAlpha(20),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, selectedCategory),
+                        ExerciseLocaleHelper.categoryName(
+                          AppLocalizations.of(context)!,
+                          selectedCategory,
+                        ),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: Color(selectedCategory['color'] as int? ?? 0xFF757575),
+                          color: Color(
+                            selectedCategory['color'] as int? ?? 0xFF757575,
+                          ),
                         ),
                       ),
                     ),
@@ -255,9 +276,12 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                       decoration: InputDecoration(
                         hintText: loc.exerciseLibrarySearch,
                         prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         filled: true,
-                        fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
+                        fillColor: theme.colorScheme.surfaceContainerHighest
+                            .withAlpha(80),
                       ),
                       onChanged: (v) => setState(() => _search = v),
                     ),
@@ -283,8 +307,11 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                                 final ex = filtered[i];
                                 final exId = ex['id'] as String;
                                 final isSelected = _selectedIds.contains(exId);
-                                final catColor = Color(selectedCategory['color'] as int? ?? 0xFF757575);
-                                
+                                final catColor = Color(
+                                  selectedCategory['color'] as int? ??
+                                      0xFF757575,
+                                );
+
                                 return ListTile(
                                   leading: Container(
                                     width: 8,
@@ -295,13 +322,23 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                                     ),
                                   ),
                                   title: Text(
-                                    ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, ex),
+                                    ExerciseLocaleHelper.exerciseName(
+                                      AppLocalizations.of(context)!,
+                                      ex,
+                                    ),
                                     style: TextStyle(
-                                      fontWeight: isSelected ? FontWeight.w600 : null,
-                                      color: isSelected ? theme.colorScheme.primary : null,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : null,
+                                      color: isSelected
+                                          ? theme.colorScheme.primary
+                                          : null,
                                     ),
                                   ),
-                                  subtitle: ExerciseLocaleHelper.equipment(ex).isNotEmpty
+                                  subtitle:
+                                      ExerciseLocaleHelper.equipment(
+                                        ex,
+                                      ).isNotEmpty
                                       ? Text(ExerciseLocaleHelper.equipment(ex))
                                       : null,
                                   trailing: AnimatedSwitcher(
@@ -317,7 +354,8 @@ class _ExercisePickerSheetState extends State<ExercisePickerSheet> {
                                             ),
                                             child: Icon(
                                               Icons.check,
-                                              color: theme.colorScheme.onPrimary,
+                                              color:
+                                                  theme.colorScheme.onPrimary,
                                               size: 20,
                                             ),
                                           )

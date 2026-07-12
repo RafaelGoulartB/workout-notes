@@ -44,11 +44,8 @@ class AiToolCall {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': 'function',
-        'function': {
-          'name': name,
-          'arguments': jsonEncode(arguments),
-        },
-      };
+    'id': id,
+    'type': 'function',
+    'function': {'name': name, 'arguments': jsonEncode(arguments)},
+  };
 }

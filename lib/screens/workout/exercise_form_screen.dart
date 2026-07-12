@@ -26,19 +26,57 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
   bool get _isEditing => widget.exerciseId != null;
 
   final _types = [
-    {'id': 'weightReps', 'name': 'Peso × Repetições', 'icon': Icons.fitness_center},
-    {'id': 'distanceTime', 'name': 'Distância × Tempo', 'icon': Icons.straighten},
-    {'id': 'weightDistance', 'name': 'Peso × Distância', 'icon': Icons.monitor_weight},
+    {
+      'id': 'weightReps',
+      'name': 'Peso × Repetições',
+      'icon': Icons.fitness_center,
+    },
+    {
+      'id': 'distanceTime',
+      'name': 'Distância × Tempo',
+      'icon': Icons.straighten,
+    },
+    {
+      'id': 'weightDistance',
+      'name': 'Peso × Distância',
+      'icon': Icons.monitor_weight,
+    },
     {'id': 'weightTime', 'name': 'Peso × Tempo', 'icon': Icons.timer},
-    {'id': 'repsDistance', 'name': 'Repetições × Distância', 'icon': Icons.repeat},
+    {
+      'id': 'repsDistance',
+      'name': 'Repetições × Distância',
+      'icon': Icons.repeat,
+    },
     {'id': 'repsTime', 'name': 'Repetições × Tempo', 'icon': Icons.repeat_one},
-    {'id': 'weightOnly', 'name': 'Apenas Peso', 'icon': Icons.monitor_weight_outlined},
-    {'id': 'repsOnly', 'name': 'Apenas Repetições', 'icon': Icons.repeat_one_on},
-    {'id': 'distanceOnly', 'name': 'Apenas Distância', 'icon': Icons.straighten},
+    {
+      'id': 'weightOnly',
+      'name': 'Apenas Peso',
+      'icon': Icons.monitor_weight_outlined,
+    },
+    {
+      'id': 'repsOnly',
+      'name': 'Apenas Repetições',
+      'icon': Icons.repeat_one_on,
+    },
+    {
+      'id': 'distanceOnly',
+      'name': 'Apenas Distância',
+      'icon': Icons.straighten,
+    },
     {'id': 'timeOnly', 'name': 'Apenas Tempo', 'icon': Icons.timer_outlined},
   ];
 
-  final _equipmentOptions = ['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight', 'Treadmill', 'Stationary', 'Kettlebell', 'Band'];
+  final _equipmentOptions = [
+    'Barbell',
+    'Dumbbell',
+    'Cable',
+    'Machine',
+    'Bodyweight',
+    'Treadmill',
+    'Stationary',
+    'Kettlebell',
+    'Band',
+  ];
 
   @override
   void initState() {
@@ -66,7 +104,10 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
   Future<void> _save() async {
     if (_nameCtl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.exerciseFormNameRequired), behavior: SnackBarBehavior.floating),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.exerciseFormNameRequired),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -74,22 +115,38 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
     setState(() => _isSaving = true);
     try {
       if (_isEditing) {
-        await _exerciseRepo.updateExercise(widget.exerciseId!, name: _nameCtl.text.trim(),
-          categoryId: _categoryId, type: _type, notes: _notesCtl.text.trim(),
+        await _exerciseRepo.updateExercise(
+          widget.exerciseId!,
+          name: _nameCtl.text.trim(),
+          categoryId: _categoryId,
+          type: _type,
+          notes: _notesCtl.text.trim(),
           equipment: _equipment.isEmpty ? null : _equipment,
-          weightIncrement: _weightIncrement, defaultRestTime: _defaultRestTime);
+          weightIncrement: _weightIncrement,
+          defaultRestTime: _defaultRestTime,
+        );
       } else {
-        await _exerciseRepo.addExercise(name: _nameCtl.text.trim(), categoryId: _categoryId,
-          type: _type, notes: _notesCtl.text.trim(),
+        await _exerciseRepo.addExercise(
+          name: _nameCtl.text.trim(),
+          categoryId: _categoryId,
+          type: _type,
+          notes: _notesCtl.text.trim(),
           equipment: _equipment.isEmpty ? null : _equipment,
-          weightIncrement: _weightIncrement, defaultRestTime: _defaultRestTime);
+          weightIncrement: _weightIncrement,
+          defaultRestTime: _defaultRestTime,
+        );
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       setState(() => _isSaving = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.commonError(e.toString())), behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.commonError(e.toString()),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -108,13 +165,21 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? AppLocalizations.of(context)!.exerciseFormTitleEdit : AppLocalizations.of(context)!.exerciseFormTitleNew),
+        title: Text(
+          _isEditing
+              ? AppLocalizations.of(context)!.exerciseFormTitleEdit
+              : AppLocalizations.of(context)!.exerciseFormTitleNew,
+        ),
         centerTitle: true,
         actions: [
           TextButton(
             onPressed: _isSaving ? null : _save,
             child: _isSaving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : Text(AppLocalizations.of(context)!.exerciseFormSave),
           ),
         ],
@@ -132,7 +197,9 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                     decoration: InputDecoration(
                       labelText: AppLocalizations.of(context)!.exerciseFormName,
                       border: OutlineInputBorder(),
-                      hintText: AppLocalizations.of(context)!.exerciseFormNameHint,
+                      hintText: AppLocalizations.of(
+                        context,
+                      )!.exerciseFormNameHint,
                     ),
                     textCapitalization: TextCapitalization.words,
                     autofocus: !_isEditing,
@@ -143,42 +210,69 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                   DropdownButtonFormField<String>(
                     initialValue: _categoryId,
                     decoration: InputDecoration(
-                      labelText: AppLocalizations.of(context)!.exerciseFormCategory,
+                      labelText: AppLocalizations.of(
+                        context,
+                      )!.exerciseFormCategory,
                       border: OutlineInputBorder(),
                     ),
-                    items: _categories.map((cat) => DropdownMenuItem(
-                      value: cat['id'] as String,
-                      child: Row(
-                        children: [
-                          Container(width: 12, height: 12, decoration: BoxDecoration(
-                            color: Color(cat['color'] as int), shape: BoxShape.circle,
-                          )),
-                          const SizedBox(width: 8),
-                          Text(ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, cat)),
-                        ],
-                      ),
-                    )).toList(),
-                    onChanged: (v) => setState(() => _categoryId = v ?? _categoryId),
+                    items: _categories
+                        .map(
+                          (cat) => DropdownMenuItem(
+                            value: cat['id'] as String,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: Color(cat['color'] as int),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  ExerciseLocaleHelper.categoryName(
+                                    AppLocalizations.of(context)!,
+                                    cat,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) =>
+                        setState(() => _categoryId = v ?? _categoryId),
                   ),
                   const SizedBox(height: 16),
 
                   // Type
                   DropdownButtonFormField<String>(
-                    initialValue: _types.any((t) => t['id'] == _type) ? _type : 'weightReps',
+                    initialValue: _types.any((t) => t['id'] == _type)
+                        ? _type
+                        : 'weightReps',
                     decoration: InputDecoration(
                       labelText: AppLocalizations.of(context)!.exerciseFormType,
                       border: OutlineInputBorder(),
                     ),
-                    items: _types.map((t) => DropdownMenuItem<String>(
-                      value: t['id'] as String,
-                      child: Row(
-                        children: [
-                          Icon(t['icon'] as IconData, size: 18, color: theme.colorScheme.primary),
-                          const SizedBox(width: 8),
-                          Text(_exerciseTypeName(t['id'] as String)),
-                        ],
-                      ),
-                    )).toList(),
+                    items: _types
+                        .map(
+                          (t) => DropdownMenuItem<String>(
+                            value: t['id'] as String,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  t['icon'] as IconData,
+                                  size: 18,
+                                  color: theme.colorScheme.primary,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(_exerciseTypeName(t['id'] as String)),
+                              ],
+                            ),
+                          ),
+                        )
+                        .toList(),
                     onChanged: (v) => setState(() => _type = v ?? _type),
                   ),
                   const SizedBox(height: 16),
@@ -186,50 +280,71 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                   // Equipment
                   Autocomplete<String>(
                     optionsBuilder: (textEditingValue) {
-                      if (textEditingValue.text.isEmpty) return _equipmentOptions;
-                      return _equipmentOptions.where((opt) =>
-                        opt.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+                      if (textEditingValue.text.isEmpty)
+                        return _equipmentOptions;
+                      return _equipmentOptions.where(
+                        (opt) => opt.toLowerCase().contains(
+                          textEditingValue.text.toLowerCase(),
+                        ),
+                      );
                     },
                     initialValue: TextEditingValue(text: _equipment),
                     onSelected: (v) => _equipment = v,
-                    fieldViewBuilder: (ctx, ctl, focusNode, onSubmit) => TextField(
-                      controller: ctl,
-                      focusNode: focusNode,
-                      decoration: InputDecoration(
-                        labelText: AppLocalizations.of(context)!.exerciseFormEquipment,
-                        border: OutlineInputBorder(),
-                        hintText: AppLocalizations.of(context)!.exerciseFormEquipmentHint,
-                      ),
-                      onSubmitted: (_) => onSubmit(),
-                      onChanged: (v) => _equipment = v,
-                    ),
+                    fieldViewBuilder: (ctx, ctl, focusNode, onSubmit) =>
+                        TextField(
+                          controller: ctl,
+                          focusNode: focusNode,
+                          decoration: InputDecoration(
+                            labelText: AppLocalizations.of(
+                              context,
+                            )!.exerciseFormEquipment,
+                            border: OutlineInputBorder(),
+                            hintText: AppLocalizations.of(
+                              context,
+                            )!.exerciseFormEquipmentHint,
+                          ),
+                          onSubmitted: (_) => onSubmit(),
+                          onChanged: (v) => _equipment = v,
+                        ),
                   ),
                   const SizedBox(height: 16),
 
                   // Weight increment
                   TextField(
                     decoration: InputDecoration(
-                      labelText: AppLocalizations.of(context)!.exerciseFormWeightIncrement,
+                      labelText: AppLocalizations.of(
+                        context,
+                      )!.exerciseFormWeightIncrement,
                       border: OutlineInputBorder(),
-                      hintText: AppLocalizations.of(context)!.exerciseFormWeightIncrementHint,
+                      hintText: AppLocalizations.of(
+                        context,
+                      )!.exerciseFormWeightIncrementHint,
                     ),
                     keyboardType: TextInputType.number,
                     controller: TextEditingController(
-                      text: _weightIncrement?.toStringAsFixed(1) ?? ''),
-                    onChanged: (v) => _weightIncrement = double.tryParse(v.replaceAll(',', '.')),
+                      text: _weightIncrement?.toStringAsFixed(1) ?? '',
+                    ),
+                    onChanged: (v) => _weightIncrement = double.tryParse(
+                      v.replaceAll(',', '.'),
+                    ),
                   ),
                   const SizedBox(height: 16),
 
                   // Default rest time
                   TextField(
                     decoration: InputDecoration(
-                      labelText: AppLocalizations.of(context)!.exerciseFormDefaultRest,
+                      labelText: AppLocalizations.of(
+                        context,
+                      )!.exerciseFormDefaultRest,
                       border: OutlineInputBorder(),
-                      hintText: AppLocalizations.of(context)!.exerciseFormDefaultRestHint,
+                      hintText: AppLocalizations.of(
+                        context,
+                      )!.exerciseFormDefaultRestHint,
                     ),
                     keyboardType: TextInputType.number,
                     controller: TextEditingController(
-                      text: _defaultRestTime?.toString() ?? ''),
+                      text: _defaultRestTime?.toString() ?? '',
+                    ),
                     onChanged: (v) => _defaultRestTime = int.tryParse(v),
                   ),
                   const SizedBox(height: 16),
@@ -239,9 +354,13 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                     controller: _notesCtl,
                     maxLines: 3,
                     decoration: InputDecoration(
-                      labelText: AppLocalizations.of(context)!.exerciseFormNotes,
+                      labelText: AppLocalizations.of(
+                        context,
+                      )!.exerciseFormNotes,
                       border: OutlineInputBorder(),
-                      hintText: AppLocalizations.of(context)!.exerciseFormNotesHint,
+                      hintText: AppLocalizations.of(
+                        context,
+                      )!.exerciseFormNotesHint,
                     ),
                   ),
                 ],
@@ -252,17 +371,28 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
 
   String _exerciseTypeName(String typeId) {
     switch (typeId) {
-      case 'weightReps': return AppLocalizations.of(context)!.exerciseFormTypeWeightReps;
-      case 'distanceTime': return AppLocalizations.of(context)!.exerciseFormTypeDistanceTime;
-      case 'weightDistance': return AppLocalizations.of(context)!.exerciseFormTypeWeightDistance;
-      case 'weightTime': return AppLocalizations.of(context)!.exerciseFormTypeWeightTime;
-      case 'repsDistance': return AppLocalizations.of(context)!.exerciseFormTypeRepsDistance;
-      case 'repsTime': return AppLocalizations.of(context)!.exerciseFormTypeRepsTime;
-      case 'weightOnly': return AppLocalizations.of(context)!.exerciseFormTypeWeightOnly;
-      case 'repsOnly': return AppLocalizations.of(context)!.exerciseFormTypeRepsOnly;
-      case 'distanceOnly': return AppLocalizations.of(context)!.exerciseFormTypeDistanceOnly;
-      case 'timeOnly': return AppLocalizations.of(context)!.exerciseFormTypeTimeOnly;
-      default: return typeId;
+      case 'weightReps':
+        return AppLocalizations.of(context)!.exerciseFormTypeWeightReps;
+      case 'distanceTime':
+        return AppLocalizations.of(context)!.exerciseFormTypeDistanceTime;
+      case 'weightDistance':
+        return AppLocalizations.of(context)!.exerciseFormTypeWeightDistance;
+      case 'weightTime':
+        return AppLocalizations.of(context)!.exerciseFormTypeWeightTime;
+      case 'repsDistance':
+        return AppLocalizations.of(context)!.exerciseFormTypeRepsDistance;
+      case 'repsTime':
+        return AppLocalizations.of(context)!.exerciseFormTypeRepsTime;
+      case 'weightOnly':
+        return AppLocalizations.of(context)!.exerciseFormTypeWeightOnly;
+      case 'repsOnly':
+        return AppLocalizations.of(context)!.exerciseFormTypeRepsOnly;
+      case 'distanceOnly':
+        return AppLocalizations.of(context)!.exerciseFormTypeDistanceOnly;
+      case 'timeOnly':
+        return AppLocalizations.of(context)!.exerciseFormTypeTimeOnly;
+      default:
+        return typeId;
     }
   }
 }

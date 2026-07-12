@@ -36,8 +36,10 @@ String formatVolume(double v) {
 
 String monthLabel(String isoMonth) {
   try {
-    return DateFormat('MMM', Intl.defaultLocale)
-        .format(DateTime.parse(isoMonth));
+    return DateFormat(
+      'MMM',
+      Intl.defaultLocale,
+    ).format(DateTime.parse(isoMonth));
   } catch (_) {
     return isoMonth.length >= 7 ? isoMonth.substring(5) : isoMonth;
   }

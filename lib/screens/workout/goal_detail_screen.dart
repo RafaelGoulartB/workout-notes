@@ -40,7 +40,10 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     try {
       _isKm = await widget.db.settingsRepo.getIsDistanceKm();
       final repo = GoalRepository();
-      final (current, history) = await repo.getProgressWithHistory(_goal, historyCount: 6);
+      final (current, history) = await repo.getProgressWithHistory(
+        _goal,
+        historyCount: 6,
+      );
       final contributors = await repo.getContributingWorkouts(_goal);
       if (!mounted) return;
       setState(() {
@@ -55,13 +58,19 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   }
 
   void _openWorkout(String workoutId) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => WorkoutDetailScreen(workoutId: workoutId),
-    ));
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WorkoutDetailScreen(workoutId: workoutId),
+      ),
+    );
   }
 
   Future<void> _edit() async {
-    final saved = await GoalFormSheet.show(context, widget.db.settingsRepo, existing: _goal);
+    final saved = await GoalFormSheet.show(
+      context,
+      widget.db.settingsRepo,
+      existing: _goal,
+    );
     if (saved == null) return;
     await widget.db.goalRepo.update(saved);
     if (!mounted) return;
@@ -104,9 +113,9 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     if (confirm != true) return;
     await widget.db.goalRepo.delete(_goal.id);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.goalDeleted)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.goalDeleted)));
     Navigator.of(context).pop();
   }
 
@@ -139,9 +148,9 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_goal.title.isNotEmpty
-            ? _goal.title
-            : _buildDefaultTitle(loc)),
+        title: Text(
+          _goal.title.isNotEmpty ? _goal.title : _buildDefaultTitle(loc),
+        ),
         actions: [
           IconButton(
             icon: Icon(_goal.isActive ? Icons.pause : Icons.play_arrow),
@@ -157,7 +166,10 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
               PopupMenuItem(value: 'edit', child: Text(loc.goalEditTitle)),
               PopupMenuItem(
                 value: 'delete',
-                child: Text(loc.goalDelete, style: const TextStyle(color: Colors.red)),
+                child: Text(
+                  loc.goalDelete,
+                  style: const TextStyle(color: Colors.red),
+                ),
               ),
             ],
           ),
@@ -316,10 +328,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                       if (isComplete)
                         Text(
                           '✓',
-                          style: TextStyle(
-                            fontSize: 20,
-                            color: Colors.green,
-                          ),
+                          style: TextStyle(fontSize: 20, color: Colors.green),
                         ),
                     ],
                   ),
@@ -350,8 +359,11 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                         theme,
                         Icons.calendar_today,
                         GoalFormatters.periodRangeLabel(
-                            _goal.period, current.periodStart, current.periodEnd,
-                            isPortuguese: isPortuguese),
+                          _goal.period,
+                          current.periodStart,
+                          current.periodEnd,
+                          isPortuguese: isPortuguese,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       _statRow(
@@ -391,10 +403,19 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     );
   }
 
-  Widget _statRow(ThemeData theme, IconData icon, String text, {bool highlight = false}) {
+  Widget _statRow(
+    ThemeData theme,
+    IconData icon,
+    String text, {
+    bool highlight = false,
+  }) {
     return Row(
       children: [
-        Icon(icon, size: 12, color: highlight ? Colors.green : theme.colorScheme.onSurfaceVariant),
+        Icon(
+          icon,
+          size: 12,
+          color: highlight ? Colors.green : theme.colorScheme.onSurfaceVariant,
+        ),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
@@ -430,8 +451,11 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
         padding: const EdgeInsets.symmetric(vertical: 24),
         child: Column(
           children: [
-            Icon(Icons.history,
-                size: 40, color: theme.colorScheme.onSurfaceVariant.withAlpha(100)),
+            Icon(
+              Icons.history,
+              size: 40,
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(100),
+            ),
             const SizedBox(height: 8),
             Text(
               loc.goalNoHistory,
@@ -468,7 +492,11 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.history, size: 18, color: theme.colorScheme.onSurface),
+                Icon(
+                  Icons.history,
+                  size: 18,
+                  color: theme.colorScheme.onSurface,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   loc.goalHistory,
@@ -478,7 +506,10 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: color.withAlpha(30),
                     borderRadius: BorderRadius.circular(8),
@@ -495,17 +526,26 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            ..._history.map((h) => _historyTile(theme, loc, h, color, isPortuguese)),
+            ..._history.map(
+              (h) => _historyTile(theme, loc, h, color, isPortuguese),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _historyTile(ThemeData theme, AppLocalizations loc, GoalPeriodResult h,
-      Color color, bool isPortuguese) {
+  Widget _historyTile(
+    ThemeData theme,
+    AppLocalizations loc,
+    GoalPeriodResult h,
+    Color color,
+    bool isPortuguese,
+  ) {
     final isComplete = h.wasCompleted;
-    final iconColor = isComplete ? Colors.green : theme.colorScheme.onSurfaceVariant;
+    final iconColor = isComplete
+        ? Colors.green
+        : theme.colorScheme.onSurfaceVariant;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -530,8 +570,11 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
               children: [
                 Text(
                   GoalFormatters.periodRangeLabel(
-                      _goal.period, h.start, h.end,
-                      isPortuguese: isPortuguese),
+                    _goal.period,
+                    h.start,
+                    h.end,
+                    isPortuguese: isPortuguese,
+                  ),
                   style: theme.textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),

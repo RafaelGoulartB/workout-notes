@@ -44,15 +44,15 @@ class BodyMeasurementCard extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(
-              color: theme.colorScheme.outlineVariant.withAlpha(60)),
+            color: theme.colorScheme.outlineVariant.withAlpha(60),
+          ),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
           onLongPress: onLongPress,
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(
               children: [
                 // Date column
@@ -61,16 +61,14 @@ class BodyMeasurementCard extends StatelessWidget {
                   child: Column(
                     children: [
                       Text(
-                        DateFormat('d', 'pt_BR')
-                            .format(DateTime.parse(date)),
+                        DateFormat('d', 'pt_BR').format(DateTime.parse(date)),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: 19,
                         ),
                       ),
                       Text(
-                        DateFormat('MMM', 'pt_BR')
-                            .format(DateTime.parse(date)),
+                        DateFormat('MMM', 'pt_BR').format(DateTime.parse(date)),
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 10,
                           color: theme.colorScheme.onSurfaceVariant,
@@ -98,8 +96,7 @@ class BodyMeasurementCard extends StatelessWidget {
                             const SizedBox(width: 6),
                             SideBadge(side: side),
                           ],
-                          if (timeOfDay != null &&
-                              timeOfDay.isNotEmpty) ...[
+                          if (timeOfDay != null && timeOfDay.isNotEmpty) ...[
                             const SizedBox(width: 6),
                             TimeOfDayBadge(tod: timeOfDay),
                           ],
@@ -115,8 +112,9 @@ class BodyMeasurementCard extends StatelessWidget {
                           comment,
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontSize: 11,
-                            color: theme.colorScheme.onSurfaceVariant
-                                .withAlpha(180),
+                            color: theme.colorScheme.onSurfaceVariant.withAlpha(
+                              180,
+                            ),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -130,17 +128,15 @@ class BodyMeasurementCard extends StatelessWidget {
                 if (delta != null && delta != 0) ...[
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 5),
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
-                      color: (isGood == true
-                              ? Colors.green
-                              : Colors.red)
+                      color: (isGood == true ? Colors.green : Colors.red)
                           .withAlpha(18),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: (isGood == true
-                                ? Colors.green
-                                : Colors.red)
+                        color: (isGood == true ? Colors.green : Colors.red)
                             .withAlpha(60),
                       ),
                     ),
@@ -152,9 +148,7 @@ class BodyMeasurementCard extends StatelessWidget {
                               ? Icons.arrow_upward
                               : Icons.arrow_downward,
                           size: 10,
-                          color: isGood == true
-                              ? Colors.green
-                              : Colors.red,
+                          color: isGood == true ? Colors.green : Colors.red,
                         ),
                         const SizedBox(width: 2),
                         Text(
@@ -162,9 +156,7 @@ class BodyMeasurementCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: isGood == true
-                                ? Colors.green
-                                : Colors.red,
+                            color: isGood == true ? Colors.green : Colors.red,
                           ),
                         ),
                       ],
@@ -173,10 +165,11 @@ class BodyMeasurementCard extends StatelessWidget {
                   const SizedBox(width: 4),
                 ],
 
-                Icon(Icons.chevron_right,
-                    size: 16,
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withAlpha(100)),
+                Icon(
+                  Icons.chevron_right,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant.withAlpha(100),
+                ),
               ],
             ),
           ),

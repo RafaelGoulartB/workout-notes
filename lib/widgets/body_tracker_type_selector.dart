@@ -23,8 +23,7 @@ class BodyTypeSelector extends StatelessWidget {
     this.onCustomize,
   });
 
-  MeasureType get _current =>
-      types.firstWhere((t) => t.id == selectedType);
+  MeasureType get _current => types.firstWhere((t) => t.id == selectedType);
 
   double? _latestValue(String typeId) {
     final entry = latestByType?[typeId];
@@ -92,7 +91,10 @@ class BodyTypeSelector extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: type.color.withAlpha(15),
                       borderRadius: BorderRadius.circular(8),
@@ -325,7 +327,11 @@ class BodyTypeSelector extends StatelessWidget {
     );
   }
 
-  Widget _buildGrid(BuildContext context, ThemeData theme, AppLocalizations loc) {
+  Widget _buildGrid(
+    BuildContext context,
+    ThemeData theme,
+    AppLocalizations loc,
+  ) {
     const crossAxisCount = 4;
     final rowCount = (types.length / crossAxisCount).ceil();
 
@@ -417,7 +423,9 @@ class _TypeGridItem extends StatelessWidget {
             Icon(
               type.icon,
               size: 26,
-              color: isSelected ? type.color : theme.colorScheme.onSurfaceVariant,
+              color: isSelected
+                  ? type.color
+                  : theme.colorScheme.onSurfaceVariant,
             ),
             const SizedBox(height: 6),
             Text(

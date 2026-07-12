@@ -4,7 +4,11 @@ import 'package:workout_notes/models/goal.dart';
 /// Format helpers for goal values, periods, etc.
 class GoalFormatters {
   /// Formats a raw value into a human-friendly string with the right unit.
-  static String formatValue(GoalMetric metric, double value, {bool isKm = true}) {
+  static String formatValue(
+    GoalMetric metric,
+    double value, {
+    bool isKm = true,
+  }) {
     switch (metric) {
       case GoalMetric.volume:
         if (value >= 1000) {
@@ -21,7 +25,11 @@ class GoalFormatters {
   }
 
   /// Short version of [formatValue] (used inside the ring).
-  static String formatValueShort(GoalMetric metric, double value, {bool isKm = true}) {
+  static String formatValueShort(
+    GoalMetric metric,
+    double value, {
+    bool isKm = true,
+  }) {
     switch (metric) {
       case GoalMetric.volume:
         if (value >= 1000) {
@@ -55,8 +63,12 @@ class GoalFormatters {
   }
 
   /// Period range label (e.g. "01–07 Jun" or "Junho 2026").
-  static String periodRangeLabel(GoalPeriod period, DateTime start, DateTime end,
-      {bool isPortuguese = true}) {
+  static String periodRangeLabel(
+    GoalPeriod period,
+    DateTime start,
+    DateTime end, {
+    bool isPortuguese = true,
+  }) {
     final loc = isPortuguese ? 'pt_BR' : 'en_US';
     if (period == GoalPeriod.weekly) {
       final fmt = DateFormat('d MMM', loc);
@@ -67,8 +79,11 @@ class GoalFormatters {
   }
 
   /// Short period label (e.g. "Jun 2026" or "W23 Jun").
-  static String shortPeriodLabel(GoalPeriod period, DateTime start,
-      {bool isPortuguese = true}) {
+  static String shortPeriodLabel(
+    GoalPeriod period,
+    DateTime start, {
+    bool isPortuguese = true,
+  }) {
     final loc = isPortuguese ? 'pt_BR' : 'en_US';
     if (period == GoalPeriod.weekly) {
       return DateFormat('d MMM', loc).format(start);

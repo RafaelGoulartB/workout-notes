@@ -11,11 +11,12 @@ import '../l10n/l10n_exercises.dart';
 import '../repositories/workout_repository.dart';
 import '../repositories/export_import_repository.dart';
 
-typedef SaveFileCallback = Future<String?> Function({
-  required String dialogTitle,
-  required String fileName,
-  required Uint8List bytes,
-});
+typedef SaveFileCallback =
+    Future<String?> Function({
+      required String dialogTitle,
+      required String fileName,
+      required Uint8List bytes,
+    });
 
 typedef ShareFileCallback = Future<void> Function(XFile file, String text);
 
@@ -54,9 +55,9 @@ class ExportService {
     SaveFileCallback? saveFile,
     ShareFileCallback? shareFile,
     this.backupsDirectoryProvider,
-  })  : _exportRepo = exportRepo ?? ExportImportRepository(),
-        _saveFile = saveFile ?? _saveFileWithPicker,
-        _shareFile = shareFile ?? _shareFileWithSheet;
+  }) : _exportRepo = exportRepo ?? ExportImportRepository(),
+       _saveFile = saveFile ?? _saveFileWithPicker,
+       _shareFile = shareFile ?? _shareFileWithSheet;
 
   static const _backupFolderName = 'WorkoutNotes';
 
@@ -112,12 +113,14 @@ class ExportService {
       await for (final entity in dir.list()) {
         if (entity is File && entity.path.endsWith('.json')) {
           final stat = await entity.stat();
-          files.add(BackupFileInfo(
-            path: entity.path,
-            name: entity.uri.pathSegments.last,
-            createdAt: stat.modified,
-            sizeBytes: stat.size,
-          ));
+          files.add(
+            BackupFileInfo(
+              path: entity.path,
+              name: entity.uri.pathSegments.last,
+              createdAt: stat.modified,
+              sizeBytes: stat.size,
+            ),
+          );
         }
       }
       files.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -259,8 +262,16 @@ class ExportService {
     );
     final csvRows = <List<String>>[
       [
-        'Data', 'Exercício', 'Categoria', 'Peso', 'Repetições',
-        'Distância', 'Tempo (s)', 'Aquecimento', 'RPE', 'Nota',
+        'Data',
+        'Exercício',
+        'Categoria',
+        'Peso',
+        'Repetições',
+        'Distância',
+        'Tempo (s)',
+        'Aquecimento',
+        'RPE',
+        'Nota',
         'Observação do Treino',
       ],
     ];
@@ -281,7 +292,9 @@ class ExportService {
     }
     final csvData = const ListToCsvConverter().convert(csvRows);
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/workout_notes_export_${DateTime.now().millisecondsSinceEpoch}.csv');
+    final file = File(
+      '${dir.path}/workout_notes_export_${DateTime.now().millisecondsSinceEpoch}.csv',
+    );
     await file.writeAsString(csvData);
     return file.path;
   }
@@ -306,7 +319,10 @@ class ExportService {
   // Share workout summary
   // ===================================================================
 
-  Future<void> shareWorkoutSummary(String workoutId, AppLocalizations loc) async {
+  Future<void> shareWorkoutSummary(
+    String workoutId,
+    AppLocalizations loc,
+  ) async {
     final workout = await _workoutRepo.getWorkout(workoutId);
     if (workout == null) return;
     final exercises = await _workoutRepo.getWorkoutExercises(workoutId);
@@ -335,8 +351,10 @@ class ExportService {
   String _localizedExerciseName(AppLocalizations loc, Map<String, dynamic> ex) {
     final localeKey = ex['exercise_locale_key'] as String?;
     if (localeKey != null) {
-      final translated =
-          ExerciseLocalization.exerciseName(localeKey, loc.localeName);
+      final translated = ExerciseLocalization.exerciseName(
+        localeKey,
+        loc.localeName,
+      );
       if (translated != null && translated.isNotEmpty) return translated;
     }
     return (ex['exercise_name'] as String?) ?? '';

@@ -31,8 +31,11 @@ class GoalContributingWorkouts extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Column(
           children: [
-            Icon(Icons.fitness_center,
-                size: 36, color: theme.colorScheme.onSurfaceVariant.withAlpha(100)),
+            Icon(
+              Icons.fitness_center,
+              size: 36,
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(100),
+            ),
             const SizedBox(height: 8),
             Text(
               loc.goalNoContributors,
@@ -59,7 +62,11 @@ class GoalContributingWorkouts extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.list_alt, size: 18, color: theme.colorScheme.onSurface),
+                Icon(
+                  Icons.list_alt,
+                  size: 18,
+                  color: theme.colorScheme.onSurface,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   loc.goalContributingWorkouts,
@@ -69,9 +76,14 @@ class GoalContributingWorkouts extends StatelessWidget {
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
+                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                      120,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -86,13 +98,15 @@ class GoalContributingWorkouts extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            ...workouts.map((w) => _WorkoutTile(
-                  workout: w,
-                  goal: goal,
-                  isKm: isKm,
-                  isPortuguese: isPortuguese,
-                  onTap: () => onTapWorkout(w.workoutId),
-                )),
+            ...workouts.map(
+              (w) => _WorkoutTile(
+                workout: w,
+                goal: goal,
+                isKm: isKm,
+                isPortuguese: isPortuguese,
+                onTap: () => onTapWorkout(w.workoutId),
+              ),
+            ),
           ],
         ),
       ),
@@ -193,7 +207,10 @@ class _WorkoutTile extends StatelessWidget {
             // Contribution
             Text(
               GoalFormatters.formatValueShort(
-                  goal.metric, workout.contributedValue, isKm: isKm),
+                goal.metric,
+                workout.contributedValue,
+                isKm: isKm,
+              ),
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
@@ -201,7 +218,11 @@ class _WorkoutTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.chevron_right,
+              size: 18,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ],
         ),
       ),

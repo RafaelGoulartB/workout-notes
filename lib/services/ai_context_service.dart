@@ -11,8 +11,8 @@ class AiContextService {
   final GoalRepository goalRepo;
 
   AiContextService({DatabaseHelper? db, GoalRepository? goalRepo})
-      : db = db ?? DatabaseHelper.instance,
-        goalRepo = goalRepo ?? GoalRepository();
+    : db = db ?? DatabaseHelper.instance,
+      goalRepo = goalRepo ?? GoalRepository();
 
   static const Duration _kTtl = Duration(seconds: 60);
 
@@ -20,7 +20,9 @@ class AiContextService {
 
   Future<Map<String, dynamic>> build({required AiContextMode mode}) async {
     final now = DateTime.now();
-    if (_cache != null && now.difference(_cache!.builtAt) < _kTtl && _cache!.mode == mode) {
+    if (_cache != null &&
+        now.difference(_cache!.builtAt) < _kTtl &&
+        _cache!.mode == mode) {
       return _cache!.json;
     }
     final json = await _buildFresh(mode: mode, now: now);
@@ -49,7 +51,9 @@ class AiContextService {
     final byCategory = await _safeList(() => db.getVolumeByCategory());
     final topEx = await _safeList(() => db.getTopExercisesByVolume(limit: 8));
     final activeGoals = await _safeList(_loadActiveGoalsSummary);
-    final bodyTrend = await _safeList(() => db.getBodyCompositionTrend(months: 1));
+    final bodyTrend = await _safeList(
+      () => db.getBodyCompositionTrend(months: 1),
+    );
 
     final summary = <String, dynamic>{
       'totals': {
@@ -90,12 +94,28 @@ class AiContextService {
   Future<Map<String, int>> _loadBaseCounts() async {
     try {
       final rawDb = await db.database;
-      final exercises = Sqflite.firstIntValue(await rawDb.rawQuery('SELECT COUNT(*) FROM exercises')) ?? 0;
-      final routines = Sqflite.firstIntValue(await rawDb.rawQuery('SELECT COUNT(*) FROM routines')) ?? 0;
-      final body = Sqflite.firstIntValue(await rawDb.rawQuery('SELECT COUNT(*) FROM body_measurements')) ?? 0;
-      final goals = Sqflite.firstIntValue(
-        await rawDb.rawQuery('SELECT COUNT(*) FROM user_goals WHERE is_active = 1'),
-      ) ?? 0;
+      final exercises =
+          Sqflite.firstIntValue(
+            await rawDb.rawQuery('SELECT COUNT(*) FROM exercises'),
+          ) ??
+          0;
+      final routines =
+          Sqflite.firstIntValue(
+            await rawDb.rawQuery('SELECT COUNT(*) FROM routines'),
+          ) ??
+          0;
+      final body =
+          Sqflite.firstIntValue(
+            await rawDb.rawQuery('SELECT COUNT(*) FROM body_measurements'),
+          ) ??
+          0;
+      final goals =
+          Sqflite.firstIntValue(
+            await rawDb.rawQuery(
+              'SELECT COUNT(*) FROM user_goals WHERE is_active = 1',
+            ),
+          ) ??
+          0;
       return {
         'exercises': exercises,
         'routines': routines,
@@ -139,7 +159,9 @@ class AiContextService {
     return out;
   }
 
-  Future<Map<String, dynamic>> _safeMap(Future<Map<String, dynamic>> Function() f) async {
+  Future<Map<String, dynamic>> _safeMap(
+    Future<Map<String, dynamic>> Function() f,
+  ) async {
     try {
       return await f();
     } catch (_) {
@@ -148,7 +170,8 @@ class AiContextService {
   }
 
   Future<List<Map<String, dynamic>>> _safeList(
-      Future<List<Map<String, dynamic>>> Function() f) async {
+    Future<List<Map<String, dynamic>>> Function() f,
+  ) async {
     try {
       return await f();
     } catch (_) {
@@ -161,5 +184,9 @@ class _AiContextCache {
   final DateTime builtAt;
   final AiContextMode mode;
   final Map<String, dynamic> json;
-  _AiContextCache({required this.builtAt, required this.mode, required this.json});
+  _AiContextCache({
+    required this.builtAt,
+    required this.mode,
+    required this.json,
+  });
 }

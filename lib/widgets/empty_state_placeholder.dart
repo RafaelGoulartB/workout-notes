@@ -25,14 +25,25 @@ class EmptyStatePlaceholder extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 80, color: theme.colorScheme.primary.withAlpha(80)),
+            Icon(
+              icon,
+              size: 80,
+              color: theme.colorScheme.primary.withAlpha(80),
+            ),
             const SizedBox(height: 24),
-            Text(title, style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              title,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 12),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 32),

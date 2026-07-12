@@ -58,8 +58,9 @@ class AiChatMessage {
       'content': content,
       'tool_call_id': toolCallId,
       'tool_name': toolName,
-      'tool_calls_json':
-          toolCalls.isEmpty ? null : jsonEncode(toolCalls.map((c) => c.toJson()).toList()),
+      'tool_calls_json': toolCalls.isEmpty
+          ? null
+          : jsonEncode(toolCalls.map((c) => c.toJson()).toList()),
       'created_at': createdAt.toIso8601String(),
     };
   }

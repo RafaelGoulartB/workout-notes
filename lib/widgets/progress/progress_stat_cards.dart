@@ -21,9 +21,7 @@ class ProgressStatCard extends StatelessWidget {
     return Card(
       elevation: 0,
       color: color.withAlpha(15),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(10),
         child: Column(

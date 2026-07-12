@@ -149,8 +149,8 @@ class GoalCard extends StatelessWidget {
                                 icon: isComplete
                                     ? Icons.check_circle
                                     : (isPaused
-                                        ? Icons.pause_circle
-                                        : _metricIcon()),
+                                          ? Icons.pause_circle
+                                          : _metricIcon()),
                                 label: _metricLabel(loc),
                               ),
                             ),
@@ -192,9 +192,9 @@ class GoalCard extends StatelessWidget {
                             value: percent.clamp(0.0, 1.0),
                             minHeight: 4,
                             backgroundColor: Colors.white.withAlpha(40),
-                            valueColor:
-                                const AlwaysStoppedAnimation<Color>(
-                                    Colors.white),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -214,7 +214,8 @@ class GoalCard extends StatelessWidget {
                                 isComplete
                                     ? loc.goalCompleted
                                     : loc.goalDaysRemaining(
-                                        progress.daysRemaining),
+                                        progress.daysRemaining,
+                                      ),
                                 style: TextStyle(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w600,
@@ -273,8 +274,10 @@ class GoalCard extends StatelessWidget {
             if (onDelete != null)
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: Text(loc.goalDelete,
-                    style: const TextStyle(color: Colors.red)),
+                title: Text(
+                  loc.goalDelete,
+                  style: const TextStyle(color: Colors.red),
+                ),
                 onTap: () {
                   Navigator.of(ctx).pop();
                   onDelete?.call();

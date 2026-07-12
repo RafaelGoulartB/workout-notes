@@ -131,8 +131,10 @@ class WeeklyDistanceChart extends StatelessWidget {
       if (date.length >= 10) {
         try {
           final dt = DateTime.parse(date);
-          final weekKey = dt.subtract(Duration(days: dt.weekday - 1))
-              .toIso8601String().substring(0, 10);
+          final weekKey = dt
+              .subtract(Duration(days: dt.weekday - 1))
+              .toIso8601String()
+              .substring(0, 10);
           weeklyTotals.update(weekKey, (v) => v + dist, ifAbsent: () => dist);
         } catch (_) {}
       }
@@ -168,7 +170,9 @@ class WeeklyDistanceChart extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   loc.progressCardioWeekly,
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -202,7 +206,8 @@ class WeeklyDistanceChart extends StatelessWidget {
                         showTitles: true,
                         getTitlesWidget: (v, _) {
                           final idx = v.toInt();
-                          if (idx < 0 || idx >= display.length) return const SizedBox.shrink();
+                          if (idx < 0 || idx >= display.length)
+                            return const SizedBox.shrink();
                           final key = display[idx].key;
                           final parts = key.split('-');
                           if (parts.length < 3) return const SizedBox.shrink();
@@ -210,7 +215,9 @@ class WeeklyDistanceChart extends StatelessWidget {
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
                               '${parts[2]}/${parts[1]}',
-                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 9),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 9,
+                              ),
                             ),
                           );
                         },
@@ -224,19 +231,27 @@ class WeeklyDistanceChart extends StatelessWidget {
                           if (v == 0) return const SizedBox.shrink();
                           return Text(
                             '${v.toInt()}',
-                            style: theme.textTheme.bodySmall?.copyWith(fontSize: 9),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 9,
+                            ),
                           );
                         },
                       ),
                     ),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval: maxDist > 0 ? niceInterval(maxDist / 4) : 1,
+                    horizontalInterval: maxDist > 0
+                        ? niceInterval(maxDist / 4)
+                        : 1,
                   ),
                   barGroups: display.asMap().entries.map((entry) {
                     final idx = entry.key;
@@ -277,10 +292,15 @@ class DistanceByModalityChart extends StatelessWidget {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
 
-    final valid = data.where((d) => ((d['total_distance'] as num?)?.toDouble() ?? 0) > 0).toList();
+    final valid = data
+        .where((d) => ((d['total_distance'] as num?)?.toDouble() ?? 0) > 0)
+        .toList();
     if (valid.isEmpty) return const SizedBox.shrink();
 
-    final totalDist = valid.fold<double>(0, (sum, d) => sum + ((d['total_distance'] as num?)?.toDouble() ?? 0));
+    final totalDist = valid.fold<double>(
+      0,
+      (sum, d) => sum + ((d['total_distance'] as num?)?.toDouble() ?? 0),
+    );
 
     return Card(
       elevation: 0,
@@ -295,11 +315,17 @@ class DistanceByModalityChart extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.pie_chart, size: 18, color: theme.colorScheme.primary),
+                Icon(
+                  Icons.pie_chart,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   loc.progressCardioByModality,
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -315,9 +341,12 @@ class DistanceByModalityChart extends StatelessWidget {
                         centerSpaceRadius: 30,
                         sections: valid.asMap().entries.map((entry) {
                           final d = entry.value;
-                          final dist = (d['total_distance'] as num?)?.toDouble() ?? 0;
+                          final dist =
+                              (d['total_distance'] as num?)?.toDouble() ?? 0;
                           final pct = totalDist > 0 ? dist / totalDist : 0.0;
-                          final color = Color(d['modality_color'] as int? ?? 0xFFE53935);
+                          final color = Color(
+                            d['modality_color'] as int? ?? 0xFFE53935,
+                          );
                           return PieChartSectionData(
                             value: dist,
                             color: color,
@@ -339,8 +368,11 @@ class DistanceByModalityChart extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: valid.map((d) {
-                        final dist = (d['total_distance'] as num?)?.toDouble() ?? 0;
-                        final color = Color(d['modality_color'] as int? ?? 0xFFE53935);
+                        final dist =
+                            (d['total_distance'] as num?)?.toDouble() ?? 0;
+                        final color = Color(
+                          d['modality_color'] as int? ?? 0xFFE53935,
+                        );
                         final name = ExerciseLocaleHelper.categoryNameFromId(
                           AppLocalizations.of(context)!,
                           d['id'] as String? ?? '',
@@ -350,13 +382,19 @@ class DistanceByModalityChart extends StatelessWidget {
                           child: Row(
                             children: [
                               Container(
-                                width: 10, height: 10,
-                                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: color,
+                                  shape: BoxShape.circle,
+                                ),
                               ),
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  name.isNotEmpty ? name : (d['modality'] as String? ?? ''),
+                                  name.isNotEmpty
+                                      ? name
+                                      : (d['modality'] as String? ?? ''),
                                   style: theme.textTheme.bodySmall,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -423,7 +461,9 @@ class _PaceTrendChartState extends State<PaceTrendChart> {
                 const SizedBox(width: 6),
                 Text(
                   loc.progressCardioPace,
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -433,7 +473,8 @@ class _PaceTrendChartState extends State<PaceTrendChart> {
                 height: 120,
                 child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
               )
-            else if (widget.paceData.isEmpty || widget.selectedExerciseName == null)
+            else if (widget.paceData.isEmpty ||
+                widget.selectedExerciseName == null)
               SizedBox(
                 height: 100,
                 child: Center(
@@ -474,7 +515,9 @@ class _PaceTrendChartState extends State<PaceTrendChart> {
         child: Center(
           child: Text(
             loc.progressNoChartData,
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       );
@@ -516,10 +559,14 @@ class _PaceTrendChartState extends State<PaceTrendChart> {
               sideTitles: SideTitles(
                 showTitles: true,
                 reservedSize: 22,
-                interval: (paces.length / 5).ceilToDouble().clamp(1, double.infinity),
+                interval: (paces.length / 5).ceilToDouble().clamp(
+                  1,
+                  double.infinity,
+                ),
                 getTitlesWidget: (v, _) {
                   final idx = v.toInt();
-                  if (idx < 0 || idx >= labels.length) return const SizedBox.shrink();
+                  if (idx < 0 || idx >= labels.length)
+                    return const SizedBox.shrink();
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
@@ -543,24 +590,33 @@ class _PaceTrendChartState extends State<PaceTrendChart> {
                 },
               ),
             ),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
           ),
           borderData: FlBorderData(show: false),
           lineBarsData: [
             LineChartBarData(
-              spots: paces.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value)).toList(),
+              spots: paces
+                  .asMap()
+                  .entries
+                  .map((e) => FlSpot(e.key.toDouble(), e.value))
+                  .toList(),
               isCurved: true,
               color: const Color(0xFFE53935),
               barWidth: 2.5,
               dotData: FlDotData(
                 show: true,
-                getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-                  radius: 3,
-                  color: const Color(0xFFE53935),
-                  strokeWidth: 1,
-                  strokeColor: Colors.white,
-                ),
+                getDotPainter: (spot, percent, bar, index) =>
+                    FlDotCirclePainter(
+                      radius: 3,
+                      color: const Color(0xFFE53935),
+                      strokeWidth: 1,
+                      strokeColor: Colors.white,
+                    ),
               ),
               belowBarData: BarAreaData(
                 show: true,
@@ -600,11 +656,17 @@ class CardioPRsCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.emoji_events, size: 18, color: Colors.amber.shade700),
+                Icon(
+                  Icons.emoji_events,
+                  size: 18,
+                  color: Colors.amber.shade700,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   loc.progressCardioPRs,
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -630,24 +692,38 @@ class CardioPRsCard extends StatelessWidget {
                 final bestDist = (pr['best_distance'] as num?)?.toDouble() ?? 0;
                 final bestTime = (pr['best_time'] as int?) ?? 0;
                 final bestPace = (pr['best_pace'] as num?)?.toDouble();
-                final modalityColor = Color(pr['modality_color'] as int? ?? 0xFFE53935);
+                final modalityColor = Color(
+                  pr['modality_color'] as int? ?? 0xFFE53935,
+                );
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: cardioColor.withAlpha(12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.directions_run, size: 16, color: modalityColor),
+                      Icon(
+                        Icons.directions_run,
+                        size: 16,
+                        color: modalityColor,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(name, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                            Text(
+                              name,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             const SizedBox(height: 2),
                             Text(
                               '${loc.cardioLongestDistance}: ${PaceCalculator.formatDistance(bestDist)}',

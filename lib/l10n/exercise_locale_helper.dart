@@ -13,8 +13,10 @@ class ExerciseLocaleHelper {
   static String exerciseName(AppLocalizations loc, Map<String, dynamic> row) {
     final localeKey = row['locale_key'] as String?;
     if (localeKey != null) {
-      final translated =
-          ExerciseLocalization.exerciseName(localeKey, loc.localeName);
+      final translated = ExerciseLocalization.exerciseName(
+        localeKey,
+        loc.localeName,
+      );
       if (translated != null && translated.isNotEmpty) return translated;
     }
     return (row['name'] as String?) ?? '';
@@ -25,8 +27,10 @@ class ExerciseLocaleHelper {
   static String exerciseNotes(AppLocalizations loc, Map<String, dynamic> row) {
     final localeKey = row['locale_key'] as String?;
     if (localeKey != null) {
-      final translated =
-          ExerciseLocalization.exerciseNotes(localeKey, loc.localeName);
+      final translated = ExerciseLocalization.exerciseNotes(
+        localeKey,
+        loc.localeName,
+      );
       if (translated != null && translated.isNotEmpty) return translated;
     }
     return (row['notes'] as String?) ?? '';
@@ -39,15 +43,19 @@ class ExerciseLocaleHelper {
     // If the row has a locale_key (direct category query)
     final localeKey = row['locale_key'] as String?;
     if (localeKey != null) {
-      final translated =
-          ExerciseLocalization.categoryName(localeKey, loc.localeName);
+      final translated = ExerciseLocalization.categoryName(
+        localeKey,
+        loc.localeName,
+      );
       if (translated != null && translated.isNotEmpty) return translated;
     }
     // If the row has a category_name (JOIN result)
     final catKey = row['category_id'] as String?;
     if (catKey != null) {
-      final translated =
-          ExerciseLocalization.categoryName(catKey, loc.localeName);
+      final translated = ExerciseLocalization.categoryName(
+        catKey,
+        loc.localeName,
+      );
       if (translated != null && translated.isNotEmpty) return translated;
     }
     // Fallback to the stored name
@@ -55,17 +63,17 @@ class ExerciseLocaleHelper {
   }
 
   /// Returns the localized category name from a category ID.
-  static String categoryNameFromId(
-      AppLocalizations loc, String categoryId) {
-    final translated =
-        ExerciseLocalization.categoryName(categoryId, loc.localeName);
+  static String categoryNameFromId(AppLocalizations loc, String categoryId) {
+    final translated = ExerciseLocalization.categoryName(
+      categoryId,
+      loc.localeName,
+    );
     return translated ?? categoryId;
   }
 
   /// Returns the localized exercise name from a locale key.
   static String exerciseNameFromKey(AppLocalizations loc, String key) {
-    final translated =
-        ExerciseLocalization.exerciseName(key, loc.localeName);
+    final translated = ExerciseLocalization.exerciseName(key, loc.localeName);
     return translated ?? key;
   }
 
@@ -93,15 +101,19 @@ class ExerciseLocaleHelper {
     // Search in localized name
     final localeKey = row['locale_key'] as String?;
     if (localeKey != null) {
-      final localized =
-          ExerciseLocalization.exerciseName(localeKey, loc.localeName);
+      final localized = ExerciseLocalization.exerciseName(
+        localeKey,
+        loc.localeName,
+      );
       if (localized != null && localized.toLowerCase().contains(q)) {
         return true;
       }
       // Also search in the other locale as a bonus
       final otherLocale = loc.localeName == 'en' ? 'pt' : 'en';
-      final otherLocalized =
-          ExerciseLocalization.exerciseName(localeKey, otherLocale);
+      final otherLocalized = ExerciseLocalization.exerciseName(
+        localeKey,
+        otherLocale,
+      );
       if (otherLocalized != null && otherLocalized.toLowerCase().contains(q)) {
         return true;
       }
@@ -126,8 +138,10 @@ class ExerciseLocaleHelper {
     // Search in localized name
     final localeKey = row['locale_key'] as String?;
     if (localeKey != null) {
-      final localized =
-          ExerciseLocalization.categoryName(localeKey, loc.localeName);
+      final localized = ExerciseLocalization.categoryName(
+        localeKey,
+        loc.localeName,
+      );
       if (localized != null && localized.toLowerCase().contains(q)) {
         return true;
       }
@@ -135,8 +149,10 @@ class ExerciseLocaleHelper {
       // Search by category ID
       final catId = row['id'] as String?;
       if (catId != null) {
-        final localized =
-            ExerciseLocalization.categoryName(catId, loc.localeName);
+        final localized = ExerciseLocalization.categoryName(
+          catId,
+          loc.localeName,
+        );
         if (localized != null && localized.toLowerCase().contains(q)) {
           return true;
         }

@@ -43,7 +43,11 @@ Future<void> showAddMeasurementSheet(
         builder: (ctx, setSheetState) {
           return Padding(
             padding: EdgeInsets.fromLTRB(
-                24, 20, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+              24,
+              20,
+              24,
+              MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
             child: Form(
               key: formKey,
               child: SingleChildScrollView(
@@ -56,8 +60,9 @@ Future<void> showAddMeasurementSheet(
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.onSurfaceVariant
-                              .withAlpha(60),
+                          color: theme.colorScheme.onSurfaceVariant.withAlpha(
+                            60,
+                          ),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -71,15 +76,19 @@ Future<void> showAddMeasurementSheet(
                             color: currentType.color.withAlpha(20),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(currentType.icon,
-                              size: 24, color: currentType.color),
+                          child: Icon(
+                            currentType.icon,
+                            size: 24,
+                            color: currentType.color,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             loc.bodyTrackerAddTitle(typeName(typeId, ctx)),
-                            style: theme.textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.bold),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -87,8 +96,9 @@ Future<void> showAddMeasurementSheet(
                     const SizedBox(height: 20),
                     TextFormField(
                       controller: valueCtl,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       autofocus: true,
                       style: theme.textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -106,16 +116,19 @@ Future<void> showAddMeasurementSheet(
                           borderRadius: BorderRadius.circular(14),
                         ),
                         filled: true,
-                        fillColor:
-                            theme.colorScheme.surfaceContainerHighest
-                                .withAlpha(80),
+                        fillColor: theme.colorScheme.surfaceContainerHighest
+                            .withAlpha(80),
                         contentPadding: const EdgeInsets.symmetric(
-                            vertical: 20, horizontal: 16),
+                          vertical: 20,
+                          horizontal: 16,
+                        ),
                       ),
                       validator: (v) {
-                        final val =
-                            double.tryParse(v?.replaceAll(',', '.') ?? '');
-                        if (val == null || val <= 0) return loc.bodyTrackerInvalidValue;
+                        final val = double.tryParse(
+                          v?.replaceAll(',', '.') ?? '',
+                        );
+                        if (val == null || val <= 0)
+                          return loc.bodyTrackerInvalidValue;
                         return null;
                       },
                     ),
@@ -138,7 +151,9 @@ Future<void> showAddMeasurementSheet(
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 12),
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
@@ -148,13 +163,17 @@ Future<void> showAddMeasurementSheet(
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.calendar_today,
-                                      size: 18,
-                                      color: theme.colorScheme.primary),
+                                  Icon(
+                                    Icons.calendar_today,
+                                    size: 18,
+                                    color: theme.colorScheme.primary,
+                                  ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    DateFormat('d MMM yyyy', 'pt_BR')
-                                        .format(date),
+                                    DateFormat(
+                                      'd MMM yyyy',
+                                      'pt_BR',
+                                    ).format(date),
                                     style: theme.textTheme.bodyMedium,
                                   ),
                                 ],
@@ -177,11 +196,13 @@ Future<void> showAddMeasurementSheet(
                         const SizedBox(width: 8),
                         Expanded(
                           child: FilterChip(
-                            avatar: Icon(Icons.nightlight_round,
-                                size: 16,
-                                color: isFasted
-                                    ? Colors.deepPurple
-                                    : theme.colorScheme.onSurfaceVariant),
+                            avatar: Icon(
+                              Icons.nightlight_round,
+                              size: 16,
+                              color: isFasted
+                                  ? Colors.deepPurple
+                                  : theme.colorScheme.onSurfaceVariant,
+                            ),
                             label: Text(loc.bodyTrackerFasting),
                             selected: isFasted,
                             onSelected: (v) =>
@@ -217,14 +238,18 @@ Future<void> showAddMeasurementSheet(
                       maxLines: 2,
                       decoration: InputDecoration(
                         hintText: loc.bodyTrackerComment,
-                        prefixIcon: Icon(Icons.notes,
-                            size: 18,
-                            color: theme.colorScheme.onSurfaceVariant),
+                        prefixIcon: Icon(
+                          Icons.notes,
+                          size: 18,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
-                            vertical: 12, horizontal: 14),
+                          vertical: 12,
+                          horizontal: 14,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -237,7 +262,8 @@ Future<void> showAddMeasurementSheet(
                             return;
                           }
                           final value = double.tryParse(
-                              valueCtl.text.replaceAll(',', '.'));
+                            valueCtl.text.replaceAll(',', '.'),
+                          );
                           if (value == null || value <= 0) return;
                           await repo.addBodyMeasurement(
                             typeId,
@@ -267,10 +293,13 @@ Future<void> showAddMeasurementSheet(
                           onSaved();
                         },
                         icon: const Icon(Icons.check),
-                        label: Text(loc.bodyTrackerSave,
-                            style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600)),
+                        label: Text(
+                          loc.bodyTrackerSave,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         style: FilledButton.styleFrom(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -347,8 +376,9 @@ Future<void> showQuickMeasureSheet(
                         width: 36,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.onSurfaceVariant
-                              .withAlpha(60),
+                          color: theme.colorScheme.onSurfaceVariant.withAlpha(
+                            60,
+                          ),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
@@ -362,22 +392,29 @@ Future<void> showQuickMeasureSheet(
                             color: theme.colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(Icons.bolt,
-                              size: 22,
-                              color: theme.colorScheme.onPrimaryContainer),
+                          child: Icon(
+                            Icons.bolt,
+                            size: 22,
+                            color: theme.colorScheme.onPrimaryContainer,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(loc.bodyTrackerQuickMeasure,
-                                  style: theme.textTheme.titleMedium
-                                      ?.copyWith(fontWeight: FontWeight.bold)),
-                              Text(loc.bodyTrackerQuickMeasureSubtitle,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  )),
+                              Text(
+                                loc.bodyTrackerQuickMeasure,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                loc.bodyTrackerQuickMeasureSubtitle,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -402,7 +439,9 @@ Future<void> showQuickMeasureSheet(
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 10),
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
@@ -412,14 +451,18 @@ Future<void> showQuickMeasureSheet(
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.calendar_today,
-                                      size: 16,
-                                      color: theme.colorScheme.primary),
+                                  Icon(
+                                    Icons.calendar_today,
+                                    size: 16,
+                                    color: theme.colorScheme.primary,
+                                  ),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
-                                      DateFormat('d MMM yyyy', 'pt_BR')
-                                          .format(date),
+                                      DateFormat(
+                                        'd MMM yyyy',
+                                        'pt_BR',
+                                      ).format(date),
                                       style: theme.textTheme.bodySmall,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -431,16 +474,19 @@ Future<void> showQuickMeasureSheet(
                         ),
                         const SizedBox(width: 8),
                         FilterChip(
-                          avatar: Icon(Icons.nightlight_round,
-                              size: 14,
-                              color: isFasted
-                                  ? Colors.deepPurple
-                                  : theme.colorScheme.onSurfaceVariant),
-                          label: Text(loc.bodyTrackerFasted,
-                              style: TextStyle(fontSize: 12)),
+                          avatar: Icon(
+                            Icons.nightlight_round,
+                            size: 14,
+                            color: isFasted
+                                ? Colors.deepPurple
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                          label: Text(
+                            loc.bodyTrackerFasted,
+                            style: TextStyle(fontSize: 12),
+                          ),
                           selected: isFasted,
-                          onSelected: (v) =>
-                              setSheetState(() => isFasted = v),
+                          onSelected: (v) => setSheetState(() => isFasted = v),
                           selectedColor: Colors.deepPurple.withAlpha(30),
                           checkmarkColor: Colors.deepPurple,
                           visualDensity: VisualDensity.compact,
@@ -477,14 +523,18 @@ Future<void> showQuickMeasureSheet(
                       maxLines: 2,
                       decoration: InputDecoration(
                         hintText: loc.bodyTrackerQuickCommentHint,
-                        prefixIcon: Icon(Icons.notes,
-                            size: 16,
-                            color: theme.colorScheme.onSurfaceVariant),
+                        prefixIcon: Icon(
+                          Icons.notes,
+                          size: 16,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         contentPadding: const EdgeInsets.symmetric(
-                            vertical: 10, horizontal: 12),
+                          vertical: 10,
+                          horizontal: 12,
+                        ),
                         isDense: true,
                       ),
                     ),
@@ -503,7 +553,8 @@ Future<void> showQuickMeasureSheet(
                                       final txt = controllers[key]!.text;
                                       if (txt.isEmpty) continue;
                                       final val = double.tryParse(
-                                          txt.replaceAll(',', '.'));
+                                        txt.replaceAll(',', '.'),
+                                      );
                                       if (val == null || val <= 0) continue;
                                       batch.add({
                                         'type': t.id,
@@ -512,10 +563,9 @@ Future<void> showQuickMeasureSheet(
                                         'date': date
                                             .toIso8601String()
                                             .substring(0, 10),
-                                        'comment':
-                                            commentCtl.text.isNotEmpty
-                                                ? commentCtl.text
-                                                : null,
+                                        'comment': commentCtl.text.isNotEmpty
+                                            ? commentCtl.text
+                                            : null,
                                         'time_of_day': timeOfDay,
                                         'is_fasted': isFasted,
                                         'side': side,
@@ -525,15 +575,17 @@ Future<void> showQuickMeasureSheet(
                                     final txt = controllers[t.id]!.text;
                                     if (txt.isEmpty) continue;
                                     final val = double.tryParse(
-                                        txt.replaceAll(',', '.'));
+                                      txt.replaceAll(',', '.'),
+                                    );
                                     if (val == null || val <= 0) continue;
                                     batch.add({
                                       'type': t.id,
                                       'value': val,
                                       'unit': t.unit,
-                                      'date': date
-                                          .toIso8601String()
-                                          .substring(0, 10),
+                                      'date': date.toIso8601String().substring(
+                                        0,
+                                        10,
+                                      ),
                                       'comment': commentCtl.text.isNotEmpty
                                           ? commentCtl.text
                                           : null,
@@ -546,15 +598,18 @@ Future<void> showQuickMeasureSheet(
                                   await repo.addBodyMeasurementsBatch(batch);
                                   if (ctx.mounted) {
                                     Navigator.pop(ctx);
-                                    ScaffoldMessenger.of(context)
-                                        .showSnackBar(
+                                    ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                            loc.bodyTrackerSavedBatch(batch.length)),
+                                          loc.bodyTrackerSavedBatch(
+                                            batch.length,
+                                          ),
+                                        ),
                                         behavior: SnackBarBehavior.floating,
                                         shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
                                         ),
                                       ),
                                     );
@@ -564,10 +619,13 @@ Future<void> showQuickMeasureSheet(
                               }
                             : null,
                         icon: const Icon(Icons.save),
-                        label: Text(loc.bodyTrackerSaveAll,
-                            style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600)),
+                        label: Text(
+                          loc.bodyTrackerSaveAll,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         style: FilledButton.styleFrom(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -603,30 +661,34 @@ List<Widget> _buildQuickMeasureFields(
       for (final side in ['left', 'right']) {
         final key = '${t.id}_$side';
         final ctl = controllers[key]!;
-        items.add(_buildQuickMeasureField(
-          theme: theme,
-          loc: loc,
-          type: t,
-          label:
-              '${_typeLabel(t.id, context)} ${side == 'left' ? loc.bodyTrackerLeftAbbr : loc.bodyTrackerRightAbbr}.',
-          controller: ctl,
-          isFilled: hasValue[key] == true,
-          latest: latestByType[t.id],
-          onChanged: (v) => setSheetState(() => hasValue[key] = v),
-        ));
+        items.add(
+          _buildQuickMeasureField(
+            theme: theme,
+            loc: loc,
+            type: t,
+            label:
+                '${_typeLabel(t.id, context)} ${side == 'left' ? loc.bodyTrackerLeftAbbr : loc.bodyTrackerRightAbbr}.',
+            controller: ctl,
+            isFilled: hasValue[key] == true,
+            latest: latestByType[t.id],
+            onChanged: (v) => setSheetState(() => hasValue[key] = v),
+          ),
+        );
       }
     } else {
       final ctl = controllers[t.id]!;
-      items.add(_buildQuickMeasureField(
-        theme: theme,
-        loc: loc,
-        type: t,
-        label: _typeLabel(t.id, context),
-        controller: ctl,
-        isFilled: hasValue[t.id] == true,
-        latest: latestByType[t.id],
-        onChanged: (v) => setSheetState(() => hasValue[t.id] = v),
-      ));
+      items.add(
+        _buildQuickMeasureField(
+          theme: theme,
+          loc: loc,
+          type: t,
+          label: _typeLabel(t.id, context),
+          controller: ctl,
+          isFilled: hasValue[t.id] == true,
+          latest: latestByType[t.id],
+          onChanged: (v) => setSheetState(() => hasValue[t.id] = v),
+        ),
+      );
     }
   }
   return items;
@@ -643,8 +705,9 @@ Widget _buildQuickMeasureField({
   required Map<String, dynamic>? latest,
   required ValueChanged<bool> onChanged,
 }) {
-  final latestVal =
-      latest != null ? (latest['value'] as num?)?.toDouble() : null;
+  final latestVal = latest != null
+      ? (latest['value'] as num?)?.toDouble()
+      : null;
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 4),
     child: Container(
@@ -677,18 +740,17 @@ Widget _buildQuickMeasureField({
             ? Text(
                 '${loc.bodyTrackerLastLabel}${latestVal.toStringAsFixed(1)} ${type.unit}',
                 style: TextStyle(
-                    fontSize: 11,
-                    color: theme.colorScheme.onSurfaceVariant.withAlpha(180)),
+                  fontSize: 11,
+                  color: theme.colorScheme.onSurfaceVariant.withAlpha(180),
+                ),
               )
             : null,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
         trailing: SizedBox(
           width: 80,
           child: TextFormField(
             controller: controller,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             textAlign: TextAlign.end,
             style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
@@ -774,8 +836,7 @@ Future<void> showMeasurementDetailSheet(
                     color: type.color.withAlpha(22),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child:
-                      Icon(type.icon, size: 28, color: type.color),
+                  child: Icon(type.icon, size: 28, color: type.color),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -862,15 +923,18 @@ Future<void> showMeasurementDetailSheet(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: theme.colorScheme.surfaceContainerHighest
-                      .withAlpha(100),
+                  color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                    100,
+                  ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.notes,
-                        size: 16,
-                        color: theme.colorScheme.onSurfaceVariant),
+                    Icon(
+                      Icons.notes,
+                      size: 16,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(child: Text(comment)),
                   ],
@@ -895,16 +959,18 @@ Future<void> showMeasurementDetailSheet(
                           ),
                           TextButton(
                             onPressed: () => Navigator.pop(c, true),
-                            child: Text(loc.commonDelete,
-                                style:
-                                    const TextStyle(color: Colors.red)),
+                            child: Text(
+                              loc.commonDelete,
+                              style: const TextStyle(color: Colors.red),
+                            ),
                           ),
                         ],
                       ),
                     );
                     if (confirm == true) {
                       await repo.deleteBodyMeasurement(
-                          measurement['id'] as String);
+                        measurement['id'] as String,
+                      );
                       onDeleted();
                     }
                   },

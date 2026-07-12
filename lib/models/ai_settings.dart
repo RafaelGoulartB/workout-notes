@@ -44,8 +44,9 @@ class AiSettings {
   }) {
     return AiSettings(
       providers: providers ?? this.providers,
-      activeProviderId:
-          clearActiveProvider ? null : (activeProviderId ?? this.activeProviderId),
+      activeProviderId: clearActiveProvider
+          ? null
+          : (activeProviderId ?? this.activeProviderId),
       systemPrompt: systemPrompt ?? this.systemPrompt,
       contextMode: contextMode ?? this.contextMode,
     );

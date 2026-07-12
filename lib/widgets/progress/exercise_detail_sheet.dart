@@ -29,11 +29,11 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
   int _chartType = 0;
 
   List<String> _chartTypes(AppLocalizations loc) => [
-        loc.exerciseDetailChart1RM,
-        loc.exerciseDetailChartMaxWeight,
-        loc.exerciseDetailChartVolume,
-        loc.exerciseDetailChartTotalReps,
-      ];
+    loc.exerciseDetailChart1RM,
+    loc.exerciseDetailChartMaxWeight,
+    loc.exerciseDetailChartVolume,
+    loc.exerciseDetailChartTotalReps,
+  ];
 
   @override
   void initState() {
@@ -42,8 +42,10 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
   }
 
   Future<void> _load() async {
-    final data =
-        await widget.analytics.getExerciseHistory(widget.exerciseId, limit: 30);
+    final data = await widget.analytics.getExerciseHistory(
+      widget.exerciseId,
+      limit: 30,
+    );
     if (!mounted) return;
     setState(() {
       _history = data;
@@ -85,8 +87,9 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
                     Expanded(
                       child: Text(
                         widget.exerciseName,
-                        style: theme.textTheme.titleLarge
-                            ?.copyWith(fontWeight: FontWeight.bold),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     IconButton(
@@ -105,7 +108,9 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
               else if (_history == null)
                 Expanded(
                   child: Center(
-                    child: Text(AppLocalizations.of(context)!.progressLoadError),
+                    child: Text(
+                      AppLocalizations.of(context)!.progressLoadError,
+                    ),
                   ),
                 )
               else
@@ -137,8 +142,10 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
-                  label: Text(_chartTypes(loc)[i],
-                      style: TextStyle(fontSize: 12)),
+                  label: Text(
+                    _chartTypes(loc)[i],
+                    style: TextStyle(fontSize: 12),
+                  ),
                   selected: isSelected,
                   onSelected: (_) => setState(() => _chartType = i),
                 ),
@@ -215,20 +222,18 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
         break;
       case 1:
         title = AppLocalizations.of(context)!.exerciseDetailChartMaxWeight;
-        values = history
-            .map((h) => (h['max_weight'] as double?) ?? 0)
-            .toList();
+        values = history.map((h) => (h['max_weight'] as double?) ?? 0).toList();
         break;
       case 2:
-        title =
-            AppLocalizations.of(context)!.progressChartTitleVolumePerWorkout;
+        title = AppLocalizations.of(
+          context,
+        )!.progressChartTitleVolumePerWorkout;
         values = history
             .map((h) => (h['total_volume'] as double?) ?? 0)
             .toList();
         break;
       case 3:
-        title =
-            AppLocalizations.of(context)!.progressChartTitleRepsPerWorkout;
+        title = AppLocalizations.of(context)!.progressChartTitleRepsPerWorkout;
         values = history
             .map((h) => (h['total_reps'] as int?)?.toDouble() ?? 0)
             .toList();
@@ -248,20 +253,24 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(
-              color: theme.colorScheme.outlineVariant.withAlpha(80)),
+            color: theme.colorScheme.outlineVariant.withAlpha(80),
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
             children: [
-              Icon(Icons.bar_chart_outlined,
-                  size: 48,
-                  color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
+              Icon(
+                Icons.bar_chart_outlined,
+                size: 48,
+                color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+              ),
               const SizedBox(height: 12),
               Text(
                 AppLocalizations.of(context)!.progressNoChartData,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant),
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -276,8 +285,7 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -286,14 +294,18 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
           children: [
             Row(
               children: [
-                Text(title,
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const Spacer(),
                 Text(
                   '${history.length} ${AppLocalizations.of(context)!.progressWorkouts.toLowerCase()}',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -309,8 +321,7 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
                     drawVerticalLine: false,
                     horizontalInterval: interval,
                     getDrawingHorizontalLine: (value) => FlLine(
-                      color:
-                          theme.colorScheme.outlineVariant.withAlpha(60),
+                      color: theme.colorScheme.outlineVariant.withAlpha(60),
                       strokeWidth: 1,
                     ),
                   ),
@@ -327,8 +338,9 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
                               _chartType == 3
                                   ? v.toInt().toString()
                                   : v.toStringAsFixed(1),
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(fontSize: 10),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 10,
+                              ),
                             ),
                           );
                         },
@@ -349,50 +361,57 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
                               date.length >= 10 ? date.substring(5) : date,
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(fontSize: 9),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 9,
+                              ),
                             ),
                           );
                         },
                       ),
                     ),
                     topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                     rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   lineBarsData: [
                     LineChartBarData(
-                      spots: values.asMap().entries.map((e) =>
-                          FlSpot(e.key.toDouble(), e.value)).toList(),
+                      spots: values
+                          .asMap()
+                          .entries
+                          .map((e) => FlSpot(e.key.toDouble(), e.value))
+                          .toList(),
                       isCurved: true,
                       color: _chartType == 0
                           ? Colors.amber
                           : _chartType == 2
-                              ? theme.colorScheme.secondary
-                              : theme.colorScheme.primary,
+                          ? theme.colorScheme.secondary
+                          : theme.colorScheme.primary,
                       barWidth: 3,
                       dotData: FlDotData(
                         show: history.length <= 30,
                         getDotPainter: (spot, percent, bar, index) =>
                             FlDotCirclePainter(
-                          radius: 4,
-                          color: _chartType == 0
-                              ? Colors.amber
-                              : _chartType == 2
+                              radius: 4,
+                              color: _chartType == 0
+                                  ? Colors.amber
+                                  : _chartType == 2
                                   ? theme.colorScheme.secondary
                                   : theme.colorScheme.primary,
-                        ),
+                            ),
                       ),
                       belowBarData: BarAreaData(
                         show: true,
-                        color: (_chartType == 0
-                                ? Colors.amber
-                                : _chartType == 2
+                        color:
+                            (_chartType == 0
+                                    ? Colors.amber
+                                    : _chartType == 2
                                     ? theme.colorScheme.secondary
                                     : theme.colorScheme.primary)
-                            .withAlpha(30),
+                                .withAlpha(30),
                       ),
                     ),
                   ],
@@ -400,18 +419,18 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
                     touchTooltipData: LineTouchTooltipData(
                       getTooltipItems: (touchedSpots) =>
                           touchedSpots.map((spot) {
-                        final idx = spot.spotIndex;
-                        final date = idx < history.length
-                            ? (history[idx]['date'] as String? ?? '')
-                            : '';
-                        return LineTooltipItem(
-                          '$date\n${spot.y.toStringAsFixed(1)}',
-                          TextStyle(
-                            color: theme.colorScheme.onSurface,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        );
-                      }).toList(),
+                            final idx = spot.spotIndex;
+                            final date = idx < history.length
+                                ? (history[idx]['date'] as String? ?? '')
+                                : '';
+                            return LineTooltipItem(
+                              '$date\n${spot.y.toStringAsFixed(1)}',
+                              TextStyle(
+                                color: theme.colorScheme.onSurface,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            );
+                          }).toList(),
                     ),
                   ),
                 ),
@@ -434,8 +453,9 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
       children: [
         Text(
           loc.progressHistoryTitle,
-          style: theme.textTheme.titleSmall
-              ?.copyWith(fontWeight: FontWeight.bold),
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 8),
         Container(
@@ -448,33 +468,48 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
             children: [
               Expanded(
                 flex: 2,
-                child: Text(loc.progressHistoryDate,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                child: Text(
+                  loc.progressHistoryDate,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               Expanded(
                 flex: 2,
-                child: Text(loc.workoutDetailWeight,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                child: Text(
+                  loc.workoutDetailWeight,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               Expanded(
                 flex: 2,
-                child: Text(loc.commonVolume,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                child: Text(
+                  loc.commonVolume,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               Expanded(
                 flex: 2,
-                child: Text(loc.progressHistorySetsReps,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                child: Text(
+                  loc.progressHistorySetsReps,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               Expanded(
                 flex: 2,
-                child: Text(loc.exerciseDetailChart1RM,
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                child: Text(
+                  loc.exerciseDetailChart1RM,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -492,20 +527,23 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
             child: InkWell(
               onTap: workoutId != null
                   ? () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              WorkoutDetailScreen(workoutId: workoutId),
-                        ),
-                      )
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            WorkoutDetailScreen(workoutId: workoutId),
+                      ),
+                    )
                   : null,
               borderRadius: BorderRadius.circular(8),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest
-                      .withAlpha(60),
+                  color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                    60,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -514,8 +552,9 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
                       flex: 2,
                       child: Text(
                         date.length >= 10 ? date.substring(5) : date,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(fontWeight: FontWeight.w600),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     Expanded(
@@ -534,8 +573,10 @@ class _ExerciseDetailSheetState extends State<ExerciseDetailSheet> {
                     ),
                     Expanded(
                       flex: 2,
-                      child: Text('$sets×$reps',
-                          style: theme.textTheme.bodySmall),
+                      child: Text(
+                        '$sets×$reps',
+                        style: theme.textTheme.bodySmall,
+                      ),
                     ),
                     Expanded(
                       flex: 2,

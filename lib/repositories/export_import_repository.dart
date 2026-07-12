@@ -71,16 +71,36 @@ class ExportImportRepository extends BaseRepository {
       await txn.delete('app_settings');
 
       // 2. Insert backup rows in FK-safe order
-      totalRows += await _insertAll(txn, 'exercise_categories', data['categories']);
+      totalRows += await _insertAll(
+        txn,
+        'exercise_categories',
+        data['categories'],
+      );
       totalRows += await _insertAll(txn, 'exercises', data['exercises']);
       totalRows += await _insertAll(txn, 'workouts', data['workouts']);
-      totalRows += await _insertAll(txn, 'exercise_entries', data['exercise_entries']);
+      totalRows += await _insertAll(
+        txn,
+        'exercise_entries',
+        data['exercise_entries'],
+      );
       totalRows += await _insertAll(txn, 'sets', data['sets']);
       totalRows += await _insertAll(txn, 'routines', data['routines']);
       totalRows += await _insertAll(txn, 'routine_days', data['routine_days']);
-      totalRows += await _insertAll(txn, 'routine_exercises', data['routine_exercises']);
-      totalRows += await _insertAll(txn, 'predefined_sets', data['predefined_sets']);
-      totalRows += await _insertAll(txn, 'body_measurements', data['body_measurements']);
+      totalRows += await _insertAll(
+        txn,
+        'routine_exercises',
+        data['routine_exercises'],
+      );
+      totalRows += await _insertAll(
+        txn,
+        'predefined_sets',
+        data['predefined_sets'],
+      );
+      totalRows += await _insertAll(
+        txn,
+        'body_measurements',
+        data['body_measurements'],
+      );
       totalRows += await _insertAll(txn, 'app_settings', data['settings']);
     });
 
@@ -88,13 +108,15 @@ class ExportImportRepository extends BaseRepository {
   }
 
   /// Inserts [rows] into [table], returning the count.
-  Future<int> _insertAll(
-      Transaction txn, String table, dynamic rows) async {
+  Future<int> _insertAll(Transaction txn, String table, dynamic rows) async {
     if (rows == null || rows is! List || rows.isEmpty) return 0;
     int count = 0;
     for (final row in rows) {
-      await txn.insert(table, row as Map<String, dynamic>,
-          conflictAlgorithm: ConflictAlgorithm.replace);
+      await txn.insert(
+        table,
+        row as Map<String, dynamic>,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
       count++;
     }
     return count;

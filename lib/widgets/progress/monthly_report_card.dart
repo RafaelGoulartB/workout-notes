@@ -62,8 +62,11 @@ class MonthlyReportCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.auto_graph,
-                    size: 20, color: theme.colorScheme.primary),
+                Icon(
+                  Icons.auto_graph,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   loc.progressMonthlyReport(monthName.toUpperCase()),
@@ -120,8 +123,7 @@ class MonthlyReportCard extends StatelessWidget {
                   Icon(Icons.star, size: 14, color: Colors.amber),
                   const SizedBox(width: 4),
                   Text(
-                    loc.progressAverageFeeling(
-                        avgFeeling.toStringAsFixed(1)),
+                    loc.progressAverageFeeling(avgFeeling.toStringAsFixed(1)),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -130,7 +132,9 @@ class MonthlyReportCard extends StatelessWidget {
                   if (deltaW != 0)
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: deltaW > 0
                             ? Colors.green.withAlpha(25)
@@ -145,18 +149,17 @@ class MonthlyReportCard extends StatelessWidget {
                                 ? Icons.trending_up
                                 : Icons.trending_down,
                             size: 14,
-                            color:
-                                deltaW > 0 ? Colors.green : Colors.red,
+                            color: deltaW > 0 ? Colors.green : Colors.red,
                           ),
                           const SizedBox(width: 2),
                           Text(
                             loc.progressVsLastMonth(
-                                '${deltaW > 0 ? '+' : ''}$deltaW'),
+                              '${deltaW > 0 ? '+' : ''}$deltaW',
+                            ),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
-                              color:
-                                  deltaW > 0 ? Colors.green : Colors.red,
+                              color: deltaW > 0 ? Colors.green : Colors.red,
                             ),
                           ),
                         ],

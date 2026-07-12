@@ -30,8 +30,9 @@ class DurationRecoveryCharts extends StatelessWidget {
         if (durationTrend.isNotEmpty) ...[
           Text(
             loc.progressDuration,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 6),
           _DurationChart(data: durationTrend),
@@ -42,8 +43,9 @@ class DurationRecoveryCharts extends StatelessWidget {
         if (densityData.isNotEmpty) ...[
           Text(
             loc.progressDensity,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 6),
           _DensityChart(data: densityData),
@@ -54,8 +56,9 @@ class DurationRecoveryCharts extends StatelessWidget {
         if (feelingTrend.isNotEmpty) ...[
           Text(
             loc.progressRecoveryFeeling,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 6),
           _FeelingChart(data: feelingTrend),
@@ -66,8 +69,9 @@ class DurationRecoveryCharts extends StatelessWidget {
         if (feelingVsVolume.isNotEmpty) ...[
           Text(
             loc.progressRecoveryFeelingVsVolume,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 6),
           _FeelingVsVolumeChart(data: feelingVsVolume),
@@ -89,8 +93,9 @@ class _DurationChart extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
 
     final reversed = data.reversed.toList();
-    final values =
-        reversed.map((d) => ((d['duration_seconds'] as int?) ?? 0) / 60.0).toList();
+    final values = reversed
+        .map((d) => ((d['duration_seconds'] as int?) ?? 0) / 60.0)
+        .toList();
     final maxVal = values.fold<double>(0, (a, b) => a > b ? a : b);
     if (maxVal <= 0) return const SizedBox.shrink();
 
@@ -100,8 +105,7 @@ class _DurationChart extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -112,8 +116,7 @@ class _DurationChart extends StatelessWidget {
               children: [
                 Text(
                   loc.progressAverage(avg.toStringAsFixed(0)),
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(fontSize: 11),
+                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
                 ),
               ],
             ),
@@ -127,8 +130,7 @@ class _DurationChart extends StatelessWidget {
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval:
-                        niceInterval(maxVal / 4),
+                    horizontalInterval: niceInterval(maxVal / 4),
                   ),
                   titlesData: FlTitlesData(
                     leftTitles: AxisTitles(
@@ -137,8 +139,9 @@ class _DurationChart extends StatelessWidget {
                         reservedSize: 32,
                         getTitlesWidget: (v, _) => Text(
                           '${v.toInt()}min',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(fontSize: 8),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 8,
+                          ),
                         ),
                       ),
                     ),
@@ -146,44 +149,41 @@ class _DurationChart extends StatelessWidget {
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 20,
-                        interval:
-                            data.length > 10 ? 2 : 1,
+                        interval: data.length > 10 ? 2 : 1,
                         getTitlesWidget: (v, _) {
                           final idx = v.toInt();
-                          if (idx < 0 ||
-                              idx >= reversed.length) {
+                          if (idx < 0 || idx >= reversed.length) {
                             return const SizedBox.shrink();
                           }
-                          final d = reversed[idx]['date']
-                                  as String? ??
-                              '';
+                          final d = reversed[idx]['date'] as String? ?? '';
                           return Text(
-                            d.length >= 10
-                                ? d.substring(5)
-                                : d,
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(fontSize: 7),
+                            d.length >= 10 ? d.substring(5) : d,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 7,
+                            ),
                           );
                         },
                       ),
                     ),
                     topTitles: const AxisTitles(
-                        sideTitles:
-                            SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                     rightTitles: const AxisTitles(
-                        sideTitles:
-                            SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   lineBarsData: [
                     LineChartBarData(
-                      spots: values.asMap().entries.map((e) =>
-                          FlSpot(e.key.toDouble(), e.value)).toList(),
+                      spots: values
+                          .asMap()
+                          .entries
+                          .map((e) => FlSpot(e.key.toDouble(), e.value))
+                          .toList(),
                       isCurved: true,
                       color: Colors.purple,
                       barWidth: 2.5,
-                      dotData: FlDotData(
-                          show: values.length <= 20),
+                      dotData: FlDotData(show: values.length <= 20),
                       belowBarData: BarAreaData(
                         show: true,
                         color: Colors.purple.withAlpha(25),
@@ -191,21 +191,16 @@ class _DurationChart extends StatelessWidget {
                     ),
                   ],
                   lineTouchData: LineTouchData(
-                    touchTooltipData:
-                        LineTouchTooltipData(
-                      getTooltipItems: (spots) =>
-                          spots.map((s) {
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipItems: (spots) => spots.map((s) {
                         final idx = s.spotIndex;
                         final d = idx < reversed.length
-                            ? (reversed[idx]['date']
-                                    as String? ??
-                                '')
+                            ? (reversed[idx]['date'] as String? ?? '')
                             : '';
                         return LineTooltipItem(
                           '$d\n${s.y.toStringAsFixed(0)}min',
                           TextStyle(
-                            color:
-                                theme.colorScheme.onSurface,
+                            color: theme.colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
                           ),
                         );
@@ -241,17 +236,14 @@ class _DensityChart extends StatelessWidget {
     }).toList();
 
     if (densities.isEmpty) return const SizedBox.shrink();
-    final maxVal =
-        densities.fold<double>(0, (a, b) => a > b ? a : b);
-    final avg =
-        densities.fold<double>(0, (a, b) => a + b) / densities.length;
+    final maxVal = densities.fold<double>(0, (a, b) => a > b ? a : b);
+    final avg = densities.fold<double>(0, (a, b) => a + b) / densities.length;
 
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -261,10 +253,8 @@ class _DensityChart extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  loc.progressDensityAverage(
-                      avg.toStringAsFixed(1)),
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(fontSize: 11),
+                  loc.progressDensityAverage(avg.toStringAsFixed(1)),
+                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
                 ),
               ],
             ),
@@ -273,11 +263,9 @@ class _DensityChart extends StatelessWidget {
               height: 120,
               child: BarChart(
                 BarChartData(
-                  alignment:
-                      BarChartAlignment.spaceAround,
+                  alignment: BarChartAlignment.spaceAround,
                   maxY: maxVal * 1.2,
-                  barTouchData:
-                      BarTouchData(enabled: false),
+                  barTouchData: BarTouchData(enabled: false),
                   titlesData: FlTitlesData(
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
@@ -285,8 +273,9 @@ class _DensityChart extends StatelessWidget {
                         reservedSize: 32,
                         getTitlesWidget: (v, _) => Text(
                           v.toStringAsFixed(0),
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(fontSize: 8),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 8,
+                          ),
                         ),
                       ),
                     ),
@@ -294,44 +283,36 @@ class _DensityChart extends StatelessWidget {
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 16,
-                        interval: data.length > 10
-                            ? 2
-                            : 1,
+                        interval: data.length > 10 ? 2 : 1,
                         getTitlesWidget: (v, _) {
                           final idx = v.toInt();
-                          if (idx < 0 ||
-                              idx >= reversed.length) {
+                          if (idx < 0 || idx >= reversed.length) {
                             return const SizedBox.shrink();
                           }
-                          final d = reversed[idx]['date']
-                                  as String? ??
-                              '';
+                          final d = reversed[idx]['date'] as String? ?? '';
                           return Text(
-                            d.length >= 10
-                                ? d.substring(5)
-                                : d,
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(fontSize: 7),
+                            d.length >= 10 ? d.substring(5) : d,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 7,
+                            ),
                           );
                         },
                       ),
                     ),
                     topTitles: const AxisTitles(
-                        sideTitles:
-                            SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                     rightTitles: const AxisTitles(
-                        sideTitles:
-                            SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval:
-                        niceInterval(maxVal / 4),
+                    horizontalInterval: niceInterval(maxVal / 4),
                   ),
-                  barGroups:
-                      densities.asMap().entries.map((e) {
+                  barGroups: densities.asMap().entries.map((e) {
                     return BarChartGroupData(
                       x: e.key,
                       barRods: [
@@ -339,11 +320,9 @@ class _DensityChart extends StatelessWidget {
                           toY: e.value,
                           color: Colors.purple.shade300,
                           width: 10,
-                          borderRadius:
-                              const BorderRadius.only(
+                          borderRadius: const BorderRadius.only(
                             topLeft: Radius.circular(3),
-                            topRight:
-                                Radius.circular(3),
+                            topRight: Radius.circular(3),
                           ),
                         ),
                       ],
@@ -380,8 +359,7 @@ class _FeelingChart extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -396,15 +374,12 @@ class _FeelingChart extends StatelessWidget {
                 touchTooltipData: BarTouchTooltipData(
                   getTooltipItem: (g, gi, r, ri) {
                     final d = reversed[gi];
-                    final date =
-                        d['date'] as String? ?? '';
-                    final feeling =
-                        d['feeling_rating'] as int? ?? 0;
+                    final date = d['date'] as String? ?? '';
+                    final feeling = d['feeling_rating'] as int? ?? 0;
                     return BarTooltipItem(
                       '$date\n${'★' * feeling}',
                       TextStyle(
-                        color:
-                            theme.colorScheme.onSurface,
+                        color: theme.colorScheme.onSurface,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),
@@ -423,10 +398,7 @@ class _FeelingChart extends StatelessWidget {
                       }
                       return Text(
                         '★' * v.toInt(),
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: Colors.amber,
-                        ),
+                        style: TextStyle(fontSize: 9, color: Colors.amber),
                       );
                     },
                   ),
@@ -435,33 +407,26 @@ class _FeelingChart extends StatelessWidget {
                   sideTitles: SideTitles(
                     showTitles: true,
                     reservedSize: 16,
-                    interval:
-                        data.length > 12 ? 2 : 1,
+                    interval: data.length > 12 ? 2 : 1,
                     getTitlesWidget: (v, _) {
                       final idx = v.toInt();
-                      if (idx < 0 ||
-                          idx >= reversed.length) {
+                      if (idx < 0 || idx >= reversed.length) {
                         return const SizedBox.shrink();
                       }
-                      final d = reversed[idx]['date']
-                              as String? ??
-                          '';
+                      final d = reversed[idx]['date'] as String? ?? '';
                       return Text(
-                        d.length >= 10
-                            ? d.substring(5)
-                            : d,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(fontSize: 7),
+                        d.length >= 10 ? d.substring(5) : d,
+                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 7),
                       );
                     },
                   ),
                 ),
                 topTitles: const AxisTitles(
-                    sideTitles:
-                        SideTitles(showTitles: false)),
+                  sideTitles: SideTitles(showTitles: false),
+                ),
                 rightTitles: const AxisTitles(
-                    sideTitles:
-                        SideTitles(showTitles: false)),
+                  sideTitles: SideTitles(showTitles: false),
+                ),
               ),
               borderData: FlBorderData(show: false),
               gridData: FlGridData(
@@ -469,8 +434,7 @@ class _FeelingChart extends StatelessWidget {
                 drawVerticalLine: false,
                 horizontalInterval: 1,
               ),
-              barGroups:
-                  values.asMap().entries.map((e) {
+              barGroups: values.asMap().entries.map((e) {
                 return BarChartGroupData(
                   x: e.key,
                   barRods: [
@@ -479,11 +443,10 @@ class _FeelingChart extends StatelessWidget {
                       color: e.value >= 4
                           ? Colors.green
                           : e.value >= 3
-                              ? Colors.amber
-                              : Colors.red.shade300,
+                          ? Colors.amber
+                          : Colors.red.shade300,
                       width: 10,
-                      borderRadius:
-                          const BorderRadius.only(
+                      borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(3),
                         topRight: Radius.circular(3),
                       ),
@@ -519,8 +482,7 @@ class _FeelingVsVolumeChart extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -534,17 +496,13 @@ class _FeelingVsVolumeChart extends StatelessWidget {
                 touchTooltipData: BarTouchTooltipData(
                   getTooltipItem: (g, gi, r, ri) {
                     final d = data[gi];
-                    final feeling =
-                        d['feeling_rating'] as int? ?? 0;
-                    final vol =
-                        (d['avg_volume'] as num?)?.toDouble() ?? 0;
-                    final count =
-                        d['workout_count'] as int? ?? 0;
+                    final feeling = d['feeling_rating'] as int? ?? 0;
+                    final vol = (d['avg_volume'] as num?)?.toDouble() ?? 0;
+                    final count = d['workout_count'] as int? ?? 0;
                     return BarTooltipItem(
                       '${'★' * feeling}\n${loc.commonVolume}: ${formatVolume(vol)}\n$count ${loc.progressWorkouts}',
                       TextStyle(
-                        color:
-                            theme.colorScheme.onSurface,
+                        color: theme.colorScheme.onSurface,
                         fontWeight: FontWeight.bold,
                         fontSize: 11,
                       ),
@@ -559,19 +517,13 @@ class _FeelingVsVolumeChart extends StatelessWidget {
                     reservedSize: 20,
                     getTitlesWidget: (v, _) {
                       final idx = v.toInt();
-                      if (idx < 0 ||
-                          idx >= data.length) {
+                      if (idx < 0 || idx >= data.length) {
                         return const SizedBox.shrink();
                       }
-                      final feeling = data[idx]
-                              ['feeling_rating']
-                          as int? ?? 0;
+                      final feeling = data[idx]['feeling_rating'] as int? ?? 0;
                       return Text(
                         '★' * feeling,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.amber,
-                        ),
+                        style: TextStyle(fontSize: 10, color: Colors.amber),
                       );
                     },
                   ),
@@ -582,29 +534,25 @@ class _FeelingVsVolumeChart extends StatelessWidget {
                     reservedSize: 32,
                     getTitlesWidget: (v, _) => Text(
                       formatVolume(v),
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(fontSize: 8),
+                      style: theme.textTheme.bodySmall?.copyWith(fontSize: 8),
                     ),
                   ),
                 ),
                 topTitles: const AxisTitles(
-                    sideTitles:
-                        SideTitles(showTitles: false)),
+                  sideTitles: SideTitles(showTitles: false),
+                ),
                 rightTitles: const AxisTitles(
-                    sideTitles:
-                        SideTitles(showTitles: false)),
+                  sideTitles: SideTitles(showTitles: false),
+                ),
               ),
               borderData: FlBorderData(show: false),
               gridData: FlGridData(
                 show: true,
                 drawVerticalLine: false,
-                horizontalInterval:
-                    niceInterval(maxVol / 4),
+                horizontalInterval: niceInterval(maxVol / 4),
               ),
               barGroups: data.asMap().entries.map((e) {
-                final vol =
-                    (e.value['avg_volume'] as num?)?.toDouble() ??
-                        0;
+                final vol = (e.value['avg_volume'] as num?)?.toDouble() ?? 0;
                 return BarChartGroupData(
                   x: e.key,
                   barRods: [
@@ -612,8 +560,7 @@ class _FeelingVsVolumeChart extends StatelessWidget {
                       toY: vol,
                       color: Colors.red.shade300,
                       width: 24,
-                      borderRadius:
-                          const BorderRadius.only(
+                      borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(4),
                         topRight: Radius.circular(4),
                       ),

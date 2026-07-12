@@ -52,22 +52,24 @@ class AiProvider {
   }
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'name': name,
-        'baseUrl': baseUrl,
-        'availableModels': availableModels,
-        'selectedModel': selectedModel,
-        'createdAt': createdAt.toIso8601String(),
-      };
+    'id': id,
+    'name': name,
+    'baseUrl': baseUrl,
+    'availableModels': availableModels,
+    'selectedModel': selectedModel,
+    'createdAt': createdAt.toIso8601String(),
+  };
 
   factory AiProvider.fromMap(Map<String, dynamic> m) {
     return AiProvider(
       id: m['id'] as String,
       name: m['name'] as String,
       baseUrl: m['baseUrl'] as String,
-      availableModels: (m['availableModels'] as List?)?.cast<String>() ?? const [],
+      availableModels:
+          (m['availableModels'] as List?)?.cast<String>() ?? const [],
       selectedModel: (m['selectedModel'] as String?) ?? '',
-      createdAt: DateTime.tryParse(m['createdAt'] as String? ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(m['createdAt'] as String? ?? '') ?? DateTime.now(),
     );
   }
 

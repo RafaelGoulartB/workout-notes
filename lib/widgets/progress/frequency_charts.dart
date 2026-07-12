@@ -37,26 +37,19 @@ class FrequencyCharts extends StatelessWidget {
         const SizedBox(height: 4),
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: WorkoutHeatmap(
-            dailyData: heatmapData,
-            year: year,
-          ),
+          child: WorkoutHeatmap(dailyData: heatmapData, year: year),
         ),
         const SizedBox(height: 4),
-        Row(
-          children: [
-            const Spacer(),
-            _buildLegend(),
-          ],
-        ),
+        Row(children: [const Spacer(), _buildLegend()]),
         const SizedBox(height: 16),
 
         // Weekly frequency chart
         if (workoutDates.isNotEmpty) ...[
           Text(
             loc.progressWeeklyFrequency,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 8),
           _WeeklyFrequencyChart(workoutDates: workoutDates),
@@ -67,13 +60,9 @@ class FrequencyCharts extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: _DayOfWeekChart(workoutDates: workoutDates),
-            ),
+            Expanded(child: _DayOfWeekChart(workoutDates: workoutDates)),
             const SizedBox(width: 8),
-            Expanded(
-              child: _TimeOfDayChart(workoutDates: workoutDates),
-            ),
+            Expanded(child: _TimeOfDayChart(workoutDates: workoutDates)),
           ],
         ),
       ],
@@ -89,10 +78,7 @@ class FrequencyCharts extends StatelessWidget {
         _legendDot(Colors.green.shade600),
         _legendDot(Colors.green.shade800),
         const SizedBox(width: 4),
-        Text(
-          '+ volume',
-          style: TextStyle(fontSize: 9, color: Colors.grey),
-        ),
+        Text('+ volume', style: TextStyle(fontSize: 9, color: Colors.grey)),
       ],
     );
   }
@@ -125,8 +111,7 @@ class _WeeklyFrequencyChart extends StatelessWidget {
 
     // Build last 12 weeks
     for (int i = 11; i >= 0; i--) {
-      final weekStart =
-          now.subtract(Duration(days: now.weekday - 1 + (i * 7)));
+      final weekStart = now.subtract(Duration(days: now.weekday - 1 + (i * 7)));
       final weekEnd = weekStart.add(const Duration(days: 6));
       final startStr = weekStart.toIso8601String().substring(0, 10);
       final endStr = weekEnd.toIso8601String().substring(0, 10);
@@ -138,19 +123,18 @@ class _WeeklyFrequencyChart extends StatelessWidget {
           count++;
         }
       }
-      weeks.add(_WeekBar(
-          weekLabel(weekStart, loc.progressWeekAbbreviation), count));
+      weeks.add(
+        _WeekBar(weekLabel(weekStart, loc.progressWeekAbbreviation), count),
+      );
     }
 
-    final maxCount =
-        weeks.fold<int>(0, (a, b) => a > b.count ? a : b.count);
+    final maxCount = weeks.fold<int>(0, (a, b) => a > b.count ? a : b.count);
 
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -189,9 +173,12 @@ class _WeeklyFrequencyChart extends StatelessWidget {
                       }
                       return Padding(
                         padding: const EdgeInsets.only(top: 4),
-                        child: Text(weeks[idx].label,
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(fontSize: 8)),
+                        child: Text(
+                          weeks[idx].label,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 8,
+                          ),
+                        ),
                       );
                     },
                     reservedSize: 20,
@@ -203,23 +190,27 @@ class _WeeklyFrequencyChart extends StatelessWidget {
                     reservedSize: 20,
                     getTitlesWidget: (v, _) {
                       if (v == 0) return const SizedBox.shrink();
-                      return Text('${v.toInt()}',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(fontSize: 9));
+                      return Text(
+                        '${v.toInt()}',
+                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 9),
+                      );
                     },
                   ),
                 ),
                 topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false)),
+                  sideTitles: SideTitles(showTitles: false),
+                ),
                 rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false)),
+                  sideTitles: SideTitles(showTitles: false),
+                ),
               ),
               borderData: FlBorderData(show: false),
               gridData: FlGridData(
                 show: true,
                 drawVerticalLine: false,
-                horizontalInterval:
-                    niceInterval(maxCount > 0 ? maxCount / 4 : 1),
+                horizontalInterval: niceInterval(
+                  maxCount > 0 ? maxCount / 4 : 1,
+                ),
               ),
               barGroups: weeks.asMap().entries.map((e) {
                 return BarChartGroupData(
@@ -256,27 +247,28 @@ class _DayOfWeekChart extends StatelessWidget {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
 
-    final dowCount = <int, int>{
-      0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0
-    };
+    final dowCount = <int, int>{0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0};
     for (final wd in workoutDates) {
       final dow = wd['day_of_week'] as int? ?? 0;
       dowCount[dow] = (dowCount[dow] ?? 0) + 1;
     }
 
     final labels = [
-      loc.calendarSun, loc.calendarMon, loc.calendarTue,
-      loc.calendarWed, loc.calendarThu, loc.calendarFri, loc.calendarSat
+      loc.calendarSun,
+      loc.calendarMon,
+      loc.calendarTue,
+      loc.calendarWed,
+      loc.calendarThu,
+      loc.calendarFri,
+      loc.calendarSat,
     ];
-    final maxVal =
-        dowCount.values.fold<int>(0, (a, b) => a > b ? a : b);
+    final maxVal = dowCount.values.fold<int>(0, (a, b) => a > b ? a : b);
 
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(10),
@@ -286,7 +278,9 @@ class _DayOfWeekChart extends StatelessWidget {
             Text(
               loc.progressDayOfWeek,
               style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w600, fontSize: 10),
+                fontWeight: FontWeight.w600,
+                fontSize: 10,
+              ),
             ),
             const SizedBox(height: 6),
             SizedBox(
@@ -306,18 +300,24 @@ class _DayOfWeekChart extends StatelessWidget {
                           if (idx < 0 || idx >= 7) {
                             return const SizedBox.shrink();
                           }
-                          return Text(labels[idx],
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(fontSize: 8));
+                          return Text(
+                            labels[idx],
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 8,
+                            ),
+                          );
                         },
                       ),
                     ),
                     leftTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                     topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                     rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   gridData: FlGridData(show: false),
@@ -364,7 +364,10 @@ class _TimeOfDayChart extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
 
     final periods = <String, int>{
-      'manhã': 0, 'tarde': 0, 'noite': 0, 'madrugada': 0
+      'manhã': 0,
+      'tarde': 0,
+      'noite': 0,
+      'madrugada': 0,
     };
     for (final wd in workoutDates) {
       final startTime = wd['start_time'] as String?;
@@ -391,7 +394,8 @@ class _TimeOfDayChart extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(
-              color: theme.colorScheme.outlineVariant.withAlpha(80)),
+            color: theme.colorScheme.outlineVariant.withAlpha(80),
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.all(10),
@@ -400,17 +404,19 @@ class _TimeOfDayChart extends StatelessWidget {
               Text(
                 loc.progressTimeOfDay,
                 style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600, fontSize: 10),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 10,
+                ),
               ),
               const SizedBox(height: 20),
-              Icon(Icons.access_time,
-                  size: 24,
-                  color: theme.colorScheme.onSurfaceVariant
-                      .withAlpha(80)),
+              Icon(
+                Icons.access_time,
+                size: 24,
+                color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+              ),
               Text(
                 loc.progressNoData,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(fontSize: 9),
+                style: theme.textTheme.bodySmall?.copyWith(fontSize: 9),
               ),
             ],
           ),
@@ -422,27 +428,26 @@ class _TimeOfDayChart extends StatelessWidget {
       Colors.orange,
       Colors.amber,
       Colors.indigo,
-      Colors.deepPurple
+      Colors.deepPurple,
     ];
     final labels = [
       loc.progressMorning,
       loc.progressAfternoon,
       loc.progressEvening,
-      loc.progressDawn
+      loc.progressDawn,
     ];
     final values = [
       periods['manhã']!,
       periods['tarde']!,
       periods['noite']!,
-      periods['madrugada']!
+      periods['madrugada']!,
     ];
 
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(10),
@@ -452,7 +457,9 @@ class _TimeOfDayChart extends StatelessWidget {
             Text(
               loc.progressTimeOfDay,
               style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w600, fontSize: 10),
+                fontWeight: FontWeight.w600,
+                fontSize: 10,
+              ),
             ),
             const SizedBox(height: 6),
             SizedBox(
@@ -472,8 +479,7 @@ class _TimeOfDayChart extends StatelessWidget {
                     return PieChartSectionData(
                       color: colors[i],
                       value: values[i].toDouble(),
-                      title:
-                          '${(values[i] / total * 100).toStringAsFixed(0)}%',
+                      title: '${(values[i] / total * 100).toStringAsFixed(0)}%',
                       titleStyle: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.bold,

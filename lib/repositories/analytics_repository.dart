@@ -10,7 +10,10 @@ class AnalyticsRepository extends BaseRepository {
   // EXERCISE HISTORY
   // ===================================================================
 
-  Future<Map<String, dynamic>> getExerciseHistory(String exerciseId, {int? limit}) async {
+  Future<Map<String, dynamic>> getExerciseHistory(
+    String exerciseId, {
+    int? limit,
+  }) async {
     final db = await this.db;
     final query = '''
       SELECT s.*, w.date, w.id as workout_id, ee.exercise_id
@@ -34,15 +37,25 @@ class AnalyticsRepository extends BaseRepository {
     // Calculate stats per session
     final history = <Map<String, dynamic>>[];
     final entries = byDate.entries.toList();
-    final recent = entries.reversed.take(effectiveLimit).toList().reversed.toList();
+    final recent = entries.reversed
+        .take(effectiveLimit)
+        .toList()
+        .reversed
+        .toList();
 
     for (final entry in recent) {
       final sets = entry.value;
-      final weights = sets.map<double>((s) => (s['weight'] as num?)?.toDouble() ?? 0.0).toList();
+      final weights = sets
+          .map<double>((s) => (s['weight'] as num?)?.toDouble() ?? 0.0)
+          .toList();
       final reps = sets.map<int>((s) => (s['reps'] as int?) ?? 0).toList();
-      final maxWeight = weights.isEmpty ? 0.0 : weights.reduce((a, b) => a > b ? a : b);
+      final maxWeight = weights.isEmpty
+          ? 0.0
+          : weights.reduce((a, b) => a > b ? a : b);
       final totalVolume = weights.asMap().entries.fold<double>(
-        0.0, (sum, e) => sum + (e.value * reps[e.key]));
+        0.0,
+        (sum, e) => sum + (e.value * reps[e.key]),
+      );
       final bestSetIndex = weights.indexOf(maxWeight);
 
       double? estimated1RM;
@@ -60,10 +73,7 @@ class AnalyticsRepository extends BaseRepository {
         'total_reps': reps.fold<int>(0, (a, b) => a + b),
         'estimated_1rm': estimated1RM,
         'workout_id': firstSet['workout_id'],
-        'best_set': {
-          'weight': maxWeight,
-          'reps': reps[bestSetIndex],
-        },
+        'best_set': {'weight': maxWeight, 'reps': reps[bestSetIndex]},
       });
     }
 
@@ -85,8 +95,11 @@ class AnalyticsRepository extends BaseRepository {
       'best_weight': allMaxWeight,
       'best_volume': allMaxVolume,
       'best_1rm': history.fold<double>(
-        0, (a, b) => (b['estimated_1rm'] as double? ?? 0) > a
-            ? (b['estimated_1rm'] as double? ?? 0) : a),
+        0,
+        (a, b) => (b['estimated_1rm'] as double? ?? 0) > a
+            ? (b['estimated_1rm'] as double? ?? 0)
+            : a,
+      ),
     };
   }
 
@@ -105,7 +118,8 @@ class AnalyticsRepository extends BaseRepository {
       final startStr = weekStart.toIso8601String().substring(0, 10);
       final endStr = weekEnd.toIso8601String().substring(0, 10);
 
-      final rows = await db.rawQuery('''
+      final rows = await db.rawQuery(
+        '''
         SELECT ec.name as category, ec.color as color,
           SUM(s.weight * s.reps) as volume, COUNT(s.id) as total_sets
         FROM sets s
@@ -116,7 +130,9 @@ class AnalyticsRepository extends BaseRepository {
         WHERE w.date >= ? AND w.date <= ? AND s.is_warmup = 0
         GROUP BY ec.id
         ORDER BY volume DESC
-      ''', [startStr, endStr]);
+      ''',
+        [startStr, endStr],
+      );
 
       results['week_${w + 1}'] = {
         'start': startStr,
@@ -135,16 +151,20 @@ class AnalyticsRepository extends BaseRepository {
 
     for (int m = months - 1; m >= 0; m--) {
       final monthDate = DateTime(now.year, now.month - m, 1);
-      final monthStr = '${monthDate.year}-${monthDate.month.toString().padLeft(2, '0')}';
+      final monthStr =
+          '${monthDate.year}-${monthDate.month.toString().padLeft(2, '0')}';
 
-      final row = await db.rawQuery('''
+      final row = await db.rawQuery(
+        '''
         SELECT COALESCE(SUM(s.weight * s.reps), 0) as volume,
           COUNT(DISTINCT w.id) as workouts
         FROM sets s
         JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
         JOIN workouts w ON ee.workout_id = w.id
         WHERE w.date LIKE ? AND s.is_warmup = 0
-      ''', ['$monthStr%']);
+      ''',
+        ['$monthStr%'],
+      );
 
       if (row.isNotEmpty) {
         results.add({
@@ -166,7 +186,8 @@ class AnalyticsRepository extends BaseRepository {
     final db = await this.db;
     final startDate = '$year-01-01';
     final endDate = '$year-12-31';
-    final rows = await db.rawQuery('''
+    final rows = await db.rawQuery(
+      '''
       SELECT w.date, COALESCE(SUM(s.weight * s.reps), 0) as volume
       FROM workouts w
       LEFT JOIN exercise_entries ee ON w.id = ee.workout_id
@@ -174,25 +195,33 @@ class AnalyticsRepository extends BaseRepository {
       WHERE w.date >= ? AND w.date <= ?
       GROUP BY w.date
       ORDER BY w.date
-    ''', [startDate, endDate]);
+    ''',
+      [startDate, endDate],
+    );
 
     final Map<String, int> result = {};
     for (final row in rows) {
-      result[row['date'] as String] = ((row['volume'] as num?)?.toDouble() ?? 0).toInt();
+      result[row['date'] as String] = ((row['volume'] as num?)?.toDouble() ?? 0)
+          .toInt();
     }
     return result;
   }
 
-  Future<List<Map<String, dynamic>>> getWorkoutDatesInRange(DateTime start) async {
+  Future<List<Map<String, dynamic>>> getWorkoutDatesInRange(
+    DateTime start,
+  ) async {
     final db = await this.db;
     final startStr = start.toIso8601String().substring(0, 10);
-    return db.rawQuery('''
+    return db.rawQuery(
+      '''
       SELECT date, duration_seconds, start_time,
         CAST(strftime('%w', date) AS INTEGER) as day_of_week
       FROM workouts
       WHERE date >= ?
       ORDER BY date ASC
-    ''', [startStr]);
+    ''',
+      [startStr],
+    );
   }
 
   // ===================================================================
@@ -214,11 +243,16 @@ class AnalyticsRepository extends BaseRepository {
     ''');
   }
 
-  Future<List<Map<String, dynamic>>> getWeeklyVolumeByCategory({int weeks = 12}) async {
+  Future<List<Map<String, dynamic>>> getWeeklyVolumeByCategory({
+    int weeks = 12,
+  }) async {
     final db = await this.db;
-    final start = DateTime.now().subtract(Duration(days: weeks * 7))
-        .toIso8601String().substring(0, 10);
-    return db.rawQuery('''
+    final start = DateTime.now()
+        .subtract(Duration(days: weeks * 7))
+        .toIso8601String()
+        .substring(0, 10);
+    return db.rawQuery(
+      '''
       SELECT w.date, ec.id as category_id, ec.name as category_name,
         ec.color as category_color,
         COALESCE(SUM(s.weight * s.reps), 0) as volume
@@ -230,12 +264,17 @@ class AnalyticsRepository extends BaseRepository {
       WHERE w.date >= ?
       GROUP BY w.date, ec.id
       ORDER BY w.date
-    ''', [start]);
+    ''',
+      [start],
+    );
   }
 
-  Future<List<Map<String, dynamic>>> getTopExercisesByVolume({int limit = 10}) async {
+  Future<List<Map<String, dynamic>>> getTopExercisesByVolume({
+    int limit = 10,
+  }) async {
     final db = await this.db;
-    return db.rawQuery('''
+    return db.rawQuery(
+      '''
       SELECT e.id, e.name, ec.name as category_name, ec.color as category_color,
         COALESCE(SUM(s.weight * s.reps), 0) as volume,
         COUNT(s.id) as sets_count
@@ -246,7 +285,9 @@ class AnalyticsRepository extends BaseRepository {
       GROUP BY e.id
       ORDER BY volume DESC
       LIMIT ?
-    ''', [limit]);
+    ''',
+      [limit],
+    );
   }
 
   Future<List<Map<String, dynamic>>> getEnergySystemDistribution() async {
@@ -277,8 +318,11 @@ class AnalyticsRepository extends BaseRepository {
     final db = await this.db;
     final startStr = start.toIso8601String().substring(0, 10);
     final endStr = end.toIso8601String().substring(0, 10);
-    final valueExpr = bySets ? 'COUNT(s.id)' : 'COALESCE(SUM(s.weight * s.reps), 0)';
-    return db.rawQuery('''
+    final valueExpr = bySets
+        ? 'COUNT(s.id)'
+        : 'COALESCE(SUM(s.weight * s.reps), 0)';
+    return db.rawQuery(
+      '''
       SELECT ec.id, ec.name, ec.color,
         $valueExpr as volume,
         COUNT(s.id) as sets_count
@@ -291,7 +335,9 @@ class AnalyticsRepository extends BaseRepository {
         AND w.date >= ? AND w.date <= ?
       GROUP BY ec.id
       ORDER BY volume DESC
-    ''', [startStr, endStr]);
+    ''',
+      [startStr, endStr],
+    );
   }
 
   /// Top exercises (anaerobic only) for a date range.
@@ -304,8 +350,11 @@ class AnalyticsRepository extends BaseRepository {
     final db = await this.db;
     final startStr = start.toIso8601String().substring(0, 10);
     final endStr = end.toIso8601String().substring(0, 10);
-    final valueExpr = bySets ? 'COUNT(s.id)' : 'COALESCE(SUM(s.weight * s.reps), 0)';
-    return db.rawQuery('''
+    final valueExpr = bySets
+        ? 'COUNT(s.id)'
+        : 'COALESCE(SUM(s.weight * s.reps), 0)';
+    return db.rawQuery(
+      '''
       SELECT e.id, e.name, ec.name as category_name, ec.color as category_color,
         $valueExpr as volume,
         COUNT(s.id) as sets_count
@@ -319,7 +368,9 @@ class AnalyticsRepository extends BaseRepository {
       GROUP BY e.id
       ORDER BY volume DESC
       LIMIT ?
-    ''', [startStr, endStr, limit]);
+    ''',
+      [startStr, endStr, limit],
+    );
   }
 
   /// Time-bucketed trend of anaerobic volume.
@@ -332,7 +383,9 @@ class AnalyticsRepository extends BaseRepository {
     required bool bySets,
   }) async {
     final db = await this.db;
-    final valueExpr = bySets ? 'COUNT(s.id)' : 'COALESCE(SUM(s.weight * s.reps), 0)';
+    final valueExpr = bySets
+        ? 'COUNT(s.id)'
+        : 'COALESCE(SUM(s.weight * s.reps), 0)';
 
     final List<Map<String, dynamic>> results = [];
 
@@ -343,7 +396,8 @@ class AnalyticsRepository extends BaseRepository {
       for (int i = count - 1; i >= 0; i--) {
         final weekStart = endMonday.subtract(Duration(days: i * 7));
         final weekEnd = weekStart.add(const Duration(days: 6));
-        final rows = await db.rawQuery('''
+        final rows = await db.rawQuery(
+          '''
           SELECT $valueExpr as volume
           FROM sets s
           JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
@@ -353,10 +407,12 @@ class AnalyticsRepository extends BaseRepository {
           WHERE ec.energy_system = 'anaerobic'
             AND s.is_warmup = 0
             AND w.date >= ? AND w.date <= ?
-        ''', [
-          weekStart.toIso8601String().substring(0, 10),
-          weekEnd.toIso8601String().substring(0, 10),
-        ]);
+        ''',
+          [
+            weekStart.toIso8601String().substring(0, 10),
+            weekEnd.toIso8601String().substring(0, 10),
+          ],
+        );
         results.add({
           'bucket_start': weekStart.toIso8601String().substring(0, 10),
           'volume': (rows.first['volume'] as num?)?.toDouble() ?? 0,
@@ -371,9 +427,9 @@ class AnalyticsRepository extends BaseRepository {
             ? DateTime(ref.year + 1, 1, 1)
             : DateTime(ref.year, ref.month + 1, 1);
         final lastDay = nextMonth.subtract(const Duration(days: 1));
-        final monthStr =
-            '${ref.year}-${ref.month.toString().padLeft(2, '0')}';
-        final rows = await db.rawQuery('''
+        final monthStr = '${ref.year}-${ref.month.toString().padLeft(2, '0')}';
+        final rows = await db.rawQuery(
+          '''
           SELECT $valueExpr as volume
           FROM sets s
           JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
@@ -383,10 +439,9 @@ class AnalyticsRepository extends BaseRepository {
           WHERE ec.energy_system = 'anaerobic'
             AND s.is_warmup = 0
             AND w.date >= ? AND w.date <= ?
-        ''', [
-          '$monthStr-01',
-          lastDay.toIso8601String().substring(0, 10),
-        ]);
+        ''',
+          ['$monthStr-01', lastDay.toIso8601String().substring(0, 10)],
+        );
         results.add({
           'bucket_start': '$monthStr-01',
           'volume': (rows.first['volume'] as num?)?.toDouble() ?? 0,
@@ -398,7 +453,8 @@ class AnalyticsRepository extends BaseRepository {
       const count = 5;
       for (int i = count - 1; i >= 0; i--) {
         final year = end.year - i;
-        final rows = await db.rawQuery('''
+        final rows = await db.rawQuery(
+          '''
           SELECT $valueExpr as volume
           FROM sets s
           JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
@@ -408,7 +464,9 @@ class AnalyticsRepository extends BaseRepository {
           WHERE ec.energy_system = 'anaerobic'
             AND s.is_warmup = 0
             AND w.date >= ? AND w.date <= ?
-        ''', ['$year-01-01', '$year-12-31']);
+        ''',
+          ['$year-01-01', '$year-12-31'],
+        );
         results.add({
           'bucket_start': '$year-01-01',
           'volume': (rows.first['volume'] as num?)?.toDouble() ?? 0,
@@ -424,7 +482,8 @@ class AnalyticsRepository extends BaseRepository {
 
   Future<List<Map<String, dynamic>>> getRpeTrend({int limit = 50}) async {
     final db = await this.db;
-    return db.rawQuery('''
+    return db.rawQuery(
+      '''
       SELECT w.date, AVG(s.rpe) as avg_rpe,
         COUNT(s.id) as sets_with_rpe
       FROM sets s
@@ -434,12 +493,15 @@ class AnalyticsRepository extends BaseRepository {
       GROUP BY w.id
       ORDER BY w.date DESC
       LIMIT ?
-    ''', [limit]);
+    ''',
+      [limit],
+    );
   }
 
   Future<List<Map<String, dynamic>>> getWorkoutDensity({int limit = 50}) async {
     final db = await this.db;
-    return db.rawQuery('''
+    return db.rawQuery(
+      '''
       SELECT w.date, w.duration_seconds,
         COALESCE(SUM(s.weight * s.reps), 0) as volume
       FROM workouts w
@@ -449,12 +511,17 @@ class AnalyticsRepository extends BaseRepository {
       GROUP BY w.id
       ORDER BY w.date DESC
       LIMIT ?
-    ''', [limit]);
+    ''',
+      [limit],
+    );
   }
 
-  Future<List<Map<String, dynamic>>> getPersonalRecords({int limit = 20}) async {
+  Future<List<Map<String, dynamic>>> getPersonalRecords({
+    int limit = 20,
+  }) async {
     final db = await this.db;
-    return db.rawQuery('''
+    return db.rawQuery(
+      '''
       SELECT e.id as exercise_id, e.name as exercise_name,
         ec.name as category_name, ec.color as category_color,
         MAX(s.weight) as best_weight,
@@ -483,7 +550,9 @@ class AnalyticsRepository extends BaseRepository {
       HAVING best_weight > 0
       ORDER BY best_weight DESC
       LIMIT ?
-    ''', [limit]);
+    ''',
+      [limit],
+    );
   }
 
   // ===================================================================
@@ -492,13 +561,16 @@ class AnalyticsRepository extends BaseRepository {
 
   Future<List<Map<String, dynamic>>> getFeelingTrend({int limit = 50}) async {
     final db = await this.db;
-    return db.rawQuery('''
+    return db.rawQuery(
+      '''
       SELECT date, feeling_rating, duration_seconds
       FROM workouts
       WHERE feeling_rating IS NOT NULL
       ORDER BY date DESC
       LIMIT ?
-    ''', [limit]);
+    ''',
+      [limit],
+    );
   }
 
   Future<List<Map<String, dynamic>>> getFeelingVsVolume() async {
@@ -522,24 +594,32 @@ class AnalyticsRepository extends BaseRepository {
 
   Future<List<Map<String, dynamic>>> getDurationTrend({int limit = 50}) async {
     final db = await this.db;
-    return db.rawQuery('''
+    return db.rawQuery(
+      '''
       SELECT date, duration_seconds
       FROM workouts
       WHERE duration_seconds IS NOT NULL AND duration_seconds > 0
       ORDER BY date DESC
       LIMIT ?
-    ''', [limit]);
+    ''',
+      [limit],
+    );
   }
 
   // ===================================================================
   // BODY WEIGHT WITH VOLUME
   // ===================================================================
 
-  Future<List<Map<String, dynamic>>> getBodyWeightWithVolume({int months = 6}) async {
+  Future<List<Map<String, dynamic>>> getBodyWeightWithVolume({
+    int months = 6,
+  }) async {
     final db = await this.db;
-    final start = DateTime.now().subtract(Duration(days: months * 30))
-        .toIso8601String().substring(0, 10);
-    return db.rawQuery('''
+    final start = DateTime.now()
+        .subtract(Duration(days: months * 30))
+        .toIso8601String()
+        .substring(0, 10);
+    return db.rawQuery(
+      '''
       SELECT bm.date, bm.value as weight, bm.unit,
         (SELECT COALESCE(SUM(s2.weight * s2.reps), 0)
          FROM workouts w2
@@ -550,7 +630,9 @@ class AnalyticsRepository extends BaseRepository {
       FROM body_measurements bm
       WHERE bm.type = 'weight' AND bm.date >= ?
       ORDER BY bm.date ASC
-    ''', [start]);
+    ''',
+      [start],
+    );
   }
 
   // ===================================================================
@@ -561,25 +643,32 @@ class AnalyticsRepository extends BaseRepository {
     final db = await this.db;
     final monthStr = '$year-${month.toString().padLeft(2, '0')}';
 
-    final workouts = await db.rawQuery('''
+    final workouts = await db.rawQuery(
+      '''
       SELECT COUNT(*) as count,
         COALESCE(SUM(duration_seconds), 0) as total_duration,
         AVG(feeling_rating) as avg_feeling,
         COUNT(CASE WHEN feeling_rating IS NOT NULL THEN 1 END) as feeling_count
       FROM workouts
       WHERE date LIKE ?
-    ''', ['$monthStr%']);
+    ''',
+      ['$monthStr%'],
+    );
 
-    final volume = await db.rawQuery('''
+    final volume = await db.rawQuery(
+      '''
       SELECT COALESCE(SUM(s.weight * s.reps), 0) as total_volume,
         COUNT(s.id) as total_sets
       FROM sets s
       JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
       JOIN workouts w ON ee.workout_id = w.id
       WHERE w.date LIKE ? AND s.is_warmup = 0
-    ''', ['$monthStr%']);
+    ''',
+      ['$monthStr%'],
+    );
 
-    final categoryVol = await db.rawQuery('''
+    final categoryVol = await db.rawQuery(
+      '''
       SELECT ec.name, ec.color, COALESCE(SUM(s.weight * s.reps), 0) as volume
       FROM exercise_categories ec
       JOIN exercises e ON e.category_id = ec.id
@@ -589,11 +678,20 @@ class AnalyticsRepository extends BaseRepository {
       WHERE w.date LIKE ?
       GROUP BY ec.id
       ORDER BY volume DESC
-    ''', ['$monthStr%']);
+    ''',
+      ['$monthStr%'],
+    );
 
-    final daysWithWorkouts = Sqflite.firstIntValue(await db.rawQuery('''
+    final daysWithWorkouts =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            '''
       SELECT COUNT(DISTINCT date) FROM workouts WHERE date LIKE ?
-    ''', ['$monthStr%'])) ?? 0;
+    ''',
+            ['$monthStr%'],
+          ),
+        ) ??
+        0;
 
     return {
       'workout_count': (workouts.first['count'] as int?) ?? 0,
@@ -620,9 +718,14 @@ class AnalyticsRepository extends BaseRepository {
     return {
       'current': current,
       'previous': previous,
-      'delta_workouts': (current['workout_count'] as int) - (previous['workout_count'] as int),
-      'delta_volume': (current['total_volume'] as double) - (previous['total_volume'] as double),
-      'delta_sets': (current['total_sets'] as int) - (previous['total_sets'] as int),
+      'delta_workouts':
+          (current['workout_count'] as int) -
+          (previous['workout_count'] as int),
+      'delta_volume':
+          (current['total_volume'] as double) -
+          (previous['total_volume'] as double),
+      'delta_sets':
+          (current['total_sets'] as int) - (previous['total_sets'] as int),
     };
   }
 
@@ -661,17 +764,25 @@ class AnalyticsRepository extends BaseRepository {
   Future<Map<String, dynamic>> getWorkoutOverviewStats() async {
     final db = await this.db;
 
-    final totalWorkouts = Sqflite.firstIntValue(await db.rawQuery(
-      'SELECT COUNT(*) FROM workouts',
-    )) ?? 0;
+    final totalWorkouts =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM workouts'),
+        ) ??
+        0;
 
-    final totalSets = Sqflite.firstIntValue(await db.rawQuery(
-      'SELECT COUNT(*) FROM sets WHERE is_warmup = 0',
-    )) ?? 0;
+    final totalSets =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM sets WHERE is_warmup = 0'),
+        ) ??
+        0;
 
-    final totalVolume = Sqflite.firstIntValue(await db.rawQuery(
-      'SELECT COALESCE(SUM(weight * reps), 0) FROM sets WHERE is_warmup = 0',
-    )) ?? 0;
+    final totalVolume =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            'SELECT COALESCE(SUM(weight * reps), 0) FROM sets WHERE is_warmup = 0',
+          ),
+        ) ??
+        0;
 
     final currentStreak = await _calculateStreak();
 
@@ -688,11 +799,16 @@ class AnalyticsRepository extends BaseRepository {
   // ===================================================================
 
   /// Weekly cardio distance grouped by modality (running, cycling, etc.)
-  Future<List<Map<String, dynamic>>> getCardioWeeklyDistance({int weeks = 12}) async {
+  Future<List<Map<String, dynamic>>> getCardioWeeklyDistance({
+    int weeks = 12,
+  }) async {
     final db = await this.db;
-    final start = DateTime.now().subtract(Duration(days: weeks * 7))
-        .toIso8601String().substring(0, 10);
-    return db.rawQuery('''
+    final start = DateTime.now()
+        .subtract(Duration(days: weeks * 7))
+        .toIso8601String()
+        .substring(0, 10);
+    return db.rawQuery(
+      '''
       SELECT w.date,
         ec.name as modality, ec.color as modality_color,
         s.distance, s.time_seconds, w.id as workout_id,
@@ -706,15 +822,22 @@ class AnalyticsRepository extends BaseRepository {
         AND s.distance IS NOT NULL AND s.distance > 0
         AND w.date >= ?
       ORDER BY w.date ASC
-    ''', [start]);
+    ''',
+      [start],
+    );
   }
 
   /// Monthly cardio stats (distance, time, sessions) by modality.
-  Future<List<Map<String, dynamic>>> getCardioMonthlyDistance({int months = 6}) async {
+  Future<List<Map<String, dynamic>>> getCardioMonthlyDistance({
+    int months = 6,
+  }) async {
     final db = await this.db;
-    final start = DateTime.now().subtract(Duration(days: months * 31))
-        .toIso8601String().substring(0, 10);
-    return db.rawQuery('''
+    final start = DateTime.now()
+        .subtract(Duration(days: months * 31))
+        .toIso8601String()
+        .substring(0, 10);
+    return db.rawQuery(
+      '''
       SELECT substr(w.date, 1, 7) as month,
         ec.name as modality, ec.color as modality_color,
         SUM(s.distance) as total_distance,
@@ -730,7 +853,9 @@ class AnalyticsRepository extends BaseRepository {
         AND w.date >= ?
       GROUP BY month, ec.id
       ORDER BY month ASC
-    ''', [start]);
+    ''',
+      [start],
+    );
   }
 
   /// Total distance grouped by modality (for pie chart).
@@ -751,9 +876,13 @@ class AnalyticsRepository extends BaseRepository {
   }
 
   /// Pace trend (distance + time per session) for a specific cardio exercise.
-  Future<List<Map<String, dynamic>>> getPaceTrend(String exerciseId, {int limit = 30}) async {
+  Future<List<Map<String, dynamic>>> getPaceTrend(
+    String exerciseId, {
+    int limit = 30,
+  }) async {
     final db = await this.db;
-    return db.rawQuery('''
+    return db.rawQuery(
+      '''
       SELECT w.date,
         SUM(s.distance) as total_distance,
         SUM(s.time_seconds) as total_time,
@@ -767,13 +896,16 @@ class AnalyticsRepository extends BaseRepository {
       GROUP BY w.id
       ORDER BY w.date ASC
       LIMIT ?
-    ''', [exerciseId, limit]);
+    ''',
+      [exerciseId, limit],
+    );
   }
 
   /// Cardio personal records: best distance, best pace, longest duration per exercise.
   Future<List<Map<String, dynamic>>> getCardioPRs({int limit = 20}) async {
     final db = await this.db;
-    return db.rawQuery('''
+    return db.rawQuery(
+      '''
       SELECT e.id as exercise_id, e.name as exercise_name,
         ec.name as modality, ec.color as modality_color,
         MAX(s.distance) as best_distance,
@@ -789,14 +921,20 @@ class AnalyticsRepository extends BaseRepository {
       HAVING best_distance > 0
       ORDER BY best_distance DESC
       LIMIT ?
-    ''', [limit]);
+    ''',
+      [limit],
+    );
   }
 
   /// Overall cardio stats for a given month.
-  Future<Map<String, dynamic>> getMonthlyCardioStats(int year, int month) async {
+  Future<Map<String, dynamic>> getMonthlyCardioStats(
+    int year,
+    int month,
+  ) async {
     final db = await this.db;
     final monthStr = '$year-${month.toString().padLeft(2, '0')}';
-    final row = await db.rawQuery('''
+    final row = await db.rawQuery(
+      '''
       SELECT
         COALESCE(SUM(s.distance), 0) as total_distance,
         COALESCE(SUM(s.time_seconds), 0) as total_time,
@@ -809,10 +947,17 @@ class AnalyticsRepository extends BaseRepository {
       JOIN workouts w ON ee.workout_id = w.id
       WHERE ec.energy_system = 'aerobic' AND s.is_warmup = 0
         AND w.date LIKE ? AND s.distance IS NOT NULL AND s.distance > 0
-    ''', ['$monthStr%']);
+    ''',
+      ['$monthStr%'],
+    );
 
     if (row.isEmpty) {
-      return {'total_distance': 0.0, 'total_time': 0, 'cardio_sessions': 0, 'cardio_sets': 0};
+      return {
+        'total_distance': 0.0,
+        'total_time': 0,
+        'cardio_sessions': 0,
+        'cardio_sets': 0,
+      };
     }
     return {
       'total_distance': (row.first['total_distance'] as num?)?.toDouble() ?? 0,

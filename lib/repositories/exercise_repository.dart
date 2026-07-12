@@ -15,16 +15,22 @@ class ExerciseRepository extends BaseRepository {
 
   Future<Map<String, dynamic>?> getCategory(String id) async {
     final db = await this.db;
-    final result = await db.query('exercise_categories', where: 'id = ?', whereArgs: [id]);
+    final result = await db.query(
+      'exercise_categories',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
     return result.isEmpty ? null : result.first;
   }
 
   Future<String> addCategory(String name, int color) async {
     final db = await this.db;
     final id = const Uuid().v4();
-    final count = Sqflite.firstIntValue(
-      await db.rawQuery('SELECT COUNT(*) FROM exercise_categories'),
-    ) ?? 0;
+    final count =
+        Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM exercise_categories'),
+        ) ??
+        0;
     await db.insert('exercise_categories', {
       'id': id,
       'name': name,
@@ -36,8 +42,12 @@ class ExerciseRepository extends BaseRepository {
 
   Future<void> updateCategory(String id, String name, int color) async {
     final db = await this.db;
-    await db.update('exercise_categories', {'name': name, 'color': color},
-        where: 'id = ?', whereArgs: [id]);
+    await db.update(
+      'exercise_categories',
+      {'name': name, 'color': color},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> deleteCategory(String id) async {
@@ -49,9 +59,14 @@ class ExerciseRepository extends BaseRepository {
   // EXERCISES
   // ===================================================================
 
-  Future<List<Map<String, dynamic>>> getExercises({String? categoryId, String? search, bool? favorites}) async {
+  Future<List<Map<String, dynamic>>> getExercises({
+    String? categoryId,
+    String? search,
+    bool? favorites,
+  }) async {
     final db = await this.db;
-    var query = 'SELECT e.*, ec.name as category_name, ec.color as category_color, ec.energy_system as category_energy '
+    var query =
+        'SELECT e.*, ec.name as category_name, ec.color as category_color, ec.energy_system as category_energy '
         'FROM exercises e '
         'JOIN exercise_categories ec ON e.category_id = ec.id '
         'WHERE 1=1';
@@ -111,7 +126,8 @@ class ExerciseRepository extends BaseRepository {
     return id;
   }
 
-  Future<void> updateExercise(String id, {
+  Future<void> updateExercise(
+    String id, {
     String? name,
     String? categoryId,
     String? type,
@@ -139,8 +155,12 @@ class ExerciseRepository extends BaseRepository {
     final ex = await getExercise(id);
     if (ex != null) {
       final current = (ex['is_favorite'] as int?) ?? 0;
-      await db.update('exercises', {'is_favorite': current == 0 ? 1 : 0},
-          where: 'id = ?', whereArgs: [id]);
+      await db.update(
+        'exercises',
+        {'is_favorite': current == 0 ? 1 : 0},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
     }
   }
 

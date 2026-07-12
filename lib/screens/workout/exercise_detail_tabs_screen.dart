@@ -18,7 +18,8 @@ class ExerciseDetailTabsScreen extends StatefulWidget {
   });
 
   @override
-  State<ExerciseDetailTabsScreen> createState() => _ExerciseDetailTabsScreenState();
+  State<ExerciseDetailTabsScreen> createState() =>
+      _ExerciseDetailTabsScreenState();
 }
 
 class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
@@ -46,19 +47,57 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   static const _chartTypes = ['1RM', 'Max Weight', 'Volume', 'Total Reps'];
 
   final _types = [
-    {'id': 'weightReps', 'name': 'Peso × Repetições', 'icon': Icons.fitness_center},
-    {'id': 'distanceTime', 'name': 'Distância × Tempo', 'icon': Icons.straighten},
-    {'id': 'weightDistance', 'name': 'Peso × Distância', 'icon': Icons.monitor_weight},
+    {
+      'id': 'weightReps',
+      'name': 'Peso × Repetições',
+      'icon': Icons.fitness_center,
+    },
+    {
+      'id': 'distanceTime',
+      'name': 'Distância × Tempo',
+      'icon': Icons.straighten,
+    },
+    {
+      'id': 'weightDistance',
+      'name': 'Peso × Distância',
+      'icon': Icons.monitor_weight,
+    },
     {'id': 'weightTime', 'name': 'Peso × Tempo', 'icon': Icons.timer},
-    {'id': 'repsDistance', 'name': 'Repetições × Distância', 'icon': Icons.repeat},
+    {
+      'id': 'repsDistance',
+      'name': 'Repetições × Distância',
+      'icon': Icons.repeat,
+    },
     {'id': 'repsTime', 'name': 'Repetições × Tempo', 'icon': Icons.repeat_one},
-    {'id': 'weightOnly', 'name': 'Apenas Peso', 'icon': Icons.monitor_weight_outlined},
-    {'id': 'repsOnly', 'name': 'Apenas Repetições', 'icon': Icons.repeat_one_on},
-    {'id': 'distanceOnly', 'name': 'Apenas Distância', 'icon': Icons.straighten},
+    {
+      'id': 'weightOnly',
+      'name': 'Apenas Peso',
+      'icon': Icons.monitor_weight_outlined,
+    },
+    {
+      'id': 'repsOnly',
+      'name': 'Apenas Repetições',
+      'icon': Icons.repeat_one_on,
+    },
+    {
+      'id': 'distanceOnly',
+      'name': 'Apenas Distância',
+      'icon': Icons.straighten,
+    },
     {'id': 'timeOnly', 'name': 'Apenas Tempo', 'icon': Icons.timer_outlined},
   ];
 
-  final _equipmentOptions = ['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight', 'Treadmill', 'Stationary', 'Kettlebell', 'Band'];
+  final _equipmentOptions = [
+    'Barbell',
+    'Dumbbell',
+    'Cable',
+    'Machine',
+    'Bodyweight',
+    'Treadmill',
+    'Stationary',
+    'Kettlebell',
+    'Band',
+  ];
 
   @override
   void initState() {
@@ -99,7 +138,10 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   }
 
   Future<void> _loadHistory() async {
-    final data = await _analyticsRepo.getExerciseHistory(widget.exerciseId, limit: 30);
+    final data = await _analyticsRepo.getExerciseHistory(
+      widget.exerciseId,
+      limit: 30,
+    );
     if (!mounted) return;
     setState(() {
       _history = data;
@@ -110,13 +152,17 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   Future<void> _save() async {
     if (_nameCtl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nome é obrigatório'), behavior: SnackBarBehavior.floating),
+        const SnackBar(
+          content: Text('Nome é obrigatório'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
     setState(() => _isSaving = true);
     try {
-      await _exerciseRepo.updateExercise(widget.exerciseId,
+      await _exerciseRepo.updateExercise(
+        widget.exerciseId,
         name: _nameCtl.text.trim(),
         categoryId: _categoryId,
         type: _type,
@@ -130,7 +176,10 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
       setState(() => _isSaving = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e'), behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content: Text('Erro: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -141,9 +190,14 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Excluir Exercício'),
-        content: Text('Tem certeza que deseja excluir "${widget.exerciseName}"?'),
+        content: Text(
+          'Tem certeza que deseja excluir "${widget.exerciseName}"?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -169,8 +223,14 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     final rough = range / 5;
     double magnitude = 1;
     double temp = rough;
-    while (temp >= 10) { temp /= 10; magnitude *= 10; }
-    while (temp < 1) { temp *= 10; magnitude /= 10; }
+    while (temp >= 10) {
+      temp /= 10;
+      magnitude *= 10;
+    }
+    while (temp < 1) {
+      temp *= 10;
+      magnitude /= 10;
+    }
     if (temp <= 1) {
       temp = 1;
     } else if (temp <= 2) {
@@ -250,45 +310,73 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                   labelText: 'Grupo Muscular',
                   border: OutlineInputBorder(),
                 ),
-                items: _categories.map((cat) => DropdownMenuItem(
-                  value: cat['id'] as String,
-                  child: Row(
-                    children: [
-                      Container(width: 12, height: 12, decoration: BoxDecoration(
-                        color: Color(cat['color'] as int), shape: BoxShape.circle,
-                      )),
-                      const SizedBox(width: 8),
-                      Text(ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, cat)),
-                    ],
-                  ),
-                )).toList(),
-                onChanged: (v) => setState(() => _categoryId = v ?? _categoryId),
+                items: _categories
+                    .map(
+                      (cat) => DropdownMenuItem(
+                        value: cat['id'] as String,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: Color(cat['color'] as int),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              ExerciseLocaleHelper.categoryName(
+                                AppLocalizations.of(context)!,
+                                cat,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) =>
+                    setState(() => _categoryId = v ?? _categoryId),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                initialValue: _types.any((t) => t['id'] == _type) ? _type : 'weightReps',
+                initialValue: _types.any((t) => t['id'] == _type)
+                    ? _type
+                    : 'weightReps',
                 decoration: const InputDecoration(
                   labelText: 'Tipo',
                   border: OutlineInputBorder(),
                 ),
-                items: _types.map((t) => DropdownMenuItem<String>(
-                  value: t['id'] as String,
-                  child: Row(
-                    children: [
-                      Icon(t['icon'] as IconData, size: 18, color: theme.colorScheme.primary),
-                      const SizedBox(width: 8),
-                      Text(t['name'] as String),
-                    ],
-                  ),
-                )).toList(),
+                items: _types
+                    .map(
+                      (t) => DropdownMenuItem<String>(
+                        value: t['id'] as String,
+                        child: Row(
+                          children: [
+                            Icon(
+                              t['icon'] as IconData,
+                              size: 18,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(t['name'] as String),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (v) => setState(() => _type = v ?? _type),
               ),
               const SizedBox(height: 16),
               Autocomplete<String>(
                 optionsBuilder: (textEditingValue) {
                   if (textEditingValue.text.isEmpty) return _equipmentOptions;
-                  return _equipmentOptions.where((opt) =>
-                    opt.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+                  return _equipmentOptions.where(
+                    (opt) => opt.toLowerCase().contains(
+                      textEditingValue.text.toLowerCase(),
+                    ),
+                  );
                 },
                 initialValue: TextEditingValue(text: _equipment),
                 onSelected: (v) => _equipment = v,
@@ -313,8 +401,10 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                 ),
                 keyboardType: TextInputType.number,
                 controller: TextEditingController(
-                  text: _weightIncrement?.toStringAsFixed(1) ?? ''),
-                onChanged: (v) => _weightIncrement = double.tryParse(v.replaceAll(',', '.')),
+                  text: _weightIncrement?.toStringAsFixed(1) ?? '',
+                ),
+                onChanged: (v) =>
+                    _weightIncrement = double.tryParse(v.replaceAll(',', '.')),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -325,7 +415,8 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                 ),
                 keyboardType: TextInputType.number,
                 controller: TextEditingController(
-                  text: _defaultRestTime?.toString() ?? ''),
+                  text: _defaultRestTime?.toString() ?? '',
+                ),
                 onChanged: (v) => _defaultRestTime = int.tryParse(v),
               ),
               const SizedBox(height: 16),
@@ -344,7 +435,14 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                 child: FilledButton.icon(
                   onPressed: _isSaving ? null : _save,
                   icon: _isSaving
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Icon(Icons.save),
                   label: Text(_isSaving ? 'Salvando...' : 'Salvar Alterações'),
                 ),
@@ -369,12 +467,23 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.history, size: 64, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
+            Icon(
+              Icons.history,
+              size: 64,
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+            ),
             const SizedBox(height: 16),
-            Text('Nenhum treino registrado', style: theme.textTheme.titleMedium),
+            Text(
+              'Nenhum treino registrado',
+              style: theme.textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
-            Text('Os treinos com este exercício aparecerão aqui',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text(
+              'Os treinos com este exercício aparecerão aqui',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       );
@@ -392,11 +501,35 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
           // Records cards
           Row(
             children: [
-              Expanded(child: _buildRecCard('Peso Máx', bestWeight > 0 ? '${bestWeight.toStringAsFixed(1)} kg' : '--', Icons.monitor_weight, theme.colorScheme.primary, theme)),
+              Expanded(
+                child: _buildRecCard(
+                  'Peso Máx',
+                  bestWeight > 0 ? '${bestWeight.toStringAsFixed(1)} kg' : '--',
+                  Icons.monitor_weight,
+                  theme.colorScheme.primary,
+                  theme,
+                ),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: _buildRecCard('Volume', bestVolume > 0 ? '${_formatVolume(bestVolume)} kg' : '--', Icons.auto_graph, theme.colorScheme.secondary, theme)),
+              Expanded(
+                child: _buildRecCard(
+                  'Volume',
+                  bestVolume > 0 ? '${_formatVolume(bestVolume)} kg' : '--',
+                  Icons.auto_graph,
+                  theme.colorScheme.secondary,
+                  theme,
+                ),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: _buildRecCard('1RM', best1RM > 0 ? '${best1RM.toStringAsFixed(1)} kg' : '--', Icons.emoji_events, Colors.amber, theme)),
+              Expanded(
+                child: _buildRecCard(
+                  '1RM',
+                  best1RM > 0 ? '${best1RM.toStringAsFixed(1)} kg' : '--',
+                  Icons.emoji_events,
+                  Colors.amber,
+                  theme,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -410,11 +543,51 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
             ),
             child: Row(
               children: [
-                Expanded(flex: 2, child: Text('Data', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text('Peso', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text('Volume', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text('Sets×Reps', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text('1RM', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Data',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Peso',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Volume',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'Sets×Reps',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    '1RM',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -433,29 +606,65 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                     ? () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => WorkoutDetailScreen(workoutId: workoutId),
+                          builder: (_) =>
+                              WorkoutDetailScreen(workoutId: workoutId),
                         ),
                       )
                     : null,
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                      60,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      Expanded(flex: 2, child: Text(date.length >= 10 ? date.substring(5) : date,
-                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                      Expanded(flex: 2, child: Text(maxW > 0 ? maxW.toStringAsFixed(1) : '-',
-                          style: theme.textTheme.bodySmall)),
-                      Expanded(flex: 2, child: Text(vol > 0 ? vol.toStringAsFixed(0) : '-',
-                          style: theme.textTheme.bodySmall)),
-                      Expanded(flex: 2, child: Text('$sets×$reps',
-                          style: theme.textTheme.bodySmall)),
-                      Expanded(flex: 2, child: Text(est1RM != null ? est1RM.toStringAsFixed(1) : '-',
-                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: Colors.amber[700]))),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          date.length >= 10 ? date.substring(5) : date,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          maxW > 0 ? maxW.toStringAsFixed(1) : '-',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          vol > 0 ? vol.toStringAsFixed(0) : '-',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          '$sets×$reps',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          est1RM != null ? est1RM.toStringAsFixed(1) : '-',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.amber[700],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -467,7 +676,13 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     );
   }
 
-  Widget _buildRecCard(String label, String value, IconData icon, Color color, ThemeData theme) {
+  Widget _buildRecCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+    ThemeData theme,
+  ) {
     return Card(
       elevation: 0,
       color: color.withAlpha(15),
@@ -478,8 +693,20 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
           children: [
             Icon(icon, color: color, size: 20),
             const SizedBox(height: 4),
-            Text(value, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: 11)),
-            Text(label, style: theme.textTheme.bodySmall?.copyWith(fontSize: 9, color: theme.colorScheme.onSurfaceVariant)),
+            Text(
+              value,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
+            ),
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 9,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       ),
@@ -530,7 +757,9 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     switch (_chartType) {
       case 0:
         title = 'Evolução do 1RM Estimado';
-        values = history.map((h) => (h['estimated_1rm'] as double?) ?? 0).toList();
+        values = history
+            .map((h) => (h['estimated_1rm'] as double?) ?? 0)
+            .toList();
         break;
       case 1:
         title = 'Evolução do Peso Máximo';
@@ -538,11 +767,15 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
         break;
       case 2:
         title = 'Volume por Treino';
-        values = history.map((h) => (h['total_volume'] as double?) ?? 0).toList();
+        values = history
+            .map((h) => (h['total_volume'] as double?) ?? 0)
+            .toList();
         break;
       case 3:
         title = 'Repetições por Treino';
-        values = history.map((h) => (h['total_reps'] as int?)?.toDouble() ?? 0).toList();
+        values = history
+            .map((h) => (h['total_reps'] as int?)?.toDouble() ?? 0)
+            .toList();
         break;
       default:
         return const SizedBox.shrink();
@@ -558,12 +791,20 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.bar_chart_outlined, size: 64, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
+            Icon(
+              Icons.bar_chart_outlined,
+              size: 64,
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+            ),
             const SizedBox(height: 16),
             Text('Nenhum dado disponível', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
-            Text('Registre treinos com este exercício para ver os gráficos',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text(
+              'Registre treinos com este exercício para ver os gráficos',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       );
@@ -578,7 +819,9 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+          side: BorderSide(
+            color: theme.colorScheme.outlineVariant.withAlpha(80),
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -587,9 +830,19 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
             children: [
               Row(
                 children: [
-                  Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  Text(
+                    title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const Spacer(),
-                  Text('${history.length} treinos', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  Text(
+                    '${history.length} treinos',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -617,8 +870,12 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                           getTitlesWidget: (v, _) => Padding(
                             padding: const EdgeInsets.only(right: 4),
                             child: Text(
-                              _chartType == 3 ? v.toInt().toString() : v.toStringAsFixed(1),
-                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+                              _chartType == 3
+                                  ? v.toInt().toString()
+                                  : v.toStringAsFixed(1),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 10,
+                              ),
                             ),
                           ),
                         ),
@@ -630,32 +887,42 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                           interval: history.length > 15 ? 2 : 1,
                           getTitlesWidget: (v, _) {
                             final idx = v.toInt();
-                            if (idx < 0 || idx >= history.length) return const SizedBox.shrink();
+                            if (idx < 0 || idx >= history.length)
+                              return const SizedBox.shrink();
                             final date = history[idx]['date'] as String? ?? '';
                             return Padding(
                               padding: const EdgeInsets.only(top: 4),
                               child: Text(
                                 date.length >= 10 ? date.substring(5) : date,
-                                style: theme.textTheme.bodySmall?.copyWith(fontSize: 9),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 9,
+                                ),
                               ),
                             );
                           },
                         ),
                       ),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                     ),
                     borderData: FlBorderData(show: false),
                     lineBarsData: [
                       LineChartBarData(
-                        spots: values.asMap().entries.map((e) =>
-                          FlSpot(e.key.toDouble(), e.value)).toList(),
+                        spots: values
+                            .asMap()
+                            .entries
+                            .map((e) => FlSpot(e.key.toDouble(), e.value))
+                            .toList(),
                         isCurved: true,
                         color: _chartType == 0
                             ? Colors.amber
                             : _chartType == 2
-                                ? theme.colorScheme.secondary
-                                : theme.colorScheme.primary,
+                            ? theme.colorScheme.secondary
+                            : theme.colorScheme.primary,
                         barWidth: 3,
                         dotData: FlDotData(
                           show: history.length <= 30,
@@ -665,32 +932,38 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                                 color: _chartType == 0
                                     ? Colors.amber
                                     : _chartType == 2
-                                        ? theme.colorScheme.secondary
-                                        : theme.colorScheme.primary,
+                                    ? theme.colorScheme.secondary
+                                    : theme.colorScheme.primary,
                               ),
                         ),
                         belowBarData: BarAreaData(
                           show: true,
-                          color: (_chartType == 0
-                              ? Colors.amber
-                              : _chartType == 2
-                                  ? theme.colorScheme.secondary
-                                  : theme.colorScheme.primary).withAlpha(30),
+                          color:
+                              (_chartType == 0
+                                      ? Colors.amber
+                                      : _chartType == 2
+                                      ? theme.colorScheme.secondary
+                                      : theme.colorScheme.primary)
+                                  .withAlpha(30),
                         ),
                       ),
                     ],
                     lineTouchData: LineTouchData(
                       touchTooltipData: LineTouchTooltipData(
-                        getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
-                          final idx = spot.spotIndex;
-                          final date = idx < history.length
-                              ? (history[idx]['date'] as String? ?? '')
-                              : '';
-                          return LineTooltipItem(
-                            '$date\n${spot.y.toStringAsFixed(1)}',
-                            TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-                          );
-                        }).toList(),
+                        getTooltipItems: (touchedSpots) =>
+                            touchedSpots.map((spot) {
+                              final idx = spot.spotIndex;
+                              final date = idx < history.length
+                                  ? (history[idx]['date'] as String? ?? '')
+                                  : '';
+                              return LineTooltipItem(
+                                '$date\n${spot.y.toStringAsFixed(1)}',
+                                TextStyle(
+                                  color: theme.colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            }).toList(),
                       ),
                     ),
                   ),

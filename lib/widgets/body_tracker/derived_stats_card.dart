@@ -33,40 +33,46 @@ class BodyDerivedStatsCard extends StatelessWidget {
     final whr = (waistVal != null && hipVal != null && hipVal > 0)
         ? waistVal / hipVal
         : null;
-    final leanMass =
-        (bodyFatVal != null) ? weight * (1 - bodyFatVal / 100) : null;
-    final fatMass =
-        (bodyFatVal != null) ? weight * (bodyFatVal / 100) : null;
+    final leanMass = (bodyFatVal != null)
+        ? weight * (1 - bodyFatVal / 100)
+        : null;
+    final fatMass = (bodyFatVal != null) ? weight * (bodyFatVal / 100) : null;
 
     final stats = <DerivedStat>[];
     if (leanMass != null) {
-      stats.add(DerivedStat(
-        loc.bodyTrackerLeanMass,
-        '${leanMass.toStringAsFixed(1)} kg',
-        Icons.fitness_center,
-        Colors.green,
-      ));
+      stats.add(
+        DerivedStat(
+          loc.bodyTrackerLeanMass,
+          '${leanMass.toStringAsFixed(1)} kg',
+          Icons.fitness_center,
+          Colors.green,
+        ),
+      );
     }
     if (fatMass != null) {
-      stats.add(DerivedStat(
-        loc.bodyTrackerFatMass,
-        '${fatMass.toStringAsFixed(1)} kg',
-        Icons.water_drop,
-        Colors.orange,
-      ));
+      stats.add(
+        DerivedStat(
+          loc.bodyTrackerFatMass,
+          '${fatMass.toStringAsFixed(1)} kg',
+          Icons.water_drop,
+          Colors.orange,
+        ),
+      );
     }
     if (whr != null) {
       final whrEval = whr < 0.9
           ? loc.bodyTrackerHealthy
           : whr < 1.0
-              ? loc.bodyTrackerModerate
-              : loc.bodyTrackerHigh;
-      stats.add(DerivedStat(
-        loc.bodyTrackerWHR,
-        '${whr.toStringAsFixed(2)} · $whrEval',
-        Icons.monitor_weight,
-        Colors.teal,
-      ));
+          ? loc.bodyTrackerModerate
+          : loc.bodyTrackerHigh;
+      stats.add(
+        DerivedStat(
+          loc.bodyTrackerWHR,
+          '${whr.toStringAsFixed(2)} · $whrEval',
+          Icons.monitor_weight,
+          Colors.teal,
+        ),
+      );
     }
 
     if (stats.isEmpty) return const SizedBox.shrink();
@@ -78,7 +84,8 @@ class BodyDerivedStatsCard extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-              color: theme.colorScheme.outlineVariant.withAlpha(80)),
+            color: theme.colorScheme.outlineVariant.withAlpha(80),
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -96,32 +103,36 @@ class BodyDerivedStatsCard extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: stats
-                    .map((s) => Expanded(
-                          child: Column(
-                            children: [
-                              Icon(s.icon,
-                                  size: 20, color: s.color.withAlpha(200)),
-                              const SizedBox(height: 4),
-                              Text(
-                                s.value,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                                textAlign: TextAlign.center,
+                    .map(
+                      (s) => Expanded(
+                        child: Column(
+                          children: [
+                            Icon(
+                              s.icon,
+                              size: 20,
+                              color: s.color.withAlpha(200),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              s.value,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
                               ),
-                              Text(
-                                s.label,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontSize: 9,
-                                  color:
-                                      theme.colorScheme.onSurfaceVariant,
-                                ),
-                                textAlign: TextAlign.center,
+                              textAlign: TextAlign.center,
+                            ),
+                            Text(
+                              s.label,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 9,
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
-                            ],
-                          ),
-                        ))
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
             ],

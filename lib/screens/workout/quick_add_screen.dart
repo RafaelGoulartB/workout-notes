@@ -67,7 +67,7 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
 
     // Parse formats:
     // "Supino 80kg 3x10" or "Supino 80kg x 3x10" or "Supino 80 3x10"
-    // "Supino 80kg 10reps" or "Supino 80kg 10" 
+    // "Supino 80kg 10reps" or "Supino 80kg 10"
     // "Supino 50kg 3x12 2x10" (multiple sets)
     try {
       final parts = text.trim().split(RegExp(r'\s+'));
@@ -145,7 +145,9 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
 
       setState(() {
         _parsedSets = sets;
-        _error = sets.isEmpty ? AppLocalizations.of(context)!.quickAddNoSets : null;
+        _error = sets.isEmpty
+            ? AppLocalizations.of(context)!.quickAddNoSets
+            : null;
       });
     } catch (e) {
       setState(() {
@@ -183,7 +185,8 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       final exercises = await _exerciseRepo.getExercises(search: exerciseName);
       if (exercises.isNotEmpty) {
         exercise = exercises.firstWhere(
-          (e) => (e['name'] as String).toLowerCase() == exerciseName.toLowerCase(),
+          (e) =>
+              (e['name'] as String).toLowerCase() == exerciseName.toLowerCase(),
           orElse: () => exercises.first,
         );
       }
@@ -194,7 +197,11 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
         if (loc != null) {
           final allExercises = await _exerciseRepo.getExercises();
           for (final ex in allExercises) {
-            if (ExerciseLocaleHelper.exerciseMatchesSearch(loc, ex, exerciseName)) {
+            if (ExerciseLocaleHelper.exerciseMatchesSearch(
+              loc,
+              ex,
+              exerciseName,
+            )) {
               exercise = ex;
               break;
             }
@@ -206,7 +213,11 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(AppLocalizations.of(context)!.quickAddExerciseNotFound(exerciseName)),
+              content: Text(
+                AppLocalizations.of(
+                  context,
+                )!.quickAddExerciseNotFound(exerciseName),
+              ),
               behavior: SnackBarBehavior.floating,
               action: SnackBarAction(
                 label: AppLocalizations.of(context)!.quickAddCreate,
@@ -245,7 +256,15 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(AppLocalizations.of(context)!.quickAddSaved(ExerciseLocaleHelper.exerciseName(AppLocalizations.of(context)!, exercise), _parsedSets.length.toString())),
+            content: Text(
+              AppLocalizations.of(context)!.quickAddSaved(
+                ExerciseLocaleHelper.exerciseName(
+                  AppLocalizations.of(context)!,
+                  exercise,
+                ),
+                _parsedSets.length.toString(),
+              ),
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -255,7 +274,12 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
       setState(() => _isSaving = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.commonError(e.toString())), behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.commonError(e.toString()),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -290,7 +314,12 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.quickAddCreatedAndSaved(exerciseName)), behavior: SnackBarBehavior.floating),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)!.quickAddCreatedAndSaved(exerciseName),
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       Navigator.pop(context, true);
     }
@@ -315,7 +344,11 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
           TextButton(
             onPressed: _parsedSets.isNotEmpty && !_isSaving ? _save : null,
             child: _isSaving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : Text(AppLocalizations.of(context)!.quickAddSave),
           ),
         ],
@@ -344,7 +377,9 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
                   style: theme.textTheme.bodyLarge,
                   decoration: InputDecoration(
                     hintText: AppLocalizations.of(context)!.quickAddHint,
-                    hintStyle: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant.withAlpha(120)),
+                    hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant.withAlpha(120),
+                    ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.all(16),
                   ),
@@ -358,13 +393,23 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Text(_error!, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error)),
+                child: Text(
+                  _error!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
               ),
 
             // Examples
             if (_parsedSets.isEmpty && _textController.text.isEmpty) ...[
               const SizedBox(height: 16),
-              Text(AppLocalizations.of(context)!.quickAddAcceptedFormats, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              Text(
+                AppLocalizations.of(context)!.quickAddAcceptedFormats,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: 8),
               ...() {
                 final localeName = AppLocalizations.of(context)!.localeName;
@@ -375,24 +420,37 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
                   '${ExerciseLocalization.exerciseName('leg_press', localeName) ?? 'Leg Press'} 200kg 4x8',
                   '${ExerciseLocalization.exerciseName('lat_pulldown', localeName) ?? 'Puxada Alta'} 50kg 3x10',
                 ];
-              }().map((ex) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: GestureDetector(
-                  onTap: () {
-                    _textController.text = ex;
-                    _textController.selection = TextSelection.fromPosition(TextPosition(offset: ex.length));
-                    _parseText(ex);
-                    _focusNode.requestFocus();
-                  },
-                  child: Row(
-                    children: [
-                      Icon(Icons.lightbulb_outline, size: 16, color: theme.colorScheme.secondary),
-                      const SizedBox(width: 8),
-                      Text(ex, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.secondary)),
-                    ],
+              }().map(
+                (ex) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: GestureDetector(
+                    onTap: () {
+                      _textController.text = ex;
+                      _textController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: ex.length),
+                      );
+                      _parseText(ex);
+                      _focusNode.requestFocus();
+                    },
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.lightbulb_outline,
+                          size: 16,
+                          color: theme.colorScheme.secondary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          ex,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              )),
+              ),
             ],
 
             // Parsed sets preview
@@ -402,8 +460,14 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
                 children: [
                   Icon(Icons.check_circle, color: Colors.green, size: 18),
                   const SizedBox(width: 8),
-                  Text(AppLocalizations.of(context)!.quickAddSetsIdentified(_parsedSets.length.toString()),
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                  Text(
+                    AppLocalizations.of(
+                      context,
+                    )!.quickAddSetsIdentified(_parsedSets.length.toString()),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -424,20 +488,33 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
                         child: Row(
                           children: [
                             Container(
-                              width: 28, height: 28,
+                              width: 28,
+                              height: 28,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: theme.colorScheme.primaryContainer,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Text('${i + 1}', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                              child: Text(
+                                '${i + 1}',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 12),
-                            Text('${set.weight.toStringAsFixed(1)} kg',
-                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                            Text(
+                              '${set.weight.toStringAsFixed(1)} kg',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             if (set.reps != null) ...[
                               const SizedBox(width: 8),
-                              Text('× ${set.reps} reps', style: theme.textTheme.bodyMedium),
+                              Text(
+                                '× ${set.reps} reps',
+                                style: theme.textTheme.bodyMedium,
+                              ),
                             ],
                           ],
                         ),
@@ -449,16 +526,25 @@ class _QuickAddScreenState extends State<QuickAddScreen> {
             ],
 
             // Recent exercises quick pick
-            if (_recentExercises.isNotEmpty && _textController.text.isEmpty) ...[
+            if (_recentExercises.isNotEmpty &&
+                _textController.text.isEmpty) ...[
               const SizedBox(height: 24),
-              Text(AppLocalizations.of(context)!.quickAddRecentExercises, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              Text(
+                AppLocalizations.of(context)!.quickAddRecentExercises,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: _recentExercises.map((ex) {
                   final loc = AppLocalizations.of(context)!;
-                  final localizedName = ExerciseLocaleHelper.exerciseName(loc, ex);
+                  final localizedName = ExerciseLocaleHelper.exerciseName(
+                    loc,
+                    ex,
+                  );
                   return ActionChip(
                     avatar: const Icon(Icons.fitness_center, size: 16),
                     label: Text(localizedName),

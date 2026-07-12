@@ -25,8 +25,10 @@ class TimeOfDayBadge extends StatelessWidget {
         children: [
           Icon(icon, size: 10, color: Colors.blueGrey),
           const SizedBox(width: 2),
-          Text(label,
-              style: TextStyle(fontSize: 9, color: Colors.blueGrey.shade700)),
+          Text(
+            label,
+            style: TextStyle(fontSize: 9, color: Colors.blueGrey.shade700),
+          ),
         ],
       ),
     );
@@ -49,8 +51,11 @@ class FastedBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.nightlight_round,
-              size: 10, color: Colors.deepPurple.shade400),
+          Icon(
+            Icons.nightlight_round,
+            size: 10,
+            color: Colors.deepPurple.shade400,
+          ),
           const SizedBox(width: 2),
           Text(
             loc.bodyTrackerFasted,
