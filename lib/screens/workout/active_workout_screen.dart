@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import '../../database/database_helper.dart';
+import 'package:workout_notes/models/exercise_personal_records.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/routine_repository.dart';
 import '../../repositories/settings_repository.dart';
@@ -1396,90 +1396,60 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       }
     }
 
-    // Detect PRs
+    // Detect PRs against records that existed before this workout.
     if (_workoutId != null) {
-      final db = await DatabaseHelper.instance.database;
+      final recordsByExercise = <String, ExercisePersonalRecords>{};
 
-      // Strength PRs
-      for (final entry in thisWorkoutBests.entries) {
-        final exId = entry.key;
-        final current = entry.value;
-
-        final rows = await db.rawQuery(
-          '''
-          SELECT
-            COALESCE(MAX(s.weight), 0) as best_weight,
-            COALESCE(SUM(s.weight * s.reps), 0) as best_volume
-          FROM sets s
-          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
-          WHERE ee.exercise_id = ? AND ee.workout_id != ?
-            AND s.is_warmup = 0 AND s.is_complete = 1
-        ''',
-          [exId, _workoutId],
+      Future<ExercisePersonalRecords> recordsFor(String exerciseId) async {
+        final cached = recordsByExercise[exerciseId];
+        if (cached != null) return cached;
+        final records = await _workoutRepo.getPersonalRecordsBeforeWorkout(
+          exerciseId: exerciseId,
+          workoutId: _workoutId!,
         );
+        recordsByExercise[exerciseId] = records;
+        return records;
+      }
 
-        if (rows.isNotEmpty) {
-          final bestWeight =
-              (rows.first['best_weight'] as num?)?.toDouble() ?? 0;
-          final bestVolume =
-              (rows.first['best_volume'] as num?)?.toDouble() ?? 0;
-
-          if (bestWeight > 0 && current.maxWeight >= bestWeight) {
-            prs.add(
-              PR(
-                exerciseName: current.name,
-                type: 'weight',
-                value:
-                    '${current.maxWeight.toStringAsFixed(1)}kg × ${current.bestReps}',
-                previous: '${bestWeight.toStringAsFixed(1)}kg',
-              ),
-            );
-          }
-          if (bestVolume > 0 && current.volume > bestVolume) {
-            prs.add(
-              PR(
-                exerciseName: current.name,
-                type: 'volume',
-                value: '${current.volume.toStringAsFixed(0)} kg',
-                previous: '${bestVolume.toStringAsFixed(0)} kg',
-              ),
-            );
-          }
+      for (final entry in thisWorkoutBests.entries) {
+        final current = entry.value;
+        final records = await recordsFor(entry.key);
+        if (records.maxWeight > 0 && current.maxWeight >= records.maxWeight) {
+          prs.add(
+            PR(
+              exerciseName: current.name,
+              type: 'weight',
+              value:
+                  '${current.maxWeight.toStringAsFixed(1)}kg × ${current.bestReps}',
+              previous: '${records.maxWeight.toStringAsFixed(1)}kg',
+            ),
+          );
+        }
+        if (records.maxVolume > 0 && current.volume > records.maxVolume) {
+          prs.add(
+            PR(
+              exerciseName: current.name,
+              type: 'volume',
+              value: '${current.volume.toStringAsFixed(0)} kg',
+              previous: '${records.maxVolume.toStringAsFixed(0)} kg',
+            ),
+          );
         }
       }
 
-      // Cardio PRs (best distance, best pace)
       for (final entry in thisWorkoutCardio.entries) {
-        final exId = entry.key;
         final current = entry.value;
-
-        final rows = await db.rawQuery(
-          '''
-          SELECT
-            COALESCE(MAX(s.distance), 0) as best_distance,
-            COALESCE(MIN(CAST(s.time_seconds AS REAL) / NULLIF(s.distance, 0)), 999999) as best_pace
-          FROM sets s
-          JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
-          WHERE ee.exercise_id = ? AND ee.workout_id != ?
-            AND s.is_warmup = 0 AND s.is_complete = 1
-            AND s.distance IS NOT NULL AND s.distance > 0
-        ''',
-          [exId, _workoutId],
-        );
-
-        if (rows.isNotEmpty) {
-          final bestDist =
-              (rows.first['best_distance'] as num?)?.toDouble() ?? 0;
-          if (bestDist > 0 && current.distance >= bestDist) {
-            prs.add(
-              PR(
-                exerciseName: current.name,
-                type: 'distance',
-                value: '${current.distance.toStringAsFixed(1)} km',
-                previous: '${bestDist.toStringAsFixed(1)} km',
-              ),
-            );
-          }
+        final records = await recordsFor(entry.key);
+        if (records.maxDistance > 0 &&
+            current.distance >= records.maxDistance) {
+          prs.add(
+            PR(
+              exerciseName: current.name,
+              type: 'distance',
+              value: '${current.distance.toStringAsFixed(1)} km',
+              previous: '${records.maxDistance.toStringAsFixed(1)} km',
+            ),
+          );
         }
       }
     }

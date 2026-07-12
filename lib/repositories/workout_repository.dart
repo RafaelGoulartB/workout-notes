@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:workout_notes/models/exercise_with_sets.dart';
+import 'package:workout_notes/models/exercise_personal_records.dart';
 import 'package:workout_notes/models/workout_stats.dart';
 import 'package:workout_notes/models/workout_set_draft.dart';
 import 'package:sqflite/sqflite.dart';
@@ -1040,6 +1041,34 @@ class WorkoutRepository extends BaseRepository {
       db,
       exerciseId,
       excludeWorkoutId: excludeWorkoutId,
+    );
+  }
+
+  /// Returns personal-record baselines while excluding the workout currently
+  /// being completed, so a set cannot be compared against itself.
+  Future<ExercisePersonalRecords> getPersonalRecordsBeforeWorkout({
+    required String exerciseId,
+    required String workoutId,
+  }) async {
+    final db = await this.db;
+    final rows = await db.rawQuery(
+      '''
+      SELECT
+        COALESCE(MAX(s.weight), 0) AS max_weight,
+        COALESCE(SUM(s.weight * s.reps), 0) AS max_volume,
+        COALESCE(MAX(s.distance), 0) AS max_distance
+      FROM sets s
+      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
+      WHERE ee.exercise_id = ? AND ee.workout_id != ?
+        AND s.is_warmup = 0 AND s.is_complete = 1
+      ''',
+      [exerciseId, workoutId],
+    );
+    final row = rows.single;
+    return ExercisePersonalRecords(
+      maxWeight: (row['max_weight'] as num?)?.toDouble() ?? 0,
+      maxVolume: (row['max_volume'] as num?)?.toDouble() ?? 0,
+      maxDistance: (row['max_distance'] as num?)?.toDouble() ?? 0,
     );
   }
 
