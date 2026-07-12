@@ -1,7 +1,7 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart' as p;
 import 'seed_data.dart';
 import 'database_provider.dart';
+import 'app_database.dart';
 import '../repositories/settings_repository.dart';
 import '../repositories/exercise_repository.dart';
 import '../repositories/workout_repository.dart';
@@ -16,8 +16,14 @@ class DatabaseHelper implements DatabaseProvider {
   static const _dbVersion = 17;
 
   static DatabaseHelper? _instance;
-  static Database? _database;
   static Database? _overrideDatabase;
+
+  late final AppDatabase _appDatabase = AppDatabase(
+    name: _dbName,
+    version: _dbVersion,
+    onCreate: _onCreate,
+    onUpgrade: _onUpgrade,
+  );
 
   /// Repository instances (lazy-loaded)
   late final SettingsRepository settingsRepo = SettingsRepository(this);
@@ -36,33 +42,21 @@ class DatabaseHelper implements DatabaseProvider {
 
   static DatabaseHelper get instance {
     _instance ??= DatabaseHelper._();
+    DatabaseProviderRegistry.configure(_instance!);
     return _instance!;
   }
 
   @override
   Future<Database> get database async {
     if (_overrideDatabase != null) return _overrideDatabase!;
-    _database ??= await _initDatabase();
-    return _database!;
+    return _appDatabase.database;
   }
 
   /// Test-only hook. Sets an external [Database] to be returned by
   /// [database] instead of the singleton. Pass `null` to clear.
   static set overrideDatabase(Database? db) {
     _overrideDatabase = db;
-  }
-
-  Future<Database> _initDatabase() async {
-    final dbPath = await getDatabasesPath();
-    final path = p.join(dbPath, _dbName);
-    return openDatabase(
-      path,
-      version: _dbVersion,
-      onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-      singleInstance: true,
-    );
+    DatabaseProviderRegistry.configure(instance);
   }
 
   Future<void> _onCreate(Database db, int version) async {
