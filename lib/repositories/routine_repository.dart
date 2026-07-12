@@ -1,12 +1,10 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'base_repository.dart';
-import '../database/database_provider.dart';
 
 /// Repository for routines, routine days, routine exercises, and predefined sets.
 class RoutineRepository extends BaseRepository {
-  RoutineRepository([DatabaseProvider? databaseProvider])
-    : super(databaseProvider);
+  RoutineRepository([super.databaseProvider]);
   Future<String> createRoutine(String name, {String? notes}) async {
     final db = await this.db;
     final id = const Uuid().v4();

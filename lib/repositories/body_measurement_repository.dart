@@ -1,12 +1,10 @@
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
 import 'base_repository.dart';
-import '../database/database_provider.dart';
 
 /// Repository for body measurements CRUD and analytics operations.
 class BodyMeasurementRepository extends BaseRepository {
-  BodyMeasurementRepository([DatabaseProvider? databaseProvider])
-    : super(databaseProvider);
+  BodyMeasurementRepository([super.databaseProvider]);
   Future<void> addBodyMeasurement(
     String type,
     double value,

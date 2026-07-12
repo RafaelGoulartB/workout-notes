@@ -1,12 +1,10 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'base_repository.dart';
-import '../database/database_provider.dart';
 
 /// Repository for exercise categories and exercises CRUD operations.
 class ExerciseRepository extends BaseRepository {
-  ExerciseRepository([DatabaseProvider? databaseProvider])
-    : super(databaseProvider);
+  ExerciseRepository([super.databaseProvider]);
   // ===================================================================
   // EXERCISE CATEGORIES
   // ===================================================================

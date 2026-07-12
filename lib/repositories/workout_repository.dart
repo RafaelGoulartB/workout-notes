@@ -8,12 +8,10 @@ import 'package:workout_notes/utils/app_date_codec.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'base_repository.dart';
-import '../database/database_provider.dart';
 
 /// Repository for workouts, exercise entries, and sets CRUD operations.
 class WorkoutRepository extends BaseRepository {
-  WorkoutRepository([DatabaseProvider? databaseProvider])
-    : super(databaseProvider);
+  WorkoutRepository([super.databaseProvider]);
   // ===================================================================
   // WORKOUTS
   // ===================================================================
