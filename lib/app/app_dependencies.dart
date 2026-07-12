@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/database/database_provider.dart';
+import 'package:workout_notes/repositories/ai_chat_repository.dart';
 import 'package:workout_notes/repositories/analytics_repository.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/exercise_repository.dart';
@@ -26,6 +27,7 @@ class AppDependencies {
     bodyMeasurementRepository = BodyMeasurementRepository(this.database);
     analyticsRepository = AnalyticsRepository(this.database);
     goalRepository = GoalRepository(this.database);
+    aiChatRepository = AiChatRepository(this.database);
     exportImportRepository = ExportImportRepository(
       databaseProvider: () => this.database.database,
     );
@@ -41,6 +43,7 @@ class AppDependencies {
   late final BodyMeasurementRepository bodyMeasurementRepository;
   late final AnalyticsRepository analyticsRepository;
   late final GoalRepository goalRepository;
+  late final AiChatRepository aiChatRepository;
   late final ExportImportRepository exportImportRepository;
 }
 

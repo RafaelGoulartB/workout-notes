@@ -50,6 +50,20 @@ class AiChatMessage {
     );
   }
 
+  AiChatMessage withThreadId(String value) {
+    return AiChatMessage(
+      id: id,
+      threadId: value,
+      role: role,
+      createdAt: createdAt,
+      content: content,
+      toolCallId: toolCallId,
+      toolName: toolName,
+      toolCalls: toolCalls,
+      toolResult: toolResult,
+    );
+  }
+
   Map<String, dynamic> toRow() {
     return {
       'id': id,

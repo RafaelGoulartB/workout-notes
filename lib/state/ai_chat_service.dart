@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
-import '../database/database_helper.dart';
+import '../repositories/ai_chat_repository.dart';
 import '../models/ai_chat_message.dart';
 import '../models/ai_chat_state.dart';
 import '../models/ai_chat_thread.dart';
@@ -48,7 +48,7 @@ class AiChatService extends ChangeNotifier {
 
   AiChatService._();
 
-  final DatabaseHelper _db = DatabaseHelper.instance;
+  AiChatRepository _chatRepository = AiChatRepository();
   AiService _service = AiService();
   AiToolRegistry _tools = AiToolRegistry();
   AiContextService _context = AiContextService();
@@ -62,11 +62,13 @@ class AiChatService extends ChangeNotifier {
 
   /// Replaces default collaborators (used in tests).
   void overrideForTest({
+    AiChatRepository? chatRepository,
     AiService? service,
     AiToolRegistry? tools,
     AiContextService? context,
     AiRoutineMutationService? routineMutations,
   }) {
+    if (chatRepository != null) _chatRepository = chatRepository;
     if (service != null) _service = service;
     if (tools != null) _tools = tools;
     if (context != null) _context = context;
@@ -90,10 +92,8 @@ class AiChatService extends ChangeNotifier {
 
   Future<void> refreshThreads({bool notify = true}) async {
     try {
-      final rows = await _db.getAiChatThreads();
-      _state = _state.copyWith(
-        threads: rows.map(AiChatThread.fromRow).toList(),
-      );
+      final threads = await _chatRepository.getThreads();
+      _state = _state.copyWith(threads: threads);
       if (notify) notifyListeners();
     } catch (_) {}
   }
@@ -112,8 +112,7 @@ class AiChatService extends ChangeNotifier {
   Future<void> openThread(String threadId) async {
     if (_state.activeThreadId == threadId) return;
     try {
-      final rows = await _db.getAiChatMessagesThread(threadId);
-      final messages = rows.map(AiChatMessage.fromRow).toList();
+      final messages = await _chatRepository.getMessages(threadId);
       final proposals = await _routineMutations.getThreadProposals(threadId);
       _state = _state.copyWith(
         activeThreadId: threadId,
@@ -132,7 +131,7 @@ class AiChatService extends ChangeNotifier {
 
   Future<void> deleteThread(String threadId) async {
     try {
-      await _db.deleteAiChatThread(threadId);
+      await _chatRepository.deleteThread(threadId);
       final threads = _state.threads.where((t) => t.id != threadId).toList();
       final clearActive = _state.activeThreadId == threadId;
       _state = _state.copyWith(
@@ -151,7 +150,7 @@ class AiChatService extends ChangeNotifier {
     final trimmed = title.trim();
     if (trimmed.isEmpty) return false;
     try {
-      await _db.renameAiChatThread(threadId, trimmed);
+      await _chatRepository.renameThread(threadId, trimmed);
       await refreshThreads(notify: false);
       _state = _state.copyWith(clearError: true);
       notifyListeners();
@@ -165,7 +164,7 @@ class AiChatService extends ChangeNotifier {
 
   Future<bool> setThreadPinned(String threadId, bool isPinned) async {
     try {
-      await _db.setAiChatThreadPinned(threadId, isPinned);
+      await _chatRepository.setThreadPinned(threadId, isPinned);
       await refreshThreads(notify: false);
       _state = _state.copyWith(clearError: true);
       notifyListeners();
@@ -728,15 +727,17 @@ class AiChatService extends ChangeNotifier {
     final title = firstUserText.length > 48
         ? '${firstUserText.substring(0, 45)}…'
         : firstUserText;
-    await _db.upsertAiChatThread(
-      id: id,
-      title: title.isEmpty ? 'Nova conversa' : title,
-      createdAt: now,
-      updatedAt: now,
-      lastMessagePreview: firstUserText.length > 96
-          ? '${firstUserText.substring(0, 93)}…'
-          : firstUserText,
-      isPinned: false,
+    await _chatRepository.saveThread(
+      AiChatThread(
+        id: id,
+        title: title.isEmpty ? 'Nova conversa' : title,
+        createdAt: now,
+        updatedAt: now,
+        lastMessagePreview: firstUserText.length > 96
+            ? '${firstUserText.substring(0, 93)}…'
+            : firstUserText,
+        isPinned: false,
+      ),
     );
     return id;
   }
@@ -746,19 +747,21 @@ class AiChatService extends ChangeNotifier {
     if (id == null) return;
     try {
       final preview = _lastUserOrAssistantPreview();
-      await _db.upsertAiChatThread(
-        id: id,
-        title: _state.activeThread?.title ?? 'Conversa',
-        createdAt: _state.activeThread?.createdAt ?? DateTime.now(),
-        updatedAt: DateTime.now(),
-        lastMessagePreview: preview,
-        isPinned: _state.activeThread?.isPinned ?? false,
+      await _chatRepository.saveThread(
+        AiChatThread(
+          id: id,
+          title: _state.activeThread?.title ?? 'Conversa',
+          createdAt: _state.activeThread?.createdAt ?? DateTime.now(),
+          updatedAt: DateTime.now(),
+          lastMessagePreview: preview,
+          isPinned: _state.activeThread?.isPinned ?? false,
+        ),
       );
-      final rows = _state.messages
+      final messages = _state.messages
           .where((m) => m.role != AiMessageRole.system)
-          .map((m) => m.toRow()..['thread_id'] = id)
+          .map((m) => m.withThreadId(id))
           .toList();
-      await _db.replaceAiChatMessages(id, rows);
+      await _chatRepository.replaceMessages(id, messages);
       await refreshThreads();
     } catch (_) {}
   }
@@ -847,7 +850,7 @@ class AiChatService extends ChangeNotifier {
         phase: AiTurnPhase.idle,
         phaseMessage: null,
       );
-      await _db.updateAiRoutineProposal(proposal.id, {
+      await _routineMutations.updateProposalStatus(proposal.id, {
         'error_code': null,
         'error_message': null,
       });
@@ -858,7 +861,7 @@ class AiChatService extends ChangeNotifier {
     } catch (_) {
       // The routine is already committed. Keep it applied and expose a retry
       // on the proposal card instead of risking a second mutation.
-      await _db.updateAiRoutineProposal(proposal.id, {
+      await _routineMutations.updateProposalStatus(proposal.id, {
         'error_code': 'summary_pending',
         'error_message': 'Resumo da IA pendente.',
       });

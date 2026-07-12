@@ -101,6 +101,9 @@ class AiRoutineMutationService {
         threadId,
       )).map(AiRoutineProposal.fromRow).toList();
 
+  Future<void> updateProposalStatus(String id, Map<String, dynamic> values) =>
+      db.updateAiRoutineProposal(id, values);
+
   Future<AiRoutineProposal> reject(String id) async {
     final p = await getProposal(id);
     if (p == null) throw StateError('Proposta não encontrada.');
