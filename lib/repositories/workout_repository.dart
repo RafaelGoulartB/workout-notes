@@ -227,66 +227,69 @@ class WorkoutRepository extends BaseRepository {
     DateTime newDate,
   ) async {
     final db = await this.db;
-    final sourceWorkout = await _getWorkout(db, sourceWorkoutId);
-    if (sourceWorkout == null) throw Exception('Source workout not found');
-
     final newId = const Uuid().v4();
     final now = DateTime.now().toIso8601String();
-    await db.insert('workouts', {
-      'id': newId,
-      'date': newDate.toIso8601String().substring(0, 10),
-      'start_time': null,
-      'end_time': null,
-      'duration_seconds': null,
-      'comment': null,
-      'feeling_rating': null,
-      'is_from_routine': sourceWorkout['is_from_routine'] ?? 0,
-      'routine_id': sourceWorkout['routine_id'],
-      'created_at': now,
-    });
-
-    final entries = await db.query(
-      'exercise_entries',
-      where: 'workout_id = ?',
-      whereArgs: [sourceWorkoutId],
-      orderBy: 'order_index ASC',
-    );
-
-    for (final entry in entries) {
-      final newEntryId = const Uuid().v4();
-      await db.insert('exercise_entries', {
-        'id': newEntryId,
-        'workout_id': newId,
-        'exercise_id': entry['exercise_id'],
-        'order_index': entry['order_index'],
-        'superset_group_id': entry['superset_group_id'],
-        'notes': entry['notes'],
-        'rest_time_seconds': entry['rest_time_seconds'],
+    await db.transaction((txn) async {
+      final sourceWorkout = await _getWorkout(txn, sourceWorkoutId);
+      if (sourceWorkout == null) {
+        throw StateError('Source workout not found');
+      }
+      await txn.insert('workouts', {
+        'id': newId,
+        'date': newDate.toIso8601String().substring(0, 10),
+        'start_time': null,
+        'end_time': null,
+        'duration_seconds': null,
+        'comment': null,
+        'feeling_rating': null,
+        'is_from_routine': sourceWorkout['is_from_routine'] ?? 0,
+        'routine_id': sourceWorkout['routine_id'],
+        'created_at': now,
       });
 
-      final sets = await db.query(
-        'sets',
-        where: 'exercise_entry_id = ?',
-        whereArgs: [entry['id']],
+      final entries = await txn.query(
+        'exercise_entries',
+        where: 'workout_id = ?',
+        whereArgs: [sourceWorkoutId],
         orderBy: 'order_index ASC',
       );
 
-      for (final s in sets) {
-        await db.insert('sets', {
-          'id': const Uuid().v4(),
-          'exercise_entry_id': newEntryId,
-          'weight': s['weight'],
-          'reps': s['reps'],
-          'distance': s['distance'],
-          'time_seconds': s['time_seconds'],
-          'is_complete': 0,
-          'is_warmup': s['is_warmup'] ?? 0,
-          'rpe': s['rpe'],
-          'comment': s['comment'],
-          'order_index': s['order_index'],
+      for (final entry in entries) {
+        final newEntryId = const Uuid().v4();
+        await txn.insert('exercise_entries', {
+          'id': newEntryId,
+          'workout_id': newId,
+          'exercise_id': entry['exercise_id'],
+          'order_index': entry['order_index'],
+          'superset_group_id': entry['superset_group_id'],
+          'notes': entry['notes'],
+          'rest_time_seconds': entry['rest_time_seconds'],
         });
+
+        final sets = await txn.query(
+          'sets',
+          where: 'exercise_entry_id = ?',
+          whereArgs: [entry['id']],
+          orderBy: 'order_index ASC',
+        );
+
+        for (final set in sets) {
+          await txn.insert('sets', {
+            'id': const Uuid().v4(),
+            'exercise_entry_id': newEntryId,
+            'weight': set['weight'],
+            'reps': set['reps'],
+            'distance': set['distance'],
+            'time_seconds': set['time_seconds'],
+            'is_complete': 0,
+            'is_warmup': set['is_warmup'] ?? 0,
+            'rpe': set['rpe'],
+            'comment': set['comment'],
+            'order_index': set['order_index'],
+          });
+        }
       }
-    }
+    });
 
     return newId;
   }
