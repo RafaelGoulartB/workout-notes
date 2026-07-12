@@ -4,6 +4,7 @@ import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/models/exercise_personal_records.dart';
 import 'package:workout_notes/models/workout_stats.dart';
 import 'package:workout_notes/models/workout_set_draft.dart';
+import 'package:workout_notes/utils/app_date_codec.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'base_repository.dart';
@@ -25,7 +26,7 @@ class WorkoutRepository extends BaseRepository {
     await db.transaction((txn) async {
       await txn.insert('workouts', {
         'id': id,
-        'date': (date ?? now).toIso8601String().substring(0, 10),
+        'date': AppDateCodec.toStorageDate(date ?? now),
         'is_from_routine': routineId != null ? 1 : 0,
         'routine_id': routineId,
         'created_at': now.toIso8601String(),
@@ -95,7 +96,7 @@ class WorkoutRepository extends BaseRepository {
     await db.transaction((txn) async {
       await txn.insert('workouts', {
         'id': workoutId,
-        'date': nowIso.substring(0, 10),
+        'date': AppDateCodec.toStorageDate(now),
         'start_time': nowIso,
         'end_time': nowIso,
         'duration_seconds': 0,
@@ -245,7 +246,7 @@ class WorkoutRepository extends BaseRepository {
       }
       await txn.insert('workouts', {
         'id': newId,
-        'date': newDate.toIso8601String().substring(0, 10),
+        'date': AppDateCodec.toStorageDate(newDate),
         'start_time': null,
         'end_time': null,
         'duration_seconds': null,
@@ -317,7 +318,7 @@ class WorkoutRepository extends BaseRepository {
   /// and with at least one exercise entry).
   Future<List<Map<String, dynamic>>> getActiveWorkouts() async {
     final db = await this.db;
-    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final today = AppDateCodec.toStorageDate(DateTime.now());
     return db.rawQuery(
       '''
       SELECT DISTINCT w.* FROM workouts w
@@ -341,11 +342,11 @@ class WorkoutRepository extends BaseRepository {
 
     if (startDate != null) {
       query += ' AND date >= ?';
-      args.add(startDate.toIso8601String().substring(0, 10));
+      args.add(AppDateCodec.toStorageDate(startDate));
     }
     if (endDate != null) {
       query += ' AND date <= ?';
-      args.add(endDate.toIso8601String().substring(0, 10));
+      args.add(AppDateCodec.toStorageDate(endDate));
     }
 
     query += ' ORDER BY date DESC, start_time DESC';
