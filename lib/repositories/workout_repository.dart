@@ -21,45 +21,53 @@ class WorkoutRepository extends BaseRepository {
     final db = await this.db;
     final id = const Uuid().v4();
     final now = DateTime.now();
-    await db.insert('workouts', {
-      'id': id,
-      'date': (date ?? now).toIso8601String().substring(0, 10),
-      'is_from_routine': routineId != null ? 1 : 0,
-      'routine_id': routineId,
-      'created_at': now.toIso8601String(),
-    });
+    await db.transaction((txn) async {
+      await txn.insert('workouts', {
+        'id': id,
+        'date': (date ?? now).toIso8601String().substring(0, 10),
+        'is_from_routine': routineId != null ? 1 : 0,
+        'routine_id': routineId,
+        'created_at': now.toIso8601String(),
+      });
 
-    if (exercises != null) {
-      for (int i = 0; i < exercises.length; i++) {
+      if (exercises == null) {
+        return;
+      }
+      for (
+        var exerciseIndex = 0;
+        exerciseIndex < exercises.length;
+        exerciseIndex++
+      ) {
+        final exercise = exercises[exerciseIndex];
         final entryId = const Uuid().v4();
-        await db.insert('exercise_entries', {
+        await txn.insert('exercise_entries', {
           'id': entryId,
           'workout_id': id,
-          'exercise_id': exercises[i]['exercise_id'],
-          'order_index': i,
-          'notes': exercises[i]['notes'],
-          'rest_time_seconds': exercises[i]['rest_time_seconds'],
+          'exercise_id': exercise['exercise_id'],
+          'order_index': exerciseIndex,
+          'notes': exercise['notes'],
+          'rest_time_seconds': exercise['rest_time_seconds'],
         });
 
-        final sets = exercises[i]['sets'] as List<Map<String, dynamic>>? ?? [];
-        for (int j = 0; j < sets.length; j++) {
-          final s = sets[j];
-          await db.insert('sets', {
+        final sets = exercise['sets'] as List<Map<String, dynamic>>? ?? [];
+        for (var setIndex = 0; setIndex < sets.length; setIndex++) {
+          final set = sets[setIndex];
+          await txn.insert('sets', {
             'id': const Uuid().v4(),
             'exercise_entry_id': entryId,
-            'weight': s['weight'],
-            'reps': s['reps'],
-            'distance': s['distance'],
-            'time_seconds': s['time_seconds'],
+            'weight': set['weight'],
+            'reps': set['reps'],
+            'distance': set['distance'],
+            'time_seconds': set['time_seconds'],
             'is_complete': 0,
-            'is_warmup': s['is_warmup'] ?? 0,
-            'rpe': s['rpe'],
-            'comment': s['comment'],
-            'order_index': j,
+            'is_warmup': set['is_warmup'] ?? 0,
+            'rpe': set['rpe'],
+            'comment': set['comment'],
+            'order_index': setIndex,
           });
         }
       }
-    }
+    });
 
     return id;
   }
