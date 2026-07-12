@@ -2134,22 +2134,18 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final scaffoldMessenger = ScaffoldMessenger.of(ctx);
     final loc = AppLocalizations.of(ctx);
     final routines = await _routineRepo.getRoutines();
+    if (!ctx.mounted) return;
     if (routines.isEmpty) {
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.activeWorkoutNoRoutineFound,
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(loc!.activeWorkoutNoRoutineFound),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
     final routineId = await showModalBottomSheet<String>(
-      // ignore: use_build_context_synchronously
       context: ctx,
       isScrollControlled: true,
       useSafeArea: true,
@@ -2158,22 +2154,20 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     if (routineId == null || !mounted) return;
 
     final days = await _routineRepo.getRoutineDays(routineId);
+    if (!ctx.mounted) return;
     if (days.isEmpty) {
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(loc!.activeWorkoutNoRoutineDays),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(loc!.activeWorkoutNoRoutineDays),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
     final routineName =
         routines.firstWhere((r) => r['id'] == routineId)['name'] as String;
     final dayId = await showModalBottomSheet<String>(
-      // ignore: use_build_context_synchronously
       context: ctx,
       isScrollControlled: true,
       useSafeArea: true,
