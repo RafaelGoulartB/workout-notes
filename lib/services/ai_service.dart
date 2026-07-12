@@ -36,10 +36,20 @@ class AiServiceException implements Exception {
 /// OpenAI-compatible HTTP client. Stateless; safe to share.
 class AiService {
   final http.Client _client;
+  final bool _ownsClient;
   final Duration timeout;
 
   AiService({http.Client? client, this.timeout = const Duration(seconds: 90)})
-    : _client = client ?? http.Client();
+    : _client = client ?? http.Client(),
+      _ownsClient = client == null;
+
+  /// Releases the internally-created HTTP client.
+  ///
+  /// Callers that injected a client retain ownership of it, which keeps tests
+  /// and shared application clients from being closed unexpectedly.
+  void close() {
+    if (_ownsClient) _client.close();
+  }
 
   /// Normalises a user-provided base URL to end with `/v1`.
   static String normalizeBaseUri(String input) {
