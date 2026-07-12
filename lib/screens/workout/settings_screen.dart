@@ -15,6 +15,7 @@ import '../../main.dart';
 import '../../navigation/ai_coach_navigation.dart';
 import 'ai_chat_screen.dart';
 import 'ai_settings_screen.dart';
+import '../../constants/preference_keys.dart';
 
 class WorkoutSettingsScreen extends StatefulWidget {
   const WorkoutSettingsScreen({super.key});
@@ -86,7 +87,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   Future<void> _changeAccentColor(int index) async {
     final color = AccentColors.options[index];
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('accent_color', color.toARGB32());
+    await prefs.setInt(PreferenceKeys.accentColor, color.toARGB32());
     if (!mounted) return;
     setState(() => _selectedAccentIndex = index);
     WorkoutNotesApp.themeNotifier.setSeedColor(color);
@@ -105,7 +106,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       default:
         value = 'system';
     }
-    await prefs.setString('theme_mode', value);
+    await prefs.setString(PreferenceKeys.themeMode, value);
     await _update('theme_mode', value);
     if (!mounted) return;
     setState(() => _selectedThemeMode = mode);
@@ -115,7 +116,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   Future<void> _changeLocale(Locale newLocale) async {
     final prefs = await SharedPreferences.getInstance();
     final localeStr = newLocale.languageCode == 'pt' ? 'pt' : 'en';
-    await prefs.setString('app_locale', localeStr);
+    await prefs.setString(PreferenceKeys.appLocale, localeStr);
 
     // Update date formatting
     await initializeDateFormatting(localeStr == 'pt' ? 'pt_BR' : 'en', null);

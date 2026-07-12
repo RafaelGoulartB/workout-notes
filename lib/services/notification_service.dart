@@ -5,6 +5,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/app_localizations_en.dart';
 import 'package:workout_notes/l10n/app_localizations_pt.dart';
 import '../repositories/settings_repository.dart';
+import '../constants/preference_keys.dart';
 
 /// Centralized notification service for timer notifications.
 ///
@@ -120,7 +121,9 @@ class NotificationService {
 
   Future<void> _loadLocale() async {
     final prefs = await SharedPreferences.getInstance();
-    _localeCode = prefs.getString('app_locale') == 'pt' ? 'pt' : 'en';
+    _localeCode = prefs.getString(PreferenceKeys.appLocale) == 'pt'
+        ? 'pt'
+        : 'en';
   }
 
   // Channel updates

@@ -11,6 +11,7 @@ import 'screens/workout/workout_home_screen.dart';
 import 'state/ai_chat_service.dart';
 import 'state/ai_settings_notifier.dart';
 import 'widgets/ai/ai_coach_fab.dart';
+import 'constants/preference_keys.dart';
 
 /// List of accent seed colors available in settings.
 class AccentColors {
@@ -82,14 +83,15 @@ void main() async {
   // Load saved settings
   final prefs = await SharedPreferences.getInstance();
   final savedColor =
-      prefs.getInt('accent_color') ?? AccentColors.defaultColor.toARGB32();
+      prefs.getInt(PreferenceKeys.accentColor) ??
+      AccentColors.defaultColor.toARGB32();
   final initialColor = Color(savedColor);
 
-  final themeModeStr = prefs.getString('theme_mode') ?? 'system';
+  final themeModeStr = prefs.getString(PreferenceKeys.themeMode) ?? 'system';
   final initialThemeMode = _parseThemeMode(themeModeStr);
 
   // Load saved locale
-  final localeStr = prefs.getString('app_locale') ?? 'en';
+  final localeStr = prefs.getString(PreferenceKeys.appLocale) ?? 'en';
   final initialLocale = _parseLocale(localeStr);
 
   // Initialize date formatting based on locale
