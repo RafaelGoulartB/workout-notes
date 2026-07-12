@@ -130,41 +130,41 @@ class WorkoutRepository extends BaseRepository {
   }) async {
     final db = await this.db;
     final entryId = const Uuid().v4();
-    final count =
-        Sqflite.firstIntValue(
-          await db.rawQuery(
-            'SELECT COUNT(*) FROM exercise_entries WHERE workout_id = ?',
-            [workoutId],
-          ),
-        ) ??
-        0;
-    final rt = restTimeSeconds ?? 90;
-    await db.insert('exercise_entries', {
-      'id': entryId,
-      'workout_id': workoutId,
-      'exercise_id': exerciseId,
-      'order_index': count,
-      'rest_time_seconds': rt,
-    });
-    // Auto-populate sets from last workout for this exercise
-    final lastSets = await getLastWorkoutSets(
-      exerciseId,
-      excludeWorkoutId: workoutId,
-    );
-    for (final s in lastSets) {
-      final setId = const Uuid().v4();
-      await db.insert('sets', {
-        'id': setId,
-        'exercise_entry_id': entryId,
-        'weight': s['weight'],
-        'reps': s['reps'],
-        'distance': s['distance'],
-        'time_seconds': s['time_seconds'],
-        'is_complete': 0,
-        'is_warmup': s['is_warmup'] ?? 0,
-        'order_index': s['order_index'],
+    await db.transaction((txn) async {
+      final count =
+          Sqflite.firstIntValue(
+            await txn.rawQuery(
+              'SELECT COUNT(*) FROM exercise_entries WHERE workout_id = ?',
+              [workoutId],
+            ),
+          ) ??
+          0;
+      await txn.insert('exercise_entries', {
+        'id': entryId,
+        'workout_id': workoutId,
+        'exercise_id': exerciseId,
+        'order_index': count,
+        'rest_time_seconds': restTimeSeconds ?? 90,
       });
-    }
+      final lastSets = await _getLastWorkoutSets(
+        txn,
+        exerciseId,
+        excludeWorkoutId: workoutId,
+      );
+      for (final set in lastSets) {
+        await txn.insert('sets', {
+          'id': const Uuid().v4(),
+          'exercise_entry_id': entryId,
+          'weight': set['weight'],
+          'reps': set['reps'],
+          'distance': set['distance'],
+          'time_seconds': set['time_seconds'],
+          'is_complete': 0,
+          'is_warmup': set['is_warmup'] ?? 0,
+          'order_index': set['order_index'],
+        });
+      }
+    });
     return entryId;
   }
 
@@ -1023,7 +1023,18 @@ class WorkoutRepository extends BaseRepository {
     String? excludeWorkoutId,
   }) async {
     final db = await this.db;
+    return _getLastWorkoutSets(
+      db,
+      exerciseId,
+      excludeWorkoutId: excludeWorkoutId,
+    );
+  }
 
+  Future<List<Map<String, dynamic>>> _getLastWorkoutSets(
+    DatabaseExecutor db,
+    String exerciseId, {
+    String? excludeWorkoutId,
+  }) async {
     String where = 'ee.exercise_id = ?';
     final args = <dynamic>[exerciseId];
     if (excludeWorkoutId != null) {
