@@ -5,39 +5,7 @@ import 'package:workout_notes/widgets/workout/stat_tile.dart';
 import 'package:workout_notes/utils/pace_calculator.dart';
 
 export 'package:workout_notes/models/workout_summary.dart'
-    show PR, WorkoutSummary;
-
-/// Cardio bests data class for tracking distance/pace PRs.
-class CardioBests {
-  final String name;
-  final double distance;
-  final int timeSeconds;
-
-  const CardioBests({
-    required this.name,
-    required this.distance,
-    required this.timeSeconds,
-  });
-
-  double get paceSeconds => distance > 0 ? timeSeconds / distance : 0;
-}
-
-/// Exercise bests data class.
-class ExerciseBests {
-  final String name;
-  final double maxWeight;
-  final int bestReps;
-  final double volume;
-  final int completedSets;
-
-  const ExerciseBests({
-    required this.name,
-    required this.maxWeight,
-    required this.bestReps,
-    required this.volume,
-    required this.completedSets,
-  });
-}
+    show CardioBests, ExerciseBests, PR, WorkoutSummary;
 
 /// A bottom sheet shown when finishing a workout.
 /// Displays summary stats, PRs, feeling rating, and comment input.

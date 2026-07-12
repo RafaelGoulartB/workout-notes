@@ -20,6 +20,38 @@ class PR {
       type == 'weight' ? Icons.emoji_events : Icons.inventory_2;
 }
 
+/// Best cardio values completed for an exercise in the current workout.
+class CardioBests {
+  final String name;
+  final double distance;
+  final int timeSeconds;
+
+  const CardioBests({
+    required this.name,
+    required this.distance,
+    required this.timeSeconds,
+  });
+
+  double get paceSeconds => distance > 0 ? timeSeconds / distance : 0;
+}
+
+/// Best strength values completed for an exercise in the current workout.
+class ExerciseBests {
+  final String name;
+  final double maxWeight;
+  final int bestReps;
+  final double volume;
+  final int completedSets;
+
+  const ExerciseBests({
+    required this.name,
+    required this.maxWeight,
+    required this.bestReps,
+    required this.volume,
+    required this.completedSets,
+  });
+}
+
 /// Aggregate values shown after a workout is completed.
 class WorkoutSummary {
   final int durationSeconds;
