@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
+import 'package:workout_notes/app/app_dependencies.dart';
 import 'l10n/app_localizations.dart';
 import 'navigation/ai_coach_navigation.dart';
 import 'services/notification_service.dart';
@@ -109,10 +110,13 @@ void main() async {
   await AiChatService.bootstrap(settings: WorkoutNotesApp.aiSettings);
 
   runApp(
-    WorkoutNotesApp(
-      initialColor: initialColor,
-      initialThemeMode: initialThemeMode,
-      initialLocale: initialLocale,
+    AppDependenciesScope(
+      dependencies: AppDependencies.instance,
+      child: WorkoutNotesApp(
+        initialColor: initialColor,
+        initialThemeMode: initialThemeMode,
+        initialLocale: initialLocale,
+      ),
     ),
   );
 }
