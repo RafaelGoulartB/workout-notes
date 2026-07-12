@@ -57,6 +57,9 @@ jobs:
       - name: Run static analysis
         run: flutter analyze --no-pub
 
+      - name: Verify Dart formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
       - name: Run tests
         run: flutter test --no-pub
 

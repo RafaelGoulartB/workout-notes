@@ -37,22 +37,26 @@ void main() {
     expect(summary.containsKey('topExercisesByVolume'), isFalse);
   });
 
-  test('standard mode includes last4Weeks + top exercises + active goals',
-      () async {
-    final json = await context.build(mode: AiContextMode.standard);
-    final summary = json['summary'] as Map;
-    expect(summary.containsKey('last4WeeksVolume'), isTrue);
-    expect(summary.containsKey('topExercisesByVolume'), isTrue);
-    expect(summary.containsKey('activeGoals'), isTrue);
-  });
+  test(
+    'standard mode includes last4Weeks + top exercises + active goals',
+    () async {
+      final json = await context.build(mode: AiContextMode.standard);
+      final summary = json['summary'] as Map;
+      expect(summary.containsKey('last4WeeksVolume'), isTrue);
+      expect(summary.containsKey('topExercisesByVolume'), isTrue);
+      expect(summary.containsKey('activeGoals'), isTrue);
+    },
+  );
 
-  test('full mode also includes category distribution and body trend',
-      () async {
-    final json = await context.build(mode: AiContextMode.full);
-    final summary = json['summary'] as Map;
-    expect(summary.containsKey('categoryDistributionPct'), isTrue);
-    expect(summary.containsKey('bodyTrend30d'), isTrue);
-  });
+  test(
+    'full mode also includes category distribution and body trend',
+    () async {
+      final json = await context.build(mode: AiContextMode.full);
+      final summary = json['summary'] as Map;
+      expect(summary.containsKey('categoryDistributionPct'), isTrue);
+      expect(summary.containsKey('bodyTrend30d'), isTrue);
+    },
+  );
 
   test('cache is invalidated on invalidate()', () async {
     final a = await context.build(mode: AiContextMode.standard);
