@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
 import 'seed_data.dart';
+import 'database_provider.dart';
 import '../repositories/settings_repository.dart';
 import '../repositories/exercise_repository.dart';
 import '../repositories/workout_repository.dart';
@@ -10,7 +11,7 @@ import '../repositories/analytics_repository.dart';
 import '../repositories/export_import_repository.dart';
 import '../repositories/goal_repository.dart';
 
-class DatabaseHelper {
+class DatabaseHelper implements DatabaseProvider {
   static const _dbName = 'workout_notes.db';
   static const _dbVersion = 17;
 
@@ -36,6 +37,7 @@ class DatabaseHelper {
     return _instance!;
   }
 
+  @override
   Future<Database> get database async {
     if (_overrideDatabase != null) return _overrideDatabase!;
     _database ??= await _initDatabase();
