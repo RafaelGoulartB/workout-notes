@@ -203,46 +203,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
     );
   }
 
-  // Kept as a compatibility helper for callers using the older chat layout.
-  // ignore: unused_element
-  Widget _buildProviderHeader(ThemeData theme) {
-    final active = _settings.activeProvider;
-    final l10n = AppLocalizations.of(context)!;
-    if (active == null) return const SizedBox.shrink();
-    return Material(
-      color: theme.colorScheme.surfaceContainerHigh,
-      child: InkWell(
-        onTap: _showProviderSheet,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              Icon(
-                Icons.cloud_outlined,
-                size: 16,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  active.selectedModel.isEmpty
-                      ? l10n.aiChatNoModel(active.name)
-                      : l10n.aiChatActiveModel(
-                          active.name,
-                          active.selectedModel,
-                        ),
-                  style: theme.textTheme.bodySmall,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const Icon(Icons.swap_horiz_rounded, size: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildPhaseBanner(
     ThemeData theme,
     AiChatState state,
