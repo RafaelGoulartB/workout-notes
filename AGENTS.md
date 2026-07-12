@@ -8,8 +8,7 @@ A comprehensive guide for LLM agents working on the Workout Notes project. This 
 
 **Workout Notes** is a Flutter mobile application for tracking workouts, exercises, sets, and progress. It supports Android, iOS, web, and desktop (Linux, macOS, Windows).
 
-- **Journal module:** Write, edit, browse, and delete personal notes. Persisted via `shared_preferences` (local JSON).
-- **Workout tracker module:** Exercise library, workout logging, set tracking, routines, body measurements, progress charts, calendar, rest timer, CSV export. All persisted via **SQLite** (`sqflite`).
+- **Workout tracker:** Exercise library, workout logging, set tracking, routines, body measurements, progress charts, calendar, rest timer, CSV export, and an optional AI coach. Workout data is persisted via **SQLite** (`sqflite`).
 
 The app uses Material 3 with dynamic theming, automatic dark mode support, and customizable accent colors.
 
@@ -22,7 +21,6 @@ The app uses Material 3 with dynamic theming, automatic dark mode support, and c
 | Language | Dart 3.12+ |
 | UI Framework | Flutter (Material 3) |
 | State Management | `setState` + `ChangeNotifier` (lightweight) |
-| Notes Storage | `shared_preferences` (JSON string) |
 | Workout Storage | `sqflite` (SQLite) |
 | Charts | `fl_chart` |
 | Animations | `flutter_animate` |
@@ -72,6 +70,18 @@ lib/
 ---
 
 ## 4. Architecture & Design Decisions
+
+### Refactoring direction
+
+New code follows `UI → controller/service → repository → DatabaseProvider`.
+`AppDatabase` owns opening the SQLite connection and enables foreign keys.
+`AppDependencies` is the composition root and `AppDependenciesScope` exposes
+those dependencies to the widget tree. `DatabaseHelper` is a compatibility
+facade during the migration: do not add domain methods to it.
+
+Dynamic maps are allowed only at persistence, JSON backup, HTTP, and AI tool
+boundaries; convert them to typed models before presenting domain data to UI.
+Operations that create a tree of workout data must be transactional.
 
 ### 4.1 State Management
 
