@@ -280,8 +280,9 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                   // Equipment
                   Autocomplete<String>(
                     optionsBuilder: (textEditingValue) {
-                      if (textEditingValue.text.isEmpty)
+                      if (textEditingValue.text.isEmpty) {
                         return _equipmentOptions;
+                      }
                       return _equipmentOptions.where(
                         (opt) => opt.toLowerCase().contains(
                           textEditingValue.text.toLowerCase(),

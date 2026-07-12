@@ -1199,15 +1199,23 @@ class TestDataGenerator {
   double _progressRate(String name) {
     if (name.contains('Agachamento') ||
         name.contains('Leg Press') ||
-        name.contains('Terra'))
+        name.contains('Terra')) {
       return 2.5;
+    }
     if (name.contains('Supino') ||
         name.contains('Remada') ||
-        name.contains('Puxada'))
+        name.contains('Puxada')) {
       return 1.5;
-    if (name.contains('Rosca') || name.contains('Tríceps')) return 0.5;
-    if (name.contains('Elevação') || name.contains('Crucifixo')) return 0.25;
-    if (name.contains('Desenvolvimento')) return 1.0;
+    }
+    if (name.contains('Rosca') || name.contains('Tríceps')) {
+      return 0.5;
+    }
+    if (name.contains('Elevação') || name.contains('Crucifixo')) {
+      return 0.25;
+    }
+    if (name.contains('Desenvolvimento')) {
+      return 1.0;
+    }
     return 1.0;
   }
 }

@@ -127,8 +127,9 @@ Future<void> showAddMeasurementSheet(
                         final val = double.tryParse(
                           v?.replaceAll(',', '.') ?? '',
                         );
-                        if (val == null || val <= 0)
+                        if (val == null || val <= 0) {
                           return loc.bodyTrackerInvalidValue;
+                        }
                         return null;
                       },
                     ),

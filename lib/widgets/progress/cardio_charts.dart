@@ -206,8 +206,9 @@ class WeeklyDistanceChart extends StatelessWidget {
                         showTitles: true,
                         getTitlesWidget: (v, _) {
                           final idx = v.toInt();
-                          if (idx < 0 || idx >= display.length)
+                          if (idx < 0 || idx >= display.length) {
                             return const SizedBox.shrink();
+                          }
                           final key = display[idx].key;
                           final parts = key.split('-');
                           if (parts.length < 3) return const SizedBox.shrink();
@@ -565,8 +566,9 @@ class _PaceTrendChartState extends State<PaceTrendChart> {
                 ),
                 getTitlesWidget: (v, _) {
                   final idx = v.toInt();
-                  if (idx < 0 || idx >= labels.length)
+                  if (idx < 0 || idx >= labels.length) {
                     return const SizedBox.shrink();
+                  }
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(

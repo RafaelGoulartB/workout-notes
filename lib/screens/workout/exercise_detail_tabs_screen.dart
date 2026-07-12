@@ -887,8 +887,9 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                           interval: history.length > 15 ? 2 : 1,
                           getTitlesWidget: (v, _) {
                             final idx = v.toInt();
-                            if (idx < 0 || idx >= history.length)
+                            if (idx < 0 || idx >= history.length) {
                               return const SizedBox.shrink();
+                            }
                             final date = history[idx]['date'] as String? ?? '';
                             return Padding(
                               padding: const EdgeInsets.only(top: 4),

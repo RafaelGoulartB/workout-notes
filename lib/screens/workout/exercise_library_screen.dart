@@ -39,11 +39,15 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   List<Map<String, dynamic>> get _filtered {
     return _exercises.where((e) {
       if (_selectedCategoryId != null &&
-          e['category_id'] != _selectedCategoryId)
+          e['category_id'] != _selectedCategoryId) {
         return false;
+      }
       if (_search.isNotEmpty &&
-          !(e['name'] as String).toLowerCase().contains(_search.toLowerCase()))
+          !(e['name'] as String).toLowerCase().contains(
+            _search.toLowerCase(),
+          )) {
         return false;
+      }
       return true;
     }).toList();
   }
