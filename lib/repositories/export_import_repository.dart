@@ -10,6 +10,21 @@ import 'base_repository.dart';
 class ExportImportRepository extends BaseRepository {
   static const int currentBackupVersion = 2;
 
+  /// Tables that form a complete backup, in their dependency-safe order.
+  static const backupTables = <String>[
+    'categories',
+    'exercises',
+    'workouts',
+    'exercise_entries',
+    'sets',
+    'routines',
+    'routine_days',
+    'routine_exercises',
+    'predefined_sets',
+    'body_measurements',
+    'settings',
+  ];
+
   final Future<Database> Function()? _databaseProvider;
 
   ExportImportRepository({this._databaseProvider});
@@ -53,6 +68,7 @@ class ExportImportRepository extends BaseRepository {
   ///
   /// Returns the total number of rows inserted.
   Future<int> restoreFromBackup(Map<String, dynamic> data) async {
+    final rows = validateBackup(data);
     final db = await this.db;
     int totalRows = 0;
 
@@ -74,47 +90,92 @@ class ExportImportRepository extends BaseRepository {
       totalRows += await _insertAll(
         txn,
         'exercise_categories',
-        data['categories'],
+        rows['categories']!,
       );
-      totalRows += await _insertAll(txn, 'exercises', data['exercises']);
-      totalRows += await _insertAll(txn, 'workouts', data['workouts']);
+      totalRows += await _insertAll(txn, 'exercises', rows['exercises']!);
+      totalRows += await _insertAll(txn, 'workouts', rows['workouts']!);
       totalRows += await _insertAll(
         txn,
         'exercise_entries',
-        data['exercise_entries'],
+        rows['exercise_entries']!,
       );
-      totalRows += await _insertAll(txn, 'sets', data['sets']);
-      totalRows += await _insertAll(txn, 'routines', data['routines']);
-      totalRows += await _insertAll(txn, 'routine_days', data['routine_days']);
+      totalRows += await _insertAll(txn, 'sets', rows['sets']!);
+      totalRows += await _insertAll(txn, 'routines', rows['routines']!);
+      totalRows += await _insertAll(txn, 'routine_days', rows['routine_days']!);
       totalRows += await _insertAll(
         txn,
         'routine_exercises',
-        data['routine_exercises'],
+        rows['routine_exercises']!,
       );
       totalRows += await _insertAll(
         txn,
         'predefined_sets',
-        data['predefined_sets'],
+        rows['predefined_sets']!,
       );
       totalRows += await _insertAll(
         txn,
         'body_measurements',
-        data['body_measurements'],
+        rows['body_measurements']!,
       );
-      totalRows += await _insertAll(txn, 'app_settings', data['settings']);
+      totalRows += await _insertAll(txn, 'app_settings', rows['settings']!);
     });
 
     return totalRows;
   }
 
-  /// Inserts [rows] into [table], returning the count.
-  Future<int> _insertAll(Transaction txn, String table, dynamic rows) async {
-    if (rows == null || rows is! List || rows.isEmpty) return 0;
+  /// Validates the entire document before a restore transaction deletes data.
+  /// Dynamic maps stay confined to this persistence boundary.
+  static Map<String, List<Map<String, dynamic>>> validateBackup(
+    Map<String, dynamic> data,
+  ) {
+    final version = data['version'];
+    if (version != currentBackupVersion) {
+      throw FormatException(
+        'Unsupported backup version: $version (expected '
+        '$currentBackupVersion).',
+      );
+    }
+
+    final validated = <String, List<Map<String, dynamic>>>{};
+    for (final key in backupTables) {
+      final value = data[key];
+      if (value is! List) {
+        throw FormatException('Backup table "$key" must be a list.');
+      }
+
+      final rows = <Map<String, dynamic>>[];
+      for (var index = 0; index < value.length; index++) {
+        final row = value[index];
+        if (row is! Map) {
+          throw FormatException('Backup row $key[$index] must be an object.');
+        }
+        final normalized = <String, dynamic>{};
+        for (final entry in row.entries) {
+          if (entry.key is! String) {
+            throw FormatException(
+              'Backup row $key[$index] contains a non-text column name.',
+            );
+          }
+          normalized[entry.key as String] = entry.value;
+        }
+        rows.add(normalized);
+      }
+      validated[key] = rows;
+    }
+    return validated;
+  }
+
+  /// Inserts validated [rows] into [table], returning the count.
+  Future<int> _insertAll(
+    Transaction txn,
+    String table,
+    List<Map<String, dynamic>> rows,
+  ) async {
     int count = 0;
     for (final row in rows) {
       await txn.insert(
         table,
-        row as Map<String, dynamic>,
+        row,
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
       count++;

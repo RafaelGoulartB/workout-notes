@@ -190,6 +190,27 @@ void main() {
       );
     },
   );
+  test(
+    'rejects a backup missing a required table before deleting data',
+    () async {
+      final backup = _validBackup()..remove('sets');
+
+      await expectInvalidAndUnchanged(
+        () => service.restoreFromBytes(_bytes(backup)),
+      );
+    },
+  );
+
+  test(
+    'rejects a table row that is not an object before deleting data',
+    () async {
+      final backup = _validBackup()..['workouts'] = ['not a row'];
+
+      await expectInvalidAndUnchanged(
+        () => service.restoreFromBytes(_bytes(backup)),
+      );
+    },
+  );
 }
 
 Uint8List _bytes(Object data) =>
