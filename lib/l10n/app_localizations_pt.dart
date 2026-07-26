@@ -1211,12 +1211,6 @@ class AppLocalizationsPt extends AppLocalizations {
   String get exerciseLibraryNew => 'Novo Exercício';
 
   @override
-  String get exerciseLibraryAerobic => 'Aeróbico';
-
-  @override
-  String get exerciseLibraryAnaerobic => 'Anaeróbico';
-
-  @override
   String get exerciseFormTitleNew => 'Novo Exercício';
 
   @override
@@ -1298,6 +1292,12 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get exerciseFormTypeTimeOnly => 'Apenas Tempo';
+
+  @override
+  String get exerciseFormSectionBasic => 'Básico';
+
+  @override
+  String get exerciseFormSectionDefaults => 'Padrões';
 
   @override
   String get quickAddTitle => 'Quick Add';

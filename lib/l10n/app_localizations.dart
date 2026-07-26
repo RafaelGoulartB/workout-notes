@@ -2318,18 +2318,6 @@ abstract class AppLocalizations {
   /// **'New Exercise'**
   String get exerciseLibraryNew;
 
-  /// No description provided for @exerciseLibraryAerobic.
-  ///
-  /// In en, this message translates to:
-  /// **'Aerobic'**
-  String get exerciseLibraryAerobic;
-
-  /// No description provided for @exerciseLibraryAnaerobic.
-  ///
-  /// In en, this message translates to:
-  /// **'Anaerobic'**
-  String get exerciseLibraryAnaerobic;
-
   /// No description provided for @exerciseFormTitleNew.
   ///
   /// In en, this message translates to:
@@ -2491,6 +2479,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Time Only'**
   String get exerciseFormTypeTimeOnly;
+
+  /// No description provided for @exerciseFormSectionBasic.
+  ///
+  /// In en, this message translates to:
+  /// **'Basics'**
+  String get exerciseFormSectionBasic;
+
+  /// No description provided for @exerciseFormSectionDefaults.
+  ///
+  /// In en, this message translates to:
+  /// **'Defaults'**
+  String get exerciseFormSectionDefaults;
 
   /// No description provided for @quickAddTitle.
   ///

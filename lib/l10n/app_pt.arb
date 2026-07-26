@@ -387,8 +387,6 @@
   "exerciseLibraryNoResults": "Nenhum exercício encontrado",
   "exerciseLibraryNoResultsHint": "Tente alterar a busca ou adicione um novo",
   "exerciseLibraryNew": "Novo Exercício",
-  "exerciseLibraryAerobic": "Aeróbico",
-  "exerciseLibraryAnaerobic": "Anaeróbico",
 
   "exerciseFormTitleNew": "Novo Exercício",
   "exerciseFormTitleEdit": "Editar Exercício",
@@ -418,6 +416,8 @@
   "exerciseFormTypeRepsOnly": "Apenas Repetições",
   "exerciseFormTypeDistanceOnly": "Apenas Distância",
   "exerciseFormTypeTimeOnly": "Apenas Tempo",
+  "exerciseFormSectionBasic": "Básico",
+  "exerciseFormSectionDefaults": "Padrões",
 
   "quickAddTitle": "Quick Add",
   "quickAddHint": "Ex: Supino 80kg 3x10",

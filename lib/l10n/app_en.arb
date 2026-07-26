@@ -386,8 +386,6 @@
   "exerciseLibraryNoResults": "No exercises found",
   "exerciseLibraryNoResultsHint": "Try a different search or add a new one",
   "exerciseLibraryNew": "New Exercise",
-  "exerciseLibraryAerobic": "Aerobic",
-  "exerciseLibraryAnaerobic": "Anaerobic",
 
   "exerciseFormTitleNew": "New Exercise",
   "exerciseFormTitleEdit": "Edit Exercise",
@@ -417,6 +415,8 @@
   "exerciseFormTypeRepsOnly": "Reps Only",
   "exerciseFormTypeDistanceOnly": "Distance Only",
   "exerciseFormTypeTimeOnly": "Time Only",
+  "exerciseFormSectionBasic": "Basics",
+  "exerciseFormSectionDefaults": "Defaults",
 
   "quickAddTitle": "Quick Add",
   "quickAddHint": "Ex: Bench Press 80kg 3x10",

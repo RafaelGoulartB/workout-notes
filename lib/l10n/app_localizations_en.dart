@@ -1203,12 +1203,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get exerciseLibraryNew => 'New Exercise';
 
   @override
-  String get exerciseLibraryAerobic => 'Aerobic';
-
-  @override
-  String get exerciseLibraryAnaerobic => 'Anaerobic';
-
-  @override
   String get exerciseFormTitleNew => 'New Exercise';
 
   @override
@@ -1290,6 +1284,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exerciseFormTypeTimeOnly => 'Time Only';
+
+  @override
+  String get exerciseFormSectionBasic => 'Basics';
+
+  @override
+  String get exerciseFormSectionDefaults => 'Defaults';
 
   @override
   String get quickAddTitle => 'Quick Add';
