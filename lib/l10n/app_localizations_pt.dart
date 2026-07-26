@@ -1154,6 +1154,14 @@ class AppLocalizationsPt extends AppLocalizations {
   String get routinesRestTimeTitle => 'Tempo de Descanso';
 
   @override
+  String routinesEstimatedDuration(Object duration) {
+    return 'Tempo estimado: $duration';
+  }
+
+  @override
+  String get workoutEstimatedCalories => 'Calorias estimadas';
+
+  @override
   String get restTimerTitle => 'Temporizador';
 
   @override

@@ -367,6 +367,8 @@
   "routinesAddExercise": "Add Exercise",
   "routinesRestTimeTitle": "Rest Time",
 
+  "routinesEstimatedDuration": "Estimated time: {duration}",
+  "workoutEstimatedCalories": "Estimated calories",
   "restTimerTitle": "Rest Timer",
   "restTimerStop": "Stop",
   "restTimerComplete": "COMPLETED",

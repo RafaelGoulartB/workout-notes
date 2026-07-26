@@ -4,9 +4,16 @@ import 'base_repository.dart';
 
 /// Repository for body measurements CRUD and analytics operations.
 class BodyMeasurementRepository extends BaseRepository {
-  Future<void> addBodyMeasurement(String type, double value, String unit, {
-    DateTime? date, String? comment, String? timeOfDay,
-    bool isFasted = false, List<String>? photosPaths, String? side,
+  Future<void> addBodyMeasurement(
+    String type,
+    double value,
+    String unit, {
+    DateTime? date,
+    String? comment,
+    String? timeOfDay,
+    bool isFasted = false,
+    List<String>? photosPaths,
+    String? side,
   }) async {
     final db = await this.db;
     await db.insert('body_measurements', {
@@ -19,13 +26,16 @@ class BodyMeasurementRepository extends BaseRepository {
       'time_of_day': timeOfDay,
       'is_fasted': isFasted ? 1 : 0,
       'photos_paths': photosPaths != null && photosPaths.isNotEmpty
-          ? jsonEncode(photosPaths) : null,
+          ? jsonEncode(photosPaths)
+          : null,
       'side': side,
       'created_at': DateTime.now().toIso8601String(),
     });
   }
 
-  Future<void> addBodyMeasurementsBatch(List<Map<String, dynamic>> measurements) async {
+  Future<void> addBodyMeasurementsBatch(
+    List<Map<String, dynamic>> measurements,
+  ) async {
     final db = await this.db;
     for (final m in measurements) {
       await db.insert('body_measurements', {
@@ -38,14 +48,18 @@ class BodyMeasurementRepository extends BaseRepository {
         'time_of_day': m['time_of_day'],
         'is_fasted': (m['is_fasted'] as bool?) == true ? 1 : 0,
         'photos_paths': m['photos_paths'] != null
-            ? jsonEncode(m['photos_paths']) : null,
+            ? jsonEncode(m['photos_paths'])
+            : null,
         'side': m['side'],
         'created_at': DateTime.now().toIso8601String(),
       });
     }
   }
 
-  Future<List<Map<String, dynamic>>> getBodyMeasurements({String? type, int? limit}) async {
+  Future<List<Map<String, dynamic>>> getBodyMeasurements({
+    String? type,
+    int? limit,
+  }) async {
     final db = await this.db;
     var where = '';
     var args = <dynamic>[];
@@ -59,6 +73,29 @@ class BodyMeasurementRepository extends BaseRepository {
       args.add(limit);
     }
     return db.rawQuery(query, args);
+  }
+
+  /// Returns the most recent body weight normalized to kilograms.
+  Future<double?> getLatestWeightKg() async {
+    final db = await this.db;
+    final rows = await db.query(
+      'body_measurements',
+      where: 'type = ?',
+      whereArgs: ['weight'],
+      orderBy: 'date DESC, created_at DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+
+    final value = (rows.first['value'] as num?)?.toDouble();
+    if (value == null || value <= 0) return null;
+
+    final unit = (rows.first['unit'] as String? ?? 'kg').toLowerCase();
+    if (unit == 'lb' || unit == 'lbs' || unit == 'pound' || unit == 'pounds') {
+      return value * 0.45359237;
+    }
+    if (unit == 'kg' || unit.isEmpty) return value;
+    return null;
   }
 
   Future<void> deleteBodyMeasurement(String id) async {
@@ -82,20 +119,31 @@ class BodyMeasurementRepository extends BaseRepository {
   }
 
   /// Returns the previous measurement for a given type (before the latest).
-  Future<Map<String, dynamic>?> getPreviousBodyMeasurement(String type, {String? beforeDate}) async {
+  Future<Map<String, dynamic>?> getPreviousBodyMeasurement(
+    String type, {
+    String? beforeDate,
+  }) async {
     final db = await this.db;
-    return db.rawQuery(
-      'SELECT * FROM body_measurements WHERE type = ? ORDER BY date DESC, created_at DESC LIMIT 1',
-      [type],
-    ).then((r) => r.isEmpty ? null : r.first);
+    return db
+        .rawQuery(
+          'SELECT * FROM body_measurements WHERE type = ? ORDER BY date DESC, created_at DESC LIMIT 1',
+          [type],
+        )
+        .then((r) => r.isEmpty ? null : r.first);
   }
 
   /// Returns body measurements grouped by month for trend analysis.
-  Future<List<Map<String, dynamic>>> getBodyMeasurementsTrend(String type, {int months = 6}) async {
+  Future<List<Map<String, dynamic>>> getBodyMeasurementsTrend(
+    String type, {
+    int months = 6,
+  }) async {
     final db = await this.db;
-    final start = DateTime.now().subtract(Duration(days: months * 30))
-        .toIso8601String().substring(0, 10);
-    return db.rawQuery('''
+    final start = DateTime.now()
+        .subtract(Duration(days: months * 30))
+        .toIso8601String()
+        .substring(0, 10);
+    return db.rawQuery(
+      '''
       SELECT date, value, unit, comment, time_of_day, is_fasted,
         (SELECT value FROM body_measurements bm2
          WHERE bm2.type = bm.type AND bm2.date < bm.date
@@ -103,23 +151,35 @@ class BodyMeasurementRepository extends BaseRepository {
       FROM body_measurements bm
       WHERE type = ? AND date >= ?
       ORDER BY date ASC
-    ''', [type, start]);
+    ''',
+      [type, start],
+    );
   }
 
   /// Returns all measurements for a specific date.
-  Future<List<Map<String, dynamic>>> getBodyMeasurementsByDate(String date) async {
+  Future<List<Map<String, dynamic>>> getBodyMeasurementsByDate(
+    String date,
+  ) async {
     final db = await this.db;
-    return db.query('body_measurements',
-      where: 'date = ?', whereArgs: [date],
-      orderBy: 'type ASC');
+    return db.query(
+      'body_measurements',
+      where: 'date = ?',
+      whereArgs: [date],
+      orderBy: 'type ASC',
+    );
   }
 
   /// Returns body composition data (weight + body fat) for trend analysis.
-  Future<List<Map<String, dynamic>>> getBodyCompositionTrend({int months = 6}) async {
+  Future<List<Map<String, dynamic>>> getBodyCompositionTrend({
+    int months = 6,
+  }) async {
     final db = await this.db;
-    final start = DateTime.now().subtract(Duration(days: months * 30))
-        .toIso8601String().substring(0, 10);
-    return db.rawQuery('''
+    final start = DateTime.now()
+        .subtract(Duration(days: months * 30))
+        .toIso8601String()
+        .substring(0, 10);
+    return db.rawQuery(
+      '''
       SELECT w.date, w.value as weight,
         (SELECT value FROM body_measurements WHERE type = 'bodyFat' AND date = w.date LIMIT 1) as body_fat,
         (SELECT value FROM body_measurements WHERE type = 'waist' AND date = w.date LIMIT 1) as waist,
@@ -128,21 +188,28 @@ class BodyMeasurementRepository extends BaseRepository {
       FROM body_measurements w
       WHERE w.type = 'weight' AND w.date >= ?
       ORDER BY w.date ASC
-    ''', [start]);
+    ''',
+      [start],
+    );
   }
 
   /// Returns measurement count per month for consistency tracking.
   Future<Map<String, int>> getBodyMeasurementFrequency({int months = 6}) async {
     final db = await this.db;
-    final start = DateTime.now().subtract(Duration(days: months * 30))
-        .toIso8601String().substring(0, 10);
-    final rows = await db.rawQuery('''
+    final start = DateTime.now()
+        .subtract(Duration(days: months * 30))
+        .toIso8601String()
+        .substring(0, 10);
+    final rows = await db.rawQuery(
+      '''
       SELECT date, COUNT(*) as count
       FROM body_measurements
       WHERE date >= ?
       GROUP BY date
       ORDER BY date ASC
-    ''', [start]);
+    ''',
+      [start],
+    );
     final Map<String, int> result = {};
     for (final row in rows) {
       result[row['date'] as String] = row['count'] as int;
@@ -151,7 +218,10 @@ class BodyMeasurementRepository extends BaseRepository {
   }
 
   /// Returns all measurements for a given type with their photo paths.
-  Future<List<Map<String, dynamic>>> getBodyMeasurementsWithPhotos(String type, {int limit = 50}) async {
+  Future<List<Map<String, dynamic>>> getBodyMeasurementsWithPhotos(
+    String type, {
+    int limit = 50,
+  }) async {
     final db = await this.db;
     return db.rawQuery(
       'SELECT * FROM body_measurements WHERE type = ? AND photos_paths IS NOT NULL ORDER BY date DESC LIMIT ?',

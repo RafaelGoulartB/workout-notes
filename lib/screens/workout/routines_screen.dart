@@ -4,6 +4,7 @@ import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/widgets/category_timeline_bar.dart';
 import '../../repositories/routine_repository.dart';
 import '../../navigation/ai_coach_navigation.dart';
+import '../../utils/workout_estimator.dart';
 import 'routine_day_editor_screen.dart';
 
 class RoutinesScreen extends StatefulWidget {
@@ -265,12 +266,14 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
     try {
       final loc = AppLocalizations.of(context)!;
       final perDay = <String, List<_DayStat>>{};
+      final durationByDay = <String, int>{};
       final perCategory = <String, _RoutineCatStat>{};
 
       for (final day in _days) {
         final dayId = day['id'] as String;
         final exercises = await _routineRepo.getRoutineExercises(dayId);
         final dayStats = <_DayStat>[];
+        final estimateExercises = <WorkoutEstimateExercise>[];
 
         for (final ex in exercises) {
           final catId = ex['category_id'] as String? ?? '';
@@ -278,6 +281,20 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
           final colorVal = ex['category_color'] as int? ?? 0xFF757575;
           final exerciseType = ex['exercise_type'] as String? ?? 'weightReps';
           final sets = await _routineRepo.getPredefinedSets(ex['id'] as String);
+
+          estimateExercises.add(
+            WorkoutEstimateExercise(
+              restTimeSeconds: ex['rest_time_seconds'] as int?,
+              sets: sets
+                  .map(
+                    (s) => WorkoutEstimateSet(
+                      reps: (s['reps'] as num?)?.toInt(),
+                      timeSeconds: (s['time_seconds'] as num?)?.toInt(),
+                    ),
+                  )
+                  .toList(),
+            ),
+          );
 
           int catSets = 0;
           double catVolume = 0;
@@ -307,11 +324,16 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
         }
 
         perDay[dayId] = dayStats;
+        durationByDay[dayId] =
+            WorkoutEstimateCalculator.estimateDurationSeconds(
+              estimateExercises,
+            );
       }
 
       setState(() {
         _dashboard = _RoutineDashboardData(
           perDay: perDay,
+          durationByDay: durationByDay,
           perCategory: perCategory,
         );
         _dashboardLoading = false;
@@ -540,6 +562,10 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
   }
 
   Widget _buildDayCard(Map<String, dynamic> day, ThemeData theme) {
+    final estimatedDuration = _dashboard?.durationByDay[day['id'] as String];
+    final formattedDuration = estimatedDuration == null
+        ? null
+        : WorkoutEstimateCalculator.formatDuration(estimatedDuration);
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
       elevation: 0,
@@ -590,6 +616,27 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (formattedDuration != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.timer_outlined,
+                            size: 13,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            AppLocalizations.of(
+                              context,
+                            )!.routinesEstimatedDuration(formattedDuration),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -624,6 +671,10 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
       ..sort((a, b) => b.sets.compareTo(a.sets));
     final totalSets = cats.fold<int>(0, (a, c) => a + c.sets);
     final totalVolume = cats.fold<double>(0, (a, c) => a + c.volume);
+    final totalDurationSeconds = dash.durationByDay.values.fold<int>(
+      0,
+      (total, duration) => total + duration,
+    );
     final daysCount = _days.length;
     final maxSets = cats.isEmpty ? 1 : cats.first.sets;
 
@@ -647,6 +698,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
               totalSets,
               totalVolume,
               cats,
+              totalDurationSeconds,
             ),
             secondChild: _buildDashboardExpanded(
               theme,
@@ -656,6 +708,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
               daysCount,
               maxSets,
               dash,
+              totalDurationSeconds,
             ),
             crossFadeState: _dashboardExpanded
                 ? CrossFadeState.showSecond
@@ -673,6 +726,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
     int totalSets,
     double totalVolume,
     List<_RoutineCatStat> cats,
+    int totalDurationSeconds,
   ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -707,6 +761,16 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
               ),
             ],
           ),
+          if (WorkoutEstimateCalculator.formatDuration(totalDurationSeconds)
+              case final duration?) ...[
+            const SizedBox(height: 4),
+            Text(
+              AppLocalizations.of(context)!.routinesEstimatedDuration(duration),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
           if (cats.isNotEmpty) ...[
             const SizedBox(height: 8),
             // Single category timeline bar — width is proportional to each
@@ -732,6 +796,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
     int daysCount,
     int maxSets,
     _RoutineDashboardData dash,
+    int totalDurationSeconds,
   ) {
     return Padding(
       padding: const EdgeInsets.all(14),
@@ -771,6 +836,17 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
             ),
           ),
           const SizedBox(height: 12),
+
+          if (WorkoutEstimateCalculator.formatDuration(totalDurationSeconds)
+              case final duration?) ...[
+            const SizedBox(height: 4),
+            Text(
+              AppLocalizations.of(context)!.routinesEstimatedDuration(duration),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
 
           // Per-category bars
           ...cats.map((cat) {
@@ -859,6 +935,9 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
               final dayStats = dash.perDay[dayId] ?? [];
               final daySets = dayStats.fold<int>(0, (a, s) => a + s.sets);
               final dayVol = dayStats.fold<double>(0, (a, s) => a + s.volume);
+              final dayDuration = WorkoutEstimateCalculator.formatDuration(
+                dash.durationByDay[dayId] ?? 0,
+              );
               // Unique categories
               final dayCats = dayStats
                   .map((s) => s.categoryName)
@@ -897,6 +976,18 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                         ),
                       ),
                     ],
+                    if (dayDuration != null) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        AppLocalizations.of(
+                          context,
+                        )!.routinesEstimatedDuration(dayDuration),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                     const SizedBox(width: 4),
                     Text(
                       AppLocalizations.of(context)!.routinesDayGroups(dayCats),
@@ -919,9 +1010,14 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
 /// Data for the weekly routine dashboard.
 class _RoutineDashboardData {
   final Map<String, List<_DayStat>> perDay;
+  final Map<String, int> durationByDay;
   final Map<String, _RoutineCatStat> perCategory;
 
-  _RoutineDashboardData({required this.perDay, required this.perCategory});
+  _RoutineDashboardData({
+    required this.perDay,
+    required this.durationByDay,
+    required this.perCategory,
+  });
 }
 
 /// Per-category stat for the routine dashboard.

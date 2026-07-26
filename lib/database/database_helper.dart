@@ -12,7 +12,7 @@ import '../repositories/goal_repository.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 17;
+  static const _dbVersion = 19;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -66,6 +66,7 @@ class DatabaseHelper {
       CREATE TABLE exercise_categories (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        locale_key TEXT,
         color INTEGER NOT NULL,
         order_index INTEGER NOT NULL DEFAULT 0,
         energy_system TEXT NOT NULL DEFAULT 'anaerobic'
@@ -77,6 +78,7 @@ class DatabaseHelper {
       CREATE TABLE exercises (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        locale_key TEXT,
         category_id TEXT NOT NULL,
         type TEXT NOT NULL DEFAULT 'weightReps',
         notes TEXT,
@@ -97,6 +99,7 @@ class DatabaseHelper {
         start_time TEXT,
         end_time TEXT,
         duration_seconds INTEGER,
+        estimated_calories REAL,
         comment TEXT,
         feeling_rating INTEGER,
         is_from_routine INTEGER NOT NULL DEFAULT 0,
@@ -1496,6 +1499,25 @@ class DatabaseHelper {
         );
       } catch (_) {}
     }
+    if (oldVersion < 18) {
+      try {
+        await db.execute(
+          'ALTER TABLE workouts ADD COLUMN estimated_calories REAL',
+        );
+      } catch (_) {}
+    }
+    if (oldVersion < 19) {
+      // Repair databases created by versions whose initial schema omitted
+      // locale_key even though the seed data and queries already use it.
+      try {
+        await db.execute(
+          'ALTER TABLE exercise_categories ADD COLUMN locale_key TEXT',
+        );
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE exercises ADD COLUMN locale_key TEXT');
+      } catch (_) {}
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -1686,10 +1708,12 @@ class DatabaseHelper {
     String id, {
     String? comment,
     int? feelingRating,
+    double? estimatedCalories,
   }) => workoutRepo.finishWorkout(
     id,
     comment: comment,
     feelingRating: feelingRating,
+    estimatedCalories: estimatedCalories,
   );
   Future<void> startWorkoutTimer(String id) =>
       workoutRepo.startWorkoutTimer(id);

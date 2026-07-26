@@ -368,6 +368,8 @@
   "routinesAddExercise": "Adicionar Exercício",
   "routinesRestTimeTitle": "Tempo de Descanso",
 
+  "routinesEstimatedDuration": "Tempo estimado: {duration}",
+  "workoutEstimatedCalories": "Calorias estimadas",
   "restTimerTitle": "Temporizador",
   "restTimerStop": "Parar",
   "restTimerComplete": "CONCLUÍDO",

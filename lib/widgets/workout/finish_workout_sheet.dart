@@ -12,6 +12,7 @@ class WorkoutSummary {
   final List<PR> prs;
   final double totalDistance;
   final int totalCardioTime;
+  final double? estimatedCalories;
 
   const WorkoutSummary({
     required this.durationSeconds,
@@ -21,6 +22,7 @@ class WorkoutSummary {
     this.prs = const [],
     this.totalDistance = 0,
     this.totalCardioTime = 0,
+    this.estimatedCalories,
   });
 
   String get formattedDuration {
@@ -72,6 +74,12 @@ class WorkoutSummary {
       return '${min ~/ 60}h${min % 60}min';
     }
     return '${min}min';
+  }
+
+  String get formattedCalories {
+    final calories = estimatedCalories;
+    if (calories == null || calories <= 0) return '--';
+    return calories.round().toString();
   }
 }
 
@@ -235,11 +243,27 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
       ],
     ];
 
+    final calories = summary.estimatedCalories;
+
     return Column(
       children: [
         Row(children: firstRow),
         const SizedBox(height: 6),
         Row(children: secondRow),
+        if (calories != null && calories > 0) ...[
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              StatTile(
+                icon: Icons.local_fire_department,
+                label: loc.workoutEstimatedCalories,
+                value: '${summary.formattedCalories} kcal',
+                color: Colors.deepOrange,
+                theme: theme,
+              ),
+            ],
+          ),
+        ],
       ],
     );
   }

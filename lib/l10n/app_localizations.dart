@@ -2210,6 +2210,18 @@ abstract class AppLocalizations {
   /// **'Rest Time'**
   String get routinesRestTimeTitle;
 
+  /// No description provided for @routinesEstimatedDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated time: {duration}'**
+  String routinesEstimatedDuration(Object duration);
+
+  /// No description provided for @workoutEstimatedCalories.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated calories'**
+  String get workoutEstimatedCalories;
+
   /// No description provided for @restTimerTitle.
   ///
   /// In en, this message translates to:
