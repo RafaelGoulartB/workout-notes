@@ -9,10 +9,12 @@ import '../repositories/body_measurement_repository.dart';
 import '../repositories/analytics_repository.dart';
 import '../repositories/export_import_repository.dart';
 import '../repositories/goal_repository.dart';
+import '../repositories/sleep_repository.dart';
+import '../models/sleep_entry.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 19;
+  static const _dbVersion = 20;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -28,6 +30,7 @@ class DatabaseHelper {
   late final AnalyticsRepository analyticsRepo = AnalyticsRepository();
   late final ExportImportRepository exportImportRepo = ExportImportRepository();
   late final GoalRepository goalRepo = GoalRepository();
+  late final SleepRepository sleepRepo = SleepRepository();
 
   DatabaseHelper._();
 
@@ -209,6 +212,20 @@ class DatabaseHelper {
       )
     ''');
 
+    // Nightly sleep records (v20)
+    await db.execute('''
+      CREATE TABLE sleep_entries (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL UNIQUE,
+        sleep_minutes INTEGER NOT NULL,
+        actual_sleep_minutes INTEGER,
+        bedtime_minutes INTEGER,
+        wake_time_minutes INTEGER,
+        comment TEXT,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
     // App settings
     await db.execute('''
       CREATE TABLE app_settings (
@@ -293,6 +310,7 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX idx_measurements_type ON body_measurements(type)',
     );
+    await db.execute('CREATE INDEX idx_sleep_entries_date ON sleep_entries(date DESC)');
     await db.execute(
       'CREATE INDEX idx_ai_chat_messages_thread ON ai_chat_messages(thread_id, created_at ASC)',
     );
@@ -1518,6 +1536,27 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE exercises ADD COLUMN locale_key TEXT');
       } catch (_) {}
     }
+    if (oldVersion < 20) {
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS sleep_entries (
+            id TEXT PRIMARY KEY,
+            date TEXT NOT NULL UNIQUE,
+            sleep_minutes INTEGER NOT NULL,
+            actual_sleep_minutes INTEGER,
+            bedtime_minutes INTEGER,
+            wake_time_minutes INTEGER,
+            comment TEXT,
+            created_at TEXT NOT NULL
+          )
+        ''');
+      } catch (_) {}
+      try {
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_sleep_entries_date ON sleep_entries(date DESC)',
+        );
+      } catch (_) {}
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -2053,6 +2092,20 @@ class DatabaseHelper {
   );
   Future<void> deleteAllWorkoutData() =>
       exportImportRepo.deleteAllWorkoutData();
+
+  // -- SLEEP --
+  Future<List<SleepEntry>> getSleepEntries({
+    DateTime? from,
+    DateTime? to,
+    int? limit,
+  }) => sleepRepo.getEntries(from: from, to: to, limit: limit);
+  Future<SleepEntry?> getLatestSleepEntry() => sleepRepo.getLatest();
+  Future<SleepEntry?> getSleepEntryByDate(DateTime date) =>
+      sleepRepo.getByDate(date);
+  Future<void> saveSleepEntry(SleepEntry entry) => sleepRepo.save(entry);
+  Future<void> deleteSleepEntry(String id) => sleepRepo.delete(id);
+  Future<SleepDashboardStats> getSleepDashboardStats({DateTime? referenceDate}) =>
+      sleepRepo.getDashboardStats(referenceDate: referenceDate);
 
   // -- AI CHAT --
   Future<String> upsertAiChatThread({

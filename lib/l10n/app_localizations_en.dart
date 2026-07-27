@@ -15,6 +15,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabWorkout => 'Workout';
 
   @override
+  String get tabSleep => 'Sleep';
+
+  @override
   String get commonCancel => 'Cancel';
 
   @override
@@ -347,14 +350,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsGenerateTestDataSubtitle =>
-      'Adds fictional workouts to test the app';
+      'Adds fictional workouts, measurements, and sleep to test the app';
 
   @override
   String get settingsGenerateTitle => 'Generate Test Data?';
 
   @override
   String get settingsGenerateContent =>
-      'This will add fictional workouts from recent months to test charts and features.\n\nUse \"Delete All History\" to remove them later.';
+      'This will add fictional workouts, body measurements, and sleep records from recent months to test charts and features.\n\nUse \"Delete All History\" to remove them later.';
 
   @override
   String get settingsGenerate => 'Generate';
@@ -362,6 +365,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String settingsGenerateSuccess(Object count) {
     return '✅ $count workouts generated!';
+  }
+
+  @override
+  String settingsGenerateSuccessDetailed(
+    Object routines,
+    Object sleep,
+    Object workouts,
+  ) {
+    return '✅ $workouts workouts, $routines routines, and $sleep sleep nights generated!';
   }
 
   @override
@@ -1073,6 +1085,160 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonOptional => 'optional';
+
+  @override
+  String get sleepTitle => 'Sleep';
+
+  @override
+  String get sleepAdd => 'Log sleep';
+
+  @override
+  String get sleepAddTitle => 'Log sleep';
+
+  @override
+  String get sleepEditTitle => 'Edit sleep record';
+
+  @override
+  String get sleepEmptyTitle => 'No sleep logged';
+
+  @override
+  String get sleepEmptySubtitle =>
+      'Log your nights to track duration, actual sleep, and consistency.';
+
+  @override
+  String get sleepDate => 'Wake-up date';
+
+  @override
+  String get sleepDuration => 'Sleep duration';
+
+  @override
+  String get sleepActualDuration => 'Actual sleep';
+
+  @override
+  String get sleepActualDurationHint => 'Time actually asleep';
+
+  @override
+  String get sleepBedtime => 'Bedtime';
+
+  @override
+  String get sleepWakeTime => 'Wake-up time';
+
+  @override
+  String get sleepComment => 'Note (optional)';
+
+  @override
+  String get sleepHours => 'hours';
+
+  @override
+  String get sleepMinutes => 'minutes';
+
+  @override
+  String get sleepSave => 'Save record';
+
+  @override
+  String get sleepSaved => 'Sleep record saved!';
+
+  @override
+  String get sleepDeleted => 'Sleep record deleted';
+
+  @override
+  String get sleepDeleteConfirm => 'Delete this sleep record?';
+
+  @override
+  String get sleepInvalidDuration =>
+      'Enter a duration between 1 minute and 24 hours.';
+
+  @override
+  String get sleepInvalidActual =>
+      'Actual sleep must be greater than zero and cannot exceed the main duration.';
+
+  @override
+  String get sleepInvalidTime => 'Enter a valid time.';
+
+  @override
+  String get sleepSummary => 'Summary';
+
+  @override
+  String get sleepLatest => 'Latest record';
+
+  @override
+  String get sleepAverage7Days => 'Average · 7 days';
+
+  @override
+  String get sleepAverage30Days => 'Average · 30 days';
+
+  @override
+  String get sleepActualAverage => 'Actual sleep average';
+
+  @override
+  String get sleepMinimum => 'Minimum · 30 days';
+
+  @override
+  String get sleepMaximum => 'Maximum · 30 days';
+
+  @override
+  String get sleepConsistency => 'Consistency';
+
+  @override
+  String get sleepEfficiency => 'Efficiency';
+
+  @override
+  String sleepDaysRecorded(Object count, Object total) {
+    return '$count of $total days recorded';
+  }
+
+  @override
+  String get sleepNoActual => 'No actual sleep';
+
+  @override
+  String get sleepDailyChart => 'Last 7 days';
+
+  @override
+  String get sleepTrendChart => 'Trend · 30 days';
+
+  @override
+  String get sleepChartRecorded => 'Recorded duration';
+
+  @override
+  String get sleepChartActual => 'Actual sleep';
+
+  @override
+  String get sleepHistory => 'History';
+
+  @override
+  String sleepEntries(Object count) {
+    return '$count records';
+  }
+
+  @override
+  String get sleepNeedTwoEntries => 'Add at least 2 records to see the trend.';
+
+  @override
+  String sleepLoadMore(Object count) {
+    return 'Load $count more records';
+  }
+
+  @override
+  String sleepLoadMoreCount(Object count) {
+    return 'Load $count more';
+  }
+
+  @override
+  String get sleepDetails => 'Sleep details';
+
+  @override
+  String get sleepDelete => 'Delete record';
+
+  @override
+  String get sleepEdit => 'Edit record';
+
+  @override
+  String get sleepNotInformed => 'Not informed';
+
+  @override
+  String sleepDurationValue(Object hours, Object minutes) {
+    return '${hours}h ${minutes}min';
+  }
 
   @override
   String get routinesTitle => 'Routines';

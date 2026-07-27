@@ -8,7 +8,8 @@ import 'base_repository.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
-  static const int currentBackupVersion = 2;
+  static const int currentBackupVersion = 3;
+  static const int minimumSupportedBackupVersion = 2;
 
   final Future<Database> Function()? _databaseProvider;
 
@@ -37,6 +38,7 @@ class ExportImportRepository extends BaseRepository {
       'routine_exercises': await db.query('routine_exercises'),
       'predefined_sets': await db.query('predefined_sets'),
       'body_measurements': await db.query('body_measurements'),
+      'sleep_entries': await db.query('sleep_entries'),
       'settings': await db.query('app_settings'),
     };
   }
@@ -66,6 +68,7 @@ class ExportImportRepository extends BaseRepository {
       await txn.delete('exercise_entries');
       await txn.delete('workouts');
       await txn.delete('body_measurements');
+      await txn.delete('sleep_entries');
       await txn.delete('exercises');
       await txn.delete('exercise_categories');
       await txn.delete('app_settings');
@@ -81,6 +84,7 @@ class ExportImportRepository extends BaseRepository {
       totalRows += await _insertAll(txn, 'routine_exercises', data['routine_exercises']);
       totalRows += await _insertAll(txn, 'predefined_sets', data['predefined_sets']);
       totalRows += await _insertAll(txn, 'body_measurements', data['body_measurements']);
+      totalRows += await _insertAll(txn, 'sleep_entries', data['sleep_entries']);
       totalRows += await _insertAll(txn, 'app_settings', data['settings']);
     });
 
@@ -156,6 +160,7 @@ class ExportImportRepository extends BaseRepository {
       await txn.delete('exercise_entries');
       await txn.delete('workouts');
       await txn.delete('body_measurements');
+      await txn.delete('sleep_entries');
     });
   }
 }

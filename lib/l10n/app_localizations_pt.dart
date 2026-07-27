@@ -15,6 +15,9 @@ class AppLocalizationsPt extends AppLocalizations {
   String get tabWorkout => 'Treino';
 
   @override
+  String get tabSleep => 'Sono';
+
+  @override
   String get commonCancel => 'Cancelar';
 
   @override
@@ -349,14 +352,14 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get settingsGenerateTestDataSubtitle =>
-      'Adiciona treinos fictícios para testar o app';
+      'Adiciona treinos, medidas e sono fictícios para testar o app';
 
   @override
   String get settingsGenerateTitle => 'Gerar Dados de Teste?';
 
   @override
   String get settingsGenerateContent =>
-      'Isso vai adicionar treinos fictícios nos últimos meses para testar gráficos e funcionalidades.\n\nUse \"Excluir Todo Histórico\" para remover depois.';
+      'Isso vai adicionar treinos, medidas corporais e registros de sono fictícios nos últimos meses para testar gráficos e funcionalidades.\n\nUse \"Excluir Todo Histórico\" para remover depois.';
 
   @override
   String get settingsGenerate => 'Gerar';
@@ -364,6 +367,15 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String settingsGenerateSuccess(Object count) {
     return '✅ $count treinos gerados!';
+  }
+
+  @override
+  String settingsGenerateSuccessDetailed(
+    Object routines,
+    Object sleep,
+    Object workouts,
+  ) {
+    return '✅ $workouts treinos, $routines rotinas e $sleep noites de sono gerados!';
   }
 
   @override
@@ -1079,6 +1091,161 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get commonOptional => 'opcional';
+
+  @override
+  String get sleepTitle => 'Sono';
+
+  @override
+  String get sleepAdd => 'Registrar sono';
+
+  @override
+  String get sleepAddTitle => 'Registrar sono';
+
+  @override
+  String get sleepEditTitle => 'Editar registro de sono';
+
+  @override
+  String get sleepEmptyTitle => 'Nenhum sono registrado';
+
+  @override
+  String get sleepEmptySubtitle =>
+      'Registre suas noites para acompanhar duração, sono real e consistência.';
+
+  @override
+  String get sleepDate => 'Data do despertar';
+
+  @override
+  String get sleepDuration => 'Horas de sono';
+
+  @override
+  String get sleepActualDuration => 'Sono real';
+
+  @override
+  String get sleepActualDurationHint => 'Tempo realmente dormido';
+
+  @override
+  String get sleepBedtime => 'Hora de dormir';
+
+  @override
+  String get sleepWakeTime => 'Hora de acordar';
+
+  @override
+  String get sleepComment => 'Observação (opcional)';
+
+  @override
+  String get sleepHours => 'horas';
+
+  @override
+  String get sleepMinutes => 'minutos';
+
+  @override
+  String get sleepSave => 'Salvar registro';
+
+  @override
+  String get sleepSaved => 'Registro de sono salvo!';
+
+  @override
+  String get sleepDeleted => 'Registro de sono excluído';
+
+  @override
+  String get sleepDeleteConfirm => 'Excluir este registro de sono?';
+
+  @override
+  String get sleepInvalidDuration =>
+      'Informe uma duração entre 1 minuto e 24 horas.';
+
+  @override
+  String get sleepInvalidActual =>
+      'O sono real deve ser maior que zero e não pode superar a duração principal.';
+
+  @override
+  String get sleepInvalidTime => 'Informe uma hora válida.';
+
+  @override
+  String get sleepSummary => 'Resumo';
+
+  @override
+  String get sleepLatest => 'Último registro';
+
+  @override
+  String get sleepAverage7Days => 'Média · 7 dias';
+
+  @override
+  String get sleepAverage30Days => 'Média · 30 dias';
+
+  @override
+  String get sleepActualAverage => 'Média de sono real';
+
+  @override
+  String get sleepMinimum => 'Mínimo · 30 dias';
+
+  @override
+  String get sleepMaximum => 'Máximo · 30 dias';
+
+  @override
+  String get sleepConsistency => 'Consistência';
+
+  @override
+  String get sleepEfficiency => 'Eficiência';
+
+  @override
+  String sleepDaysRecorded(Object count, Object total) {
+    return '$count de $total dias registrados';
+  }
+
+  @override
+  String get sleepNoActual => 'Sem sono real';
+
+  @override
+  String get sleepDailyChart => 'Últimos 7 dias';
+
+  @override
+  String get sleepTrendChart => 'Tendência · 30 dias';
+
+  @override
+  String get sleepChartRecorded => 'Horas registradas';
+
+  @override
+  String get sleepChartActual => 'Sono real';
+
+  @override
+  String get sleepHistory => 'Histórico';
+
+  @override
+  String sleepEntries(Object count) {
+    return '$count registros';
+  }
+
+  @override
+  String get sleepNeedTwoEntries =>
+      'Adicione pelo menos 2 registros para ver a tendência.';
+
+  @override
+  String sleepLoadMore(Object count) {
+    return 'Carregar mais $count registros';
+  }
+
+  @override
+  String sleepLoadMoreCount(Object count) {
+    return 'Carregar mais $count';
+  }
+
+  @override
+  String get sleepDetails => 'Detalhes do sono';
+
+  @override
+  String get sleepDelete => 'Excluir registro';
+
+  @override
+  String get sleepEdit => 'Editar registro';
+
+  @override
+  String get sleepNotInformed => 'Não informado';
+
+  @override
+  String sleepDurationValue(Object hours, Object minutes) {
+    return '${hours}h ${minutes}min';
+  }
 
   @override
   String get routinesTitle => 'Rotinas';

@@ -110,6 +110,12 @@ abstract class AppLocalizations {
   /// **'Workout'**
   String get tabWorkout;
 
+  /// No description provided for @tabSleep.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep'**
+  String get tabSleep;
+
   /// No description provided for @commonCancel.
   ///
   /// In en, this message translates to:
@@ -749,7 +755,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsGenerateTestDataSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Adds fictional workouts to test the app'**
+  /// **'Adds fictional workouts, measurements, and sleep to test the app'**
   String get settingsGenerateTestDataSubtitle;
 
   /// No description provided for @settingsGenerateTitle.
@@ -761,7 +767,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsGenerateContent.
   ///
   /// In en, this message translates to:
-  /// **'This will add fictional workouts from recent months to test charts and features.\n\nUse \"Delete All History\" to remove them later.'**
+  /// **'This will add fictional workouts, body measurements, and sleep records from recent months to test charts and features.\n\nUse \"Delete All History\" to remove them later.'**
   String get settingsGenerateContent;
 
   /// No description provided for @settingsGenerate.
@@ -775,6 +781,16 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'✅ {count} workouts generated!'**
   String settingsGenerateSuccess(Object count);
+
+  /// No description provided for @settingsGenerateSuccessDetailed.
+  ///
+  /// In en, this message translates to:
+  /// **'✅ {workouts} workouts, {routines} routines, and {sleep} sleep nights generated!'**
+  String settingsGenerateSuccessDetailed(
+    Object routines,
+    Object sleep,
+    Object workouts,
+  );
 
   /// No description provided for @settingsAbout.
   ///
@@ -2071,6 +2087,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'optional'**
   String get commonOptional;
+
+  /// No description provided for @sleepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep'**
+  String get sleepTitle;
+
+  /// No description provided for @sleepAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Log sleep'**
+  String get sleepAdd;
+
+  /// No description provided for @sleepAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log sleep'**
+  String get sleepAddTitle;
+
+  /// No description provided for @sleepEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit sleep record'**
+  String get sleepEditTitle;
+
+  /// No description provided for @sleepEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No sleep logged'**
+  String get sleepEmptyTitle;
+
+  /// No description provided for @sleepEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log your nights to track duration, actual sleep, and consistency.'**
+  String get sleepEmptySubtitle;
+
+  /// No description provided for @sleepDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Wake-up date'**
+  String get sleepDate;
+
+  /// No description provided for @sleepDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep duration'**
+  String get sleepDuration;
+
+  /// No description provided for @sleepActualDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Actual sleep'**
+  String get sleepActualDuration;
+
+  /// No description provided for @sleepActualDurationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Time actually asleep'**
+  String get sleepActualDurationHint;
+
+  /// No description provided for @sleepBedtime.
+  ///
+  /// In en, this message translates to:
+  /// **'Bedtime'**
+  String get sleepBedtime;
+
+  /// No description provided for @sleepWakeTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Wake-up time'**
+  String get sleepWakeTime;
+
+  /// No description provided for @sleepComment.
+  ///
+  /// In en, this message translates to:
+  /// **'Note (optional)'**
+  String get sleepComment;
+
+  /// No description provided for @sleepHours.
+  ///
+  /// In en, this message translates to:
+  /// **'hours'**
+  String get sleepHours;
+
+  /// No description provided for @sleepMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'minutes'**
+  String get sleepMinutes;
+
+  /// No description provided for @sleepSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save record'**
+  String get sleepSave;
+
+  /// No description provided for @sleepSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep record saved!'**
+  String get sleepSaved;
+
+  /// No description provided for @sleepDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep record deleted'**
+  String get sleepDeleted;
+
+  /// No description provided for @sleepDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this sleep record?'**
+  String get sleepDeleteConfirm;
+
+  /// No description provided for @sleepInvalidDuration.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a duration between 1 minute and 24 hours.'**
+  String get sleepInvalidDuration;
+
+  /// No description provided for @sleepInvalidActual.
+  ///
+  /// In en, this message translates to:
+  /// **'Actual sleep must be greater than zero and cannot exceed the main duration.'**
+  String get sleepInvalidActual;
+
+  /// No description provided for @sleepInvalidTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid time.'**
+  String get sleepInvalidTime;
+
+  /// No description provided for @sleepSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary'**
+  String get sleepSummary;
+
+  /// No description provided for @sleepLatest.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest record'**
+  String get sleepLatest;
+
+  /// No description provided for @sleepAverage7Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Average · 7 days'**
+  String get sleepAverage7Days;
+
+  /// No description provided for @sleepAverage30Days.
+  ///
+  /// In en, this message translates to:
+  /// **'Average · 30 days'**
+  String get sleepAverage30Days;
+
+  /// No description provided for @sleepActualAverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Actual sleep average'**
+  String get sleepActualAverage;
+
+  /// No description provided for @sleepMinimum.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum · 30 days'**
+  String get sleepMinimum;
+
+  /// No description provided for @sleepMaximum.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum · 30 days'**
+  String get sleepMaximum;
+
+  /// No description provided for @sleepConsistency.
+  ///
+  /// In en, this message translates to:
+  /// **'Consistency'**
+  String get sleepConsistency;
+
+  /// No description provided for @sleepEfficiency.
+  ///
+  /// In en, this message translates to:
+  /// **'Efficiency'**
+  String get sleepEfficiency;
+
+  /// No description provided for @sleepDaysRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} of {total} days recorded'**
+  String sleepDaysRecorded(Object count, Object total);
+
+  /// No description provided for @sleepNoActual.
+  ///
+  /// In en, this message translates to:
+  /// **'No actual sleep'**
+  String get sleepNoActual;
+
+  /// No description provided for @sleepDailyChart.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 days'**
+  String get sleepDailyChart;
+
+  /// No description provided for @sleepTrendChart.
+  ///
+  /// In en, this message translates to:
+  /// **'Trend · 30 days'**
+  String get sleepTrendChart;
+
+  /// No description provided for @sleepChartRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded duration'**
+  String get sleepChartRecorded;
+
+  /// No description provided for @sleepChartActual.
+  ///
+  /// In en, this message translates to:
+  /// **'Actual sleep'**
+  String get sleepChartActual;
+
+  /// No description provided for @sleepHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get sleepHistory;
+
+  /// No description provided for @sleepEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} records'**
+  String sleepEntries(Object count);
+
+  /// No description provided for @sleepNeedTwoEntries.
+  ///
+  /// In en, this message translates to:
+  /// **'Add at least 2 records to see the trend.'**
+  String get sleepNeedTwoEntries;
+
+  /// No description provided for @sleepLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load {count} more records'**
+  String sleepLoadMore(Object count);
+
+  /// No description provided for @sleepLoadMoreCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Load {count} more'**
+  String sleepLoadMoreCount(Object count);
+
+  /// No description provided for @sleepDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep details'**
+  String get sleepDetails;
+
+  /// No description provided for @sleepDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete record'**
+  String get sleepDelete;
+
+  /// No description provided for @sleepEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit record'**
+  String get sleepEdit;
+
+  /// No description provided for @sleepNotInformed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not informed'**
+  String get sleepNotInformed;
+
+  /// No description provided for @sleepDurationValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours}h {minutes}min'**
+  String sleepDurationValue(Object hours, Object minutes);
 
   /// No description provided for @routinesTitle.
   ///

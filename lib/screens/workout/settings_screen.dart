@@ -769,9 +769,16 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
       if (mounted) {
         final wc = result['workouts'] as int;
         final rc = result['routines'] as int;
-        final msg = '✅ $wc treinos e $rc rotinas gerados!';
+        final sc = result['sleep'] ?? 0;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(
+                context,
+              )!.settingsGenerateSuccessDetailed(wc, rc, sc),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } catch (e) {
