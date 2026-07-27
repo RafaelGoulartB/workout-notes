@@ -214,11 +214,15 @@ class SleepMonitoringService : Service() {
             processor = null
             val endedMillis = System.currentTimeMillis()
             val ended = Instant.ofEpochMilli(endedMillis)
-            current["status"] = finalStatus
-            current["ended_at"] = ended.toString()
-            current["end_reason"] = reason
             val elapsedMillis =
                 endedMillis - Instant.parse(current["started_at"].toString()).toEpochMilli()
+            val completedWithoutData =
+                finalStatus == "completed" &&
+                segmentCount == 0 &&
+                elapsedMillis >= AudioSignalProcessor.NO_DATA_TIMEOUT_MILLIS
+            current["status"] = if (completedWithoutData) "failed" else finalStatus
+            current["ended_at"] = ended.toString()
+            current["end_reason"] = if (completedWithoutData) "no_audio_data" else reason
             current["time_in_bed_minutes"] = if (elapsedMillis <= 0) {
                 0
             } else {

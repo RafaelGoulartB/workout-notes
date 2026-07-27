@@ -33,6 +33,10 @@ class SleepMonitorBridge(private val context: Context) :
                     "supported" to true,
                     "microphone_granted" to microphoneGranted(),
                     "notifications_permission_required" to (Build.VERSION.SDK_INT >= 33),
+                    "device_manufacturer" to Build.MANUFACTURER,
+                    "device_model" to Build.MODEL,
+                    "android_sdk_int" to Build.VERSION.SDK_INT,
+                    "android_release" to Build.VERSION.RELEASE,
                 ),
             )
             "getState" -> result.success(SleepMonitoringService.currentState(context))

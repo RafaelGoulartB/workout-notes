@@ -614,6 +614,162 @@ abstract class AppLocalizations {
   /// **'Invalid signal'**
   String get sleepMonitorInvalid;
 
+  /// No description provided for @sleepMonitorDataQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'MVP data quality'**
+  String get sleepMonitorDataQuality;
+
+  /// No description provided for @sleepMonitorDataAcceptable.
+  ///
+  /// In en, this message translates to:
+  /// **'Night suitable for the next MVP phase'**
+  String get sleepMonitorDataAcceptable;
+
+  /// No description provided for @sleepMonitorDataAcceptableBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration and capture coverage are sufficient for evaluating the current monitor.'**
+  String get sleepMonitorDataAcceptableBody;
+
+  /// No description provided for @sleepMonitorDataInsufficient.
+  ///
+  /// In en, this message translates to:
+  /// **'Night needs another monitoring round'**
+  String get sleepMonitorDataInsufficient;
+
+  /// No description provided for @sleepMonitorDataInsufficientBody.
+  ///
+  /// In en, this message translates to:
+  /// **'For the next phase, record at least 4 hours with 90% timeline coverage and 80% valid signal.'**
+  String get sleepMonitorDataInsufficientBody;
+
+  /// No description provided for @sleepMonitorCapturedSegments.
+  ///
+  /// In en, this message translates to:
+  /// **'Captured segments'**
+  String get sleepMonitorCapturedSegments;
+
+  /// No description provided for @sleepMonitorTimelineCoverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeline coverage'**
+  String get sleepMonitorTimelineCoverage;
+
+  /// No description provided for @sleepMonitorNoiseGraph.
+  ///
+  /// In en, this message translates to:
+  /// **'Relative noise through the night'**
+  String get sleepMonitorNoiseGraph;
+
+  /// No description provided for @sleepMonitorNoiseScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Noise score'**
+  String get sleepMonitorNoiseScore;
+
+  /// No description provided for @sleepMonitorNoSegments.
+  ///
+  /// In en, this message translates to:
+  /// **'No signal segments were recorded'**
+  String get sleepMonitorNoSegments;
+
+  /// No description provided for @sleepMonitorNoSegmentsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This session cannot evaluate the MVP. The monitor will now stop with an error if the microphone stops returning data, instead of completing an empty night.'**
+  String get sleepMonitorNoSegmentsBody;
+
+  /// No description provided for @sleepMonitorAverageNoise.
+  ///
+  /// In en, this message translates to:
+  /// **'Average noise score'**
+  String get sleepMonitorAverageNoise;
+
+  /// No description provided for @sleepMonitorPeakNoise.
+  ///
+  /// In en, this message translates to:
+  /// **'Peak noise score'**
+  String get sleepMonitorPeakNoise;
+
+  /// No description provided for @sleepMonitorStartTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Started'**
+  String get sleepMonitorStartTime;
+
+  /// No description provided for @sleepMonitorEndTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Finished'**
+  String get sleepMonitorEndTime;
+
+  /// No description provided for @sleepMonitorThreshold.
+  ///
+  /// In en, this message translates to:
+  /// **'Noise threshold'**
+  String get sleepMonitorThreshold;
+
+  /// No description provided for @sleepMonitorExportDiagnostic.
+  ///
+  /// In en, this message translates to:
+  /// **'Export diagnostic'**
+  String get sleepMonitorExportDiagnostic;
+
+  /// No description provided for @sleepMonitorExportDiagnosticTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What should be included?'**
+  String get sleepMonitorExportDiagnosticTitle;
+
+  /// No description provided for @sleepMonitorExportDiagnosticBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The JSON file can be shared for technical analysis. Raw audio is never stored and cannot be exported.'**
+  String get sleepMonitorExportDiagnosticBody;
+
+  /// No description provided for @sleepMonitorExportTechnicalOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical data only (recommended)'**
+  String get sleepMonitorExportTechnicalOnly;
+
+  /// No description provided for @sleepMonitorExportTechnicalOnlyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses relative times and excludes the sleep date, exact timestamps, local IDs and your note.'**
+  String get sleepMonitorExportTechnicalOnlyBody;
+
+  /// No description provided for @sleepMonitorExportWithPersonal.
+  ///
+  /// In en, this message translates to:
+  /// **'Include personal sleep data'**
+  String get sleepMonitorExportWithPersonal;
+
+  /// No description provided for @sleepMonitorExportWithPersonalBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Also includes exact date and time, local IDs, manual durations and your personal sleep comment.'**
+  String get sleepMonitorExportWithPersonalBody;
+
+  /// No description provided for @sleepMonitorExportConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate and share'**
+  String get sleepMonitorExportConfirm;
+
+  /// No description provided for @sleepMonitorExportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostic generated. Choose where to share or save it.'**
+  String get sleepMonitorExportSuccess;
+
+  /// No description provided for @sleepMonitorExportError.
+  ///
+  /// In en, this message translates to:
+  /// **'The diagnostic file could not be generated.'**
+  String get sleepMonitorExportError;
+
   /// No description provided for @sleepMonitorTimeInBed.
   ///
   /// In en, this message translates to:

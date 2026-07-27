@@ -294,6 +294,96 @@ class AppLocalizationsPt extends AppLocalizations {
   String get sleepMonitorInvalid => 'Sinal inválido';
 
   @override
+  String get sleepMonitorDataQuality => 'Qualidade dos dados do MVP';
+
+  @override
+  String get sleepMonitorDataAcceptable =>
+      'Noite adequada para a próxima fase do MVP';
+
+  @override
+  String get sleepMonitorDataAcceptableBody =>
+      'A duração e a cobertura da captura são suficientes para avaliar o monitor atual.';
+
+  @override
+  String get sleepMonitorDataInsufficient =>
+      'A noite precisa de outra rodada de monitoramento';
+
+  @override
+  String get sleepMonitorDataInsufficientBody =>
+      'Para avançar, registre pelo menos 4 horas, com 90% de cobertura da linha do tempo e 80% de sinal válido.';
+
+  @override
+  String get sleepMonitorCapturedSegments => 'Segmentos capturados';
+
+  @override
+  String get sleepMonitorTimelineCoverage => 'Cobertura da linha do tempo';
+
+  @override
+  String get sleepMonitorNoiseGraph => 'Ruído relativo ao longo da noite';
+
+  @override
+  String get sleepMonitorNoiseScore => 'Índice de ruído';
+
+  @override
+  String get sleepMonitorNoSegments =>
+      'Nenhum segmento de sinal foi registrado';
+
+  @override
+  String get sleepMonitorNoSegmentsBody =>
+      'Esta sessão não permite avaliar o MVP. Agora o monitor encerra com erro quando o microfone deixa de retornar dados, em vez de concluir uma noite vazia.';
+
+  @override
+  String get sleepMonitorAverageNoise => 'Ruído médio';
+
+  @override
+  String get sleepMonitorPeakNoise => 'Pico de ruído';
+
+  @override
+  String get sleepMonitorStartTime => 'Início';
+
+  @override
+  String get sleepMonitorEndTime => 'Fim';
+
+  @override
+  String get sleepMonitorThreshold => 'Limite de ruído';
+
+  @override
+  String get sleepMonitorExportDiagnostic => 'Exportar diagnóstico';
+
+  @override
+  String get sleepMonitorExportDiagnosticTitle => 'O que deve ser incluído?';
+
+  @override
+  String get sleepMonitorExportDiagnosticBody =>
+      'O arquivo JSON poderá ser compartilhado para análise técnica. O áudio bruto nunca é armazenado e não pode ser exportado.';
+
+  @override
+  String get sleepMonitorExportTechnicalOnly =>
+      'Somente dados técnicos (recomendado)';
+
+  @override
+  String get sleepMonitorExportTechnicalOnlyBody =>
+      'Usa tempos relativos e exclui a data do sono, horários exatos, identificadores locais e seu comentário.';
+
+  @override
+  String get sleepMonitorExportWithPersonal => 'Incluir dados pessoais do sono';
+
+  @override
+  String get sleepMonitorExportWithPersonalBody =>
+      'Também inclui data e horários exatos, identificadores locais, durações manuais e seu comentário pessoal sobre o sono.';
+
+  @override
+  String get sleepMonitorExportConfirm => 'Gerar e compartilhar';
+
+  @override
+  String get sleepMonitorExportSuccess =>
+      'Diagnóstico gerado. Escolha onde compartilhar ou salvar.';
+
+  @override
+  String get sleepMonitorExportError =>
+      'Não foi possível gerar o arquivo de diagnóstico.';
+
+  @override
   String get sleepMonitorTimeInBed => 'Tempo na cama';
 
   @override

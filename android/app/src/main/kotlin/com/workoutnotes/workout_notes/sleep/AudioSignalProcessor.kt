@@ -23,6 +23,8 @@ class AudioSignalProcessor(
         const val MAX_SESSION_SECONDS = 16 * 60 * 60
         const val INVALID_VALID_FRACTION = 0.5
         const val NOISE_DELTA_DB = 10.0
+        const val MAX_CONSECUTIVE_READ_ERRORS = 3
+        const val NO_DATA_TIMEOUT_MILLIS = 5_000L
 
         fun rms(samples: ShortArray, length: Int = samples.size): Double {
             if (length <= 0) return 0.0
@@ -154,15 +156,29 @@ class AudioSignalProcessor(
 
     private fun captureLoop(record: AudioRecord, bufferLength: Int) {
         val buffer = ShortArray(max(bufferLength, 256))
+        var consecutiveReadErrors = 0
+        var lastSuccessfulReadAt = System.currentTimeMillis()
         try {
             while (running) {
                 val read = record.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
-                if (read <= 0) {
-                    if (read == AudioRecord.ERROR_DEAD_OBJECT) {
-                        throw IllegalStateException("audio_record_dead_object")
+                if (read == 0) {
+                    if (System.currentTimeMillis() - lastSuccessfulReadAt >= NO_DATA_TIMEOUT_MILLIS) {
+                        throw IllegalStateException("audio_record_no_data")
                     }
                     continue
                 }
+                if (read < 0) {
+                    consecutiveReadErrors++
+                    if (
+                        read == AudioRecord.ERROR_DEAD_OBJECT ||
+                        consecutiveReadErrors >= MAX_CONSECUTIVE_READ_ERRORS
+                    ) {
+                        throw IllegalStateException("audio_record_read_error_$read")
+                    }
+                    continue
+                }
+                consecutiveReadErrors = 0
+                lastSuccessfulReadAt = System.currentTimeMillis()
                 addBuffer(buffer, read)
                 if (System.currentTimeMillis() - windowStartedAt >= WINDOW_SECONDS * 1_000L) {
                     emitSegment()

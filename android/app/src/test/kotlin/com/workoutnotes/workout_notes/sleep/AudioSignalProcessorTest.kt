@@ -30,6 +30,8 @@ class AudioSignalProcessorTest {
             ),
         )
         assertTrue(AudioSignalProcessor.MAX_SESSION_SECONDS >= 16 * 60 * 60)
+        assertTrue(AudioSignalProcessor.MAX_CONSECUTIVE_READ_ERRORS <= 3)
+        assertTrue(AudioSignalProcessor.NO_DATA_TIMEOUT_MILLIS <= 5_000)
     }
 
     @Test

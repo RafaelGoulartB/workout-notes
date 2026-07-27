@@ -293,6 +293,95 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sleepMonitorInvalid => 'Invalid signal';
 
   @override
+  String get sleepMonitorDataQuality => 'MVP data quality';
+
+  @override
+  String get sleepMonitorDataAcceptable =>
+      'Night suitable for the next MVP phase';
+
+  @override
+  String get sleepMonitorDataAcceptableBody =>
+      'Duration and capture coverage are sufficient for evaluating the current monitor.';
+
+  @override
+  String get sleepMonitorDataInsufficient =>
+      'Night needs another monitoring round';
+
+  @override
+  String get sleepMonitorDataInsufficientBody =>
+      'For the next phase, record at least 4 hours with 90% timeline coverage and 80% valid signal.';
+
+  @override
+  String get sleepMonitorCapturedSegments => 'Captured segments';
+
+  @override
+  String get sleepMonitorTimelineCoverage => 'Timeline coverage';
+
+  @override
+  String get sleepMonitorNoiseGraph => 'Relative noise through the night';
+
+  @override
+  String get sleepMonitorNoiseScore => 'Noise score';
+
+  @override
+  String get sleepMonitorNoSegments => 'No signal segments were recorded';
+
+  @override
+  String get sleepMonitorNoSegmentsBody =>
+      'This session cannot evaluate the MVP. The monitor will now stop with an error if the microphone stops returning data, instead of completing an empty night.';
+
+  @override
+  String get sleepMonitorAverageNoise => 'Average noise score';
+
+  @override
+  String get sleepMonitorPeakNoise => 'Peak noise score';
+
+  @override
+  String get sleepMonitorStartTime => 'Started';
+
+  @override
+  String get sleepMonitorEndTime => 'Finished';
+
+  @override
+  String get sleepMonitorThreshold => 'Noise threshold';
+
+  @override
+  String get sleepMonitorExportDiagnostic => 'Export diagnostic';
+
+  @override
+  String get sleepMonitorExportDiagnosticTitle => 'What should be included?';
+
+  @override
+  String get sleepMonitorExportDiagnosticBody =>
+      'The JSON file can be shared for technical analysis. Raw audio is never stored and cannot be exported.';
+
+  @override
+  String get sleepMonitorExportTechnicalOnly =>
+      'Technical data only (recommended)';
+
+  @override
+  String get sleepMonitorExportTechnicalOnlyBody =>
+      'Uses relative times and excludes the sleep date, exact timestamps, local IDs and your note.';
+
+  @override
+  String get sleepMonitorExportWithPersonal => 'Include personal sleep data';
+
+  @override
+  String get sleepMonitorExportWithPersonalBody =>
+      'Also includes exact date and time, local IDs, manual durations and your personal sleep comment.';
+
+  @override
+  String get sleepMonitorExportConfirm => 'Generate and share';
+
+  @override
+  String get sleepMonitorExportSuccess =>
+      'Diagnostic generated. Choose where to share or save it.';
+
+  @override
+  String get sleepMonitorExportError =>
+      'The diagnostic file could not be generated.';
+
+  @override
   String get sleepMonitorTimeInBed => 'Time in bed';
 
   @override

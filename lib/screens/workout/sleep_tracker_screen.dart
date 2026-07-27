@@ -8,7 +8,6 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
-import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
@@ -526,15 +525,23 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   }
 
   Future<void> _showDetails(SleepEntry entry) async {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
     final monitorSession = await _monitorRepository.getSessionForSleepEntry(
       entry.id,
     );
-    final monitorSegments = monitorSession == null
-        ? const <SleepMonitorSegment>[]
-        : await _monitorRepository.getSegments(monitorSession.id);
     if (!mounted) return;
+    if (monitorSession != null) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              SleepMonitorResultScreen(sessionId: monitorSession.id),
+        ),
+      );
+      await _load();
+      return;
+    }
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -571,7 +578,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  if (entry.source != 'manual' || monitorSession != null) ...[
+                  if (entry.source != 'manual') ...[
                     const SizedBox(height: 10),
                     Chip(
                       avatar: const Icon(Icons.mic_none, size: 18),
@@ -609,21 +616,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                       loc.sleepMonitorTimeInBed,
                       '${entry.timeInBedMinutes} min',
                     ),
-                  if (monitorSession != null) ...[
-                    _DetailRow(
-                      Icons.volume_off_outlined,
-                      loc.sleepMonitorQuietPeriod,
-                      '${monitorSession.quietMinutes ?? 0} min',
-                    ),
-                    _DetailRow(
-                      Icons.volume_up_outlined,
-                      loc.sleepMonitorNoisyPeriod,
-                      '${monitorSession.noisyMinutes ?? 0} min',
-                    ),
-                    const SizedBox(height: 8),
-                    SleepMonitorTimeline(segments: monitorSegments),
-                    const SizedBox(height: 8),
-                  ],
                   if (entry.comment != null && entry.comment!.isNotEmpty) ...[
                     const SizedBox(height: 10),
                     Text(entry.comment!),

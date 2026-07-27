@@ -238,6 +238,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         return loc.sleepMonitorMicrophoneDenied;
       case 'audio_unavailable':
       case 'audio_error':
+      case 'no_audio_data':
         return loc.sleepMonitorAudioUnavailable;
       case 'already_active':
         return loc.sleepMonitorAlreadyActive;
