@@ -2,6 +2,10 @@
     <!-- Required by the AI Coach to call configured web/API endpoints. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:label="Workout Notes"
@@ -35,6 +39,13 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <service
+            android:name=".sleep.SleepMonitoringService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+        <receiver
+            android:name=".sleep.StopSleepMonitoringReceiver"
+            android:exported="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

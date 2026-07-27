@@ -29,6 +29,9 @@ void main() {
               bedtime_minutes INTEGER,
               wake_time_minutes INTEGER,
               comment TEXT,
+              source TEXT NOT NULL DEFAULT 'manual',
+              time_in_bed_minutes INTEGER,
+              estimated_sleep_minutes INTEGER,
               created_at TEXT NOT NULL
             )
           ''');
@@ -71,17 +74,63 @@ void main() {
     expect(await repository.getLatest(), isNull);
   });
 
-  test('replaces the existing record for the same date', () async {
-    await repository.add(date: DateTime(2026, 7, 25), sleepMinutes: 420);
-    await repository.add(
-      date: DateTime(2026, 7, 25),
-      sleepMinutes: 500,
-      actualSleepMinutes: 480,
-    );
+  test(
+    'updates the existing record for the same date without replacing its id',
+    () async {
+      await repository.add(date: DateTime(2026, 7, 25), sleepMinutes: 420);
+      final original = await repository.getByDate(DateTime(2026, 7, 25));
+      await repository.add(
+        date: DateTime(2026, 7, 25),
+        sleepMinutes: 500,
+        actualSleepMinutes: 480,
+      );
 
-    final entries = await repository.getEntries();
-    expect(entries, hasLength(1));
-    expect(entries.single.sleepMinutes, 500);
+      final entries = await repository.getEntries();
+      expect(entries, hasLength(1));
+      expect(entries.single.sleepMinutes, 500);
+      expect(entries.single.id, original!.id);
+    },
+  );
+
+  test(
+    'manual data merges into monitored entry without losing metrics',
+    () async {
+      final date = DateTime(2026, 7, 25);
+      await repository.add(
+        date: date,
+        sleepMinutes: 480,
+        source: 'monitored',
+        timeInBedMinutes: 480,
+        estimatedSleepMinutes: 430,
+      );
+      final monitored = await repository.getByDate(date);
+
+      await repository.add(
+        date: date,
+        sleepMinutes: 450,
+        actualSleepMinutes: 420,
+        comment: 'Acordei bem',
+      );
+
+      final merged = await repository.getByDate(date);
+      expect(merged!.id, monitored!.id);
+      expect(merged.source, 'hybrid');
+      expect(merged.sleepMinutes, 450);
+      expect(merged.actualSleepMinutes, 420);
+      expect(merged.comment, 'Acordei bem');
+      expect(merged.timeInBedMinutes, 480);
+      expect(merged.estimatedSleepMinutes, 430);
+    },
+  );
+
+  test('rejects changing an entry onto another entry date', () async {
+    await repository.add(date: DateTime(2026, 7, 24), sleepMinutes: 420);
+    await repository.add(date: DateTime(2026, 7, 25), sleepMinutes: 500);
+    final first = await repository.getByDate(DateTime(2026, 7, 24));
+    expect(
+      () => repository.save(first!.copyWith(date: DateTime(2026, 7, 25))),
+      throwsStateError,
+    );
   });
 
   test(

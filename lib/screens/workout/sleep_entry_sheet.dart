@@ -249,6 +249,13 @@ class _SleepEntrySheetState extends State<_SleepEntrySheet> {
           comment: _commentController.text.trim().isEmpty
               ? null
               : _commentController.text.trim(),
+          source: widget.existing == null
+              ? 'manual'
+              : widget.existing!.source == 'manual'
+              ? 'manual'
+              : 'hybrid',
+          timeInBedMinutes: widget.existing?.timeInBedMinutes,
+          estimatedSleepMinutes: widget.existing?.estimatedSleepMinutes,
           createdAt: widget.existing?.createdAt ?? DateTime.now(),
         ),
       );

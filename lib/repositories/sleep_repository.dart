@@ -1,4 +1,3 @@
-import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/sleep_entry.dart';
@@ -29,14 +28,61 @@ class SleepRepository extends BaseRepository {
     return rows.isEmpty ? null : SleepEntry.fromMap(rows.first);
   }
 
-  /// Inserts or replaces the single record associated with [entry.date].
+  Future<SleepEntry?> getById(String id) async {
+    final rows = await (await db).query(
+      'sleep_entries',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : SleepEntry.fromMap(rows.first);
+  }
+
+  /// Inserts or updates the single record associated with [entry.date].
+  ///
+  /// This deliberately avoids SQLite REPLACE. REPLACE deletes the conflicting
+  /// parent row first, which can cascade into monitor sessions.
   Future<void> save(SleepEntry entry) async {
     _validate(entry);
-    await (await db).insert(
-      'sleep_entries',
-      entry.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    final database = await db;
+    final existingForDate = await getByDate(entry.date);
+    final existingById = await getById(entry.id);
+    if (existingForDate != null) {
+      // A new entry for an already recorded date is an upsert-by-date. An
+      // existing entry being moved onto another occupied date is a real edit
+      // conflict and must be explicit.
+      if (existingForDate.id != entry.id && existingById != null) {
+        throw StateError('sleep_entry_date_conflict');
+      }
+      final mergesManualDataIntoMonitoring =
+          existingForDate.source != 'manual' && entry.source == 'manual';
+      final savedEntry = entry.copyWith(
+        id: existingForDate.id,
+        source: mergesManualDataIntoMonitoring ? 'hybrid' : entry.source,
+        timeInBedMinutes: mergesManualDataIntoMonitoring
+            ? existingForDate.timeInBedMinutes
+            : entry.timeInBedMinutes,
+        estimatedSleepMinutes: mergesManualDataIntoMonitoring
+            ? existingForDate.estimatedSleepMinutes
+            : entry.estimatedSleepMinutes,
+        createdAt: existingForDate.createdAt,
+      );
+      await database.update(
+        'sleep_entries',
+        savedEntry.toMap(),
+        where: 'id = ?',
+        whereArgs: [existingForDate.id],
+      );
+    } else if (existingById != null) {
+      await database.update(
+        'sleep_entries',
+        entry.toMap(),
+        where: 'id = ?',
+        whereArgs: [entry.id],
+      );
+    } else {
+      await database.insert('sleep_entries', entry.toMap());
+    }
   }
 
   Future<void> add({
@@ -46,6 +92,9 @@ class SleepRepository extends BaseRepository {
     int? bedtimeMinutes,
     int? wakeTimeMinutes,
     String? comment,
+    String source = 'manual',
+    int? timeInBedMinutes,
+    int? estimatedSleepMinutes,
   }) async {
     await save(
       SleepEntry(
@@ -56,6 +105,9 @@ class SleepRepository extends BaseRepository {
         bedtimeMinutes: bedtimeMinutes,
         wakeTimeMinutes: wakeTimeMinutes,
         comment: _cleanComment(comment),
+        source: source,
+        timeInBedMinutes: timeInBedMinutes,
+        estimatedSleepMinutes: estimatedSleepMinutes,
         createdAt: DateTime.now(),
       ),
     );
@@ -131,6 +183,9 @@ class SleepRepository extends BaseRepository {
   }
 
   static void _validate(SleepEntry entry) {
+    if (!const {'manual', 'monitored', 'hybrid'}.contains(entry.source)) {
+      throw ArgumentError.value(entry.source, 'source');
+    }
     if (entry.sleepMinutes <= 0 || entry.sleepMinutes > 24 * 60) {
       throw ArgumentError.value(entry.sleepMinutes, 'sleepMinutes');
     }

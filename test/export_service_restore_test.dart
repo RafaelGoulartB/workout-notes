@@ -38,6 +38,8 @@ void main() {
             'predefined_sets',
             'body_measurements',
             'sleep_entries',
+            'sleep_monitor_sessions',
+            'sleep_monitor_segments',
           ]) {
             await db.execute('CREATE TABLE $table (id TEXT PRIMARY KEY)');
           }
@@ -90,6 +92,8 @@ void main() {
       expect(data['settings'], [
         {'key': 'current', 'value': 'unchanged'},
       ]);
+      expect(data['sleep_monitor_sessions'], isEmpty);
+      expect(data['sleep_monitor_segments'], isEmpty);
     },
   );
 
@@ -202,6 +206,19 @@ void main() {
     expect(count, 1);
     expect(await database.query('sleep_entries'), isEmpty);
   });
+
+  test('accepts a version 3 backup without monitoring records', () async {
+    final backup = _validBackup()
+      ..['version'] = 3
+      ..remove('sleep_monitor_sessions')
+      ..remove('sleep_monitor_segments');
+
+    final count = await service.restoreFromBytes(_bytes(backup));
+
+    expect(count, 1);
+    expect(await database.query('sleep_monitor_sessions'), isEmpty);
+    expect(await database.query('sleep_monitor_segments'), isEmpty);
+  });
 }
 
 Uint8List _bytes(Object data) =>
@@ -220,6 +237,8 @@ Map<String, dynamic> _validBackup() => {
   'predefined_sets': <Map<String, dynamic>>[],
   'body_measurements': <Map<String, dynamic>>[],
   'sleep_entries': <Map<String, dynamic>>[],
+  'sleep_monitor_sessions': <Map<String, dynamic>>[],
+  'sleep_monitor_segments': <Map<String, dynamic>>[],
   'settings': [
     {'key': 'restored', 'value': 'yes'},
   ],

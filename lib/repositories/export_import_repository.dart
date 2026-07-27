@@ -8,7 +8,7 @@ import 'base_repository.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
-  static const int currentBackupVersion = 3;
+  static const int currentBackupVersion = 4;
   static const int minimumSupportedBackupVersion = 2;
 
   final Future<Database> Function()? _databaseProvider;
@@ -39,6 +39,8 @@ class ExportImportRepository extends BaseRepository {
       'predefined_sets': await db.query('predefined_sets'),
       'body_measurements': await db.query('body_measurements'),
       'sleep_entries': await db.query('sleep_entries'),
+      'sleep_monitor_sessions': await db.query('sleep_monitor_sessions'),
+      'sleep_monitor_segments': await db.query('sleep_monitor_segments'),
       'settings': await db.query('app_settings'),
     };
   }
@@ -68,23 +70,59 @@ class ExportImportRepository extends BaseRepository {
       await txn.delete('exercise_entries');
       await txn.delete('workouts');
       await txn.delete('body_measurements');
+      await txn.delete('sleep_monitor_segments');
+      await txn.delete('sleep_monitor_sessions');
       await txn.delete('sleep_entries');
       await txn.delete('exercises');
       await txn.delete('exercise_categories');
       await txn.delete('app_settings');
 
       // 2. Insert backup rows in FK-safe order
-      totalRows += await _insertAll(txn, 'exercise_categories', data['categories']);
+      totalRows += await _insertAll(
+        txn,
+        'exercise_categories',
+        data['categories'],
+      );
       totalRows += await _insertAll(txn, 'exercises', data['exercises']);
       totalRows += await _insertAll(txn, 'workouts', data['workouts']);
-      totalRows += await _insertAll(txn, 'exercise_entries', data['exercise_entries']);
+      totalRows += await _insertAll(
+        txn,
+        'exercise_entries',
+        data['exercise_entries'],
+      );
       totalRows += await _insertAll(txn, 'sets', data['sets']);
       totalRows += await _insertAll(txn, 'routines', data['routines']);
       totalRows += await _insertAll(txn, 'routine_days', data['routine_days']);
-      totalRows += await _insertAll(txn, 'routine_exercises', data['routine_exercises']);
-      totalRows += await _insertAll(txn, 'predefined_sets', data['predefined_sets']);
-      totalRows += await _insertAll(txn, 'body_measurements', data['body_measurements']);
-      totalRows += await _insertAll(txn, 'sleep_entries', data['sleep_entries']);
+      totalRows += await _insertAll(
+        txn,
+        'routine_exercises',
+        data['routine_exercises'],
+      );
+      totalRows += await _insertAll(
+        txn,
+        'predefined_sets',
+        data['predefined_sets'],
+      );
+      totalRows += await _insertAll(
+        txn,
+        'body_measurements',
+        data['body_measurements'],
+      );
+      totalRows += await _insertAll(
+        txn,
+        'sleep_entries',
+        data['sleep_entries'],
+      );
+      totalRows += await _insertAll(
+        txn,
+        'sleep_monitor_sessions',
+        data['sleep_monitor_sessions'],
+      );
+      totalRows += await _insertAll(
+        txn,
+        'sleep_monitor_segments',
+        data['sleep_monitor_segments'],
+      );
       totalRows += await _insertAll(txn, 'app_settings', data['settings']);
     });
 
@@ -92,13 +130,15 @@ class ExportImportRepository extends BaseRepository {
   }
 
   /// Inserts [rows] into [table], returning the count.
-  Future<int> _insertAll(
-      Transaction txn, String table, dynamic rows) async {
+  Future<int> _insertAll(Transaction txn, String table, dynamic rows) async {
     if (rows == null || rows is! List || rows.isEmpty) return 0;
     int count = 0;
     for (final row in rows) {
-      await txn.insert(table, row as Map<String, dynamic>,
-          conflictAlgorithm: ConflictAlgorithm.replace);
+      await txn.insert(
+        table,
+        row as Map<String, dynamic>,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
       count++;
     }
     return count;
@@ -160,6 +200,8 @@ class ExportImportRepository extends BaseRepository {
       await txn.delete('exercise_entries');
       await txn.delete('workouts');
       await txn.delete('body_measurements');
+      await txn.delete('sleep_monitor_segments');
+      await txn.delete('sleep_monitor_sessions');
       await txn.delete('sleep_entries');
     });
   }

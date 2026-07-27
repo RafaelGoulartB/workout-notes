@@ -18,6 +18,301 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabSleep => 'Sleep';
 
   @override
+  String get sleepTitle => 'Sleep';
+
+  @override
+  String get sleepAdd => 'Log sleep';
+
+  @override
+  String get sleepAddTitle => 'Log sleep';
+
+  @override
+  String get sleepEditTitle => 'Edit sleep record';
+
+  @override
+  String get sleepEmptyTitle => 'No sleep logged';
+
+  @override
+  String get sleepEmptySubtitle =>
+      'Log your nights to track duration, actual sleep, and consistency.';
+
+  @override
+  String get sleepDate => 'Wake-up date';
+
+  @override
+  String get sleepDuration => 'Sleep duration';
+
+  @override
+  String get sleepActualDuration => 'Actual sleep';
+
+  @override
+  String get sleepActualDurationHint => 'Time actually asleep';
+
+  @override
+  String get sleepBedtime => 'Bedtime';
+
+  @override
+  String get sleepWakeTime => 'Wake-up time';
+
+  @override
+  String get sleepComment => 'Note (optional)';
+
+  @override
+  String get sleepHours => 'hours';
+
+  @override
+  String get sleepMinutes => 'minutes';
+
+  @override
+  String get sleepSave => 'Save record';
+
+  @override
+  String get sleepSaved => 'Sleep record saved!';
+
+  @override
+  String get sleepDeleted => 'Sleep record deleted';
+
+  @override
+  String get sleepDeleteConfirm => 'Delete this sleep record?';
+
+  @override
+  String get sleepInvalidDuration =>
+      'Enter a duration between 1 minute and 24 hours.';
+
+  @override
+  String get sleepInvalidActual =>
+      'Actual sleep must be greater than zero and cannot exceed the main duration.';
+
+  @override
+  String get sleepInvalidTime => 'Enter a valid time.';
+
+  @override
+  String get sleepSummary => 'Summary';
+
+  @override
+  String get sleepLatest => 'Latest record';
+
+  @override
+  String get sleepAverage7Days => 'Average · 7 days';
+
+  @override
+  String get sleepAverage30Days => 'Average · 30 days';
+
+  @override
+  String get sleepActualAverage => 'Actual sleep average';
+
+  @override
+  String get sleepMinimum => 'Minimum · 30 days';
+
+  @override
+  String get sleepMaximum => 'Maximum · 30 days';
+
+  @override
+  String get sleepConsistency => 'Consistency';
+
+  @override
+  String get sleepEfficiency => 'Efficiency';
+
+  @override
+  String sleepDaysRecorded(Object count, Object total) {
+    return '$count of $total days recorded';
+  }
+
+  @override
+  String get sleepNoActual => 'No actual sleep';
+
+  @override
+  String get sleepDailyChart => 'Last 7 days';
+
+  @override
+  String get sleepTrendChart => 'Trend · 30 days';
+
+  @override
+  String get sleepChartRecorded => 'Recorded duration';
+
+  @override
+  String get sleepChartActual => 'Actual sleep';
+
+  @override
+  String get sleepHistory => 'History';
+
+  @override
+  String sleepEntries(Object count) {
+    return '$count records';
+  }
+
+  @override
+  String get sleepNeedTwoEntries => 'Add at least 2 records to see the trend.';
+
+  @override
+  String sleepLoadMore(Object count) {
+    return 'Load $count more records';
+  }
+
+  @override
+  String sleepLoadMoreCount(Object count) {
+    return 'Load $count more';
+  }
+
+  @override
+  String get sleepDetails => 'Sleep details';
+
+  @override
+  String get sleepDelete => 'Delete record';
+
+  @override
+  String get sleepEdit => 'Edit record';
+
+  @override
+  String get sleepNotInformed => 'Not informed';
+
+  @override
+  String sleepDurationValue(Object hours, Object minutes) {
+    return '${hours}h ${minutes}min';
+  }
+
+  @override
+  String get sleepMonitorCta => 'Monitor sleep';
+
+  @override
+  String get sleepMonitorCtaSubtitle =>
+      'Analyze quiet and noise locally during the night.';
+
+  @override
+  String get sleepMonitorOpenActive => 'Monitoring in progress';
+
+  @override
+  String sleepMonitorRecovered(Object count) {
+    return '$count monitoring session(s) recovered.';
+  }
+
+  @override
+  String get sleepMonitorTitle => 'Monitor sleep';
+
+  @override
+  String get sleepMonitorAndroidOnly =>
+      'Monitoring is available only on Android.';
+
+  @override
+  String get sleepMonitorRunning => 'Monitoring in progress';
+
+  @override
+  String get sleepMonitorReady => 'Ready to monitor';
+
+  @override
+  String get sleepMonitorMicrophone => 'Microphone permission';
+
+  @override
+  String get sleepMonitorStart => 'Start monitoring';
+
+  @override
+  String get sleepMonitorFinish => 'Finish and view result';
+
+  @override
+  String get sleepMonitorDiscard => 'Discard session';
+
+  @override
+  String get sleepMonitorLocalProcessing =>
+      'Audio is processed locally and never recorded. Only aggregate metrics are kept.';
+
+  @override
+  String get sleepMonitorEstimateWarning =>
+      'Results are environment-based estimates and are not medical measurements. Quiet does not necessarily mean you were asleep.';
+
+  @override
+  String get sleepMonitorMicrophoneDenied =>
+      'Microphone permission is required to monitor this night.';
+
+  @override
+  String get sleepMonitorNotificationsLimited =>
+      'Notifications are disabled; the service may be less visible while the screen is locked.';
+
+  @override
+  String get sleepMonitorAudioUnavailable =>
+      'The microphone could not be accessed. Check whether another app is using it.';
+
+  @override
+  String get sleepMonitorAlreadyActive =>
+      'A monitoring session is already active.';
+
+  @override
+  String get sleepMonitorImportError =>
+      'The session could not be imported. It will be kept for another attempt.';
+
+  @override
+  String get sleepMonitorGenericError =>
+      'The monitoring session could not be started or finished.';
+
+  @override
+  String get sleepMonitorWaitingSignal =>
+      'Waiting for the first signal segment';
+
+  @override
+  String get sleepMonitorNoiseNow => 'Relative noise detected';
+
+  @override
+  String get sleepMonitorQuietNow => 'Estimated quiet period';
+
+  @override
+  String get sleepMonitorInvalidSignal => 'Signal temporarily unavailable';
+
+  @override
+  String get sleepMonitorResultTitle => 'Monitoring result';
+
+  @override
+  String get sleepMonitorResultMissing => 'Result not found.';
+
+  @override
+  String get sleepMonitorSource => 'Monitoring';
+
+  @override
+  String get sleepMonitorTimeline => 'Night timeline';
+
+  @override
+  String get sleepMonitorTimeMonitored => 'Time monitored';
+
+  @override
+  String get sleepMonitorQuietPeriod => 'Quiet period';
+
+  @override
+  String get sleepMonitorNoisyPeriod => 'Noisy period';
+
+  @override
+  String get sleepMonitorNoiseEvents => 'Noise events';
+
+  @override
+  String get sleepMonitorSignalCoverage => 'Signal coverage';
+
+  @override
+  String get sleepMonitorQuiet => 'Relative quiet';
+
+  @override
+  String get sleepMonitorNoise => 'Relative noise';
+
+  @override
+  String get sleepMonitorInvalid => 'Invalid signal';
+
+  @override
+  String get sleepMonitorTimeInBed => 'Time in bed';
+
+  @override
+  String get sleepMonitorEditManual => 'Edit manual record';
+
+  @override
+  String get sleepMonitorDeleteSession => 'Delete session';
+
+  @override
+  String get sleepMonitorDeleteSessionBody =>
+      'The metrics and timeline for this session will be deleted. The sleep record remains.';
+
+  @override
+  String get sleepMonitorDiscardTitle => 'Discard session?';
+
+  @override
+  String get sleepMonitorDiscardBody =>
+      'The active session and its metrics will be deleted.';
+
+  @override
   String get commonCancel => 'Cancel';
 
   @override
@@ -1085,160 +1380,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonOptional => 'optional';
-
-  @override
-  String get sleepTitle => 'Sleep';
-
-  @override
-  String get sleepAdd => 'Log sleep';
-
-  @override
-  String get sleepAddTitle => 'Log sleep';
-
-  @override
-  String get sleepEditTitle => 'Edit sleep record';
-
-  @override
-  String get sleepEmptyTitle => 'No sleep logged';
-
-  @override
-  String get sleepEmptySubtitle =>
-      'Log your nights to track duration, actual sleep, and consistency.';
-
-  @override
-  String get sleepDate => 'Wake-up date';
-
-  @override
-  String get sleepDuration => 'Sleep duration';
-
-  @override
-  String get sleepActualDuration => 'Actual sleep';
-
-  @override
-  String get sleepActualDurationHint => 'Time actually asleep';
-
-  @override
-  String get sleepBedtime => 'Bedtime';
-
-  @override
-  String get sleepWakeTime => 'Wake-up time';
-
-  @override
-  String get sleepComment => 'Note (optional)';
-
-  @override
-  String get sleepHours => 'hours';
-
-  @override
-  String get sleepMinutes => 'minutes';
-
-  @override
-  String get sleepSave => 'Save record';
-
-  @override
-  String get sleepSaved => 'Sleep record saved!';
-
-  @override
-  String get sleepDeleted => 'Sleep record deleted';
-
-  @override
-  String get sleepDeleteConfirm => 'Delete this sleep record?';
-
-  @override
-  String get sleepInvalidDuration =>
-      'Enter a duration between 1 minute and 24 hours.';
-
-  @override
-  String get sleepInvalidActual =>
-      'Actual sleep must be greater than zero and cannot exceed the main duration.';
-
-  @override
-  String get sleepInvalidTime => 'Enter a valid time.';
-
-  @override
-  String get sleepSummary => 'Summary';
-
-  @override
-  String get sleepLatest => 'Latest record';
-
-  @override
-  String get sleepAverage7Days => 'Average · 7 days';
-
-  @override
-  String get sleepAverage30Days => 'Average · 30 days';
-
-  @override
-  String get sleepActualAverage => 'Actual sleep average';
-
-  @override
-  String get sleepMinimum => 'Minimum · 30 days';
-
-  @override
-  String get sleepMaximum => 'Maximum · 30 days';
-
-  @override
-  String get sleepConsistency => 'Consistency';
-
-  @override
-  String get sleepEfficiency => 'Efficiency';
-
-  @override
-  String sleepDaysRecorded(Object count, Object total) {
-    return '$count of $total days recorded';
-  }
-
-  @override
-  String get sleepNoActual => 'No actual sleep';
-
-  @override
-  String get sleepDailyChart => 'Last 7 days';
-
-  @override
-  String get sleepTrendChart => 'Trend · 30 days';
-
-  @override
-  String get sleepChartRecorded => 'Recorded duration';
-
-  @override
-  String get sleepChartActual => 'Actual sleep';
-
-  @override
-  String get sleepHistory => 'History';
-
-  @override
-  String sleepEntries(Object count) {
-    return '$count records';
-  }
-
-  @override
-  String get sleepNeedTwoEntries => 'Add at least 2 records to see the trend.';
-
-  @override
-  String sleepLoadMore(Object count) {
-    return 'Load $count more records';
-  }
-
-  @override
-  String sleepLoadMoreCount(Object count) {
-    return 'Load $count more';
-  }
-
-  @override
-  String get sleepDetails => 'Sleep details';
-
-  @override
-  String get sleepDelete => 'Delete record';
-
-  @override
-  String get sleepEdit => 'Edit record';
-
-  @override
-  String get sleepNotInformed => 'Not informed';
-
-  @override
-  String sleepDurationValue(Object hours, Object minutes) {
-    return '${hours}h ${minutes}min';
-  }
 
   @override
   String get routinesTitle => 'Routines';

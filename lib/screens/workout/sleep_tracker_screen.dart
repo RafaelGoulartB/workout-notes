@@ -1,16 +1,22 @@
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
+import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
+import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 
 import 'sleep_entry_sheet.dart';
+import 'sleep_monitor_result_screen.dart';
+import 'sleep_monitor_screen.dart';
 
 class SleepTrackerScreen extends StatefulWidget {
   const SleepTrackerScreen({super.key});
@@ -21,15 +27,57 @@ class SleepTrackerScreen extends StatefulWidget {
 
 class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   final _repository = SleepRepository();
+  final _monitorRepository = SleepMonitorRepository();
+  final _monitorService = SleepMonitorService.instance;
   List<SleepEntry> _entries = const [];
   SleepDashboardStats? _stats;
   bool _isLoading = true;
   int _historyDisplayCount = 5;
+  int _lastRecoveryCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _monitorService.addListener(_onMonitorChanged);
+    _lastRecoveryCount = _monitorService.recoveredCount;
+    _monitorService.initialize();
+    if (_lastRecoveryCount > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showRecoveryMessage(_lastRecoveryCount);
+      });
+    }
     _load();
+  }
+
+  @override
+  void dispose() {
+    _monitorService.removeListener(_onMonitorChanged);
+    super.dispose();
+  }
+
+  void _onMonitorChanged() {
+    if (mounted) {
+      setState(() {});
+      if (_monitorService.recoveredCount > _lastRecoveryCount) {
+        _lastRecoveryCount = _monitorService.recoveredCount;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showRecoveryMessage(_lastRecoveryCount);
+        });
+      }
+      if (!_monitorService.isMonitoring &&
+          (_monitorService.state.status == 'completed' ||
+              _monitorService.state.status == 'interrupted')) {
+        _load();
+      }
+    }
+  }
+
+  void _showRecoveryMessage(int count) {
+    final loc = AppLocalizations.of(context);
+    if (loc == null) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.sleepMonitorRecovered(count))));
   }
 
   Future<void> _load() async {
@@ -77,15 +125,23 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   Widget _buildEmptyState(AppLocalizations loc) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * .65,
-        child: EmptyStatePlaceholder(
-          icon: Icons.nightlight_round,
-          title: loc.sleepEmptyTitle,
-          subtitle: loc.sleepEmptySubtitle,
-          actionLabel: loc.sleepAdd,
-          onAction: _openAdd,
-        ),
+      child: Column(
+        children: [
+          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
+            _buildMonitorCta(loc),
+            const SizedBox(height: 16),
+          ],
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height * .58,
+            child: EmptyStatePlaceholder(
+              icon: Icons.nightlight_round,
+              title: loc.sleepEmptyTitle,
+              subtitle: loc.sleepEmptySubtitle,
+              actionLabel: loc.sleepAdd,
+              onAction: _openAdd,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -96,6 +152,10 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
+          _buildMonitorCta(loc),
+          const SizedBox(height: 12),
+        ],
         _LatestSleepCard(
           entry: stats.latest,
           loc: loc,
@@ -130,6 +190,25 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         const SizedBox(height: 16),
         _buildHistory(theme, loc),
       ],
+    );
+  }
+
+  Widget _buildMonitorCta(AppLocalizations loc) {
+    final active = _monitorService.isMonitoring;
+    return Card(
+      color: Theme.of(context).colorScheme.primaryContainer,
+      child: ListTile(
+        leading: Icon(active ? Icons.graphic_eq : Icons.mic_none),
+        title: Text(
+          active ? loc.sleepMonitorRunning : loc.sleepMonitorCta,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(
+          active ? loc.sleepMonitorOpenActive : loc.sleepMonitorCtaSubtitle,
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: _openMonitor,
+      ),
     );
   }
 
@@ -438,92 +517,154 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     await showSleepEntrySheet(context, repository: _repository, onSaved: _load);
   }
 
+  Future<void> _openMonitor() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SleepMonitorScreen()),
+    );
+    _load();
+  }
+
   Future<void> _showDetails(SleepEntry entry) async {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final monitorSession = await _monitorRepository.getSessionForSleepEntry(
+      entry.id,
+    );
+    final monitorSegments = monitorSession == null
+        ? const <SleepMonitorSegment>[]
+        : await _monitorRepository.getSegments(monitorSession.id);
+    if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              loc.sleepDetails,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final mediaQuery = MediaQuery.of(sheetContext);
+        return SafeArea(
+          top: false,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: mediaQuery.size.height * 0.9,
+            ),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                0,
+                20,
+                24 + mediaQuery.viewInsets.bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    loc.sleepDetails,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    DateFormat.yMMMMd(Intl.defaultLocale).format(entry.date),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (entry.source != 'manual' || monitorSession != null) ...[
+                    const SizedBox(height: 10),
+                    Chip(
+                      avatar: const Icon(Icons.mic_none, size: 18),
+                      label: Text(loc.sleepMonitorSource),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  _DetailRow(
+                    Icons.bedtime_outlined,
+                    loc.sleepDuration,
+                    _formatMinutes(entry.sleepMinutes, loc),
+                  ),
+                  _DetailRow(
+                    Icons.timelapse_outlined,
+                    loc.sleepActualDuration,
+                    entry.actualSleepMinutes == null
+                        ? loc.sleepNoActual
+                        : _formatMinutes(entry.actualSleepMinutes, loc),
+                  ),
+                  if (entry.bedtimeMinutes != null)
+                    _DetailRow(
+                      Icons.nightlight_outlined,
+                      loc.sleepBedtime,
+                      _formatTime(entry.bedtimeMinutes!),
+                    ),
+                  if (entry.wakeTimeMinutes != null)
+                    _DetailRow(
+                      Icons.wb_sunny_outlined,
+                      loc.sleepWakeTime,
+                      _formatTime(entry.wakeTimeMinutes!),
+                    ),
+                  if (entry.timeInBedMinutes != null)
+                    _DetailRow(
+                      Icons.bed_outlined,
+                      loc.sleepMonitorTimeInBed,
+                      '${entry.timeInBedMinutes} min',
+                    ),
+                  if (monitorSession != null) ...[
+                    _DetailRow(
+                      Icons.volume_off_outlined,
+                      loc.sleepMonitorQuietPeriod,
+                      '${monitorSession.quietMinutes ?? 0} min',
+                    ),
+                    _DetailRow(
+                      Icons.volume_up_outlined,
+                      loc.sleepMonitorNoisyPeriod,
+                      '${monitorSession.noisyMinutes ?? 0} min',
+                    ),
+                    const SizedBox(height: 8),
+                    SleepMonitorTimeline(segments: monitorSegments),
+                    const SizedBox(height: 8),
+                  ],
+                  if (entry.comment != null && entry.comment!.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(entry.comment!),
+                  ],
+                  const SizedBox(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          await _deleteEntry(entry);
+                        },
+                        icon: const Icon(Icons.delete_outline),
+                        label: Text(loc.sleepDelete),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      FilledButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          await showSleepEntrySheet(
+                            context,
+                            repository: _repository,
+                            existing: entry,
+                            onSaved: _load,
+                          );
+                        },
+                        icon: const Icon(Icons.edit_outlined),
+                        label: Text(loc.sleepEdit),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              DateFormat.yMMMMd(Intl.defaultLocale).format(entry.date),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 18),
-            _DetailRow(
-              Icons.bedtime_outlined,
-              loc.sleepDuration,
-              _formatMinutes(entry.sleepMinutes, loc),
-            ),
-            _DetailRow(
-              Icons.timelapse_outlined,
-              loc.sleepActualDuration,
-              entry.actualSleepMinutes == null
-                  ? loc.sleepNoActual
-                  : _formatMinutes(entry.actualSleepMinutes, loc),
-            ),
-            if (entry.bedtimeMinutes != null)
-              _DetailRow(
-                Icons.nightlight_outlined,
-                loc.sleepBedtime,
-                _formatTime(entry.bedtimeMinutes!),
-              ),
-            if (entry.wakeTimeMinutes != null)
-              _DetailRow(
-                Icons.wb_sunny_outlined,
-                loc.sleepWakeTime,
-                _formatTime(entry.wakeTimeMinutes!),
-              ),
-            if (entry.comment != null && entry.comment!.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(entry.comment!),
-            ],
-            const SizedBox(height: 18),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    Navigator.pop(sheetContext);
-                    await _deleteEntry(entry);
-                  },
-                  icon: const Icon(Icons.delete_outline),
-                  label: Text(loc.sleepDelete),
-                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                ),
-                const SizedBox(width: 10),
-                FilledButton.icon(
-                  onPressed: () async {
-                    Navigator.pop(sheetContext);
-                    await showSleepEntrySheet(
-                      context,
-                      repository: _repository,
-                      existing: entry,
-                      onSaved: _load,
-                    );
-                  },
-                  icon: const Icon(Icons.edit_outlined),
-                  label: Text(loc.sleepEdit),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -869,6 +1010,13 @@ class _SleepHistoryCard extends StatelessWidget {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
+                    if (entry.source != 'manual')
+                      Text(
+                        loc.sleepMonitorSource,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
                   ],
                 ),
               ),

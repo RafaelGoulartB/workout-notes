@@ -10,11 +10,14 @@ import '../repositories/analytics_repository.dart';
 import '../repositories/export_import_repository.dart';
 import '../repositories/goal_repository.dart';
 import '../repositories/sleep_repository.dart';
+import '../repositories/sleep_monitor_repository.dart';
 import '../models/sleep_entry.dart';
+import '../models/sleep_monitor_segment.dart';
+import '../models/sleep_monitor_session.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 20;
+  static const _dbVersion = 21;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -31,6 +34,7 @@ class DatabaseHelper {
   late final ExportImportRepository exportImportRepo = ExportImportRepository();
   late final GoalRepository goalRepo = GoalRepository();
   late final SleepRepository sleepRepo = SleepRepository();
+  late final SleepMonitorRepository sleepMonitorRepo = SleepMonitorRepository();
 
   DatabaseHelper._();
 
@@ -57,6 +61,9 @@ class DatabaseHelper {
     return openDatabase(
       path,
       version: _dbVersion,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+      },
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       singleInstance: true,
@@ -222,7 +229,49 @@ class DatabaseHelper {
         bedtime_minutes INTEGER,
         wake_time_minutes INTEGER,
         comment TEXT,
+        source TEXT NOT NULL DEFAULT 'manual',
+        time_in_bed_minutes INTEGER,
+        estimated_sleep_minutes INTEGER,
         created_at TEXT NOT NULL
+      )
+    ''');
+
+    // Native audio-monitoring sessions and their 30-second aggregates.
+    await db.execute('''
+      CREATE TABLE sleep_monitor_sessions (
+        id TEXT PRIMARY KEY,
+        sleep_entry_id TEXT,
+        status TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        utc_offset_start_minutes INTEGER NOT NULL,
+        utc_offset_end_minutes INTEGER,
+        sensor_mode TEXT NOT NULL DEFAULT 'audio',
+        algorithm_version TEXT NOT NULL,
+        time_in_bed_minutes INTEGER,
+        quiet_minutes INTEGER,
+        noisy_minutes INTEGER,
+        estimated_sleep_minutes INTEGER,
+        noise_event_count INTEGER NOT NULL DEFAULT 0,
+        signal_quality_score REAL,
+        end_reason TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (sleep_entry_id) REFERENCES sleep_entries(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE sleep_monitor_segments (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        duration_seconds INTEGER NOT NULL,
+        audio_rms_dbfs REAL,
+        audio_peak_dbfs REAL,
+        noise_score REAL,
+        classification TEXT NOT NULL,
+        valid_fraction REAL NOT NULL,
+        noise_burst_count INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (session_id) REFERENCES sleep_monitor_sessions(id) ON DELETE CASCADE
       )
     ''');
 
@@ -310,7 +359,18 @@ class DatabaseHelper {
     await db.execute(
       'CREATE INDEX idx_measurements_type ON body_measurements(type)',
     );
-    await db.execute('CREATE INDEX idx_sleep_entries_date ON sleep_entries(date DESC)');
+    await db.execute(
+      'CREATE INDEX idx_sleep_entries_date ON sleep_entries(date DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_sleep_monitor_sessions_status_started ON sleep_monitor_sessions(status, started_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_sleep_monitor_sessions_entry ON sleep_monitor_sessions(sleep_entry_id)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_sleep_monitor_segments_session_started ON sleep_monitor_segments(session_id, started_at ASC)',
+    );
     await db.execute(
       'CREATE INDEX idx_ai_chat_messages_thread ON ai_chat_messages(thread_id, created_at ASC)',
     );
@@ -1557,6 +1617,67 @@ class DatabaseHelper {
         );
       } catch (_) {}
     }
+    if (oldVersion < 21) {
+      for (final statement in [
+        "ALTER TABLE sleep_entries ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'",
+        'ALTER TABLE sleep_entries ADD COLUMN time_in_bed_minutes INTEGER',
+        'ALTER TABLE sleep_entries ADD COLUMN estimated_sleep_minutes INTEGER',
+      ]) {
+        try {
+          await db.execute(statement);
+        } catch (_) {}
+      }
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS sleep_monitor_sessions (
+            id TEXT PRIMARY KEY,
+            sleep_entry_id TEXT,
+            status TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            ended_at TEXT,
+            utc_offset_start_minutes INTEGER NOT NULL,
+            utc_offset_end_minutes INTEGER,
+            sensor_mode TEXT NOT NULL DEFAULT 'audio',
+            algorithm_version TEXT NOT NULL,
+            time_in_bed_minutes INTEGER,
+            quiet_minutes INTEGER,
+            noisy_minutes INTEGER,
+            estimated_sleep_minutes INTEGER,
+            noise_event_count INTEGER NOT NULL DEFAULT 0,
+            signal_quality_score REAL,
+            end_reason TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (sleep_entry_id) REFERENCES sleep_entries(id) ON DELETE CASCADE
+          )
+        ''');
+      } catch (_) {}
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS sleep_monitor_segments (
+            id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            duration_seconds INTEGER NOT NULL,
+            audio_rms_dbfs REAL,
+            audio_peak_dbfs REAL,
+            noise_score REAL,
+            classification TEXT NOT NULL,
+            valid_fraction REAL NOT NULL,
+            noise_burst_count INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (session_id) REFERENCES sleep_monitor_sessions(id) ON DELETE CASCADE
+          )
+        ''');
+      } catch (_) {}
+      for (final statement in [
+        'CREATE INDEX IF NOT EXISTS idx_sleep_monitor_sessions_status_started ON sleep_monitor_sessions(status, started_at DESC)',
+        'CREATE INDEX IF NOT EXISTS idx_sleep_monitor_sessions_entry ON sleep_monitor_sessions(sleep_entry_id)',
+        'CREATE INDEX IF NOT EXISTS idx_sleep_monitor_segments_session_started ON sleep_monitor_segments(session_id, started_at ASC)',
+      ]) {
+        try {
+          await db.execute(statement);
+        } catch (_) {}
+      }
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -2104,8 +2225,18 @@ class DatabaseHelper {
       sleepRepo.getByDate(date);
   Future<void> saveSleepEntry(SleepEntry entry) => sleepRepo.save(entry);
   Future<void> deleteSleepEntry(String id) => sleepRepo.delete(id);
-  Future<SleepDashboardStats> getSleepDashboardStats({DateTime? referenceDate}) =>
-      sleepRepo.getDashboardStats(referenceDate: referenceDate);
+  Future<SleepEntry?> getSleepEntryById(String id) => sleepRepo.getById(id);
+  Future<SleepDashboardStats> getSleepDashboardStats({
+    DateTime? referenceDate,
+  }) => sleepRepo.getDashboardStats(referenceDate: referenceDate);
+
+  // -- SLEEP MONITOR --
+  Future<List<SleepMonitorSession>> getSleepMonitorSessions({int? limit}) =>
+      sleepMonitorRepo.getSessions(limit: limit);
+  Future<SleepMonitorSession?> getSleepMonitorSession(String id) =>
+      sleepMonitorRepo.getSession(id);
+  Future<List<SleepMonitorSegment>> getSleepMonitorSegments(String sessionId) =>
+      sleepMonitorRepo.getSegments(sessionId);
 
   // -- AI CHAT --
   Future<String> upsertAiChatThread({

@@ -10,6 +10,9 @@ class SleepEntry {
   final int? bedtimeMinutes;
   final int? wakeTimeMinutes;
   final String? comment;
+  final String source;
+  final int? timeInBedMinutes;
+  final int? estimatedSleepMinutes;
   final DateTime createdAt;
 
   const SleepEntry({
@@ -20,6 +23,9 @@ class SleepEntry {
     this.bedtimeMinutes,
     this.wakeTimeMinutes,
     this.comment,
+    this.source = 'manual',
+    this.timeInBedMinutes,
+    this.estimatedSleepMinutes,
     required this.createdAt,
   });
 
@@ -31,6 +37,9 @@ class SleepEntry {
     Object? bedtimeMinutes = _sentinel,
     Object? wakeTimeMinutes = _sentinel,
     Object? comment = _sentinel,
+    String? source,
+    Object? timeInBedMinutes = _sentinel,
+    Object? estimatedSleepMinutes = _sentinel,
     DateTime? createdAt,
   }) {
     return SleepEntry(
@@ -49,6 +58,13 @@ class SleepEntry {
       comment: identical(comment, _sentinel)
           ? this.comment
           : comment as String?,
+      source: source ?? this.source,
+      timeInBedMinutes: identical(timeInBedMinutes, _sentinel)
+          ? this.timeInBedMinutes
+          : timeInBedMinutes as int?,
+      estimatedSleepMinutes: identical(estimatedSleepMinutes, _sentinel)
+          ? this.estimatedSleepMinutes
+          : estimatedSleepMinutes as int?,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -62,6 +78,9 @@ class SleepEntry {
       'bedtime_minutes': bedtimeMinutes,
       'wake_time_minutes': wakeTimeMinutes,
       'comment': comment,
+      'source': source,
+      'time_in_bed_minutes': timeInBedMinutes,
+      'estimated_sleep_minutes': estimatedSleepMinutes,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -75,6 +94,9 @@ class SleepEntry {
       bedtimeMinutes: (map['bedtime_minutes'] as num?)?.toInt(),
       wakeTimeMinutes: (map['wake_time_minutes'] as num?)?.toInt(),
       comment: map['comment'] as String?,
+      source: (map['source'] as String?) ?? 'manual',
+      timeInBedMinutes: (map['time_in_bed_minutes'] as num?)?.toInt(),
+      estimatedSleepMinutes: (map['estimated_sleep_minutes'] as num?)?.toInt(),
       createdAt: DateTime.parse(map['created_at'] as String),
     );
   }
