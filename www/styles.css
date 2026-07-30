@@ -87,16 +87,10 @@ body {
 }
 
 /* ============================================================
-   TILT — perspective tilt for hero / feature screenshots
+   TILT — static perspective pose, no animation
    ============================================================ */
 .tilt {
   transform: rotateY(-6deg) rotateX(2deg);
-  transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
-  will-change: transform;
-}
-
-.perspective:hover .tilt {
-  transform: rotateY(0deg) rotateX(0deg);
 }
 
 /* ============================================================
