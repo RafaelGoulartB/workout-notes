@@ -11,13 +11,23 @@ import '../repositories/export_import_repository.dart';
 import '../repositories/goal_repository.dart';
 import '../repositories/sleep_repository.dart';
 import '../repositories/sleep_monitor_repository.dart';
+import '../repositories/nutrition_repository.dart';
 import '../models/sleep_entry.dart';
 import '../models/sleep_monitor_segment.dart';
 import '../models/sleep_monitor_session.dart';
+import '../models/nutrition/daily_nutrition_summary.dart';
+import '../models/nutrition/food.dart';
+import '../models/nutrition/food_serving.dart';
+import '../models/nutrition/food_variant.dart';
+import '../models/nutrition/meal_log.dart';
+import '../models/nutrition/meal_log_item.dart';
+import '../models/nutrition/nutrition_goal.dart';
+import '../models/nutrition/nutrition_values.dart';
+import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 21;
+  static const _dbVersion = 22;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -35,6 +45,7 @@ class DatabaseHelper {
   late final GoalRepository goalRepo = GoalRepository();
   late final SleepRepository sleepRepo = SleepRepository();
   late final SleepMonitorRepository sleepMonitorRepo = SleepMonitorRepository();
+  late final NutritionRepository nutritionRepo = NutritionRepository();
 
   DatabaseHelper._();
 
@@ -346,6 +357,11 @@ class DatabaseHelper {
         FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
       )
     ''');
+
+    // Nutrition module (v22). Foods, variants, servings, meal logs and
+    // goals share a single helper so `_onCreate` and `_onUpgrade` use
+    // the same definition.
+    await _createNutritionSchema(db);
 
     // Indexes
     await db.execute('CREATE INDEX idx_workouts_date ON workouts(date)');
@@ -1678,6 +1694,127 @@ class DatabaseHelper {
         } catch (_) {}
       }
     }
+    if (oldVersion < 22) {
+      // Add the nutrition schema. The helper is idempotent so it is
+      // safe to call multiple times during repeated upgrades.
+      try {
+        await _createNutritionSchema(db);
+      } catch (_) {}
+    }
+  }
+
+  /// Creates the full nutrition module schema (v22) using
+  /// `IF NOT EXISTS` so it can be invoked both from `_onCreate` and
+  /// `_onUpgrade` without duplicating SQL.
+  static Future<void> _createNutritionSchema(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS foods (
+        id TEXT PRIMARY KEY,
+        source TEXT NOT NULL,
+        external_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        search_name TEXT NOT NULL,
+        brand TEXT,
+        barcode TEXT,
+        source_url TEXT,
+        fetched_at TEXT NOT NULL,
+        last_used_at TEXT,
+        UNIQUE(source, external_id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS food_variants (
+        id TEXT PRIMARY KEY,
+        food_id TEXT NOT NULL,
+        label TEXT,
+        reference_amount REAL NOT NULL,
+        reference_unit TEXT NOT NULL,
+        calories REAL,
+        protein_g REAL,
+        carbs_g REAL,
+        fat_g REAL,
+        fiber_g REAL,
+        sugars_g REAL,
+        sodium_mg REAL,
+        extra_nutrients_json TEXT,
+        is_estimated INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS food_servings (
+        id TEXT PRIMARY KEY,
+        food_variant_id TEXT NOT NULL,
+        label TEXT NOT NULL,
+        quantity REAL NOT NULL DEFAULT 1,
+        unit TEXT NOT NULL,
+        grams_equivalent REAL,
+        ml_equivalent REAL,
+        FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS meal_logs (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        meal_type TEXT NOT NULL,
+        name TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        UNIQUE(date, meal_type)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS meal_log_items (
+        id TEXT PRIMARY KEY,
+        meal_log_id TEXT NOT NULL,
+        food_id TEXT,
+        food_variant_id TEXT,
+        food_name_snapshot TEXT NOT NULL,
+        brand_snapshot TEXT,
+        quantity REAL NOT NULL,
+        unit TEXT NOT NULL,
+        calories REAL,
+        protein_g REAL,
+        carbs_g REAL,
+        fat_g REAL,
+        fiber_g REAL,
+        sugars_g REAL,
+        sodium_mg REAL,
+        nutrition_snapshot_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE,
+        FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL,
+        FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE SET NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS nutrition_goals (
+        id TEXT PRIMARY KEY,
+        calories REAL,
+        protein_g REAL,
+        carbs_g REAL,
+        fat_g REAL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 1
+      )
+    ''');
+
+    for (final statement in <String>[
+      'CREATE INDEX IF NOT EXISTS idx_foods_search_name ON foods(search_name)',
+      'CREATE INDEX IF NOT EXISTS idx_foods_brand ON foods(brand)',
+      'CREATE INDEX IF NOT EXISTS idx_foods_barcode ON foods(barcode)',
+      'CREATE INDEX IF NOT EXISTS idx_food_variants_food ON food_variants(food_id)',
+      'CREATE INDEX IF NOT EXISTS idx_food_servings_variant ON food_servings(food_variant_id)',
+      'CREATE INDEX IF NOT EXISTS idx_meal_logs_date ON meal_logs(date)',
+      'CREATE INDEX IF NOT EXISTS idx_meal_log_items_meal ON meal_log_items(meal_log_id, created_at ASC)',
+      'CREATE INDEX IF NOT EXISTS idx_nutrition_goals_active ON nutrition_goals(is_active)',
+    ]) {
+      try {
+        await db.execute(statement);
+      } catch (_) {}
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -2237,6 +2374,99 @@ class DatabaseHelper {
       sleepMonitorRepo.getSession(id);
   Future<List<SleepMonitorSegment>> getSleepMonitorSegments(String sessionId) =>
       sleepMonitorRepo.getSegments(sessionId);
+
+  // -- NUTRITION --
+  NutritionRepository get nutritionRepository => nutritionRepo;
+  Future<List<FoodSearchResultLite>> searchLocalFoods(
+    String query, {
+    int limit = 30,
+  }) => nutritionRepo.searchLocalFoods(query, limit: limit);
+  Future<FoodWithDetails?> getFoodWithDetails(String id) =>
+      nutritionRepo.getFoodWithDetails(id);
+  Future<FoodWithDetails?> getFoodBySource({
+    required String source,
+    required String externalId,
+  }) => nutritionRepo.getFoodBySource(source: source, externalId: externalId);
+  Future<Food> upsertFoodWithDetails({
+    required Food food,
+    required List<FoodVariant> variants,
+    Map<String, List<FoodServing>>? servings,
+  }) => nutritionRepo.upsertFoodWithDetails(
+    food: food,
+    variants: variants,
+    servings: servings,
+  );
+  Future<Food> createManualFood({
+    required String name,
+    String? brand,
+    String? barcode,
+    required double referenceAmount,
+    required String referenceUnit,
+    required NutritionValues referenceValues,
+    bool isEstimated = false,
+    List<ManualServingInput> servings = const [],
+  }) => nutritionRepo.createManualFood(
+    name: name,
+    brand: brand,
+    barcode: barcode,
+    referenceAmount: referenceAmount,
+    referenceUnit: referenceUnit,
+    referenceValues: referenceValues,
+    isEstimated: isEstimated,
+    servings: servings,
+  );
+  Future<MealLog> ensureMealLog({
+    required String date,
+    required String mealType,
+  }) => nutritionRepo.ensureMealLog(date: date, mealType: mealType);
+  Future<MealLogItem> addMealLogItem({
+    required String date,
+    required String mealType,
+    required Food food,
+    required FoodVariant variant,
+    required NutritionConversion conversion,
+    List<FoodServing> availableServings = const [],
+  }) => nutritionRepo.addMealLogItem(
+    date: date,
+    mealType: mealType,
+    food: food,
+    variant: variant,
+    conversion: conversion,
+    availableServings: availableServings,
+  );
+  Future<MealLogItem> updateMealLogItem({
+    required String itemId,
+    required NutritionConversion conversion,
+    required FoodVariant variant,
+  }) => nutritionRepo.updateMealLogItem(
+    itemId: itemId,
+    conversion: conversion,
+    variant: variant,
+  );
+  Future<void> deleteMealLogItem(String id) =>
+      nutritionRepo.deleteMealLogItem(id);
+  Future<List<MealLogWithItems>> getDayMeals(String date) =>
+      nutritionRepo.getDayMeals(date);
+  Future<DailyNutritionSummary> getDailyNutritionSummary(String date) =>
+      nutritionRepo.getDailySummary(date);
+  Future<NutritionGoal?> getActiveNutritionGoal() =>
+      nutritionRepo.getActiveGoal();
+  Future<NutritionGoal> saveNutritionGoal({
+    double? calories,
+    double? proteinG,
+    double? carbsG,
+    double? fatG,
+  }) => nutritionRepo.saveGoal(
+    calories: calories,
+    proteinG: proteinG,
+    carbsG: carbsG,
+    fatG: fatG,
+  );
+  Future<void> clearActiveNutritionGoal() => nutritionRepo.clearActiveGoal();
+  Future<List<NutritionExportRow>> exportNutritionRows({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) => nutritionRepo.exportRows(startDate: startDate, endDate: endDate);
 
   // -- AI CHAT --
   Future<String> upsertAiChatThread({

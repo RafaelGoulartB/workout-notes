@@ -1509,7 +1509,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsDeleteHistoryContent.
   ///
   /// In en, this message translates to:
-  /// **'All workouts, sets and registered exercises will be deleted. This action cannot be undone.'**
+  /// **'All workouts, sleep, nutrition and body measurements will be deleted. This action cannot be undone.'**
   String get settingsDeleteHistoryContent;
 
   /// No description provided for @settingsDeleteEverything.
@@ -5457,6 +5457,732 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Configure provider'**
   String get aiEmptyConfigure;
+
+  /// No description provided for @tabNutrition.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition'**
+  String get tabNutrition;
+
+  /// No description provided for @nutritionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition'**
+  String get nutritionTitle;
+
+  /// No description provided for @nutritionEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No food logged today'**
+  String get nutritionEmptyTitle;
+
+  /// No description provided for @nutritionEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your first item to start tracking calories and macros.'**
+  String get nutritionEmptySubtitle;
+
+  /// No description provided for @nutritionMealBreakfast.
+  ///
+  /// In en, this message translates to:
+  /// **'Breakfast'**
+  String get nutritionMealBreakfast;
+
+  /// No description provided for @nutritionMealLunch.
+  ///
+  /// In en, this message translates to:
+  /// **'Lunch'**
+  String get nutritionMealLunch;
+
+  /// No description provided for @nutritionMealDinner.
+  ///
+  /// In en, this message translates to:
+  /// **'Dinner'**
+  String get nutritionMealDinner;
+
+  /// No description provided for @nutritionMealSnacks.
+  ///
+  /// In en, this message translates to:
+  /// **'Snacks'**
+  String get nutritionMealSnacks;
+
+  /// No description provided for @nutritionAddItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add food'**
+  String get nutritionAddItem;
+
+  /// No description provided for @nutritionAddItemTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to {meal}'**
+  String nutritionAddItemTo(String meal);
+
+  /// No description provided for @nutritionConsumedKcal.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} kcal'**
+  String nutritionConsumedKcal(String value);
+
+  /// No description provided for @nutritionConsumedGrams.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} g'**
+  String nutritionConsumedGrams(String value);
+
+  /// No description provided for @nutritionGoalRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} kcal left'**
+  String nutritionGoalRemaining(String value);
+
+  /// No description provided for @nutritionGoalSurplus.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} kcal over'**
+  String nutritionGoalSurplus(String value);
+
+  /// No description provided for @nutritionGoalNoGoal.
+  ///
+  /// In en, this message translates to:
+  /// **'No goal configured'**
+  String get nutritionGoalNoGoal;
+
+  /// No description provided for @nutritionConfigureGoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure goal'**
+  String get nutritionConfigureGoal;
+
+  /// No description provided for @nutritionIncompleteWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Some items have incomplete nutritional data. Totals may be underestimated.'**
+  String get nutritionIncompleteWarning;
+
+  /// No description provided for @nutritionItemCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
+  String nutritionItemCount(int count);
+
+  /// No description provided for @nutritionSummaryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily summary'**
+  String get nutritionSummaryTitle;
+
+  /// No description provided for @nutritionProgressProtein.
+  ///
+  /// In en, this message translates to:
+  /// **'Protein'**
+  String get nutritionProgressProtein;
+
+  /// No description provided for @nutritionProgressCarbs.
+  ///
+  /// In en, this message translates to:
+  /// **'Carbs'**
+  String get nutritionProgressCarbs;
+
+  /// No description provided for @nutritionProgressFat.
+  ///
+  /// In en, this message translates to:
+  /// **'Fat'**
+  String get nutritionProgressFat;
+
+  /// No description provided for @nutritionGoalCalories.
+  ///
+  /// In en, this message translates to:
+  /// **'Calories'**
+  String get nutritionGoalCalories;
+
+  /// No description provided for @nutritionPreviousDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous day'**
+  String get nutritionPreviousDay;
+
+  /// No description provided for @nutritionNextDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Next day'**
+  String get nutritionNextDay;
+
+  /// No description provided for @nutritionJumpToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get nutritionJumpToday;
+
+  /// No description provided for @nutritionDateSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'{date}'**
+  String nutritionDateSelected(String date);
+
+  /// No description provided for @nutritionEditItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit item'**
+  String get nutritionEditItem;
+
+  /// No description provided for @nutritionDeleteItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove item'**
+  String get nutritionDeleteItem;
+
+  /// No description provided for @nutritionDeleteItemConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this food from the meal?'**
+  String get nutritionDeleteItemConfirm;
+
+  /// No description provided for @nutritionItemDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Item removed'**
+  String get nutritionItemDeleted;
+
+  /// No description provided for @nutritionItemSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Item added'**
+  String get nutritionItemSaved;
+
+  /// No description provided for @nutritionItemUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Item updated'**
+  String get nutritionItemUpdated;
+
+  /// No description provided for @nutritionUndo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get nutritionUndo;
+
+  /// No description provided for @nutritionSearchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search food'**
+  String get nutritionSearchTitle;
+
+  /// No description provided for @nutritionSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search for a food'**
+  String get nutritionSearchHint;
+
+  /// No description provided for @nutritionSearchEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches yet'**
+  String get nutritionSearchEmpty;
+
+  /// No description provided for @nutritionSearchEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Try a different word or register the food manually.'**
+  String get nutritionSearchEmptyHint;
+
+  /// No description provided for @nutritionSearchLocalResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved on this device'**
+  String get nutritionSearchLocalResults;
+
+  /// No description provided for @nutritionSearchRemoteResults.
+  ///
+  /// In en, this message translates to:
+  /// **'From the gateway'**
+  String get nutritionSearchRemoteResults;
+
+  /// No description provided for @nutritionSearchLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching the gateway…'**
+  String get nutritionSearchLoading;
+
+  /// No description provided for @nutritionSearchUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Online results are unavailable. Using the local cache.'**
+  String get nutritionSearchUnavailable;
+
+  /// No description provided for @nutritionSearchNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'No nutrition gateway configured. Local results only.'**
+  String get nutritionSearchNotConfigured;
+
+  /// No description provided for @nutritionSearchQueryTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Type at least 2 characters.'**
+  String get nutritionSearchQueryTooShort;
+
+  /// No description provided for @nutritionAddManually.
+  ///
+  /// In en, this message translates to:
+  /// **'Add food manually'**
+  String get nutritionAddManually;
+
+  /// No description provided for @nutritionSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get nutritionSource;
+
+  /// No description provided for @nutritionSourceManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get nutritionSourceManual;
+
+  /// No description provided for @nutritionSourceGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway'**
+  String get nutritionSourceGateway;
+
+  /// No description provided for @nutritionPer100g.
+  ///
+  /// In en, this message translates to:
+  /// **'per {amount} {unit}'**
+  String nutritionPer100g(String amount, String unit);
+
+  /// No description provided for @nutritionVariant.
+  ///
+  /// In en, this message translates to:
+  /// **'Variant'**
+  String get nutritionVariant;
+
+  /// No description provided for @nutritionUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit'**
+  String get nutritionUnit;
+
+  /// No description provided for @nutritionUnitGrams.
+  ///
+  /// In en, this message translates to:
+  /// **'Grams (g)'**
+  String get nutritionUnitGrams;
+
+  /// No description provided for @nutritionUnitMilliliters.
+  ///
+  /// In en, this message translates to:
+  /// **'Millilitres (ml)'**
+  String get nutritionUnitMilliliters;
+
+  /// No description provided for @nutritionUnitServing.
+  ///
+  /// In en, this message translates to:
+  /// **'Serving'**
+  String get nutritionUnitServing;
+
+  /// No description provided for @nutritionUnitUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit'**
+  String get nutritionUnitUnit;
+
+  /// No description provided for @nutritionQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get nutritionQuantity;
+
+  /// No description provided for @nutritionServingsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available servings'**
+  String get nutritionServingsAvailable;
+
+  /// No description provided for @nutritionPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get nutritionPreview;
+
+  /// No description provided for @nutritionMissingValues.
+  ///
+  /// In en, this message translates to:
+  /// **'Some nutritional values are missing for this food.'**
+  String get nutritionMissingValues;
+
+  /// No description provided for @nutritionEstimated.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated values'**
+  String get nutritionEstimated;
+
+  /// No description provided for @nutritionSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get nutritionSave;
+
+  /// No description provided for @nutritionCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get nutritionCancel;
+
+  /// No description provided for @nutritionFieldRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required field'**
+  String get nutritionFieldRequired;
+
+  /// No description provided for @nutritionInvalidNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid number'**
+  String get nutritionInvalidNumber;
+
+  /// No description provided for @nutritionInvalidQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a quantity greater than zero'**
+  String get nutritionInvalidQuantity;
+
+  /// No description provided for @nutritionManualTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add food manually'**
+  String get nutritionManualTitle;
+
+  /// No description provided for @nutritionManualName.
+  ///
+  /// In en, this message translates to:
+  /// **'Food name'**
+  String get nutritionManualName;
+
+  /// No description provided for @nutritionManualNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ex: Whole-wheat bread'**
+  String get nutritionManualNameHint;
+
+  /// No description provided for @nutritionManualBrand.
+  ///
+  /// In en, this message translates to:
+  /// **'Brand (optional)'**
+  String get nutritionManualBrand;
+
+  /// No description provided for @nutritionManualBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode (optional)'**
+  String get nutritionManualBarcode;
+
+  /// No description provided for @nutritionManualReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference amount'**
+  String get nutritionManualReference;
+
+  /// No description provided for @nutritionManualReferenceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount the nutrition values refer to (e.g. 100 g)'**
+  String get nutritionManualReferenceHint;
+
+  /// No description provided for @nutritionManualCalories.
+  ///
+  /// In en, this message translates to:
+  /// **'Calories (kcal)'**
+  String get nutritionManualCalories;
+
+  /// No description provided for @nutritionManualProtein.
+  ///
+  /// In en, this message translates to:
+  /// **'Protein (g)'**
+  String get nutritionManualProtein;
+
+  /// No description provided for @nutritionManualCarbs.
+  ///
+  /// In en, this message translates to:
+  /// **'Carbs (g)'**
+  String get nutritionManualCarbs;
+
+  /// No description provided for @nutritionManualFat.
+  ///
+  /// In en, this message translates to:
+  /// **'Fat (g)'**
+  String get nutritionManualFat;
+
+  /// No description provided for @nutritionManualFiber.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiber (g) — optional'**
+  String get nutritionManualFiber;
+
+  /// No description provided for @nutritionManualSugars.
+  ///
+  /// In en, this message translates to:
+  /// **'Sugars (g) — optional'**
+  String get nutritionManualSugars;
+
+  /// No description provided for @nutritionManualSodium.
+  ///
+  /// In en, this message translates to:
+  /// **'Sodium (mg) — optional'**
+  String get nutritionManualSodium;
+
+  /// No description provided for @nutritionManualIsEstimated.
+  ///
+  /// In en, this message translates to:
+  /// **'Some values are estimated'**
+  String get nutritionManualIsEstimated;
+
+  /// No description provided for @nutritionManualServingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Portion label (optional)'**
+  String get nutritionManualServingLabel;
+
+  /// No description provided for @nutritionManualServingGrams.
+  ///
+  /// In en, this message translates to:
+  /// **'Grams equivalent (optional)'**
+  String get nutritionManualServingGrams;
+
+  /// No description provided for @nutritionManualAddServing.
+  ///
+  /// In en, this message translates to:
+  /// **'Add portion'**
+  String get nutritionManualAddServing;
+
+  /// No description provided for @nutritionManualSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Food saved to your library'**
+  String get nutritionManualSaved;
+
+  /// No description provided for @nutritionSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition goal'**
+  String get nutritionSettingsTitle;
+
+  /// No description provided for @nutritionSettingsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set a daily target for calories and macros. The values are stored locally.'**
+  String get nutritionSettingsSubtitle;
+
+  /// No description provided for @nutritionSettingsCalories.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily calories (kcal)'**
+  String get nutritionSettingsCalories;
+
+  /// No description provided for @nutritionSettingsProtein.
+  ///
+  /// In en, this message translates to:
+  /// **'Protein (g)'**
+  String get nutritionSettingsProtein;
+
+  /// No description provided for @nutritionSettingsCarbs.
+  ///
+  /// In en, this message translates to:
+  /// **'Carbs (g)'**
+  String get nutritionSettingsCarbs;
+
+  /// No description provided for @nutritionSettingsFat.
+  ///
+  /// In en, this message translates to:
+  /// **'Fat (g)'**
+  String get nutritionSettingsFat;
+
+  /// No description provided for @nutritionSettingsSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save goal'**
+  String get nutritionSettingsSave;
+
+  /// No description provided for @nutritionSettingsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal saved'**
+  String get nutritionSettingsSaved;
+
+  /// No description provided for @nutritionSettingsClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove goal'**
+  String get nutritionSettingsClear;
+
+  /// No description provided for @nutritionSettingsCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal removed'**
+  String get nutritionSettingsCleared;
+
+  /// No description provided for @nutritionSettingsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave any field blank to skip that target.'**
+  String get nutritionSettingsEmpty;
+
+  /// No description provided for @exportNutritionCsv.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition CSV'**
+  String get exportNutritionCsv;
+
+  /// No description provided for @exportNutritionCsvSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export the meal log history (date, meal, food, macros) — filterable by date range'**
+  String get exportNutritionCsvSubtitle;
+
+  /// No description provided for @exportNutritionHeaderDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get exportNutritionHeaderDate;
+
+  /// No description provided for @exportNutritionHeaderMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal'**
+  String get exportNutritionHeaderMeal;
+
+  /// No description provided for @exportNutritionHeaderFood.
+  ///
+  /// In en, this message translates to:
+  /// **'Food'**
+  String get exportNutritionHeaderFood;
+
+  /// No description provided for @exportNutritionHeaderBrand.
+  ///
+  /// In en, this message translates to:
+  /// **'Brand'**
+  String get exportNutritionHeaderBrand;
+
+  /// No description provided for @exportNutritionHeaderQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get exportNutritionHeaderQuantity;
+
+  /// No description provided for @exportNutritionHeaderUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit'**
+  String get exportNutritionHeaderUnit;
+
+  /// No description provided for @exportNutritionHeaderCalories.
+  ///
+  /// In en, this message translates to:
+  /// **'Calories (kcal)'**
+  String get exportNutritionHeaderCalories;
+
+  /// No description provided for @exportNutritionHeaderProtein.
+  ///
+  /// In en, this message translates to:
+  /// **'Protein (g)'**
+  String get exportNutritionHeaderProtein;
+
+  /// No description provided for @exportNutritionHeaderCarbs.
+  ///
+  /// In en, this message translates to:
+  /// **'Carbs (g)'**
+  String get exportNutritionHeaderCarbs;
+
+  /// No description provided for @exportNutritionHeaderFat.
+  ///
+  /// In en, this message translates to:
+  /// **'Fat (g)'**
+  String get exportNutritionHeaderFat;
+
+  /// No description provided for @exportNutritionHeaderFiber.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiber (g)'**
+  String get exportNutritionHeaderFiber;
+
+  /// No description provided for @exportNutritionHeaderSugars.
+  ///
+  /// In en, this message translates to:
+  /// **'Sugars (g)'**
+  String get exportNutritionHeaderSugars;
+
+  /// No description provided for @exportNutritionHeaderSodium.
+  ///
+  /// In en, this message translates to:
+  /// **'Sodium (mg)'**
+  String get exportNutritionHeaderSodium;
+
+  /// No description provided for @exportNutritionHeaderSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Source'**
+  String get exportNutritionHeaderSource;
+
+  /// No description provided for @exportNutritionHeaderEstimated.
+  ///
+  /// In en, this message translates to:
+  /// **'Data quality'**
+  String get exportNutritionHeaderEstimated;
+
+  /// No description provided for @exportNutritionFlagComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete'**
+  String get exportNutritionFlagComplete;
+
+  /// No description provided for @exportNutritionFlagIncomplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Incomplete/estimated'**
+  String get exportNutritionFlagIncomplete;
+
+  /// No description provided for @exportNutritionShareText.
+  ///
+  /// In en, this message translates to:
+  /// **'Workout Notes - Nutrition log'**
+  String get exportNutritionShareText;
+
+  /// No description provided for @exportNutritionStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Start date'**
+  String get exportNutritionStartDate;
+
+  /// No description provided for @exportNutritionEndDate.
+  ///
+  /// In en, this message translates to:
+  /// **'End date'**
+  String get exportNutritionEndDate;
+
+  /// No description provided for @exportNutritionAllTime.
+  ///
+  /// In en, this message translates to:
+  /// **'All dates'**
+  String get exportNutritionAllTime;
+
+  /// No description provided for @exportNutritionSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition CSV generated'**
+  String get exportNutritionSuccess;
+
+  /// No description provided for @exportNutritionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not generate the nutrition CSV: {error}'**
+  String exportNutritionError(String error);
+
+  /// No description provided for @settingsExportIncludesNutrition.
+  ///
+  /// In en, this message translates to:
+  /// **'Workouts, sleep, nutrition, measurements, routines and settings'**
+  String get settingsExportIncludesNutrition;
 }
 
 class _AppLocalizationsDelegate

@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../repositories/settings_repository.dart';
 import '../../repositories/export_import_repository.dart';
+import '../../repositories/nutrition_repository.dart';
 import '../../services/export_service.dart';
 import '../../database/test_seed_data.dart';
 import '../../services/notification_service.dart';
@@ -15,6 +16,7 @@ import '../../main.dart';
 import '../../navigation/ai_coach_navigation.dart';
 import 'ai_chat_screen.dart';
 import 'ai_settings_screen.dart';
+import 'nutrition_settings_screen.dart';
 
 class WorkoutSettingsScreen extends StatefulWidget {
   const WorkoutSettingsScreen({super.key});
@@ -123,6 +125,24 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
 
     WorkoutNotesApp.localeNotifier.setLocale(newLocale);
     await NotificationService.instance.loadSettings();
+  }
+
+  Future<void> _exportNutritionCsv() async {
+    final loc = AppLocalizations.of(context)!;
+    if (!mounted) return;
+    final service = ExportService();
+    try {
+      await service.shareNutritionCsv(loc: loc);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.exportNutritionSuccess)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.exportNutritionError(e.toString()))),
+      );
+    }
   }
 
   Future<void> _exportBackup() async {
@@ -820,7 +840,9 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
     );
 
     if (confirm == true) {
-      await ExportImportRepository().deleteAllWorkoutData();
+      final repo = ExportImportRepository();
+      await repo.deleteAllWorkoutData();
+      await repo.deleteAllNutritionData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1300,6 +1322,36 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                   ],
                 ),
 
+                // ===== NUTRIÇÃO =====
+                _SectionHeader(text: loc.nutritionTitle.toUpperCase()),
+                _SettingsCard(
+                  children: [
+                    _LinkTile(
+                      icon: Icons.flag_outlined,
+                      iconColor: theme.colorScheme.primary,
+                      title: loc.nutritionSettingsTitle,
+                      subtitle: loc.nutritionSettingsSubtitle,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => NutritionSettingsScreen(
+                              repository: NutritionRepository(),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const _CardDivider(),
+                    _LinkTile(
+                      icon: Icons.table_view_outlined,
+                      iconColor: theme.colorScheme.primary,
+                      title: loc.exportNutritionCsv,
+                      subtitle: loc.exportNutritionCsvSubtitle,
+                      onTap: _exportNutritionCsv,
+                    ),
+                  ],
+                ),
+
                 // ===== DADOS =====
                 _SectionHeader(text: loc.settingsSectionData),
                 _SettingsCard(
@@ -1308,7 +1360,7 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
                       icon: Icons.download_outlined,
                       iconColor: theme.colorScheme.primary,
                       title: loc.settingsExportBackup,
-                      subtitle: loc.settingsExportBackupSubtitle,
+                      subtitle: loc.settingsExportIncludesNutrition,
                       onTap: _exportBackup,
                     ),
                     const _CardDivider(),

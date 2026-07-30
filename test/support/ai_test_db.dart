@@ -59,6 +59,24 @@ Future<Database> installAiTestDb() async {
           'CREATE TABLE ai_routine_proposals (id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, tool_call_id TEXT NOT NULL, action TEXT NOT NULL, routine_id TEXT, before_json TEXT, target_json TEXT NOT NULL, diff_json TEXT NOT NULL, status TEXT NOT NULL, applied_routine_id TEXT, error_code TEXT, error_message TEXT, created_at TEXT NOT NULL, resolved_at TEXT, FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE)',
         );
         await db.execute(
+          'CREATE TABLE foods (id TEXT PRIMARY KEY, source TEXT NOT NULL, external_id TEXT NOT NULL, name TEXT NOT NULL, search_name TEXT NOT NULL, brand TEXT, barcode TEXT, source_url TEXT, fetched_at TEXT NOT NULL, last_used_at TEXT, UNIQUE(source, external_id))',
+        );
+        await db.execute(
+          'CREATE TABLE food_variants (id TEXT PRIMARY KEY, food_id TEXT NOT NULL, label TEXT, reference_amount REAL NOT NULL, reference_unit TEXT NOT NULL, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, fiber_g REAL, sugars_g REAL, sodium_mg REAL, extra_nutrients_json TEXT, is_estimated INTEGER NOT NULL DEFAULT 0, FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE CASCADE)',
+        );
+        await db.execute(
+          'CREATE TABLE food_servings (id TEXT PRIMARY KEY, food_variant_id TEXT NOT NULL, label TEXT NOT NULL, quantity REAL NOT NULL DEFAULT 1, unit TEXT NOT NULL, grams_equivalent REAL, ml_equivalent REAL, FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE CASCADE)',
+        );
+        await db.execute(
+          'CREATE TABLE meal_logs (id TEXT PRIMARY KEY, date TEXT NOT NULL, meal_type TEXT NOT NULL, name TEXT, notes TEXT, created_at TEXT NOT NULL, UNIQUE(date, meal_type))',
+        );
+        await db.execute(
+          'CREATE TABLE meal_log_items (id TEXT PRIMARY KEY, meal_log_id TEXT NOT NULL, food_id TEXT, food_variant_id TEXT, food_name_snapshot TEXT NOT NULL, brand_snapshot TEXT, quantity REAL NOT NULL, unit TEXT NOT NULL, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, fiber_g REAL, sugars_g REAL, sodium_mg REAL, nutrition_snapshot_json TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE, FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL, FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE SET NULL)',
+        );
+        await db.execute(
+          'CREATE TABLE nutrition_goals (id TEXT PRIMARY KEY, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1)',
+        );
+        await db.execute(
           'CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)',
         );
       },

@@ -17,7 +17,7 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
-  setUp(() async {
+    setUp(() async {
     backupsDirectory = await Directory.systemTemp.createTemp(
       'workout_notes_export_test_',
     );
@@ -40,6 +40,12 @@ void main() {
             'sleep_entries',
             'sleep_monitor_sessions',
             'sleep_monitor_segments',
+            'foods',
+            'food_variants',
+            'food_servings',
+            'meal_logs',
+            'meal_log_items',
+            'nutrition_goals',
           ]) {
             await db.execute('CREATE TABLE $table (id TEXT PRIMARY KEY)');
           }
@@ -239,6 +245,12 @@ Map<String, dynamic> _validBackup() => {
   'sleep_entries': <Map<String, dynamic>>[],
   'sleep_monitor_sessions': <Map<String, dynamic>>[],
   'sleep_monitor_segments': <Map<String, dynamic>>[],
+  'foods': <Map<String, dynamic>>[],
+  'food_variants': <Map<String, dynamic>>[],
+  'food_servings': <Map<String, dynamic>>[],
+  'meal_logs': <Map<String, dynamic>>[],
+  'meal_log_items': <Map<String, dynamic>>[],
+  'nutrition_goals': <Map<String, dynamic>>[],
   'settings': [
     {'key': 'restored', 'value': 'yes'},
   ],

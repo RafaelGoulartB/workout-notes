@@ -774,7 +774,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsDeleteHistoryContent =>
-      'All workouts, sets and registered exercises will be deleted. This action cannot be undone.';
+      'All workouts, sleep, nutrition and body measurements will be deleted. This action cannot be undone.';
 
   @override
   String get settingsDeleteEverything => 'Delete Everything';
@@ -2934,4 +2934,402 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiEmptyConfigure => 'Configure provider';
+
+  @override
+  String get tabNutrition => 'Nutrition';
+
+  @override
+  String get nutritionTitle => 'Nutrition';
+
+  @override
+  String get nutritionEmptyTitle => 'No food logged today';
+
+  @override
+  String get nutritionEmptySubtitle =>
+      'Add your first item to start tracking calories and macros.';
+
+  @override
+  String get nutritionMealBreakfast => 'Breakfast';
+
+  @override
+  String get nutritionMealLunch => 'Lunch';
+
+  @override
+  String get nutritionMealDinner => 'Dinner';
+
+  @override
+  String get nutritionMealSnacks => 'Snacks';
+
+  @override
+  String get nutritionAddItem => 'Add food';
+
+  @override
+  String nutritionAddItemTo(String meal) {
+    return 'Add to $meal';
+  }
+
+  @override
+  String nutritionConsumedKcal(String value) {
+    return '$value kcal';
+  }
+
+  @override
+  String nutritionConsumedGrams(String value) {
+    return '$value g';
+  }
+
+  @override
+  String nutritionGoalRemaining(String value) {
+    return '$value kcal left';
+  }
+
+  @override
+  String nutritionGoalSurplus(String value) {
+    return '$value kcal over';
+  }
+
+  @override
+  String get nutritionGoalNoGoal => 'No goal configured';
+
+  @override
+  String get nutritionConfigureGoal => 'Configure goal';
+
+  @override
+  String get nutritionIncompleteWarning =>
+      'Some items have incomplete nutritional data. Totals may be underestimated.';
+
+  @override
+  String nutritionItemCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get nutritionSummaryTitle => 'Daily summary';
+
+  @override
+  String get nutritionProgressProtein => 'Protein';
+
+  @override
+  String get nutritionProgressCarbs => 'Carbs';
+
+  @override
+  String get nutritionProgressFat => 'Fat';
+
+  @override
+  String get nutritionGoalCalories => 'Calories';
+
+  @override
+  String get nutritionPreviousDay => 'Previous day';
+
+  @override
+  String get nutritionNextDay => 'Next day';
+
+  @override
+  String get nutritionJumpToday => 'Today';
+
+  @override
+  String nutritionDateSelected(String date) {
+    return '$date';
+  }
+
+  @override
+  String get nutritionEditItem => 'Edit item';
+
+  @override
+  String get nutritionDeleteItem => 'Remove item';
+
+  @override
+  String get nutritionDeleteItemConfirm => 'Remove this food from the meal?';
+
+  @override
+  String get nutritionItemDeleted => 'Item removed';
+
+  @override
+  String get nutritionItemSaved => 'Item added';
+
+  @override
+  String get nutritionItemUpdated => 'Item updated';
+
+  @override
+  String get nutritionUndo => 'Undo';
+
+  @override
+  String get nutritionSearchTitle => 'Search food';
+
+  @override
+  String get nutritionSearchHint => 'Search for a food';
+
+  @override
+  String get nutritionSearchEmpty => 'No matches yet';
+
+  @override
+  String get nutritionSearchEmptyHint =>
+      'Try a different word or register the food manually.';
+
+  @override
+  String get nutritionSearchLocalResults => 'Saved on this device';
+
+  @override
+  String get nutritionSearchRemoteResults => 'From the gateway';
+
+  @override
+  String get nutritionSearchLoading => 'Searching the gateway…';
+
+  @override
+  String get nutritionSearchUnavailable =>
+      'Online results are unavailable. Using the local cache.';
+
+  @override
+  String get nutritionSearchNotConfigured =>
+      'No nutrition gateway configured. Local results only.';
+
+  @override
+  String get nutritionSearchQueryTooShort => 'Type at least 2 characters.';
+
+  @override
+  String get nutritionAddManually => 'Add food manually';
+
+  @override
+  String get nutritionSource => 'Source';
+
+  @override
+  String get nutritionSourceManual => 'Manual';
+
+  @override
+  String get nutritionSourceGateway => 'Gateway';
+
+  @override
+  String nutritionPer100g(String amount, String unit) {
+    return 'per $amount $unit';
+  }
+
+  @override
+  String get nutritionVariant => 'Variant';
+
+  @override
+  String get nutritionUnit => 'Unit';
+
+  @override
+  String get nutritionUnitGrams => 'Grams (g)';
+
+  @override
+  String get nutritionUnitMilliliters => 'Millilitres (ml)';
+
+  @override
+  String get nutritionUnitServing => 'Serving';
+
+  @override
+  String get nutritionUnitUnit => 'Unit';
+
+  @override
+  String get nutritionQuantity => 'Quantity';
+
+  @override
+  String get nutritionServingsAvailable => 'Available servings';
+
+  @override
+  String get nutritionPreview => 'Preview';
+
+  @override
+  String get nutritionMissingValues =>
+      'Some nutritional values are missing for this food.';
+
+  @override
+  String get nutritionEstimated => 'Estimated values';
+
+  @override
+  String get nutritionSave => 'Save';
+
+  @override
+  String get nutritionCancel => 'Cancel';
+
+  @override
+  String get nutritionFieldRequired => 'Required field';
+
+  @override
+  String get nutritionInvalidNumber => 'Enter a valid number';
+
+  @override
+  String get nutritionInvalidQuantity => 'Enter a quantity greater than zero';
+
+  @override
+  String get nutritionManualTitle => 'Add food manually';
+
+  @override
+  String get nutritionManualName => 'Food name';
+
+  @override
+  String get nutritionManualNameHint => 'Ex: Whole-wheat bread';
+
+  @override
+  String get nutritionManualBrand => 'Brand (optional)';
+
+  @override
+  String get nutritionManualBarcode => 'Barcode (optional)';
+
+  @override
+  String get nutritionManualReference => 'Reference amount';
+
+  @override
+  String get nutritionManualReferenceHint =>
+      'Amount the nutrition values refer to (e.g. 100 g)';
+
+  @override
+  String get nutritionManualCalories => 'Calories (kcal)';
+
+  @override
+  String get nutritionManualProtein => 'Protein (g)';
+
+  @override
+  String get nutritionManualCarbs => 'Carbs (g)';
+
+  @override
+  String get nutritionManualFat => 'Fat (g)';
+
+  @override
+  String get nutritionManualFiber => 'Fiber (g) — optional';
+
+  @override
+  String get nutritionManualSugars => 'Sugars (g) — optional';
+
+  @override
+  String get nutritionManualSodium => 'Sodium (mg) — optional';
+
+  @override
+  String get nutritionManualIsEstimated => 'Some values are estimated';
+
+  @override
+  String get nutritionManualServingLabel => 'Portion label (optional)';
+
+  @override
+  String get nutritionManualServingGrams => 'Grams equivalent (optional)';
+
+  @override
+  String get nutritionManualAddServing => 'Add portion';
+
+  @override
+  String get nutritionManualSaved => 'Food saved to your library';
+
+  @override
+  String get nutritionSettingsTitle => 'Nutrition goal';
+
+  @override
+  String get nutritionSettingsSubtitle =>
+      'Set a daily target for calories and macros. The values are stored locally.';
+
+  @override
+  String get nutritionSettingsCalories => 'Daily calories (kcal)';
+
+  @override
+  String get nutritionSettingsProtein => 'Protein (g)';
+
+  @override
+  String get nutritionSettingsCarbs => 'Carbs (g)';
+
+  @override
+  String get nutritionSettingsFat => 'Fat (g)';
+
+  @override
+  String get nutritionSettingsSave => 'Save goal';
+
+  @override
+  String get nutritionSettingsSaved => 'Goal saved';
+
+  @override
+  String get nutritionSettingsClear => 'Remove goal';
+
+  @override
+  String get nutritionSettingsCleared => 'Goal removed';
+
+  @override
+  String get nutritionSettingsEmpty =>
+      'Leave any field blank to skip that target.';
+
+  @override
+  String get exportNutritionCsv => 'Nutrition CSV';
+
+  @override
+  String get exportNutritionCsvSubtitle =>
+      'Export the meal log history (date, meal, food, macros) — filterable by date range';
+
+  @override
+  String get exportNutritionHeaderDate => 'Date';
+
+  @override
+  String get exportNutritionHeaderMeal => 'Meal';
+
+  @override
+  String get exportNutritionHeaderFood => 'Food';
+
+  @override
+  String get exportNutritionHeaderBrand => 'Brand';
+
+  @override
+  String get exportNutritionHeaderQuantity => 'Quantity';
+
+  @override
+  String get exportNutritionHeaderUnit => 'Unit';
+
+  @override
+  String get exportNutritionHeaderCalories => 'Calories (kcal)';
+
+  @override
+  String get exportNutritionHeaderProtein => 'Protein (g)';
+
+  @override
+  String get exportNutritionHeaderCarbs => 'Carbs (g)';
+
+  @override
+  String get exportNutritionHeaderFat => 'Fat (g)';
+
+  @override
+  String get exportNutritionHeaderFiber => 'Fiber (g)';
+
+  @override
+  String get exportNutritionHeaderSugars => 'Sugars (g)';
+
+  @override
+  String get exportNutritionHeaderSodium => 'Sodium (mg)';
+
+  @override
+  String get exportNutritionHeaderSource => 'Source';
+
+  @override
+  String get exportNutritionHeaderEstimated => 'Data quality';
+
+  @override
+  String get exportNutritionFlagComplete => 'Complete';
+
+  @override
+  String get exportNutritionFlagIncomplete => 'Incomplete/estimated';
+
+  @override
+  String get exportNutritionShareText => 'Workout Notes - Nutrition log';
+
+  @override
+  String get exportNutritionStartDate => 'Start date';
+
+  @override
+  String get exportNutritionEndDate => 'End date';
+
+  @override
+  String get exportNutritionAllTime => 'All dates';
+
+  @override
+  String get exportNutritionSuccess => 'Nutrition CSV generated';
+
+  @override
+  String exportNutritionError(String error) {
+    return 'Could not generate the nutrition CSV: $error';
+  }
+
+  @override
+  String get settingsExportIncludesNutrition =>
+      'Workouts, sleep, nutrition, measurements, routines and settings';
 }

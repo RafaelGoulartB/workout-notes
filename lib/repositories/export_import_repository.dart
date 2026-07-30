@@ -8,7 +8,7 @@ import 'base_repository.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
-  static const int currentBackupVersion = 4;
+  static const int currentBackupVersion = 5;
   static const int minimumSupportedBackupVersion = 2;
 
   final Future<Database> Function()? _databaseProvider;
@@ -41,6 +41,12 @@ class ExportImportRepository extends BaseRepository {
       'sleep_entries': await db.query('sleep_entries'),
       'sleep_monitor_sessions': await db.query('sleep_monitor_sessions'),
       'sleep_monitor_segments': await db.query('sleep_monitor_segments'),
+      'foods': await db.query('foods'),
+      'food_variants': await db.query('food_variants'),
+      'food_servings': await db.query('food_servings'),
+      'meal_logs': await db.query('meal_logs'),
+      'meal_log_items': await db.query('meal_log_items'),
+      'nutrition_goals': await db.query('nutrition_goals'),
       'settings': await db.query('app_settings'),
     };
   }
@@ -73,6 +79,12 @@ class ExportImportRepository extends BaseRepository {
       await txn.delete('sleep_monitor_segments');
       await txn.delete('sleep_monitor_sessions');
       await txn.delete('sleep_entries');
+      await txn.delete('meal_log_items');
+      await txn.delete('meal_logs');
+      await txn.delete('food_servings');
+      await txn.delete('food_variants');
+      await txn.delete('foods');
+      await txn.delete('nutrition_goals');
       await txn.delete('exercises');
       await txn.delete('exercise_categories');
       await txn.delete('app_settings');
@@ -122,6 +134,28 @@ class ExportImportRepository extends BaseRepository {
         txn,
         'sleep_monitor_segments',
         data['sleep_monitor_segments'],
+      );
+      totalRows += await _insertAll(txn, 'foods', data['foods']);
+      totalRows += await _insertAll(
+        txn,
+        'food_variants',
+        data['food_variants'],
+      );
+      totalRows += await _insertAll(
+        txn,
+        'food_servings',
+        data['food_servings'],
+      );
+      totalRows += await _insertAll(txn, 'meal_logs', data['meal_logs']);
+      totalRows += await _insertAll(
+        txn,
+        'meal_log_items',
+        data['meal_log_items'],
+      );
+      totalRows += await _insertAll(
+        txn,
+        'nutrition_goals',
+        data['nutrition_goals'],
       );
       totalRows += await _insertAll(txn, 'app_settings', data['settings']);
     });
@@ -203,6 +237,22 @@ class ExportImportRepository extends BaseRepository {
       await txn.delete('sleep_monitor_segments');
       await txn.delete('sleep_monitor_sessions');
       await txn.delete('sleep_entries');
+    });
+  }
+
+  /// Removes user-generated nutrition data (foods, meal logs, goals).
+  /// Food cache rows created from manual entries are also dropped, but
+  /// the user can re-enter them. Used by the "delete everything" path
+  /// so the action really represents full app reset.
+  Future<void> deleteAllNutritionData() async {
+    final db = await this.db;
+    await db.transaction((txn) async {
+      await txn.delete('meal_log_items');
+      await txn.delete('meal_logs');
+      await txn.delete('food_servings');
+      await txn.delete('food_variants');
+      await txn.delete('foods');
+      await txn.delete('nutrition_goals');
     });
   }
 }
