@@ -1,0 +1,299 @@
+package com.workoutnotes.workout_notes.sleep
+
+import android.Manifest
+import android.app.Service
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.IBinder
+import android.os.PowerManager
+import androidx.core.content.ContextCompat
+import java.time.Instant
+import java.time.ZoneId
+import java.util.UUID
+import kotlin.math.ceil
+import kotlin.math.roundToInt
+
+class SleepMonitoringService : Service() {
+    companion object {
+        private const val MAX_SESSION_MILLIS = 16L * 60L * 60L * 1_000L
+        private var activeInstance: SleepMonitoringService? = null
+        @Volatile private var lastState: Map<String, Any?>? = null
+        @Volatile var eventSink: ((Map<String, Any?>) -> Unit)? = null
+
+        fun startResponse(context: android.content.Context): Map<String, Any?> {
+            val granted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO,
+            ) == PackageManager.PERMISSION_GRANTED
+            return state(
+                context,
+                status = "starting",
+                microphoneGranted = granted,
+            )
+        }
+
+        fun stopCurrent(reason: String): Map<String, Any?> {
+            val service = activeInstance
+            if (service != null) {
+                service.finish(reason, "completed")
+                return service.stateMap()
+            }
+            return lastState ?: mapOf("status" to "idle")
+        }
+
+        fun discardCurrent(): Map<String, Any?> {
+            val service = activeInstance
+            if (service != null) {
+                service.finish("user", "discarded")
+                return service.stateMap()
+            }
+            return lastState ?: mapOf("status" to "idle")
+        }
+
+        fun currentState(context: android.content.Context): Map<String, Any?> {
+            val service = activeInstance
+            if (service != null) return service.stateMap()
+            val granted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO,
+            ) == PackageManager.PERMISSION_GRANTED
+            return lastState ?: state(context, "idle", granted)
+        }
+
+        private fun state(
+            context: android.content.Context,
+            status: String,
+            microphoneGranted: Boolean,
+        ): Map<String, Any?> = mapOf(
+            "supported" to true,
+            "microphone_granted" to microphoneGranted,
+            "status" to status,
+            "updated_at" to Instant.now().toString(),
+        )
+    }
+
+    private lateinit var spool: SleepSessionSpool
+    private var session: MutableMap<String, Any?>? = null
+    private var processor: AudioSignalProcessor? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var finished = false
+    @Volatile private var finishing = false
+    private var latestSegment: Map<String, Any?>? = null
+    private var noiseScore: Double? = null
+    private var quietSeconds = 0
+    private var noisySeconds = 0
+    private var noiseEvents = 0
+    private var inNoiseEvent = false
+    private var validFractionSum = 0.0
+    private var segmentCount = 0
+
+    override fun onCreate() {
+        super.onCreate()
+        spool = SleepSessionSpool(this)
+        activeInstance = this
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == SleepMonitorNotification.ACTION_STOP) {
+            finish("notification_action", "completed")
+            return START_NOT_STICKY
+        }
+        if (session != null) return START_NOT_STICKY
+
+        // Foreground first: Android requires this immediately for a microphone
+        // service, even though AudioRecord is opened only below after permission.
+        SleepMonitorNotification.ensureChannel(this)
+        val startedAt = System.currentTimeMillis()
+        val notification = SleepMonitorNotification.build(this, startedAt)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                SleepMonitorNotification.NOTIFICATION_ID,
+                notification,
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
+            )
+        } else {
+            startForeground(SleepMonitorNotification.NOTIFICATION_ID, notification)
+        }
+
+        val sessionId = UUID.randomUUID().toString()
+        val start = Instant.ofEpochMilli(startedAt)
+        val offset = ZoneId.systemDefault().rules.getOffset(start).totalSeconds / 60
+        session = mutableMapOf(
+            "id" to sessionId,
+            "sleep_entry_id" to null,
+            "status" to "starting",
+            "started_at" to start.toString(),
+            "ended_at" to null,
+            "utc_offset_start_minutes" to offset,
+            "utc_offset_end_minutes" to null,
+            "sensor_mode" to "audio",
+            "algorithm_version" to "audio-noise-v1",
+            "time_in_bed_minutes" to null,
+            "quiet_minutes" to null,
+            "noisy_minutes" to null,
+            "estimated_sleep_minutes" to null,
+            "noise_event_count" to 0,
+            "signal_quality_score" to null,
+            "end_reason" to null,
+            "created_at" to start.toString(),
+        )
+        spool.create(session!!)
+        publish()
+
+        if (!hasMicrophonePermission()) {
+            finish("permission_revoked", "failed")
+            return START_NOT_STICKY
+        }
+
+        try {
+            acquireWakeLock()
+            processor = AudioSignalProcessor(
+                sessionId,
+                onSegment = ::onSegment,
+                onError = { finish("audio_error", "failed") },
+            )
+            processor?.start()
+            session!!["status"] = "running"
+            spool.updateSession(session!!)
+            publish()
+        } catch (_: Throwable) {
+            finish("audio_error", "failed")
+        }
+        return START_NOT_STICKY
+    }
+
+    private fun onSegment(segment: Map<String, Any?>) {
+        val current = session ?: return
+        if (finished) return
+        val startedMillis = Instant.parse(current["started_at"].toString()).toEpochMilli()
+        if (!finishing) {
+            if (!hasMicrophonePermission()) {
+                finish("permission_revoked", "failed")
+                return
+            }
+            if (System.currentTimeMillis() - startedMillis >= MAX_SESSION_MILLIS) {
+                finish("time_limit", "completed")
+                return
+            }
+        }
+        latestSegment = segment
+        noiseScore = (segment["noise_score"] as? Number)?.toDouble()
+        val duration = (segment["duration_seconds"] as? Number)?.toInt() ?: 0
+        val classification = segment["classification"]?.toString()
+        if (classification == "quiet") quietSeconds += duration
+        if (classification == "noise") noisySeconds += duration
+        if (classification == "noise" && !inNoiseEvent) noiseEvents++
+        inNoiseEvent = classification == "noise"
+        validFractionSum += (segment["valid_fraction"] as? Number)?.toDouble() ?: 0.0
+        segmentCount++
+        current["quiet_minutes"] = (quietSeconds / 60.0).roundToInt()
+        current["noisy_minutes"] = (noisySeconds / 60.0).roundToInt()
+        current["noise_event_count"] = noiseEvents
+        current["signal_quality_score"] = if (segmentCount == 0) 0.0 else validFractionSum / segmentCount
+        current["time_in_bed_minutes"] = ((System.currentTimeMillis() - startedMillis) / 60_000.0).roundToInt()
+        spool.appendSegment(segment)
+        spool.updateSession(current)
+        publish()
+    }
+
+    @Synchronized
+    private fun finish(reason: String, finalStatus: String) {
+        if (finished || finishing) return
+        finishing = true
+        val current = session
+        if (current != null && finalStatus == "completed") {
+            current["status"] = "stopping"
+            spool.updateSession(current)
+            publish()
+        }
+        if (current != null) {
+            // stop() emits the final partial window. Keep onSegment enabled
+            // until this returns so the last seconds are durably spooled.
+            try { processor?.stop() } catch (_: Throwable) {}
+            processor = null
+            val endedMillis = System.currentTimeMillis()
+            val ended = Instant.ofEpochMilli(endedMillis)
+            val elapsedMillis =
+                endedMillis - Instant.parse(current["started_at"].toString()).toEpochMilli()
+            val completedWithoutData =
+                finalStatus == "completed" &&
+                segmentCount == 0 &&
+                elapsedMillis >= AudioSignalProcessor.NO_DATA_TIMEOUT_MILLIS
+            current["status"] = if (completedWithoutData) "failed" else finalStatus
+            current["ended_at"] = ended.toString()
+            current["end_reason"] = if (completedWithoutData) "no_audio_data" else reason
+            current["time_in_bed_minutes"] = if (elapsedMillis <= 0) {
+                0
+            } else {
+                ceil(elapsedMillis / 60_000.0).toInt()
+            }
+            current["quiet_minutes"] = (quietSeconds / 60.0).roundToInt()
+            current["noisy_minutes"] = (noisySeconds / 60.0).roundToInt()
+            current["noise_event_count"] = noiseEvents
+            current["signal_quality_score"] =
+                if (segmentCount == 0) 0.0 else validFractionSum / segmentCount
+            val endOffset = ZoneId.systemDefault().rules.getOffset(ended).totalSeconds / 60
+            current["utc_offset_end_minutes"] = endOffset
+            spool.updateSession(current)
+        }
+        finished = true
+        finishing = false
+        releaseResources()
+        publish()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    private fun releaseResources() {
+        processor = null
+        wakeLock?.let { lock ->
+            if (lock.isHeld) lock.release()
+        }
+        wakeLock = null
+        activeInstance = null
+        lastState = session?.let { stateMap() }
+    }
+
+    private fun acquireWakeLock() {
+        val manager = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = manager.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "WorkoutNotes:SleepMonitoring",
+        ).apply { acquire(MAX_SESSION_MILLIS) }
+    }
+
+    private fun hasMicrophonePermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun stateMap(): Map<String, Any?> = mapOf(
+        "supported" to true,
+        "microphone_granted" to hasMicrophonePermission(),
+        "status" to (session?.get("status") ?: "idle"),
+        "session_id" to session?.get("id"),
+        "started_at" to session?.get("started_at"),
+        "updated_at" to Instant.now().toString(),
+        "latest_segment" to latestSegment,
+        "current_noise_score" to noiseScore,
+        "end_reason" to session?.get("end_reason"),
+        "error_code" to if (session?.get("status") == "failed") {
+            session?.get("end_reason")
+        } else {
+            null
+        },
+    )
+
+    private fun publish() {
+        val map = stateMap()
+        lastState = map
+        eventSink?.invoke(map)
+    }
+
+    override fun onDestroy() {
+        if (!finished && session != null) finish("service_destroyed", "interrupted")
+        super.onDestroy()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+}

@@ -1,4 +1,4 @@
-import 'dart:math';
+import 'dart:math' as math;
 import 'package:uuid/uuid.dart';
 import 'database_helper.dart';
 
@@ -7,13 +7,18 @@ import 'database_helper.dart';
 class TestDataGenerator {
   final _db = DatabaseHelper.instance;
   final _uuid = const Uuid();
-  final _rng = Random(42);
+  final _rng = math.Random(42);
 
   /// Generate [months] of fake workout data.
-  /// Returns a map with workout count and routine count.
+  /// Returns counts for workouts, routines, and sleep entries.
   Future<Map<String, int>> generate({int months = 4}) async {
     final exercises = await _db.getExercises();
-    if (exercises.isEmpty) return {'workouts': 0, 'routines': 0};
+    final now = DateTime.now();
+    final periodStart = DateTime(now.year, now.month - months, 1);
+    if (exercises.isEmpty) {
+      final sleepCount = await _generateSleepEntries(periodStart, now);
+      return {'workouts': 0, 'routines': 0, 'sleep': sleepCount};
+    }
 
     // Separate exercises by category for realistic PPL-like splits
     final byCategory = <String, List<Map<String, dynamic>>>{};
@@ -22,8 +27,6 @@ class TestDataGenerator {
       byCategory.putIfAbsent(catId, () => []).add(ex);
     }
 
-    final now = DateTime.now();
-    final periodStart = DateTime(now.year, now.month - months, 1);
     int workoutsCreated = 0;
     DateTime currentDate = periodStart;
 
@@ -53,24 +56,40 @@ class TestDataGenerator {
       List<Map<String, dynamic>> selectedExercises;
       if (dayMod == 0) {
         // Push: chest, shoulders, triceps
-        selectedExercises = _pickExercises(byCategory, ['chest', 'shoulders', 'triceps'], 4);
+        selectedExercises = _pickExercises(byCategory, [
+          'chest',
+          'shoulders',
+          'triceps',
+        ], 4);
       } else if (dayMod == 1) {
         // Pull: back, biceps
         selectedExercises = _pickExercises(byCategory, ['back', 'biceps'], 4);
       } else {
         // Legs + core + cardio
-        selectedExercises = _pickExercises(byCategory, ['legs', 'core', 'cardio'], 5);
+        selectedExercises = _pickExercises(byCategory, [
+          'legs',
+          'core',
+          'cardio',
+        ], 5);
       }
 
       // Add random extra from fullbody sometimes
       if (_rng.nextDouble() < 0.3 && byCategory.containsKey('fullbody')) {
-        selectedExercises.add(byCategory['fullbody']![_rng.nextInt(byCategory['fullbody']!.length)]);
+        selectedExercises.add(
+          byCategory['fullbody']![_rng.nextInt(byCategory['fullbody']!.length)],
+        );
       }
 
       // Create the workout
       final startHour = 6 + _rng.nextInt(12);
       final startMinute = _rng.nextInt(60);
-      final startTime = DateTime(currentDate.year, currentDate.month, currentDate.day, startHour, startMinute);
+      final startTime = DateTime(
+        currentDate.year,
+        currentDate.month,
+        currentDate.day,
+        startHour,
+        startMinute,
+      );
       final durationMinutes = 30 + _rng.nextInt(60);
 
       await db.rawInsert(
@@ -111,8 +130,13 @@ class TestDataGenerator {
 
           if (exType == 'weightReps') {
             double base = progression[ex['id'] as String] ?? 20;
-            final monthsSinceStart = currentDate.difference(DateTime(now.year, now.month - months, 1)).inDays / 30;
-            final progress = monthsSinceStart * _progressRate(ex['name'] as String);
+            final monthsSinceStart =
+                currentDate
+                    .difference(DateTime(now.year, now.month - months, 1))
+                    .inDays /
+                30;
+            final progress =
+                monthsSinceStart * _progressRate(ex['name'] as String);
             final noise = (_rng.nextDouble() - 0.5) * 4;
             weight = (base + progress + noise).clamp(1, 500);
             weight = (weight / 2.5).round() * 2.5;
@@ -145,10 +169,17 @@ class TestDataGenerator {
     // Generate body measurements over the same period
     await _generateBodyMeasurements(periodStart, now);
 
+    // Generate nightly sleep entries over the same period
+    final sleepCount = await _generateSleepEntries(periodStart, now);
+
     // Also generate sample routines for testing
     final routineCount = await generateRoutines();
 
-    return {'workouts': workoutsCreated, 'routines': routineCount};
+    return {
+      'workouts': workoutsCreated,
+      'routines': routineCount,
+      'sleep': sleepCount,
+    };
   }
 
   /// Generates sample routines (PPL, Upper/Lower, Full Body) for testing.
@@ -173,7 +204,10 @@ class TestDataGenerator {
     const kR = 'reps';
 
     // Helper to add a routine with days, exercises, and predefined sets
-    Future<void> createRoutine(String name, List<Map<String, dynamic>> days) async {
+    Future<void> createRoutine(
+      String name,
+      List<Map<String, dynamic>> days,
+    ) async {
       final routineId = _uuid.v4();
       await db.insert('routines', {
         'id': routineId,
@@ -239,63 +273,322 @@ class TestDataGenerator {
       {
         'name': 'Push A - Peito',
         'exercises': [
-          {kEx: 'bench_press', kRest: 120, kSets: [{kW: 60, kR: 10}, {kW: 70, kR: 8}, {kW: 75, kR: 6}, {kW: 60, kR: 12}]},
-          {kEx: 'incl_bench', kRest: 90, kSets: [{kW: 50, kR: 10}, {kW: 55, kR: 8}, {kW: 60, kR: 8}]},
-          {kEx: 'ohp', kRest: 120, kSets: [{kW: 30, kR: 10}, {kW: 35, kR: 8}, {kW: 40, kR: 6}]},
-          {kEx: 'lat_raise', kRest: 60, kSets: [{kW: 10, kR: 15}, {kW: 12, kR: 12}, {kW: 12, kR: 12}]},
-          {kEx: 'triceps_pushdown', kRest: 60, kSets: [{kW: 20, kR: 12}, {kW: 25, kR: 10}, {kW: 25, kR: 10}]},
-          {kEx: 'cable_fly', kRest: 60, kSets: [{kW: 15, kR: 15}, {kW: 20, kR: 12}, {kW: 20, kR: 12}]},
+          {
+            kEx: 'bench_press',
+            kRest: 120,
+            kSets: [
+              {kW: 60, kR: 10},
+              {kW: 70, kR: 8},
+              {kW: 75, kR: 6},
+              {kW: 60, kR: 12},
+            ],
+          },
+          {
+            kEx: 'incl_bench',
+            kRest: 90,
+            kSets: [
+              {kW: 50, kR: 10},
+              {kW: 55, kR: 8},
+              {kW: 60, kR: 8},
+            ],
+          },
+          {
+            kEx: 'ohp',
+            kRest: 120,
+            kSets: [
+              {kW: 30, kR: 10},
+              {kW: 35, kR: 8},
+              {kW: 40, kR: 6},
+            ],
+          },
+          {
+            kEx: 'lat_raise',
+            kRest: 60,
+            kSets: [
+              {kW: 10, kR: 15},
+              {kW: 12, kR: 12},
+              {kW: 12, kR: 12},
+            ],
+          },
+          {
+            kEx: 'triceps_pushdown',
+            kRest: 60,
+            kSets: [
+              {kW: 20, kR: 12},
+              {kW: 25, kR: 10},
+              {kW: 25, kR: 10},
+            ],
+          },
+          {
+            kEx: 'cable_fly',
+            kRest: 60,
+            kSets: [
+              {kW: 15, kR: 15},
+              {kW: 20, kR: 12},
+              {kW: 20, kR: 12},
+            ],
+          },
         ],
       },
       {
         'name': 'Pull A - Costas',
         'exercises': [
-          {kEx: 'deadlift', kRest: 180, kSets: [{kW: 80, kR: 8}, {kW: 100, kR: 6}, {kW: 110, kR: 4}, {kW: 80, kR: 10}]},
-          {kEx: 'pullup', kRest: 90, kSets: [{kW: 0, kR: 10}, {kW: 0, kR: 8}, {kW: 0, kR: 8}]},
-          {kEx: 'bent_row', kRest: 90, kSets: [{kW: 50, kR: 10}, {kW: 60, kR: 8}, {kW: 65, kR: 6}]},
-          {kEx: 'face_pull', kRest: 60, kSets: [{kW: 15, kR: 15}, {kW: 17.5, kR: 12}, {kW: 17.5, kR: 12}]},
-          {kEx: 'bb_curl', kRest: 60, kSets: [{kW: 25, kR: 12}, {kW: 30, kR: 10}, {kW: 30, kR: 10}]},
-          {kEx: 'hammer_curl', kRest: 60, kSets: [{kW: 12, kR: 12}, {kW: 14, kR: 10}, {kW: 14, kR: 10}]},
+          {
+            kEx: 'deadlift',
+            kRest: 180,
+            kSets: [
+              {kW: 80, kR: 8},
+              {kW: 100, kR: 6},
+              {kW: 110, kR: 4},
+              {kW: 80, kR: 10},
+            ],
+          },
+          {
+            kEx: 'pullup',
+            kRest: 90,
+            kSets: [
+              {kW: 0, kR: 10},
+              {kW: 0, kR: 8},
+              {kW: 0, kR: 8},
+            ],
+          },
+          {
+            kEx: 'bent_row',
+            kRest: 90,
+            kSets: [
+              {kW: 50, kR: 10},
+              {kW: 60, kR: 8},
+              {kW: 65, kR: 6},
+            ],
+          },
+          {
+            kEx: 'face_pull',
+            kRest: 60,
+            kSets: [
+              {kW: 15, kR: 15},
+              {kW: 17.5, kR: 12},
+              {kW: 17.5, kR: 12},
+            ],
+          },
+          {
+            kEx: 'bb_curl',
+            kRest: 60,
+            kSets: [
+              {kW: 25, kR: 12},
+              {kW: 30, kR: 10},
+              {kW: 30, kR: 10},
+            ],
+          },
+          {
+            kEx: 'hammer_curl',
+            kRest: 60,
+            kSets: [
+              {kW: 12, kR: 12},
+              {kW: 14, kR: 10},
+              {kW: 14, kR: 10},
+            ],
+          },
         ],
       },
       {
         'name': 'Legs A - Quadríceps',
         'exercises': [
-          {kEx: 'squat', kRest: 180, kSets: [{kW: 60, kR: 10}, {kW: 80, kR: 8}, {kW: 90, kR: 6}, {kW: 100, kR: 4}]},
-          {kEx: 'leg_press', kRest: 120, kSets: [{kW: 140, kR: 12}, {kW: 180, kR: 10}, {kW: 200, kR: 8}]},
-          {kEx: 'leg_ext', kRest: 90, kSets: [{kW: 40, kR: 12}, {kW: 50, kR: 10}, {kW: 55, kR: 10}]},
-          {kEx: 'leg_curl', kRest: 90, kSets: [{kW: 35, kR: 12}, {kW: 40, kR: 10}, {kW: 45, kR: 10}]},
-          {kEx: 'calf_raise', kRest: 60, kSets: [{kW: 60, kR: 15}, {kW: 70, kR: 12}, {kW: 80, kR: 12}]},
+          {
+            kEx: 'squat',
+            kRest: 180,
+            kSets: [
+              {kW: 60, kR: 10},
+              {kW: 80, kR: 8},
+              {kW: 90, kR: 6},
+              {kW: 100, kR: 4},
+            ],
+          },
+          {
+            kEx: 'leg_press',
+            kRest: 120,
+            kSets: [
+              {kW: 140, kR: 12},
+              {kW: 180, kR: 10},
+              {kW: 200, kR: 8},
+            ],
+          },
+          {
+            kEx: 'leg_ext',
+            kRest: 90,
+            kSets: [
+              {kW: 40, kR: 12},
+              {kW: 50, kR: 10},
+              {kW: 55, kR: 10},
+            ],
+          },
+          {
+            kEx: 'leg_curl',
+            kRest: 90,
+            kSets: [
+              {kW: 35, kR: 12},
+              {kW: 40, kR: 10},
+              {kW: 45, kR: 10},
+            ],
+          },
+          {
+            kEx: 'calf_raise',
+            kRest: 60,
+            kSets: [
+              {kW: 60, kR: 15},
+              {kW: 70, kR: 12},
+              {kW: 80, kR: 12},
+            ],
+          },
         ],
       },
       {
         'name': 'Push B - Ombros',
         'exercises': [
-          {kEx: 'db_ohp', kRest: 90, kSets: [{kW: 20, kR: 10}, {kW: 24, kR: 8}, {kW: 26, kR: 6}]},
-          {kEx: 'db_bench', kRest: 90, kSets: [{kW: 28, kR: 10}, {kW: 32, kR: 8}, {kW: 36, kR: 6}]},
-          {kEx: 'chest_dip', kRest: 90, kSets: [{kW: 0, kR: 12}, {kW: 0, kR: 10}, {kW: 0, kR: 8}]},
-          {kEx: 'lat_raise', kRest: 60, kSets: [{kW: 10, kR: 15}, {kW: 12, kR: 12}, {kW: 12, kR: 12}]},
-          {kEx: 'skull_crusher', kRest: 60, kSets: [{kW: 20, kR: 12}, {kW: 25, kR: 10}, {kW: 25, kR: 10}]},
+          {
+            kEx: 'db_ohp',
+            kRest: 90,
+            kSets: [
+              {kW: 20, kR: 10},
+              {kW: 24, kR: 8},
+              {kW: 26, kR: 6},
+            ],
+          },
+          {
+            kEx: 'db_bench',
+            kRest: 90,
+            kSets: [
+              {kW: 28, kR: 10},
+              {kW: 32, kR: 8},
+              {kW: 36, kR: 6},
+            ],
+          },
+          {
+            kEx: 'chest_dip',
+            kRest: 90,
+            kSets: [
+              {kW: 0, kR: 12},
+              {kW: 0, kR: 10},
+              {kW: 0, kR: 8},
+            ],
+          },
+          {
+            kEx: 'lat_raise',
+            kRest: 60,
+            kSets: [
+              {kW: 10, kR: 15},
+              {kW: 12, kR: 12},
+              {kW: 12, kR: 12},
+            ],
+          },
+          {
+            kEx: 'skull_crusher',
+            kRest: 60,
+            kSets: [
+              {kW: 20, kR: 12},
+              {kW: 25, kR: 10},
+              {kW: 25, kR: 10},
+            ],
+          },
         ],
       },
       {
         'name': 'Pull B - Dorsal',
         'exercises': [
-          {kEx: 'chinup', kRest: 90, kSets: [{kW: 0, kR: 10}, {kW: 0, kR: 8}, {kW: 0, kR: 6}]},
-          {kEx: 'lat_pulldown', kRest: 90, kSets: [{kW: 50, kR: 10}, {kW: 60, kR: 8}, {kW: 65, kR: 6}]},
-          {kEx: 'seated_row', kRest: 90, kSets: [{kW: 40, kR: 12}, {kW: 50, kR: 10}, {kW: 55, kR: 8}]},
-          {kEx: 'rear_delt_fly', kRest: 60, kSets: [{kW: 12, kR: 15}, {kW: 15, kR: 12}, {kW: 15, kR: 12}]},
-          {kEx: 'cable_curl', kRest: 60, kSets: [{kW: 15, kR: 12}, {kW: 20, kR: 10}, {kW: 20, kR: 10}]},
+          {
+            kEx: 'chinup',
+            kRest: 90,
+            kSets: [
+              {kW: 0, kR: 10},
+              {kW: 0, kR: 8},
+              {kW: 0, kR: 6},
+            ],
+          },
+          {
+            kEx: 'lat_pulldown',
+            kRest: 90,
+            kSets: [
+              {kW: 50, kR: 10},
+              {kW: 60, kR: 8},
+              {kW: 65, kR: 6},
+            ],
+          },
+          {
+            kEx: 'seated_row',
+            kRest: 90,
+            kSets: [
+              {kW: 40, kR: 12},
+              {kW: 50, kR: 10},
+              {kW: 55, kR: 8},
+            ],
+          },
+          {
+            kEx: 'rear_delt_fly',
+            kRest: 60,
+            kSets: [
+              {kW: 12, kR: 15},
+              {kW: 15, kR: 12},
+              {kW: 15, kR: 12},
+            ],
+          },
+          {
+            kEx: 'cable_curl',
+            kRest: 60,
+            kSets: [
+              {kW: 15, kR: 12},
+              {kW: 20, kR: 10},
+              {kW: 20, kR: 10},
+            ],
+          },
         ],
       },
       {
         'name': 'Legs B - Posterior',
         'exercises': [
-          {kEx: 'romanian_dl', kRest: 120, kSets: [{kW: 50, kR: 10}, {kW: 60, kR: 8}, {kW: 70, kR: 6}]},
-          {kEx: 'front_squat', kRest: 150, kSets: [{kW: 40, kR: 8}, {kW: 50, kR: 6}, {kW: 55, kR: 4}]},
-          {kEx: 'bulgarian_split', kRest: 90, kSets: [{kW: 20, kR: 10}, {kW: 24, kR: 8}, {kW: 24, kR: 8}]},
-          {kEx: 'hip_thrust', kRest: 90, kSets: [{kW: 60, kR: 12}, {kW: 70, kR: 10}, {kW: 80, kR: 8}]},
-          {kEx: 'calf_raise', kRest: 60, kSets: [{kW: 60, kR: 15}, {kW: 70, kR: 12}, {kW: 80, kR: 12}]},
+          {
+            kEx: 'romanian_dl',
+            kRest: 120,
+            kSets: [
+              {kW: 50, kR: 10},
+              {kW: 60, kR: 8},
+              {kW: 70, kR: 6},
+            ],
+          },
+          {
+            kEx: 'front_squat',
+            kRest: 150,
+            kSets: [
+              {kW: 40, kR: 8},
+              {kW: 50, kR: 6},
+              {kW: 55, kR: 4},
+            ],
+          },
+          {
+            kEx: 'bulgarian_split',
+            kRest: 90,
+            kSets: [
+              {kW: 20, kR: 10},
+              {kW: 24, kR: 8},
+              {kW: 24, kR: 8},
+            ],
+          },
+          {
+            kEx: 'hip_thrust',
+            kRest: 90,
+            kSets: [
+              {kW: 60, kR: 12},
+              {kW: 70, kR: 10},
+              {kW: 80, kR: 8},
+            ],
+          },
+          {
+            kEx: 'calf_raise',
+            kRest: 60,
+            kSets: [
+              {kW: 60, kR: 15},
+              {kW: 70, kR: 12},
+              {kW: 80, kR: 12},
+            ],
+          },
         ],
       },
     ]);
@@ -308,43 +601,223 @@ class TestDataGenerator {
       {
         'name': 'Upper A - Força',
         'exercises': [
-          {kEx: 'bench_press', kRest: 120, kSets: [{kW: 50, kR: 10}, {kW: 60, kR: 8}, {kW: 70, kR: 6}, {kW: 75, kR: 4}]},
-          {kEx: 'bent_row', kRest: 120, kSets: [{kW: 50, kR: 10}, {kW: 60, kR: 8}, {kW: 65, kR: 6}]},
-          {kEx: 'ohp', kRest: 90, kSets: [{kW: 30, kR: 8}, {kW: 35, kR: 6}, {kW: 40, kR: 4}]},
-          {kEx: 'pullup', kRest: 90, kSets: [{kW: 0, kR: 10}, {kW: 0, kR: 8}, {kW: 0, kR: 6}]},
-          {kEx: 'bb_curl', kRest: 60, kSets: [{kW: 25, kR: 12}, {kW: 30, kR: 10}, {kW: 30, kR: 10}]},
-          {kEx: 'triceps_pushdown', kRest: 60, kSets: [{kW: 20, kR: 12}, {kW: 25, kR: 10}, {kW: 25, kR: 10}]},
+          {
+            kEx: 'bench_press',
+            kRest: 120,
+            kSets: [
+              {kW: 50, kR: 10},
+              {kW: 60, kR: 8},
+              {kW: 70, kR: 6},
+              {kW: 75, kR: 4},
+            ],
+          },
+          {
+            kEx: 'bent_row',
+            kRest: 120,
+            kSets: [
+              {kW: 50, kR: 10},
+              {kW: 60, kR: 8},
+              {kW: 65, kR: 6},
+            ],
+          },
+          {
+            kEx: 'ohp',
+            kRest: 90,
+            kSets: [
+              {kW: 30, kR: 8},
+              {kW: 35, kR: 6},
+              {kW: 40, kR: 4},
+            ],
+          },
+          {
+            kEx: 'pullup',
+            kRest: 90,
+            kSets: [
+              {kW: 0, kR: 10},
+              {kW: 0, kR: 8},
+              {kW: 0, kR: 6},
+            ],
+          },
+          {
+            kEx: 'bb_curl',
+            kRest: 60,
+            kSets: [
+              {kW: 25, kR: 12},
+              {kW: 30, kR: 10},
+              {kW: 30, kR: 10},
+            ],
+          },
+          {
+            kEx: 'triceps_pushdown',
+            kRest: 60,
+            kSets: [
+              {kW: 20, kR: 12},
+              {kW: 25, kR: 10},
+              {kW: 25, kR: 10},
+            ],
+          },
         ],
       },
       {
         'name': 'Lower A - Quad Dominant',
         'exercises': [
-          {kEx: 'squat', kRest: 180, kSets: [{kW: 60, kR: 10}, {kW: 80, kR: 8}, {kW: 90, kR: 6}, {kW: 100, kR: 4}]},
-          {kEx: 'romanian_dl', kRest: 120, kSets: [{kW: 50, kR: 10}, {kW: 60, kR: 8}, {kW: 65, kR: 6}]},
-          {kEx: 'leg_ext', kRest: 90, kSets: [{kW: 40, kR: 12}, {kW: 50, kR: 10}, {kW: 55, kR: 10}]},
-          {kEx: 'leg_curl', kRest: 90, kSets: [{kW: 35, kR: 12}, {kW: 40, kR: 10}, {kW: 45, kR: 10}]},
-          {kEx: 'calf_raise', kRest: 60, kSets: [{kW: 60, kR: 15}, {kW: 70, kR: 12}, {kW: 80, kR: 12}]},
+          {
+            kEx: 'squat',
+            kRest: 180,
+            kSets: [
+              {kW: 60, kR: 10},
+              {kW: 80, kR: 8},
+              {kW: 90, kR: 6},
+              {kW: 100, kR: 4},
+            ],
+          },
+          {
+            kEx: 'romanian_dl',
+            kRest: 120,
+            kSets: [
+              {kW: 50, kR: 10},
+              {kW: 60, kR: 8},
+              {kW: 65, kR: 6},
+            ],
+          },
+          {
+            kEx: 'leg_ext',
+            kRest: 90,
+            kSets: [
+              {kW: 40, kR: 12},
+              {kW: 50, kR: 10},
+              {kW: 55, kR: 10},
+            ],
+          },
+          {
+            kEx: 'leg_curl',
+            kRest: 90,
+            kSets: [
+              {kW: 35, kR: 12},
+              {kW: 40, kR: 10},
+              {kW: 45, kR: 10},
+            ],
+          },
+          {
+            kEx: 'calf_raise',
+            kRest: 60,
+            kSets: [
+              {kW: 60, kR: 15},
+              {kW: 70, kR: 12},
+              {kW: 80, kR: 12},
+            ],
+          },
         ],
       },
       {
         'name': 'Upper B - Hipertrofia',
         'exercises': [
-          {kEx: 'db_incl', kRest: 90, kSets: [{kW: 26, kR: 10}, {kW: 30, kR: 8}, {kW: 32, kR: 8}, {kW: 26, kR: 12}]},
-          {kEx: 'lat_pulldown', kRest: 90, kSets: [{kW: 50, kR: 12}, {kW: 60, kR: 10}, {kW: 65, kR: 8}]},
-          {kEx: 'db_ohp', kRest: 90, kSets: [{kW: 20, kR: 10}, {kW: 24, kR: 8}, {kW: 26, kR: 8}]},
-          {kEx: 'seated_row', kRest: 90, kSets: [{kW: 45, kR: 12}, {kW: 55, kR: 10}, {kW: 55, kR: 10}]},
-          {kEx: 'hammer_curl', kRest: 60, kSets: [{kW: 12, kR: 12}, {kW: 14, kR: 10}, {kW: 14, kR: 10}]},
-          {kEx: 'skull_crusher', kRest: 60, kSets: [{kW: 20, kR: 12}, {kW: 25, kR: 10}, {kW: 25, kR: 10}]},
+          {
+            kEx: 'db_incl',
+            kRest: 90,
+            kSets: [
+              {kW: 26, kR: 10},
+              {kW: 30, kR: 8},
+              {kW: 32, kR: 8},
+              {kW: 26, kR: 12},
+            ],
+          },
+          {
+            kEx: 'lat_pulldown',
+            kRest: 90,
+            kSets: [
+              {kW: 50, kR: 12},
+              {kW: 60, kR: 10},
+              {kW: 65, kR: 8},
+            ],
+          },
+          {
+            kEx: 'db_ohp',
+            kRest: 90,
+            kSets: [
+              {kW: 20, kR: 10},
+              {kW: 24, kR: 8},
+              {kW: 26, kR: 8},
+            ],
+          },
+          {
+            kEx: 'seated_row',
+            kRest: 90,
+            kSets: [
+              {kW: 45, kR: 12},
+              {kW: 55, kR: 10},
+              {kW: 55, kR: 10},
+            ],
+          },
+          {
+            kEx: 'hammer_curl',
+            kRest: 60,
+            kSets: [
+              {kW: 12, kR: 12},
+              {kW: 14, kR: 10},
+              {kW: 14, kR: 10},
+            ],
+          },
+          {
+            kEx: 'skull_crusher',
+            kRest: 60,
+            kSets: [
+              {kW: 20, kR: 12},
+              {kW: 25, kR: 10},
+              {kW: 25, kR: 10},
+            ],
+          },
         ],
       },
       {
         'name': 'Lower B - Posterior Focus',
         'exercises': [
-          {kEx: 'deadlift', kRest: 180, kSets: [{kW: 80, kR: 8}, {kW: 100, kR: 6}, {kW: 110, kR: 4}, {kW: 80, kR: 10}]},
-          {kEx: 'leg_press', kRest: 120, kSets: [{kW: 160, kR: 12}, {kW: 200, kR: 10}, {kW: 220, kR: 8}]},
-          {kEx: 'bulgarian_split', kRest: 90, kSets: [{kW: 20, kR: 10}, {kW: 24, kR: 8}, {kW: 24, kR: 8}]},
-          {kEx: 'hip_thrust', kRest: 90, kSets: [{kW: 60, kR: 12}, {kW: 80, kR: 10}, {kW: 90, kR: 8}]},
-          {kEx: 'leg_curl', kRest: 90, kSets: [{kW: 40, kR: 12}, {kW: 45, kR: 10}, {kW: 50, kR: 10}]},
+          {
+            kEx: 'deadlift',
+            kRest: 180,
+            kSets: [
+              {kW: 80, kR: 8},
+              {kW: 100, kR: 6},
+              {kW: 110, kR: 4},
+              {kW: 80, kR: 10},
+            ],
+          },
+          {
+            kEx: 'leg_press',
+            kRest: 120,
+            kSets: [
+              {kW: 160, kR: 12},
+              {kW: 200, kR: 10},
+              {kW: 220, kR: 8},
+            ],
+          },
+          {
+            kEx: 'bulgarian_split',
+            kRest: 90,
+            kSets: [
+              {kW: 20, kR: 10},
+              {kW: 24, kR: 8},
+              {kW: 24, kR: 8},
+            ],
+          },
+          {
+            kEx: 'hip_thrust',
+            kRest: 90,
+            kSets: [
+              {kW: 60, kR: 12},
+              {kW: 80, kR: 10},
+              {kW: 90, kR: 8},
+            ],
+          },
+          {
+            kEx: 'leg_curl',
+            kRest: 90,
+            kSets: [
+              {kW: 40, kR: 12},
+              {kW: 45, kR: 10},
+              {kW: 50, kR: 10},
+            ],
+          },
         ],
       },
     ]);
@@ -357,34 +830,177 @@ class TestDataGenerator {
       {
         'name': 'Full A - Força',
         'exercises': [
-          {kEx: 'squat', kRest: 180, kSets: [{kW: 60, kR: 10}, {kW: 80, kR: 8}, {kW: 90, kR: 6}]},
-          {kEx: 'bench_press', kRest: 120, kSets: [{kW: 50, kR: 10}, {kW: 60, kR: 8}, {kW: 70, kR: 6}]},
-          {kEx: 'bent_row', kRest: 120, kSets: [{kW: 50, kR: 10}, {kW: 60, kR: 8}, {kW: 65, kR: 6}]},
-          {kEx: 'ohp', kRest: 90, kSets: [{kW: 30, kR: 8}, {kW: 35, kR: 6}, {kW: 40, kR: 5}]},
-          {kEx: 'bb_curl', kRest: 60, kSets: [{kW: 25, kR: 12}, {kW: 30, kR: 10}]},
-          {kEx: 'leg_curl', kRest: 90, kSets: [{kW: 35, kR: 12}, {kW: 40, kR: 10}, {kW: 45, kR: 10}]},
+          {
+            kEx: 'squat',
+            kRest: 180,
+            kSets: [
+              {kW: 60, kR: 10},
+              {kW: 80, kR: 8},
+              {kW: 90, kR: 6},
+            ],
+          },
+          {
+            kEx: 'bench_press',
+            kRest: 120,
+            kSets: [
+              {kW: 50, kR: 10},
+              {kW: 60, kR: 8},
+              {kW: 70, kR: 6},
+            ],
+          },
+          {
+            kEx: 'bent_row',
+            kRest: 120,
+            kSets: [
+              {kW: 50, kR: 10},
+              {kW: 60, kR: 8},
+              {kW: 65, kR: 6},
+            ],
+          },
+          {
+            kEx: 'ohp',
+            kRest: 90,
+            kSets: [
+              {kW: 30, kR: 8},
+              {kW: 35, kR: 6},
+              {kW: 40, kR: 5},
+            ],
+          },
+          {
+            kEx: 'bb_curl',
+            kRest: 60,
+            kSets: [
+              {kW: 25, kR: 12},
+              {kW: 30, kR: 10},
+            ],
+          },
+          {
+            kEx: 'leg_curl',
+            kRest: 90,
+            kSets: [
+              {kW: 35, kR: 12},
+              {kW: 40, kR: 10},
+              {kW: 45, kR: 10},
+            ],
+          },
         ],
       },
       {
         'name': 'Full B - Resistência',
         'exercises': [
-          {kEx: 'deadlift', kRest: 180, kSets: [{kW: 80, kR: 8}, {kW: 100, kR: 6}, {kW: 105, kR: 5}]},
-          {kEx: 'incl_bench', kRest: 90, kSets: [{kW: 40, kR: 10}, {kW: 50, kR: 8}, {kW: 55, kR: 8}]},
-          {kEx: 'lat_pulldown', kRest: 90, kSets: [{kW: 50, kR: 10}, {kW: 60, kR: 8}, {kW: 65, kR: 8}]},
-          {kEx: 'db_ohp', kRest: 90, kSets: [{kW: 20, kR: 10}, {kW: 24, kR: 8}, {kW: 26, kR: 8}]},
-          {kEx: 'triceps_pushdown', kRest: 60, kSets: [{kW: 20, kR: 12}, {kW: 25, kR: 10}, {kW: 25, kR: 10}]},
-          {kEx: 'leg_ext', kRest: 90, kSets: [{kW: 40, kR: 12}, {kW: 50, kR: 10}, {kW: 55, kR: 10}]},
+          {
+            kEx: 'deadlift',
+            kRest: 180,
+            kSets: [
+              {kW: 80, kR: 8},
+              {kW: 100, kR: 6},
+              {kW: 105, kR: 5},
+            ],
+          },
+          {
+            kEx: 'incl_bench',
+            kRest: 90,
+            kSets: [
+              {kW: 40, kR: 10},
+              {kW: 50, kR: 8},
+              {kW: 55, kR: 8},
+            ],
+          },
+          {
+            kEx: 'lat_pulldown',
+            kRest: 90,
+            kSets: [
+              {kW: 50, kR: 10},
+              {kW: 60, kR: 8},
+              {kW: 65, kR: 8},
+            ],
+          },
+          {
+            kEx: 'db_ohp',
+            kRest: 90,
+            kSets: [
+              {kW: 20, kR: 10},
+              {kW: 24, kR: 8},
+              {kW: 26, kR: 8},
+            ],
+          },
+          {
+            kEx: 'triceps_pushdown',
+            kRest: 60,
+            kSets: [
+              {kW: 20, kR: 12},
+              {kW: 25, kR: 10},
+              {kW: 25, kR: 10},
+            ],
+          },
+          {
+            kEx: 'leg_ext',
+            kRest: 90,
+            kSets: [
+              {kW: 40, kR: 12},
+              {kW: 50, kR: 10},
+              {kW: 55, kR: 10},
+            ],
+          },
         ],
       },
       {
         'name': 'Full C - Híbrido',
         'exercises': [
-          {kEx: 'front_squat', kRest: 150, kSets: [{kW: 40, kR: 8}, {kW: 50, kR: 6}, {kW: 60, kR: 5}]},
-          {kEx: 'db_bench', kRest: 90, kSets: [{kW: 28, kR: 10}, {kW: 32, kR: 8}, {kW: 36, kR: 6}]},
-          {kEx: 'pullup', kRest: 90, kSets: [{kW: 0, kR: 8}, {kW: 0, kR: 6}, {kW: 0, kR: 6}]},
-          {kEx: 'arnold_press', kRest: 90, kSets: [{kW: 18, kR: 10}, {kW: 20, kR: 8}, {kW: 22, kR: 8}]},
-          {kEx: 'hammer_curl', kRest: 60, kSets: [{kW: 12, kR: 12}, {kW: 14, kR: 10}, {kW: 14, kR: 10}]},
-          {kEx: 'cable_curl', kRest: 60, kSets: [{kW: 15, kR: 12}, {kW: 20, kR: 10}, {kW: 20, kR: 10}]},
+          {
+            kEx: 'front_squat',
+            kRest: 150,
+            kSets: [
+              {kW: 40, kR: 8},
+              {kW: 50, kR: 6},
+              {kW: 60, kR: 5},
+            ],
+          },
+          {
+            kEx: 'db_bench',
+            kRest: 90,
+            kSets: [
+              {kW: 28, kR: 10},
+              {kW: 32, kR: 8},
+              {kW: 36, kR: 6},
+            ],
+          },
+          {
+            kEx: 'pullup',
+            kRest: 90,
+            kSets: [
+              {kW: 0, kR: 8},
+              {kW: 0, kR: 6},
+              {kW: 0, kR: 6},
+            ],
+          },
+          {
+            kEx: 'arnold_press',
+            kRest: 90,
+            kSets: [
+              {kW: 18, kR: 10},
+              {kW: 20, kR: 8},
+              {kW: 22, kR: 8},
+            ],
+          },
+          {
+            kEx: 'hammer_curl',
+            kRest: 60,
+            kSets: [
+              {kW: 12, kR: 12},
+              {kW: 14, kR: 10},
+              {kW: 14, kR: 10},
+            ],
+          },
+          {
+            kEx: 'cable_curl',
+            kRest: 60,
+            kSets: [
+              {kW: 15, kR: 12},
+              {kW: 20, kR: 10},
+              {kW: 20, kR: 10},
+            ],
+          },
         ],
       },
     ]);
@@ -393,22 +1009,25 @@ class TestDataGenerator {
   }
 
   /// Generates realistic body measurement data over the given period.
-  Future<void> _generateBodyMeasurements(DateTime periodStart, DateTime now) async {
+  Future<void> _generateBodyMeasurements(
+    DateTime periodStart,
+    DateTime now,
+  ) async {
     final db = await _db.database;
 
     // ── Measurement definitions with realistic progression ───────────
     // Each entry: (type, startVal, endVal, unit, isBilateral, dayInterval)
     final definitions = [
-      ('weight',   82.0,  77.0,  'kg', false, 7),
-      ('bodyFat',  18.5,  14.0,  '%',  false, 14),
-      ('waist',    88.0,  81.0,  'cm', false, 10),
-      ('chest',    100.0, 104.5, 'cm', false, 14),
-      ('arm',      33.5,  36.5,  'cm', true,  14),
-      ('forearm',  27.0,  29.0,  'cm', true,  14),
-      ('neck',     39.0,  38.0,  'cm', false, 14),
-      ('thigh',    55.0,  57.5,  'cm', true,  14),
-      ('calf',     36.0,  37.0,  'cm', true,  14),
-      ('hip',      98.0,  94.0,  'cm', false, 14),
+      ('weight', 82.0, 77.0, 'kg', false, 7),
+      ('bodyFat', 18.5, 14.0, '%', false, 14),
+      ('waist', 88.0, 81.0, 'cm', false, 10),
+      ('chest', 100.0, 104.5, 'cm', false, 14),
+      ('arm', 33.5, 36.5, 'cm', true, 14),
+      ('forearm', 27.0, 29.0, 'cm', true, 14),
+      ('neck', 39.0, 38.0, 'cm', false, 14),
+      ('thigh', 55.0, 57.5, 'cm', true, 14),
+      ('calf', 36.0, 37.0, 'cm', true, 14),
+      ('hip', 98.0, 94.0, 'cm', false, 14),
     ];
 
     final totalDays = now.difference(periodStart).inDays;
@@ -424,7 +1043,15 @@ class TestDataGenerator {
       final progress = endVal - startVal;
 
       // Time-of-day distribution
-      final todOptions = [null, null, null, 'morning', 'afternoon', 'morning', 'evening'];
+      final todOptions = [
+        null,
+        null,
+        null,
+        'morning',
+        'afternoon',
+        'morning',
+        'evening',
+      ];
 
       // Generate measurements at regular intervals with some noise
       int dayOffset = _rng.nextInt(interval); // random start offset
@@ -444,10 +1071,12 @@ class TestDataGenerator {
 
         // Add measurement noise: larger for weight, smaller for tape measures
         final measurementNoise = type == 'weight'
-            ? (_rng.nextDouble() - 0.5) * 1.2   // ±0.6kg for weight
+            ? (_rng.nextDouble() - 0.5) *
+                  1.2 // ±0.6kg for weight
             : type == 'bodyFat'
-                ? (_rng.nextDouble() - 0.5) * 0.8 // ±0.4% for body fat
-                : (_rng.nextDouble() - 0.5) * 0.6; // ±0.3cm for tape
+            ? (_rng.nextDouble() - 0.5) *
+                  0.8 // ±0.4% for body fat
+            : (_rng.nextDouble() - 0.5) * 0.6; // ±0.3cm for tape
 
         double value = (trendValue + measurementNoise).clamp(1.0, 200.0);
         value = double.parse(value.toStringAsFixed(1));
@@ -457,7 +1086,8 @@ class TestDataGenerator {
 
         // 30% chance of a comment on weight/bodyfat measurements
         String? comment;
-        if (_rng.nextDouble() < 0.3 && (type == 'weight' || type == 'bodyFat')) {
+        if (_rng.nextDouble() < 0.3 &&
+            (type == 'weight' || type == 'bodyFat')) {
           comment = _randomWeightComment();
           if (comment?.isEmpty == true) comment = null;
         }
@@ -465,12 +1095,14 @@ class TestDataGenerator {
         if (isBilateral) {
           // Generate left and right with slight natural asymmetry
           final asymmetry = double.parse(
-              ((_rng.nextDouble() - 0.5) * 0.8).toStringAsFixed(1)); // ±0.4cm asymmetry
+            ((_rng.nextDouble() - 0.5) * 0.8).toStringAsFixed(1),
+          ); // ±0.4cm asymmetry
 
           for (final side in ['left', 'right']) {
             final sideOffset = side == 'right' ? asymmetry : 0.0;
             final sideValue = double.parse(
-                (value + sideOffset).clamp(1.0, 200.0).toStringAsFixed(1));
+              (value + sideOffset).clamp(1.0, 200.0).toStringAsFixed(1),
+            );
 
             await db.rawInsert(
               'INSERT INTO body_measurements '
@@ -515,6 +1147,53 @@ class TestDataGenerator {
         dayOffset += (interval + jitter).clamp(3, 21);
       }
     }
+  }
+
+  /// Generates nightly sleep data with occasional missing actual-sleep values
+  /// so the dashboard can be previewed in both complete and partial states.
+  Future<int> _generateSleepEntries(DateTime periodStart, DateTime now) async {
+    final db = await _db.database;
+    final totalDays = now.difference(periodStart).inDays;
+    var created = 0;
+
+    for (var dayOffset = 0; dayOffset <= totalDays; dayOffset++) {
+      // Keep a few gaps so the consistency metric is meaningful.
+      if (_rng.nextDouble() < 0.08) continue;
+
+      final date = periodStart.add(Duration(days: dayOffset));
+      final dateStr = date.toIso8601String().substring(0, 10);
+      final trend = math.sin(dayOffset / 12) * 18;
+      final sleepMinutes = (450 + trend + _rng.nextInt(71) - 35).round().clamp(
+        300,
+        600,
+      );
+      final hasActual = _rng.nextDouble() >= 0.22;
+      final actualSleepMinutes = hasActual
+          ? (sleepMinutes - (8 + _rng.nextInt(53))).clamp(240, sleepMinutes)
+          : null;
+      final bedtimeMinutes = 21 * 60 + _rng.nextInt(180);
+      final wakeTimeMinutes =
+          (bedtimeMinutes + sleepMinutes + _rng.nextInt(50)) % (24 * 60);
+
+      await db.rawInsert(
+        'INSERT OR REPLACE INTO sleep_entries '
+        '(id, date, sleep_minutes, actual_sleep_minutes, bedtime_minutes, '
+        'wake_time_minutes, comment, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          _uuid.v4(),
+          dateStr,
+          sleepMinutes,
+          actualSleepMinutes,
+          bedtimeMinutes,
+          wakeTimeMinutes,
+          hasActual ? null : 'Sono real não informado',
+          date.add(const Duration(hours: 7)).toIso8601String(),
+        ],
+      );
+      created++;
+    }
+
+    return created;
   }
 
   String? _randomWeightComment() {
@@ -575,8 +1254,16 @@ class TestDataGenerator {
   }
 
   double _progressRate(String name) {
-    if (name.contains('Agachamento') || name.contains('Leg Press') || name.contains('Terra')) return 2.5;
-    if (name.contains('Supino') || name.contains('Remada') || name.contains('Puxada')) return 1.5;
+    if (name.contains('Agachamento') ||
+        name.contains('Leg Press') ||
+        name.contains('Terra')) {
+      return 2.5;
+    }
+    if (name.contains('Supino') ||
+        name.contains('Remada') ||
+        name.contains('Puxada')) {
+      return 1.5;
+    }
     if (name.contains('Rosca') || name.contains('Tríceps')) return 0.5;
     if (name.contains('Elevação') || name.contains('Crucifixo')) return 0.25;
     if (name.contains('Desenvolvimento')) return 1.0;

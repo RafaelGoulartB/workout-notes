@@ -6,8 +6,9 @@ import 'package:intl/intl.dart';
 import 'l10n/app_localizations.dart';
 import 'navigation/ai_coach_navigation.dart';
 import 'services/notification_service.dart';
+import 'services/sleep_monitor_service.dart';
 import 'screens/workout/ai_chat_screen.dart';
-import 'screens/workout/workout_home_screen.dart';
+import 'screens/main_shell.dart';
 import 'state/ai_chat_service.dart';
 import 'state/ai_settings_notifier.dart';
 import 'widgets/ai/ai_coach_fab.dart';
@@ -105,6 +106,7 @@ void main() async {
   WorkoutNotesApp.aiSettings = AiSettingsNotifier(prefs: prefs);
   await WorkoutNotesApp.aiSettings.load();
   await AiChatService.bootstrap(settings: WorkoutNotesApp.aiSettings);
+  await SleepMonitorService.instance.initialize();
 
   runApp(
     WorkoutNotesApp(
@@ -264,7 +266,7 @@ class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
       theme: _buildTheme(_seedColor, Brightness.light),
       darkTheme: _buildTheme(_seedColor, Brightness.dark),
       themeMode: _themeMode,
-      home: const WorkoutHomeScreen(),
+      home: const MainShell(),
     );
   }
 }

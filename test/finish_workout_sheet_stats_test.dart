@@ -18,6 +18,7 @@ void main() {
               totalVolume: 3000,
               totalSets: 3,
               completedSets: 3,
+              estimatedCalories: 367.5,
             ),
           ),
         ),
@@ -26,5 +27,7 @@ void main() {
 
     expect(find.text('Density'), findsOneWidget);
     expect(find.text('100 kg/min'), findsOneWidget);
+    expect(find.text('Estimated calories'), findsOneWidget);
+    expect(find.text('368 kcal'), findsOneWidget);
   });
 }

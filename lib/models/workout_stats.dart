@@ -99,6 +99,7 @@ class CategoryWorkoutStats {
 class WorkoutStats {
   final String workoutId;
   final int durationSeconds;
+  final double? estimatedCalories;
   final double totalVolume;
   final int completedSets;
   final int totalSets;
@@ -111,6 +112,7 @@ class WorkoutStats {
   const WorkoutStats({
     required this.workoutId,
     required this.durationSeconds,
+    this.estimatedCalories,
     required this.totalVolume,
     required this.completedSets,
     required this.totalSets,
@@ -131,6 +133,7 @@ class WorkoutStats {
   static WorkoutStats calculate({
     required String workoutId,
     required int durationSeconds,
+    double? estimatedCalories,
     required List<WorkoutStatsExerciseInput> exercises,
   }) {
     var totalVolume = 0.0;
@@ -223,6 +226,7 @@ class WorkoutStats {
     return WorkoutStats(
       workoutId: workoutId,
       durationSeconds: durationSeconds,
+      estimatedCalories: estimatedCalories,
       totalVolume: totalVolume,
       completedSets: completedSets,
       totalSets: totalSets,

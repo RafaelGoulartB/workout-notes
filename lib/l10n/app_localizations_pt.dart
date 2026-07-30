@@ -15,6 +15,395 @@ class AppLocalizationsPt extends AppLocalizations {
   String get tabWorkout => 'Treino';
 
   @override
+  String get tabSleep => 'Sono';
+
+  @override
+  String get sleepTitle => 'Sono';
+
+  @override
+  String get sleepAdd => 'Registrar sono';
+
+  @override
+  String get sleepAddTitle => 'Registrar sono';
+
+  @override
+  String get sleepEditTitle => 'Editar registro de sono';
+
+  @override
+  String get sleepEmptyTitle => 'Nenhum sono registrado';
+
+  @override
+  String get sleepEmptySubtitle =>
+      'Registre suas noites para acompanhar duração, sono real e consistência.';
+
+  @override
+  String get sleepDate => 'Data do despertar';
+
+  @override
+  String get sleepDuration => 'Horas de sono';
+
+  @override
+  String get sleepActualDuration => 'Sono real';
+
+  @override
+  String get sleepActualDurationHint => 'Tempo realmente dormido';
+
+  @override
+  String get sleepBedtime => 'Hora de dormir';
+
+  @override
+  String get sleepWakeTime => 'Hora de acordar';
+
+  @override
+  String get sleepComment => 'Observação (opcional)';
+
+  @override
+  String get sleepHours => 'horas';
+
+  @override
+  String get sleepMinutes => 'minutos';
+
+  @override
+  String get sleepSave => 'Salvar registro';
+
+  @override
+  String get sleepSaved => 'Registro de sono salvo!';
+
+  @override
+  String get sleepDeleted => 'Registro de sono excluído';
+
+  @override
+  String get sleepDeleteConfirm => 'Excluir este registro de sono?';
+
+  @override
+  String get sleepInvalidDuration =>
+      'Informe uma duração entre 1 minuto e 24 horas.';
+
+  @override
+  String get sleepInvalidActual =>
+      'O sono real deve ser maior que zero e não pode superar a duração principal.';
+
+  @override
+  String get sleepInvalidTime => 'Informe uma hora válida.';
+
+  @override
+  String get sleepSummary => 'Resumo';
+
+  @override
+  String get sleepLatest => 'Último registro';
+
+  @override
+  String get sleepAverage7Days => 'Média · 7 dias';
+
+  @override
+  String get sleepAverage30Days => 'Média · 30 dias';
+
+  @override
+  String get sleepActualAverage => 'Média de sono real';
+
+  @override
+  String get sleepMinimum => 'Mínimo · 30 dias';
+
+  @override
+  String get sleepMaximum => 'Máximo · 30 dias';
+
+  @override
+  String get sleepConsistency => 'Consistência';
+
+  @override
+  String get sleepEfficiency => 'Eficiência';
+
+  @override
+  String sleepDaysRecorded(Object count, Object total) {
+    return '$count de $total dias registrados';
+  }
+
+  @override
+  String get sleepNoActual => 'Sem sono real';
+
+  @override
+  String get sleepDailyChart => 'Últimos 7 dias';
+
+  @override
+  String get sleepTrendChart => 'Tendência · 30 dias';
+
+  @override
+  String get sleepChartRecorded => 'Horas registradas';
+
+  @override
+  String get sleepChartActual => 'Sono real';
+
+  @override
+  String get sleepHistory => 'Histórico';
+
+  @override
+  String sleepEntries(Object count) {
+    return '$count registros';
+  }
+
+  @override
+  String get sleepNeedTwoEntries =>
+      'Adicione pelo menos 2 registros para ver a tendência.';
+
+  @override
+  String sleepLoadMore(Object count) {
+    return 'Carregar mais $count registros';
+  }
+
+  @override
+  String sleepLoadMoreCount(Object count) {
+    return 'Carregar mais $count';
+  }
+
+  @override
+  String get sleepDetails => 'Detalhes do sono';
+
+  @override
+  String get sleepDelete => 'Excluir registro';
+
+  @override
+  String get sleepEdit => 'Editar registro';
+
+  @override
+  String get sleepNotInformed => 'Não informado';
+
+  @override
+  String sleepDurationValue(Object hours, Object minutes) {
+    return '${hours}h ${minutes}min';
+  }
+
+  @override
+  String get sleepMonitorCta => 'Monitorar sono';
+
+  @override
+  String get sleepMonitorCtaSubtitle =>
+      'Analise silêncio e ruído localmente durante a noite.';
+
+  @override
+  String get sleepMonitorOpenActive => 'Monitoramento em andamento';
+
+  @override
+  String sleepMonitorRecovered(Object count) {
+    return '$count sessão(ões) de monitoramento recuperada(s).';
+  }
+
+  @override
+  String get sleepMonitorTitle => 'Monitorar sono';
+
+  @override
+  String get sleepMonitorAndroidOnly =>
+      'O monitoramento está disponível somente no Android.';
+
+  @override
+  String get sleepMonitorRunning => 'Monitoramento em andamento';
+
+  @override
+  String get sleepMonitorReady => 'Pronto para monitorar';
+
+  @override
+  String get sleepMonitorMicrophone => 'Permissão do microfone';
+
+  @override
+  String get sleepMonitorStart => 'Iniciar monitoramento';
+
+  @override
+  String get sleepMonitorFinish => 'Finalizar e ver resultado';
+
+  @override
+  String get sleepMonitorDiscard => 'Descartar sessão';
+
+  @override
+  String get sleepMonitorLocalProcessing =>
+      'O áudio é processado localmente e não é gravado. Apenas métricas agregadas são mantidas.';
+
+  @override
+  String get sleepMonitorEstimateWarning =>
+      'Os resultados são estimativas baseadas no ambiente e não constituem medição médica. Silêncio não significa necessariamente que você estava dormindo.';
+
+  @override
+  String get sleepMonitorMicrophoneDenied =>
+      'A permissão do microfone é necessária para monitorar esta noite.';
+
+  @override
+  String get sleepMonitorNotificationsLimited =>
+      'As notificações estão desativadas; o serviço pode ficar menos visível durante a tela bloqueada.';
+
+  @override
+  String get sleepMonitorAudioUnavailable =>
+      'Não foi possível acessar o microfone. Verifique se outro app está usando-o.';
+
+  @override
+  String get sleepMonitorAlreadyActive =>
+      'Já existe uma sessão de monitoramento ativa.';
+
+  @override
+  String get sleepMonitorImportError =>
+      'Não foi possível importar a sessão. Ela será mantida para tentar novamente.';
+
+  @override
+  String get sleepMonitorGenericError =>
+      'Não foi possível iniciar ou finalizar o monitoramento.';
+
+  @override
+  String get sleepMonitorWaitingSignal =>
+      'Aguardando o primeiro segmento de sinal';
+
+  @override
+  String get sleepMonitorNoiseNow => 'Ruído relativo detectado';
+
+  @override
+  String get sleepMonitorQuietNow => 'Período silencioso estimado';
+
+  @override
+  String get sleepMonitorInvalidSignal => 'Sinal temporariamente indisponível';
+
+  @override
+  String get sleepMonitorResultTitle => 'Resultado do monitoramento';
+
+  @override
+  String get sleepMonitorResultMissing => 'Resultado não encontrado.';
+
+  @override
+  String get sleepMonitorSource => 'Monitoramento';
+
+  @override
+  String get sleepMonitorTimeline => 'Linha do tempo da noite';
+
+  @override
+  String get sleepMonitorTimeMonitored => 'Tempo monitorado';
+
+  @override
+  String get sleepMonitorQuietPeriod => 'Período silencioso';
+
+  @override
+  String get sleepMonitorNoisyPeriod => 'Período com ruído';
+
+  @override
+  String get sleepMonitorNoiseEvents => 'Eventos de ruído';
+
+  @override
+  String get sleepMonitorSignalCoverage => 'Cobertura do sinal';
+
+  @override
+  String get sleepMonitorQuiet => 'Silêncio relativo';
+
+  @override
+  String get sleepMonitorNoise => 'Ruído relativo';
+
+  @override
+  String get sleepMonitorInvalid => 'Sinal inválido';
+
+  @override
+  String get sleepMonitorDataQuality => 'Qualidade dos dados do MVP';
+
+  @override
+  String get sleepMonitorDataAcceptable =>
+      'Noite adequada para a próxima fase do MVP';
+
+  @override
+  String get sleepMonitorDataAcceptableBody =>
+      'A duração e a cobertura da captura são suficientes para avaliar o monitor atual.';
+
+  @override
+  String get sleepMonitorDataInsufficient =>
+      'A noite precisa de outra rodada de monitoramento';
+
+  @override
+  String get sleepMonitorDataInsufficientBody =>
+      'Para avançar, registre pelo menos 4 horas, com 90% de cobertura da linha do tempo e 80% de sinal válido.';
+
+  @override
+  String get sleepMonitorCapturedSegments => 'Segmentos capturados';
+
+  @override
+  String get sleepMonitorTimelineCoverage => 'Cobertura da linha do tempo';
+
+  @override
+  String get sleepMonitorNoiseGraph => 'Ruído relativo ao longo da noite';
+
+  @override
+  String get sleepMonitorNoiseScore => 'Índice de ruído';
+
+  @override
+  String get sleepMonitorNoSegments =>
+      'Nenhum segmento de sinal foi registrado';
+
+  @override
+  String get sleepMonitorNoSegmentsBody =>
+      'Esta sessão não permite avaliar o MVP. Agora o monitor encerra com erro quando o microfone deixa de retornar dados, em vez de concluir uma noite vazia.';
+
+  @override
+  String get sleepMonitorAverageNoise => 'Ruído médio';
+
+  @override
+  String get sleepMonitorPeakNoise => 'Pico de ruído';
+
+  @override
+  String get sleepMonitorStartTime => 'Início';
+
+  @override
+  String get sleepMonitorEndTime => 'Fim';
+
+  @override
+  String get sleepMonitorThreshold => 'Limite de ruído';
+
+  @override
+  String get sleepMonitorExportDiagnostic => 'Exportar diagnóstico';
+
+  @override
+  String get sleepMonitorExportDiagnosticTitle => 'O que deve ser incluído?';
+
+  @override
+  String get sleepMonitorExportDiagnosticBody =>
+      'O arquivo JSON poderá ser compartilhado para análise técnica. O áudio bruto nunca é armazenado e não pode ser exportado.';
+
+  @override
+  String get sleepMonitorExportTechnicalOnly =>
+      'Somente dados técnicos (recomendado)';
+
+  @override
+  String get sleepMonitorExportTechnicalOnlyBody =>
+      'Usa tempos relativos e exclui a data do sono, horários exatos, identificadores locais e seu comentário.';
+
+  @override
+  String get sleepMonitorExportWithPersonal => 'Incluir dados pessoais do sono';
+
+  @override
+  String get sleepMonitorExportWithPersonalBody =>
+      'Também inclui data e horários exatos, identificadores locais, durações manuais e seu comentário pessoal sobre o sono.';
+
+  @override
+  String get sleepMonitorExportConfirm => 'Gerar e compartilhar';
+
+  @override
+  String get sleepMonitorExportSuccess =>
+      'Diagnóstico gerado. Escolha onde compartilhar ou salvar.';
+
+  @override
+  String get sleepMonitorExportError =>
+      'Não foi possível gerar o arquivo de diagnóstico.';
+
+  @override
+  String get sleepMonitorTimeInBed => 'Tempo na cama';
+
+  @override
+  String get sleepMonitorEditManual => 'Corrigir registro manual';
+
+  @override
+  String get sleepMonitorDeleteSession => 'Apagar sessão';
+
+  @override
+  String get sleepMonitorDeleteSessionBody =>
+      'As métricas e a linha do tempo desta sessão serão apagadas. O registro de sono permanece.';
+
+  @override
+  String get sleepMonitorDiscardTitle => 'Descartar sessão?';
+
+  @override
+  String get sleepMonitorDiscardBody =>
+      'A sessão em andamento e suas métricas serão apagadas.';
+
+  @override
   String get commonCancel => 'Cancelar';
 
   @override
@@ -349,14 +738,14 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get settingsGenerateTestDataSubtitle =>
-      'Adiciona treinos fictícios para testar o app';
+      'Adiciona treinos, medidas e sono fictícios para testar o app';
 
   @override
   String get settingsGenerateTitle => 'Gerar Dados de Teste?';
 
   @override
   String get settingsGenerateContent =>
-      'Isso vai adicionar treinos fictícios nos últimos meses para testar gráficos e funcionalidades.\n\nUse \"Excluir Todo Histórico\" para remover depois.';
+      'Isso vai adicionar treinos, medidas corporais e registros de sono fictícios nos últimos meses para testar gráficos e funcionalidades.\n\nUse \"Excluir Todo Histórico\" para remover depois.';
 
   @override
   String get settingsGenerate => 'Gerar';
@@ -364,6 +753,15 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String settingsGenerateSuccess(Object count) {
     return '✅ $count treinos gerados!';
+  }
+
+  @override
+  String settingsGenerateSuccessDetailed(
+    Object routines,
+    Object sleep,
+    Object workouts,
+  ) {
+    return '✅ $workouts treinos, $routines rotinas e $sleep noites de sono gerados!';
   }
 
   @override
@@ -1154,6 +1552,14 @@ class AppLocalizationsPt extends AppLocalizations {
   String get routinesRestTimeTitle => 'Tempo de Descanso';
 
   @override
+  String routinesEstimatedDuration(Object duration) {
+    return 'Tempo estimado: $duration';
+  }
+
+  @override
+  String get workoutEstimatedCalories => 'Calorias estimadas';
+
+  @override
   String get restTimerTitle => 'Temporizador';
 
   @override
@@ -1201,12 +1607,6 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get exerciseLibraryNew => 'Novo Exercício';
-
-  @override
-  String get exerciseLibraryAerobic => 'Aeróbico';
-
-  @override
-  String get exerciseLibraryAnaerobic => 'Anaeróbico';
 
   @override
   String get exerciseFormTitleNew => 'Novo Exercício';
@@ -1290,6 +1690,12 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get exerciseFormTypeTimeOnly => 'Apenas Tempo';
+
+  @override
+  String get exerciseFormSectionBasic => 'Básico';
+
+  @override
+  String get exerciseFormSectionDefaults => 'Padrões';
 
   @override
   String get quickAddTitle => 'Quick Add';

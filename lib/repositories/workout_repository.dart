@@ -397,6 +397,7 @@ class WorkoutRepository extends BaseRepository {
     return WorkoutStats.calculate(
       workoutId: workoutId,
       durationSeconds: (workout['duration_seconds'] as int?) ?? 0,
+      estimatedCalories: (workout['estimated_calories'] as num?)?.toDouble(),
       exercises: inputs,
     );
   }
@@ -653,6 +654,7 @@ class WorkoutRepository extends BaseRepository {
     String id, {
     String? comment,
     int? feelingRating,
+    double? estimatedCalories,
   }) async {
     final db = await this.db;
     final now = DateTime.now();
@@ -671,9 +673,10 @@ class WorkoutRepository extends BaseRepository {
       {
         'end_time': now.toIso8601String(),
         'duration_seconds': duration,
+        'estimated_calories': estimatedCalories,
         'start_time': startTimeStr ?? now.toIso8601String(),
-        'comment': ?comment,
-        'feeling_rating': ?feelingRating,
+        'comment': comment,
+        'feeling_rating': feelingRating,
       },
       where: 'id = ?',
       whereArgs: [id],

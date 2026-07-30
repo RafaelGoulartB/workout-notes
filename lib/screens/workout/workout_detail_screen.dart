@@ -334,6 +334,13 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
             value: '${_formatDecimal(density)} ${loc.workoutStatsKgPerMin}',
             color: Colors.teal,
           ),
+        if (stats.estimatedCalories != null && stats.estimatedCalories! > 0)
+          _InlineMetric(
+            icon: Icons.local_fire_department,
+            label: loc.workoutEstimatedCalories,
+            value: '${stats.estimatedCalories!.round()} kcal',
+            color: Colors.deepOrange,
+          ),
       ],
     );
   }

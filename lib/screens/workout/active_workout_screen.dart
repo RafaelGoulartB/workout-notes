@@ -9,6 +9,7 @@ import '../../database/database_helper.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/routine_repository.dart';
 import '../../repositories/settings_repository.dart';
+import '../../repositories/body_measurement_repository.dart';
 import '../../services/rest_timer_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/exercise_picker_sheet.dart';
@@ -17,6 +18,7 @@ import '../../widgets/workout/exercise_card.dart';
 import '../../widgets/workout/finish_workout_sheet.dart';
 import '../../models/exercise_with_sets.dart';
 import '../../utils/workout_card_helpers.dart';
+import '../../utils/workout_estimator.dart';
 import 'rest_timer_screen.dart';
 
 class ActiveWorkoutScreen extends StatefulWidget {
@@ -39,6 +41,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   final _workoutRepo = WorkoutRepository();
   final _routineRepo = RoutineRepository();
   final _settingsRepo = SettingsRepository();
+  final _bodyRepo = BodyMeasurementRepository();
   final _timerService = RestTimerService.instance;
   final _uuid = const Uuid();
   bool _isLoading = true;
@@ -1287,6 +1290,23 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     setState(() {});
   }
 
+  int _estimateCurrentWorkoutDurationSeconds() {
+    final estimateExercises = _exercises.map(
+      (exercise) => WorkoutEstimateExercise(
+        restTimeSeconds: exercise.restTimeSeconds,
+        sets: exercise.sets
+            .map(
+              (set) => WorkoutEstimateSet(
+                reps: (set['reps'] as num?)?.toInt(),
+                timeSeconds: (set['time_seconds'] as num?)?.toInt(),
+              ),
+            )
+            .toList(),
+      ),
+    );
+    return WorkoutEstimateCalculator.estimateDurationSeconds(estimateExercises);
+  }
+
   Future<void> _finishWorkout() async {
     if (_workoutId == null) return;
     if (_exercises.isEmpty) return;
@@ -1324,6 +1344,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       _workoutId!,
       comment: comment,
       feelingRating: feeling,
+      estimatedCalories: summary.estimatedCalories,
     );
 
     if (mounted) {
@@ -1340,6 +1361,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
   /// Compute workout summary: duration, volume, sets, distance/time, and PRs.
   Future<WorkoutSummary> _computeSummary() async {
+    final loc = AppLocalizations.of(context)!;
     int durationSeconds = 0;
     double totalVolume = 0;
     int totalSets = 0;
@@ -1352,6 +1374,15 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       final end = _timerEnd ?? DateTime.now();
       durationSeconds = end.difference(_timerStart!).inSeconds;
     }
+    final plannedDurationSeconds = _estimateCurrentWorkoutDurationSeconds();
+    final calorieDurationSeconds = durationSeconds > 0
+        ? durationSeconds
+        : plannedDurationSeconds;
+    final bodyWeightKg = await _bodyRepo.getLatestWeightKg();
+    final estimatedCalories = WorkoutEstimateCalculator.estimateCalories(
+      durationSeconds: calorieDurationSeconds,
+      bodyWeightKg: bodyWeightKg,
+    );
 
     // Collect strength and cardio stats per exercise
     final Map<String, ExerciseBests> thisWorkoutBests = {};
@@ -1401,7 +1432,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
       if (maxWeight > 0) {
         thisWorkoutBests[ex.exerciseId] = ExerciseBests(
-          name: ex.localizedName(AppLocalizations.of(context)!),
+          name: ex.localizedName(loc),
           maxWeight: maxWeight,
           bestReps: bestReps,
           volume: exerciseVolume,
@@ -1412,7 +1443,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       // Track cardio bests (longest distance, best pace)
       if (exerciseDistance > 0 && exerciseTime > 0) {
         thisWorkoutCardio[ex.exerciseId] = CardioBests(
-          name: ex.localizedName(AppLocalizations.of(context)!),
+          name: ex.localizedName(loc),
           distance: exerciseDistance,
           timeSeconds: exerciseTime,
         );
@@ -1514,6 +1545,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       completedSets: completedSets,
       totalDistance: totalDistance,
       totalCardioTime: totalCardioTime,
+      estimatedCalories: estimatedCalories,
       prs: prs,
     );
   }

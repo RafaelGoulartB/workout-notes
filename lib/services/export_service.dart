@@ -225,7 +225,9 @@ class ExportService {
       );
     }
     final version = data['version'];
-    if (version != ExportImportRepository.currentBackupVersion) {
+    if (version is! int ||
+        version < ExportImportRepository.minimumSupportedBackupVersion ||
+        version > ExportImportRepository.currentBackupVersion) {
       throw FormatException(
         'Versão de backup incompatível: $version. '
         'Versão esperada: ${ExportImportRepository.currentBackupVersion}.',

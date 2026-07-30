@@ -18,7 +18,9 @@ void main() {
   });
 
   setUp(() async {
-    backupsDirectory = await Directory.systemTemp.createTemp('workout_notes_export_test_');
+    backupsDirectory = await Directory.systemTemp.createTemp(
+      'workout_notes_export_test_',
+    );
     database = await databaseFactory.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
@@ -35,6 +37,9 @@ void main() {
             'routine_exercises',
             'predefined_sets',
             'body_measurements',
+            'sleep_entries',
+            'sleep_monitor_sessions',
+            'sleep_monitor_segments',
           ]) {
             await db.execute('CREATE TABLE $table (id TEXT PRIMARY KEY)');
           }
@@ -61,42 +66,36 @@ void main() {
     await backupsDirectory.delete(recursive: true);
   });
 
-  Future<void> expectInvalidAndUnchanged(
-    Future<int> Function() restore,
-  ) async {
+  Future<void> expectInvalidAndUnchanged(Future<int> Function() restore) async {
     await expectLater(restore, throwsA(isA<FormatException>()));
-    expect(
-      await database.query('app_settings'),
-      [
-        {'key': 'current', 'value': 'unchanged'},
-      ],
-    );
+    expect(await database.query('app_settings'), [
+      {'key': 'current', 'value': 'unchanged'},
+    ]);
   }
 
   test('restores a valid backup from bytes', () async {
     final count = await service.restoreFromBytes(_bytes(_validBackup()));
 
     expect(count, 1);
-    expect(
-      await database.query('app_settings'),
-      [
-        {'key': 'restored', 'value': 'yes'},
-      ],
-    );
+    expect(await database.query('app_settings'), [
+      {'key': 'restored', 'value': 'yes'},
+    ]);
   });
 
-  test('exports valid JSON using UTF-8 bytes in the current backup format', () async {
-    final bytes = await service.exportBackupBytes();
-    final data = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+  test(
+    'exports valid JSON using UTF-8 bytes in the current backup format',
+    () async {
+      final bytes = await service.exportBackupBytes();
+      final data = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
 
-    expect(data['version'], ExportImportRepository.currentBackupVersion);
-    expect(
-      data['settings'],
-      [
+      expect(data['version'], ExportImportRepository.currentBackupVersion);
+      expect(data['settings'], [
         {'key': 'current', 'value': 'unchanged'},
-      ],
-    );
-  });
+      ]);
+      expect(data['sleep_monitor_sessions'], isEmpty);
+      expect(data['sleep_monitor_segments'], isEmpty);
+    },
+  );
 
   test('passes bytes to the save picker and handles cancellation', () async {
     Uint8List? receivedBytes;
@@ -106,16 +105,13 @@ void main() {
       exportRepo: ExportImportRepository(
         databaseProvider: () async => database,
       ),
-      saveFile: ({
-        required dialogTitle,
-        required fileName,
-        required bytes,
-      }) async {
-        receivedDialogTitle = dialogTitle;
-        receivedFileName = fileName;
-        receivedBytes = bytes;
-        return null;
-      },
+      saveFile:
+          ({required dialogTitle, required fileName, required bytes}) async {
+            receivedDialogTitle = dialogTitle;
+            receivedFileName = fileName;
+            receivedBytes = bytes;
+            return null;
+          },
     );
 
     final selectedPath = await saveService.saveJsonBackup(
@@ -124,77 +120,126 @@ void main() {
 
     expect(selectedPath, isNull);
     expect(receivedDialogTitle, 'Salvar backup JSON');
-    expect(receivedFileName, matches(RegExp(r'^backup_\d{4}-\d{2}-\d{2}_\d{6}\.json$')));
-    expect(jsonDecode(utf8.decode(receivedBytes!)), isA<Map<String, dynamic>>());
-  });
-
-  test('keeps the existing share flow and shares the generated JSON file', () async {
-    String? sharedPath;
-    String? sharedText;
-    final sharingService = ExportService(
-      exportRepo: ExportImportRepository(
-        databaseProvider: () async => database,
-      ),
-      backupsDirectoryProvider: () async => backupsDirectory,
-      shareFile: (file, text) async {
-        sharedPath = file.path;
-        sharedText = text;
-      },
+    expect(
+      receivedFileName,
+      matches(RegExp(r'^backup_\d{4}-\d{2}-\d{2}_\d{6}\.json$')),
     );
-
-    final exportedPath = await sharingService.shareJsonBackup();
-
-    expect(sharedPath, exportedPath);
-    expect(sharedText, 'Workout Notes - Backup');
-    expect(jsonDecode(await File(exportedPath).readAsString()), isA<Map<String, dynamic>>());
+    expect(
+      jsonDecode(utf8.decode(receivedBytes!)),
+      isA<Map<String, dynamic>>(),
+    );
   });
+
+  test(
+    'keeps the existing share flow and shares the generated JSON file',
+    () async {
+      String? sharedPath;
+      String? sharedText;
+      final sharingService = ExportService(
+        exportRepo: ExportImportRepository(
+          databaseProvider: () async => database,
+        ),
+        backupsDirectoryProvider: () async => backupsDirectory,
+        shareFile: (file, text) async {
+          sharedPath = file.path;
+          sharedText = text;
+        },
+      );
+
+      final exportedPath = await sharingService.shareJsonBackup();
+
+      expect(sharedPath, exportedPath);
+      expect(sharedText, 'Workout Notes - Backup');
+      expect(
+        jsonDecode(await File(exportedPath).readAsString()),
+        isA<Map<String, dynamic>>(),
+      );
+    },
+  );
 
   test('rejects invalid JSON without changing current data', () async {
-    await expectInvalidAndUnchanged(() => service.restoreFromBytes(
-          Uint8List.fromList(utf8.encode('{invalid json')),
-        ));
-  });
-
-  test('rejects JSON that is not an object without changing current data', () async {
     await expectInvalidAndUnchanged(
-      () => service.restoreFromBytes(_bytes([1, 2, 3])),
+      () => service.restoreFromBytes(
+        Uint8List.fromList(utf8.encode('{invalid json')),
+      ),
     );
   });
 
-  test('rejects a backup without version without changing current data', () async {
-    final backup = _validBackup()..remove('version');
+  test(
+    'rejects JSON that is not an object without changing current data',
+    () async {
+      await expectInvalidAndUnchanged(
+        () => service.restoreFromBytes(_bytes([1, 2, 3])),
+      );
+    },
+  );
 
-    await expectInvalidAndUnchanged(
-      () => service.restoreFromBytes(_bytes(backup)),
-    );
+  test(
+    'rejects a backup without version without changing current data',
+    () async {
+      final backup = _validBackup()..remove('version');
+
+      await expectInvalidAndUnchanged(
+        () => service.restoreFromBytes(_bytes(backup)),
+      );
+    },
+  );
+
+  test(
+    'rejects an incompatible backup version without changing current data',
+    () async {
+      final backup = _validBackup()..['version'] = 999;
+
+      await expectInvalidAndUnchanged(
+        () => service.restoreFromBytes(_bytes(backup)),
+      );
+    },
+  );
+
+  test('accepts a version 2 backup without sleep records', () async {
+    final backup = _validBackup()
+      ..['version'] = ExportImportRepository.minimumSupportedBackupVersion
+      ..remove('sleep_entries');
+
+    final count = await service.restoreFromBytes(_bytes(backup));
+
+    expect(count, 1);
+    expect(await database.query('sleep_entries'), isEmpty);
   });
 
-  test('rejects an incompatible backup version without changing current data', () async {
-    final backup = _validBackup()..['version'] = 999;
+  test('accepts a version 3 backup without monitoring records', () async {
+    final backup = _validBackup()
+      ..['version'] = 3
+      ..remove('sleep_monitor_sessions')
+      ..remove('sleep_monitor_segments');
 
-    await expectInvalidAndUnchanged(
-      () => service.restoreFromBytes(_bytes(backup)),
-    );
+    final count = await service.restoreFromBytes(_bytes(backup));
+
+    expect(count, 1);
+    expect(await database.query('sleep_monitor_sessions'), isEmpty);
+    expect(await database.query('sleep_monitor_segments'), isEmpty);
   });
-
 }
 
 Uint8List _bytes(Object data) =>
     Uint8List.fromList(utf8.encode(jsonEncode(data)));
 
 Map<String, dynamic> _validBackup() => {
-      'version': ExportImportRepository.currentBackupVersion,
-      'categories': <Map<String, dynamic>>[],
-      'exercises': <Map<String, dynamic>>[],
-      'workouts': <Map<String, dynamic>>[],
-      'exercise_entries': <Map<String, dynamic>>[],
-      'sets': <Map<String, dynamic>>[],
-      'routines': <Map<String, dynamic>>[],
-      'routine_days': <Map<String, dynamic>>[],
-      'routine_exercises': <Map<String, dynamic>>[],
-      'predefined_sets': <Map<String, dynamic>>[],
-      'body_measurements': <Map<String, dynamic>>[],
-      'settings': [
-        {'key': 'restored', 'value': 'yes'},
-      ],
-    };
+  'version': ExportImportRepository.currentBackupVersion,
+  'categories': <Map<String, dynamic>>[],
+  'exercises': <Map<String, dynamic>>[],
+  'workouts': <Map<String, dynamic>>[],
+  'exercise_entries': <Map<String, dynamic>>[],
+  'sets': <Map<String, dynamic>>[],
+  'routines': <Map<String, dynamic>>[],
+  'routine_days': <Map<String, dynamic>>[],
+  'routine_exercises': <Map<String, dynamic>>[],
+  'predefined_sets': <Map<String, dynamic>>[],
+  'body_measurements': <Map<String, dynamic>>[],
+  'sleep_entries': <Map<String, dynamic>>[],
+  'sleep_monitor_sessions': <Map<String, dynamic>>[],
+  'sleep_monitor_segments': <Map<String, dynamic>>[],
+  'settings': [
+    {'key': 'restored', 'value': 'yes'},
+  ],
+};

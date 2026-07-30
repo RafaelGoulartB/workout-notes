@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
+import 'package:workout_notes/widgets/form_section_card.dart';
 import '../../repositories/exercise_repository.dart';
 import '../../repositories/analytics_repository.dart';
 import 'workout_detail_screen.dart';
@@ -31,11 +32,11 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   List<Map<String, dynamic>> _categories = [];
   final _nameCtl = TextEditingController();
   final _notesCtl = TextEditingController();
+  final _weightIncrementCtl = TextEditingController();
+  final _defaultRestCtl = TextEditingController();
   String _categoryId = 'chest';
   String _type = 'weightReps';
   String _equipment = '';
-  double? _weightIncrement;
-  int? _defaultRestTime;
   bool _formLoading = true;
   bool _isSaving = false;
 
@@ -46,16 +47,16 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   static const _chartTypes = ['1RM', 'Max Weight', 'Volume', 'Total Reps'];
 
   final _types = [
-    {'id': 'weightReps', 'name': 'Peso × Repetições', 'icon': Icons.fitness_center},
-    {'id': 'distanceTime', 'name': 'Distância × Tempo', 'icon': Icons.straighten},
-    {'id': 'weightDistance', 'name': 'Peso × Distância', 'icon': Icons.monitor_weight},
-    {'id': 'weightTime', 'name': 'Peso × Tempo', 'icon': Icons.timer},
-    {'id': 'repsDistance', 'name': 'Repetições × Distância', 'icon': Icons.repeat},
-    {'id': 'repsTime', 'name': 'Repetições × Tempo', 'icon': Icons.repeat_one},
-    {'id': 'weightOnly', 'name': 'Apenas Peso', 'icon': Icons.monitor_weight_outlined},
-    {'id': 'repsOnly', 'name': 'Apenas Repetições', 'icon': Icons.repeat_one_on},
-    {'id': 'distanceOnly', 'name': 'Apenas Distância', 'icon': Icons.straighten},
-    {'id': 'timeOnly', 'name': 'Apenas Tempo', 'icon': Icons.timer_outlined},
+    {'id': 'weightReps', 'icon': Icons.fitness_center_rounded},
+    {'id': 'distanceTime', 'icon': Icons.straighten_rounded},
+    {'id': 'weightDistance', 'icon': Icons.monitor_weight_rounded},
+    {'id': 'weightTime', 'icon': Icons.timer_rounded},
+    {'id': 'repsDistance', 'icon': Icons.repeat_rounded},
+    {'id': 'repsTime', 'icon': Icons.repeat_one_rounded},
+    {'id': 'weightOnly', 'icon': Icons.monitor_weight_outlined},
+    {'id': 'repsOnly', 'icon': Icons.repeat_one_on_outlined},
+    {'id': 'distanceOnly', 'icon': Icons.straighten_outlined},
+    {'id': 'timeOnly', 'icon': Icons.timer_outlined},
   ];
 
   final _equipmentOptions = ['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight', 'Treadmill', 'Stationary', 'Kettlebell', 'Band'];
@@ -80,6 +81,8 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     _tabCtl.dispose();
     _nameCtl.dispose();
     _notesCtl.dispose();
+    _weightIncrementCtl.dispose();
+    _defaultRestCtl.dispose();
     super.dispose();
   }
 
@@ -92,8 +95,11 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
       _type = ex['type'] as String? ?? 'weightReps';
       _notesCtl.text = ex['notes'] as String? ?? '';
       _equipment = ex['equipment'] as String? ?? '';
-      _weightIncrement = (ex['weight_increment'] as num?)?.toDouble();
-      _defaultRestTime = ex['default_rest_time'] as int?;
+      final wi = (ex['weight_increment'] as num?)?.toDouble();
+      _weightIncrementCtl.text =
+          wi != null ? wi.toStringAsFixed(wi.truncateToDouble() == wi ? 0 : 1) : '';
+      final drt = ex['default_rest_time'] as int?;
+      _defaultRestCtl.text = drt?.toString() ?? '';
     }
     setState(() => _formLoading = false);
   }
@@ -110,27 +116,42 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   Future<void> _save() async {
     if (_nameCtl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nome é obrigatório'), behavior: SnackBarBehavior.floating),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)!.exerciseFormNameRequired,
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
     setState(() => _isSaving = true);
     try {
-      await _exerciseRepo.updateExercise(widget.exerciseId,
+      final weightInc = double.tryParse(
+        _weightIncrementCtl.text.replaceAll(',', '.'),
+      );
+      final restTime = int.tryParse(_defaultRestCtl.text);
+      await _exerciseRepo.updateExercise(
+        widget.exerciseId,
         name: _nameCtl.text.trim(),
         categoryId: _categoryId,
         type: _type,
         notes: _notesCtl.text.trim(),
         equipment: _equipment.isEmpty ? null : _equipment,
-        weightIncrement: _weightIncrement,
-        defaultRestTime: _defaultRestTime,
+        weightIncrement: weightInc,
+        defaultRestTime: restTime,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       setState(() => _isSaving = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e'), behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)!.commonError(e.toString()),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -227,134 +248,311 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     if (_formLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    return Stack(
+    final loc = AppLocalizations.of(context)!;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
-        SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: _nameCtl,
-                decoration: const InputDecoration(
-                  labelText: 'Nome do Exercício',
-                  border: OutlineInputBorder(),
-                  hintText: 'Ex: Supino Inclinado',
-                ),
-                textCapitalization: TextCapitalization.words,
+        FormSectionCard(
+          icon: Icons.fitness_center_rounded,
+          title: loc.exerciseFormSectionBasic,
+          children: [
+            FormFieldLabel(text: loc.exerciseFormName),
+            TextField(
+              controller: _nameCtl,
+              decoration: InputDecoration(
+                hintText: loc.exerciseFormNameHint,
+                border: const OutlineInputBorder(),
+                filled: true,
+                fillColor:
+                    theme.colorScheme.surfaceContainerHighest.withAlpha(60),
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                initialValue: _categoryId,
-                decoration: const InputDecoration(
-                  labelText: 'Grupo Muscular',
-                  border: OutlineInputBorder(),
+              textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: 16),
+            FormFieldLabel(text: loc.exerciseFormCategory),
+            _buildCategoryPicker(theme),
+            const SizedBox(height: 16),
+            FormFieldLabel(text: loc.exerciseFormType),
+            _buildTypePicker(theme),
+            const SizedBox(height: 16),
+            FormFieldLabel(text: loc.exerciseFormEquipment),
+            Autocomplete<String>(
+              optionsBuilder: (textEditingValue) {
+                if (textEditingValue.text.isEmpty) return _equipmentOptions;
+                return _equipmentOptions.where(
+                  (opt) => opt.toLowerCase().contains(
+                        textEditingValue.text.toLowerCase(),
+                      ),
+                );
+              },
+              initialValue: TextEditingValue(text: _equipment),
+              onSelected: (v) => _equipment = v,
+              fieldViewBuilder: (ctx, ctl, focusNode, onSubmit) => TextField(
+                controller: ctl,
+                focusNode: focusNode,
+                decoration: InputDecoration(
+                  hintText: loc.exerciseFormEquipmentHint,
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                  fillColor:
+                      theme.colorScheme.surfaceContainerHighest.withAlpha(60),
                 ),
-                items: _categories.map((cat) => DropdownMenuItem(
-                  value: cat['id'] as String,
-                  child: Row(
-                    children: [
-                      Container(width: 12, height: 12, decoration: BoxDecoration(
-                        color: Color(cat['color'] as int), shape: BoxShape.circle,
-                      )),
-                      const SizedBox(width: 8),
-                      Text(ExerciseLocaleHelper.categoryName(AppLocalizations.of(context)!, cat)),
-                    ],
-                  ),
-                )).toList(),
-                onChanged: (v) => setState(() => _categoryId = v ?? _categoryId),
+                onSubmitted: (_) => onSubmit(),
+                onChanged: (v) => _equipment = v,
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                initialValue: _types.any((t) => t['id'] == _type) ? _type : 'weightReps',
-                decoration: const InputDecoration(
-                  labelText: 'Tipo',
-                  border: OutlineInputBorder(),
-                ),
-                items: _types.map((t) => DropdownMenuItem<String>(
-                  value: t['id'] as String,
-                  child: Row(
-                    children: [
-                      Icon(t['icon'] as IconData, size: 18, color: theme.colorScheme.primary),
-                      const SizedBox(width: 8),
-                      Text(t['name'] as String),
-                    ],
-                  ),
-                )).toList(),
-                onChanged: (v) => setState(() => _type = v ?? _type),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        FormSectionCard(
+          icon: Icons.tune_rounded,
+          title: loc.exerciseFormSectionDefaults,
+          children: [
+            FormFieldLabel(text: loc.exerciseFormWeightIncrement),
+            TextField(
+              controller: _weightIncrementCtl,
+              decoration: InputDecoration(
+                hintText: loc.exerciseFormWeightIncrementHint,
+                border: const OutlineInputBorder(),
+                filled: true,
+                fillColor:
+                    theme.colorScheme.surfaceContainerHighest.withAlpha(60),
               ),
-              const SizedBox(height: 16),
-              Autocomplete<String>(
-                optionsBuilder: (textEditingValue) {
-                  if (textEditingValue.text.isEmpty) return _equipmentOptions;
-                  return _equipmentOptions.where((opt) =>
-                    opt.toLowerCase().contains(textEditingValue.text.toLowerCase()));
-                },
-                initialValue: TextEditingValue(text: _equipment),
-                onSelected: (v) => _equipment = v,
-                fieldViewBuilder: (ctx, ctl, focusNode, onSubmit) => TextField(
-                  controller: ctl,
-                  focusNode: focusNode,
-                  decoration: const InputDecoration(
-                    labelText: 'Equipamento (opcional)',
-                    border: OutlineInputBorder(),
-                    hintText: 'Barbell, Dumbbell, Machine...',
-                  ),
-                  onSubmitted: (_) => onSubmit(),
-                  onChanged: (v) => _equipment = v,
-                ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
               ),
-              const SizedBox(height: 16),
-              TextField(
-                decoration: const InputDecoration(
-                  labelText: 'Incremento de Peso (kg)',
-                  border: OutlineInputBorder(),
-                  hintText: 'Ex: 2.5',
-                ),
-                keyboardType: TextInputType.number,
-                controller: TextEditingController(
-                  text: _weightIncrement?.toStringAsFixed(1) ?? ''),
-                onChanged: (v) => _weightIncrement = double.tryParse(v.replaceAll(',', '.')),
+            ),
+            const SizedBox(height: 16),
+            FormFieldLabel(text: loc.exerciseFormDefaultRest),
+            TextField(
+              controller: _defaultRestCtl,
+              decoration: InputDecoration(
+                hintText: loc.exerciseFormDefaultRestHint,
+                border: const OutlineInputBorder(),
+                filled: true,
+                fillColor:
+                    theme.colorScheme.surfaceContainerHighest.withAlpha(60),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                decoration: const InputDecoration(
-                  labelText: 'Descanso Padrão (segundos)',
-                  border: OutlineInputBorder(),
-                  hintText: 'Ex: 90',
-                ),
-                keyboardType: TextInputType.number,
-                controller: TextEditingController(
-                  text: _defaultRestTime?.toString() ?? ''),
-                onChanged: (v) => _defaultRestTime = int.tryParse(v),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            FormFieldLabel(text: loc.exerciseFormNotes),
+            TextField(
+              controller: _notesCtl,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: loc.exerciseFormNotesHint,
+                border: const OutlineInputBorder(),
+                filled: true,
+                fillColor:
+                    theme.colorScheme.surfaceContainerHighest.withAlpha(60),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _notesCtl,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  labelText: 'Instruções / Dicas (opcional)',
-                  border: OutlineInputBorder(),
-                  hintText: 'Dicas de execução, forma correta...',
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _isSaving ? null : _save,
-                  icon: _isSaving
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.save),
-                  label: Text(_isSaving ? 'Salvando...' : 'Salvar Alterações'),
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _isSaving ? null : _save,
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.save_rounded),
+            label: Text(_isSaving ? 'Salvando...' : loc.exerciseFormSave),
           ),
         ),
       ],
     );
+  }
+
+  Widget _buildCategoryPicker(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
+    final current = _categories.firstWhere(
+      (c) => c['id'] == _categoryId,
+      orElse: () =>
+          {'id': _categoryId, 'name': _categoryId, 'color': 0xFF757575},
+    );
+    final currentName = ExerciseLocaleHelper.categoryName(loc, current);
+    final currentColor = Color(current['color'] as int? ?? 0xFF757575);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () async {
+        final selected = await showModalBottomSheet<String>(
+          context: context,
+          showDragHandle: true,
+          builder: (ctx) {
+            return SafeArea(
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                itemCount: _categories.length,
+                itemBuilder: (ctx, i) {
+                  final cat = _categories[i];
+                  final color = Color(cat['color'] as int? ?? 0xFF757575);
+                  final isSelected = cat['id'] == _categoryId;
+                  return ListTile(
+                    leading: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    title: Text(
+                      ExerciseLocaleHelper.categoryName(loc, cat),
+                    ),
+                    trailing: isSelected
+                        ? Icon(
+                            Icons.check_rounded,
+                            color: theme.colorScheme.primary,
+                          )
+                        : null,
+                    onTap: () => Navigator.pop(ctx, cat['id'] as String),
+                  );
+                },
+              ),
+            );
+          },
+        );
+        if (selected != null) {
+          setState(() => _categoryId = selected);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outline),
+          borderRadius: BorderRadius.circular(8),
+          color: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: currentColor,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(currentName)),
+            Icon(
+              Icons.arrow_drop_down_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypePicker(ThemeData theme) {
+    final current = _types.firstWhere(
+      (t) => t['id'] == _type,
+      orElse: () => _types.first,
+    );
+    final currentName = _exerciseTypeName(current['id'] as String);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () async {
+        final selected = await showModalBottomSheet<String>(
+          context: context,
+          showDragHandle: true,
+          builder: (ctx) {
+            return SafeArea(
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                itemCount: _types.length,
+                itemBuilder: (ctx, i) {
+                  final t = _types[i];
+                  final isSelected = t['id'] == _type;
+                  return ListTile(
+                    leading: Icon(
+                      t['icon'] as IconData,
+                      color: theme.colorScheme.primary,
+                    ),
+                    title: Text(_exerciseTypeName(t['id'] as String)),
+                    trailing: isSelected
+                        ? Icon(
+                            Icons.check_rounded,
+                            color: theme.colorScheme.primary,
+                          )
+                        : null,
+                    onTap: () => Navigator.pop(ctx, t['id'] as String),
+                  );
+                },
+              ),
+            );
+          },
+        );
+        if (selected != null) {
+          setState(() => _type = selected);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outline),
+          borderRadius: BorderRadius.circular(8),
+          color: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              current['icon'] as IconData,
+              size: 18,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(currentName)),
+            Icon(
+              Icons.arrow_drop_down_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _exerciseTypeName(String typeId) {
+    final loc = AppLocalizations.of(context)!;
+    switch (typeId) {
+      case 'weightReps':
+        return loc.exerciseFormTypeWeightReps;
+      case 'distanceTime':
+        return loc.exerciseFormTypeDistanceTime;
+      case 'weightDistance':
+        return loc.exerciseFormTypeWeightDistance;
+      case 'weightTime':
+        return loc.exerciseFormTypeWeightTime;
+      case 'repsDistance':
+        return loc.exerciseFormTypeRepsDistance;
+      case 'repsTime':
+        return loc.exerciseFormTypeRepsTime;
+      case 'weightOnly':
+        return loc.exerciseFormTypeWeightOnly;
+      case 'repsOnly':
+        return loc.exerciseFormTypeRepsOnly;
+      case 'distanceOnly':
+        return loc.exerciseFormTypeDistanceOnly;
+      case 'timeOnly':
+        return loc.exerciseFormTypeTimeOnly;
+      default:
+        return typeId;
+    }
   }
 
   // ===================== TAB 2: HISTORY =====================

@@ -7,6 +7,7 @@ import 'package:workout_notes/widgets/category_timeline_bar.dart';
 import 'package:workout_notes/widgets/exercise_picker_sheet.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
+import 'package:workout_notes/utils/workout_estimator.dart';
 
 /// Full-screen editor for a routine day.
 /// Allows adding/removing exercises and managing predefined sets,
@@ -110,6 +111,24 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       _predefinedSets[ex['id'] as String] = sets;
     }
     if (mounted) setState(() => _isLoading = false);
+  }
+
+  int get _estimatedDurationSeconds {
+    final estimateExercises = _exercises.map((ex) {
+      final sets = _predefinedSets[ex['id'] as String] ?? const [];
+      return WorkoutEstimateExercise(
+        restTimeSeconds: ex['rest_time_seconds'] as int?,
+        sets: sets
+            .map(
+              (s) => WorkoutEstimateSet(
+                reps: (s['reps'] as num?)?.toInt(),
+                timeSeconds: (s['time_seconds'] as num?)?.toInt(),
+              ),
+            )
+            .toList(),
+      );
+    });
+    return WorkoutEstimateCalculator.estimateDurationSeconds(estimateExercises);
   }
 
   /// Resolves exercise name from aliased JOIN columns.
@@ -1229,6 +1248,9 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     final totalSets = stats.fold<int>(0, (a, s) => a + s.sets);
     final totalVolume = stats.fold<double>(0, (a, s) => a + s.volume);
     final maxSets = stats.fold<int>(0, (a, s) => s.sets > a ? s.sets : a);
+    final estimatedDuration = WorkoutEstimateCalculator.formatDuration(
+      _estimatedDurationSeconds,
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -1250,6 +1272,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
               stats,
               totalSets,
               totalVolume,
+              estimatedDuration,
             ),
             secondChild: _buildDayDashboardExpanded(
               theme,
@@ -1258,6 +1281,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
               totalSets,
               totalVolume,
               maxSets,
+              estimatedDuration,
             ),
             crossFadeState: _dashboardExpanded
                 ? CrossFadeState.showSecond
@@ -1275,6 +1299,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     List<_CategoryStat> stats,
     int totalSets,
     double totalVolume,
+    String? estimatedDuration,
   ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1305,6 +1330,25 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
               ),
             ],
           ),
+          if (estimatedDuration != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(
+                  Icons.timer_outlined,
+                  size: 14,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  loc.routinesEstimatedDuration(estimatedDuration),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (stats.isNotEmpty) ...[
             const SizedBox(height: 8),
             // Single category timeline bar — width is proportional to each
@@ -1329,6 +1373,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     int totalSets,
     double totalVolume,
     int maxSets,
+    String? estimatedDuration,
   ) {
     return Padding(
       padding: const EdgeInsets.all(14),
@@ -1354,6 +1399,25 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
               ),
             ],
           ),
+          if (estimatedDuration != null) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(
+                  Icons.timer_outlined,
+                  size: 14,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  loc.routinesEstimatedDuration(estimatedDuration),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
 
           // Per-category rows with visual bars
