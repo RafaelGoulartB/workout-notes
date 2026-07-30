@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="pt-BR" class="scroll-smooth">
+<html lang="en" class="scroll-smooth">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <title>Workout Notes — Diário de treinos offline, com IA opcional</title>
+    <title>Workout Notes — Offline workout journal, with optional AI</title>
     <meta
       name="description"
-      content="Um app Flutter open-source para registrar treinos, exercícios, rotinas, medidas corporais, sono e progresso. Funciona 100% offline. Opcionalmente com treinador IA."
+      content="An open-source Flutter app for logging workouts, exercises, routines, body measurements, sleep and progress. Works 100% offline. Optionally with an AI coach."
     />
 
     <!-- Tailwind via CDN -->
@@ -89,11 +89,11 @@
 
         <nav class="hidden md:flex items-center gap-8 text-sm text-fg-muted">
           <a href="#features" class="hover:text-fg transition-colors"
-            >Funcionalidades</a
+            >Features</a
           >
-          <a href="#ai" class="hover:text-fg transition-colors">Treinador IA</a>
-          <a href="#progresso" class="hover:text-fg transition-colors"
-            >Progresso</a
+          <a href="#ai" class="hover:text-fg transition-colors">AI Coach</a>
+          <a href="#progress" class="hover:text-fg transition-colors"
+            >Progress</a
           >
           <a href="#opensource" class="hover:text-fg transition-colors"
             >Open Source</a
@@ -104,7 +104,7 @@
           <a
             href="#download"
             class="hidden sm:inline-flex items-center gap-2 px-3.5 h-9 rounded-md text-sm font-medium bg-fg text-bg hover:-translate-y-px transition-transform"
-            >Baixar
+            >Download
             <svg
               class="w-3.5 h-3.5"
               viewBox="0 0 24 24"
@@ -121,7 +121,7 @@
             rel="noopener noreferrer"
             id="starBtn"
             class="inline-flex items-center gap-2 px-3 h-9 rounded-md text-sm border border-border hover:border-border-strong transition-colors font-mono"
-            aria-label="Ver repositório no GitHub"
+            aria-label="View repository on GitHub"
           >
             <svg
               class="w-4 h-4"
@@ -139,7 +139,7 @@
           <button
             id="menuBtn"
             class="md:hidden w-9 h-9 inline-flex items-center justify-center rounded-md border border-border"
-            aria-label="Abrir menu"
+            aria-label="Open menu"
           >
             <svg
               class="w-4 h-4"
@@ -159,14 +159,14 @@
         class="md:hidden hidden border-t border-border bg-bg-elev"
       >
         <div class="px-6 py-4 flex flex-col gap-3 text-sm text-fg-muted">
-          <a href="#features" class="py-1.5">Funcionalidades</a>
-          <a href="#ai" class="py-1.5">Treinador IA</a>
-          <a href="#progresso" class="py-1.5">Progresso</a>
+          <a href="#features" class="py-1.5">Features</a>
+          <a href="#ai" class="py-1.5">AI Coach</a>
+          <a href="#progress" class="py-1.5">Progress</a>
           <a href="#opensource" class="py-1.5">Open Source</a>
           <a
             href="#download"
             class="mt-2 inline-flex items-center justify-center h-10 rounded-md bg-fg text-bg font-medium"
-            >Baixar app</a
+            >Download app</a
           >
         </div>
       </div>
@@ -214,7 +214,7 @@
           <h1
             class="mt-8 text-5xl sm:text-6xl md:text-7xl font-medium leading-[1.05] tracking-[-0.035em]"
           >
-            Seu diário de treinos,
+            Your workout journal,
             <span
               class="text-fg-muted"
               style="
@@ -228,14 +228,14 @@
                 background-clip: text;
                 color: transparent;
               "
-              >agora inteligente.</span
+              >now intelligent.</span
             >
           </h1>
 
           <p class="mt-6 text-fg-muted text-lg leading-relaxed max-w-2xl mx-auto">
-            Registre séries, peso, repetições, RPE, cardio, medidas e sono em um
-            só lugar. Funciona 100% offline. Conecte um treinador IA quando
-            quiser conversar sobre seus dados.
+            Log sets, weight, reps, RPE, cardio, measurements and sleep in one
+            place. Works 100% offline. Connect an AI coach whenever you want to
+            chat about your data.
           </p>
 
           <div class="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -243,7 +243,7 @@
               href="#download"
               class="inline-flex items-center gap-2 h-11 px-5 rounded-lg bg-fg text-bg font-medium hover:-translate-y-px transition-transform"
             >
-              Baixar para Android
+              Download for Android
               <svg
                 class="w-4 h-4"
                 viewBox="0 0 24 24"
@@ -270,7 +270,7 @@
                   d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 015.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5z"
                 />
               </svg>
-              Ver no GitHub
+              View on GitHub
             </a>
           </div>
 
@@ -294,7 +294,7 @@
           >
             <img
               src="assets/screenshots/home.png"
-              alt="Tela inicial do Workout Notes mostrando dashboard com estatísticas do mês, ações rápidas e lista de treinos completados"
+              alt="Workout Notes home screen showing the dashboard with month stats, quick actions and completed workouts list"
               class="w-full h-auto block"
               loading="eager"
               decoding="async"
@@ -441,7 +441,7 @@
       </div>
     </section>
 
-    <!-- ============== FEATURE: TREINO EM TEMPO REAL ============== -->
+    <!-- ============== FEATURE: ACTIVE SESSION ============== -->
     <section id="features" class="border-t border-border">
       <div
         class="max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center"
@@ -449,18 +449,17 @@
         <div>
           <span
             class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
-            >Sessão ativa</span
+            >Active session</span
           >
           <h2
             class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
           >
-            Treino em tempo real, sem fricção.
+            Real-time training, friction-free.
           </h2>
           <p class="mt-5 text-fg-muted leading-relaxed">
-            Abra o app, escolha o exercício e comece a registrar séries.
-            Cronômetro de descanso, supersets, RPE, séries de aquecimento e
-            Pré-preenchimento de séries com base no histórico — tudo no
-            mesmo fluxo.
+            Open the app, pick the exercise and start logging sets. Rest timer,
+            supersets, RPE, warm-up sets and pre-fill from history — all in the
+            same flow.
           </p>
 
           <ul class="mt-7 space-y-3 text-fg-muted">
@@ -478,7 +477,7 @@
                   <path d="M5 13l4 4L19 7" />
                 </svg>
               </span>
-              Cronômetro de descanso com notificação e som
+              Rest timer with notification and sound
             </li>
             <li class="flex items-start gap-3">
               <span
@@ -493,7 +492,7 @@
                   <path d="M5 13l4 4L19 7" />
                 </svg>
               </span>
-              Superset e tri-set agrupados por cor
+              Color-coded superset and tri-set groups
             </li>
             <li class="flex items-start gap-3">
               <span
@@ -508,7 +507,7 @@
                   <path d="M5 13l4 4L19 7" />
                 </svg>
               </span>
-              Auto-sugestão de peso e repetições do último treino
+              Auto-suggest weight and reps from last workout
             </li>
             <li class="flex items-start gap-3">
               <span
@@ -523,7 +522,7 @@
                   <path d="M5 13l4 4L19 7" />
                 </svg>
               </span>
-              RPE, notas por série e séries de aquecimento
+              RPE, per-set notes and warm-up sets
             </li>
             <li class="flex items-start gap-3">
               <span
@@ -538,7 +537,7 @@
                   <path d="M5 13l4 4L19 7" />
                 </svg>
               </span>
-              Funciona offline — sem login, sem servidor
+              Works offline — no login, no server
             </li>
           </ul>
         </div>
@@ -551,7 +550,7 @@
           >
             <img
               src="assets/screenshots/workout-progress.png"
-              alt="Tela de treino ativo mostrando séries de Squat e Romanian Deadlift com peso, reps, RPE e cronômetro de descanso"
+              alt="Active workout screen showing Squat and Romanian Deadlift sets with weight, reps, RPE and rest timer"
               class="w-full h-auto block"
               loading="lazy"
               decoding="async"
@@ -573,7 +572,7 @@
       </div>
     </section>
 
-    <!-- ============== FEATURE: BIBLIOTECA + ROTINAS ============== -->
+    <!-- ============== FEATURE: LIBRARY + ROUTINES ============== -->
     <section class="border-t border-border">
       <div
         class="max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-[1fr_1.1fr] gap-12 lg:gap-16 items-center"
@@ -587,16 +586,16 @@
           >
             <span
               class="font-mono text-[11px] text-fg-dim uppercase tracking-[0.14em]"
-              >biblioteca</span
+              >library</span
             >
             <div class="flex items-center gap-1.5">
               <span
                 class="font-mono text-[10px] px-1.5 py-0.5 rounded-full bg-accent-dim text-accent"
-                >42 exercícios</span
+                >42 exercises</span
               >
               <span
                 class="font-mono text-[10px] px-1.5 py-0.5 rounded-full border border-border text-fg-muted"
-                >8 categorias</span
+                >8 categories</span
               >
             </div>
           </div>
@@ -605,49 +604,49 @@
               class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
             >
               <span class="w-2 h-2 rounded-full bg-accent"></span>
-              <span class="text-sm">Supino Reto</span>
+              <span class="text-sm">Bench Press</span>
             </div>
             <div
               class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
             >
               <span class="w-2 h-2 rounded-full bg-accent"></span>
-              <span class="text-sm">Agachamento Livre</span>
+              <span class="text-sm">Back Squat</span>
             </div>
             <div
               class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
             >
               <span class="w-2 h-2 rounded-full bg-ok"></span>
-              <span class="text-sm">Levantamento Terra</span>
+              <span class="text-sm">Deadlift</span>
             </div>
             <div
               class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
             >
               <span class="w-2 h-2 rounded-full bg-ok"></span>
-              <span class="text-sm">Remada Curvada</span>
+              <span class="text-sm">Bent-over Row</span>
             </div>
             <div
               class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
             >
               <span class="w-2 h-2 rounded-full bg-warn"></span>
-              <span class="text-sm">Desenvolvimento Militar</span>
+              <span class="text-sm">Overhead Press</span>
             </div>
             <div
               class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
             >
               <span class="w-2 h-2 rounded-full bg-warn"></span>
-              <span class="text-sm">Puxada Frontal</span>
+              <span class="text-sm">Lat Pulldown</span>
             </div>
             <div
               class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
             >
               <span class="w-2 h-2 rounded-full bg-[#e67e22]"></span>
-              <span class="text-sm">Rosca Direta</span>
+              <span class="text-sm">Bicep Curl</span>
             </div>
             <div
               class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
             >
               <span class="w-2 h-2 rounded-full bg-[#e67e22]"></span>
-              <span class="text-sm">Tríceps Corda</span>
+              <span class="text-sm">Tricep Pushdown</span>
             </div>
           </div>
         </div>
@@ -655,43 +654,43 @@
         <div class="order-1 lg:order-2">
           <span
             class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
-            >Biblioteca & Rotinas</span
+            >Library & Routines</span
           >
           <h2
             class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
           >
-            Sua biblioteca, do seu jeito.
+            Your library, your way.
           </h2>
           <p class="mt-5 text-fg-muted leading-relaxed">
-            Categorias por sistema energético (aeróbico / anaeróbico),
-            favoritos, equipamento, tipo, notas pessoais e tempo padrão de
-            descanso por exercício. Monte rotinas multi-dia com séries
-            pré-definidas e inicie o treino com um toque.
+            Categories by energy system (aerobic / anaerobic), favorites,
+            equipment, type, personal notes and default rest time per exercise.
+            Build multi-day routines with predefined sets and start a workout
+            in one tap.
           </p>
           <div class="mt-6 grid grid-cols-2 gap-3 text-sm">
             <div class="tile rounded-lg border border-border p-3">
               <div class="font-mono text-[11px] text-fg-dim uppercase">
-                Favoritos
+                Favorites
               </div>
-              <div class="mt-1 text-fg">Acesso rápido</div>
+              <div class="mt-1 text-fg">Quick access</div>
             </div>
             <div class="tile rounded-lg border border-border p-3">
               <div class="font-mono text-[11px] text-fg-dim uppercase">
-                Incremento
+                Increment
               </div>
-              <div class="mt-1 text-fg">Por exercício</div>
+              <div class="mt-1 text-fg">Per exercise</div>
             </div>
             <div class="tile rounded-lg border border-border p-3">
               <div class="font-mono text-[11px] text-fg-dim uppercase">
-                Rotinas
+                Routines
               </div>
-              <div class="mt-1 text-fg">Multi-dia</div>
+              <div class="mt-1 text-fg">Multi-day</div>
             </div>
             <div class="tile rounded-lg border border-border p-3">
               <div class="font-mono text-[11px] text-fg-dim uppercase">
-                Séries
+                Sets
               </div>
-              <div class="mt-1 text-fg">Pré-definidas</div>
+              <div class="mt-1 text-fg">Predefined</div>
             </div>
           </div>
         </div>
@@ -719,36 +718,36 @@
         <div>
           <span
             class="font-mono text-[11px] uppercase tracking-[0.14em] text-accent"
-            >Treinador IA</span
+            >AI Coach</span
           >
           <h2
             class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
           >
-            Converse com seus dados.
+            Chat with your data.
           </h2>
           <p class="mt-5 text-fg-muted leading-relaxed">
-            O AI Coach é um chat opcional, <strong class="text-fg">read-only</strong>,
-            que vê seu histórico, medidas, rotinas e metas. Ele usa
-            ferramentas para puxar detalhes sob demanda e responder com
-            contexto real — sem inventar números.
+            The AI Coach is an optional, <strong class="text-fg">read-only</strong>
+            chat that sees your history, measurements, routines and goals. It
+            uses tools to pull details on demand and answer with real context
+            — never inventing numbers.
           </p>
 
           <ul class="mt-7 space-y-3 text-fg-muted">
             <li class="flex items-start gap-3">
               <span class="text-accent">▸</span>
-              <span><span class="text-fg">13 ferramentas de leitura:</span> treinos, PRs, volume, tendências, medidas, sono, cardio e metas</span>
+              <span><span class="text-fg">13 read tools:</span> workouts, PRs, volume, trends, measurements, sleep, cardio and goals</span>
             </li>
             <li class="flex items-start gap-3">
               <span class="text-accent">▸</span>
-              <span><span class="text-fg">Multi-provider:</span> OpenAI, OpenRouter, Ollama ou qualquer endpoint compatível</span>
+              <span><span class="text-fg">Multi-provider:</span> OpenAI, OpenRouter, Ollama or any compatible endpoint</span>
             </li>
             <li class="flex items-start gap-3">
               <span class="text-accent">▸</span>
-              <span><span class="text-fg">Tokens locais:</span> salvos com <code class="font-mono text-xs px-1 py-0.5 rounded bg-bg-elev">flutter_secure_storage</code>, nunca no banco</span>
+              <span><span class="text-fg">Local tokens:</span> stored with <code class="font-mono text-xs px-1 py-0.5 rounded bg-bg-elev">flutter_secure_storage</code>, never in the database</span>
             </li>
             <li class="flex items-start gap-3">
               <span class="text-accent">▸</span>
-              <span><span class="text-fg">Propostas de rotina:</span> a IA sugere mudanças e você aprova antes de aplicar</span>
+              <span><span class="text-fg">Routine proposals:</span> AI suggests changes and you approve before applying</span>
             </li>
           </ul>
         </div>
@@ -778,14 +777,14 @@
             <div class="flex gap-3">
               <span class="text-fg-dim shrink-0">user</span>
               <span class="text-fg"
-                >Qual meu volume semanal de peito nas últimas 4 semanas?</span
+                >What's my weekly chest volume over the last 4 weeks?</span
               >
             </div>
 
             <div class="flex gap-3">
               <span class="text-accent shrink-0">tool</span>
               <span class="text-fg-muted"
-                >↳ get_weekly_volume_breakdown(weeks=4, group="peito")
+                >↳ get_weekly_volume_breakdown(weeks=4, group="chest")
                 <span class="text-ok">[ok]</span></span
               >
             </div>
@@ -794,19 +793,19 @@
               <span class="text-accent shrink-0">assistant</span>
               <div class="text-fg space-y-2">
                 <p>
-                  Seu volume de peito nas últimas 4 semanas foi
-                  <span class="text-accent">28.400 kg</span> total, distribuídos
-                  assim:
+                  Your chest volume over the last 4 weeks was
+                  <span class="text-accent">28,400 kg</span> total, broken down
+                  as follows:
                 </p>
                 <ul class="space-y-1 pl-2 text-fg-muted">
-                  <li>· Semana 1: 6.200 kg <span class="text-fg-faint">(baseline)</span></li>
-                  <li>· Semana 2: 6.850 kg <span class="text-ok">+10,5%</span></li>
-                  <li>· Semana 3: 7.200 kg <span class="text-ok">+5,1%</span></li>
-                  <li>· Semana 4: 8.150 kg <span class="text-ok">+13,2%</span></li>
+                  <li>· Week 1: 6,200 kg <span class="text-fg-faint">(baseline)</span></li>
+                  <li>· Week 2: 6,850 kg <span class="text-ok">+10.5%</span></li>
+                  <li>· Week 3: 7,200 kg <span class="text-ok">+5.1%</span></li>
+                  <li>· Week 4: 8,150 kg <span class="text-ok">+13.2%</span></li>
                 </ul>
                 <p class="text-fg-muted pt-1">
-                  Tendência positiva consistente, sem sinais de overreaching.
-                  Quer que eu olhe também a distribuição por exercício?
+                  Consistent positive trend, no signs of overreaching. Want me
+                  to also look at the per-exercise distribution?
                 </p>
                 <span class="inline-block w-2 h-4 bg-accent align-middle caret-blink"></span>
               </div>
@@ -816,32 +815,32 @@
       </div>
     </section>
 
-    <!-- ============== PROGRESSO ============== -->
-    <section id="progresso" class="border-t border-border">
+    <!-- ============== PROGRESS ============== -->
+    <section id="progress" class="border-t border-border">
       <div
         class="max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center"
       >
         <div>
           <span
             class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
-            >Progresso</span
+            >Progress</span
           >
           <h2
             class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
           >
-            Veja a tendência, não o dia.
+            See the trend, not the day.
           </h2>
           <p class="mt-5 text-fg-muted leading-relaxed">
-            Gráficos de volume semanal, PRs pessoais, distribuição por grupo
-            muscular, frequência, streak atual e relatório mensal automático.
-            Tudo construído direto sobre os seus dados reais.
+            Weekly volume charts, personal records, muscle group distribution,
+            frequency, current streak and automatic monthly report — all built
+            directly on your real data.
           </p>
 
           <div class="mt-7 grid grid-cols-3 gap-3 text-center">
             <div class="tile rounded-lg border border-border p-4">
               <div class="font-mono text-2xl text-fg">28.4k</div>
               <div class="font-mono text-[10px] text-fg-dim uppercase mt-1">
-                kg / 4 sem
+                kg / 4 wk
               </div>
             </div>
             <div class="tile rounded-lg border border-border p-4">
@@ -867,7 +866,7 @@
           >
             <img
               src="assets/screenshots/progress.png"
-              alt="Tela de Progresso mostrando relatório mensal, totais de treinos e séries, metas, heatmap anual e frequência semanal"
+              alt="Progress screen showing monthly report, total workouts and sets, goals, annual heatmap and weekly frequency"
               class="w-full h-auto block"
               loading="lazy"
               decoding="async"
@@ -892,45 +891,45 @@
         <div>
           <span
             class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
-            >Corpo & hábitos</span
+            >Body & habits</span
           >
           <h2
             class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
           >
-            Mais do que haltere.
+            More than dumbbells.
           </h2>
           <p class="mt-5 text-fg-muted leading-relaxed">
-            Treino é só uma parte. Acompanhe medidas corporais, peso, sono,
-            metas com prazo e cardio — tudo na mesma base local.
+            Training is only part of it. Track body measurements, weight,
+            sleep, time-bound goals and cardio — all in the same local store.
           </p>
 
           <div class="mt-8 grid sm:grid-cols-2 gap-3">
             <div class="tile rounded-tile border border-border p-4 bg-bg-card/40">
               <div class="text-xl">📏</div>
-              <div class="mt-2 font-medium text-sm">Medidas corporais</div>
+              <div class="mt-2 font-medium text-sm">Body measurements</div>
               <p class="mt-1 text-xs text-fg-muted">
-                Tendência por região ao longo do tempo.
+                Trend per region over time.
               </p>
             </div>
             <div class="tile rounded-tile border border-border p-4 bg-bg-card/40">
               <div class="text-xl">😴</div>
-              <div class="mt-2 font-medium text-sm">Sono & qualidade</div>
+              <div class="mt-2 font-medium text-sm">Sleep & quality</div>
               <p class="mt-1 text-xs text-fg-muted">
-                Duração e impacto percebido no treino.
+                Duration and perceived impact on training.
               </p>
             </div>
             <div class="tile rounded-tile border border-border p-4 bg-bg-card/40">
               <div class="text-xl">🎯</div>
-              <div class="mt-2 font-medium text-sm">Metas com prazo</div>
+              <div class="mt-2 font-medium text-sm">Time-bound goals</div>
               <p class="mt-1 text-xs text-fg-muted">
-                Peso, PR, medida. Progresso automático.
+                Weight, PR, measurement. Automatic progress.
               </p>
             </div>
             <div class="tile rounded-tile border border-border p-4 bg-bg-card/40">
               <div class="text-xl">🏃</div>
               <div class="mt-2 font-medium text-sm">Cardio</div>
               <p class="mt-1 text-xs text-fg-muted">
-                Distância, pace, tempo no resumo semanal.
+                Distance, pace, time in the weekly summary.
               </p>
             </div>
           </div>
@@ -944,7 +943,7 @@
           >
             <img
               src="assets/screenshots/body-measurements.png"
-              alt="Tela de medidas corporais mostrando diferença entre lados, gráfico de tendência e estatísticas min/max/média"
+              alt="Body measurements screen showing side-by-side left/right comparison, trend chart and min/max/average stats"
               class="w-full h-auto block"
               loading="lazy"
               decoding="async"
@@ -986,7 +985,7 @@
           <div class="p-5 font-mono text-sm space-y-2">
             <div class="flex gap-3">
               <span class="text-accent">$</span>
-              <span class="text-fg-muted"># Todos os seus dados ficam no dispositivo</span>
+              <span class="text-fg-muted"># All your data stays on the device</span>
             </div>
             <div class="flex gap-3">
               <span class="text-accent">$</span>
@@ -1000,21 +999,21 @@
               <span class="text-fg">sqlite&gt; SELECT SUM(weight*reps) FROM sets;</span>
             </div>
             <div class="flex gap-3">
-              <span class="text-fg-dim ml-5">284 350</span>
+              <span class="text-fg-dim ml-5">284,350</span>
             </div>
             <div class="flex gap-3">
               <span class="text-accent">$</span>
               <span class="text-fg-muted"
-                ># Exportar é um toque: CSV completo</span
+                ># One-tap export: full CSV</span
               >
             </div>
             <div class="flex gap-3">
               <span class="text-accent">$</span>
-              <span class="text-fg">share_plus.save("treinos.csv")</span>
+              <span class="text-fg">share_plus.save("workouts.csv")</span>
             </div>
             <div class="flex gap-3">
               <span class="text-ok">✓</span>
-              <span class="text-fg-muted">Nuvem opcional. Conta nunca obrigatória.</span>
+              <span class="text-fg-muted">Cloud is optional. Account never required.</span>
             </div>
           </div>
         </div>
@@ -1028,12 +1027,12 @@
             <h2
               class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
             >
-              Seus dados. Seu dispositivo.
+              Your data. Your device.
             </h2>
             <p class="mt-5 text-fg-muted leading-relaxed">
-              O Workout Notes é construído com Flutter e SQLite. Nada sai do
-              seu telefone a menos que você peça. O AI Coach é totalmente
-              opcional — sem ele, o app funciona 100% offline, sem login, sem
+              Workout Notes is built with Flutter and SQLite. Nothing leaves
+              your phone unless you ask. The AI Coach is fully optional —
+              without it, the app runs 100% offline, with no login, no
               analytics.
             </p>
             <div class="mt-6 flex flex-wrap gap-2 font-mono text-[11px]">
@@ -1072,7 +1071,7 @@
                   d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 015.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5z"
                 />
               </svg>
-              Explorar o código
+              Explore the code
             </a>
           </div>
 
@@ -1084,7 +1083,7 @@
             >
               <img
                 src="assets/screenshots/workout-finish.png"
-                alt="Detalhes do treino concluído com evolução, destaques, volume muscular por grupo e séries com RPE"
+                alt="Completed workout details with evolution, highlights, muscle volume per group and sets with RPE"
                 class="w-full h-auto block"
                 loading="lazy"
                 decoding="async"
@@ -1122,7 +1121,7 @@
         <h2
           class="text-4xl md:text-6xl font-medium leading-[1.05] tracking-[-0.035em] max-w-3xl mx-auto"
         >
-          Comece a registrar
+          Start logging
           <span
             class="text-transparent"
             style="
@@ -1130,12 +1129,12 @@
               -webkit-background-clip: text;
               background-clip: text;
             "
-            >hoje.</span
+            >today.</span
           >
         </h2>
         <p class="mt-5 text-fg-muted max-w-xl mx-auto">
-          Build direto do repositório, ou baixe um release. Sem conta, sem
-          assinatura, sem telemetria.
+          Build straight from the repo, or grab a release. No account, no
+          subscription, no telemetry.
         </p>
         <div class="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
           <a
@@ -1146,10 +1145,10 @@
           >
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
               <path
-                d="M3 20.5V3.5c0-.4.2-.8.5-1L14.6 12 3.5 21.5c-.3-.2-.5-.6-.5-1zm14.5-7L20 11.5l-3 1.7-2.4-1.4 2.9-1.3zm-2.4 2.7L5.5 21 17 14l-1.9-1.1zM5.5 3l11.5 7.5L15.1 9 5.5 3z"
+                d="M3 20.5V3.5c0-.4.2-.8.5-1L14.6 12 3.5 21.5c-.3-.2-.5-.6-.5-1zm14.5-7L20 11.5l-3 1.7-2.4-1.4 2.9-1.3zm-2.4 2.7L5.5 21 17 14-1.9-1.1zM5.5 3l11.5 7.5L15.1 9 5.5 3z"
               />
             </svg>
-            Baixar APK
+            Download APK
           </a>
           <a
             href="https://github.com/RafaelGoulartB/workout-notes#readme"
@@ -1162,7 +1161,7 @@
                 d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 015.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5z"
               />
             </svg>
-            Ver no GitHub
+            View on GitHub
           </a>
           <a
             href="https://github.com/RafaelGoulartB/workout-notes"
@@ -1192,8 +1191,7 @@
             >
           </div>
           <p class="mt-3 text-sm text-fg-muted max-w-xs">
-            Diário de treinos offline, com IA opcional. Construído com
-            Flutter.
+            Offline workout journal, with optional AI. Built with Flutter.
           </p>
         </div>
 
@@ -1201,12 +1199,12 @@
           <div
             class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
           >
-            Produto
+            Product
           </div>
           <ul class="mt-3 space-y-2 text-sm text-fg-muted">
-            <li><a href="#features" class="hover:text-fg">Funcionalidades</a></li>
-            <li><a href="#ai" class="hover:text-fg">Treinador IA</a></li>
-            <li><a href="#progresso" class="hover:text-fg">Progresso</a></li>
+            <li><a href="#features" class="hover:text-fg">Features</a></li>
+            <li><a href="#ai" class="hover:text-fg">AI Coach</a></li>
+            <li><a href="#progress" class="hover:text-fg">Progress</a></li>
             <li><a href="#download" class="hover:text-fg">Download</a></li>
           </ul>
         </div>
@@ -1215,7 +1213,7 @@
           <div
             class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
           >
-            Recursos
+            Resources
           </div>
           <ul class="mt-3 space-y-2 text-sm text-fg-muted">
             <li>
@@ -1224,7 +1222,7 @@
                 target="_blank"
                 rel="noopener noreferrer"
                 class="hover:text-fg"
-                >Documentação</a
+                >Documentation</a
               >
             </li>
             <li>
@@ -1261,7 +1259,7 @@
           <div
             class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
           >
-            Comunidade
+            Community
           </div>
           <ul class="mt-3 space-y-2 text-sm text-fg-muted">
             <li>
@@ -1279,7 +1277,7 @@
                 target="_blank"
                 rel="noopener noreferrer"
                 class="hover:text-fg"
-                >Reportar bug</a
+                >Report bug</a
               >
             </li>
             <li>
@@ -1288,7 +1286,7 @@
                 target="_blank"
                 rel="noopener noreferrer"
                 class="hover:text-fg"
-                >Contribuir</a
+                >Contribute</a
               >
             </li>
             <li>
@@ -1309,7 +1307,7 @@
           class="max-w-container mx-auto px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-fg-dim"
         >
           <div class="font-mono">
-            © 2025 Workout Notes · MIT License · feito com Flutter
+            © 2025 Workout Notes · MIT License · built with Flutter
           </div>
           <div class="flex items-center gap-4 font-mono">
             <a

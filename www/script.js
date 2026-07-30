@@ -22,14 +22,14 @@
       mobileMenu.classList.toggle("hidden", isOpen);
       menuBtn.setAttribute(
         "aria-label",
-        isOpen ? "Abrir menu" : "Fechar menu"
+        isOpen ? "Open menu" : "Close menu"
       );
     });
     // close menu when a link is clicked
     mobileMenu.querySelectorAll("a").forEach((a) => {
       a.addEventListener("click", () => {
         mobileMenu.classList.add("hidden");
-        menuBtn.setAttribute("aria-label", "Abrir menu");
+        menuBtn.setAttribute("aria-label", "Open menu");
       });
     });
   }
