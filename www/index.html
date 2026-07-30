@@ -1,0 +1,1330 @@
+<!doctype html>
+<html lang="pt-BR" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>Workout Notes — Diário de treinos offline, com IA opcional</title>
+    <meta
+      name="description"
+      content="Um app Flutter open-source para registrar treinos, exercícios, rotinas, medidas corporais, sono e progresso. Funciona 100% offline. Opcionalmente com treinador IA."
+    />
+
+    <!-- Tailwind via CDN -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+
+    <!-- DM Sans + JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              bg: "#09090b",
+              "bg-elev": "#0c0c0e",
+              "bg-card": "#111113",
+              fg: "#fafafa",
+              "fg-muted": "#a1a1aa",
+              "fg-dim": "#71717a",
+              "fg-faint": "#52525b",
+              border: "rgba(255,255,255,0.08)",
+              "border-strong": "rgba(255,255,255,0.14)",
+              accent: "oklch(0.68 0.11 198)",
+              "accent-dim": "oklch(0.68 0.11 198 / 0.18)",
+            },
+            fontFamily: {
+              sans: ['"DM Sans"', "system-ui", "sans-serif"],
+              mono: ['"JetBrains Mono"', "ui-monospace", "monospace"],
+            },
+            maxWidth: {
+              container: "1240px",
+            },
+            borderRadius: {
+              tile: "16px",
+            },
+          },
+        },
+      };
+    </script>
+
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+
+  <body
+    class="bg-bg text-fg font-sans antialiased selection:bg-accent selection:text-bg"
+    style="font-feature-settings: 'ss01', 'ss02'"
+  >
+    <!-- film grain overlay -->
+    <div
+      class="pointer-events-none fixed inset-0 z-[60] mix-blend-overlay opacity-[0.035]"
+      style="
+        background-image: url(&quot;data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>&quot;);
+      "
+    ></div>
+
+    <!-- ============== NAV ============== -->
+    <header
+      id="nav"
+      class="sticky top-0 z-50 backdrop-blur-md bg-bg/70 border-b border-transparent transition-colors"
+    >
+      <div
+        class="max-w-container mx-auto px-6 lg:px-8 h-16 flex items-center justify-between"
+      >
+        <a href="#" class="flex items-center gap-2 group">
+          <span
+            class="w-7 h-7 rounded-md bg-accent flex items-center justify-center text-bg font-bold text-sm"
+            >W</span
+          >
+          <span class="font-medium tracking-tight text-[15px]"
+            >Workout Notes</span
+          >
+        </a>
+
+        <nav class="hidden md:flex items-center gap-8 text-sm text-fg-muted">
+          <a href="#features" class="hover:text-fg transition-colors"
+            >Funcionalidades</a
+          >
+          <a href="#ai" class="hover:text-fg transition-colors">Treinador IA</a>
+          <a href="#progresso" class="hover:text-fg transition-colors"
+            >Progresso</a
+          >
+          <a href="#opensource" class="hover:text-fg transition-colors"
+            >Open Source</a
+          >
+        </nav>
+
+        <div class="flex items-center gap-2">
+          <a
+            href="#download"
+            class="hidden sm:inline-flex items-center gap-2 px-3.5 h-9 rounded-md text-sm font-medium bg-fg text-bg hover:-translate-y-px transition-transform"
+            >Baixar
+            <svg
+              class="w-3.5 h-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M7 17L17 7M9 7h8v8" />
+            </svg>
+          </a>
+          <a
+            href="https://github.com/RafaelGoulartB/workout-notes"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-2 px-3 h-9 rounded-md text-sm border border-border hover:border-border-strong transition-colors font-mono"
+          >
+            <svg
+              class="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 015.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5z"
+              />
+            </svg>
+            <span class="hidden sm:inline">star</span>
+          </a>
+          <button
+            id="menuBtn"
+            class="md:hidden w-9 h-9 inline-flex items-center justify-center rounded-md border border-border"
+            aria-label="Abrir menu"
+          >
+            <svg
+              class="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div
+        id="mobileMenu"
+        class="md:hidden hidden border-t border-border bg-bg-elev"
+      >
+        <div class="px-6 py-4 flex flex-col gap-3 text-sm text-fg-muted">
+          <a href="#features" class="py-1.5">Funcionalidades</a>
+          <a href="#ai" class="py-1.5">Treinador IA</a>
+          <a href="#progresso" class="py-1.5">Progresso</a>
+          <a href="#opensource" class="py-1.5">Open Source</a>
+          <a
+            href="#download"
+            class="mt-2 inline-flex items-center justify-center h-10 rounded-md bg-fg text-bg font-medium"
+            >Baixar app</a
+          >
+        </div>
+      </div>
+    </header>
+
+    <!-- ============== HERO ============== -->
+    <section class="relative overflow-hidden">
+      <!-- grid mask -->
+      <div
+        class="pointer-events-none absolute inset-0 opacity-[0.35]"
+        style="
+          background-image: linear-gradient(
+              to right,
+              rgba(255, 255, 255, 0.04) 1px,
+              transparent 1px
+            ),
+            linear-gradient(
+              to bottom,
+              rgba(255, 255, 255, 0.04) 1px,
+              transparent 1px
+            );
+          background-size: 48px 48px;
+          -webkit-mask-image: radial-gradient(
+            ellipse 70% 60% at 50% 30%,
+            black 30%,
+            transparent 75%
+          );
+          mask-image: radial-gradient(
+            ellipse 70% 60% at 50% 30%,
+            black 30%,
+            transparent 75%
+          );
+        "
+      ></div>
+
+      <div class="relative max-w-container mx-auto px-6 lg:px-8 pt-24 pb-24">
+        <div class="text-center max-w-3xl mx-auto fade-in">
+          <div
+            class="inline-flex items-center gap-2 px-3 h-7 rounded-full border border-border bg-bg-card/60 backdrop-blur font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+            v0.9 — Flutter, offline-first
+          </div>
+
+          <h1
+            class="mt-8 text-5xl sm:text-6xl md:text-7xl font-medium leading-[1.05] tracking-[-0.035em]"
+          >
+            Seu diário de treinos,
+            <span
+              class="text-fg-muted"
+              style="
+                background: linear-gradient(
+                  180deg,
+                  #fafafa 0%,
+                  #fafafa 50%,
+                  #71717a 100%
+                );
+                -webkit-background-clip: text;
+                background-clip: text;
+                color: transparent;
+              "
+              >agora inteligente.</span
+            >
+          </h1>
+
+          <p class="mt-6 text-fg-muted text-lg leading-relaxed max-w-2xl mx-auto">
+            Registre séries, peso, repetições, RPE, cardio, medidas e sono em um
+            só lugar. Funciona 100% offline. Conecte um treinador IA quando
+            quiser conversar sobre seus dados.
+          </p>
+
+          <div class="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a
+              href="#download"
+              class="inline-flex items-center gap-2 h-11 px-5 rounded-lg bg-fg text-bg font-medium hover:-translate-y-px transition-transform"
+            >
+              Baixar para Android
+              <svg
+                class="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M12 5v14M5 12l7 7 7-7" />
+              </svg>
+            </a>
+            <a
+              href="https://github.com/RafaelGoulartB/workout-notes"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center gap-2 h-11 px-5 rounded-lg border border-border hover:border-border-strong hover:bg-bg-card/40 transition-colors"
+            >
+              <svg
+                class="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 015.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5z"
+                />
+              </svg>
+              Ver no GitHub
+            </a>
+          </div>
+
+          <p
+            class="mt-5 font-mono text-[11px] uppercase tracking-[0.14em] text-fg-faint"
+          >
+            Android · iOS · Web · macOS · Windows · Linux
+          </p>
+        </div>
+
+        <!-- Phone mockup + floating tiles -->
+        <div
+          class="relative mt-20 mx-auto max-w-3xl perspective h-[640px] sm:h-[680px]"
+          style="perspective: 1400px"
+        >
+          <div
+            class="phone-frame absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[260px] sm:w-[290px] tilt"
+            style="
+              background: linear-gradient(#ffffff04, transparent);
+            "
+          >
+            <img
+              src="assets/screenshots/home.png"
+              alt="Tela inicial do Workout Notes mostrando dashboard com estatísticas do mês, ações rápidas e lista de treinos completados"
+              class="w-full h-auto block"
+              loading="eager"
+              decoding="async"
+            />
+          </div>
+
+          <!-- floating tiles -->
+          <div
+            class="float-tile absolute -left-6 top-12 sm:-left-12 sm:top-16 w-20 h-20 sm:w-24 sm:h-24 rounded-3xl border border-border bg-bg-elev/80 backdrop-blur"
+            style="
+              background: radial-gradient(
+                circle at 30% 25%,
+                oklch(0.7 0.12 195 / 0.3),
+                #14141a 65%
+              );
+            "
+          >
+            <div
+              class="w-full h-full flex items-center justify-center font-mono text-2xl"
+            >
+              🏋
+            </div>
+          </div>
+          <div
+            class="float-tile absolute -right-4 top-4 sm:-right-10 sm:top-8 w-20 h-20 sm:w-24 sm:h-24 rounded-3xl border border-border bg-bg-elev/80 backdrop-blur"
+            style="
+              background: radial-gradient(
+                circle at 70% 30%,
+                oklch(0.7 0.18 30 / 0.3),
+                #14141a 65%
+              );
+              animation-delay: 1.4s;
+            "
+          >
+            <div
+              class="w-full h-full flex items-center justify-center font-mono text-2xl"
+            >
+              🤖
+            </div>
+          </div>
+          <div
+            class="float-tile absolute left-10 -bottom-8 sm:left-20 sm:-bottom-10 w-20 h-20 sm:w-24 sm:h-24 rounded-3xl border border-border bg-bg-elev/80 backdrop-blur"
+            style="
+              background: radial-gradient(
+                circle at 50% 30%,
+                oklch(0.72 0.16 220 / 0.25),
+                #14141a 65%
+              );
+              animation-delay: 2.8s;
+            "
+          >
+            <div
+              class="w-full h-full flex items-center justify-center font-mono text-2xl"
+            >
+              💤
+            </div>
+          </div>
+          <div
+            class="float-tile hidden sm:flex absolute right-1/4 -bottom-12 w-20 h-20 rounded-3xl border border-border bg-bg-elev/80 backdrop-blur"
+            style="
+              background: radial-gradient(
+                circle at 50% 30%,
+                oklch(0.74 0.18 60 / 0.25),
+                #14141a 65%
+              );
+              animation-delay: 4.2s;
+            "
+          >
+            <div
+              class="w-full h-full items-center justify-center font-mono text-2xl flex"
+            >
+              📈
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== PLATFORM STRIP ============== -->
+    <section class="border-t border-border">
+      <div
+        class="max-w-container mx-auto px-6 lg:px-8 py-12 grid grid-cols-3 sm:grid-cols-6 gap-y-8 gap-x-4"
+      >
+        <div
+          class="flex flex-col items-center gap-2 text-fg-muted hover:text-fg transition-colors"
+        >
+          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M17.6 9.5c-.04-2.7 2.2-4 2.3-4-1.26-1.84-3.2-2.1-3.9-2.13-1.66-.17-3.24.98-4.08.98-.86 0-2.15-.96-3.55-.93-1.83.03-3.52 1.06-4.46 2.7-1.9 3.3-.48 8.18 1.36 10.85.9 1.3 1.97 2.77 3.36 2.72 1.35-.06 1.86-.87 3.49-.87 1.62 0 2.09.87 3.52.84 1.46-.02 2.37-1.33 3.27-2.64 1.03-1.51 1.46-2.98 1.48-3.05-.03-.01-2.84-1.09-2.87-4.32zM14.9 2.06c.74-.9 1.24-2.15 1.1-3.4-1.07.05-2.37.72-3.13 1.6-.69.78-1.3 2.05-1.13 3.27 1.19.1 2.42-.6 3.16-1.47z"
+            />
+          </svg>
+          <span class="text-xs font-mono">iOS</span>
+        </div>
+        <div
+          class="flex flex-col items-center gap-2 text-fg-muted hover:text-fg transition-colors"
+        >
+          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M17.6 8.5c-1.4 0-2.6 1-3 1.6-.7-.5-1.7-1-3-1-2.5 0-4.6 2-4.6 4.5 0 2.5 1.7 4 3 5.5 1.2 1.4 1.5 2 2.4 2 .9 0 1.2-.5 2.2-.5s1.3.5 2.2.5c.9 0 1.4-.6 2.4-2 1.3-1.5 3-3 3-5.5 0-2.5-2.1-4.5-4.6-4.5zM14.6 5.4c.9-1 1.4-2.4 1.2-3.7-1.1.1-2.5.7-3.3 1.7-.7.8-1.3 2.1-1.1 3.4 1.2.1 2.4-.6 3.2-1.4z"
+            />
+          </svg>
+          <span class="text-xs font-mono">Android</span>
+        </div>
+        <div
+          class="flex flex-col items-center gap-2 text-fg-muted hover:text-fg transition-colors"
+        >
+          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 18a8 8 0 110-16 8 8 0 010 16zm-1-13h2v6h-2V7zm0 7h2v2h-2v-2z"
+            />
+          </svg>
+          <span class="text-xs font-mono">Web</span>
+        </div>
+        <div
+          class="flex flex-col items-center gap-2 text-fg-muted hover:text-fg transition-colors"
+        >
+          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M3 6h18v12H3V6zm0-2h18a2 2 0 012 2v12a2 2 0 01-2 2H3a2 2 0 01-2-2V6a2 2 0 012-2zm5 4l4 3-4 3V8z"
+            />
+          </svg>
+          <span class="text-xs font-mono">macOS</span>
+        </div>
+        <div
+          class="flex flex-col items-center gap-2 text-fg-muted hover:text-fg transition-colors"
+        >
+          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M3 4h8v8H3V4zm10 0h8v8h-8V4zM3 14h8v6H3v-6zm10 0h8v6h-8v-6z"
+            />
+          </svg>
+          <span class="text-xs font-mono">Windows</span>
+        </div>
+        <div
+          class="flex flex-col items-center gap-2 text-fg-muted hover:text-fg transition-colors"
+        >
+          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 2c-1.7 0-3 1.3-3 3v1H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-3V5c0-1.7-1.3-3-3-3zm-1 4V5c0-.6.4-1 1-1s1 .4 1 1v1h-2z"
+            />
+          </svg>
+          <span class="text-xs font-mono">Linux</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== FEATURE: TREINO EM TEMPO REAL ============== -->
+    <section id="features" class="border-t border-border">
+      <div
+        class="max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center"
+      >
+        <div>
+          <span
+            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
+            >Sessão ativa</span
+          >
+          <h2
+            class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
+          >
+            Treino em tempo real, sem fricção.
+          </h2>
+          <p class="mt-5 text-fg-muted leading-relaxed">
+            Abra o app, escolha o exercício e comece a registrar séries.
+            Cronômetro de descanso, supersets, RPE, séries de aquecimento e
+            Pré-preenchimento de séries com base no histórico — tudo no
+            mesmo fluxo.
+          </p>
+
+          <ul class="mt-7 space-y-3 text-fg-muted">
+            <li class="flex items-start gap-3">
+              <span
+                class="mt-0.5 inline-flex w-5 h-5 rounded-md border border-border items-center justify-center text-accent"
+                >
+                <svg
+                  class="w-3 h-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                >
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+              Cronômetro de descanso com notificação e som
+            </li>
+            <li class="flex items-start gap-3">
+              <span
+                class="mt-0.5 inline-flex w-5 h-5 rounded-md border border-border items-center justify-center text-accent"
+                ><svg
+                  class="w-3 h-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                >
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+              Superset e tri-set agrupados por cor
+            </li>
+            <li class="flex items-start gap-3">
+              <span
+                class="mt-0.5 inline-flex w-5 h-5 rounded-md border border-border items-center justify-center text-accent"
+                ><svg
+                  class="w-3 h-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                >
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+              Auto-sugestão de peso e repetições do último treino
+            </li>
+            <li class="flex items-start gap-3">
+              <span
+                class="mt-0.5 inline-flex w-5 h-5 rounded-md border border-border items-center justify-center text-accent"
+                ><svg
+                  class="w-3 h-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                >
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+              RPE, notas por série e séries de aquecimento
+            </li>
+            <li class="flex items-start gap-3">
+              <span
+                class="mt-0.5 inline-flex w-5 h-5 rounded-md border border-border items-center justify-center text-accent"
+                ><svg
+                  class="w-3 h-3"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="3"
+                >
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+              Funciona offline — sem login, sem servidor
+            </li>
+          </ul>
+        </div>
+
+        <!-- Active workout phone screenshot -->
+        <div class="relative perspective flex justify-center" style="perspective: 1400px">
+          <div
+            class="phone-frame relative tilt w-[240px] sm:w-[280px]"
+            style="background: linear-gradient(#ffffff04, transparent)"
+          >
+            <img
+              src="assets/screenshots/workout-progress.png"
+              alt="Tela de treino ativo mostrando séries de Squat e Romanian Deadlift com peso, reps, RPE e cronômetro de descanso"
+              class="w-full h-auto block"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <!-- floating annotation -->
+          <div
+            class="hidden sm:flex absolute -left-4 top-1/3 items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-bg-elev/80 backdrop-blur font-mono text-[11px] text-fg-muted"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+            rest timer
+          </div>
+          <div
+            class="hidden sm:flex absolute -right-6 bottom-12 items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-bg-elev/80 backdrop-blur font-mono text-[11px] text-fg-muted"
+          >
+            +45kg (+3%)
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== FEATURE: BIBLIOTECA + ROTINAS ============== -->
+    <section class="border-t border-border">
+      <div
+        class="max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-[1fr_1.1fr] gap-12 lg:gap-16 items-center"
+      >
+        <!-- library mock -->
+        <div
+          class="tile rounded-tile border border-border bg-bg-card/60 overflow-hidden order-2 lg:order-1"
+        >
+          <div
+            class="flex items-center justify-between px-5 py-3 border-b border-border bg-bg-elev"
+          >
+            <span
+              class="font-mono text-[11px] text-fg-dim uppercase tracking-[0.14em]"
+              >biblioteca</span
+            >
+            <div class="flex items-center gap-1.5">
+              <span
+                class="font-mono text-[10px] px-1.5 py-0.5 rounded-full bg-accent-dim text-accent"
+                >42 exercícios</span
+              >
+              <span
+                class="font-mono text-[10px] px-1.5 py-0.5 rounded-full border border-border text-fg-muted"
+                >8 categorias</span
+              >
+            </div>
+          </div>
+          <div class="p-3 grid grid-cols-2 gap-2">
+            <div
+              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
+            >
+              <span class="w-2 h-2 rounded-full bg-accent"></span>
+              <span class="text-sm">Supino Reto</span>
+            </div>
+            <div
+              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
+            >
+              <span class="w-2 h-2 rounded-full bg-accent"></span>
+              <span class="text-sm">Agachamento Livre</span>
+            </div>
+            <div
+              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
+            >
+              <span class="w-2 h-2 rounded-full bg-ok"></span>
+              <span class="text-sm">Levantamento Terra</span>
+            </div>
+            <div
+              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
+            >
+              <span class="w-2 h-2 rounded-full bg-ok"></span>
+              <span class="text-sm">Remada Curvada</span>
+            </div>
+            <div
+              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
+            >
+              <span class="w-2 h-2 rounded-full bg-warn"></span>
+              <span class="text-sm">Desenvolvimento Militar</span>
+            </div>
+            <div
+              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
+            >
+              <span class="w-2 h-2 rounded-full bg-warn"></span>
+              <span class="text-sm">Puxada Frontal</span>
+            </div>
+            <div
+              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
+            >
+              <span class="w-2 h-2 rounded-full bg-[#e67e22]"></span>
+              <span class="text-sm">Rosca Direta</span>
+            </div>
+            <div
+              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
+            >
+              <span class="w-2 h-2 rounded-full bg-[#e67e22]"></span>
+              <span class="text-sm">Tríceps Corda</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="order-1 lg:order-2">
+          <span
+            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
+            >Biblioteca & Rotinas</span
+          >
+          <h2
+            class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
+          >
+            Sua biblioteca, do seu jeito.
+          </h2>
+          <p class="mt-5 text-fg-muted leading-relaxed">
+            Categorias por sistema energético (aeróbico / anaeróbico),
+            favoritos, equipamento, tipo, notas pessoais e tempo padrão de
+            descanso por exercício. Monte rotinas multi-dia com séries
+            pré-definidas e inicie o treino com um toque.
+          </p>
+          <div class="mt-6 grid grid-cols-2 gap-3 text-sm">
+            <div class="tile rounded-lg border border-border p-3">
+              <div class="font-mono text-[11px] text-fg-dim uppercase">
+                Favoritos
+              </div>
+              <div class="mt-1 text-fg">Acesso rápido</div>
+            </div>
+            <div class="tile rounded-lg border border-border p-3">
+              <div class="font-mono text-[11px] text-fg-dim uppercase">
+                Incremento
+              </div>
+              <div class="mt-1 text-fg">Por exercício</div>
+            </div>
+            <div class="tile rounded-lg border border-border p-3">
+              <div class="font-mono text-[11px] text-fg-dim uppercase">
+                Rotinas
+              </div>
+              <div class="mt-1 text-fg">Multi-dia</div>
+            </div>
+            <div class="tile rounded-lg border border-border p-3">
+              <div class="font-mono text-[11px] text-fg-dim uppercase">
+                Séries
+              </div>
+              <div class="mt-1 text-fg">Pré-definidas</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== AI COACH ============== -->
+    <section
+      id="ai"
+      class="border-t border-border relative overflow-hidden"
+    >
+      <div
+        class="pointer-events-none absolute inset-0"
+        style="
+          background: radial-gradient(
+            600px 300px at 50% 0%,
+            oklch(0.68 0.11 198 / 0.08),
+            transparent 70%
+          );
+        "
+      ></div>
+      <div
+        class="relative max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-[1fr_1.25fr] gap-12 lg:gap-16 items-center"
+      >
+        <div>
+          <span
+            class="font-mono text-[11px] uppercase tracking-[0.14em] text-accent"
+            >Treinador IA</span
+          >
+          <h2
+            class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
+          >
+            Converse com seus dados.
+          </h2>
+          <p class="mt-5 text-fg-muted leading-relaxed">
+            O AI Coach é um chat opcional, <strong class="text-fg">read-only</strong>,
+            que vê seu histórico, medidas, rotinas e metas. Ele usa
+            ferramentas para puxar detalhes sob demanda e responder com
+            contexto real — sem inventar números.
+          </p>
+
+          <ul class="mt-7 space-y-3 text-fg-muted">
+            <li class="flex items-start gap-3">
+              <span class="text-accent">▸</span>
+              <span><span class="text-fg">13 ferramentas de leitura:</span> treinos, PRs, volume, tendências, medidas, sono, cardio e metas</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="text-accent">▸</span>
+              <span><span class="text-fg">Multi-provider:</span> OpenAI, OpenRouter, Ollama ou qualquer endpoint compatível</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="text-accent">▸</span>
+              <span><span class="text-fg">Tokens locais:</span> salvos com <code class="font-mono text-xs px-1 py-0.5 rounded bg-bg-elev">flutter_secure_storage</code>, nunca no banco</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="text-accent">▸</span>
+              <span><span class="text-fg">Propostas de rotina:</span> a IA sugere mudanças e você aprova antes de aplicar</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- terminal mockup -->
+        <div
+          class="tile rounded-tile border border-border bg-bg-card/60 overflow-hidden"
+        >
+          <div
+            class="flex items-center justify-between px-5 py-3 border-b border-border bg-bg-elev"
+          >
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f57]"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-[#febc2e]"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-[#28c840]"></span>
+            </div>
+            <span
+              class="font-mono text-[11px] text-fg-dim uppercase tracking-[0.14em]"
+              >ai-chat</span
+            >
+            <span
+              class="font-mono text-[11px] text-fg-faint"
+              >gpt-4o · 3 tools</span
+            >
+          </div>
+          <div class="p-5 space-y-4 font-mono text-sm">
+            <div class="flex gap-3">
+              <span class="text-fg-dim shrink-0">user</span>
+              <span class="text-fg"
+                >Qual meu volume semanal de peito nas últimas 4 semanas?</span
+              >
+            </div>
+
+            <div class="flex gap-3">
+              <span class="text-accent shrink-0">tool</span>
+              <span class="text-fg-muted"
+                >↳ get_weekly_volume_breakdown(weeks=4, group="peito")
+                <span class="text-ok">[ok]</span></span
+              >
+            </div>
+
+            <div class="flex gap-3">
+              <span class="text-accent shrink-0">assistant</span>
+              <div class="text-fg space-y-2">
+                <p>
+                  Seu volume de peito nas últimas 4 semanas foi
+                  <span class="text-accent">28.400 kg</span> total, distribuídos
+                  assim:
+                </p>
+                <ul class="space-y-1 pl-2 text-fg-muted">
+                  <li>· Semana 1: 6.200 kg <span class="text-fg-faint">(baseline)</span></li>
+                  <li>· Semana 2: 6.850 kg <span class="text-ok">+10,5%</span></li>
+                  <li>· Semana 3: 7.200 kg <span class="text-ok">+5,1%</span></li>
+                  <li>· Semana 4: 8.150 kg <span class="text-ok">+13,2%</span></li>
+                </ul>
+                <p class="text-fg-muted pt-1">
+                  Tendência positiva consistente, sem sinais de overreaching.
+                  Quer que eu olhe também a distribuição por exercício?
+                </p>
+                <span class="inline-block w-2 h-4 bg-accent align-middle caret-blink"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== PROGRESSO ============== -->
+    <section id="progresso" class="border-t border-border">
+      <div
+        class="max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center"
+      >
+        <div>
+          <span
+            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
+            >Progresso</span
+          >
+          <h2
+            class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
+          >
+            Veja a tendência, não o dia.
+          </h2>
+          <p class="mt-5 text-fg-muted leading-relaxed">
+            Gráficos de volume semanal, PRs pessoais, distribuição por grupo
+            muscular, frequência, streak atual e relatório mensal automático.
+            Tudo construído direto sobre os seus dados reais.
+          </p>
+
+          <div class="mt-7 grid grid-cols-3 gap-3 text-center">
+            <div class="tile rounded-lg border border-border p-4">
+              <div class="font-mono text-2xl text-fg">28.4k</div>
+              <div class="font-mono text-[10px] text-fg-dim uppercase mt-1">
+                kg / 4 sem
+              </div>
+            </div>
+            <div class="tile rounded-lg border border-border p-4">
+              <div class="font-mono text-2xl text-fg">12</div>
+              <div class="font-mono text-[10px] text-fg-dim uppercase mt-1">
+                streak
+              </div>
+            </div>
+            <div class="tile rounded-lg border border-border p-4">
+              <div class="font-mono text-2xl text-fg">7</div>
+              <div class="font-mono text-[10px] text-fg-dim uppercase mt-1">
+                PRs
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress phone screenshot -->
+        <div class="relative perspective flex justify-center" style="perspective: 1400px">
+          <div
+            class="phone-frame relative tilt w-[240px] sm:w-[280px]"
+            style="background: linear-gradient(#ffffff04, transparent)"
+          >
+            <img
+              src="assets/screenshots/progress.png"
+              alt="Tela de Progresso mostrando relatório mensal, totais de treinos e séries, metas, heatmap anual e frequência semanal"
+              class="w-full h-auto block"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <!-- floating annotation -->
+          <div
+            class="hidden sm:flex absolute -left-6 top-1/4 items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-bg-elev/80 backdrop-blur font-mono text-[11px] text-fg-muted"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+            annual heatmap
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== BODY + SLEEP + GOALS ============== -->
+    <section class="border-t border-border">
+      <div
+        class="max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center"
+      >
+        <div>
+          <span
+            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
+            >Corpo & hábitos</span
+          >
+          <h2
+            class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
+          >
+            Mais do que haltere.
+          </h2>
+          <p class="mt-5 text-fg-muted leading-relaxed">
+            Treino é só uma parte. Acompanhe medidas corporais, peso, sono,
+            metas com prazo e cardio — tudo na mesma base local.
+          </p>
+
+          <div class="mt-8 grid sm:grid-cols-2 gap-3">
+            <div class="tile rounded-tile border border-border p-4 bg-bg-card/40">
+              <div class="text-xl">📏</div>
+              <div class="mt-2 font-medium text-sm">Medidas corporais</div>
+              <p class="mt-1 text-xs text-fg-muted">
+                Tendência por região ao longo do tempo.
+              </p>
+            </div>
+            <div class="tile rounded-tile border border-border p-4 bg-bg-card/40">
+              <div class="text-xl">😴</div>
+              <div class="mt-2 font-medium text-sm">Sono & qualidade</div>
+              <p class="mt-1 text-xs text-fg-muted">
+                Duração e impacto percebido no treino.
+              </p>
+            </div>
+            <div class="tile rounded-tile border border-border p-4 bg-bg-card/40">
+              <div class="text-xl">🎯</div>
+              <div class="mt-2 font-medium text-sm">Metas com prazo</div>
+              <p class="mt-1 text-xs text-fg-muted">
+                Peso, PR, medida. Progresso automático.
+              </p>
+            </div>
+            <div class="tile rounded-tile border border-border p-4 bg-bg-card/40">
+              <div class="text-xl">🏃</div>
+              <div class="mt-2 font-medium text-sm">Cardio</div>
+              <p class="mt-1 text-xs text-fg-muted">
+                Distância, pace, tempo no resumo semanal.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Body measurements phone screenshot -->
+        <div class="relative perspective flex justify-center" style="perspective: 1400px">
+          <div
+            class="phone-frame relative tilt w-[240px] sm:w-[280px]"
+            style="background: linear-gradient(#ffffff04, transparent)"
+          >
+            <img
+              src="assets/screenshots/body-measurements.png"
+              alt="Tela de medidas corporais mostrando diferença entre lados, gráfico de tendência e estatísticas min/max/média"
+              class="w-full h-auto block"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+          <!-- floating annotation -->
+          <div
+            class="hidden sm:flex absolute -right-4 top-1/3 items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-bg-elev/80 backdrop-blur font-mono text-[11px] text-fg-muted"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+            trend chart
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== OPENSOURCE / PRIVACY ============== -->
+    <section id="opensource" class="border-t border-border">
+      <div
+        class="max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center"
+      >
+        <div
+          class="tile rounded-tile border border-border bg-bg-card/60 overflow-hidden"
+        >
+          <div
+            class="flex items-center justify-between px-5 py-3 border-b border-border bg-bg-elev"
+          >
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f57]"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-[#febc2e]"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-[#28c840]"></span>
+            </div>
+            <span
+              class="font-mono text-[11px] text-fg-dim uppercase tracking-[0.14em]"
+              >local-first</span
+            >
+            <span class="font-mono text-[11px] text-fg-faint">~/data</span>
+          </div>
+          <div class="p-5 font-mono text-sm space-y-2">
+            <div class="flex gap-3">
+              <span class="text-accent">$</span>
+              <span class="text-fg-muted"># Todos os seus dados ficam no dispositivo</span>
+            </div>
+            <div class="flex gap-3">
+              <span class="text-accent">$</span>
+              <span class="text-fg">sqlite&gt; SELECT COUNT(*) FROM workouts;</span>
+            </div>
+            <div class="flex gap-3">
+              <span class="text-fg-dim ml-5">142</span>
+            </div>
+            <div class="flex gap-3">
+              <span class="text-accent">$</span>
+              <span class="text-fg">sqlite&gt; SELECT SUM(weight*reps) FROM sets;</span>
+            </div>
+            <div class="flex gap-3">
+              <span class="text-fg-dim ml-5">284 350</span>
+            </div>
+            <div class="flex gap-3">
+              <span class="text-accent">$</span>
+              <span class="text-fg-muted"
+                ># Exportar é um toque: CSV completo</span
+              >
+            </div>
+            <div class="flex gap-3">
+              <span class="text-accent">$</span>
+              <span class="text-fg">share_plus.save("treinos.csv")</span>
+            </div>
+            <div class="flex gap-3">
+              <span class="text-ok">✓</span>
+              <span class="text-fg-muted">Nuvem opcional. Conta nunca obrigatória.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-8">
+          <div>
+            <span
+              class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
+              >Open source · local-first</span
+            >
+            <h2
+              class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
+            >
+              Seus dados. Seu dispositivo.
+            </h2>
+            <p class="mt-5 text-fg-muted leading-relaxed">
+              O Workout Notes é construído com Flutter e SQLite. Nada sai do
+              seu telefone a menos que você peça. O AI Coach é totalmente
+              opcional — sem ele, o app funciona 100% offline, sem login, sem
+              analytics.
+            </p>
+            <div class="mt-6 flex flex-wrap gap-2 font-mono text-[11px]">
+              <span class="px-2.5 py-1 rounded-full border border-border text-fg-muted"
+                >MIT License</span
+              >
+              <span class="px-2.5 py-1 rounded-full border border-border text-fg-muted"
+                >Flutter 3.x</span
+              >
+              <span class="px-2.5 py-1 rounded-full border border-border text-fg-muted"
+                >SQLite (sqflite)</span
+              >
+              <span class="px-2.5 py-1 rounded-full border border-border text-fg-muted"
+                >Material 3</span
+              >
+              <span class="px-2.5 py-1 rounded-full border border-border text-fg-muted"
+                >flutter_secure_storage</span
+              >
+              <span class="px-2.5 py-1 rounded-full border border-border text-fg-muted"
+                >fl_chart</span
+              >
+            </div>
+            <a
+              href="https://github.com/RafaelGoulartB/workout-notes"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-7 inline-flex items-center gap-2 h-10 px-4 rounded-md border border-border hover:border-border-strong transition-colors text-sm"
+            >
+              <svg
+                class="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 015.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5z"
+                />
+              </svg>
+              Explorar o código
+            </a>
+          </div>
+
+          <!-- Workout detail phone screenshot -->
+          <div class="relative perspective flex justify-center sm:justify-start" style="perspective: 1400px">
+            <div
+              class="phone-frame relative tilt w-[200px] sm:w-[220px]"
+              style="background: linear-gradient(#ffffff04, transparent)"
+            >
+              <img
+                src="assets/screenshots/workout-finish.png"
+                alt="Detalhes do treino concluído com evolução, destaques, volume muscular por grupo e séries com RPE"
+                class="w-full h-auto block"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+            <div
+              class="hidden sm:flex absolute -right-4 top-1/3 items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-bg-elev/80 backdrop-blur font-mono text-[11px] text-fg-muted"
+            >
+              <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+              post-workout detail
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== FINAL CTA ============== -->
+    <section
+      id="download"
+      class="border-t border-border relative overflow-hidden"
+    >
+      <div
+        class="pointer-events-none absolute inset-0"
+        style="
+          background: radial-gradient(
+            500px 400px at 50% 100%,
+            oklch(0.68 0.11 198 / 0.12),
+            transparent 70%
+          );
+        "
+      ></div>
+      <div
+        class="relative max-w-container mx-auto px-6 lg:px-8 py-28 text-center"
+      >
+        <h2
+          class="text-4xl md:text-6xl font-medium leading-[1.05] tracking-[-0.035em] max-w-3xl mx-auto"
+        >
+          Comece a registrar
+          <span
+            class="text-transparent"
+            style="
+              background: linear-gradient(180deg, #fafafa 30%, #71717a 100%);
+              -webkit-background-clip: text;
+              background-clip: text;
+            "
+            >hoje.</span
+          >
+        </h2>
+        <p class="mt-5 text-fg-muted max-w-xl mx-auto">
+          Build direto do repositório, ou baixe um release. Sem conta, sem
+          assinatura, sem telemetria.
+        </p>
+        <div class="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <a
+            href="https://github.com/RafaelGoulartB/workout-notes/releases/latest"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-2 h-11 px-5 rounded-lg bg-fg text-bg font-medium hover:-translate-y-px transition-transform"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M3 20.5V3.5c0-.4.2-.8.5-1L14.6 12 3.5 21.5c-.3-.2-.5-.6-.5-1zm14.5-7L20 11.5l-3 1.7-2.4-1.4 2.9-1.3zm-2.4 2.7L5.5 21 17 14l-1.9-1.1zM5.5 3l11.5 7.5L15.1 9 5.5 3z"
+              />
+            </svg>
+            Baixar APK
+          </a>
+          <a
+            href="https://github.com/RafaelGoulartB/workout-notes#readme"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-2 h-11 px-5 rounded-lg border border-border hover:border-border-strong transition-colors"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 015.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5z"
+              />
+            </svg>
+            Ver no GitHub
+          </a>
+          <a
+            href="https://github.com/RafaelGoulartB/workout-notes"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-2 h-11 px-5 rounded-lg border border-border hover:border-border-strong transition-colors font-mono text-sm"
+          >
+            $ git clone
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============== FOOTER ============== -->
+    <footer class="border-t border-border">
+      <div
+        class="max-w-container mx-auto px-6 lg:px-8 py-14 grid sm:grid-cols-2 lg:grid-cols-5 gap-10"
+      >
+        <div class="lg:col-span-2">
+          <div class="flex items-center gap-2">
+            <span
+              class="w-7 h-7 rounded-md bg-accent flex items-center justify-center text-bg font-bold text-sm"
+              >W</span
+            >
+            <span class="font-medium tracking-tight text-[15px]"
+              >Workout Notes</span
+            >
+          </div>
+          <p class="mt-3 text-sm text-fg-muted max-w-xs">
+            Diário de treinos offline, com IA opcional. Construído com
+            Flutter.
+          </p>
+        </div>
+
+        <div>
+          <div
+            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
+          >
+            Produto
+          </div>
+          <ul class="mt-3 space-y-2 text-sm text-fg-muted">
+            <li><a href="#features" class="hover:text-fg">Funcionalidades</a></li>
+            <li><a href="#ai" class="hover:text-fg">Treinador IA</a></li>
+            <li><a href="#progresso" class="hover:text-fg">Progresso</a></li>
+            <li><a href="#download" class="hover:text-fg">Download</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <div
+            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
+          >
+            Recursos
+          </div>
+          <ul class="mt-3 space-y-2 text-sm text-fg-muted">
+            <li>
+              <a
+                href="https://github.com/RafaelGoulartB/workout-notes#readme"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hover:text-fg"
+                >Documentação</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://github.com/RafaelGoulartB/workout-notes/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hover:text-fg"
+                >Changelog</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://github.com/RafaelGoulartB/workout-notes/issues"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hover:text-fg"
+                >Roadmap</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://github.com/RafaelGoulartB/workout-notes/blob/main/README.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hover:text-fg"
+                >README</a
+              >
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <div
+            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
+          >
+            Comunidade
+          </div>
+          <ul class="mt-3 space-y-2 text-sm text-fg-muted">
+            <li>
+              <a
+                href="https://github.com/RafaelGoulartB/workout-notes"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hover:text-fg"
+                >GitHub</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://github.com/RafaelGoulartB/workout-notes/issues/new"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hover:text-fg"
+                >Reportar bug</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://github.com/RafaelGoulartB/workout-notes/blob/main/CONTRIBUTING.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hover:text-fg"
+                >Contribuir</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://github.com/RafaelGoulartB/workout-notes/blob/main/LICENSE"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hover:text-fg"
+                >MIT License</a
+              >
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="border-t border-border">
+        <div
+          class="max-w-container mx-auto px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-fg-dim"
+        >
+          <div class="font-mono">
+            © 2025 Workout Notes · MIT License · feito com Flutter
+          </div>
+          <div class="flex items-center gap-4 font-mono">
+            <a
+              href="https://github.com/RafaelGoulartB/workout-notes/blob/main/LICENSE"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hover:text-fg"
+              >MIT License</a
+            >
+            <span class="flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
+              status: ok
+            </span>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <script src="script.js" defer></script>
+  </body>
+</html>
