@@ -66,4 +66,33 @@
       target.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
+
+  // -------- GitHub star count --------
+  // Fetches live stargazers_count from the GitHub API and updates the
+  // pill next to the nav button. Falls back silently to the SSR value
+  // ("1") if the request fails or is rate-limited.
+  const formatCount = (n) => {
+    if (typeof n !== "number" || !isFinite(n)) return null;
+    if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, "") + "k";
+    return String(n);
+  };
+
+  const applyStars = (n) => {
+    const formatted = formatCount(n) ?? "1";
+    const desktop = document.getElementById("starCount");
+    const mobile = document.getElementById("starCountMobile");
+    if (desktop) desktop.textContent = "★ " + formatted;
+    if (mobile) mobile.textContent = formatted;
+  };
+
+  fetch("https://api.github.com/repos/RafaelGoulartB/workout-notes", {
+    headers: { Accept: "application/vnd.github+json" },
+  })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (data && typeof data.stargazers_count === "number") {
+        applyStars(data.stargazers_count);
+      }
+    })
+    .catch(() => {});
 })();
