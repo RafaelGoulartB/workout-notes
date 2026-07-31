@@ -806,6 +806,168 @@ abstract class AppLocalizations {
   /// **'The active session and its metrics will be deleted.'**
   String get sleepMonitorDiscardBody;
 
+  /// No description provided for @sleepMonitorDigitalSilence.
+  ///
+  /// In en, this message translates to:
+  /// **'Digital silence'**
+  String get sleepMonitorDigitalSilence;
+
+  /// No description provided for @sleepInferenceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Night analysis'**
+  String get sleepInferenceTitle;
+
+  /// No description provided for @sleepInferenceSleptAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Fell asleep'**
+  String get sleepInferenceSleptAt;
+
+  /// No description provided for @sleepInferenceOnsetUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Onset not identified'**
+  String get sleepInferenceOnsetUnknown;
+
+  /// No description provided for @sleepInferencePreparation.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparation'**
+  String get sleepInferencePreparation;
+
+  /// No description provided for @sleepInferenceSettling.
+  ///
+  /// In en, this message translates to:
+  /// **'Settling'**
+  String get sleepInferenceSettling;
+
+  /// No description provided for @sleepInferenceAwakenings.
+  ///
+  /// In en, this message translates to:
+  /// **'Woke up'**
+  String get sleepInferenceAwakenings;
+
+  /// No description provided for @sleepInferenceEstimatedSleep.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated sleep'**
+  String get sleepInferenceEstimatedSleep;
+
+  /// No description provided for @sleepInferenceConfidence.
+  ///
+  /// In en, this message translates to:
+  /// **'Confidence'**
+  String get sleepInferenceConfidence;
+
+  /// No description provided for @sleepInferenceConfidenceLow.
+  ///
+  /// In en, this message translates to:
+  /// **'low'**
+  String get sleepInferenceConfidenceLow;
+
+  /// No description provided for @sleepInferenceConfidenceMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'medium'**
+  String get sleepInferenceConfidenceMedium;
+
+  /// No description provided for @sleepInferenceInsufficient.
+  ///
+  /// In en, this message translates to:
+  /// **'This night\'s data is not sufficient to calculate sleep onset and awakenings safely.'**
+  String get sleepInferenceInsufficient;
+
+  /// No description provided for @sleepInferenceEventsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Night events'**
+  String get sleepInferenceEventsTitle;
+
+  /// No description provided for @sleepInferencePeak.
+  ///
+  /// In en, this message translates to:
+  /// **'peak'**
+  String get sleepInferencePeak;
+
+  /// No description provided for @sleepInferenceEventTransient.
+  ///
+  /// In en, this message translates to:
+  /// **'Transient activity'**
+  String get sleepInferenceEventTransient;
+
+  /// No description provided for @sleepInferenceEventProlonged.
+  ///
+  /// In en, this message translates to:
+  /// **'Prolonged activity'**
+  String get sleepInferenceEventProlonged;
+
+  /// No description provided for @sleepInferenceEventAwakening.
+  ///
+  /// In en, this message translates to:
+  /// **'Awakening'**
+  String get sleepInferenceEventAwakening;
+
+  /// No description provided for @sleepInferenceEventFinalActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity before monitoring ended'**
+  String get sleepInferenceEventFinalActivity;
+
+  /// No description provided for @sleepInferenceReasonShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Short peak without enough duration to indicate an awakening.'**
+  String get sleepInferenceReasonShort;
+
+  /// No description provided for @sleepInferenceReasonSustained.
+  ///
+  /// In en, this message translates to:
+  /// **'Sustained sound activity without a quiet recovery that indicates an awakening.'**
+  String get sleepInferenceReasonSustained;
+
+  /// No description provided for @sleepInferenceReasonAwakening.
+  ///
+  /// In en, this message translates to:
+  /// **'Sustained activity followed by a return to quiet.'**
+  String get sleepInferenceReasonAwakening;
+
+  /// No description provided for @sleepInferenceReasonFinal.
+  ///
+  /// In en, this message translates to:
+  /// **'Sustained activity during the final ten minutes.'**
+  String get sleepInferenceReasonFinal;
+
+  /// No description provided for @sleepInferenceBlockerTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Record at least four hours in a completed session.'**
+  String get sleepInferenceBlockerTooShort;
+
+  /// No description provided for @sleepInferenceBlockerLowTimelineCoverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Timeline coverage was below 90%.'**
+  String get sleepInferenceBlockerLowTimelineCoverage;
+
+  /// No description provided for @sleepInferenceBlockerLowSignalCoverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid signal coverage was below 80%.'**
+  String get sleepInferenceBlockerLowSignalCoverage;
+
+  /// No description provided for @sleepInferenceBlockerInvalidSegments.
+  ///
+  /// In en, this message translates to:
+  /// **'More than 20% of the period contains invalid signal.'**
+  String get sleepInferenceBlockerInvalidSegments;
+
+  /// No description provided for @sleepInferenceBlockerDigitalSilence.
+  ///
+  /// In en, this message translates to:
+  /// **'More than 20% of the period contains digital microphone silence.'**
+  String get sleepInferenceBlockerDigitalSilence;
+
   /// No description provided for @commonCancel.
   ///
   /// In en, this message translates to:

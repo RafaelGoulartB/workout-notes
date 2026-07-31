@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/models/sleep_inference.dart';
 import 'package:workout_notes/models/sleep_monitor_diagnostics.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
@@ -13,6 +14,7 @@ void main() {
   late SleepMonitorSession session;
   late List<SleepMonitorSegment> segments;
   late SleepMonitorDiagnostics diagnostics;
+  late SleepInferenceResult inference;
   late SleepEntry entry;
 
   setUp(() {
@@ -51,6 +53,27 @@ void main() {
       createdAt: start,
     );
     diagnostics = SleepMonitorDiagnostics.fromSession(session, segments);
+    inference = SleepInferenceResult(
+      status: SleepInferenceStatus.available,
+      confidence: SleepInferenceConfidence.medium,
+      sleepOnsetAt: start.add(const Duration(minutes: 30)),
+      settlingStartedAt: start.add(const Duration(minutes: 5)),
+      settlingEndedAt: start.add(const Duration(minutes: 30)),
+      estimatedSleepSeconds: 3 * 60 * 60,
+      events: [
+        SleepInferenceEvent(
+          type: SleepInferenceEventType.awakening,
+          startedAt: start.add(const Duration(hours: 2)),
+          endedAt: start.add(const Duration(hours: 2, minutes: 5)),
+          activeSeconds: 180,
+          peakNoiseScore: 22,
+          confidence: SleepInferenceConfidence.medium,
+          reason: 'sustained_activity_with_quiet_recovery',
+        ),
+      ],
+      blockers: const [],
+      parameters: const {'activity_start_score': 10},
+    );
     entry = SleepEntry(
       id: 'entry-sensitive-id',
       date: DateTime(2026, 7, 26),
@@ -71,6 +94,7 @@ void main() {
         session: session,
         segments: segments,
         diagnostics: diagnostics,
+        inference: inference,
         entry: entry,
         includePersonalData: false,
         generatedAt: DateTime.utc(2026, 7, 27),
@@ -81,9 +105,13 @@ void main() {
       expect(payload, isNot(contains('session_with_exact_timestamps')));
       expect(payload, isNot(contains('associated_sleep_entry')));
       expect(payload['segments_relative'].single['offset_seconds'], 30);
+      expect(payload['schema_version'], 2);
+      expect(payload['sleep_inference']['sleep_onset_offset_seconds'], 30 * 60);
+      expect(payload, isNot(contains('sleep_inference_with_exact_timestamps')));
       final encoded = jsonEncode(payload);
       expect(encoded, isNot(contains('Personal sleep note')));
       expect(encoded, isNot(contains('segment-sensitive-id')));
+      expect(encoded, isNot(contains('2026-07-26T22:30:00.000Z')));
       expect(encoded, contains('Test Phone'));
     },
   );
@@ -95,6 +123,7 @@ void main() {
         session: session,
         segments: segments,
         diagnostics: diagnostics,
+        inference: inference,
         entry: entry,
         includePersonalData: true,
         generatedAt: DateTime.utc(2026, 7, 27),
@@ -114,6 +143,10 @@ void main() {
         'Personal sleep note',
       );
       expect(payload['privacy']['contains_raw_audio'], isFalse);
+      expect(
+        payload['sleep_inference_with_exact_timestamps']['sleep_onset_at'],
+        session.startedAt.add(const Duration(minutes: 30)).toIso8601String(),
+      );
     },
   );
 
@@ -134,6 +167,7 @@ void main() {
         session: session,
         segments: segments,
         diagnostics: diagnostics,
+        inference: inference,
         entry: entry,
         includePersonalData: false,
       );

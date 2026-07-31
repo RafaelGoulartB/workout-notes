@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/sleep_entry.dart';
+import '../models/sleep_inference.dart';
 import '../models/sleep_monitor_diagnostics.dart';
 import '../models/sleep_monitor_segment.dart';
 import '../models/sleep_monitor_session.dart';
@@ -32,6 +33,7 @@ class SleepDiagnosticExportService {
     required SleepMonitorSession session,
     required List<SleepMonitorSegment> segments,
     required SleepMonitorDiagnostics diagnostics,
+    required SleepInferenceResult inference,
     required SleepEntry? entry,
     required bool includePersonalData,
     Map<String, dynamic>? deviceInfo,
@@ -41,6 +43,7 @@ class SleepDiagnosticExportService {
       session: session,
       segments: segments,
       diagnostics: diagnostics,
+      inference: inference,
       entry: entry,
       includePersonalData: includePersonalData,
       deviceInfo: deviceInfo,
@@ -65,6 +68,7 @@ class SleepDiagnosticExportService {
     required SleepMonitorSession session,
     required List<SleepMonitorSegment> segments,
     required SleepMonitorDiagnostics diagnostics,
+    required SleepInferenceResult inference,
     required SleepEntry? entry,
     required bool includePersonalData,
     required DateTime generatedAt,
@@ -86,10 +90,40 @@ class SleepDiagnosticExportService {
         'noise_burst_count': segment.noiseBurstCount,
       };
     }).toList();
+    final relativeInference = {
+      'algorithm_version': SleepInferenceResult.algorithmVersion,
+      'status': inference.status.name,
+      'confidence': inference.confidence.name,
+      'blockers': inference.blockers,
+      'parameters': inference.parameters,
+      'sleep_onset_offset_seconds': inference.sleepOnsetAt
+          ?.difference(session.startedAt)
+          .inSeconds,
+      'settling_start_offset_seconds': inference.settlingStartedAt
+          ?.difference(session.startedAt)
+          .inSeconds,
+      'settling_duration_seconds': inference.settlingSeconds,
+      'estimated_sleep_seconds': inference.estimatedSleepSeconds,
+      'events': inference.events
+          .map(
+            (event) => {
+              'type': event.type.name,
+              'start_offset_seconds': event.startedAt
+                  .difference(session.startedAt)
+                  .inSeconds,
+              'duration_seconds': event.durationSeconds,
+              'active_seconds': event.activeSeconds,
+              'peak_noise_score': event.peakNoiseScore,
+              'confidence': event.confidence.name,
+              'reason': event.reason,
+            },
+          )
+          .toList(),
+    };
 
     return {
       'schema': 'workout_notes_sleep_diagnostic',
-      'schema_version': 1,
+      'schema_version': 2,
       'generated_at_utc': generatedAt.toUtc().toIso8601String(),
       'privacy': {
         'personal_data_included': includePersonalData,
@@ -112,6 +146,7 @@ class SleepDiagnosticExportService {
         'minimum_timeline_coverage': 0.90,
         'minimum_signal_coverage': 0.80,
         'maximum_invalid_fraction': 0.20,
+        'maximum_digital_silence_fraction': 0.20,
         'acceptable_for_next_phase': diagnostics.isAcceptableForNextPhase,
         'scope':
             'Technical capture quality only; not sleep or medical accuracy.',
@@ -137,11 +172,15 @@ class SleepDiagnosticExportService {
         'quiet_seconds': diagnostics.quietSeconds,
         'noisy_seconds': diagnostics.noisySeconds,
         'invalid_seconds': diagnostics.invalidSeconds,
+        'digital_silence_seconds': diagnostics.digitalSilenceSeconds,
         'timeline_coverage': diagnostics.timelineCoverage,
         'signal_coverage': diagnostics.signalCoverage,
+        'digital_silence_fraction': diagnostics.digitalSilenceFraction,
         'average_noise_score': diagnostics.averageNoiseScore,
         'peak_noise_score': diagnostics.peakNoiseScore,
+        'inference_blockers': diagnostics.inferenceBlockers,
       },
+      'sleep_inference': relativeInference,
       'segments_relative': relativeSegments,
       if (includePersonalData) ...{
         'session_with_exact_timestamps': session.toMap(),
@@ -149,6 +188,20 @@ class SleepDiagnosticExportService {
             .map((segment) => segment.toMap())
             .toList(),
         'associated_sleep_entry': entry?.toMap(),
+        'sleep_inference_with_exact_timestamps': {
+          'sleep_onset_at': inference.sleepOnsetAt?.toIso8601String(),
+          'settling_started_at': inference.settlingStartedAt?.toIso8601String(),
+          'settling_ended_at': inference.settlingEndedAt?.toIso8601String(),
+          'events': inference.events
+              .map(
+                (event) => {
+                  'type': event.type.name,
+                  'started_at': event.startedAt.toIso8601String(),
+                  'ended_at': event.endedAt.toIso8601String(),
+                },
+              )
+              .toList(),
+        },
       },
       'not_collected': {
         'raw_audio': true,

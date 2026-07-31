@@ -404,6 +404,98 @@ class AppLocalizationsPt extends AppLocalizations {
       'A sessão em andamento e suas métricas serão apagadas.';
 
   @override
+  String get sleepMonitorDigitalSilence => 'Silêncio digital';
+
+  @override
+  String get sleepInferenceTitle => 'Análise da noite';
+
+  @override
+  String get sleepInferenceSleptAt => 'Dormiu';
+
+  @override
+  String get sleepInferenceOnsetUnknown => 'Início não identificado';
+
+  @override
+  String get sleepInferencePreparation => 'Preparação';
+
+  @override
+  String get sleepInferenceSettling => 'Acomodação';
+
+  @override
+  String get sleepInferenceAwakenings => 'Acordou';
+
+  @override
+  String get sleepInferenceEstimatedSleep => 'Sono estimado';
+
+  @override
+  String get sleepInferenceConfidence => 'Confiança';
+
+  @override
+  String get sleepInferenceConfidenceLow => 'baixa';
+
+  @override
+  String get sleepInferenceConfidenceMedium => 'média';
+
+  @override
+  String get sleepInferenceInsufficient =>
+      'Os dados desta noite não permitem calcular início do sono e despertares com segurança.';
+
+  @override
+  String get sleepInferenceEventsTitle => 'Eventos da noite';
+
+  @override
+  String get sleepInferencePeak => 'pico';
+
+  @override
+  String get sleepInferenceEventTransient => 'Atividade transitória';
+
+  @override
+  String get sleepInferenceEventProlonged => 'Atividade prolongada';
+
+  @override
+  String get sleepInferenceEventAwakening => 'Despertar';
+
+  @override
+  String get sleepInferenceEventFinalActivity =>
+      'Atividade antes do encerramento';
+
+  @override
+  String get sleepInferenceReasonShort =>
+      'Pico curto, sem duração suficiente para indicar despertar.';
+
+  @override
+  String get sleepInferenceReasonSustained =>
+      'Atividade sonora sustentada sem retorno ao silêncio que caracterize despertar.';
+
+  @override
+  String get sleepInferenceReasonAwakening =>
+      'Atividade sustentada seguida por retorno ao silêncio.';
+
+  @override
+  String get sleepInferenceReasonFinal =>
+      'Atividade sustentada nos dez minutos finais.';
+
+  @override
+  String get sleepInferenceBlockerTooShort =>
+      'Registre pelo menos quatro horas em uma sessão concluída.';
+
+  @override
+  String get sleepInferenceBlockerLowTimelineCoverage =>
+      'A cobertura da linha do tempo ficou abaixo de 90%.';
+
+  @override
+  String get sleepInferenceBlockerLowSignalCoverage =>
+      'A cobertura de sinal válido ficou abaixo de 80%.';
+
+  @override
+  String get sleepInferenceBlockerInvalidSegments =>
+      'Mais de 20% do período contém sinal inválido.';
+
+  @override
+  String get sleepInferenceBlockerDigitalSilence =>
+      'Mais de 20% do período contém silêncio digital do microfone.';
+
+  @override
   String get commonCancel => 'Cancelar';
 
   @override

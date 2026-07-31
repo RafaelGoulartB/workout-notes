@@ -402,6 +402,98 @@ class AppLocalizationsEn extends AppLocalizations {
       'The active session and its metrics will be deleted.';
 
   @override
+  String get sleepMonitorDigitalSilence => 'Digital silence';
+
+  @override
+  String get sleepInferenceTitle => 'Night analysis';
+
+  @override
+  String get sleepInferenceSleptAt => 'Fell asleep';
+
+  @override
+  String get sleepInferenceOnsetUnknown => 'Onset not identified';
+
+  @override
+  String get sleepInferencePreparation => 'Preparation';
+
+  @override
+  String get sleepInferenceSettling => 'Settling';
+
+  @override
+  String get sleepInferenceAwakenings => 'Woke up';
+
+  @override
+  String get sleepInferenceEstimatedSleep => 'Estimated sleep';
+
+  @override
+  String get sleepInferenceConfidence => 'Confidence';
+
+  @override
+  String get sleepInferenceConfidenceLow => 'low';
+
+  @override
+  String get sleepInferenceConfidenceMedium => 'medium';
+
+  @override
+  String get sleepInferenceInsufficient =>
+      'This night\'s data is not sufficient to calculate sleep onset and awakenings safely.';
+
+  @override
+  String get sleepInferenceEventsTitle => 'Night events';
+
+  @override
+  String get sleepInferencePeak => 'peak';
+
+  @override
+  String get sleepInferenceEventTransient => 'Transient activity';
+
+  @override
+  String get sleepInferenceEventProlonged => 'Prolonged activity';
+
+  @override
+  String get sleepInferenceEventAwakening => 'Awakening';
+
+  @override
+  String get sleepInferenceEventFinalActivity =>
+      'Activity before monitoring ended';
+
+  @override
+  String get sleepInferenceReasonShort =>
+      'Short peak without enough duration to indicate an awakening.';
+
+  @override
+  String get sleepInferenceReasonSustained =>
+      'Sustained sound activity without a quiet recovery that indicates an awakening.';
+
+  @override
+  String get sleepInferenceReasonAwakening =>
+      'Sustained activity followed by a return to quiet.';
+
+  @override
+  String get sleepInferenceReasonFinal =>
+      'Sustained activity during the final ten minutes.';
+
+  @override
+  String get sleepInferenceBlockerTooShort =>
+      'Record at least four hours in a completed session.';
+
+  @override
+  String get sleepInferenceBlockerLowTimelineCoverage =>
+      'Timeline coverage was below 90%.';
+
+  @override
+  String get sleepInferenceBlockerLowSignalCoverage =>
+      'Valid signal coverage was below 80%.';
+
+  @override
+  String get sleepInferenceBlockerInvalidSegments =>
+      'More than 20% of the period contains invalid signal.';
+
+  @override
+  String get sleepInferenceBlockerDigitalSilence =>
+      'More than 20% of the period contains digital microphone silence.';
+
+  @override
   String get commonCancel => 'Cancel';
 
   @override
