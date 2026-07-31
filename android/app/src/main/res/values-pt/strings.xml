@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sleep_alarm_channel_name">Despertador do sono</string>
+    <string name="sleep_alarm_channel_description">Despertadores das noites monitoradas</string>
+    <string name="sleep_alarm_notification_title">Hora de acordar</string>
+    <string name="sleep_alarm_notification_body">O monitoramento do seu sono terminou.</string>
+    <string name="sleep_alarm_good_morning">Bom dia</string>
+    <string name="sleep_alarm_wake_message">Sua noite monitorada foi concluída.</string>
+    <string name="sleep_alarm_dismiss">Desligar</string>
+</resources>

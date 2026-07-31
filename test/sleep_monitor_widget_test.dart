@@ -350,6 +350,7 @@ Future<Database> _resultDatabase(
             status TEXT NOT NULL,
             started_at TEXT NOT NULL,
             ended_at TEXT,
+            alarm_at TEXT,
             utc_offset_start_minutes INTEGER NOT NULL,
             utc_offset_end_minutes INTEGER,
             sensor_mode TEXT NOT NULL,

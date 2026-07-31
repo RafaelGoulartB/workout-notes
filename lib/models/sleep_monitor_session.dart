@@ -20,12 +20,14 @@ class SleepMonitorSession {
   static const endProcessRecovered = 'process_recovered';
   static const endPermissionRevoked = 'permission_revoked';
   static const endAudioError = 'audio_error';
+  static const endAlarm = 'alarm';
 
   final String id;
   final String? sleepEntryId;
   final String status;
   final DateTime startedAt;
   final DateTime? endedAt;
+  final DateTime? alarmAt;
   final int utcOffsetStartMinutes;
   final int? utcOffsetEndMinutes;
   final String sensorMode;
@@ -45,6 +47,7 @@ class SleepMonitorSession {
     required this.status,
     required this.startedAt,
     required this.endedAt,
+    this.alarmAt,
     required this.utcOffsetStartMinutes,
     required this.utcOffsetEndMinutes,
     required this.sensorMode,
@@ -66,6 +69,7 @@ class SleepMonitorSession {
     String? sleepEntryId,
     String? status,
     DateTime? endedAt,
+    DateTime? alarmAt,
     int? utcOffsetEndMinutes,
     int? timeInBedMinutes,
     int? quietMinutes,
@@ -81,6 +85,7 @@ class SleepMonitorSession {
       status: status ?? this.status,
       startedAt: startedAt,
       endedAt: endedAt ?? this.endedAt,
+      alarmAt: alarmAt ?? this.alarmAt,
       utcOffsetStartMinutes: utcOffsetStartMinutes,
       utcOffsetEndMinutes: utcOffsetEndMinutes ?? this.utcOffsetEndMinutes,
       sensorMode: sensorMode,
@@ -103,6 +108,7 @@ class SleepMonitorSession {
     'status': status,
     'started_at': startedAt.toIso8601String(),
     'ended_at': endedAt?.toIso8601String(),
+    'alarm_at': alarmAt?.toIso8601String(),
     'utc_offset_start_minutes': utcOffsetStartMinutes,
     'utc_offset_end_minutes': utcOffsetEndMinutes,
     'sensor_mode': sensorMode,
@@ -126,6 +132,9 @@ class SleepMonitorSession {
       endedAt: (map['ended_at'] as String?) == null
           ? null
           : DateTime.parse(map['ended_at'] as String),
+      alarmAt: (map['alarm_at'] as String?) == null
+          ? null
+          : DateTime.parse(map['alarm_at'] as String),
       utcOffsetStartMinutes: (map['utc_offset_start_minutes'] as num).toInt(),
       utcOffsetEndMinutes: (map['utc_offset_end_minutes'] as num?)?.toInt(),
       sensorMode: (map['sensor_mode'] as String?) ?? defaultSensorMode,

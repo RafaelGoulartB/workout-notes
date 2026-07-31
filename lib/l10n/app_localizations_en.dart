@@ -206,6 +206,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sleepMonitorStart => 'Start monitoring';
 
   @override
+  String sleepMonitorStartWithAlarm(String time) {
+    return 'Start and wake at $time';
+  }
+
+  @override
   String get sleepMonitorFinish => 'Finish and view result';
 
   @override
@@ -255,6 +260,71 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sleepMonitorInvalidSignal => 'Signal temporarily unavailable';
+
+  @override
+  String get sleepAlarmSectionTitle => 'Your wake-up time';
+
+  @override
+  String get sleepAlarmTapToChange => 'Tap the clock to change';
+
+  @override
+  String get sleepAlarmNext => 'Next alarm';
+
+  @override
+  String sleepAlarmIn(String duration) {
+    return 'in $duration';
+  }
+
+  @override
+  String get sleepAlarmSystemSound => 'System alarm sound + vibration';
+
+  @override
+  String get sleepAlarmSystemSoundBody =>
+      'Uses your device\'s alarm volume and Do Not Disturb settings.';
+
+  @override
+  String get sleepAlarmPreparation => 'Prepare your phone';
+
+  @override
+  String get sleepAlarmPreparationBody =>
+      'Leave it charging near the bed, with the microphone unobstructed.';
+
+  @override
+  String sleepAlarmScheduledFor(String time) {
+    return 'Alarm set for $time';
+  }
+
+  @override
+  String get sleepAlarmRemaining => 'Time until alarm';
+
+  @override
+  String get sleepAlarmChange => 'Change alarm';
+
+  @override
+  String get sleepAlarmInvalidWindow =>
+      'Choose a time between 1 minute and 16 hours from now.';
+
+  @override
+  String get sleepAlarmExactPermission =>
+      'Allow Alarms & reminders so the alarm can ring exactly on time.';
+
+  @override
+  String get sleepAlarmEnableExactPermission => 'Allow exact alarms';
+
+  @override
+  String get sleepAlarmNotificationRequired =>
+      'Notifications are required to show and dismiss the wake-up alarm.';
+
+  @override
+  String get sleepAlarmFullScreenLimited =>
+      'Full-screen alarms are disabled. Sound and vibration will still use a highlighted notification.';
+
+  @override
+  String get sleepAlarmEnableFullScreen => 'Allow full-screen alarm';
+
+  @override
+  String get sleepAlarmScheduleFailed =>
+      'The wake-up alarm could not be scheduled.';
 
   @override
   String get sleepMonitorResultTitle => 'Monitoring result';

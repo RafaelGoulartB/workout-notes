@@ -15,6 +15,11 @@ class SleepMonitorState {
   final String? sessionId;
   final DateTime? startedAt;
   final DateTime? updatedAt;
+  final DateTime? alarmAt;
+  final String? endReason;
+  final bool exactAlarmGranted;
+  final bool fullScreenIntentGranted;
+  final bool alarmDismissed;
   final SleepMonitorSegment? latestSegment;
   final double? currentNoiseScore;
   final String? errorCode;
@@ -27,6 +32,11 @@ class SleepMonitorState {
     required this.sessionId,
     required this.startedAt,
     required this.updatedAt,
+    this.alarmAt,
+    this.endReason,
+    this.exactAlarmGranted = false,
+    this.fullScreenIntentGranted = false,
+    this.alarmDismissed = false,
     required this.latestSegment,
     required this.currentNoiseScore,
     required this.errorCode,
@@ -41,6 +51,11 @@ class SleepMonitorState {
         sessionId: null,
         startedAt: null,
         updatedAt: null,
+        alarmAt: null,
+        endReason: null,
+        exactAlarmGranted: false,
+        fullScreenIntentGranted: false,
+        alarmDismissed: false,
         latestSegment: null,
         currentNoiseScore: null,
         errorCode: null,
@@ -64,6 +79,11 @@ class SleepMonitorState {
     String? sessionId,
     DateTime? startedAt,
     DateTime? updatedAt,
+    DateTime? alarmAt,
+    String? endReason,
+    bool? exactAlarmGranted,
+    bool? fullScreenIntentGranted,
+    bool? alarmDismissed,
     SleepMonitorSegment? latestSegment,
     double? currentNoiseScore,
     String? errorCode,
@@ -76,6 +96,12 @@ class SleepMonitorState {
       sessionId: sessionId ?? this.sessionId,
       startedAt: startedAt ?? this.startedAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      alarmAt: alarmAt ?? this.alarmAt,
+      endReason: endReason ?? this.endReason,
+      exactAlarmGranted: exactAlarmGranted ?? this.exactAlarmGranted,
+      fullScreenIntentGranted:
+          fullScreenIntentGranted ?? this.fullScreenIntentGranted,
+      alarmDismissed: alarmDismissed ?? this.alarmDismissed,
       latestSegment: latestSegment ?? this.latestSegment,
       currentNoiseScore: currentNoiseScore ?? this.currentNoiseScore,
       errorCode: errorCode,
@@ -86,6 +112,7 @@ class SleepMonitorState {
   factory SleepMonitorState.fromMap(Map<String, dynamic> map) {
     final startedText = map['started_at'] as String?;
     final updatedText = map['updated_at'] as String?;
+    final alarmText = map['alarm_at'] as String?;
     final segment = map['latest_segment'];
     return SleepMonitorState(
       supported: map['supported'] as bool? ?? true,
@@ -94,6 +121,12 @@ class SleepMonitorState {
       sessionId: map['session_id'] as String?,
       startedAt: startedText == null ? null : DateTime.parse(startedText),
       updatedAt: updatedText == null ? null : DateTime.parse(updatedText),
+      alarmAt: alarmText == null ? null : DateTime.parse(alarmText),
+      endReason: map['end_reason'] as String?,
+      exactAlarmGranted: map['exact_alarm_granted'] as bool? ?? false,
+      fullScreenIntentGranted:
+          map['full_screen_intent_granted'] as bool? ?? false,
+      alarmDismissed: map['alarm_dismissed'] as bool? ?? false,
       latestSegment: segment is Map
           ? SleepMonitorSegment.fromMap(Map<String, dynamic>.from(segment))
           : null,

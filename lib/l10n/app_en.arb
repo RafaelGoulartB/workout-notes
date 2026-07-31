@@ -65,6 +65,12 @@
   "sleepMonitorReady": "Ready to monitor",
   "sleepMonitorMicrophone": "Microphone permission",
   "sleepMonitorStart": "Start monitoring",
+  "sleepMonitorStartWithAlarm": "Start and wake at {time}",
+  "@sleepMonitorStartWithAlarm": {
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
   "sleepMonitorFinish": "Finish and view result",
   "sleepMonitorDiscard": "Discard session",
   "sleepMonitorLocalProcessing": "Audio is processed locally and never recorded. Only aggregate metrics are kept.",
@@ -79,6 +85,34 @@
   "sleepMonitorNoiseNow": "Relative noise detected",
   "sleepMonitorQuietNow": "Estimated quiet period",
   "sleepMonitorInvalidSignal": "Signal temporarily unavailable",
+  "sleepAlarmSectionTitle": "Your wake-up time",
+  "sleepAlarmTapToChange": "Tap the clock to change",
+  "sleepAlarmNext": "Next alarm",
+  "sleepAlarmIn": "in {duration}",
+  "@sleepAlarmIn": {
+    "placeholders": {
+      "duration": {"type": "String"}
+    }
+  },
+  "sleepAlarmSystemSound": "System alarm sound + vibration",
+  "sleepAlarmSystemSoundBody": "Uses your device's alarm volume and Do Not Disturb settings.",
+  "sleepAlarmPreparation": "Prepare your phone",
+  "sleepAlarmPreparationBody": "Leave it charging near the bed, with the microphone unobstructed.",
+  "sleepAlarmScheduledFor": "Alarm set for {time}",
+  "@sleepAlarmScheduledFor": {
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
+  "sleepAlarmRemaining": "Time until alarm",
+  "sleepAlarmChange": "Change alarm",
+  "sleepAlarmInvalidWindow": "Choose a time between 1 minute and 16 hours from now.",
+  "sleepAlarmExactPermission": "Allow Alarms & reminders so the alarm can ring exactly on time.",
+  "sleepAlarmEnableExactPermission": "Allow exact alarms",
+  "sleepAlarmNotificationRequired": "Notifications are required to show and dismiss the wake-up alarm.",
+  "sleepAlarmFullScreenLimited": "Full-screen alarms are disabled. Sound and vibration will still use a highlighted notification.",
+  "sleepAlarmEnableFullScreen": "Allow full-screen alarm",
+  "sleepAlarmScheduleFailed": "The wake-up alarm could not be scheduled.",
   "sleepMonitorResultTitle": "Monitoring result",
   "sleepMonitorResultMissing": "Result not found.",
   "sleepMonitorSource": "Monitoring",

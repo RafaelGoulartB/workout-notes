@@ -68,6 +68,12 @@ class SleepMonitorService extends ChangeNotifier {
         microphoneGranted:
             capabilities['microphone_granted'] as bool? ??
             _state.microphoneGranted,
+        exactAlarmGranted:
+            capabilities['exact_alarm_granted'] as bool? ??
+            _state.exactAlarmGranted,
+        fullScreenIntentGranted:
+            capabilities['full_screen_intent_granted'] as bool? ??
+            _state.fullScreenIntentGranted,
       );
       notifyListeners();
       return capabilities;
@@ -116,12 +122,63 @@ class SleepMonitorService extends ChangeNotifier {
     }
   }
 
-  Future<bool> startMonitoring() async {
+  Future<Map<String, bool>> getAlarmCapabilities() async {
+    if (!_isAndroid) {
+      return {'exactAlarmGranted': false, 'fullScreenIntentGranted': false};
+    }
+    try {
+      final result = await methods.invokeMapMethod<String, dynamic>(
+        'getAlarmCapabilities',
+      );
+      final exact = result?['exact_alarm_granted'] as bool? ?? false;
+      final fullScreen =
+          result?['full_screen_intent_granted'] as bool? ?? false;
+      _state = _state.copyWith(
+        exactAlarmGranted: exact,
+        fullScreenIntentGranted: fullScreen,
+      );
+      notifyListeners();
+      return {
+        'exactAlarmGranted': exact,
+        'fullScreenIntentGranted': fullScreen,
+      };
+    } catch (error) {
+      _setError('alarm_capabilities', error.toString());
+      return {'exactAlarmGranted': false, 'fullScreenIntentGranted': false};
+    }
+  }
+
+  Future<bool> requestExactAlarmPermission() async {
+    if (!_isAndroid) return false;
+    try {
+      await methods.invokeMethod<bool>('requestExactAlarmPermission');
+      final capabilities = await getAlarmCapabilities();
+      return capabilities['exactAlarmGranted'] ?? false;
+    } catch (error) {
+      _setError('exact_alarm_denied', error.toString());
+      return false;
+    }
+  }
+
+  Future<bool> requestFullScreenPermission() async {
+    if (!_isAndroid) return false;
+    try {
+      await methods.invokeMethod<bool>('requestFullScreenPermission');
+      final capabilities = await getAlarmCapabilities();
+      return capabilities['fullScreenIntentGranted'] ?? false;
+    } catch (error) {
+      _setError('full_screen_denied', error.toString());
+      return false;
+    }
+  }
+
+  Future<bool> startMonitoring({required DateTime alarmAt}) async {
     if (!_isAndroid) return false;
     if (_state.isActive) return true;
     try {
       final result = await methods.invokeMapMethod<String, dynamic>(
         'startMonitoring',
+        {'alarm_at_epoch_ms': alarmAt.millisecondsSinceEpoch},
       );
       if (result != null) {
         _onEvent(result);
@@ -134,6 +191,26 @@ class SleepMonitorService extends ChangeNotifier {
       return false;
     } catch (error) {
       _setError('start_failed', error.toString());
+      return false;
+    }
+  }
+
+  Future<bool> updateAlarm(DateTime alarmAt) async {
+    if (!_isAndroid || !_state.isActive) return false;
+    try {
+      final result = await methods.invokeMapMethod<String, dynamic>(
+        'updateAlarm',
+        {'alarm_at_epoch_ms': alarmAt.millisecondsSinceEpoch},
+      );
+      if (result != null) _onEvent(result);
+      return _state.alarmAt != null &&
+          _state.alarmAt!.millisecondsSinceEpoch ==
+              alarmAt.millisecondsSinceEpoch;
+    } on PlatformException catch (error) {
+      _setError(error.code, error.message ?? error.toString());
+      return false;
+    } catch (error) {
+      _setError('alarm_schedule_failed', error.toString());
       return false;
     }
   }

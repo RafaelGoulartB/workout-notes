@@ -207,6 +207,11 @@ class AppLocalizationsPt extends AppLocalizations {
   String get sleepMonitorStart => 'Iniciar monitoramento';
 
   @override
+  String sleepMonitorStartWithAlarm(String time) {
+    return 'Iniciar e despertar às $time';
+  }
+
+  @override
   String get sleepMonitorFinish => 'Finalizar e ver resultado';
 
   @override
@@ -256,6 +261,71 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get sleepMonitorInvalidSignal => 'Sinal temporariamente indisponível';
+
+  @override
+  String get sleepAlarmSectionTitle => 'Seu horário de despertar';
+
+  @override
+  String get sleepAlarmTapToChange => 'Toque no relógio para alterar';
+
+  @override
+  String get sleepAlarmNext => 'Próximo alarme';
+
+  @override
+  String sleepAlarmIn(String duration) {
+    return 'em $duration';
+  }
+
+  @override
+  String get sleepAlarmSystemSound => 'Som de alarme do sistema + vibração';
+
+  @override
+  String get sleepAlarmSystemSoundBody =>
+      'Usa o volume de alarmes e o modo Não Perturbe do aparelho.';
+
+  @override
+  String get sleepAlarmPreparation => 'Prepare o aparelho';
+
+  @override
+  String get sleepAlarmPreparationBody =>
+      'Deixe-o carregando perto da cama e com o microfone desobstruído.';
+
+  @override
+  String sleepAlarmScheduledFor(String time) {
+    return 'Despertador definido para $time';
+  }
+
+  @override
+  String get sleepAlarmRemaining => 'Tempo até despertar';
+
+  @override
+  String get sleepAlarmChange => 'Alterar despertador';
+
+  @override
+  String get sleepAlarmInvalidWindow =>
+      'Escolha um horário entre 1 minuto e 16 horas a partir de agora.';
+
+  @override
+  String get sleepAlarmExactPermission =>
+      'Permita Alarmes e lembretes para o despertador tocar pontualmente.';
+
+  @override
+  String get sleepAlarmEnableExactPermission => 'Permitir alarmes exatos';
+
+  @override
+  String get sleepAlarmNotificationRequired =>
+      'As notificações são necessárias para exibir e desligar o despertador.';
+
+  @override
+  String get sleepAlarmFullScreenLimited =>
+      'A tela cheia está desativada. O som e a vibração continuarão em uma notificação destacada.';
+
+  @override
+  String get sleepAlarmEnableFullScreen => 'Permitir tela cheia';
+
+  @override
+  String get sleepAlarmScheduleFailed =>
+      'Não foi possível programar o despertador.';
 
   @override
   String get sleepMonitorResultTitle => 'Resultado do monitoramento';

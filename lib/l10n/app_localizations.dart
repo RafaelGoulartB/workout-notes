@@ -458,6 +458,12 @@ abstract class AppLocalizations {
   /// **'Start monitoring'**
   String get sleepMonitorStart;
 
+  /// No description provided for @sleepMonitorStartWithAlarm.
+  ///
+  /// In en, this message translates to:
+  /// **'Start and wake at {time}'**
+  String sleepMonitorStartWithAlarm(String time);
+
   /// No description provided for @sleepMonitorFinish.
   ///
   /// In en, this message translates to:
@@ -541,6 +547,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Signal temporarily unavailable'**
   String get sleepMonitorInvalidSignal;
+
+  /// No description provided for @sleepAlarmSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your wake-up time'**
+  String get sleepAlarmSectionTitle;
+
+  /// No description provided for @sleepAlarmTapToChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the clock to change'**
+  String get sleepAlarmTapToChange;
+
+  /// No description provided for @sleepAlarmNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next alarm'**
+  String get sleepAlarmNext;
+
+  /// No description provided for @sleepAlarmIn.
+  ///
+  /// In en, this message translates to:
+  /// **'in {duration}'**
+  String sleepAlarmIn(String duration);
+
+  /// No description provided for @sleepAlarmSystemSound.
+  ///
+  /// In en, this message translates to:
+  /// **'System alarm sound + vibration'**
+  String get sleepAlarmSystemSound;
+
+  /// No description provided for @sleepAlarmSystemSoundBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses your device\'s alarm volume and Do Not Disturb settings.'**
+  String get sleepAlarmSystemSoundBody;
+
+  /// No description provided for @sleepAlarmPreparation.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare your phone'**
+  String get sleepAlarmPreparation;
+
+  /// No description provided for @sleepAlarmPreparationBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave it charging near the bed, with the microphone unobstructed.'**
+  String get sleepAlarmPreparationBody;
+
+  /// No description provided for @sleepAlarmScheduledFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarm set for {time}'**
+  String sleepAlarmScheduledFor(String time);
+
+  /// No description provided for @sleepAlarmRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Time until alarm'**
+  String get sleepAlarmRemaining;
+
+  /// No description provided for @sleepAlarmChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change alarm'**
+  String get sleepAlarmChange;
+
+  /// No description provided for @sleepAlarmInvalidWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a time between 1 minute and 16 hours from now.'**
+  String get sleepAlarmInvalidWindow;
+
+  /// No description provided for @sleepAlarmExactPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow Alarms & reminders so the alarm can ring exactly on time.'**
+  String get sleepAlarmExactPermission;
+
+  /// No description provided for @sleepAlarmEnableExactPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow exact alarms'**
+  String get sleepAlarmEnableExactPermission;
+
+  /// No description provided for @sleepAlarmNotificationRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications are required to show and dismiss the wake-up alarm.'**
+  String get sleepAlarmNotificationRequired;
+
+  /// No description provided for @sleepAlarmFullScreenLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Full-screen alarms are disabled. Sound and vibration will still use a highlighted notification.'**
+  String get sleepAlarmFullScreenLimited;
+
+  /// No description provided for @sleepAlarmEnableFullScreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow full-screen alarm'**
+  String get sleepAlarmEnableFullScreen;
+
+  /// No description provided for @sleepAlarmScheduleFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The wake-up alarm could not be scheduled.'**
+  String get sleepAlarmScheduleFailed;
 
   /// No description provided for @sleepMonitorResultTitle.
   ///

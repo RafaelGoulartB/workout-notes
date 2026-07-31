@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sleep_alarm_channel_name">Sleep alarm</string>
+    <string name="sleep_alarm_channel_description">Wake-up alarms for monitored nights</string>
+    <string name="sleep_alarm_notification_title">Time to wake up</string>
+    <string name="sleep_alarm_notification_body">Your sleep monitoring has finished.</string>
+    <string name="sleep_alarm_good_morning">Good morning</string>
+    <string name="sleep_alarm_wake_message">Your monitored night is complete.</string>
+    <string name="sleep_alarm_dismiss">Dismiss</string>
+</resources>

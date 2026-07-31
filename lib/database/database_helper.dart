@@ -17,7 +17,7 @@ import '../models/sleep_monitor_session.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 21;
+  static const _dbVersion = 22;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -244,6 +244,7 @@ class DatabaseHelper {
         status TEXT NOT NULL,
         started_at TEXT NOT NULL,
         ended_at TEXT,
+        alarm_at TEXT,
         utc_offset_start_minutes INTEGER NOT NULL,
         utc_offset_end_minutes INTEGER,
         sensor_mode TEXT NOT NULL DEFAULT 'audio',
@@ -1678,6 +1679,19 @@ class DatabaseHelper {
         } catch (_) {}
       }
     }
+    if (oldVersion < 22) {
+      try {
+        await db.execute(
+          'ALTER TABLE sleep_monitor_sessions ADD COLUMN alarm_at TEXT',
+        );
+      } catch (_) {}
+      try {
+        await db.insert('app_settings', {
+          'key': 'sleep_alarm_default_minutes',
+          'value': '420',
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      } catch (_) {}
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -1745,6 +1759,10 @@ class DatabaseHelper {
     batch.insert('app_settings', {
       'key': 'notification_workout_timer_vibration',
       'value': 'false',
+    });
+    batch.insert('app_settings', {
+      'key': 'sleep_alarm_default_minutes',
+      'value': '420',
     });
 
     await batch.commit(noResult: true);

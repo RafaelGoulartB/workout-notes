@@ -13,6 +13,7 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.atomic.AtomicReference
+import java.util.UUID
 
 class SleepMonitorBridge(private val context: Context) :
     MethodChannel.MethodCallHandler,
@@ -37,11 +38,34 @@ class SleepMonitorBridge(private val context: Context) :
                     "device_model" to Build.MODEL,
                     "android_sdk_int" to Build.VERSION.SDK_INT,
                     "android_release" to Build.VERSION.RELEASE,
+                    "exact_alarm_granted" to SleepAlarmScheduler.canScheduleExact(context),
+                    "full_screen_intent_granted" to
+                        SleepAlarmScheduler.canUseFullScreenIntent(context),
                 ),
             )
+            "getAlarmCapabilities" -> result.success(alarmCapabilities())
             "getState" -> result.success(SleepMonitoringService.currentState(context))
             "requestMicrophonePermission" -> requestMicrophonePermission(result)
-            "startMonitoring" -> startMonitoring(result)
+            "requestExactAlarmPermission" -> {
+                val visibleActivity = activity
+                if (visibleActivity == null) {
+                    result.error("activity_unavailable", "A visible Activity is required", null)
+                } else {
+                    SleepAlarmScheduler.openExactAlarmSettings(visibleActivity)
+                    result.success(SleepAlarmScheduler.canScheduleExact(context))
+                }
+            }
+            "requestFullScreenPermission" -> {
+                val visibleActivity = activity
+                if (visibleActivity == null) {
+                    result.error("activity_unavailable", "A visible Activity is required", null)
+                } else {
+                    SleepAlarmScheduler.openFullScreenIntentSettings(visibleActivity)
+                    result.success(SleepAlarmScheduler.canUseFullScreenIntent(context))
+                }
+            }
+            "startMonitoring" -> startMonitoring(call, result)
+            "updateAlarm" -> updateAlarm(call, result)
             "stopMonitoring" -> result.success(SleepMonitoringService.stopCurrent("user"))
             "discardSession" -> {
                 SleepMonitoringService.discardCurrent()
@@ -94,9 +118,18 @@ class SleepMonitorBridge(private val context: Context) :
         return true
     }
 
-    private fun startMonitoring(result: MethodChannel.Result) {
+    private fun startMonitoring(call: MethodCall, result: MethodChannel.Result) {
         if (!microphoneGranted()) {
             result.error("microphone_denied", "Microphone permission denied", null)
+            return
+        }
+        if (!SleepAlarmScheduler.canScheduleExact(context)) {
+            result.error("exact_alarm_denied", "Exact alarm permission denied", null)
+            return
+        }
+        val alarmAt = call.argument<Number>(SleepAlarmScheduler.EXTRA_ALARM_AT)?.toLong()
+        if (alarmAt == null || alarmAt <= System.currentTimeMillis()) {
+            result.error("invalid_alarm_time", "Alarm time must be in the future", null)
             return
         }
         val activeSpool = spool.listPending().any {
@@ -106,14 +139,64 @@ class SleepMonitorBridge(private val context: Context) :
             result.error("already_active", "A monitoring session is already active", null)
             return
         }
-        val intent = Intent(context, SleepMonitoringService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
+        val sessionId = UUID.randomUUID().toString()
+        try {
+            SleepAlarmScheduler.schedule(context, alarmAt, sessionId)
+            val intent = Intent(context, SleepMonitoringService::class.java).apply {
+                putExtra(SleepAlarmScheduler.EXTRA_ALARM_AT, alarmAt)
+                putExtra(SleepAlarmScheduler.EXTRA_SESSION_ID, sessionId)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+            result.success(
+                SleepMonitoringService.startResponse(
+                    context,
+                    sessionId,
+                    alarmAt,
+                ),
+            )
+        } catch (error: SecurityException) {
+            SleepAlarmScheduler.cancel(context)
+            result.error("exact_alarm_denied", error.message, null)
+        } catch (error: Throwable) {
+            SleepAlarmScheduler.cancel(context)
+            result.error("alarm_schedule_failed", error.message, null)
         }
-        result.success(SleepMonitoringService.startResponse(context))
     }
+
+    private fun updateAlarm(call: MethodCall, result: MethodChannel.Result) {
+        if (!SleepAlarmScheduler.canScheduleExact(context)) {
+            result.error("exact_alarm_denied", "Exact alarm permission denied", null)
+            return
+        }
+        val alarmAt = call.argument<Number>(SleepAlarmScheduler.EXTRA_ALARM_AT)?.toLong()
+        if (alarmAt == null || alarmAt <= System.currentTimeMillis()) {
+            result.error("invalid_alarm_time", "Alarm time must be in the future", null)
+            return
+        }
+        val state = SleepMonitoringService.currentState(context)
+        val sessionId = state["session_id"]?.toString()
+        if (sessionId.isNullOrBlank() || state["status"] !in setOf("starting", "running")) {
+            result.error("not_active", "No active monitoring session", null)
+            return
+        }
+        try {
+            SleepAlarmScheduler.schedule(context, alarmAt, sessionId)
+            result.success(SleepMonitoringService.updateAlarm(alarmAt))
+        } catch (error: SecurityException) {
+            result.error("exact_alarm_denied", error.message, null)
+        } catch (error: Throwable) {
+            result.error("alarm_schedule_failed", error.message, null)
+        }
+    }
+
+    private fun alarmCapabilities(): Map<String, Any?> = mapOf(
+        "exact_alarm_granted" to SleepAlarmScheduler.canScheduleExact(context),
+        "full_screen_intent_granted" to SleepAlarmScheduler.canUseFullScreenIntent(context),
+    )
 
     private fun microphoneGranted(): Boolean = ContextCompat.checkSelfPermission(
         context,

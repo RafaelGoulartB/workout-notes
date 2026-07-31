@@ -65,6 +65,12 @@
   "sleepMonitorReady": "Pronto para monitorar",
   "sleepMonitorMicrophone": "Permissão do microfone",
   "sleepMonitorStart": "Iniciar monitoramento",
+  "sleepMonitorStartWithAlarm": "Iniciar e despertar às {time}",
+  "@sleepMonitorStartWithAlarm": {
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
   "sleepMonitorFinish": "Finalizar e ver resultado",
   "sleepMonitorDiscard": "Descartar sessão",
   "sleepMonitorLocalProcessing": "O áudio é processado localmente e não é gravado. Apenas métricas agregadas são mantidas.",
@@ -79,6 +85,34 @@
   "sleepMonitorNoiseNow": "Ruído relativo detectado",
   "sleepMonitorQuietNow": "Período silencioso estimado",
   "sleepMonitorInvalidSignal": "Sinal temporariamente indisponível",
+  "sleepAlarmSectionTitle": "Seu horário de despertar",
+  "sleepAlarmTapToChange": "Toque no relógio para alterar",
+  "sleepAlarmNext": "Próximo alarme",
+  "sleepAlarmIn": "em {duration}",
+  "@sleepAlarmIn": {
+    "placeholders": {
+      "duration": {"type": "String"}
+    }
+  },
+  "sleepAlarmSystemSound": "Som de alarme do sistema + vibração",
+  "sleepAlarmSystemSoundBody": "Usa o volume de alarmes e o modo Não Perturbe do aparelho.",
+  "sleepAlarmPreparation": "Prepare o aparelho",
+  "sleepAlarmPreparationBody": "Deixe-o carregando perto da cama e com o microfone desobstruído.",
+  "sleepAlarmScheduledFor": "Despertador definido para {time}",
+  "@sleepAlarmScheduledFor": {
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
+  "sleepAlarmRemaining": "Tempo até despertar",
+  "sleepAlarmChange": "Alterar despertador",
+  "sleepAlarmInvalidWindow": "Escolha um horário entre 1 minuto e 16 horas a partir de agora.",
+  "sleepAlarmExactPermission": "Permita Alarmes e lembretes para o despertador tocar pontualmente.",
+  "sleepAlarmEnableExactPermission": "Permitir alarmes exatos",
+  "sleepAlarmNotificationRequired": "As notificações são necessárias para exibir e desligar o despertador.",
+  "sleepAlarmFullScreenLimited": "A tela cheia está desativada. O som e a vibração continuarão em uma notificação destacada.",
+  "sleepAlarmEnableFullScreen": "Permitir tela cheia",
+  "sleepAlarmScheduleFailed": "Não foi possível programar o despertador.",
   "sleepMonitorResultTitle": "Resultado do monitoramento",
   "sleepMonitorResultMissing": "Resultado não encontrado.",
   "sleepMonitorSource": "Monitoramento",

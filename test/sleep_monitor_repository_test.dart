@@ -45,6 +45,7 @@ void main() {
               status TEXT NOT NULL,
               started_at TEXT NOT NULL,
               ended_at TEXT,
+              alarm_at TEXT,
               utc_offset_start_minutes INTEGER NOT NULL,
               utc_offset_end_minutes INTEGER,
               sensor_mode TEXT NOT NULL DEFAULT 'audio',
@@ -106,6 +107,7 @@ void main() {
       status: SleepMonitorSession.completed,
       startedAt: segment.startedAt,
       endedAt: segment.startedAt.add(const Duration(seconds: 60)),
+      alarmAt: segment.startedAt.add(const Duration(hours: 8)),
       utcOffsetStartMinutes: -180,
       utcOffsetEndMinutes: -180,
       sensorMode: 'audio',
@@ -123,7 +125,9 @@ void main() {
       SleepMonitorSegment.fromMap(segment.toMap()).classification,
       'quiet',
     );
-    expect(SleepMonitorSession.fromMap(session.toMap()).id, 'session-1');
+    final restored = SleepMonitorSession.fromMap(session.toMap());
+    expect(restored.id, 'session-1');
+    expect(restored.alarmAt, session.alarmAt);
   });
 
   test(
@@ -295,6 +299,7 @@ Map<String, dynamic> _spool(
       'ended_at': status == SleepMonitorSession.running
           ? null
           : end.toIso8601String(),
+      'alarm_at': start.add(const Duration(hours: 8)).toIso8601String(),
       'utc_offset_start_minutes': -180,
       'utc_offset_end_minutes': -180,
       'sensor_mode': 'audio',

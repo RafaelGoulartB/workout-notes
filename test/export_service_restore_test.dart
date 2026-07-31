@@ -38,11 +38,14 @@ void main() {
             'predefined_sets',
             'body_measurements',
             'sleep_entries',
-            'sleep_monitor_sessions',
             'sleep_monitor_segments',
           ]) {
             await db.execute('CREATE TABLE $table (id TEXT PRIMARY KEY)');
           }
+          await db.execute(
+            'CREATE TABLE sleep_monitor_sessions '
+            '(id TEXT PRIMARY KEY, alarm_at TEXT)',
+          );
           await db.execute(
             'CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)',
           );
@@ -218,6 +221,32 @@ void main() {
     expect(count, 1);
     expect(await database.query('sleep_monitor_sessions'), isEmpty);
     expect(await database.query('sleep_monitor_segments'), isEmpty);
+  });
+
+  test('restores the alarm time from a version 5 backup', () async {
+    final backup = _validBackup();
+    backup['sleep_monitor_sessions'] = [
+      {'id': 'night-1', 'alarm_at': '2026-08-01T10:00:00.000Z'},
+    ];
+
+    await service.restoreFromBytes(_bytes(backup));
+
+    expect(await database.query('sleep_monitor_sessions'), [
+      {'id': 'night-1', 'alarm_at': '2026-08-01T10:00:00.000Z'},
+    ]);
+  });
+
+  test('accepts a version 4 session without alarm time', () async {
+    final backup = _validBackup()..['version'] = 4;
+    backup['sleep_monitor_sessions'] = [
+      {'id': 'night-legacy'},
+    ];
+
+    await service.restoreFromBytes(_bytes(backup));
+
+    expect(await database.query('sleep_monitor_sessions'), [
+      {'id': 'night-legacy', 'alarm_at': null},
+    ]);
   });
 }
 
