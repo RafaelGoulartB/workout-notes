@@ -3,6 +3,22 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/utils/sleep_alarm_time.dart';
 
 void main() {
+  test('defaults to eight hours rounded down to a 15-minute division', () {
+    final now = DateTime(2026, 7, 31, 22, 44, 38);
+
+    final alarm = SleepAlarmTime.defaultAlarm(now: now);
+
+    expect(alarm, DateTime(2026, 8, 1, 6, 30));
+  });
+
+  test('keeps an exact 15-minute division after adding eight hours', () {
+    final now = DateTime(2026, 7, 31, 21, 15);
+
+    final alarm = SleepAlarmTime.defaultAlarm(now: now);
+
+    expect(alarm, DateTime(2026, 8, 1, 5, 15));
+  });
+
   test('uses today when the selected time is at least one minute away', () {
     final now = DateTime(2026, 7, 31, 22);
 

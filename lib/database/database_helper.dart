@@ -1685,12 +1685,6 @@ class DatabaseHelper {
           'ALTER TABLE sleep_monitor_sessions ADD COLUMN alarm_at TEXT',
         );
       } catch (_) {}
-      try {
-        await db.insert('app_settings', {
-          'key': 'sleep_alarm_default_minutes',
-          'value': '420',
-        }, conflictAlgorithm: ConflictAlgorithm.ignore);
-      } catch (_) {}
     }
   }
 
@@ -1760,11 +1754,6 @@ class DatabaseHelper {
       'key': 'notification_workout_timer_vibration',
       'value': 'false',
     });
-    batch.insert('app_settings', {
-      'key': 'sleep_alarm_default_minutes',
-      'value': '420',
-    });
-
     await batch.commit(noResult: true);
   }
 

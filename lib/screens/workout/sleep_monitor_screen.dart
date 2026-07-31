@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_state.dart';
-import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/services/notification_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/utils/sleep_alarm_time.dart';
@@ -22,7 +21,6 @@ class SleepMonitorScreen extends StatefulWidget {
 class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     with WidgetsBindingObserver {
   final _service = SleepMonitorService.instance;
-  final _settings = SettingsRepository();
   Timer? _ticker;
   TimeOfDay _selectedTime = const TimeOfDay(hour: 7, minute: 0);
   bool _isBusy = false;
@@ -61,10 +59,10 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   Future<void> _initialize() async {
     await _service.initialize();
     await _service.getAlarmCapabilities();
-    final minutes = await _settings.getSleepAlarmMinutes();
+    final defaultAlarm = SleepAlarmTime.defaultAlarm();
     if (!mounted) return;
     setState(() {
-      _selectedTime = TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
+      _selectedTime = TimeOfDay.fromDateTime(defaultAlarm);
       _loading = false;
     });
   }
@@ -368,7 +366,6 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
       _showMessage(AppLocalizations.of(context)!.sleepAlarmInvalidWindow);
       return;
     }
-    await _settings.setSleepAlarmMinutes(picked.hour * 60 + picked.minute);
     if (_service.isMonitoring) {
       setState(() => _isBusy = true);
       final updated = await _service.updateAlarm(alarmAt);

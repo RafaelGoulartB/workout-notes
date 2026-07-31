@@ -38,18 +38,4 @@ class SettingsRepository extends BaseRepository {
   Future<void> setDistanceUnitKm(bool isKm) async {
     await setSetting('distance_unit', isKm ? 'km' : 'mi');
   }
-
-  Future<int> getSleepAlarmMinutes() async {
-    final value = int.tryParse(
-      await getSetting('sleep_alarm_default_minutes') ?? '',
-    );
-    return value != null && value >= 0 && value < 24 * 60 ? value : 7 * 60;
-  }
-
-  Future<void> setSleepAlarmMinutes(int minutes) async {
-    if (minutes < 0 || minutes >= 24 * 60) {
-      throw ArgumentError.value(minutes, 'minutes', 'Must be within one day');
-    }
-    await setSetting('sleep_alarm_default_minutes', '$minutes');
-  }
 }
