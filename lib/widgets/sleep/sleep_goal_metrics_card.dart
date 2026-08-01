@@ -125,7 +125,7 @@ class SleepGoalMetricsCard extends StatelessWidget {
                       value: _formatClock(entry.wakeTimeMinutes),
                     ),
                   ];
-                  final columns = constraints.maxWidth < 300 ? 1 : 2;
+                  final columns = constraints.maxWidth < 200 ? 1 : 2;
                   return GridView.builder(
                     itemCount: metrics.length,
                     shrinkWrap: true,

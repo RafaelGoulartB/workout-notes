@@ -178,6 +178,9 @@ void main() {
         (await database.query('sleep_entries')).single['source'],
         'monitored',
       );
+      final entry = await SleepRepository().getLatest();
+      expect(entry?.bedtimeMinutes, 19 * 60);
+      expect(entry?.wakeTimeMinutes, 19 * 60 + 2);
     },
   );
 

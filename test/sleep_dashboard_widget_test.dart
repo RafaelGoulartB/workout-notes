@@ -88,6 +88,39 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('goal metrics keeps two columns on a compact phone', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      _localized(
+        SleepGoalMetricsCard(
+          entry: _entry(
+            date: DateTime(2026, 7, 26),
+            sleepMinutes: 420,
+            actualSleepMinutes: 390,
+            bedtimeMinutes: 1380,
+            wakeTimeMinutes: 420,
+          ),
+          stats: _stats(),
+          goalMinutes: 480,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester.getSize(find.byType(SleepGoalMetricsCard)).height,
+      lessThan(300),
+    );
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('schedule chart renders sleep windows across midnight', (
     tester,
   ) async {

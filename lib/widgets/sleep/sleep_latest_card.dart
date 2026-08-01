@@ -26,7 +26,7 @@ class SleepLatestCard extends StatelessWidget {
           padding: const EdgeInsets.all(18),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final compact = constraints.maxWidth < 310;
+              final compact = constraints.maxWidth < 240;
               final summary = _LatestSummary(entry: entry);
               final ring = _EfficiencyRing(efficiency: efficiency);
               return Column(

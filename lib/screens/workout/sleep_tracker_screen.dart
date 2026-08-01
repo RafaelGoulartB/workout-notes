@@ -52,19 +52,23 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     _weekEnd = DateTime(now.year, now.month, now.day);
     _monitorService.addListener(_onMonitorChanged);
     _lastRecoveryCount = _monitorService.recoveredCount;
-    _monitorService.initialize();
+    _bootstrap();
     if (_lastRecoveryCount > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _showRecoveryMessage(_lastRecoveryCount);
       });
     }
-    _load();
   }
 
   @override
   void dispose() {
     _monitorService.removeListener(_onMonitorChanged);
     super.dispose();
+  }
+
+  Future<void> _bootstrap() async {
+    await _monitorService.initialize();
+    if (mounted) await _load();
   }
 
   void _onMonitorChanged() {
@@ -95,6 +99,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   Future<void> _load() async {
     if (mounted) setState(() => _isLoading = true);
     try {
+      await _monitorRepository.repairSleepEntriesFromSessions();
       final entries = await _repository.getEntries(limit: 500);
       final stats = await _repository.getDashboardStats(
         referenceDate: _weekEnd,
