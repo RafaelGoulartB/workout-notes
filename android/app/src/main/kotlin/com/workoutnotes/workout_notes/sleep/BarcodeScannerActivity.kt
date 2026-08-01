@@ -145,54 +145,62 @@ class BarcodeScannerActivity : ComponentActivity() {
     }
 
     private fun startCamera() {
-        val providerFuture = ProcessCameraProvider.getInstance(this)
-        providerFuture.addListener({
-            val provider = providerFuture.get()
-            val preview = Preview.Builder().build().also {
-                it.surfaceProvider = previewView.surfaceProvider
-            }
-            val analysis = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-                .also { useCase ->
-                    useCase.setAnalyzer(cameraExecutor) { proxy ->
-                        val image = proxy.image
-                        if (image == null || completed) {
-                            proxy.close()
-                            return@setAnalyzer
-                        }
-                        scanner.process(
-                            InputImage.fromMediaImage(
-                                image,
-                                proxy.imageInfo.rotationDegrees,
-                            ),
-                        ).addOnSuccessListener { barcodes ->
-                            val barcode = barcodes.firstOrNull { isSupported(it.format) }
-                            val value = barcode?.rawValue
-                            if (value.isNullOrBlank() || barcode == null) return@addOnSuccessListener
-                            val detectedFormat = formatName(barcode.format) ?: return@addOnSuccessListener
-                            val key = "${barcode.format}:$value"
-                            if (key == lastValue) stableReads++ else {
-                                lastValue = key
-                                stableReads = 1
-                            }
-                            if (stableReads >= 2) complete(value, detectedFormat)
-                        }.addOnCompleteListener { proxy.close() }
+        try {
+            val providerFuture = ProcessCameraProvider.getInstance(this)
+            providerFuture.addListener({
+                try {
+                    val provider = providerFuture.get()
+                    val preview = Preview.Builder().build().also {
+                        it.surfaceProvider = previewView.surfaceProvider
                     }
+                    val analysis = ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
+                        .also { useCase ->
+                            useCase.setAnalyzer(cameraExecutor) { proxy ->
+                                val image = proxy.image
+                                if (image == null || completed) {
+                                    proxy.close()
+                                    return@setAnalyzer
+                                }
+                                scanner.process(
+                                    InputImage.fromMediaImage(
+                                        image,
+                                        proxy.imageInfo.rotationDegrees,
+                                    ),
+                                ).addOnSuccessListener { barcodes ->
+                                    val barcode = barcodes.firstOrNull { isSupported(it.format) }
+                                    val value = barcode?.rawValue
+                                    if (value.isNullOrBlank() || barcode == null) return@addOnSuccessListener
+                                    val detectedFormat =
+                                        formatName(barcode.format) ?: return@addOnSuccessListener
+                                    val key = "${barcode.format}:$value"
+                                    if (key == lastValue) stableReads++ else {
+                                        lastValue = key
+                                        stableReads = 1
+                                    }
+                                    if (stableReads >= 2) complete(value, detectedFormat)
+                                }.addOnCompleteListener { proxy.close() }
+                            }
+                        }
+                    provider.unbindAll()
+                    camera = provider.bindToLifecycle(
+                        this,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview,
+                        analysis,
+                    )
+                } catch (_: Throwable) {
+                    setResult(RESULT_CANCELED)
+                    finish()
                 }
-            try {
-                provider.unbindAll()
-                camera = provider.bindToLifecycle(
-                    this,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
-                    analysis,
-                )
-            } catch (_: Throwable) {
-                setResult(RESULT_CANCELED)
-                finish()
-            }
-        }, ContextCompat.getMainExecutor(this))
+            }, ContextCompat.getMainExecutor(this))
+        } catch (_: Throwable) {
+            // Some physical devices fail before CameraX returns its future.
+            // Keep that device-specific error from terminating the app process.
+            setResult(RESULT_CANCELED)
+            finish()
+        }
     }
 
     private fun complete(rawValue: String, format: String) {

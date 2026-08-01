@@ -51,6 +51,7 @@ android {
                 // upload keystore before it reaches the build step.
                 signingConfigs.getByName("debug")
             }
+            proguardFiles("proguard-rules.pro")
         }
     }
 }
