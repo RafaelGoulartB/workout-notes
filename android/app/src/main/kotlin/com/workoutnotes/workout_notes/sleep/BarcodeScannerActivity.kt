@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -33,6 +34,7 @@ class BarcodeScannerActivity : ComponentActivity() {
         const val EXTRA_RAW_VALUE = "barcode_raw_value"
         const val EXTRA_FORMAT = "barcode_format"
         const val EXTRA_CAMERA_DENIED = "barcode_camera_denied"
+        const val EXTRA_TIMEOUT = "barcode_timeout"
         const val RESULT_CANCELLED = 0
         const val RESULT_SUCCESS = 1
         private const val CAMERA_REQUEST = 7654
@@ -43,6 +45,8 @@ class BarcodeScannerActivity : ComponentActivity() {
     private lateinit var scanner: BarcodeScanner
     private var camera: androidx.camera.core.Camera? = null
     private lateinit var torchButton: Button
+    private lateinit var timerView: TextView
+    private var timer: CountDownTimer? = null
     private var lastValue: String? = null
     private var stableReads = 0
     private var completed = false
@@ -66,6 +70,7 @@ class BarcodeScannerActivity : ComponentActivity() {
                 .build(),
         )
         render()
+        startTimeoutTimer()
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED) {
             startCamera()
@@ -108,6 +113,16 @@ class BarcodeScannerActivity : ComponentActivity() {
             setPadding(32, 24, 32, 24)
             setBackgroundColor(0x99000000.toInt())
         }, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
+        timerView = TextView(this).apply {
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setPadding(16, 12, 16, 12)
+            setBackgroundColor(0x99000000.toInt())
+        }
+        root.addView(timerView, FrameLayout.LayoutParams(-1, -2, Gravity.TOP).apply {
+            topMargin = 64
+        })
         root.addView(View(this).apply {
             background = GradientDrawable().apply {
                 setColor(Color.TRANSPARENT)
@@ -217,7 +232,37 @@ class BarcodeScannerActivity : ComponentActivity() {
                 putExtra("salt", salt)
             }
         }
+        timer?.cancel()
         setResult(RESULT_SUCCESS, intent)
+        finish()
+    }
+
+    private fun startTimeoutTimer() {
+        timer?.cancel()
+        val remaining = SleepAlarmScheduler.barcodeRemainingMillis(this)
+        if (remaining <= 0L) {
+            timeoutScanner()
+            return
+        }
+        timer = object : CountDownTimer(remaining, 250L) {
+            override fun onTick(millisUntilFinished: Long) {
+                val seconds = ((millisUntilFinished + 999L) / 1000L).toInt()
+                timerView.text = getString(
+                    com.workoutnotes.workout_notes.R.string.barcode_scanner_time_left,
+                    seconds,
+                )
+            }
+            override fun onFinish() {
+                timeoutScanner()
+            }
+        }.start()
+    }
+
+    private fun timeoutScanner() {
+        if (completed) return
+        completed = true
+        timer?.cancel()
+        setResult(RESULT_CANCELLED, Intent().putExtra(EXTRA_TIMEOUT, true))
         finish()
     }
 
@@ -237,6 +282,7 @@ class BarcodeScannerActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        timer?.cancel()
         cameraExecutor.shutdown()
         scanner.close()
         super.onDestroy()

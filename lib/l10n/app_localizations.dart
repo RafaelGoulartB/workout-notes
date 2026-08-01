@@ -5725,7 +5725,7 @@ abstract class AppLocalizations {
   /// No description provided for @sleepMonitorModeAlarmWithMissionBody.
   ///
   /// In en, this message translates to:
-  /// **'To dismiss it, scan the registered code or complete the emergency action with 1000 taps.'**
+  /// **'To dismiss it, scan the registered code or complete the emergency action with 500 taps.'**
   String get sleepMonitorModeAlarmWithMissionBody;
 
   /// No description provided for @sleepMonitorModeOnlyBody.

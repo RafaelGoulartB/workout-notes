@@ -25,14 +25,17 @@ class SleepMonitorSession {
 
   static const dismissButton = 'button';
   static const dismissBarcode = 'barcode';
+  static const dismissEmergency500Taps = 'emergency_500_taps';
+
+  /// Previous values remain countable after changing the challenge limit.
+  @Deprecated('Use dismissEmergency500Taps')
   static const dismissEmergency1000Taps = 'emergency_1000_taps';
 
-  /// Legacy value kept so historical sessions remain countable after the
-  /// emergency challenge was increased from 100 to 1000 taps.
-  @Deprecated('Use dismissEmergency1000Taps')
+  @Deprecated('Use dismissEmergency500Taps')
   static const dismissEmergency100Taps = 'emergency_100_taps';
 
   static const emergencyDismissMethods = <String>{
+    dismissEmergency500Taps,
     dismissEmergency1000Taps,
     dismissEmergency100Taps,
   };

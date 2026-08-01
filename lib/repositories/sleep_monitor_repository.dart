@@ -24,13 +24,14 @@ class SleepMonitorRepository extends BaseRepository {
 
   /// Counts alarms completed through the emergency mission.
   ///
-  /// The legacy method is included so changing the challenge from 100 to
-  /// 1000 taps does not hide completions already stored on the device.
+  /// Legacy methods remain included so changing the challenge to 500 taps
+  /// does not hide completions already stored on the device.
   Future<int> getEmergencyDismissalCount() async {
     final rows = await (await db).rawQuery(
       'SELECT COUNT(*) AS count FROM sleep_monitor_sessions '
-      'WHERE alarm_dismiss_method IN (?, ?)',
+      'WHERE alarm_dismiss_method IN (?, ?, ?)',
       [
+        SleepMonitorSession.dismissEmergency500Taps,
         SleepMonitorSession.dismissEmergency1000Taps,
         SleepMonitorSession.dismissEmergency100Taps,
       ],

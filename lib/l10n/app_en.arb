@@ -1022,7 +1022,7 @@
   "sleepMonitorModeAlarmWithMission": "Monitor + alarm with mission",
   "sleepMonitorModeOnly": "Monitor only, without alarm",
   "sleepMonitorModeAlarmNoMissionBody": "The alarm rings at the selected time and can be dismissed normally.",
-   "sleepMonitorModeAlarmWithMissionBody": "To dismiss it, scan the registered code or complete the emergency action with 1000 taps.",
+   "sleepMonitorModeAlarmWithMissionBody": "To dismiss it, scan the registered code or complete the emergency action with 500 taps.",
   "sleepMonitorModeOnlyBody": "Monitors the environment without scheduling an alarm.",
   "sleepMonitorModeMissionUnavailable": "Configure a barcode mission to unlock this mode.",
   "sleepMonitorStartOnly": "Start monitoring only",

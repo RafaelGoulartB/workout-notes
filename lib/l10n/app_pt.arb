@@ -1023,7 +1023,7 @@
   "sleepMonitorModeAlarmWithMission": "Monitorar + alarme com missão",
   "sleepMonitorModeOnly": "Somente monitorar, sem alarme",
   "sleepMonitorModeAlarmNoMissionBody": "O alarme tocará no horário escolhido e poderá ser desligado normalmente.",
-  "sleepMonitorModeAlarmWithMissionBody": "Para desligar, leia o código cadastrado ou complete a emergência com 1000 toques.",
+  "sleepMonitorModeAlarmWithMissionBody": "Para desligar, leia o código cadastrado ou complete a emergência com 500 toques.",
   "sleepMonitorModeOnlyBody": "Monitora o ambiente sem programar despertador.",
   "sleepMonitorModeMissionUnavailable": "Configure uma missão por código de barras para liberar este modo.",
   "sleepMonitorStartOnly": "Iniciar somente monitoramento",

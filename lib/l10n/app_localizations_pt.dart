@@ -3112,7 +3112,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get sleepMonitorModeAlarmWithMissionBody =>
-      'Para desligar, leia o código cadastrado ou complete a emergência com 1000 toques.';
+      'Para desligar, leia o código cadastrado ou complete a emergência com 500 toques.';
 
   @override
   String get sleepMonitorModeOnlyBody =>

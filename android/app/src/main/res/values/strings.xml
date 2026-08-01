@@ -10,19 +10,21 @@
     <string name="sleep_alarm_mission_notification_body">Scan the registered barcode or use the emergency action.</string>
     <string name="sleep_alarm_mission_body">Scan the registered barcode to dismiss this alarm.</string>
     <string name="sleep_alarm_open_mission">Open mission</string>
-    <string name="sleep_alarm_emergency">Emergency: tap %1$d/1000</string>
+    <string name="sleep_alarm_emergency">Emergency: tap %1$d/500</string>
     <string name="sleep_alarm_emergency_open">Complete emergency</string>
     <string name="sleep_alarm_emergency_title">Emergency challenge</string>
-    <string name="sleep_alarm_emergency_instruction">Tap the button 1000 times within 3 minutes to dismiss the alarm.</string>
-    <string name="sleep_alarm_emergency_count">%1$d/1000</string>
+    <string name="sleep_alarm_emergency_instruction">Tap the button 500 times within 3 minutes to dismiss the alarm.</string>
+    <string name="sleep_alarm_emergency_count">%1$d/500</string>
     <string name="sleep_alarm_emergency_tap_button">Tap to complete</string>
     <string name="sleep_alarm_emergency_time_left">%1$d s remaining</string>
     <string name="sleep_alarm_emergency_cancel_hint">If time runs out, the alarm will ring again.</string>
     <string name="sleep_alarm_mission_wrong_code">That code does not match. Try again.</string>
     <string name="sleep_alarm_mission_camera_denied">Camera access is needed to read the mission.</string>
+    <string name="sleep_alarm_mission_timeout">Time ran out. Try the mission again.</string>
     <string name="sleep_alarm_open_camera_settings">Open camera settings</string>
     <string name="barcode_scanner_instruction">Point the camera at a barcode</string>
     <string name="barcode_scanner_flashlight">Flashlight</string>
     <string name="barcode_scanner_flashlight_off">Turn off flashlight</string>
     <string name="barcode_scanner_cancel">Cancel</string>
+    <string name="barcode_scanner_time_left">%1$d s remaining</string>
 </resources>

@@ -29,6 +29,8 @@ class SleepAlarmRingingService : Service() {
         const val ACTION_DISMISS = "com.workoutnotes.workout_notes.sleep.ALARM_DISMISS"
         const val ACTION_PAUSE_FOR_EMERGENCY = "com.workoutnotes.workout_notes.sleep.ALARM_PAUSE_FOR_EMERGENCY"
         const val ACTION_RESUME_AFTER_EMERGENCY = "com.workoutnotes.workout_notes.sleep.ALARM_RESUME_AFTER_EMERGENCY"
+        const val ACTION_PAUSE_FOR_BARCODE = "com.workoutnotes.workout_notes.sleep.ALARM_PAUSE_FOR_BARCODE"
+        const val ACTION_RESUME_AFTER_BARCODE = "com.workoutnotes.workout_notes.sleep.ALARM_RESUME_AFTER_BARCODE"
         private const val ACTION_COMPLETE = "com.workoutnotes.workout_notes.sleep.ALARM_COMPLETE"
         private const val EXTRA_METHOD = "dismiss_method"
         const val CHANNEL_ID = "sleep_alarm"
@@ -68,6 +70,14 @@ class SleepAlarmRingingService : Service() {
             sendAction(context, ACTION_RESUME_AFTER_EMERGENCY)
         }
 
+        fun pauseForBarcode(context: Context) {
+            sendAction(context, ACTION_PAUSE_FOR_BARCODE)
+        }
+
+        fun resumeAfterBarcode(context: Context) {
+            sendAction(context, ACTION_RESUME_AFTER_BARCODE)
+        }
+
         private fun sendAction(context: Context, action: String) {
             val intent = Intent(context, SleepAlarmRingingService::class.java).apply {
                 this.action = action
@@ -83,7 +93,8 @@ class SleepAlarmRingingService : Service() {
             val snapshot = SleepAlarmScheduler.read(context) ?: return false
             if (snapshot.state != SleepAlarmScheduler.STATE_RINGING ||
                 !snapshot.requiresMission || snapshot.missionHash == null ||
-                snapshot.missionSalt == null
+                snapshot.missionSalt == null ||
+                !SleepAlarmScheduler.isBarcodeChallengeActive(context)
             ) return false
             val actual = BarcodeMissionCrypto.hash(format, rawValue, snapshot.missionSalt)
             if (!BarcodeMissionCrypto.constantTimeEquals(actual, snapshot.missionHash)) {
@@ -123,6 +134,7 @@ class SleepAlarmRingingService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
     private val handler = Handler(Looper.getMainLooper())
     private var emergencyResume: Runnable? = null
+    private var barcodeResume: Runnable? = null
     private var ringingPaused = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -168,6 +180,45 @@ class SleepAlarmRingingService : Service() {
             SleepMonitoringService.publishAlarmRinging(this)
             return START_STICKY
         }
+        if (action == ACTION_PAUSE_FOR_BARCODE) {
+            if (snapshot?.state != SleepAlarmScheduler.STATE_RINGING ||
+                snapshot.requiresMission != true ||
+                !SleepAlarmScheduler.isBarcodePauseActive(this)
+            ) return START_NOT_STICKY
+            ensureChannel()
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(alarmAt, protected = true),
+            )
+            val remaining = SleepAlarmScheduler.barcodeRemainingMillis(this)
+            acquireWakeLock()
+            if (remaining <= 0L) {
+                SleepAlarmScheduler.resetBarcodeChallenge(this)
+                resumeRinging()
+            } else {
+                pauseRinging()
+                scheduleBarcodeResume(remaining)
+            }
+            SleepMonitoringService.publishAlarmRinging(this)
+            return START_STICKY
+        }
+
+        if (action == ACTION_RESUME_AFTER_BARCODE) {
+            if (snapshot?.state != SleepAlarmScheduler.STATE_RINGING) {
+                return START_NOT_STICKY
+            }
+            SleepAlarmScheduler.resetBarcodeChallenge(this)
+            ensureChannel()
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(alarmAt, protected = snapshot.requiresMission),
+            )
+            acquireWakeLock()
+            resumeRinging()
+            SleepMonitoringService.publishAlarmRinging(this)
+            return START_STICKY
+        }
+
         if (action == ACTION_DISMISS) {
             if (snapshot?.state != SleepAlarmScheduler.STATE_RINGING) {
                 return START_NOT_STICKY
@@ -195,8 +246,16 @@ class SleepAlarmRingingService : Service() {
             acquireWakeLock()
             pauseRinging()
             scheduleEmergencyResume(emergencyRemaining)
+        } else if (
+            SleepAlarmScheduler.isBarcodePauseActive(this) &&
+            SleepAlarmScheduler.barcodeRemainingMillis(this) > 0L
+        ) {
+            acquireWakeLock()
+            pauseRinging()
+            scheduleBarcodeResume(SleepAlarmScheduler.barcodeRemainingMillis(this))
         } else if (ringingPaused) {
             SleepAlarmScheduler.resetEmergencyChallenge(this)
+            SleepAlarmScheduler.resetBarcodeChallenge(this)
             acquireWakeLock()
             resumeRinging()
         } else if (player == null) {
@@ -210,6 +269,7 @@ class SleepAlarmRingingService : Service() {
 
     override fun onDestroy() {
         emergencyResume?.let(handler::removeCallbacks)
+        barcodeResume?.let(handler::removeCallbacks)
         stopRinging()
         handler.removeCallbacksAndMessages(null)
         super.onDestroy()
@@ -219,7 +279,9 @@ class SleepAlarmRingingService : Service() {
 
     private fun finishAlarm(method: String) {
         emergencyResume?.let(handler::removeCallbacks)
+        barcodeResume?.let(handler::removeCallbacks)
         emergencyResume = null
+        barcodeResume = null
         SleepMonitoringService.alarmDismissed(this, method)
         SleepAlarmScheduler.complete(this)
         stopRinging()
@@ -362,7 +424,9 @@ class SleepAlarmRingingService : Service() {
         }
         startVibration()
         emergencyResume?.let(handler::removeCallbacks)
+        barcodeResume?.let(handler::removeCallbacks)
         emergencyResume = null
+        barcodeResume = null
     }
 
     private fun scheduleEmergencyResume(remainingMillis: Long) {
@@ -382,6 +446,23 @@ class SleepAlarmRingingService : Service() {
         handler.postDelayed(callback, remainingMillis.coerceAtLeast(1L))
     }
 
+    private fun scheduleBarcodeResume(remainingMillis: Long) {
+        barcodeResume?.let(handler::removeCallbacks)
+        val callback = Runnable {
+            if (SleepAlarmScheduler.isBarcodeChallengeActive(this)) {
+                scheduleBarcodeResume(SleepAlarmScheduler.barcodeRemainingMillis(this))
+                return@Runnable
+            }
+            if (SleepAlarmScheduler.read(this)?.state == SleepAlarmScheduler.STATE_RINGING) {
+                SleepAlarmScheduler.resetBarcodeChallenge(this)
+                resumeRinging()
+                SleepMonitoringService.publishAlarmRinging(this)
+            }
+        }
+        barcodeResume = callback
+        handler.postDelayed(callback, remainingMillis.coerceAtLeast(1L))
+    }
+
     private fun acquireWakeLock() {
         val manager = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = manager.newWakeLock(
@@ -393,7 +474,9 @@ class SleepAlarmRingingService : Service() {
     private fun stopRinging() {
         ringingPaused = false
         emergencyResume?.let(handler::removeCallbacks)
+        barcodeResume?.let(handler::removeCallbacks)
         emergencyResume = null
+        barcodeResume = null
         try { player?.stop() } catch (_: Throwable) {}
         player?.release()
         player = null
@@ -411,5 +494,5 @@ class SleepAlarmRingingService : Service() {
 private object SleepMonitorSessionDismiss {
     const val BUTTON = "button"
     const val BARCODE = "barcode"
-    const val EMERGENCY = "emergency_1000_taps"
+    const val EMERGENCY = "emergency_500_taps"
 }

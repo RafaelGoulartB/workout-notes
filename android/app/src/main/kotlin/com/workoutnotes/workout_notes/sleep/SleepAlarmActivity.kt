@@ -42,9 +42,13 @@ class SleepAlarmActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != BarcodeScannerActivity.RESULT_SUCCESS + 9000) return
         if (resultCode != BarcodeScannerActivity.RESULT_SUCCESS || data == null) {
+            SleepAlarmRingingService.resumeAfterBarcode(this)
             if (data?.getBooleanExtra(BarcodeScannerActivity.EXTRA_CAMERA_DENIED, false) == true) {
                 missionError = getString(R.string.sleep_alarm_mission_camera_denied)
                 showCameraSettings = true
+                render(intent)
+            } else if (data?.getBooleanExtra(BarcodeScannerActivity.EXTRA_TIMEOUT, false) == true) {
+                missionError = getString(R.string.sleep_alarm_mission_timeout)
                 render(intent)
             }
             return
@@ -56,6 +60,7 @@ class SleepAlarmActivity : Activity() {
         ) {
             finishAndRemoveTask()
         } else {
+            SleepAlarmRingingService.resumeAfterBarcode(this)
             missionError = getString(R.string.sleep_alarm_mission_wrong_code)
             render(intent)
         }
@@ -204,8 +209,12 @@ class SleepAlarmActivity : Activity() {
     }
 
     private fun openScanner() {
+        if (!SleepAlarmScheduler.beginBarcodeChallenge(this)) return
         missionError = null
         showCameraSettings = false
+        if (SleepAlarmScheduler.isBarcodePauseActive(this)) {
+            SleepAlarmRingingService.pauseForBarcode(this)
+        }
         startActivityForResult(
             Intent(this, BarcodeScannerActivity::class.java).apply {
                 putExtra(BarcodeScannerActivity.EXTRA_ENROLLMENT, false)

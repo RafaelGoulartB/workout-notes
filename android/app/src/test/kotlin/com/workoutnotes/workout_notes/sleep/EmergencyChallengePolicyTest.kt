@@ -7,11 +7,20 @@ import org.junit.Test
 
 class EmergencyChallengePolicyTest {
     @Test
-    fun capsTapsAtOneThousand() {
+    fun capsTapsAtFiveHundred() {
         assertEquals(1, EmergencyChallengePolicy.nextTaps(0))
-        assertEquals(1000, EmergencyChallengePolicy.nextTaps(999))
-        assertEquals(1000, EmergencyChallengePolicy.nextTaps(1000))
-        assertEquals(1000, EmergencyChallengePolicy.nextTaps(1200))
+        assertEquals(500, EmergencyChallengePolicy.nextTaps(499))
+        assertEquals(500, EmergencyChallengePolicy.nextTaps(500))
+        assertEquals(500, EmergencyChallengePolicy.nextTaps(1200))
+    }
+
+    @Test
+    fun pausesBarcodeOnlyForFirstFiveAttempts() {
+        assertTrue(EmergencyChallengePolicy.shouldPauseBarcodeAttempt(0))
+        assertTrue(EmergencyChallengePolicy.shouldPauseBarcodeAttempt(4))
+        assertFalse(EmergencyChallengePolicy.shouldPauseBarcodeAttempt(5))
+        assertEquals(5, EmergencyChallengePolicy.nextBarcodePauseAttempts(4))
+        assertEquals(5, EmergencyChallengePolicy.nextBarcodePauseAttempts(5))
     }
 
     @Test

@@ -137,6 +137,7 @@ void main() {
   test('counts current and legacy emergency dismissals only', () async {
     final start = DateTime.utc(2026, 8, 1, 22);
     final methods = <String>[
+      SleepMonitorSession.dismissEmergency500Taps,
       SleepMonitorSession.dismissEmergency1000Taps,
       SleepMonitorSession.dismissEmergency100Taps,
       SleepMonitorSession.dismissBarcode,
@@ -156,7 +157,7 @@ void main() {
       });
     }
 
-    expect(await repository.getEmergencyDismissalCount(), 2);
+    expect(await repository.getEmergencyDismissalCount(), 3);
   });
 
   test(

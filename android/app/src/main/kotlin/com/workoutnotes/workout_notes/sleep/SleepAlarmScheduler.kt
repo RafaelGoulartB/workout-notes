@@ -32,11 +32,16 @@ object SleepAlarmScheduler {
     private const val KEY_STATE = "state"
     private const val KEY_EMERGENCY_TAPS = "emergency_taps"
     private const val KEY_EMERGENCY_DEADLINE = "emergency_deadline_epoch_ms"
+    private const val KEY_BARCODE_DEADLINE = "barcode_deadline_epoch_ms"
+    private const val KEY_BARCODE_PAUSE_ATTEMPTS = "barcode_pause_attempts"
+    private const val KEY_BARCODE_PAUSE_ACTIVE = "barcode_pause_active"
     const val STATE_SCHEDULED = "scheduled"
     const val STATE_RINGING = "ringing"
     const val STATE_COMPLETED = "completed"
     const val MAX_EMERGENCY_TAPS = EmergencyChallengePolicy.MAX_TAPS
     const val EMERGENCY_CHALLENGE_DURATION_MILLIS = EmergencyChallengePolicy.DURATION_MILLIS
+    const val BARCODE_CHALLENGE_DURATION_MILLIS = 60_000L
+    const val MAX_BARCODE_PAUSE_ATTEMPTS = EmergencyChallengePolicy.MAX_BARCODE_PAUSE_ATTEMPTS
     private const val REQUEST_FIRE = 1201
     private const val REQUEST_SHOW = 1202
 
@@ -136,6 +141,9 @@ object SleepAlarmScheduler {
             .putString(KEY_STATE, STATE_SCHEDULED)
             .putInt(KEY_EMERGENCY_TAPS, 0)
             .remove(KEY_EMERGENCY_DEADLINE)
+            .remove(KEY_BARCODE_DEADLINE)
+            .remove(KEY_BARCODE_PAUSE_ATTEMPTS)
+            .remove(KEY_BARCODE_PAUSE_ACTIVE)
             .apply()
     }
 
@@ -156,6 +164,9 @@ object SleepAlarmScheduler {
             .putString(KEY_STATE, STATE_RINGING)
             .putInt(KEY_EMERGENCY_TAPS, 0)
             .remove(KEY_EMERGENCY_DEADLINE)
+            .remove(KEY_BARCODE_DEADLINE)
+            .remove(KEY_BARCODE_PAUSE_ATTEMPTS)
+            .remove(KEY_BARCODE_PAUSE_ACTIVE)
             .apply()
     }
 
@@ -167,6 +178,9 @@ object SleepAlarmScheduler {
             .putString(KEY_STATE, STATE_COMPLETED)
             .putInt(KEY_EMERGENCY_TAPS, 0)
             .remove(KEY_EMERGENCY_DEADLINE)
+            .remove(KEY_BARCODE_DEADLINE)
+            .remove(KEY_BARCODE_PAUSE_ATTEMPTS)
+            .remove(KEY_BARCODE_PAUSE_ACTIVE)
             .apply()
     }
 
@@ -208,6 +222,51 @@ object SleepAlarmScheduler {
         preferences(context).edit()
             .putInt(KEY_EMERGENCY_TAPS, 0)
             .remove(KEY_EMERGENCY_DEADLINE)
+            .apply()
+    }
+
+    fun beginBarcodeChallenge(context: Context): Boolean {
+        val snapshot = read(context) ?: return false
+        if (snapshot.state != STATE_RINGING || !snapshot.requiresMission) return false
+
+        val now = System.currentTimeMillis()
+        val deadline = barcodeDeadline(context)
+        if (deadline > now) return true
+
+        val previousAttempts = barcodePauseAttempts(context)
+        preferences(context).edit()
+            .putInt(
+                KEY_BARCODE_PAUSE_ATTEMPTS,
+                EmergencyChallengePolicy.nextBarcodePauseAttempts(previousAttempts),
+            )
+            .putBoolean(
+                KEY_BARCODE_PAUSE_ACTIVE,
+                EmergencyChallengePolicy.shouldPauseBarcodeAttempt(previousAttempts),
+            )
+            .putLong(KEY_BARCODE_DEADLINE, now + BARCODE_CHALLENGE_DURATION_MILLIS)
+            .apply()
+        return true
+    }
+
+    fun barcodeDeadline(context: Context): Long =
+        preferences(context).getLong(KEY_BARCODE_DEADLINE, 0L)
+
+    fun barcodePauseAttempts(context: Context): Int =
+        preferences(context).getInt(KEY_BARCODE_PAUSE_ATTEMPTS, 0)
+
+    fun isBarcodePauseActive(context: Context): Boolean =
+        preferences(context).getBoolean(KEY_BARCODE_PAUSE_ACTIVE, false)
+
+    fun barcodeRemainingMillis(context: Context): Long =
+        (barcodeDeadline(context) - System.currentTimeMillis()).coerceAtLeast(0L)
+
+    fun isBarcodeChallengeActive(context: Context): Boolean =
+        barcodeDeadline(context) > System.currentTimeMillis()
+
+    fun resetBarcodeChallenge(context: Context) {
+        preferences(context).edit()
+            .remove(KEY_BARCODE_DEADLINE)
+            .remove(KEY_BARCODE_PAUSE_ACTIVE)
             .apply()
     }
 
