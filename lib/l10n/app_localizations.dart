@@ -122,24 +122,6 @@ abstract class AppLocalizations {
   /// **'Sleep'**
   String get sleepTitle;
 
-  /// No description provided for @sleepAdd.
-  ///
-  /// In en, this message translates to:
-  /// **'Log sleep'**
-  String get sleepAdd;
-
-  /// No description provided for @sleepAddTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Log sleep'**
-  String get sleepAddTitle;
-
-  /// No description provided for @sleepEditTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Edit sleep record'**
-  String get sleepEditTitle;
-
   /// No description provided for @sleepEmptyTitle.
   ///
   /// In en, this message translates to:
@@ -149,14 +131,8 @@ abstract class AppLocalizations {
   /// No description provided for @sleepEmptySubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Log your nights to track duration, actual sleep, and consistency.'**
+  /// **'Monitor your nights to track duration, actual sleep, and consistency.'**
   String get sleepEmptySubtitle;
-
-  /// No description provided for @sleepDate.
-  ///
-  /// In en, this message translates to:
-  /// **'Wake-up date'**
-  String get sleepDate;
 
   /// No description provided for @sleepDuration.
   ///
@@ -170,12 +146,6 @@ abstract class AppLocalizations {
   /// **'Actual sleep'**
   String get sleepActualDuration;
 
-  /// No description provided for @sleepActualDurationHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Time actually asleep'**
-  String get sleepActualDurationHint;
-
   /// No description provided for @sleepBedtime.
   ///
   /// In en, this message translates to:
@@ -188,36 +158,6 @@ abstract class AppLocalizations {
   /// **'Wake-up time'**
   String get sleepWakeTime;
 
-  /// No description provided for @sleepComment.
-  ///
-  /// In en, this message translates to:
-  /// **'Note (optional)'**
-  String get sleepComment;
-
-  /// No description provided for @sleepHours.
-  ///
-  /// In en, this message translates to:
-  /// **'hours'**
-  String get sleepHours;
-
-  /// No description provided for @sleepMinutes.
-  ///
-  /// In en, this message translates to:
-  /// **'minutes'**
-  String get sleepMinutes;
-
-  /// No description provided for @sleepSave.
-  ///
-  /// In en, this message translates to:
-  /// **'Save record'**
-  String get sleepSave;
-
-  /// No description provided for @sleepSaved.
-  ///
-  /// In en, this message translates to:
-  /// **'Sleep record saved!'**
-  String get sleepSaved;
-
   /// No description provided for @sleepDeleted.
   ///
   /// In en, this message translates to:
@@ -229,24 +169,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete this sleep record?'**
   String get sleepDeleteConfirm;
-
-  /// No description provided for @sleepInvalidDuration.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter a duration between 1 minute and 24 hours.'**
-  String get sleepInvalidDuration;
-
-  /// No description provided for @sleepInvalidActual.
-  ///
-  /// In en, this message translates to:
-  /// **'Actual sleep must be greater than zero and cannot exceed the main duration.'**
-  String get sleepInvalidActual;
-
-  /// No description provided for @sleepInvalidTime.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter a valid time.'**
-  String get sleepInvalidTime;
 
   /// No description provided for @sleepSummary.
   ///
@@ -379,18 +301,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete record'**
   String get sleepDelete;
-
-  /// No description provided for @sleepEdit.
-  ///
-  /// In en, this message translates to:
-  /// **'Edit record'**
-  String get sleepEdit;
-
-  /// No description provided for @sleepNotInformed.
-  ///
-  /// In en, this message translates to:
-  /// **'Not informed'**
-  String get sleepNotInformed;
 
   /// No description provided for @sleepDurationValue.
   ///
@@ -863,7 +773,7 @@ abstract class AppLocalizations {
   /// No description provided for @sleepMonitorExportWithPersonalBody.
   ///
   /// In en, this message translates to:
-  /// **'Also includes exact date and time, local IDs, manual durations and your personal sleep comment.'**
+  /// **'Also includes exact date and time, local IDs, recorded durations and your personal sleep comment.'**
   String get sleepMonitorExportWithPersonalBody;
 
   /// No description provided for @sleepMonitorExportConfirm.
@@ -889,12 +799,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Time in bed'**
   String get sleepMonitorTimeInBed;
-
-  /// No description provided for @sleepMonitorEditManual.
-  ///
-  /// In en, this message translates to:
-  /// **'Edit manual record'**
-  String get sleepMonitorEditManual;
 
   /// No description provided for @sleepMonitorDeleteSession.
   ///

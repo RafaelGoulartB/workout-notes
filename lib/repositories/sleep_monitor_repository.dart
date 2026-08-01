@@ -143,7 +143,7 @@ class SleepMonitorRepository extends BaseRepository {
           await txn.insert('sleep_entries', entry.toMap());
         } else {
           entry = entry.copyWith(
-            source: entry.source == 'manual' ? 'hybrid' : entry.source,
+            source: 'monitored',
             timeInBedMinutes: recovered.timeInBedMinutes,
             estimatedSleepMinutes: recovered.estimatedSleepMinutes,
           );

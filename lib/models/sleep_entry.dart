@@ -23,7 +23,7 @@ class SleepEntry {
     this.bedtimeMinutes,
     this.wakeTimeMinutes,
     this.comment,
-    this.source = 'manual',
+    this.source = 'monitored',
     this.timeInBedMinutes,
     this.estimatedSleepMinutes,
     required this.createdAt,

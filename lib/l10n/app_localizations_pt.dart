@@ -21,23 +21,11 @@ class AppLocalizationsPt extends AppLocalizations {
   String get sleepTitle => 'Sono';
 
   @override
-  String get sleepAdd => 'Registrar sono';
-
-  @override
-  String get sleepAddTitle => 'Registrar sono';
-
-  @override
-  String get sleepEditTitle => 'Editar registro de sono';
-
-  @override
   String get sleepEmptyTitle => 'Nenhum sono registrado';
 
   @override
   String get sleepEmptySubtitle =>
-      'Registre suas noites para acompanhar duração, sono real e consistência.';
-
-  @override
-  String get sleepDate => 'Data do despertar';
+      'Monitore suas noites para acompanhar duração, sono real e consistência.';
 
   @override
   String get sleepDuration => 'Horas de sono';
@@ -46,45 +34,16 @@ class AppLocalizationsPt extends AppLocalizations {
   String get sleepActualDuration => 'Sono real';
 
   @override
-  String get sleepActualDurationHint => 'Tempo realmente dormido';
-
-  @override
   String get sleepBedtime => 'Hora de dormir';
 
   @override
   String get sleepWakeTime => 'Hora de acordar';
 
   @override
-  String get sleepComment => 'Observação (opcional)';
-
-  @override
-  String get sleepHours => 'horas';
-
-  @override
-  String get sleepMinutes => 'minutos';
-
-  @override
-  String get sleepSave => 'Salvar registro';
-
-  @override
-  String get sleepSaved => 'Registro de sono salvo!';
-
-  @override
   String get sleepDeleted => 'Registro de sono excluído';
 
   @override
   String get sleepDeleteConfirm => 'Excluir este registro de sono?';
-
-  @override
-  String get sleepInvalidDuration =>
-      'Informe uma duração entre 1 minuto e 24 horas.';
-
-  @override
-  String get sleepInvalidActual =>
-      'O sono real deve ser maior que zero e não pode superar a duração principal.';
-
-  @override
-  String get sleepInvalidTime => 'Informe uma hora válida.';
 
   @override
   String get sleepSummary => 'Resumo';
@@ -160,12 +119,6 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get sleepDelete => 'Excluir registro';
-
-  @override
-  String get sleepEdit => 'Editar registro';
-
-  @override
-  String get sleepNotInformed => 'Não informado';
 
   @override
   String sleepDurationValue(Object hours, Object minutes) {
@@ -440,7 +393,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get sleepMonitorExportWithPersonalBody =>
-      'Também inclui data e horários exatos, identificadores locais, durações manuais e seu comentário pessoal sobre o sono.';
+      'Também inclui data e horários exatos, identificadores locais, durações registradas e seu comentário pessoal sobre o sono.';
 
   @override
   String get sleepMonitorExportConfirm => 'Gerar e compartilhar';
@@ -455,9 +408,6 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get sleepMonitorTimeInBed => 'Tempo na cama';
-
-  @override
-  String get sleepMonitorEditManual => 'Corrigir registro manual';
 
   @override
   String get sleepMonitorDeleteSession => 'Apagar sessão';

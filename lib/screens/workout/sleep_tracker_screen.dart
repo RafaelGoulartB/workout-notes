@@ -13,7 +13,6 @@ import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 
-import 'sleep_entry_sheet.dart';
 import 'sleep_monitor_result_screen.dart';
 import 'sleep_monitor_screen.dart';
 import 'sleep_settings_screen.dart';
@@ -125,13 +124,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                   ? _buildEmptyState(loc)
                   : _buildContent(theme, loc),
             ),
-      floatingActionButton: _isLoading
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: _openAdd,
-              icon: const Icon(Icons.add),
-              label: Text(loc.sleepAdd),
-            ),
     );
   }
 
@@ -150,8 +142,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
               icon: Icons.nightlight_round,
               title: loc.sleepEmptyTitle,
               subtitle: loc.sleepEmptySubtitle,
-              actionLabel: loc.sleepAdd,
-              onAction: _openAdd,
             ),
           ),
         ],
@@ -526,10 +516,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     );
   }
 
-  Future<void> _openAdd() async {
-    await showSleepEntrySheet(context, repository: _repository, onSaved: _load);
-  }
-
   Future<void> _openMonitor() async {
     await Navigator.push(
       context,
@@ -648,20 +634,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: Colors.red,
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      FilledButton.icon(
-                        onPressed: () async {
-                          Navigator.pop(sheetContext);
-                          await showSleepEntrySheet(
-                            context,
-                            repository: _repository,
-                            existing: entry,
-                            onSaved: _load,
-                          );
-                        },
-                        icon: const Icon(Icons.edit_outlined),
-                        label: Text(loc.sleepEdit),
                       ),
                     ],
                   ),

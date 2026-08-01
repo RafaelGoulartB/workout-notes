@@ -15,8 +15,6 @@ import 'package:workout_notes/services/sleep_diagnostic_export_service.dart';
 import 'package:workout_notes/services/sleep_inference_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 
-import 'sleep_entry_sheet.dart';
-
 class SleepMonitorResultScreen extends StatefulWidget {
   final String sessionId;
 
@@ -207,27 +205,8 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
                 : const Icon(Icons.ios_share_outlined),
             label: Text(loc.sleepMonitorExportDiagnostic),
           ),
-          if (_entry != null) ...[
-            const SizedBox(height: 14),
-            OutlinedButton.icon(
-              onPressed: _editManualEntry,
-              icon: const Icon(Icons.edit_outlined),
-              label: Text(loc.sleepMonitorEditManual),
-            ),
-          ],
         ],
       ),
-    );
-  }
-
-  Future<void> _editManualEntry() async {
-    final entry = _entry;
-    if (entry == null) return;
-    await showSleepEntrySheet(
-      context,
-      repository: _sleepRepository,
-      existing: entry,
-      onSaved: _load,
     );
   }
 

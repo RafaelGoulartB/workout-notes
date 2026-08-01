@@ -32,7 +32,7 @@ void main() {
               bedtime_minutes INTEGER,
               wake_time_minutes INTEGER,
               comment TEXT,
-              source TEXT NOT NULL DEFAULT 'manual',
+              source TEXT NOT NULL DEFAULT 'monitored',
               time_in_bed_minutes INTEGER,
               estimated_sleep_minutes INTEGER,
               created_at TEXT NOT NULL
@@ -150,62 +150,6 @@ void main() {
       );
     },
   );
-
-  test(
-    'merges with manual entry preserving its id, comment and actual sleep',
-    () async {
-      final sleepRepository = SleepRepository();
-      await sleepRepository.add(
-        date: DateTime(2026, 7, 27),
-        sleepMinutes: 480,
-        actualSleepMinutes: 420,
-        comment: 'Manual note',
-      );
-      final manual = await sleepRepository.getByDate(DateTime(2026, 7, 27));
-      final spool = _spool(
-        DateTime.utc(2026, 7, 27, 22),
-        status: SleepMonitorSession.completed,
-        durationMinutes: 60,
-      );
-      await repository.importNativeSpool(spool);
-
-      final merged = await sleepRepository.getByDate(DateTime(2026, 7, 27));
-      expect(merged!.id, manual!.id);
-      expect(merged.source, 'hybrid');
-      expect(merged.sleepMinutes, 480);
-      expect(merged.actualSleepMinutes, 420);
-      expect(merged.comment, 'Manual note');
-      expect(merged.timeInBedMinutes, 60);
-    },
-  );
-
-  test('manual edit after monitoring preserves the linked session', () async {
-    final sleepRepository = SleepRepository();
-    final imported = await repository.importNativeSpool(
-      _spool(
-        DateTime.utc(2026, 7, 30, 22),
-        status: SleepMonitorSession.completed,
-      ),
-    );
-    final monitoredEntry = await sleepRepository.getByDate(
-      DateTime(2026, 7, 30),
-    );
-
-    await sleepRepository.add(
-      date: DateTime(2026, 7, 30),
-      sleepMinutes: 450,
-      actualSleepMinutes: 420,
-      comment: 'Ajuste manual',
-    );
-
-    final merged = await sleepRepository.getByDate(DateTime(2026, 7, 30));
-    final durableSession = await repository.getSession(imported.id);
-    expect(merged!.id, monitoredEntry!.id);
-    expect(merged.source, 'hybrid');
-    expect(merged.timeInBedMinutes, 2);
-    expect(durableSession, isNotNull);
-    expect(durableSession!.sleepEntryId, merged.id);
-  });
 
   test('recovers unfinished spool using the last segment as end', () async {
     final start = DateTime.utc(2026, 7, 28, 22);

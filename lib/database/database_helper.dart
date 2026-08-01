@@ -2303,7 +2303,6 @@ class DatabaseHelper {
   Future<SleepEntry?> getLatestSleepEntry() => sleepRepo.getLatest();
   Future<SleepEntry?> getSleepEntryByDate(DateTime date) =>
       sleepRepo.getByDate(date);
-  Future<void> saveSleepEntry(SleepEntry entry) => sleepRepo.save(entry);
   Future<void> deleteSleepEntry(String id) => sleepRepo.delete(id);
   Future<SleepEntry?> getSleepEntryById(String id) => sleepRepo.getById(id);
   Future<SleepDashboardStats> getSleepDashboardStats({

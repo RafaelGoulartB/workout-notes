@@ -81,7 +81,7 @@ void main() {
       bedtimeMinutes: 22 * 60,
       wakeTimeMinutes: 2 * 60,
       comment: 'Personal sleep note',
-      source: 'hybrid',
+      source: 'monitored',
       timeInBedMinutes: 240,
       createdAt: start,
     );
