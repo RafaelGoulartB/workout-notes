@@ -122,6 +122,8 @@ class SleepDashboardStats {
   final int recordedDays30Days;
   final double? efficiency7Days;
   final double? efficiency30Days;
+  final double? regularity7Days;
+  final int regularitySampleCount;
 
   const SleepDashboardStats({
     required this.latest,
@@ -135,6 +137,8 @@ class SleepDashboardStats {
     required this.recordedDays30Days,
     required this.efficiency7Days,
     required this.efficiency30Days,
+    required this.regularity7Days,
+    required this.regularitySampleCount,
   });
 }
 

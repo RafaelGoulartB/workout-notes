@@ -308,6 +308,114 @@ abstract class AppLocalizations {
   /// **'{hours}h {minutes}min'**
   String sleepDurationValue(Object hours, Object minutes);
 
+  /// No description provided for @sleepMonitorOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open monitoring'**
+  String get sleepMonitorOpen;
+
+  /// No description provided for @sleepMonitorElapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Active for {duration}'**
+  String sleepMonitorElapsed(String duration);
+
+  /// No description provided for @sleepWeeklySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly summary'**
+  String get sleepWeeklySummary;
+
+  /// No description provided for @sleepAverageSleep.
+  ///
+  /// In en, this message translates to:
+  /// **'Average sleep'**
+  String get sleepAverageSleep;
+
+  /// No description provided for @sleepRegularity.
+  ///
+  /// In en, this message translates to:
+  /// **'Regularity'**
+  String get sleepRegularity;
+
+  /// No description provided for @sleepRegularityInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'An app consistency score based on bedtime and wake-up variation. It is not a clinical measurement.'**
+  String get sleepRegularityInfo;
+
+  /// No description provided for @sleepNightsRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} of {total} nights recorded'**
+  String sleepNightsRecorded(Object count, Object total);
+
+  /// No description provided for @sleepScheduleChart.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep schedule'**
+  String get sleepScheduleChart;
+
+  /// No description provided for @sleepScheduleChartSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bedtime to wake-up time over the last 7 days'**
+  String get sleepScheduleChartSubtitle;
+
+  /// No description provided for @sleepScheduleNoTimes.
+  ///
+  /// In en, this message translates to:
+  /// **'Add bedtime and wake-up times to see your weekly schedule.'**
+  String get sleepScheduleNoTimes;
+
+  /// No description provided for @sleepScheduleSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly sleep schedule with {count} nights'**
+  String sleepScheduleSemantics(Object count);
+
+  /// No description provided for @sleepDurationChart.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep duration'**
+  String get sleepDurationChart;
+
+  /// No description provided for @sleepDurationChartSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recorded and actual or estimated sleep by night'**
+  String get sleepDurationChartSubtitle;
+
+  /// No description provided for @sleepChartActualOrEstimated.
+  ///
+  /// In en, this message translates to:
+  /// **'Actual / estimated'**
+  String get sleepChartActualOrEstimated;
+
+  /// No description provided for @sleepDurationChartSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly chart comparing recorded and actual or estimated sleep duration'**
+  String get sleepDurationChartSemantics;
+
+  /// No description provided for @sleepPreviousWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous week'**
+  String get sleepPreviousWeek;
+
+  /// No description provided for @sleepNextWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Next week'**
+  String get sleepNextWeek;
+
+  /// No description provided for @sleepNoRecordForDay.
+  ///
+  /// In en, this message translates to:
+  /// **'No sleep record for this day'**
+  String get sleepNoRecordForDay;
+
   /// No description provided for @sleepMonitorCta.
   ///
   /// In en, this message translates to:

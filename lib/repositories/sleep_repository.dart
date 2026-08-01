@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../models/sleep_entry.dart';
 import 'base_repository.dart';
 
@@ -52,6 +54,12 @@ class SleepRepository extends BaseRepository {
       from: end.subtract(const Duration(days: 29)),
       to: end,
     );
+    final regularityEntries = entries7
+        .where(
+          (entry) =>
+              entry.bedtimeMinutes != null && entry.wakeTimeMinutes != null,
+        )
+        .toList();
 
     return SleepDashboardStats(
       latest: await getLatest(),
@@ -77,6 +85,8 @@ class SleepRepository extends BaseRepository {
       efficiency30Days: _average(
         entries30.where((e) => e.efficiency != null).map((e) => e.efficiency!),
       ),
+      regularity7Days: _regularityScore(regularityEntries),
+      regularitySampleCount: regularityEntries.length,
     );
   }
 
@@ -121,6 +131,45 @@ class SleepRepository extends BaseRepository {
     final list = values.toList();
     if (list.isEmpty) return null;
     return list.reduce((a, b) => a > b ? a : b);
+  }
+
+  /// Returns a non-clinical schedule consistency score for the last seven days.
+  ///
+  /// Bedtime and wake-up values are circular clock values, so 23:50 and 00:10
+  /// remain close. The average deviation of both clock times is mapped to a
+  /// 0-100 score, with deviations of three hours or more scoring zero.
+  static double? _regularityScore(List<SleepEntry> entries) {
+    if (entries.length < 2) return null;
+    final bedtimes = entries.map((entry) => entry.bedtimeMinutes!).toList();
+    final wakeTimes = entries.map((entry) => entry.wakeTimeMinutes!).toList();
+    final bedtimeCenter = _circularCenter(bedtimes);
+    final wakeTimeCenter = _circularCenter(wakeTimes);
+    final bedtimeDeviation = _average(
+      bedtimes.map((value) => _circularDistance(value, bedtimeCenter)),
+    )!;
+    final wakeTimeDeviation = _average(
+      wakeTimes.map((value) => _circularDistance(value, wakeTimeCenter)),
+    )!;
+    final combinedDeviation = (bedtimeDeviation + wakeTimeDeviation) / 2;
+    return (100 * (1 - math.min(combinedDeviation, 180) / 180)).clamp(0, 100);
+  }
+
+  static int _circularCenter(List<int> values) {
+    var sinSum = 0.0;
+    var cosSum = 0.0;
+    for (final value in values) {
+      final angle = value / 1440 * 2 * math.pi;
+      sinSum += math.sin(angle);
+      cosSum += math.cos(angle);
+    }
+    var angle = math.atan2(sinSum, cosSum);
+    if (angle < 0) angle += 2 * math.pi;
+    return (angle / (2 * math.pi) * 1440).round() % 1440;
+  }
+
+  static int _circularDistance(int first, int second) {
+    final direct = (first - second).abs();
+    return math.min(direct, 1440 - direct);
   }
 
   static DateTime _dateOnly(DateTime value) =>

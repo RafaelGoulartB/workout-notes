@@ -126,6 +126,71 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String get sleepMonitorOpen => 'Abrir monitoramento';
+
+  @override
+  String sleepMonitorElapsed(String duration) {
+    return 'Ativo há $duration';
+  }
+
+  @override
+  String get sleepWeeklySummary => 'Resumo semanal';
+
+  @override
+  String get sleepAverageSleep => 'Sono médio';
+
+  @override
+  String get sleepRegularity => 'Regularidade';
+
+  @override
+  String get sleepRegularityInfo =>
+      'Índice de consistência do app baseado na variação dos horários de dormir e acordar. Não é uma medição clínica.';
+
+  @override
+  String sleepNightsRecorded(Object count, Object total) {
+    return '$count de $total noites registradas';
+  }
+
+  @override
+  String get sleepScheduleChart => 'Horários da semana';
+
+  @override
+  String get sleepScheduleChartSubtitle =>
+      'Do horário de dormir ao despertar nos últimos 7 dias';
+
+  @override
+  String get sleepScheduleNoTimes =>
+      'Adicione os horários de dormir e acordar para ver sua rotina semanal.';
+
+  @override
+  String sleepScheduleSemantics(Object count) {
+    return 'Gráfico semanal de horários com $count noites';
+  }
+
+  @override
+  String get sleepDurationChart => 'Duração por noite';
+
+  @override
+  String get sleepDurationChartSubtitle =>
+      'Duração registrada e sono real ou estimado';
+
+  @override
+  String get sleepChartActualOrEstimated => 'Real / estimado';
+
+  @override
+  String get sleepDurationChartSemantics =>
+      'Gráfico semanal comparando a duração registrada ao sono real ou estimado';
+
+  @override
+  String get sleepPreviousWeek => 'Semana anterior';
+
+  @override
+  String get sleepNextWeek => 'Próxima semana';
+
+  @override
+  String get sleepNoRecordForDay => 'Nenhum registro de sono neste dia';
+
+  @override
   String get sleepMonitorCta => 'Monitorar sono';
 
   @override

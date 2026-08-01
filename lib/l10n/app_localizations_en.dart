@@ -125,6 +125,71 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get sleepMonitorOpen => 'Open monitoring';
+
+  @override
+  String sleepMonitorElapsed(String duration) {
+    return 'Active for $duration';
+  }
+
+  @override
+  String get sleepWeeklySummary => 'Weekly summary';
+
+  @override
+  String get sleepAverageSleep => 'Average sleep';
+
+  @override
+  String get sleepRegularity => 'Regularity';
+
+  @override
+  String get sleepRegularityInfo =>
+      'An app consistency score based on bedtime and wake-up variation. It is not a clinical measurement.';
+
+  @override
+  String sleepNightsRecorded(Object count, Object total) {
+    return '$count of $total nights recorded';
+  }
+
+  @override
+  String get sleepScheduleChart => 'Sleep schedule';
+
+  @override
+  String get sleepScheduleChartSubtitle =>
+      'Bedtime to wake-up time over the last 7 days';
+
+  @override
+  String get sleepScheduleNoTimes =>
+      'Add bedtime and wake-up times to see your weekly schedule.';
+
+  @override
+  String sleepScheduleSemantics(Object count) {
+    return 'Weekly sleep schedule with $count nights';
+  }
+
+  @override
+  String get sleepDurationChart => 'Sleep duration';
+
+  @override
+  String get sleepDurationChartSubtitle =>
+      'Recorded and actual or estimated sleep by night';
+
+  @override
+  String get sleepChartActualOrEstimated => 'Actual / estimated';
+
+  @override
+  String get sleepDurationChartSemantics =>
+      'Weekly chart comparing recorded and actual or estimated sleep duration';
+
+  @override
+  String get sleepPreviousWeek => 'Previous week';
+
+  @override
+  String get sleepNextWeek => 'Next week';
+
+  @override
+  String get sleepNoRecordForDay => 'No sleep record for this day';
+
+  @override
   String get sleepMonitorCta => 'Monitor sleep';
 
   @override

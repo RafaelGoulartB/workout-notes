@@ -104,6 +104,80 @@ void main() {
       expect(stats.maximum30Days, 480);
       expect(stats.efficiency7Days, closeTo(87.5, 0.001));
       expect(stats.efficiency30Days, closeTo((87.5 + 83.333333) / 2, 0.001));
+      expect(stats.regularity7Days, isNull);
+      expect(stats.regularitySampleCount, 0);
+    },
+  );
+  test('regularity treats bedtime values around midnight as close', () async {
+    final reference = DateTime(2026, 7, 26);
+    await _insertEntry(
+      database,
+      date: DateTime(2026, 7, 26),
+      sleepMinutes: 450,
+      bedtimeMinutes: 10,
+      wakeTimeMinutes: 450,
+    );
+    await _insertEntry(
+      database,
+      date: DateTime(2026, 7, 25),
+      sleepMinutes: 450,
+      bedtimeMinutes: 1430,
+      wakeTimeMinutes: 430,
+    );
+
+    final stats = await repository.getDashboardStats(referenceDate: reference);
+
+    expect(stats.regularitySampleCount, 2);
+    expect(stats.regularity7Days, closeTo(94.44, 0.2));
+  });
+
+  test('regularity ignores incomplete times and requires two nights', () async {
+    final reference = DateTime(2026, 7, 26);
+    await _insertEntry(
+      database,
+      date: DateTime(2026, 7, 26),
+      sleepMinutes: 450,
+      bedtimeMinutes: 1380,
+      wakeTimeMinutes: 420,
+    );
+    await _insertEntry(
+      database,
+      date: DateTime(2026, 7, 25),
+      sleepMinutes: 430,
+      bedtimeMinutes: 1370,
+    );
+
+    final stats = await repository.getDashboardStats(referenceDate: reference);
+
+    expect(stats.regularitySampleCount, 1);
+    expect(stats.regularity7Days, isNull);
+  });
+
+  test(
+    'regularity bottoms out after three hours of average variation',
+    () async {
+      final reference = DateTime(2026, 7, 26);
+      await _insertEntry(
+        database,
+        date: DateTime(2026, 7, 26),
+        sleepMinutes: 480,
+        bedtimeMinutes: 0,
+        wakeTimeMinutes: 660,
+      );
+      await _insertEntry(
+        database,
+        date: DateTime(2026, 7, 25),
+        sleepMinutes: 480,
+        bedtimeMinutes: 1080,
+        wakeTimeMinutes: 300,
+      );
+
+      final stats = await repository.getDashboardStats(
+        referenceDate: reference,
+      );
+
+      expect(stats.regularitySampleCount, 2);
+      expect(stats.regularity7Days, 0);
     },
   );
 }
@@ -113,6 +187,8 @@ Future<void> _insertEntry(
   required DateTime date,
   required int sleepMinutes,
   int? actualSleepMinutes,
+  int? bedtimeMinutes,
+  int? wakeTimeMinutes,
 }) async {
   final dateString = date.toIso8601String().substring(0, 10);
   await database.insert('sleep_entries', {
@@ -120,6 +196,8 @@ Future<void> _insertEntry(
     'date': dateString,
     'sleep_minutes': sleepMinutes,
     'actual_sleep_minutes': actualSleepMinutes,
+    'bedtime_minutes': bedtimeMinutes,
+    'wake_time_minutes': wakeTimeMinutes,
     'source': 'monitored',
     'created_at': date.add(const Duration(hours: 7)).toIso8601String(),
   });
