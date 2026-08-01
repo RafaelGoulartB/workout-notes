@@ -23,11 +23,19 @@ class SleepMonitorScreen extends StatefulWidget {
 
 class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     with WidgetsBindingObserver {
+  static const _modeOrder = <SleepMonitoringMode>[
+    SleepMonitoringMode.alarmWithoutMission,
+    SleepMonitoringMode.alarmWithMission,
+    SleepMonitoringMode.monitoringOnly,
+  ];
+
   final _service = SleepMonitorService.instance;
   final _missions = SleepMissionService();
+  late final PageController _modeController;
   Timer? _ticker;
   TimeOfDay _selectedTime = const TimeOfDay(hour: 7, minute: 0);
   SleepMonitoringMode _selectedMode = SleepMonitoringMode.alarmWithoutMission;
+  int _modePage = 0;
   bool _isBusy = false;
   bool _loading = true;
   bool _openingResult = false;
@@ -37,6 +45,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   @override
   void initState() {
     super.initState();
+    _modeController = PageController();
     WidgetsBinding.instance.addObserver(this);
     _service.addListener(_onChanged);
     _initialize();
@@ -49,6 +58,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _service.removeListener(_onChanged);
+    _modeController.dispose();
     _ticker?.cancel();
     super.dispose();
   }
@@ -69,7 +79,15 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         !_missions.config.isReady) {
       setState(() {
         _selectedMode = SleepMonitoringMode.alarmWithoutMission;
+        _modePage = _modeOrder.indexOf(_selectedMode);
       });
+      if (_modeController.hasClients) {
+        _modeController.animateToPage(
+          _modePage,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+        );
+      }
       await _missions.setLastMode(_selectedMode);
       return;
     }
@@ -94,7 +112,13 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
               !_missions.config.isReady
           ? SleepMonitoringMode.alarmWithoutMission
           : remembered;
+      _modePage = _modeOrder.indexOf(_selectedMode);
       _loading = false;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _modeController.hasClients) {
+        _modeController.jumpToPage(_modePage);
+      }
     });
   }
 
@@ -139,7 +163,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     final state = _service.state;
     if (!state.supported) {
       return Scaffold(
-        appBar: AppBar(title: Text(loc.sleepMonitorTitle)),
+        appBar: AppBar(),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -160,7 +184,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         : null;
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(title: Text(loc.sleepMonitorTitle)),
+      appBar: AppBar(),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _NightBackground(
@@ -196,7 +220,9 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
                               (_selectedMode.hasAlarm &&
                                   !SleepAlarmTime.isWithinMonitoringWindow(
                                     alarmAt!,
-                                  ))
+                                  )) ||
+                              (_selectedMode.requiresMission &&
+                                  !_missions.config.isReady)
                           ? null
                           : () => _start(alarmAt),
                       icon: _busyIcon(Icons.bedtime_rounded),
@@ -217,39 +243,17 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
       _NightHero(
         icon: Icons.nightlight_round,
         title: loc.sleepMonitorReady,
-        subtitle: loc.sleepAlarmSectionTitle,
+        subtitle: _selectedMode.hasAlarm
+            ? loc.sleepAlarmSectionTitle
+            : loc.sleepMonitorModeOnly,
       ),
       const SizedBox(height: 16),
-      _buildModeSelector(loc),
-      if (alarmAt != null) ...[
-        const SizedBox(height: 16),
-        _AlarmClockCard(
-          time: _formatTime(alarmAt),
-          date: _formatDate(alarmAt),
-          remaining: loc.sleepAlarmIn(_formatRemaining(alarmAt)),
-          helper: loc.sleepAlarmTapToChange,
-          onTap: _chooseAlarmTime,
-        ),
-      ],
+      _buildModeCarousel(loc),
       if (!valid) ...[
         const SizedBox(height: 10),
         _WarningBanner(
           icon: Icons.schedule_rounded,
           text: loc.sleepAlarmInvalidWindow,
-        ),
-      ],
-      if (_selectedMode.hasAlarm) ...[
-        const SizedBox(height: 14),
-        _InfoCard(
-          icon: Icons.notifications_active_outlined,
-          title: loc.sleepAlarmSystemSound,
-          body: loc.sleepAlarmSystemSoundBody,
-        ),
-        const SizedBox(height: 10),
-        _InfoCard(
-          icon: Icons.battery_charging_full_rounded,
-          title: loc.sleepAlarmPreparation,
-          body: loc.sleepAlarmPreparationBody,
         ),
       ],
       if (_selectedMode.hasAlarm && !state.exactAlarmGranted) ...[
@@ -270,28 +274,6 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
           onPressed: _service.requestFullScreenPermission,
         ),
       ],
-      const SizedBox(height: 14),
-      Card(
-        color: Theme.of(context).colorScheme.secondaryContainer.withAlpha(190),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.privacy_tip_outlined),
-              const SizedBox(width: 10),
-              Expanded(child: Text(loc.sleepMonitorLocalProcessing)),
-            ],
-          ),
-        ),
-      ),
-      const SizedBox(height: 8),
-      Text(
-        loc.sleepMonitorEstimateWarning,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-      ),
     ];
   }
 
@@ -594,72 +576,99 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     return loc.sleepMonitorStartWithAlarm(_formatTime(alarmAt!));
   }
 
-  Widget _buildModeSelector(AppLocalizations loc) {
+  Widget _buildModeCarousel(AppLocalizations loc) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          loc.sleepMonitorModeSection,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            letterSpacing: 1.1,
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.primary,
+        SizedBox(
+          height: 400,
+          child: PageView.builder(
+            controller: _modeController,
+            itemCount: _modeOrder.length,
+            onPageChanged: _onModePageChanged,
+            itemBuilder: (context, index) {
+              final mode = _modeOrder[index];
+              final alarmAt = mode.hasAlarm
+                  ? SleepAlarmTime.nextOccurrence(_selectedTime)
+                  : null;
+              final missionReady = _missions.config.isReady;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: _ModePage(
+                  mode: mode,
+                  title: _modeTitle(loc, mode),
+                  body: mode == SleepMonitoringMode.alarmWithMission &&
+                          !missionReady
+                      ? loc.sleepMonitorModeMissionUnavailable
+                      : _modeBody(loc, mode),
+                  alarmAt: alarmAt,
+                  locked: mode == SleepMonitoringMode.alarmWithMission &&
+                      !missionReady,
+                  onAlarmTap: _chooseAlarmTime,
+                  onConfigure: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const SleepSettingsScreen(),
+                    ),
+                  ).then((_) => _reloadMission()),
+                ),
+              );
+            },
           ),
         ),
-        const SizedBox(height: 8),
-        _ModeCard(
-          selected: _selectedMode == SleepMonitoringMode.alarmWithoutMission,
-          icon: Icons.alarm_outlined,
-          title: loc.sleepMonitorModeAlarmNoMission,
-          body: loc.sleepMonitorModeAlarmNoMissionBody,
-          onTap: () => _selectMode(SleepMonitoringMode.alarmWithoutMission),
-        ),
-        const SizedBox(height: 8),
-        _ModeCard(
-          selected: _selectedMode == SleepMonitoringMode.alarmWithMission,
-          enabled: _missions.config.isReady,
-          icon: Icons.qr_code_2_rounded,
-          title: loc.sleepMonitorModeAlarmWithMission,
-          body: _missions.config.isReady
-              ? loc.sleepMonitorModeAlarmWithMissionBody
-              : loc.sleepMonitorModeMissionUnavailable,
-          onTap: _missions.config.isReady
-              ? () => _selectMode(SleepMonitoringMode.alarmWithMission)
-              : () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const SleepSettingsScreen(),
-                  ),
-                ).then((_) => _reloadMission()),
-        ),
-        const SizedBox(height: 8),
-        _ModeCard(
-          selected: _selectedMode == SleepMonitoringMode.monitoringOnly,
-          icon: Icons.graphic_eq_rounded,
-          title: loc.sleepMonitorModeOnly,
-          body: loc.sleepMonitorModeOnlyBody,
-          onTap: () => _selectMode(SleepMonitoringMode.monitoringOnly),
+        const SizedBox(height: 10),
+        _ModeDots(
+          count: _modeOrder.length,
+          selected: _modePage,
+          onSelected: (index) {
+            _modeController.animateToPage(
+              index,
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+            );
+          },
         ),
       ],
     );
   }
 
-  Future<void> _selectMode(SleepMonitoringMode mode) async {
-    setState(() => _selectedMode = mode);
-    await _missions.setLastMode(mode);
+  String _modeTitle(AppLocalizations loc, SleepMonitoringMode mode) {
+    switch (mode) {
+      case SleepMonitoringMode.alarmWithoutMission:
+        return loc.sleepMonitorModeAlarmNoMission;
+      case SleepMonitoringMode.alarmWithMission:
+        return loc.sleepMonitorModeAlarmWithMission;
+      case SleepMonitoringMode.monitoringOnly:
+        return loc.sleepMonitorModeOnly;
+    }
+  }
+
+  String _modeBody(AppLocalizations loc, SleepMonitoringMode mode) {
+    switch (mode) {
+      case SleepMonitoringMode.alarmWithoutMission:
+        return loc.sleepMonitorModeAlarmNoMissionBody;
+      case SleepMonitoringMode.alarmWithMission:
+        return loc.sleepMonitorModeAlarmWithMissionBody;
+      case SleepMonitoringMode.monitoringOnly:
+        return loc.sleepMonitorModeOnlyBody;
+    }
+  }
+
+  void _onModePageChanged(int index) {
+    if (!mounted || index < 0 || index >= _modeOrder.length) return;
+    final mode = _modeOrder[index];
+    setState(() {
+      _modePage = index;
+      _selectedMode = mode;
+    });
+    if (mode != SleepMonitoringMode.alarmWithMission ||
+        _missions.config.isReady) {
+      _missions.setLastMode(mode);
+    }
   }
 
   String _formatTime(DateTime date) => MaterialLocalizations.of(
     context,
   ).formatTimeOfDay(TimeOfDay.fromDateTime(date));
-
-  String _formatDate(DateTime date) {
-    final locale = Localizations.localeOf(context).toLanguageTag();
-    return toBeginningOfSentenceCase(
-          DateFormat('EEEE, d MMM', locale).format(date),
-        ) ??
-        '';
-  }
 
   static String _formatDuration(Duration duration) {
     final hours = duration.inHours;
@@ -683,90 +692,172 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   }
 }
 
-class _ModeCard extends StatelessWidget {
-  const _ModeCard({
-    required this.selected,
-    required this.icon,
+class _ModePage extends StatelessWidget {
+  const _ModePage({
+    required this.mode,
     required this.title,
     required this.body,
-    required this.onTap,
-    this.enabled = true,
+    required this.alarmAt,
+    required this.locked,
+    required this.onAlarmTap,
+    required this.onConfigure,
   });
 
-  final bool selected;
-  final bool enabled;
-  final IconData icon;
+  final SleepMonitoringMode mode;
   final String title;
   final String body;
-  final VoidCallback onTap;
+  final DateTime? alarmAt;
+  final bool locked;
+  final VoidCallback onAlarmTap;
+  final VoidCallback onConfigure;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final background = selected
-        ? scheme.primaryContainer
-        : scheme.surfaceContainerHighest.withAlpha(enabled ? 170 : 90);
-    final foreground = enabled
-        ? (selected ? scheme.onPrimaryContainer : scheme.onSurface)
-        : scheme.onSurfaceVariant.withAlpha(150);
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      selected: selected,
-      child: InkWell(
-        // A locked mission card still opens its setup screen.
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: selected ? scheme.primary : scheme.outlineVariant,
-              width: selected ? 1.5 : 1,
-            ),
-          ),
+    final icon = switch (mode) {
+      SleepMonitoringMode.alarmWithoutMission => Icons.alarm_outlined,
+      SleepMonitoringMode.alarmWithMission => Icons.qr_code_2_rounded,
+      SleepMonitoringMode.monitoringOnly => Icons.graphic_eq_rounded,
+    };
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: selected ? scheme.primary : foreground),
-              const SizedBox(width: 12),
+              Icon(icon, color: scheme.primary, size: 20),
+              const SizedBox(width: 8),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      body,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: foreground.withAlpha(enabled ? 210 : 150),
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(
-                selected
-                    ? Icons.radio_button_checked_rounded
-                    : Icons.radio_button_off_rounded,
-                color: selected ? scheme.primary : foreground,
-              ),
+              if (locked)
+                Icon(
+                  Icons.lock_outline_rounded,
+                  color: scheme.onSurfaceVariant,
+                  size: 18,
+                ),
             ],
           ),
         ),
+        const SizedBox(height: 10),
+        if (alarmAt != null)
+          _AlarmClockCard(
+            time: MaterialLocalizations.of(context).formatTimeOfDay(
+              TimeOfDay.fromDateTime(alarmAt!),
+            ),
+            date: _formatModeDate(context, alarmAt!),
+            remaining: _formatModeRemaining(alarmAt!),
+            helper: AppLocalizations.of(context)!.sleepAlarmTapToChange,
+            onTap: onAlarmTap,
+          )
+        else
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 30,
+              ),
+              child: Column(
+                children: [
+                  Icon(icon, size: 48, color: scheme.primary),
+                  const SizedBox(height: 10),
+                  Text(
+                    AppLocalizations.of(context)!.sleepMonitorModeOnly,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Text(
+            body,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        if (locked) ...[
+          const SizedBox(height: 4),
+          TextButton.icon(
+            onPressed: onConfigure,
+            icon: const Icon(Icons.settings_outlined, size: 17),
+            label: Text(
+              AppLocalizations.of(context)!.sleepMissionOpenSettings,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ModeDots extends StatelessWidget {
+  const _ModeDots({
+    required this.count,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final int count;
+  final int selected;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      label: AppLocalizations.of(context)!.sleepMonitorModeSection,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(count, (index) {
+          final active = index == selected;
+          return GestureDetector(
+            onTap: () => onSelected(index),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: active ? 10 : 8,
+                height: active ? 10 : 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: active
+                      ? scheme.primary
+                      : scheme.onSurfaceVariant.withAlpha(90),
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
+}
+
+String _formatModeDate(BuildContext context, DateTime date) {
+  final locale = Localizations.localeOf(context).toLanguageTag();
+  return toBeginningOfSentenceCase(
+        DateFormat('EEEE, d MMM', locale).format(date),
+      ) ??
+      '';
+}
+
+String _formatModeRemaining(DateTime alarmAt) {
+  final duration = alarmAt.difference(DateTime.now());
+  final safe = duration.isNegative ? Duration.zero : duration;
+  return '${safe.inHours}h ${safe.inMinutes.remainder(60)}min';
 }
 
 class _MissionStatusBanner extends StatelessWidget {
@@ -951,51 +1042,6 @@ class _AlarmClockCard extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String body;
-
-  const _InfoCard({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Icon(icon, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    body,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
