@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/services/sleep_mission_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
+import 'package:workout_notes/services/sleep_goal_service.dart';
 
 class SleepSettingsScreen extends StatefulWidget {
   const SleepSettingsScreen({super.key});
@@ -15,8 +16,10 @@ class SleepSettingsScreen extends StatefulWidget {
 class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
   final _missions = SleepMissionService();
   final _monitor = SleepMonitorService.instance;
+  final _sleepGoalService = SleepGoalService();
   bool _loading = true;
   bool _busy = false;
+  int _goalMinutes = SleepGoalService.defaultGoalMinutes;
 
   @override
   void initState() {
@@ -26,7 +29,13 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
 
   Future<void> _load() async {
     await _missions.load();
-    if (mounted) setState(() => _loading = false);
+    final goalMinutes = await _sleepGoalService.load();
+    if (mounted) {
+      setState(() {
+        _goalMinutes = goalMinutes;
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _scan() async {
@@ -69,6 +78,69 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
     }
     await _missions.setEnabled(enabled);
   }
+
+  Future<void> _configureGoal() async {
+    final loc = AppLocalizations.of(context)!;
+    final selected = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) {
+        var value = _goalMinutes.toDouble();
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Text(loc.sleepGoalDialogTitle),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  loc.sleepGoalDialogDescription,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  _formatGoal(value.round(), loc),
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Slider(
+                  min: SleepGoalService.minimumGoalMinutes.toDouble(),
+                  max: SleepGoalService.maximumGoalMinutes.toDouble(),
+                  divisions:
+                      (SleepGoalService.maximumGoalMinutes -
+                          SleepGoalService.minimumGoalMinutes) ~/
+                      SleepGoalService.stepMinutes,
+                  value: value,
+                  label: _formatGoal(value.round(), loc),
+                  onChanged: (next) => setDialogState(() => value = next),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(loc.commonCancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(
+                  dialogContext,
+                  SleepGoalService.normalize(value.round()),
+                ),
+                child: Text(loc.commonSave),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (selected == null) return;
+    await _sleepGoalService.save(selected);
+    if (!mounted) return;
+    setState(() => _goalMinutes = selected);
+    _message(loc.sleepGoalSaved);
+  }
+
+  static String _formatGoal(int minutes, AppLocalizations loc) =>
+      loc.sleepDurationValue(minutes ~/ 60, minutes % 60);
 
   Future<void> _remove() async {
     final loc = AppLocalizations.of(context)!;
@@ -117,6 +189,30 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
               children: [
+                _SectionHeader(text: loc.sleepSettingsGoalSection),
+                const SizedBox(height: 8),
+                _SettingsCard(
+                  children: [
+                    _LinkTile(
+                      icon: Icons.track_changes_rounded,
+                      title: loc.sleepGoalTitle,
+                      subtitle: loc.sleepGoalCurrent(
+                        _formatGoal(_goalMinutes, loc),
+                      ),
+                      onTap: _configureGoal,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Text(
+                        loc.sleepGoalBody,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 _SectionHeader(text: loc.sleepSettingsMissionSection),
                 const SizedBox(height: 8),
                 _SettingsCard(
@@ -251,11 +347,13 @@ class _LinkTile extends StatelessWidget {
     required this.title,
     required this.onTap,
     this.destructive = false,
+    this.subtitle,
   });
   final IconData icon;
   final String title;
   final VoidCallback? onTap;
   final bool destructive;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
@@ -263,6 +361,7 @@ class _LinkTile extends StatelessWidget {
     return ListTile(
       leading: Icon(icon, color: color),
       title: Text(title, style: color == null ? null : TextStyle(color: color)),
+      subtitle: subtitle == null ? null : Text(subtitle!),
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: onTap,
     );

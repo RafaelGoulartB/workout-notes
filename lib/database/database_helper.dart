@@ -1775,6 +1775,7 @@ class DatabaseHelper {
       'key': 'auto_start_workout_timer',
       'value': 'false',
     });
+    batch.insert('app_settings', {'key': 'sleep_goal_minutes', 'value': '480'});
     batch.insert('app_settings', {
       'key': 'sleep_mission_enabled',
       'value': 'false',

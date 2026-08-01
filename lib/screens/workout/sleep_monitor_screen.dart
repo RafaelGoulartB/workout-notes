@@ -259,14 +259,6 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         icon: _modeIcon(_selectedMode),
         onTap: _showModePicker,
       ),
-      const SizedBox(height: 14),
-      _MonitorReadinessCard(
-        showAlarmTip: _selectedMode.hasAlarm,
-        alarmTitle: loc.sleepAlarmSystemSound,
-        alarmBody: loc.sleepAlarmSystemSoundBody,
-        preparationTitle: loc.sleepAlarmPreparation,
-        preparationBody: loc.sleepAlarmPreparationBody,
-      ),
       if (!valid) ...[
         const SizedBox(height: 10),
         _WarningBanner(
@@ -1179,103 +1171,6 @@ class _MonitoringOnlyCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _MonitorReadinessCard extends StatelessWidget {
-  const _MonitorReadinessCard({
-    required this.showAlarmTip,
-    required this.alarmTitle,
-    required this.alarmBody,
-    required this.preparationTitle,
-    required this.preparationBody,
-  });
-
-  final bool showAlarmTip;
-  final String alarmTitle;
-  final String alarmBody;
-  final String preparationTitle;
-  final String preparationBody;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow.withAlpha(210),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: scheme.outlineVariant.withAlpha(130)),
-      ),
-      child: Column(
-        children: [
-          if (showAlarmTip) ...[
-            _ReadinessRow(
-              icon: Icons.notifications_active_outlined,
-              title: alarmTitle,
-              body: alarmBody,
-            ),
-            Divider(
-              height: 1,
-              indent: 54,
-              color: scheme.outlineVariant.withAlpha(130),
-            ),
-          ],
-          _ReadinessRow(
-            icon: Icons.battery_charging_full_rounded,
-            title: preparationTitle,
-            body: preparationBody,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReadinessRow extends StatelessWidget {
-  const _ReadinessRow({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 22, color: scheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  body,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

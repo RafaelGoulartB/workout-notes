@@ -308,6 +308,78 @@ abstract class AppLocalizations {
   /// **'{hours}h {minutes}min'**
   String sleepDurationValue(Object hours, Object minutes);
 
+  /// No description provided for @sleepGoalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep goal'**
+  String get sleepGoalTitle;
+
+  /// No description provided for @sleepGoalTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Target'**
+  String get sleepGoalTarget;
+
+  /// No description provided for @sleepGoalReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal reached'**
+  String get sleepGoalReached;
+
+  /// No description provided for @sleepGoalMissed.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal missed'**
+  String get sleepGoalMissed;
+
+  /// No description provided for @sleepGoalInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'A personal target for comparing your nights. It is not a clinical recommendation.'**
+  String get sleepGoalInfo;
+
+  /// No description provided for @sleepMetricSleep.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep'**
+  String get sleepMetricSleep;
+
+  /// No description provided for @sleepMetricTimeInBed.
+  ///
+  /// In en, this message translates to:
+  /// **'Time in bed'**
+  String get sleepMetricTimeInBed;
+
+  /// No description provided for @sleepGoalDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set sleep goal'**
+  String get sleepGoalDialogTitle;
+
+  /// No description provided for @sleepGoalDialogDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how much sleep you want to aim for each night.'**
+  String get sleepGoalDialogDescription;
+
+  /// No description provided for @sleepGoalSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep goal saved'**
+  String get sleepGoalSaved;
+
+  /// No description provided for @sleepGoalCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'{duration} per night'**
+  String sleepGoalCurrent(String duration);
+
+  /// No description provided for @sleepGoalBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This target is used to compare your latest night and highlight progress.'**
+  String get sleepGoalBody;
+
   /// No description provided for @sleepMonitorOpen.
   ///
   /// In en, this message translates to:
@@ -5733,6 +5805,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sleep settings'**
   String get sleepSettingsTitle;
+
+  /// No description provided for @sleepSettingsGoalSection.
+  ///
+  /// In en, this message translates to:
+  /// **'SLEEP GOAL'**
+  String get sleepSettingsGoalSection;
 
   /// No description provided for @sleepSettingsMissionSection.
   ///

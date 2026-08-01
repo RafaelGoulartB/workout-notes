@@ -10,10 +10,13 @@ import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
+import 'package:workout_notes/services/sleep_goal_service.dart';
+
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/sleep/sleep_duration_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_latest_card.dart';
-import 'package:workout_notes/widgets/sleep/sleep_monitor_hero_card.dart';
+import 'package:workout_notes/widgets/sleep/sleep_goal_metrics_card.dart';
+
 import 'package:workout_notes/widgets/sleep/sleep_schedule_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_weekly_summary_card.dart';
 
@@ -32,6 +35,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   final _repository = SleepRepository();
   final _monitorRepository = SleepMonitorRepository();
   final _monitorService = SleepMonitorService.instance;
+  final _sleepGoalService = SleepGoalService();
   List<SleepEntry> _entries = const [];
   SleepDashboardStats? _stats;
   bool _isLoading = true;
@@ -39,6 +43,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   int _lastRecoveryCount = 0;
   late DateTime _weekEnd;
   bool _isChangingWeek = false;
+  int _sleepGoalMinutes = SleepGoalService.defaultGoalMinutes;
 
   @override
   void initState() {
@@ -94,10 +99,12 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       final stats = await _repository.getDashboardStats(
         referenceDate: _weekEnd,
       );
+      final sleepGoalMinutes = await _sleepGoalService.load();
       if (!mounted) return;
       setState(() {
         _entries = entries;
         _stats = stats;
+        _sleepGoalMinutes = sleepGoalMinutes;
         _historyDisplayCount = 5;
         _isLoading = false;
       });
@@ -113,19 +120,25 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.sleepTitle),
-        centerTitle: true,
+        title: Text(
+          _formatHeaderDate(),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        centerTitle: false,
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             tooltip: loc.sleepSettingsTitle,
             icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SleepSettingsScreen()),
-            ),
+            onPressed: _openSleepSettings,
           ),
         ],
       ),
+      floatingActionButton: _buildMonitorFab(),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -137,16 +150,15 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     );
   }
 
+  String _formatHeaderDate() =>
+      DateFormat('EEEE, d MMMM', Intl.defaultLocale).format(DateTime.now());
+
   Widget _buildEmptyState(AppLocalizations loc) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       child: Column(
         children: [
-          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
-            _buildMonitorCta(),
-            const SizedBox(height: 20),
-          ],
           SizedBox(
             height: MediaQuery.sizeOf(context).height * .5,
             child: EmptyStatePlaceholder(
@@ -168,11 +180,13 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [
-        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
-          _buildMonitorCta(),
-          const SizedBox(height: 16),
-        ],
         if (latest != null) ...[
+          SleepGoalMetricsCard(
+            entry: latest,
+            stats: stats,
+            goalMinutes: _sleepGoalMinutes,
+          ),
+          const SizedBox(height: 16),
           SleepLatestCard(entry: latest, onTap: () => _showDetails(latest)),
           const SizedBox(height: 16),
         ],
@@ -217,12 +231,38 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     );
   }
 
-  Widget _buildMonitorCta() {
-    return SleepMonitorHeroCard(
-      isActive: _monitorService.isMonitoring,
-      elapsed: _monitorService.state.elapsed,
+  Widget? _buildMonitorFab() {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return null;
+    }
+    final isActive = _monitorService.isMonitoring;
+    final loc = AppLocalizations.of(context)!;
+    final elapsed = _formatElapsed(_monitorService.state.elapsed);
+    return FloatingActionButton.extended(
+      heroTag: 'sleep-monitor-fab',
       onPressed: _openMonitor,
+      icon: Icon(isActive ? Icons.open_in_new_rounded : Icons.nightlight_round),
+      label: Text(
+        isActive
+            ? '${loc.sleepMonitorOpenActive} - $elapsed'
+            : loc.sleepMonitorCta,
+      ),
     );
+  }
+
+  static String _formatElapsed(Duration duration) {
+    final hours = duration.inHours.toString().padLeft(2, '0');
+    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
+  }
+
+  Future<void> _openSleepSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SleepSettingsScreen()),
+    );
+    if (mounted) await _load();
   }
 
   bool get _canGoToNextWeek {

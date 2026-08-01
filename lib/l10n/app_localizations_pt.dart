@@ -126,6 +126,47 @@ class AppLocalizationsPt extends AppLocalizations {
   }
 
   @override
+  String get sleepGoalTitle => 'Meta de sono';
+
+  @override
+  String get sleepGoalTarget => 'Meta';
+
+  @override
+  String get sleepGoalReached => 'Meta atingida';
+
+  @override
+  String get sleepGoalMissed => 'Meta não atingida';
+
+  @override
+  String get sleepGoalInfo =>
+      'Uma meta pessoal para comparar suas noites. Não é uma recomendação clínica.';
+
+  @override
+  String get sleepMetricSleep => 'Sono';
+
+  @override
+  String get sleepMetricTimeInBed => 'Tempo na cama';
+
+  @override
+  String get sleepGoalDialogTitle => 'Definir meta de sono';
+
+  @override
+  String get sleepGoalDialogDescription =>
+      'Escolha quanto você quer dormir por noite.';
+
+  @override
+  String get sleepGoalSaved => 'Meta de sono salva';
+
+  @override
+  String sleepGoalCurrent(String duration) {
+    return '$duration por noite';
+  }
+
+  @override
+  String get sleepGoalBody =>
+      'Esta meta compara sua última noite e destaca seu progresso.';
+
+  @override
   String get sleepMonitorOpen => 'Abrir monitoramento';
 
   @override
@@ -3118,6 +3159,9 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get sleepSettingsTitle => 'Configurações do sono';
+
+  @override
+  String get sleepSettingsGoalSection => 'META DE SONO';
 
   @override
   String get sleepSettingsMissionSection => 'MISSÃO DO DESPERTADOR';

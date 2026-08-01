@@ -6,6 +6,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/widgets/sleep/sleep_duration_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_latest_card.dart';
+import 'package:workout_notes/widgets/sleep/sleep_goal_metrics_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_monitor_hero_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_schedule_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_weekly_summary_card.dart';
@@ -188,6 +189,34 @@ void main() {
     await tester.tap(find.text('Latest record'));
     expect(tapped, isTrue);
   });
+  testWidgets(
+    'sleep goal card compares the latest night and preserves missing values',
+    (tester) async {
+      await tester.pumpWidget(
+        _localized(
+          SleepGoalMetricsCard(
+            entry: _entry(
+              date: DateTime(2026, 7, 26),
+              sleepMinutes: 480,
+              actualSleepMinutes: 420,
+              bedtimeMinutes: 1380,
+              wakeTimeMinutes: 420,
+            ),
+            stats: _stats(),
+            goalMinutes: 510,
+          ),
+          theme: ThemeData.dark(),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Sleep goal: Goal missed'), findsOneWidget);
+      expect(find.text('7h 0min'), findsOneWidget);
+      expect(find.text('88%'), findsOneWidget);
+      expect(find.text('--'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 SleepDashboardStats _stats() => SleepDashboardStats(

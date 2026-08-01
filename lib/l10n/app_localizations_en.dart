@@ -125,6 +125,47 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get sleepGoalTitle => 'Sleep goal';
+
+  @override
+  String get sleepGoalTarget => 'Target';
+
+  @override
+  String get sleepGoalReached => 'Goal reached';
+
+  @override
+  String get sleepGoalMissed => 'Goal missed';
+
+  @override
+  String get sleepGoalInfo =>
+      'A personal target for comparing your nights. It is not a clinical recommendation.';
+
+  @override
+  String get sleepMetricSleep => 'Sleep';
+
+  @override
+  String get sleepMetricTimeInBed => 'Time in bed';
+
+  @override
+  String get sleepGoalDialogTitle => 'Set sleep goal';
+
+  @override
+  String get sleepGoalDialogDescription =>
+      'Choose how much sleep you want to aim for each night.';
+
+  @override
+  String get sleepGoalSaved => 'Sleep goal saved';
+
+  @override
+  String sleepGoalCurrent(String duration) {
+    return '$duration per night';
+  }
+
+  @override
+  String get sleepGoalBody =>
+      'This target is used to compare your latest night and highlight progress.';
+
+  @override
   String get sleepMonitorOpen => 'Open monitoring';
 
   @override
@@ -3104,6 +3145,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sleepSettingsTitle => 'Sleep settings';
+
+  @override
+  String get sleepSettingsGoalSection => 'SLEEP GOAL';
 
   @override
   String get sleepSettingsMissionSection => 'ALARM MISSION';

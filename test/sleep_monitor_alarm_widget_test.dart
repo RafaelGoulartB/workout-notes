@@ -119,8 +119,8 @@ void main() {
 
     await tester.drag(find.byType(ListView), const Offset(0, -350));
     await tester.pump();
-    expect(find.text('System alarm sound + vibration'), findsOneWidget);
-    expect(find.text('Prepare your phone'), findsOneWidget);
+    expect(find.text('System alarm sound + vibration'), findsNothing);
+    expect(find.text('Prepare your phone'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
     debugDefaultTargetPlatformOverride = null;
