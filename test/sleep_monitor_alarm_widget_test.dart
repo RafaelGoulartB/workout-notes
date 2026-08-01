@@ -85,6 +85,8 @@ void main() {
   testWidgets('shows the alarm-first daily monitoring experience', (
     tester,
   ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       const MaterialApp(
         locale: Locale('en'),
@@ -108,12 +110,16 @@ void main() {
       findsOneWidget,
       reason: 'Rendered text: $renderedText; calls: $calls',
     );
-    expect(find.text('System alarm sound + vibration'), findsOneWidget);
-    expect(find.byIcon(Icons.touch_app_outlined), findsOneWidget);
+    expect(find.text('Next alarm'), findsOneWidget);
+    expect(find.byIcon(Icons.edit_rounded), findsOneWidget);
+    expect(find.text('− 15 min'), findsOneWidget);
+    expect(find.text('+ 15 min'), findsOneWidget);
+    expect(find.byIcon(Icons.unfold_more_rounded), findsOneWidget);
     expect(find.textContaining('Start and wake at'), findsOneWidget);
 
     await tester.drag(find.byType(ListView), const Offset(0, -350));
     await tester.pump();
+    expect(find.text('System alarm sound + vibration'), findsOneWidget);
     expect(find.text('Prepare your phone'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());

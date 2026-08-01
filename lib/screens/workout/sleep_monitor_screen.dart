@@ -31,11 +31,9 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
 
   final _service = SleepMonitorService.instance;
   final _missions = SleepMissionService();
-  late final PageController _modeController;
   Timer? _ticker;
   TimeOfDay _selectedTime = const TimeOfDay(hour: 7, minute: 0);
   SleepMonitoringMode _selectedMode = SleepMonitoringMode.alarmWithoutMission;
-  int _modePage = 0;
   bool _isBusy = false;
   bool _loading = true;
   bool _openingResult = false;
@@ -45,7 +43,6 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   @override
   void initState() {
     super.initState();
-    _modeController = PageController();
     WidgetsBinding.instance.addObserver(this);
     _service.addListener(_onChanged);
     _initialize();
@@ -58,7 +55,6 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _service.removeListener(_onChanged);
-    _modeController.dispose();
     _ticker?.cancel();
     super.dispose();
   }
@@ -79,15 +75,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         !_missions.config.isReady) {
       setState(() {
         _selectedMode = SleepMonitoringMode.alarmWithoutMission;
-        _modePage = _modeOrder.indexOf(_selectedMode);
       });
-      if (_modeController.hasClients) {
-        _modeController.animateToPage(
-          _modePage,
-          duration: const Duration(milliseconds: 240),
-          curve: Curves.easeOutCubic,
-        );
-      }
       await _missions.setLastMode(_selectedMode);
       return;
     }
@@ -112,13 +100,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
               !_missions.config.isReady
           ? SleepMonitoringMode.alarmWithoutMission
           : remembered;
-      _modePage = _modeOrder.indexOf(_selectedMode);
       _loading = false;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _modeController.hasClients) {
-        _modeController.jumpToPage(_modePage);
-      }
     });
   }
 
@@ -203,31 +185,34 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
       bottomNavigationBar: _loading
           ? null
           : SafeArea(
-              minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: active
-                  ? FilledButton.icon(
-                      onPressed: _isBusy ? null : _stop,
-                      icon: _busyIcon(Icons.stop_rounded),
-                      label: Text(
-                        state.mode == SleepMonitoringMode.alarmWithMission
-                            ? loc.sleepMonitorProtectedStop
-                            : loc.sleepMonitorFinish,
+              minimum: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: SizedBox(
+                height: 56,
+                child: active
+                    ? FilledButton.icon(
+                        onPressed: _isBusy ? null : _stop,
+                        icon: _busyIcon(Icons.stop_rounded),
+                        label: Text(
+                          state.mode == SleepMonitoringMode.alarmWithMission
+                              ? loc.sleepMonitorProtectedStop
+                              : loc.sleepMonitorFinish,
+                        ),
+                      )
+                    : FilledButton.icon(
+                        onPressed:
+                            _isBusy ||
+                                (_selectedMode.hasAlarm &&
+                                    !SleepAlarmTime.isWithinMonitoringWindow(
+                                      alarmAt!,
+                                    )) ||
+                                (_selectedMode.requiresMission &&
+                                    !_missions.config.isReady)
+                            ? null
+                            : () => _start(alarmAt),
+                        icon: _busyIcon(Icons.bedtime_rounded),
+                        label: Text(_startLabel(loc, alarmAt)),
                       ),
-                    )
-                  : FilledButton.icon(
-                      onPressed:
-                          _isBusy ||
-                              (_selectedMode.hasAlarm &&
-                                  !SleepAlarmTime.isWithinMonitoringWindow(
-                                    alarmAt!,
-                                  )) ||
-                              (_selectedMode.requiresMission &&
-                                  !_missions.config.isReady)
-                          ? null
-                          : () => _start(alarmAt),
-                      icon: _busyIcon(Icons.bedtime_rounded),
-                      label: Text(_startLabel(loc, alarmAt)),
-                    ),
+              ),
             ),
     );
   }
@@ -247,8 +232,41 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
             ? loc.sleepAlarmSectionTitle
             : loc.sleepMonitorModeOnly,
       ),
-      const SizedBox(height: 16),
-      _buildModeCarousel(loc),
+      const SizedBox(height: 20),
+      if (alarmAt != null)
+        _AlarmClockCard(
+          time: _formatTime(alarmAt),
+          date: _formatModeDate(context, alarmAt),
+          remaining: _formatModeRemaining(alarmAt),
+          sectionTitle: loc.sleepAlarmNext,
+          changeLabel: loc.sleepAlarmChange,
+          onTap: _chooseAlarmTime,
+          onEarlier: () => _shiftAlarmTime(-15),
+          onLater: () => _shiftAlarmTime(15),
+        )
+      else
+        _MonitoringOnlyCard(
+          title: loc.sleepMonitorModeOnly,
+          body: loc.sleepMonitorModeOnlyBody,
+        ),
+      const SizedBox(height: 18),
+      _ModeSelectorCard(
+        sectionLabel: loc.sleepMonitorModeSection,
+        title: _modeTitle(loc, _selectedMode),
+        body: _selectedMode.requiresMission && !_missions.config.isReady
+            ? loc.sleepMonitorModeMissionUnavailable
+            : _modeBody(loc, _selectedMode),
+        icon: _modeIcon(_selectedMode),
+        onTap: _showModePicker,
+      ),
+      const SizedBox(height: 14),
+      _MonitorReadinessCard(
+        showAlarmTip: _selectedMode.hasAlarm,
+        alarmTitle: loc.sleepAlarmSystemSound,
+        alarmBody: loc.sleepAlarmSystemSoundBody,
+        preparationTitle: loc.sleepAlarmPreparation,
+        preparationBody: loc.sleepAlarmPreparationBody,
+      ),
       if (!valid) ...[
         const SizedBox(height: 10),
         _WarningBanner(
@@ -433,6 +451,18 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     }
   }
 
+  void _shiftAlarmTime(int minutes) {
+    if (!_selectedMode.hasAlarm) return;
+    final shifted = SleepAlarmTime.nextOccurrence(
+      _selectedTime,
+    ).add(Duration(minutes: minutes));
+    if (!SleepAlarmTime.isWithinMonitoringWindow(shifted)) {
+      _showMessage(AppLocalizations.of(context)!.sleepAlarmInvalidWindow);
+      return;
+    }
+    setState(() => _selectedTime = TimeOfDay.fromDateTime(shifted));
+  }
+
   Future<void> _start(DateTime? alarmAt) async {
     final loc = AppLocalizations.of(context)!;
     if (_selectedMode.hasAlarm &&
@@ -576,59 +606,65 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     return loc.sleepMonitorStartWithAlarm(_formatTime(alarmAt!));
   }
 
-  Widget _buildModeCarousel(AppLocalizations loc) {
-    return Column(
-      children: [
-        SizedBox(
-          height: 400,
-          child: PageView.builder(
-            controller: _modeController,
-            itemCount: _modeOrder.length,
-            onPageChanged: _onModePageChanged,
-            itemBuilder: (context, index) {
-              final mode = _modeOrder[index];
-              final alarmAt = mode.hasAlarm
-                  ? SleepAlarmTime.nextOccurrence(_selectedTime)
-                  : null;
-              final missionReady = _missions.config.isReady;
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: _ModePage(
-                  mode: mode,
-                  title: _modeTitle(loc, mode),
-                  body: mode == SleepMonitoringMode.alarmWithMission &&
-                          !missionReady
-                      ? loc.sleepMonitorModeMissionUnavailable
-                      : _modeBody(loc, mode),
-                  alarmAt: alarmAt,
-                  locked: mode == SleepMonitoringMode.alarmWithMission &&
-                      !missionReady,
-                  onAlarmTap: _chooseAlarmTime,
-                  onConfigure: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const SleepSettingsScreen(),
-                    ),
-                  ).then((_) => _reloadMission()),
+  Future<void> _showModePicker() async {
+    final loc = AppLocalizations.of(context)!;
+    final selected = await showModalBottomSheet<SleepMonitoringMode>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+                child: Text(
+                  loc.sleepMonitorModeSection,
+                  style: Theme.of(
+                    sheetContext,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
-              );
-            },
+              ),
+              for (final mode in _modeOrder)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _ModeChoiceTile(
+                    icon: _modeIcon(mode),
+                    title: _modeTitle(loc, mode),
+                    body: mode.requiresMission && !_missions.config.isReady
+                        ? loc.sleepMonitorModeMissionUnavailable
+                        : _modeBody(loc, mode),
+                    selected: mode == _selectedMode,
+                    locked: mode.requiresMission && !_missions.config.isReady,
+                    onTap: () {
+                      if (mode.requiresMission && !_missions.config.isReady) {
+                        Navigator.pop(sheetContext);
+                        unawaited(_openSleepSettings());
+                        return;
+                      }
+                      Navigator.pop(sheetContext, mode);
+                    },
+                  ),
+                ),
+            ],
           ),
         ),
-        const SizedBox(height: 10),
-        _ModeDots(
-          count: _modeOrder.length,
-          selected: _modePage,
-          onSelected: (index) {
-            _modeController.animateToPage(
-              index,
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-            );
-          },
-        ),
-      ],
+      ),
     );
+    if (selected == null || !mounted || selected == _selectedMode) return;
+    setState(() => _selectedMode = selected);
+    await _missions.setLastMode(selected);
+  }
+
+  Future<void> _openSleepSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SleepSettingsScreen()),
+    );
+    await _reloadMission();
   }
 
   String _modeTitle(AppLocalizations loc, SleepMonitoringMode mode) {
@@ -650,19 +686,6 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         return loc.sleepMonitorModeAlarmWithMissionBody;
       case SleepMonitoringMode.monitoringOnly:
         return loc.sleepMonitorModeOnlyBody;
-    }
-  }
-
-  void _onModePageChanged(int index) {
-    if (!mounted || index < 0 || index >= _modeOrder.length) return;
-    final mode = _modeOrder[index];
-    setState(() {
-      _modePage = index;
-      _selectedMode = mode;
-    });
-    if (mode != SleepMonitoringMode.alarmWithMission ||
-        _missions.config.isReady) {
-      _missions.setLastMode(mode);
     }
   }
 
@@ -692,155 +715,163 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   }
 }
 
-class _ModePage extends StatelessWidget {
-  const _ModePage({
-    required this.mode,
+IconData _modeIcon(SleepMonitoringMode mode) {
+  return switch (mode) {
+    SleepMonitoringMode.alarmWithoutMission => Icons.alarm_rounded,
+    SleepMonitoringMode.alarmWithMission => Icons.qr_code_2_rounded,
+    SleepMonitoringMode.monitoringOnly => Icons.graphic_eq_rounded,
+  };
+}
+
+class _ModeSelectorCard extends StatelessWidget {
+  const _ModeSelectorCard({
+    required this.sectionLabel,
     required this.title,
     required this.body,
-    required this.alarmAt,
-    required this.locked,
-    required this.onAlarmTap,
-    required this.onConfigure,
+    required this.icon,
+    required this.onTap,
   });
 
-  final SleepMonitoringMode mode;
+  final String sectionLabel;
   final String title;
   final String body;
-  final DateTime? alarmAt;
-  final bool locked;
-  final VoidCallback onAlarmTap;
-  final VoidCallback onConfigure;
+  final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final icon = switch (mode) {
-      SleepMonitoringMode.alarmWithoutMission => Icons.alarm_outlined,
-      SleepMonitoringMode.alarmWithMission => Icons.qr_code_2_rounded,
-      SleepMonitoringMode.monitoringOnly => Icons.graphic_eq_rounded,
-    };
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Icon(icon, color: scheme.primary, size: 20),
-              const SizedBox(width: 8),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: scheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: scheme.onSecondaryContainer),
+              ),
+              const SizedBox(width: 14),
               Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      sectionLabel,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.7,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      body,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              if (locked)
-                Icon(
-                  Icons.lock_outline_rounded,
-                  color: scheme.onSurfaceVariant,
-                  size: 18,
-                ),
+              const SizedBox(width: 8),
+              Icon(Icons.unfold_more_rounded, color: scheme.primary),
             ],
           ),
         ),
-        const SizedBox(height: 10),
-        if (alarmAt != null)
-          _AlarmClockCard(
-            time: MaterialLocalizations.of(context).formatTimeOfDay(
-              TimeOfDay.fromDateTime(alarmAt!),
-            ),
-            date: _formatModeDate(context, alarmAt!),
-            remaining: _formatModeRemaining(alarmAt!),
-            helper: AppLocalizations.of(context)!.sleepAlarmTapToChange,
-            onTap: onAlarmTap,
-          )
-        else
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 30,
-              ),
-              child: Column(
-                children: [
-                  Icon(icon, size: 48, color: scheme.primary),
-                  const SizedBox(height: 10),
-                  Text(
-                    AppLocalizations.of(context)!.sleepMonitorModeOnly,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            body,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        if (locked) ...[
-          const SizedBox(height: 4),
-          TextButton.icon(
-            onPressed: onConfigure,
-            icon: const Icon(Icons.settings_outlined, size: 17),
-            label: Text(
-              AppLocalizations.of(context)!.sleepMissionOpenSettings,
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 }
 
-class _ModeDots extends StatelessWidget {
-  const _ModeDots({
-    required this.count,
+class _ModeChoiceTile extends StatelessWidget {
+  const _ModeChoiceTile({
+    required this.icon,
+    required this.title,
+    required this.body,
     required this.selected,
-    required this.onSelected,
+    required this.locked,
+    required this.onTap,
   });
 
-  final int count;
-  final int selected;
-  final ValueChanged<int> onSelected;
+  final IconData icon;
+  final String title;
+  final String body;
+  final bool selected;
+  final bool locked;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Semantics(
-      label: AppLocalizations.of(context)!.sleepMonitorModeSection,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(count, (index) {
-          final active = index == selected;
-          return GestureDetector(
-            onTap: () => onSelected(index),
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: active ? 10 : 8,
-                height: active ? 10 : 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: active
-                      ? scheme.primary
-                      : scheme.onSurfaceVariant.withAlpha(90),
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final background = selected
+        ? scheme.primaryContainer
+        : scheme.surfaceContainerLow;
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: selected ? scheme.primary : null, size: 24),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      body,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          );
-        }),
+              const SizedBox(width: 8),
+              Icon(
+                locked
+                    ? Icons.settings_outlined
+                    : selected
+                    ? Icons.check_circle_rounded
+                    : Icons.circle_outlined,
+                color: selected ? scheme.primary : scheme.onSurfaceVariant,
+                size: 22,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -978,71 +1009,273 @@ class _AlarmClockCard extends StatelessWidget {
   final String time;
   final String date;
   final String remaining;
-  final String helper;
+  final String sectionTitle;
+  final String changeLabel;
   final VoidCallback onTap;
+  final VoidCallback onEarlier;
+  final VoidCallback onLater;
 
   const _AlarmClockCard({
     required this.time,
     required this.date,
     required this.remaining,
-    required this.helper,
+    required this.sectionTitle,
+    required this.changeLabel,
     required this.onTap,
+    required this.onEarlier,
+    required this.onLater,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Card(
+      margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-          child: Column(
-            children: [
-              Text(
-                time,
-                style: theme.textTheme.displayLarge?.copyWith(
-                  fontWeight: FontWeight.w300,
-                  color: theme.colorScheme.primary,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                date,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                remaining,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+              child: Column(
                 children: [
-                  Icon(
-                    Icons.touch_app_outlined,
-                    size: 17,
-                    color: theme.colorScheme.primary,
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.alarm_rounded,
+                        size: 20,
+                        color: scheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          sectionTitle,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        changeLabel,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.edit_rounded, size: 17, color: scheme.primary),
+                    ],
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(height: 12),
                   Text(
-                    helper,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.primary,
+                    time,
+                    style: theme.textTheme.displayLarge?.copyWith(
+                      fontWeight: FontWeight.w400,
+                      color: scheme.primary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    date,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: scheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      remaining,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: scheme.onPrimaryContainer,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ),
                 ],
               ),
-            ],
+            ),
           ),
+          Divider(height: 1, color: scheme.outlineVariant),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onEarlier,
+                    child: const Text('− 15 min'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onLater,
+                    child: const Text('+ 15 min'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MonitoringOnlyCard extends StatelessWidget {
+  const _MonitoringOnlyCard({required this.title, required this.body});
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: scheme.primaryContainer,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(
+                Icons.graphic_eq_rounded,
+                color: scheme.onPrimaryContainer,
+                size: 30,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              body,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _MonitorReadinessCard extends StatelessWidget {
+  const _MonitorReadinessCard({
+    required this.showAlarmTip,
+    required this.alarmTitle,
+    required this.alarmBody,
+    required this.preparationTitle,
+    required this.preparationBody,
+  });
+
+  final bool showAlarmTip;
+  final String alarmTitle;
+  final String alarmBody;
+  final String preparationTitle;
+  final String preparationBody;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow.withAlpha(210),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.outlineVariant.withAlpha(130)),
+      ),
+      child: Column(
+        children: [
+          if (showAlarmTip) ...[
+            _ReadinessRow(
+              icon: Icons.notifications_active_outlined,
+              title: alarmTitle,
+              body: alarmBody,
+            ),
+            Divider(
+              height: 1,
+              indent: 54,
+              color: scheme.outlineVariant.withAlpha(130),
+            ),
+          ],
+          _ReadinessRow(
+            icon: Icons.battery_charging_full_rounded,
+            title: preparationTitle,
+            body: preparationBody,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReadinessRow extends StatelessWidget {
+  const _ReadinessRow({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 22, color: scheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  body,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
