@@ -12,6 +12,7 @@ class ExerciseWithSets {
   final String? categoryId;
   final String categoryName;
   final Color categoryColor;
+  final double weightIncrement;
   final List<Map<String, dynamic>> sets;
   final int restTimeSeconds;
 
@@ -24,6 +25,7 @@ class ExerciseWithSets {
     this.categoryId,
     required this.categoryName,
     required this.categoryColor,
+    this.weightIncrement = 1,
     List<Map<String, dynamic>>? sets,
     this.restTimeSeconds = 90,
   }) : sets = sets ?? [];
