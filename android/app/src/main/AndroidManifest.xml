@@ -61,6 +61,13 @@
             android:turnScreenOn="true"
             android:theme="@android:style/Theme.Material.NoActionBar" />
         <activity
+            android:name=".sleep.SleepEmergencyChallengeActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+        <activity
             android:name=".sleep.BarcodeScannerActivity"
             android:exported="false"
             android:screenOrientation="portrait"

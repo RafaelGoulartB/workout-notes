@@ -46,6 +46,10 @@ void main() {
               started_at TEXT NOT NULL,
               ended_at TEXT,
               alarm_at TEXT,
+              monitor_mode TEXT,
+              mission_type TEXT,
+              alarm_dismiss_method TEXT,
+              alarm_dismissed_at TEXT,
               utc_offset_start_minutes INTEGER NOT NULL,
               utc_offset_end_minutes INTEGER,
               sensor_mode TEXT NOT NULL DEFAULT 'audio',
@@ -128,6 +132,31 @@ void main() {
     final restored = SleepMonitorSession.fromMap(session.toMap());
     expect(restored.id, 'session-1');
     expect(restored.alarmAt, session.alarmAt);
+  });
+
+  test('counts current and legacy emergency dismissals only', () async {
+    final start = DateTime.utc(2026, 8, 1, 22);
+    final methods = <String>[
+      SleepMonitorSession.dismissEmergency1000Taps,
+      SleepMonitorSession.dismissEmergency100Taps,
+      SleepMonitorSession.dismissBarcode,
+      SleepMonitorSession.dismissButton,
+    ];
+
+    for (var index = 0; index < methods.length; index++) {
+      await database.insert('sleep_monitor_sessions', {
+        'id': 'emergency-session-$index',
+        'status': SleepMonitorSession.completed,
+        'started_at': start.toIso8601String(),
+        'utc_offset_start_minutes': -180,
+        'sensor_mode': 'audio',
+        'algorithm_version': SleepMonitorSession.defaultAlgorithmVersion,
+        'alarm_dismiss_method': methods[index],
+        'created_at': start.toIso8601String(),
+      });
+    }
+
+    expect(await repository.getEmergencyDismissalCount(), 2);
   });
 
   test(

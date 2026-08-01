@@ -168,14 +168,10 @@ class SleepAlarmActivity : Activity() {
                 dp(56),
             ))
             root.addView(Button(this).apply {
-                val taps = SleepAlarmScheduler.emergencyTaps(this@SleepAlarmActivity)
-                text = getString(R.string.sleep_alarm_emergency, taps)
+                text = getString(R.string.sleep_alarm_emergency_open)
                 textSize = 15f
                 isAllCaps = false
-                setOnClickListener {
-                    val next = SleepAlarmRingingService.tapEmergency(this@SleepAlarmActivity)
-                    if (next >= 100) finishAndRemoveTask() else render(intent)
-                }
+                setOnClickListener { openEmergencyChallenge() }
             }, margins(top = 12).apply {
                 width = LinearLayout.LayoutParams.MATCH_PARENT
                 height = dp(52)
@@ -197,6 +193,14 @@ class SleepAlarmActivity : Activity() {
             ))
         }
         setContentView(root)
+    }
+
+    private fun openEmergencyChallenge() {
+        startActivity(
+            Intent(this, SleepEmergencyChallengeActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+        )
     }
 
     private fun openScanner() {

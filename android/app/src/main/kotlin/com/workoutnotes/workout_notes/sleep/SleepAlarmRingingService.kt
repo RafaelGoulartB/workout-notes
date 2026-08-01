@@ -12,7 +12,9 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -25,6 +27,8 @@ class SleepAlarmRingingService : Service() {
     companion object {
         const val ACTION_START = "com.workoutnotes.workout_notes.sleep.ALARM_START"
         const val ACTION_DISMISS = "com.workoutnotes.workout_notes.sleep.ALARM_DISMISS"
+        const val ACTION_PAUSE_FOR_EMERGENCY = "com.workoutnotes.workout_notes.sleep.ALARM_PAUSE_FOR_EMERGENCY"
+        const val ACTION_RESUME_AFTER_EMERGENCY = "com.workoutnotes.workout_notes.sleep.ALARM_RESUME_AFTER_EMERGENCY"
         private const val ACTION_COMPLETE = "com.workoutnotes.workout_notes.sleep.ALARM_COMPLETE"
         private const val EXTRA_METHOD = "dismiss_method"
         const val CHANNEL_ID = "sleep_alarm"
@@ -56,6 +60,25 @@ class SleepAlarmRingingService : Service() {
             })
         }
 
+        fun pauseForEmergency(context: Context) {
+            sendAction(context, ACTION_PAUSE_FOR_EMERGENCY)
+        }
+
+        fun resumeAfterEmergency(context: Context) {
+            sendAction(context, ACTION_RESUME_AFTER_EMERGENCY)
+        }
+
+        private fun sendAction(context: Context, action: String) {
+            val intent = Intent(context, SleepAlarmRingingService::class.java).apply {
+                this.action = action
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ContextCompat.startForegroundService(context, intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
         fun completeBarcode(context: Context, rawValue: String, format: String): Boolean {
             val snapshot = SleepAlarmScheduler.read(context) ?: return false
             if (snapshot.state != SleepAlarmScheduler.STATE_RINGING ||
@@ -73,13 +96,18 @@ class SleepAlarmRingingService : Service() {
         fun tapEmergency(context: Context): Int {
             val snapshot = SleepAlarmScheduler.read(context) ?: return 0
             if (snapshot.state != SleepAlarmScheduler.STATE_RINGING ||
-                !snapshot.requiresMission
+                !snapshot.requiresMission ||
+                !SleepAlarmScheduler.isEmergencyChallengeActive(context)
             ) return 0
-            if (SleepAlarmScheduler.emergencyTaps(context) >= 100) return 100
+            if (SleepAlarmScheduler.emergencyTaps(context) >= SleepAlarmScheduler.MAX_EMERGENCY_TAPS) {
+                return SleepAlarmScheduler.MAX_EMERGENCY_TAPS
+            }
             val taps = SleepAlarmScheduler.incrementEmergencyTaps(context)
             SleepMonitoringService.publishAlarmRinging(context)
-            if (taps >= 100) complete(context, SleepMonitorSessionDismiss.EMERGENCY)
-            return taps.coerceAtMost(100)
+            if (taps >= SleepAlarmScheduler.MAX_EMERGENCY_TAPS) {
+                complete(context, SleepMonitorSessionDismiss.EMERGENCY)
+            }
+            return taps.coerceAtMost(SleepAlarmScheduler.MAX_EMERGENCY_TAPS)
         }
 
         private fun complete(context: Context, method: String) {
@@ -93,10 +121,54 @@ class SleepAlarmRingingService : Service() {
     private var player: MediaPlayer? = null
     private var vibrator: Vibrator? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var emergencyResume: Runnable? = null
+    private var ringingPaused = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val snapshot = SleepAlarmScheduler.read(this)
-        if (intent?.action == ACTION_DISMISS) {
+        val action = intent?.action
+        val alarmAt = snapshot?.alarmAtMillis ?: intent?.getLongExtra(
+            SleepAlarmScheduler.EXTRA_ALARM_AT,
+            System.currentTimeMillis(),
+        ) ?: System.currentTimeMillis()
+        if (action == ACTION_PAUSE_FOR_EMERGENCY) {
+            if (snapshot?.state != SleepAlarmScheduler.STATE_RINGING ||
+                snapshot.requiresMission != true
+            ) return START_NOT_STICKY
+            ensureChannel()
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(alarmAt, protected = true),
+            )
+            val remaining = SleepAlarmScheduler.emergencyRemainingMillis(this)
+            acquireWakeLock()
+            if (remaining <= 0L) {
+                SleepAlarmScheduler.resetEmergencyChallenge(this)
+                resumeRinging()
+            } else {
+                pauseRinging()
+                scheduleEmergencyResume(remaining)
+            }
+            SleepMonitoringService.publishAlarmRinging(this)
+            return START_STICKY
+        }
+        if (action == ACTION_RESUME_AFTER_EMERGENCY) {
+            if (snapshot?.state != SleepAlarmScheduler.STATE_RINGING) {
+                return START_NOT_STICKY
+            }
+            SleepAlarmScheduler.resetEmergencyChallenge(this)
+            ensureChannel()
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(alarmAt, protected = snapshot.requiresMission),
+            )
+            acquireWakeLock()
+            resumeRinging()
+            SleepMonitoringService.publishAlarmRinging(this)
+            return START_STICKY
+        }
+        if (action == ACTION_DISMISS) {
             if (snapshot?.state != SleepAlarmScheduler.STATE_RINGING) {
                 return START_NOT_STICKY
             }
@@ -116,13 +188,18 @@ class SleepAlarmRingingService : Service() {
             return START_STICKY
         }
 
-        val alarmAt = snapshot?.alarmAtMillis ?: intent?.getLongExtra(
-            SleepAlarmScheduler.EXTRA_ALARM_AT,
-            System.currentTimeMillis(),
-        ) ?: System.currentTimeMillis()
         ensureChannel()
         startForeground(NOTIFICATION_ID, buildNotification(alarmAt, snapshot?.requiresMission == true))
-        if (player == null) {
+        val emergencyRemaining = SleepAlarmScheduler.emergencyRemainingMillis(this)
+        if (emergencyRemaining > 0L) {
+            acquireWakeLock()
+            pauseRinging()
+            scheduleEmergencyResume(emergencyRemaining)
+        } else if (ringingPaused) {
+            SleepAlarmScheduler.resetEmergencyChallenge(this)
+            acquireWakeLock()
+            resumeRinging()
+        } else if (player == null) {
             acquireWakeLock()
             startSound()
             startVibration()
@@ -132,13 +209,17 @@ class SleepAlarmRingingService : Service() {
     }
 
     override fun onDestroy() {
+        emergencyResume?.let(handler::removeCallbacks)
         stopRinging()
+        handler.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun finishAlarm(method: String) {
+        emergencyResume?.let(handler::removeCallbacks)
+        emergencyResume = null
         SleepMonitoringService.alarmDismissed(this, method)
         SleepAlarmScheduler.complete(this)
         stopRinging()
@@ -163,10 +244,17 @@ class SleepAlarmRingingService : Service() {
     }
 
     private fun buildNotification(alarmAt: Long, protected: Boolean): Notification {
+        val targetActivity = if (
+            protected && SleepAlarmScheduler.isEmergencyChallengeActive(this)
+        ) {
+            SleepEmergencyChallengeActivity::class.java
+        } else {
+            SleepAlarmActivity::class.java
+        }
         val activityIntent = PendingIntent.getActivity(
             this,
             1204,
-            Intent(this, SleepAlarmActivity::class.java).apply {
+            Intent(this, targetActivity).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra(SleepAlarmScheduler.EXTRA_ALARM_AT, alarmAt)
@@ -250,6 +338,50 @@ class SleepAlarmRingingService : Service() {
         }
     }
 
+    private fun pauseRinging() {
+        ringingPaused = true
+        try {
+            if (player?.isPlaying == true) player?.pause()
+        } catch (_: Throwable) {
+        }
+        vibrator?.cancel()
+    }
+
+    private fun resumeRinging() {
+        ringingPaused = false
+        if (player == null) {
+            startSound()
+        } else {
+            try {
+                if (player?.isPlaying != true) player?.start()
+            } catch (_: Throwable) {
+                player?.release()
+                player = null
+                startSound()
+            }
+        }
+        startVibration()
+        emergencyResume?.let(handler::removeCallbacks)
+        emergencyResume = null
+    }
+
+    private fun scheduleEmergencyResume(remainingMillis: Long) {
+        emergencyResume?.let(handler::removeCallbacks)
+        val callback = Runnable {
+            if (SleepAlarmScheduler.isEmergencyChallengeActive(this)) {
+                scheduleEmergencyResume(SleepAlarmScheduler.emergencyRemainingMillis(this))
+                return@Runnable
+            }
+            if (SleepAlarmScheduler.read(this)?.state == SleepAlarmScheduler.STATE_RINGING) {
+                SleepAlarmScheduler.resetEmergencyChallenge(this)
+                resumeRinging()
+                SleepMonitoringService.publishAlarmRinging(this)
+            }
+        }
+        emergencyResume = callback
+        handler.postDelayed(callback, remainingMillis.coerceAtLeast(1L))
+    }
+
     private fun acquireWakeLock() {
         val manager = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = manager.newWakeLock(
@@ -259,6 +391,9 @@ class SleepAlarmRingingService : Service() {
     }
 
     private fun stopRinging() {
+        ringingPaused = false
+        emergencyResume?.let(handler::removeCallbacks)
+        emergencyResume = null
         try { player?.stop() } catch (_: Throwable) {}
         player?.release()
         player = null
@@ -276,5 +411,5 @@ class SleepAlarmRingingService : Service() {
 private object SleepMonitorSessionDismiss {
     const val BUTTON = "button"
     const val BARCODE = "barcode"
-    const val EMERGENCY = "emergency_100_taps"
+    const val EMERGENCY = "emergency_1000_taps"
 }

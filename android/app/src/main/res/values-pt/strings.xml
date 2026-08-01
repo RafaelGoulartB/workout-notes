@@ -10,7 +10,7 @@
     <string name="sleep_alarm_mission_notification_body">Leia o código cadastrado ou use a ação de emergência.</string>
     <string name="sleep_alarm_mission_body">Leia o código cadastrado para desligar este alarme.</string>
     <string name="sleep_alarm_open_mission">Abrir missão</string>
-    <string name="sleep_alarm_emergency">Emergência: tocar %1$d/100</string>
+    <string name="sleep_alarm_emergency">Emergência: tocar %1$d/1000</string>
     <string name="sleep_alarm_mission_wrong_code">Esse código não corresponde. Tente novamente.</string>
     <string name="sleep_alarm_mission_camera_denied">O acesso à câmera é necessário para ler a missão.</string>
     <string name="sleep_alarm_open_camera_settings">Abrir configurações da câmera</string>
@@ -18,4 +18,11 @@
     <string name="barcode_scanner_flashlight">Lanterna</string>
     <string name="barcode_scanner_flashlight_off">Desligar lanterna</string>
     <string name="barcode_scanner_cancel">Cancelar</string>
+    <string name="sleep_alarm_emergency_open">Cumprir emerg&#234;ncia</string>
+    <string name="sleep_alarm_emergency_title">Emerg&#234;ncia</string>
+    <string name="sleep_alarm_emergency_instruction">Toque no bot&#227;o 1000 vezes em at&#233; 3 minutos para desligar o alarme.</string>
+    <string name="sleep_alarm_emergency_count">%1$d/1000</string>
+    <string name="sleep_alarm_emergency_tap_button">Toque para cumprir</string>
+    <string name="sleep_alarm_emergency_time_left">Restam %1$d s</string>
+    <string name="sleep_alarm_emergency_cancel_hint">Se o tempo acabar, o alarme voltar&#225; a tocar.</string>
 </resources>

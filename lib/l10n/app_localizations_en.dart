@@ -3097,7 +3097,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sleepMonitorModeAlarmWithMissionBody =>
-      'To dismiss it, scan the registered code or tap the emergency action 100 times.';
+      'To dismiss it, scan the registered code or complete the emergency action with 1000 taps.';
 
   @override
   String get sleepMonitorModeOnlyBody =>

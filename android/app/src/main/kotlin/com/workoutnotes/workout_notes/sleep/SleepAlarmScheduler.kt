@@ -31,9 +31,12 @@ object SleepAlarmScheduler {
     private const val KEY_MISSION_FORMAT = "mission_format"
     private const val KEY_STATE = "state"
     private const val KEY_EMERGENCY_TAPS = "emergency_taps"
+    private const val KEY_EMERGENCY_DEADLINE = "emergency_deadline_epoch_ms"
     const val STATE_SCHEDULED = "scheduled"
     const val STATE_RINGING = "ringing"
     const val STATE_COMPLETED = "completed"
+    const val MAX_EMERGENCY_TAPS = EmergencyChallengePolicy.MAX_TAPS
+    const val EMERGENCY_CHALLENGE_DURATION_MILLIS = EmergencyChallengePolicy.DURATION_MILLIS
     private const val REQUEST_FIRE = 1201
     private const val REQUEST_SHOW = 1202
 
@@ -132,6 +135,7 @@ object SleepAlarmScheduler {
             .putString(KEY_MISSION_FORMAT, missionFormat)
             .putString(KEY_STATE, STATE_SCHEDULED)
             .putInt(KEY_EMERGENCY_TAPS, 0)
+            .remove(KEY_EMERGENCY_DEADLINE)
             .apply()
     }
 
@@ -148,21 +152,68 @@ object SleepAlarmScheduler {
     }
 
     fun markFired(context: Context) {
-        preferences(context).edit().putString(KEY_STATE, STATE_RINGING).apply()
+        preferences(context).edit()
+            .putString(KEY_STATE, STATE_RINGING)
+            .putInt(KEY_EMERGENCY_TAPS, 0)
+            .remove(KEY_EMERGENCY_DEADLINE)
+            .apply()
     }
 
     fun complete(context: Context) {
         // Keep the immutable snapshot long enough for Flutter to import the
         // dismissal metadata after a cold start. A later session overwrites it
         // when it schedules its own alarm.
-        preferences(context).edit().putString(KEY_STATE, STATE_COMPLETED).apply()
+        preferences(context).edit()
+            .putString(KEY_STATE, STATE_COMPLETED)
+            .putInt(KEY_EMERGENCY_TAPS, 0)
+            .remove(KEY_EMERGENCY_DEADLINE)
+            .apply()
     }
 
     fun emergencyTaps(context: Context): Int =
         preferences(context).getInt(KEY_EMERGENCY_TAPS, 0)
 
+    /** Starts a fresh emergency attempt or continues one surviving recreation. */
+    fun beginEmergencyChallenge(context: Context): Boolean {
+        val snapshot = read(context) ?: return false
+        if (snapshot.state != STATE_RINGING || !snapshot.requiresMission) return false
+
+        val now = System.currentTimeMillis()
+        val deadline = emergencyDeadline(context)
+        if (deadline <= now) {
+            preferences(context).edit()
+                .putInt(KEY_EMERGENCY_TAPS, 0)
+                .putLong(
+                    KEY_EMERGENCY_DEADLINE,
+                    now + EmergencyChallengePolicy.DURATION_MILLIS,
+                )
+                .apply()
+        }
+        return true
+    }
+
+    fun emergencyDeadline(context: Context): Long =
+        preferences(context).getLong(KEY_EMERGENCY_DEADLINE, 0L)
+
+    fun emergencyRemainingMillis(context: Context): Long =
+        EmergencyChallengePolicy.remainingMillis(
+            emergencyDeadline(context),
+            System.currentTimeMillis(),
+        )
+
+    fun isEmergencyChallengeActive(context: Context): Boolean =
+        EmergencyChallengePolicy.isActive(emergencyDeadline(context), System.currentTimeMillis())
+
+    fun resetEmergencyChallenge(context: Context) {
+        preferences(context).edit()
+            .putInt(KEY_EMERGENCY_TAPS, 0)
+            .remove(KEY_EMERGENCY_DEADLINE)
+            .apply()
+    }
+
     fun incrementEmergencyTaps(context: Context): Int {
-        val next = (emergencyTaps(context) + 1).coerceAtMost(100)
+        if (!isEmergencyChallengeActive(context)) return 0
+        val next = EmergencyChallengePolicy.nextTaps(emergencyTaps(context))
         preferences(context).edit().putInt(KEY_EMERGENCY_TAPS, next).apply()
         return next
     }
