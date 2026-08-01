@@ -16,6 +16,7 @@ import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'sleep_entry_sheet.dart';
 import 'sleep_monitor_result_screen.dart';
 import 'sleep_monitor_screen.dart';
+import 'sleep_settings_screen.dart';
 
 class SleepTrackerScreen extends StatefulWidget {
   const SleepTrackerScreen({super.key});
@@ -102,7 +103,20 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: Text(loc.sleepTitle), centerTitle: true),
+      appBar: AppBar(
+        title: Text(loc.sleepTitle),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: loc.sleepSettingsTitle,
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SleepSettingsScreen()),
+            ),
+          ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(

@@ -15,10 +15,25 @@ object SleepAlarmScheduler {
     const val ACTION_FIRE = "com.workoutnotes.workout_notes.sleep.ALARM_FIRE"
     const val EXTRA_ALARM_AT = "alarm_at_epoch_ms"
     const val EXTRA_SESSION_ID = "session_id"
+    const val EXTRA_MONITOR_MODE = "monitor_mode"
+    const val EXTRA_MISSION_TYPE = "mission_type"
+    const val EXTRA_MISSION_HASH = "mission_hash"
+    const val EXTRA_MISSION_SALT = "mission_salt"
+    const val EXTRA_MISSION_FORMAT = "mission_format"
 
     private const val PREFS_NAME = "sleep_alarm_schedule"
     private const val KEY_ALARM_AT = "alarm_at_epoch_ms"
     private const val KEY_SESSION_ID = "session_id"
+    private const val KEY_MONITOR_MODE = "monitor_mode"
+    private const val KEY_MISSION_TYPE = "mission_type"
+    private const val KEY_MISSION_HASH = "mission_hash"
+    private const val KEY_MISSION_SALT = "mission_salt"
+    private const val KEY_MISSION_FORMAT = "mission_format"
+    private const val KEY_STATE = "state"
+    private const val KEY_EMERGENCY_TAPS = "emergency_taps"
+    const val STATE_SCHEDULED = "scheduled"
+    const val STATE_RINGING = "ringing"
+    const val STATE_COMPLETED = "completed"
     private const val REQUEST_FIRE = 1201
     private const val REQUEST_SHOW = 1202
 
@@ -57,14 +72,44 @@ object SleepAlarmScheduler {
         )
     }
 
-    @Throws(SecurityException::class, IllegalArgumentException::class)
-    fun schedule(context: Context, alarmAtMillis: Long, sessionId: String) {
+    data class Snapshot(
+        val alarmAtMillis: Long,
+        val sessionId: String,
+        val monitorMode: String,
+        val missionType: String?,
+        val missionHash: String?,
+        val missionSalt: String?,
+        val missionFormat: String?,
+        val state: String,
+    ) {
+        val requiresMission: Boolean get() = monitorMode == "alarm_with_mission"
+    }
+
+    fun schedule(
+        context: Context,
+        alarmAtMillis: Long,
+        sessionId: String,
+        monitorMode: String = "alarm_without_mission",
+        missionType: String? = null,
+        missionHash: String? = null,
+        missionSalt: String? = null,
+        missionFormat: String? = null,
+    ) {
         require(alarmAtMillis > System.currentTimeMillis()) { "Alarm must be in the future" }
         if (!canScheduleExact(context)) {
             throw SecurityException("Exact alarm permission is required")
         }
         val manager = context.getSystemService(AlarmManager::class.java)
-        val operation = fireIntent(context, alarmAtMillis, sessionId)
+        val operation = fireIntent(
+            context,
+            alarmAtMillis,
+            sessionId,
+            monitorMode,
+            missionType,
+            missionHash,
+            missionSalt,
+            missionFormat,
+        )
         val showIntent = PendingIntent.getActivity(
             context,
             REQUEST_SHOW,
@@ -80,42 +125,92 @@ object SleepAlarmScheduler {
         preferences(context).edit()
             .putLong(KEY_ALARM_AT, alarmAtMillis)
             .putString(KEY_SESSION_ID, sessionId)
+            .putString(KEY_MONITOR_MODE, monitorMode)
+            .putString(KEY_MISSION_TYPE, missionType)
+            .putString(KEY_MISSION_HASH, missionHash)
+            .putString(KEY_MISSION_SALT, missionSalt)
+            .putString(KEY_MISSION_FORMAT, missionFormat)
+            .putString(KEY_STATE, STATE_SCHEDULED)
+            .putInt(KEY_EMERGENCY_TAPS, 0)
             .apply()
     }
 
     fun cancel(context: Context) {
         val stored = read(context)
-        if (stored != null) {
+        if (stored != null && stored.state == STATE_SCHEDULED) {
             context.getSystemService(AlarmManager::class.java).cancel(
-                fireIntent(context, stored.first, stored.second),
+                fireIntent(context, stored.alarmAtMillis, stored.sessionId,
+                    stored.monitorMode, stored.missionType, stored.missionHash,
+                    stored.missionSalt, stored.missionFormat),
             )
         }
         clear(context)
     }
 
     fun markFired(context: Context) {
-        clear(context)
+        preferences(context).edit().putString(KEY_STATE, STATE_RINGING).apply()
+    }
+
+    fun complete(context: Context) {
+        // Keep the immutable snapshot long enough for Flutter to import the
+        // dismissal metadata after a cold start. A later session overwrites it
+        // when it schedules its own alarm.
+        preferences(context).edit().putString(KEY_STATE, STATE_COMPLETED).apply()
+    }
+
+    fun emergencyTaps(context: Context): Int =
+        preferences(context).getInt(KEY_EMERGENCY_TAPS, 0)
+
+    fun incrementEmergencyTaps(context: Context): Int {
+        val next = (emergencyTaps(context) + 1).coerceAtMost(100)
+        preferences(context).edit().putInt(KEY_EMERGENCY_TAPS, next).apply()
+        return next
     }
 
     fun restore(context: Context) {
         val stored = read(context) ?: return
-        if (stored.first <= System.currentTimeMillis()) {
-            clear(context)
+        if (stored.state == STATE_COMPLETED) return
+        if (stored.state == STATE_RINGING) {
+            SleepAlarmRingingService.start(context, stored.alarmAtMillis)
+            return
+        }
+        if (stored.alarmAtMillis <= System.currentTimeMillis()) {
+            markFired(context)
+            SleepAlarmRingingService.start(context, stored.alarmAtMillis)
             return
         }
         try {
-            schedule(context, stored.first, stored.second)
+            schedule(
+                context,
+                stored.alarmAtMillis,
+                stored.sessionId,
+                stored.monitorMode,
+                stored.missionType,
+                stored.missionHash,
+                stored.missionSalt,
+                stored.missionFormat,
+            )
         } catch (_: Throwable) {
             // Keep the durable schedule so a later boot or permission grant can retry.
         }
     }
 
-    private fun read(context: Context): Pair<Long, String>? {
+    fun read(context: Context): Snapshot? {
         val prefs = preferences(context)
         val alarmAt = prefs.getLong(KEY_ALARM_AT, 0L)
         val sessionId = prefs.getString(KEY_SESSION_ID, null)
         return if (alarmAt > 0L && !sessionId.isNullOrBlank()) {
-            alarmAt to sessionId
+            Snapshot(
+                alarmAt,
+                sessionId,
+                prefs.getString(KEY_MONITOR_MODE, "alarm_without_mission")
+                    ?: "alarm_without_mission",
+                prefs.getString(KEY_MISSION_TYPE, null),
+                prefs.getString(KEY_MISSION_HASH, null),
+                prefs.getString(KEY_MISSION_SALT, null),
+                prefs.getString(KEY_MISSION_FORMAT, null),
+                prefs.getString(KEY_STATE, STATE_SCHEDULED) ?: STATE_SCHEDULED,
+            )
         } else {
             null
         }
@@ -137,6 +232,11 @@ object SleepAlarmScheduler {
         context: Context,
         alarmAtMillis: Long,
         sessionId: String,
+        monitorMode: String,
+        missionType: String?,
+        missionHash: String?,
+        missionSalt: String?,
+        missionFormat: String?,
     ): PendingIntent = PendingIntent.getBroadcast(
         context,
         REQUEST_FIRE,
@@ -144,6 +244,11 @@ object SleepAlarmScheduler {
             action = ACTION_FIRE
             putExtra(EXTRA_ALARM_AT, alarmAtMillis)
             putExtra(EXTRA_SESSION_ID, sessionId)
+            putExtra(EXTRA_MONITOR_MODE, monitorMode)
+            putExtra(EXTRA_MISSION_TYPE, missionType)
+            putExtra(EXTRA_MISSION_HASH, missionHash)
+            putExtra(EXTRA_MISSION_SALT, missionSalt)
+            putExtra(EXTRA_MISSION_FORMAT, missionFormat)
         },
         PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
     )

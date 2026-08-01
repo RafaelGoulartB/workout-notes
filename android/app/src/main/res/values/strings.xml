@@ -7,4 +7,15 @@
     <string name="sleep_alarm_good_morning">Good morning</string>
     <string name="sleep_alarm_wake_message">Your monitored night is complete.</string>
     <string name="sleep_alarm_dismiss">Dismiss</string>
+    <string name="sleep_alarm_mission_notification_body">Scan the registered barcode or use the emergency action.</string>
+    <string name="sleep_alarm_mission_body">Scan the registered barcode to dismiss this alarm.</string>
+    <string name="sleep_alarm_open_mission">Open mission</string>
+    <string name="sleep_alarm_emergency">Emergency: tap %1$d/100</string>
+    <string name="sleep_alarm_mission_wrong_code">That code does not match. Try again.</string>
+    <string name="sleep_alarm_mission_camera_denied">Camera access is needed to read the mission.</string>
+    <string name="sleep_alarm_open_camera_settings">Open camera settings</string>
+    <string name="barcode_scanner_instruction">Point the camera at a barcode</string>
+    <string name="barcode_scanner_flashlight">Flashlight</string>
+    <string name="barcode_scanner_flashlight_off">Turn off flashlight</string>
+    <string name="barcode_scanner_cancel">Cancel</string>
 </resources>

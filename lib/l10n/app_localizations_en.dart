@@ -3088,6 +3088,109 @@ class AppLocalizationsEn extends AppLocalizations {
       'The AI Coach sends a summary of your data each turn and has access to 13 read tools. It cannot edit your data. Conversations are stored locally.';
 
   @override
+  String get sleepSettingsTitle => 'Sleep settings';
+
+  @override
+  String get sleepSettingsMissionSection => 'ALARM MISSION';
+
+  @override
+  String get sleepMissionToggle => 'Barcode mission';
+
+  @override
+  String get sleepMissionToggleBody =>
+      'A protected alarm requires a mission when you choose that mode.';
+
+  @override
+  String get sleepMissionNotConfigured => 'No barcode registered';
+
+  @override
+  String sleepMissionConfigured(String format) {
+    return 'Registered code: $format';
+  }
+
+  @override
+  String get sleepMissionScan => 'Scan code';
+
+  @override
+  String get sleepMissionReplace => 'Replace code';
+
+  @override
+  String get sleepMissionRemove => 'Remove code';
+
+  @override
+  String get sleepMissionRemoveConfirm =>
+      'Remove the registered code? Protected alarms already started will not change.';
+
+  @override
+  String get sleepMissionScanError => 'The barcode could not be read.';
+
+  @override
+  String get sleepMissionCameraDenied =>
+      'Camera permission is required to read the mission.';
+
+  @override
+  String get sleepMonitorModeSection => 'HOW TO MONITOR';
+
+  @override
+  String get sleepMonitorModeAlarmNoMission =>
+      'Monitor + alarm without mission';
+
+  @override
+  String get sleepMonitorModeAlarmWithMission => 'Monitor + alarm with mission';
+
+  @override
+  String get sleepMonitorModeOnly => 'Monitor only, without alarm';
+
+  @override
+  String get sleepMonitorModeAlarmNoMissionBody =>
+      'The alarm rings at the selected time and can be dismissed normally.';
+
+  @override
+  String get sleepMonitorModeAlarmWithMissionBody =>
+      'To dismiss it, scan the registered code or tap the emergency action 100 times.';
+
+  @override
+  String get sleepMonitorModeOnlyBody =>
+      'Monitors the environment without scheduling an alarm.';
+
+  @override
+  String get sleepMonitorModeMissionUnavailable =>
+      'Configure a barcode mission to unlock this mode.';
+
+  @override
+  String get sleepMonitorStartOnly => 'Start monitoring only';
+
+  @override
+  String sleepMonitorStartWithMission(String time) {
+    return 'Start and wake at $time with mission';
+  }
+
+  @override
+  String get sleepMonitorProtectedStop => 'Stop monitoring only';
+
+  @override
+  String get sleepMonitorProtectedStopBody =>
+      'The alarm and mission will remain active for this time.';
+
+  @override
+  String get sleepMonitorMissionPending => 'Mission pending';
+
+  @override
+  String get sleepMonitorMissionReady => 'Mission configured';
+
+  @override
+  String get sleepMissionFormatUnknown => 'barcode';
+
+  @override
+  String get sleepMissionRemoved => 'Mission removed for new sessions.';
+
+  @override
+  String get sleepMissionSaved => 'Code registered successfully.';
+
+  @override
+  String get sleepMissionOpenSettings => 'Open camera settings';
+
+  @override
   String get aiEmptyTitle => 'Configure an AI provider';
 
   @override

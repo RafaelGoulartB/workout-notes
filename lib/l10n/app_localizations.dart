@@ -5716,6 +5716,186 @@ abstract class AppLocalizations {
   /// **'The AI Coach sends a summary of your data each turn and has access to 13 read tools. It cannot edit your data. Conversations are stored locally.'**
   String get aiSettingsAboutBody;
 
+  /// No description provided for @sleepSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep settings'**
+  String get sleepSettingsTitle;
+
+  /// No description provided for @sleepSettingsMissionSection.
+  ///
+  /// In en, this message translates to:
+  /// **'ALARM MISSION'**
+  String get sleepSettingsMissionSection;
+
+  /// No description provided for @sleepMissionToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode mission'**
+  String get sleepMissionToggle;
+
+  /// No description provided for @sleepMissionToggleBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A protected alarm requires a mission when you choose that mode.'**
+  String get sleepMissionToggleBody;
+
+  /// No description provided for @sleepMissionNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'No barcode registered'**
+  String get sleepMissionNotConfigured;
+
+  /// No description provided for @sleepMissionConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Registered code: {format}'**
+  String sleepMissionConfigured(String format);
+
+  /// No description provided for @sleepMissionScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan code'**
+  String get sleepMissionScan;
+
+  /// No description provided for @sleepMissionReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace code'**
+  String get sleepMissionReplace;
+
+  /// No description provided for @sleepMissionRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove code'**
+  String get sleepMissionRemove;
+
+  /// No description provided for @sleepMissionRemoveConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the registered code? Protected alarms already started will not change.'**
+  String get sleepMissionRemoveConfirm;
+
+  /// No description provided for @sleepMissionScanError.
+  ///
+  /// In en, this message translates to:
+  /// **'The barcode could not be read.'**
+  String get sleepMissionScanError;
+
+  /// No description provided for @sleepMissionCameraDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera permission is required to read the mission.'**
+  String get sleepMissionCameraDenied;
+
+  /// No description provided for @sleepMonitorModeSection.
+  ///
+  /// In en, this message translates to:
+  /// **'HOW TO MONITOR'**
+  String get sleepMonitorModeSection;
+
+  /// No description provided for @sleepMonitorModeAlarmNoMission.
+  ///
+  /// In en, this message translates to:
+  /// **'Monitor + alarm without mission'**
+  String get sleepMonitorModeAlarmNoMission;
+
+  /// No description provided for @sleepMonitorModeAlarmWithMission.
+  ///
+  /// In en, this message translates to:
+  /// **'Monitor + alarm with mission'**
+  String get sleepMonitorModeAlarmWithMission;
+
+  /// No description provided for @sleepMonitorModeOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monitor only, without alarm'**
+  String get sleepMonitorModeOnly;
+
+  /// No description provided for @sleepMonitorModeAlarmNoMissionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The alarm rings at the selected time and can be dismissed normally.'**
+  String get sleepMonitorModeAlarmNoMissionBody;
+
+  /// No description provided for @sleepMonitorModeAlarmWithMissionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'To dismiss it, scan the registered code or tap the emergency action 100 times.'**
+  String get sleepMonitorModeAlarmWithMissionBody;
+
+  /// No description provided for @sleepMonitorModeOnlyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Monitors the environment without scheduling an alarm.'**
+  String get sleepMonitorModeOnlyBody;
+
+  /// No description provided for @sleepMonitorModeMissionUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure a barcode mission to unlock this mode.'**
+  String get sleepMonitorModeMissionUnavailable;
+
+  /// No description provided for @sleepMonitorStartOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Start monitoring only'**
+  String get sleepMonitorStartOnly;
+
+  /// No description provided for @sleepMonitorStartWithMission.
+  ///
+  /// In en, this message translates to:
+  /// **'Start and wake at {time} with mission'**
+  String sleepMonitorStartWithMission(String time);
+
+  /// No description provided for @sleepMonitorProtectedStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop monitoring only'**
+  String get sleepMonitorProtectedStop;
+
+  /// No description provided for @sleepMonitorProtectedStopBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The alarm and mission will remain active for this time.'**
+  String get sleepMonitorProtectedStopBody;
+
+  /// No description provided for @sleepMonitorMissionPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Mission pending'**
+  String get sleepMonitorMissionPending;
+
+  /// No description provided for @sleepMonitorMissionReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Mission configured'**
+  String get sleepMonitorMissionReady;
+
+  /// No description provided for @sleepMissionFormatUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'barcode'**
+  String get sleepMissionFormatUnknown;
+
+  /// No description provided for @sleepMissionRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Mission removed for new sessions.'**
+  String get sleepMissionRemoved;
+
+  /// No description provided for @sleepMissionSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Code registered successfully.'**
+  String get sleepMissionSaved;
+
+  /// No description provided for @sleepMissionOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open camera settings'**
+  String get sleepMissionOpenSettings;
+
   /// No description provided for @aiEmptyTitle.
   ///
   /// In en, this message translates to:

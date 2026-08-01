@@ -8,7 +8,7 @@ import 'base_repository.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
-  static const int currentBackupVersion = 5;
+  static const int currentBackupVersion = 6;
   static const int minimumSupportedBackupVersion = 2;
 
   final Future<Database> Function()? _databaseProvider;
@@ -113,9 +113,8 @@ class ExportImportRepository extends BaseRepository {
         'sleep_entries',
         data['sleep_entries'],
       );
-      totalRows += await _insertAll(
+      totalRows += await _insertSleepSessions(
         txn,
-        'sleep_monitor_sessions',
         data['sleep_monitor_sessions'],
       );
       totalRows += await _insertAll(
@@ -124,6 +123,15 @@ class ExportImportRepository extends BaseRepository {
         data['sleep_monitor_segments'],
       );
       totalRows += await _insertAll(txn, 'app_settings', data['settings']);
+      // Backups before v6 had no mission settings. Add the safe disabled
+      // defaults only on the production schema; the schema check keeps
+      // compatibility with older lightweight test/import databases.
+      final sessionColumns = (await txn.rawQuery(
+        'PRAGMA table_info(sleep_monitor_sessions)',
+      )).map((row) => row['name'] as String).toSet();
+      if (sessionColumns.contains('monitor_mode')) {
+        totalRows += await _insertMissingSleepSettings(txn);
+      }
     });
 
     return totalRows;
@@ -142,6 +150,59 @@ class ExportImportRepository extends BaseRepository {
       count++;
     }
     return count;
+  }
+
+  Future<int> _insertSleepSessions(Transaction txn, dynamic rows) async {
+    if (rows == null || rows is! List || rows.isEmpty) return 0;
+    final columns = (await txn.rawQuery(
+      'PRAGMA table_info(sleep_monitor_sessions)',
+    )).map((row) => row['name'] as String).toSet();
+    var count = 0;
+    for (final raw in rows) {
+      final row = Map<String, dynamic>.from(raw as Map);
+      if (columns.contains('monitor_mode')) {
+        row['monitor_mode'] ??= row['alarm_at'] == null
+            ? 'monitoring_only'
+            : 'alarm_without_mission';
+      }
+      row.removeWhere((key, _) => !columns.contains(key));
+      await txn.insert(
+        'sleep_monitor_sessions',
+        row,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      count++;
+    }
+    return count;
+  }
+
+  Future<int> _insertMissingSleepSettings(Transaction txn) async {
+    const defaults = <String, String>{
+      'sleep_mission_enabled': 'false',
+      'sleep_mission_type': 'barcode',
+      'sleep_mission_barcode_hash': '',
+      'sleep_mission_barcode_salt': '',
+      'sleep_mission_barcode_format': '',
+      'sleep_mission_registered_at': '',
+      'sleep_monitor_default_mode': 'alarm_without_mission',
+    };
+    var inserted = 0;
+    for (final entry in defaults.entries) {
+      final existing = await txn.query(
+        'app_settings',
+        where: 'key = ?',
+        whereArgs: [entry.key],
+        limit: 1,
+      );
+      if (existing.isEmpty) {
+        await txn.insert('app_settings', {
+          'key': entry.key,
+          'value': entry.value,
+        });
+        inserted++;
+      }
+    }
+    return inserted;
   }
 
   // ------------------------------------------------------------------

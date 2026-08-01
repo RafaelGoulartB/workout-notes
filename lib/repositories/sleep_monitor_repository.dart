@@ -69,6 +69,22 @@ class SleepMonitorRepository extends BaseRepository {
     });
   }
 
+  Future<void> markAlarmDismissed(
+    String sessionId,
+    String method,
+    DateTime dismissedAt,
+  ) async {
+    await (await db).update(
+      'sleep_monitor_sessions',
+      {
+        'alarm_dismiss_method': method,
+        'alarm_dismissed_at': dismissedAt.toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [sessionId],
+    );
+  }
+
   /// Imports a native spool atomically. Re-importing the same session replaces
   /// its aggregate rows and never creates a second sleep entry.
   Future<SleepMonitorSession> importNativeSpool(
@@ -143,9 +159,14 @@ class SleepMonitorRepository extends BaseRepository {
       final session = entry == null
           ? recovered
           : recovered.copyWith(sleepEntryId: entry.id);
+      final sessionColumns = (await txn.rawQuery(
+        'PRAGMA table_info(sleep_monitor_sessions)',
+      )).map((row) => row['name'] as String).toSet();
+      final sessionMap = session.toMap()
+        ..removeWhere((key, _) => !sessionColumns.contains(key));
       await txn.insert(
         'sleep_monitor_sessions',
-        session.toMap(),
+        sessionMap,
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
       await txn.delete(

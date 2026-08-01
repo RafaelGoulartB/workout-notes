@@ -7,4 +7,15 @@
     <string name="sleep_alarm_good_morning">Bom dia</string>
     <string name="sleep_alarm_wake_message">Sua noite monitorada foi concluída.</string>
     <string name="sleep_alarm_dismiss">Desligar</string>
+    <string name="sleep_alarm_mission_notification_body">Leia o código cadastrado ou use a ação de emergência.</string>
+    <string name="sleep_alarm_mission_body">Leia o código cadastrado para desligar este alarme.</string>
+    <string name="sleep_alarm_open_mission">Abrir missão</string>
+    <string name="sleep_alarm_emergency">Emergência: tocar %1$d/100</string>
+    <string name="sleep_alarm_mission_wrong_code">Esse código não corresponde. Tente novamente.</string>
+    <string name="sleep_alarm_mission_camera_denied">O acesso à câmera é necessário para ler a missão.</string>
+    <string name="sleep_alarm_open_camera_settings">Abrir configurações da câmera</string>
+    <string name="barcode_scanner_instruction">Aponte a câmera para um código de barras</string>
+    <string name="barcode_scanner_flashlight">Lanterna</string>
+    <string name="barcode_scanner_flashlight_off">Desligar lanterna</string>
+    <string name="barcode_scanner_cancel">Cancelar</string>
 </resources>

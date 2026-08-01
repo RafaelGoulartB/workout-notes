@@ -42,4 +42,11 @@ class MainActivity : FlutterActivity() {
             super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         }
     }
+
+    @Deprecated("Deprecated in Android SDK")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        if (sleepMonitorBridge?.onActivityResult(requestCode, resultCode, data) != true) {
+            super.onActivityResult(requestCode, resultCode, data)
+        }
+    }
 }

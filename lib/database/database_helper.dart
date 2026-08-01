@@ -17,7 +17,7 @@ import '../models/sleep_monitor_session.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 22;
+  static const _dbVersion = 23;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -245,6 +245,10 @@ class DatabaseHelper {
         started_at TEXT NOT NULL,
         ended_at TEXT,
         alarm_at TEXT,
+        monitor_mode TEXT,
+        mission_type TEXT,
+        alarm_dismiss_method TEXT,
+        alarm_dismissed_at TEXT,
         utc_offset_start_minutes INTEGER NOT NULL,
         utc_offset_end_minutes INTEGER,
         sensor_mode TEXT NOT NULL DEFAULT 'audio',
@@ -1686,6 +1690,47 @@ class DatabaseHelper {
         );
       } catch (_) {}
     }
+    if (oldVersion < 23) {
+      for (final statement in [
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN monitor_mode TEXT',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN mission_type TEXT',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN alarm_dismiss_method TEXT',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN alarm_dismissed_at TEXT',
+      ]) {
+        try {
+          await db.execute(statement);
+        } catch (_) {}
+      }
+      try {
+        await db.execute('''
+          UPDATE sleep_monitor_sessions
+          SET monitor_mode = CASE
+            WHEN alarm_at IS NULL THEN 'monitoring_only'
+            ELSE 'alarm_without_mission'
+          END
+          WHERE monitor_mode IS NULL
+        ''');
+      } catch (_) {}
+      // Mission settings are additive as well. INSERT OR IGNORE keeps this
+      // migration safe for databases that were partially upgraded already.
+      for (final entry in const <String, String>{
+        'sleep_mission_enabled': 'false',
+        'sleep_mission_type': 'barcode',
+        'sleep_mission_barcode_hash': '',
+        'sleep_mission_barcode_salt': '',
+        'sleep_mission_barcode_format': '',
+        'sleep_mission_registered_at': '',
+        'sleep_monitor_default_mode': 'alarm_without_mission',
+      }.entries) {
+        try {
+          await db.insert(
+            'app_settings',
+            {'key': entry.key, 'value': entry.value},
+            conflictAlgorithm: ConflictAlgorithm.ignore,
+          );
+        } catch (_) {}
+      }
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -1729,6 +1774,34 @@ class DatabaseHelper {
     batch.insert('app_settings', {
       'key': 'auto_start_workout_timer',
       'value': 'false',
+    });
+    batch.insert('app_settings', {
+      'key': 'sleep_mission_enabled',
+      'value': 'false',
+    });
+    batch.insert('app_settings', {
+      'key': 'sleep_mission_type',
+      'value': 'barcode',
+    });
+    batch.insert('app_settings', {
+      'key': 'sleep_mission_barcode_hash',
+      'value': '',
+    });
+    batch.insert('app_settings', {
+      'key': 'sleep_mission_barcode_salt',
+      'value': '',
+    });
+    batch.insert('app_settings', {
+      'key': 'sleep_mission_barcode_format',
+      'value': '',
+    });
+    batch.insert('app_settings', {
+      'key': 'sleep_mission_registered_at',
+      'value': '',
+    });
+    batch.insert('app_settings', {
+      'key': 'sleep_monitor_default_mode',
+      'value': 'alarm_without_mission',
     });
     batch.insert('app_settings', {
       'key': 'notification_rest_timer_enabled',

@@ -1,4 +1,5 @@
 import 'sleep_monitor_segment.dart';
+import 'sleep_monitor_mode.dart';
 
 class SleepMonitorState {
   static const idle = 'idle';
@@ -16,6 +17,11 @@ class SleepMonitorState {
   final DateTime? startedAt;
   final DateTime? updatedAt;
   final DateTime? alarmAt;
+  final SleepMonitoringMode mode;
+  final SleepMissionStatus missionStatus;
+  final bool alarmRinging;
+  final int emergencyTaps;
+  final String? alarmDismissMethod;
   final String? endReason;
   final bool exactAlarmGranted;
   final bool fullScreenIntentGranted;
@@ -33,6 +39,11 @@ class SleepMonitorState {
     required this.startedAt,
     required this.updatedAt,
     this.alarmAt,
+    this.mode = SleepMonitoringMode.alarmWithoutMission,
+    this.missionStatus = SleepMissionStatus.unconfigured,
+    this.alarmRinging = false,
+    this.emergencyTaps = 0,
+    this.alarmDismissMethod,
     this.endReason,
     this.exactAlarmGranted = false,
     this.fullScreenIntentGranted = false,
@@ -52,6 +63,11 @@ class SleepMonitorState {
         startedAt: null,
         updatedAt: null,
         alarmAt: null,
+        mode: SleepMonitoringMode.alarmWithoutMission,
+        missionStatus: SleepMissionStatus.unconfigured,
+        alarmRinging: false,
+        emergencyTaps: 0,
+        alarmDismissMethod: null,
         endReason: null,
         exactAlarmGranted: false,
         fullScreenIntentGranted: false,
@@ -80,6 +96,11 @@ class SleepMonitorState {
     DateTime? startedAt,
     DateTime? updatedAt,
     DateTime? alarmAt,
+    SleepMonitoringMode? mode,
+    SleepMissionStatus? missionStatus,
+    bool? alarmRinging,
+    int? emergencyTaps,
+    String? alarmDismissMethod,
     String? endReason,
     bool? exactAlarmGranted,
     bool? fullScreenIntentGranted,
@@ -97,6 +118,11 @@ class SleepMonitorState {
       startedAt: startedAt ?? this.startedAt,
       updatedAt: updatedAt ?? this.updatedAt,
       alarmAt: alarmAt ?? this.alarmAt,
+      mode: mode ?? this.mode,
+      missionStatus: missionStatus ?? this.missionStatus,
+      alarmRinging: alarmRinging ?? this.alarmRinging,
+      emergencyTaps: emergencyTaps ?? this.emergencyTaps,
+      alarmDismissMethod: alarmDismissMethod ?? this.alarmDismissMethod,
       endReason: endReason ?? this.endReason,
       exactAlarmGranted: exactAlarmGranted ?? this.exactAlarmGranted,
       fullScreenIntentGranted:
@@ -122,6 +148,11 @@ class SleepMonitorState {
       startedAt: startedText == null ? null : DateTime.parse(startedText),
       updatedAt: updatedText == null ? null : DateTime.parse(updatedText),
       alarmAt: alarmText == null ? null : DateTime.parse(alarmText),
+      mode: SleepMonitoringMode.fromWire(map['monitor_mode']),
+      missionStatus: SleepMissionStatus.fromWire(map['mission_status']),
+      alarmRinging: map['alarm_ringing'] as bool? ?? false,
+      emergencyTaps: (map['emergency_taps'] as num?)?.toInt() ?? 0,
+      alarmDismissMethod: map['alarm_dismiss_method'] as String?,
       endReason: map['end_reason'] as String?,
       exactAlarmGranted: map['exact_alarm_granted'] as bool? ?? false,
       fullScreenIntentGranted:

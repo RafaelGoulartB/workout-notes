@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../models/sleep_monitor_state.dart';
+import '../models/sleep_monitor_mode.dart';
 import '../repositories/sleep_monitor_repository.dart';
 
 /// Flutter facade for the Android foreground sleep monitor.
@@ -172,13 +173,37 @@ class SleepMonitorService extends ChangeNotifier {
     }
   }
 
-  Future<bool> startMonitoring({required DateTime alarmAt}) async {
+  Future<bool> startMonitoring({
+    DateTime? alarmAt,
+    SleepMonitoringMode mode = SleepMonitoringMode.alarmWithoutMission,
+    SleepMissionConfig? mission,
+  }) async {
     if (!_isAndroid) return false;
     if (_state.isActive) return true;
+    if (mode.hasAlarm && alarmAt == null) {
+      _setError('invalid_alarm_time', 'Alarm time is required');
+      return false;
+    }
+    if (mode.requiresMission && !(mission?.isConfigured ?? false)) {
+      _setError('mission_not_configured', 'A barcode mission is required');
+      return false;
+    }
     try {
+      final arguments = <String, dynamic>{'monitor_mode': mode.wireValue};
+      if (alarmAt != null) {
+        arguments['alarm_at_epoch_ms'] = alarmAt.millisecondsSinceEpoch;
+      }
+      if (mission != null) {
+        arguments.addAll({
+          'mission_type': mission.type,
+          'mission_hash': mission.hash,
+          'mission_salt': mission.salt,
+          'mission_format': mission.format,
+        });
+      }
       final result = await methods.invokeMapMethod<String, dynamic>(
         'startMonitoring',
-        {'alarm_at_epoch_ms': alarmAt.millisecondsSinceEpoch},
+        arguments,
       );
       if (result != null) {
         _onEvent(result);
@@ -211,6 +236,58 @@ class SleepMonitorService extends ChangeNotifier {
       return false;
     } catch (error) {
       _setError('alarm_schedule_failed', error.toString());
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> scanBarcodeForMission() async {
+    if (!_isAndroid) return null;
+    try {
+      return await methods.invokeMapMethod<String, dynamic>(
+        'scanBarcodeForMission',
+      );
+    } on PlatformException catch (error) {
+      _setError(error.code, error.message ?? error.toString());
+      return null;
+    } catch (error) {
+      _setError('barcode_scan_failed', error.toString());
+      return null;
+    }
+  }
+
+  Future<Map<String, bool>> getMissionCapabilities() async {
+    if (!_isAndroid) return {'cameraGranted': false};
+    try {
+      final result = await methods.invokeMapMethod<String, dynamic>(
+        'getMissionCapabilities',
+      );
+      return {'cameraGranted': result?['camera_granted'] as bool? ?? false};
+    } catch (error) {
+      _setError('mission_capabilities', error.toString());
+      return {'cameraGranted': false};
+    }
+  }
+
+  Future<bool> requestCameraPermission() async {
+    if (!_isAndroid) return false;
+    try {
+      return await methods.invokeMethod<bool>('requestCameraPermission') ??
+          false;
+    } on PlatformException catch (error) {
+      _setError(error.code, error.message ?? error.toString());
+      return false;
+    } catch (error) {
+      _setError('camera_permission', error.toString());
+      return false;
+    }
+  }
+
+  Future<bool> openCameraSettings() async {
+    if (!_isAndroid) return false;
+    try {
+      return await methods.invokeMethod<bool>('openCameraSettings') ?? false;
+    } catch (error) {
+      _setError('camera_settings', error.toString());
       return false;
     }
   }
@@ -297,7 +374,19 @@ class SleepMonitorService extends ChangeNotifier {
   void _onEvent(dynamic event) {
     if (event is! Map) return;
     try {
-      _state = SleepMonitorState.fromMap(Map<String, dynamic>.from(event));
+      final map = Map<String, dynamic>.from(event);
+      _state = SleepMonitorState.fromMap(map);
+      if (map['alarm_dismissed'] == true &&
+          map['session_id'] is String &&
+          map['alarm_dismiss_method'] is String) {
+        _repository
+            .markAlarmDismissed(
+              map['session_id'] as String,
+              map['alarm_dismiss_method'] as String,
+              DateTime.now(),
+            )
+            .catchError((_) {});
+      }
       notifyListeners();
     } catch (error) {
       _setError('event_invalid', error.toString());

@@ -4,12 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
+import 'package:workout_notes/models/sleep_monitor_mode.dart';
 import 'package:workout_notes/models/sleep_monitor_state.dart';
 import 'package:workout_notes/services/notification_service.dart';
+import 'package:workout_notes/services/sleep_mission_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/utils/sleep_alarm_time.dart';
 
 import 'sleep_monitor_result_screen.dart';
+import 'sleep_settings_screen.dart';
 
 class SleepMonitorScreen extends StatefulWidget {
   const SleepMonitorScreen({super.key});
@@ -21,8 +24,10 @@ class SleepMonitorScreen extends StatefulWidget {
 class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     with WidgetsBindingObserver {
   final _service = SleepMonitorService.instance;
+  final _missions = SleepMissionService();
   Timer? _ticker;
   TimeOfDay _selectedTime = const TimeOfDay(hour: 7, minute: 0);
+  SleepMonitoringMode _selectedMode = SleepMonitoringMode.alarmWithoutMission;
   bool _isBusy = false;
   bool _loading = true;
   bool _openingResult = false;
@@ -50,19 +55,45 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && _service.isSupported) {
+      _reloadMission();
       _service.initialize().then((_) => _service.getAlarmCapabilities());
       _openPendingAlarmResult();
     }
   }
 
+  Future<void> _reloadMission() async {
+    await _missions.load();
+    if (!mounted) return;
+    if (_selectedMode == SleepMonitoringMode.alarmWithMission &&
+        !_missions.config.isReady) {
+      setState(() {
+        _selectedMode = SleepMonitoringMode.alarmWithoutMission;
+      });
+      await _missions.setLastMode(_selectedMode);
+      return;
+    }
+    setState(() {});
+  }
+
   Future<void> _initialize() async {
     await _service.initialize();
+    if (!_service.isSupported) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     await _service.getAlarmCapabilities();
+    await _missions.load();
     final defaultAlarm = SleepAlarmTime.defaultAlarm();
     if (!mounted) return;
     setState(() {
       _selectedTime = TimeOfDay.fromDateTime(defaultAlarm);
+      final remembered = _missions.lastMode;
+      _selectedMode =
+          remembered == SleepMonitoringMode.alarmWithMission &&
+              !_missions.config.isReady
+          ? SleepMonitoringMode.alarmWithoutMission
+          : remembered;
       _loading = false;
     });
   }
@@ -124,7 +155,9 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     final active = state.isActive;
     final alarmAt = active && state.alarmAt != null
         ? state.alarmAt!.toLocal()
-        : SleepAlarmTime.nextOccurrence(_selectedTime);
+        : _selectedMode.hasAlarm
+        ? SleepAlarmTime.nextOccurrence(_selectedTime)
+        : null;
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(title: Text(loc.sleepMonitorTitle)),
@@ -151,18 +184,23 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
                   ? FilledButton.icon(
                       onPressed: _isBusy ? null : _stop,
                       icon: _busyIcon(Icons.stop_rounded),
-                      label: Text(loc.sleepMonitorFinish),
+                      label: Text(
+                        state.mode == SleepMonitoringMode.alarmWithMission
+                            ? loc.sleepMonitorProtectedStop
+                            : loc.sleepMonitorFinish,
+                      ),
                     )
                   : FilledButton.icon(
                       onPressed:
                           _isBusy ||
-                              !SleepAlarmTime.isWithinMonitoringWindow(alarmAt)
+                              (_selectedMode.hasAlarm &&
+                                  !SleepAlarmTime.isWithinMonitoringWindow(
+                                    alarmAt!,
+                                  ))
                           ? null
                           : () => _start(alarmAt),
                       icon: _busyIcon(Icons.bedtime_rounded),
-                      label: Text(
-                        loc.sleepMonitorStartWithAlarm(_formatTime(alarmAt)),
-                      ),
+                      label: Text(_startLabel(loc, alarmAt)),
                     ),
             ),
     );
@@ -171,9 +209,10 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   List<Widget> _readyContent(
     AppLocalizations loc,
     SleepMonitorState state,
-    DateTime alarmAt,
+    DateTime? alarmAt,
   ) {
-    final valid = SleepAlarmTime.isWithinMonitoringWindow(alarmAt);
+    final valid =
+        alarmAt == null || SleepAlarmTime.isWithinMonitoringWindow(alarmAt);
     return [
       _NightHero(
         icon: Icons.nightlight_round,
@@ -181,13 +220,17 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         subtitle: loc.sleepAlarmSectionTitle,
       ),
       const SizedBox(height: 16),
-      _AlarmClockCard(
-        time: _formatTime(alarmAt),
-        date: _formatDate(alarmAt),
-        remaining: loc.sleepAlarmIn(_formatRemaining(alarmAt)),
-        helper: loc.sleepAlarmTapToChange,
-        onTap: _chooseAlarmTime,
-      ),
+      _buildModeSelector(loc),
+      if (alarmAt != null) ...[
+        const SizedBox(height: 16),
+        _AlarmClockCard(
+          time: _formatTime(alarmAt),
+          date: _formatDate(alarmAt),
+          remaining: loc.sleepAlarmIn(_formatRemaining(alarmAt)),
+          helper: loc.sleepAlarmTapToChange,
+          onTap: _chooseAlarmTime,
+        ),
+      ],
       if (!valid) ...[
         const SizedBox(height: 10),
         _WarningBanner(
@@ -195,19 +238,21 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
           text: loc.sleepAlarmInvalidWindow,
         ),
       ],
-      const SizedBox(height: 14),
-      _InfoCard(
-        icon: Icons.notifications_active_outlined,
-        title: loc.sleepAlarmSystemSound,
-        body: loc.sleepAlarmSystemSoundBody,
-      ),
-      const SizedBox(height: 10),
-      _InfoCard(
-        icon: Icons.battery_charging_full_rounded,
-        title: loc.sleepAlarmPreparation,
-        body: loc.sleepAlarmPreparationBody,
-      ),
-      if (!state.exactAlarmGranted) ...[
+      if (_selectedMode.hasAlarm) ...[
+        const SizedBox(height: 14),
+        _InfoCard(
+          icon: Icons.notifications_active_outlined,
+          title: loc.sleepAlarmSystemSound,
+          body: loc.sleepAlarmSystemSoundBody,
+        ),
+        const SizedBox(height: 10),
+        _InfoCard(
+          icon: Icons.battery_charging_full_rounded,
+          title: loc.sleepAlarmPreparation,
+          body: loc.sleepAlarmPreparationBody,
+        ),
+      ],
+      if (_selectedMode.hasAlarm && !state.exactAlarmGranted) ...[
         const SizedBox(height: 10),
         _PermissionNotice(
           text: loc.sleepAlarmExactPermission,
@@ -215,7 +260,9 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
           onPressed: _service.requestExactAlarmPermission,
         ),
       ],
-      if (state.exactAlarmGranted && !state.fullScreenIntentGranted) ...[
+      if (_selectedMode.hasAlarm &&
+          state.exactAlarmGranted &&
+          !state.fullScreenIntentGranted) ...[
         const SizedBox(height: 10),
         _PermissionNotice(
           text: loc.sleepAlarmFullScreenLimited,
@@ -251,13 +298,15 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   List<Widget> _runningContent(
     AppLocalizations loc,
     SleepMonitorState state,
-    DateTime alarmAt,
+    DateTime? alarmAt,
   ) {
     return [
       _NightHero(
         icon: Icons.graphic_eq_rounded,
         title: loc.sleepMonitorRunning,
-        subtitle: loc.sleepAlarmScheduledFor(_formatTime(alarmAt)),
+        subtitle: alarmAt == null
+            ? loc.sleepMonitorModeOnly
+            : loc.sleepAlarmScheduledFor(_formatTime(alarmAt)),
       ),
       const SizedBox(height: 16),
       Card(
@@ -278,41 +327,49 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
                 ),
               ),
               const SizedBox(height: 18),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.alarm_rounded),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            loc.sleepAlarmRemaining,
-                            style: Theme.of(context).textTheme.labelMedium,
-                          ),
-                          Text(
-                            _formatRemaining(alarmAt, withSeconds: true),
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                        ],
+              if (alarmAt != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.alarm_rounded),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              loc.sleepAlarmRemaining,
+                              style: Theme.of(context).textTheme.labelMedium,
+                            ),
+                            Text(
+                              _formatRemaining(alarmAt, withSeconds: true),
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: _isBusy ? null : _chooseAlarmTime,
-                      child: Text(loc.sleepAlarmChange),
-                    ),
-                  ],
+                      TextButton(
+                        onPressed: _isBusy ? null : _chooseAlarmTime,
+                        child: Text(loc.sleepAlarmChange),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
               const SizedBox(height: 14),
+              if (state.mode == SleepMonitoringMode.alarmWithMission)
+                _MissionStatusBanner(
+                  label: loc.sleepMonitorMissionPending,
+                  body: loc.sleepMonitorModeAlarmWithMissionBody,
+                ),
+              if (state.mode == SleepMonitoringMode.alarmWithMission)
+                const SizedBox(height: 12),
               _PermissionRow(
                 granted: state.microphoneGranted,
                 label: loc.sleepMonitorMicrophone,
@@ -328,6 +385,16 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         ),
       ),
       const SizedBox(height: 12),
+      if (state.mode == SleepMonitoringMode.alarmWithMission)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            loc.sleepMonitorProtectedStopBody,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
       OutlinedButton.icon(
         onPressed: _isBusy ? null : _discard,
         icon: const Icon(Icons.delete_outline),
@@ -351,6 +418,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
       : Icon(fallback);
 
   Future<void> _chooseAlarmTime() async {
+    if (!_selectedMode.hasAlarm && !_service.state.mode.hasAlarm) return;
     final stateAlarm = _service.state.alarmAt?.toLocal();
     final initial = stateAlarm == null
         ? _selectedTime
@@ -383,9 +451,11 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     }
   }
 
-  Future<void> _start(DateTime alarmAt) async {
+  Future<void> _start(DateTime? alarmAt) async {
     final loc = AppLocalizations.of(context)!;
-    if (!SleepAlarmTime.isWithinMonitoringWindow(alarmAt)) {
+    if (_selectedMode.hasAlarm &&
+        (alarmAt == null ||
+            !SleepAlarmTime.isWithinMonitoringWindow(alarmAt))) {
       _showMessage(loc.sleepAlarmInvalidWindow);
       return;
     }
@@ -405,14 +475,27 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         return;
       }
 
-      final capabilities = await _service.getAlarmCapabilities();
-      if (capabilities['exactAlarmGranted'] != true) {
-        await _service.requestExactAlarmPermission();
-        if (mounted) _showMessage(loc.sleepAlarmExactPermission);
-        return;
+      if (_selectedMode.hasAlarm) {
+        final capabilities = await _service.getAlarmCapabilities();
+        if (capabilities['exactAlarmGranted'] != true) {
+          await _service.requestExactAlarmPermission();
+          if (mounted) _showMessage(loc.sleepAlarmExactPermission);
+          return;
+        }
       }
 
-      final started = await _service.startMonitoring(alarmAt: alarmAt);
+      if (_selectedMode.requiresMission) {
+        if (!_missions.config.isReady) {
+          _showMessage(loc.sleepMonitorModeMissionUnavailable);
+          return;
+        }
+      }
+
+      final started = await _service.startMonitoring(
+        alarmAt: alarmAt,
+        mode: _selectedMode,
+        mission: _missions.config,
+      );
       if (!started && mounted) {
         _showMessage(_localizedError(loc, _service.state.errorCode));
       }
@@ -487,11 +570,83 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         return loc.sleepAlarmExactPermission;
       case 'invalid_alarm_time':
         return loc.sleepAlarmInvalidWindow;
+      case 'alarm_not_configured':
+        return loc.sleepMonitorModeOnlyBody;
       case 'alarm_schedule_failed':
         return loc.sleepAlarmScheduleFailed;
+      case 'mission_not_configured':
+        return loc.sleepMonitorModeMissionUnavailable;
+      case 'camera_denied':
+      case 'camera_permission':
+        return loc.sleepMissionCameraDenied;
       default:
         return loc.sleepMonitorGenericError;
     }
+  }
+
+  String _startLabel(AppLocalizations loc, DateTime? alarmAt) {
+    if (_selectedMode == SleepMonitoringMode.monitoringOnly) {
+      return loc.sleepMonitorStartOnly;
+    }
+    if (_selectedMode == SleepMonitoringMode.alarmWithMission) {
+      return loc.sleepMonitorStartWithMission(_formatTime(alarmAt!));
+    }
+    return loc.sleepMonitorStartWithAlarm(_formatTime(alarmAt!));
+  }
+
+  Widget _buildModeSelector(AppLocalizations loc) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          loc.sleepMonitorModeSection,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            letterSpacing: 1.1,
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _ModeCard(
+          selected: _selectedMode == SleepMonitoringMode.alarmWithoutMission,
+          icon: Icons.alarm_outlined,
+          title: loc.sleepMonitorModeAlarmNoMission,
+          body: loc.sleepMonitorModeAlarmNoMissionBody,
+          onTap: () => _selectMode(SleepMonitoringMode.alarmWithoutMission),
+        ),
+        const SizedBox(height: 8),
+        _ModeCard(
+          selected: _selectedMode == SleepMonitoringMode.alarmWithMission,
+          enabled: _missions.config.isReady,
+          icon: Icons.qr_code_2_rounded,
+          title: loc.sleepMonitorModeAlarmWithMission,
+          body: _missions.config.isReady
+              ? loc.sleepMonitorModeAlarmWithMissionBody
+              : loc.sleepMonitorModeMissionUnavailable,
+          onTap: _missions.config.isReady
+              ? () => _selectMode(SleepMonitoringMode.alarmWithMission)
+              : () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SleepSettingsScreen(),
+                  ),
+                ).then((_) => _reloadMission()),
+        ),
+        const SizedBox(height: 8),
+        _ModeCard(
+          selected: _selectedMode == SleepMonitoringMode.monitoringOnly,
+          icon: Icons.graphic_eq_rounded,
+          title: loc.sleepMonitorModeOnly,
+          body: loc.sleepMonitorModeOnlyBody,
+          onTap: () => _selectMode(SleepMonitoringMode.monitoringOnly),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _selectMode(SleepMonitoringMode mode) async {
+    setState(() => _selectedMode = mode);
+    await _missions.setLastMode(mode);
   }
 
   String _formatTime(DateTime date) => MaterialLocalizations.of(
@@ -525,6 +680,134 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     return '${hours.toString().padLeft(2, '0')}:'
         '${minutes.toString().padLeft(2, '0')}:'
         '${seconds.toString().padLeft(2, '0')}';
+  }
+}
+
+class _ModeCard extends StatelessWidget {
+  const _ModeCard({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.onTap,
+    this.enabled = true,
+  });
+
+  final bool selected;
+  final bool enabled;
+  final IconData icon;
+  final String title;
+  final String body;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final background = selected
+        ? scheme.primaryContainer
+        : scheme.surfaceContainerHighest.withAlpha(enabled ? 170 : 90);
+    final foreground = enabled
+        ? (selected ? scheme.onPrimaryContainer : scheme.onSurface)
+        : scheme.onSurfaceVariant.withAlpha(150);
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      selected: selected,
+      child: InkWell(
+        // A locked mission card still opens its setup screen.
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? scheme.primary : scheme.outlineVariant,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: selected ? scheme.primary : foreground),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: foreground,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      body,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: foreground.withAlpha(enabled ? 210 : 150),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                color: selected ? scheme.primary : foreground,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MissionStatusBanner extends StatelessWidget {
+  const _MissionStatusBanner({required this.label, required this.body});
+  final String label;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: scheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.qr_code_2_rounded, color: scheme.onTertiaryContainer),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: scheme.onTertiaryContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(body, style: TextStyle(color: scheme.onTertiaryContainer)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

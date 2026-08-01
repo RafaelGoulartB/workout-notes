@@ -18,21 +18,75 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.workoutnotes.workout_notes.R
 
 class SleepAlarmRingingService : Service() {
     companion object {
         const val ACTION_START = "com.workoutnotes.workout_notes.sleep.ALARM_START"
         const val ACTION_DISMISS = "com.workoutnotes.workout_notes.sleep.ALARM_DISMISS"
+        private const val ACTION_COMPLETE = "com.workoutnotes.workout_notes.sleep.ALARM_COMPLETE"
+        private const val EXTRA_METHOD = "dismiss_method"
         const val CHANNEL_ID = "sleep_alarm"
         const val NOTIFICATION_ID = 1203
 
+        fun start(context: Context, alarmAt: Long) {
+            val intent = Intent(context, SleepAlarmRingingService::class.java).apply {
+                action = ACTION_START
+                putExtra(SleepAlarmScheduler.EXTRA_ALARM_AT, alarmAt)
+                SleepAlarmScheduler.read(context)?.let { snapshot ->
+                    putExtra(SleepAlarmScheduler.EXTRA_SESSION_ID, snapshot.sessionId)
+                    putExtra(SleepAlarmScheduler.EXTRA_MONITOR_MODE, snapshot.monitorMode)
+                    putExtra(SleepAlarmScheduler.EXTRA_MISSION_TYPE, snapshot.missionType)
+                    putExtra(SleepAlarmScheduler.EXTRA_MISSION_HASH, snapshot.missionHash)
+                    putExtra(SleepAlarmScheduler.EXTRA_MISSION_SALT, snapshot.missionSalt)
+                    putExtra(SleepAlarmScheduler.EXTRA_MISSION_FORMAT, snapshot.missionFormat)
+                }
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ContextCompat.startForegroundService(context, intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
         fun dismiss(context: Context) {
-            context.startService(
-                Intent(context, SleepAlarmRingingService::class.java).apply {
-                    action = ACTION_DISMISS
-                },
-            )
+            context.startService(Intent(context, SleepAlarmRingingService::class.java).apply {
+                action = ACTION_DISMISS
+            })
+        }
+
+        fun completeBarcode(context: Context, rawValue: String, format: String): Boolean {
+            val snapshot = SleepAlarmScheduler.read(context) ?: return false
+            if (snapshot.state != SleepAlarmScheduler.STATE_RINGING ||
+                !snapshot.requiresMission || snapshot.missionHash == null ||
+                snapshot.missionSalt == null
+            ) return false
+            val actual = BarcodeMissionCrypto.hash(format, rawValue, snapshot.missionSalt)
+            if (!BarcodeMissionCrypto.constantTimeEquals(actual, snapshot.missionHash)) {
+                return false
+            }
+            complete(context, SleepMonitorSessionDismiss.BARCODE)
+            return true
+        }
+
+        fun tapEmergency(context: Context): Int {
+            val snapshot = SleepAlarmScheduler.read(context) ?: return 0
+            if (snapshot.state != SleepAlarmScheduler.STATE_RINGING ||
+                !snapshot.requiresMission
+            ) return 0
+            if (SleepAlarmScheduler.emergencyTaps(context) >= 100) return 100
+            val taps = SleepAlarmScheduler.incrementEmergencyTaps(context)
+            SleepMonitoringService.publishAlarmRinging(context)
+            if (taps >= 100) complete(context, SleepMonitorSessionDismiss.EMERGENCY)
+            return taps.coerceAtMost(100)
+        }
+
+        private fun complete(context: Context, method: String) {
+            context.startService(Intent(context, SleepAlarmRingingService::class.java).apply {
+                action = ACTION_COMPLETE
+                putExtra(EXTRA_METHOD, method)
+            })
         }
     }
 
@@ -41,25 +95,40 @@ class SleepAlarmRingingService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val snapshot = SleepAlarmScheduler.read(this)
         if (intent?.action == ACTION_DISMISS) {
-            SleepMonitoringService.alarmDismissed()
-            stopRinging()
-            stopSelf()
+            if (snapshot?.state != SleepAlarmScheduler.STATE_RINGING) {
+                return START_NOT_STICKY
+            }
+            if (snapshot.requiresMission) return START_STICKY
+            finishAlarm(SleepMonitorSessionDismiss.BUTTON)
             return START_NOT_STICKY
         }
+        if (intent?.action == ACTION_COMPLETE) {
+            val method = intent.getStringExtra(EXTRA_METHOD)
+            if (snapshot?.state == SleepAlarmScheduler.STATE_RINGING &&
+                snapshot.requiresMission &&
+                method in setOf(SleepMonitorSessionDismiss.BARCODE, SleepMonitorSessionDismiss.EMERGENCY)
+            ) {
+                finishAlarm(method!!)
+                return START_NOT_STICKY
+            }
+            return START_STICKY
+        }
 
-        val alarmAt = intent?.getLongExtra(
+        val alarmAt = snapshot?.alarmAtMillis ?: intent?.getLongExtra(
             SleepAlarmScheduler.EXTRA_ALARM_AT,
             System.currentTimeMillis(),
         ) ?: System.currentTimeMillis()
         ensureChannel()
-        startForeground(NOTIFICATION_ID, buildNotification(alarmAt))
+        startForeground(NOTIFICATION_ID, buildNotification(alarmAt, snapshot?.requiresMission == true))
         if (player == null) {
             acquireWakeLock()
             startSound()
             startVibration()
         }
-        return START_NOT_STICKY
+        SleepMonitoringService.publishAlarmRinging(this)
+        return START_STICKY
     }
 
     override fun onDestroy() {
@@ -68,6 +137,13 @@ class SleepAlarmRingingService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun finishAlarm(method: String) {
+        SleepMonitoringService.alarmDismissed(this, method)
+        SleepAlarmScheduler.complete(this)
+        stopRinging()
+        stopSelf()
+    }
 
     private fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -86,31 +162,25 @@ class SleepAlarmRingingService : Service() {
         )
     }
 
-    private fun buildNotification(alarmAt: Long): Notification {
+    private fun buildNotification(alarmAt: Long, protected: Boolean): Notification {
         val activityIntent = PendingIntent.getActivity(
             this,
             1204,
             Intent(this, SleepAlarmActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra(SleepAlarmScheduler.EXTRA_ALARM_AT, alarmAt)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
         )
-        val dismissIntent = PendingIntent.getService(
-            this,
-            1205,
-            Intent(this, SleepAlarmRingingService::class.java).apply {
-                action = ACTION_DISMISS
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
-        )
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setColor(Color.rgb(91, 82, 171))
             .setContentTitle(getString(R.string.sleep_alarm_notification_title))
-            .setContentText(getString(R.string.sleep_alarm_notification_body))
+            .setContentText(
+                if (protected) getString(R.string.sleep_alarm_mission_notification_body)
+                else getString(R.string.sleep_alarm_notification_body),
+            )
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -118,12 +188,28 @@ class SleepAlarmRingingService : Service() {
             .setAutoCancel(false)
             .setContentIntent(activityIntent)
             .setFullScreenIntent(activityIntent, true)
-            .addAction(
+        if (!protected) {
+            val dismissIntent = PendingIntent.getService(
+                this,
+                1205,
+                Intent(this, SleepAlarmRingingService::class.java).apply {
+                    action = ACTION_DISMISS
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
+            )
+            builder.addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
                 getString(R.string.sleep_alarm_dismiss),
                 dismissIntent,
             )
-            .build()
+        } else {
+            builder.addAction(
+                android.R.drawable.ic_menu_camera,
+                getString(R.string.sleep_alarm_open_mission),
+                activityIntent,
+            )
+        }
+        return builder.build()
     }
 
     private fun startSound() {
@@ -173,10 +259,7 @@ class SleepAlarmRingingService : Service() {
     }
 
     private fun stopRinging() {
-        try {
-            player?.stop()
-        } catch (_: Throwable) {
-        }
+        try { player?.stop() } catch (_: Throwable) {}
         player?.release()
         player = null
         vibrator?.cancel()
@@ -187,9 +270,11 @@ class SleepAlarmRingingService : Service() {
     }
 
     private fun immutableFlag(): Int =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_IMMUTABLE
-        } else {
-            0
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+}
+
+private object SleepMonitorSessionDismiss {
+    const val BUTTON = "button"
+    const val BARCODE = "barcode"
+    const val EMERGENCY = "emergency_100_taps"
 }

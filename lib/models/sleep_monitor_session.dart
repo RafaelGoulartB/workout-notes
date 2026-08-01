@@ -1,4 +1,5 @@
 import 'sleep_monitor_segment.dart';
+import 'sleep_monitor_mode.dart';
 
 /// Durable aggregate for one microphone monitoring session.
 class SleepMonitorSession {
@@ -22,12 +23,20 @@ class SleepMonitorSession {
   static const endAudioError = 'audio_error';
   static const endAlarm = 'alarm';
 
+  static const dismissButton = 'button';
+  static const dismissBarcode = 'barcode';
+  static const dismissEmergency100Taps = 'emergency_100_taps';
+
   final String id;
   final String? sleepEntryId;
   final String status;
   final DateTime startedAt;
   final DateTime? endedAt;
   final DateTime? alarmAt;
+  final SleepMonitoringMode? monitorMode;
+  final String? missionType;
+  final String? alarmDismissMethod;
+  final DateTime? alarmDismissedAt;
   final int utcOffsetStartMinutes;
   final int? utcOffsetEndMinutes;
   final String sensorMode;
@@ -48,6 +57,10 @@ class SleepMonitorSession {
     required this.startedAt,
     required this.endedAt,
     this.alarmAt,
+    this.monitorMode,
+    this.missionType,
+    this.alarmDismissMethod,
+    this.alarmDismissedAt,
     required this.utcOffsetStartMinutes,
     required this.utcOffsetEndMinutes,
     required this.sensorMode,
@@ -65,11 +78,21 @@ class SleepMonitorSession {
   bool get isActive =>
       status == starting || status == running || status == stopping;
 
+  SleepMonitoringMode get mode =>
+      monitorMode ??
+      (alarmAt == null
+          ? SleepMonitoringMode.monitoringOnly
+          : SleepMonitoringMode.alarmWithoutMission);
+
   SleepMonitorSession copyWith({
     String? sleepEntryId,
     String? status,
     DateTime? endedAt,
     DateTime? alarmAt,
+    SleepMonitoringMode? monitorMode,
+    String? missionType,
+    String? alarmDismissMethod,
+    DateTime? alarmDismissedAt,
     int? utcOffsetEndMinutes,
     int? timeInBedMinutes,
     int? quietMinutes,
@@ -86,6 +109,10 @@ class SleepMonitorSession {
       startedAt: startedAt,
       endedAt: endedAt ?? this.endedAt,
       alarmAt: alarmAt ?? this.alarmAt,
+      monitorMode: monitorMode ?? this.monitorMode,
+      missionType: missionType ?? this.missionType,
+      alarmDismissMethod: alarmDismissMethod ?? this.alarmDismissMethod,
+      alarmDismissedAt: alarmDismissedAt ?? this.alarmDismissedAt,
       utcOffsetStartMinutes: utcOffsetStartMinutes,
       utcOffsetEndMinutes: utcOffsetEndMinutes ?? this.utcOffsetEndMinutes,
       sensorMode: sensorMode,
@@ -102,26 +129,39 @@ class SleepMonitorSession {
     );
   }
 
-  Map<String, dynamic> toMap() => {
-    'id': id,
-    'sleep_entry_id': sleepEntryId,
-    'status': status,
-    'started_at': startedAt.toIso8601String(),
-    'ended_at': endedAt?.toIso8601String(),
-    'alarm_at': alarmAt?.toIso8601String(),
-    'utc_offset_start_minutes': utcOffsetStartMinutes,
-    'utc_offset_end_minutes': utcOffsetEndMinutes,
-    'sensor_mode': sensorMode,
-    'algorithm_version': algorithmVersion,
-    'time_in_bed_minutes': timeInBedMinutes,
-    'quiet_minutes': quietMinutes,
-    'noisy_minutes': noisyMinutes,
-    'estimated_sleep_minutes': estimatedSleepMinutes,
-    'noise_event_count': noiseEventCount,
-    'signal_quality_score': signalQualityScore,
-    'end_reason': endReason,
-    'created_at': createdAt.toIso8601String(),
-  };
+  Map<String, dynamic> toMap() {
+    final map = <String, dynamic>{
+      'id': id,
+      'sleep_entry_id': sleepEntryId,
+      'status': status,
+      'started_at': startedAt.toIso8601String(),
+      'ended_at': endedAt?.toIso8601String(),
+      'alarm_at': alarmAt?.toIso8601String(),
+      'utc_offset_start_minutes': utcOffsetStartMinutes,
+      'utc_offset_end_minutes': utcOffsetEndMinutes,
+      'sensor_mode': sensorMode,
+      'algorithm_version': algorithmVersion,
+      'time_in_bed_minutes': timeInBedMinutes,
+      'quiet_minutes': quietMinutes,
+      'noisy_minutes': noisyMinutes,
+      'estimated_sleep_minutes': estimatedSleepMinutes,
+      'noise_event_count': noiseEventCount,
+      'signal_quality_score': signalQualityScore,
+      'end_reason': endReason,
+      'created_at': createdAt.toIso8601String(),
+    };
+    // Keep compatibility with pre-v23 test databases and old diagnostic
+    // consumers: optional metadata is emitted only when it is present.
+    if (monitorMode != null) map['monitor_mode'] = monitorMode!.wireValue;
+    if (missionType != null) map['mission_type'] = missionType;
+    if (alarmDismissMethod != null) {
+      map['alarm_dismiss_method'] = alarmDismissMethod;
+    }
+    if (alarmDismissedAt != null) {
+      map['alarm_dismissed_at'] = alarmDismissedAt!.toIso8601String();
+    }
+    return map;
+  }
 
   factory SleepMonitorSession.fromMap(Map<String, dynamic> map) {
     return SleepMonitorSession(
@@ -135,6 +175,14 @@ class SleepMonitorSession {
       alarmAt: (map['alarm_at'] as String?) == null
           ? null
           : DateTime.parse(map['alarm_at'] as String),
+      monitorMode: map['monitor_mode'] == null
+          ? null
+          : SleepMonitoringMode.fromWire(map['monitor_mode']),
+      missionType: map['mission_type'] as String?,
+      alarmDismissMethod: map['alarm_dismiss_method'] as String?,
+      alarmDismissedAt: (map['alarm_dismissed_at'] as String?) == null
+          ? null
+          : DateTime.parse(map['alarm_dismissed_at'] as String),
       utcOffsetStartMinutes: (map['utc_offset_start_minutes'] as num).toInt(),
       utcOffsetEndMinutes: (map['utc_offset_end_minutes'] as num?)?.toInt(),
       sensorMode: (map['sensor_mode'] as String?) ?? defaultSensorMode,
@@ -176,6 +224,9 @@ class SleepMonitorSession {
     normalized['end_reason'] = isUnfinished
         ? endProcessRecovered
         : normalized['end_reason'];
+    normalized['monitor_mode'] ??= normalized['alarm_at'] == null
+        ? SleepMonitoringMode.monitoringOnly.wireValue
+        : SleepMonitoringMode.alarmWithoutMission.wireValue;
     normalized['time_in_bed_minutes'] ??=
         ((DateTime.parse(
                   normalized['ended_at'] as String,

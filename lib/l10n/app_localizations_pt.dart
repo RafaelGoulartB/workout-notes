@@ -3102,6 +3102,110 @@ class AppLocalizationsPt extends AppLocalizations {
       'O Treinador IA envia um resumo dos seus dados a cada turno e tem acesso a 13 ferramentas de leitura. Não consegue editar seus dados. As conversas são salvas localmente.';
 
   @override
+  String get sleepSettingsTitle => 'Configurações do sono';
+
+  @override
+  String get sleepSettingsMissionSection => 'MISSÃO DO DESPERTADOR';
+
+  @override
+  String get sleepMissionToggle => 'Missão por código de barras';
+
+  @override
+  String get sleepMissionToggleBody =>
+      'Exige uma missão quando você escolher o alarme protegido.';
+
+  @override
+  String get sleepMissionNotConfigured => 'Nenhum código cadastrado';
+
+  @override
+  String sleepMissionConfigured(String format) {
+    return 'Código cadastrado: $format';
+  }
+
+  @override
+  String get sleepMissionScan => 'Ler código';
+
+  @override
+  String get sleepMissionReplace => 'Substituir código';
+
+  @override
+  String get sleepMissionRemove => 'Remover código';
+
+  @override
+  String get sleepMissionRemoveConfirm =>
+      'Remover o código cadastrado? Alarmes protegidos já iniciados não serão alterados.';
+
+  @override
+  String get sleepMissionScanError =>
+      'Não foi possível ler o código de barras.';
+
+  @override
+  String get sleepMissionCameraDenied =>
+      'A permissão da câmera é necessária para ler a missão.';
+
+  @override
+  String get sleepMonitorModeSection => 'COMO MONITORAR';
+
+  @override
+  String get sleepMonitorModeAlarmNoMission => 'Monitorar + alarme sem missão';
+
+  @override
+  String get sleepMonitorModeAlarmWithMission =>
+      'Monitorar + alarme com missão';
+
+  @override
+  String get sleepMonitorModeOnly => 'Somente monitorar, sem alarme';
+
+  @override
+  String get sleepMonitorModeAlarmNoMissionBody =>
+      'O alarme tocará no horário escolhido e poderá ser desligado normalmente.';
+
+  @override
+  String get sleepMonitorModeAlarmWithMissionBody =>
+      'Para desligar, leia o código cadastrado ou toque 100 vezes na emergência.';
+
+  @override
+  String get sleepMonitorModeOnlyBody =>
+      'Monitora o ambiente sem programar despertador.';
+
+  @override
+  String get sleepMonitorModeMissionUnavailable =>
+      'Configure uma missão por código de barras para liberar este modo.';
+
+  @override
+  String get sleepMonitorStartOnly => 'Iniciar somente monitoramento';
+
+  @override
+  String sleepMonitorStartWithMission(String time) {
+    return 'Iniciar e despertar às $time com missão';
+  }
+
+  @override
+  String get sleepMonitorProtectedStop => 'Parar somente o monitoramento';
+
+  @override
+  String get sleepMonitorProtectedStopBody =>
+      'O despertador e a missão continuarão ativos para este horário.';
+
+  @override
+  String get sleepMonitorMissionPending => 'Missão pendente';
+
+  @override
+  String get sleepMonitorMissionReady => 'Missão configurada';
+
+  @override
+  String get sleepMissionFormatUnknown => 'código de barras';
+
+  @override
+  String get sleepMissionRemoved => 'Missão removida para novas sessões.';
+
+  @override
+  String get sleepMissionSaved => 'Código cadastrado com sucesso.';
+
+  @override
+  String get sleepMissionOpenSettings => 'Abrir configurações da câmera';
+
+  @override
   String get aiEmptyTitle => 'Configure um provedor de IA';
 
   @override
