@@ -143,6 +143,11 @@ class SleepScheduleChart extends StatelessWidget {
                       barTouchData: BarTouchData(
                         enabled: true,
                         handleBuiltInTouches: true,
+                        // The background rod represents the whole day column.
+                        // Let it receive touches too, so a tap on a day without
+                        // a recorded window still explains that there is no
+                        // sleep record instead of doing nothing.
+                        allowTouchBarBackDraw: true,
                         touchTooltipData: BarTouchTooltipData(
                           tooltipPadding: const EdgeInsets.all(10),
                           tooltipMargin: 8,

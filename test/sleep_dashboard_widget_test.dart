@@ -136,6 +136,12 @@ void main() {
     expect(tooltipText, contains('Wake-up time: 07:10'));
     expect(tooltipText, contains('Recorded duration: 8h 0min'));
     expect(tooltipText, contains('Actual / estimated: 6h 30min'));
+
+    final missingGroup = chart.data.barGroups[0];
+    final missingTooltip = chart.data.barTouchData.touchTooltipData
+        .getTooltipItem(missingGroup, 0, missingGroup.barRods.first, 0);
+    expect(missingTooltip?.text, contains('No sleep record for this day'));
+    expect(chart.data.barTouchData.allowTouchBarBackDraw, isTrue);
     expect(tester.takeException(), isNull);
   });
 
