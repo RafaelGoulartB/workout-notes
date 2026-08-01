@@ -77,9 +77,10 @@ class SleepMonitoringService : Service() {
                 try {
                     val spool = SleepSessionSpool(context)
                     val stored = spool.read(snapshot.sessionId)
-                    val session = MutableMap<String, Any?>().apply {
-                        putAll(stored["session"] as? Map<String, Any?> ?: emptyMap())
-                    }
+                    @Suppress("UNCHECKED_CAST")
+                    val session: MutableMap<String, Any?> =
+                        (stored["session"] as? Map<String, Any?>)?.toMutableMap()
+                            ?: mutableMapOf()
                     session["alarm_dismiss_method"] = method
                     session["alarm_dismissed_at"] = Instant.now().toString()
                     session["mission_status"] = "completed"
