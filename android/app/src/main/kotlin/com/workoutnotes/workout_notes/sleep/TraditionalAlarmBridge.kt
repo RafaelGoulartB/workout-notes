@@ -19,7 +19,8 @@ class TraditionalAlarmBridge(private val context: Context) : MethodChannel.Metho
                     TraditionalAlarmScheduler.schedule(context, TraditionalAlarmScheduler.Snapshot(
                         id, at, call.argument<Int>("hour") ?: 7, call.argument<Int>("minute") ?: 0,
                         days, call.argument<Boolean>("snooze_enabled") ?: true,
-                        call.argument<Int>("snooze_minutes") ?: 5, requiresMission,
+                        call.argument<Int>("snooze_minutes") ?: 5,
+                        (call.argument<Int>("max_snoozes") ?: 3).coerceIn(0, 10), 0, requiresMission,
                         hash, salt, call.argument<String>("mission_format"), "scheduled", true,
                     ))
                     result.success(null)

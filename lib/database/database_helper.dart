@@ -18,7 +18,7 @@ import '../models/sleep_monitor_session.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 24;
+  static const _dbVersion = 25;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -293,6 +293,7 @@ class DatabaseHelper {
         enabled INTEGER NOT NULL DEFAULT 1,
         snooze_enabled INTEGER NOT NULL DEFAULT 1,
         snooze_minutes INTEGER NOT NULL DEFAULT 5,
+        max_snoozes INTEGER NOT NULL DEFAULT 3,
         requires_mission INTEGER NOT NULL DEFAULT 0,
         next_trigger_at TEXT,
         created_at TEXT NOT NULL,
@@ -1763,6 +1764,7 @@ class DatabaseHelper {
             enabled INTEGER NOT NULL DEFAULT 1,
             snooze_enabled INTEGER NOT NULL DEFAULT 1,
             snooze_minutes INTEGER NOT NULL DEFAULT 5,
+            max_snoozes INTEGER NOT NULL DEFAULT 3,
             requires_mission INTEGER NOT NULL DEFAULT 0,
             next_trigger_at TEXT,
             created_at TEXT NOT NULL,
@@ -1772,6 +1774,19 @@ class DatabaseHelper {
         await db.execute(
           'CREATE INDEX IF NOT EXISTS idx_traditional_alarms_next_trigger ON traditional_alarms(enabled, next_trigger_at ASC)',
         );
+      } catch (_) {}
+    }
+    if (oldVersion < 25) {
+      try {
+        await db.execute(
+          'ALTER TABLE traditional_alarms ADD COLUMN max_snoozes INTEGER NOT NULL DEFAULT 3',
+        );
+      } catch (_) {}
+      try {
+        await db.insert('app_settings', {
+          'key': 'alarm_global_max_snoozes',
+          'value': '3',
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       } catch (_) {}
     }
   }
@@ -1846,6 +1861,10 @@ class DatabaseHelper {
     batch.insert('app_settings', {
       'key': 'sleep_monitor_default_mode',
       'value': 'alarm_without_mission',
+    });
+    batch.insert('app_settings', {
+      'key': 'alarm_global_max_snoozes',
+      'value': '3',
     });
     batch.insert('app_settings', {
       'key': 'notification_rest_timer_enabled',

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../models/traditional_alarm.dart';
 import '../repositories/traditional_alarm_repository.dart';
+import '../repositories/settings_repository.dart';
 import 'notification_service.dart';
 import 'sleep_mission_service.dart';
 import 'sleep_monitor_service.dart';
@@ -18,6 +19,7 @@ class TraditionalAlarmService extends ChangeNotifier {
   );
 
   final TraditionalAlarmRepository _repository = TraditionalAlarmRepository();
+  final SettingsRepository _settings = SettingsRepository();
   List<TraditionalAlarm> _alarms = const [];
   List<TraditionalAlarm> get alarms => List.unmodifiable(_alarms);
 
@@ -72,6 +74,7 @@ class TraditionalAlarmService extends ChangeNotifier {
     required List<int> weekdays,
     required bool snoozeEnabled,
     required int snoozeMinutes,
+    required int maxSnoozes,
     required bool requiresMission,
   }) async {
     final alarm = await _repository.insert(
@@ -80,6 +83,7 @@ class TraditionalAlarmService extends ChangeNotifier {
       weekdays: weekdays,
       snoozeEnabled: snoozeEnabled,
       snoozeMinutes: snoozeMinutes,
+      maxSnoozes: maxSnoozes,
       requiresMission: requiresMission,
     );
     await _scheduleBestEffort(alarm);
@@ -150,6 +154,7 @@ class TraditionalAlarmService extends ChangeNotifier {
       'weekdays': alarm.weekdays,
       'snooze_enabled': alarm.snoozeEnabled,
       'snooze_minutes': alarm.snoozeMinutes,
+      'max_snoozes': alarm.maxSnoozes,
       'requires_mission': alarm.requiresMission,
       'mission_type': mission.config.type,
       'mission_hash': mission.config.hash,
@@ -157,6 +162,17 @@ class TraditionalAlarmService extends ChangeNotifier {
       'mission_format': mission.config.format,
     });
   }
+
+  static const globalMaxSnoozesKey = 'alarm_global_max_snoozes';
+  static const defaultMaxSnoozes = 3;
+
+  Future<int> getGlobalMaxSnoozes() async {
+    final raw = await _settings.getSetting(globalMaxSnoozesKey);
+    return (int.tryParse(raw ?? '') ?? defaultMaxSnoozes).clamp(0, 10);
+  }
+
+  Future<void> setGlobalMaxSnoozes(int value) =>
+      _settings.setSetting(globalMaxSnoozesKey, value.clamp(0, 10).toString());
 
   /// The SQLite write already succeeded when this is called. A temporary
   /// platform-channel failure (for example during an Android hot restart) must

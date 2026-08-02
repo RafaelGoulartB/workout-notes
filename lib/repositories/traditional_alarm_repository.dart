@@ -22,6 +22,7 @@ class TraditionalAlarmRepository extends BaseRepository {
     required List<int> weekdays,
     required bool snoozeEnabled,
     required int snoozeMinutes,
+    required int maxSnoozes,
     required bool requiresMission,
   }) async {
     final now = DateTime.now();
@@ -33,6 +34,7 @@ class TraditionalAlarmRepository extends BaseRepository {
       enabled: true,
       snoozeEnabled: snoozeEnabled,
       snoozeMinutes: snoozeMinutes,
+      maxSnoozes: maxSnoozes,
       requiresMission: requiresMission,
       nextTriggerAt: null,
       createdAt: now,

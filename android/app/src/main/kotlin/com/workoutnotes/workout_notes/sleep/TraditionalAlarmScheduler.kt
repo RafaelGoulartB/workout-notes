@@ -24,6 +24,8 @@ object TraditionalAlarmScheduler {
         val weekdays: Set<Int>,
         val snoozeEnabled: Boolean,
         val snoozeMinutes: Int,
+        val maxSnoozes: Int,
+        val snoozeCount: Int,
         val requiresMission: Boolean,
         val missionHash: String?,
         val missionSalt: String?,
@@ -54,9 +56,9 @@ object TraditionalAlarmScheduler {
 
     fun snooze(context: Context, id: String): Snapshot? {
         val snapshot = read(context, id) ?: return null
-        if (!snapshot.snoozeEnabled) return null
+        if (!snapshot.snoozeEnabled || snapshot.snoozeCount >= snapshot.maxSnoozes) return null
         val next = System.currentTimeMillis() + snapshot.snoozeMinutes.coerceIn(1, 60) * 60_000L
-        val scheduled = snapshot.copy(alarmAtMillis = next, state = "scheduled")
+        val scheduled = snapshot.copy(alarmAtMillis = next, state = "scheduled", snoozeCount = snapshot.snoozeCount + 1)
         schedule(context, scheduled)
         return scheduled
     }
@@ -79,7 +81,7 @@ object TraditionalAlarmScheduler {
             return
         }
         val next = nextOccurrence(snapshot, System.currentTimeMillis())
-        schedule(context, snapshot.copy(alarmAtMillis = next, state = "scheduled", enabled = true))
+        schedule(context, snapshot.copy(alarmAtMillis = next, state = "scheduled", enabled = true, snoozeCount = 0))
     }
 
     fun restore(context: Context) {
@@ -110,6 +112,7 @@ object TraditionalAlarmScheduler {
             id, p.getLong("alarm_at", 0L), p.getInt("hour", 7), p.getInt("minute", 0),
             p.getStringSet("weekdays", mutableSetOf())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet(),
             p.getBoolean("snooze_enabled", true), p.getInt("snooze_minutes", 5),
+            p.getInt("max_snoozes", 3), p.getInt("snooze_count", 0),
             p.getBoolean("requires_mission", false), p.getString("mission_hash", null),
             p.getString("mission_salt", null), p.getString("mission_format", null),
             p.getString("state", "scheduled") ?: "scheduled", p.getBoolean("enabled", true),
@@ -122,6 +125,7 @@ object TraditionalAlarmScheduler {
             .putInt("hour", snapshot.hour).putInt("minute", snapshot.minute)
             .putStringSet("weekdays", snapshot.weekdays.map { it.toString() }.toMutableSet())
             .putBoolean("snooze_enabled", snapshot.snoozeEnabled).putInt("snooze_minutes", snapshot.snoozeMinutes)
+            .putInt("max_snoozes", snapshot.maxSnoozes).putInt("snooze_count", snapshot.snoozeCount)
             .putBoolean("requires_mission", snapshot.requiresMission).putString("mission_hash", snapshot.missionHash)
             .putString("mission_salt", snapshot.missionSalt).putString("mission_format", snapshot.missionFormat)
             .putString("state", snapshot.state).putBoolean("enabled", snapshot.enabled).apply()

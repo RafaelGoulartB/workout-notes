@@ -3265,6 +3265,153 @@ class AppLocalizationsPt extends AppLocalizations {
   String get sleepMissionOpenSettings => 'Abrir configurações da câmera';
 
   @override
+  String get alarmTitle => 'Alarmes';
+
+  @override
+  String get alarmNew => 'Novo alarme';
+
+  @override
+  String get alarmEdit => 'Editar alarme';
+
+  @override
+  String get alarmEmptyTitle => 'Nenhum alarme';
+
+  @override
+  String get alarmEmptyBody => 'Crie um alarme para acordar no horário certo.';
+
+  @override
+  String get alarmDeleteTitle => 'Excluir alarme?';
+
+  @override
+  String get alarmDeleteBody => 'Este alarme deixará de tocar.';
+
+  @override
+  String get alarmDelete => 'Excluir';
+
+  @override
+  String get alarmPermissionRequired =>
+      'Permita notificações e alarmes exatos para continuar.';
+
+  @override
+  String get alarmUpdateError => 'Não foi possível atualizar o alarme.';
+
+  @override
+  String get alarmSaveError => 'Não foi possível salvar o alarme.';
+
+  @override
+  String alarmNext(String time) {
+    return 'Próximo: $time';
+  }
+
+  @override
+  String get alarmMission => 'Missão';
+
+  @override
+  String alarmSnoozeChip(int minutes, int count) {
+    return '$minutes min • ${count}x';
+  }
+
+  @override
+  String get alarmOneShot => 'Uma vez';
+
+  @override
+  String get alarmEveryDay => 'Todos os dias';
+
+  @override
+  String get alarmRepeat => 'Repetir';
+
+  @override
+  String get alarmOneShotHelp => 'Sem dias: este alarme tocará uma única vez.';
+
+  @override
+  String get alarmDaysHelp => 'Escolha os dias em que o alarme deve tocar.';
+
+  @override
+  String get alarmSnoozeEnable => 'Permitir soneca';
+
+  @override
+  String get alarmSnoozeEnableBody =>
+      'Adie o toque antes de desligar o alarme.';
+
+  @override
+  String get alarmSnoozeInterval => 'Intervalo da soneca';
+
+  @override
+  String get alarmMaxSnoozes => 'Máximo de sonecas';
+
+  @override
+  String get alarmNoSnoozes => 'Não permitir';
+
+  @override
+  String alarmSnoozeTimes(int count) {
+    return '$count vez(es)';
+  }
+
+  @override
+  String get alarmRequireMission => 'Exigir missão para desligar';
+
+  @override
+  String get alarmRequireMissionBody =>
+      'Exige o código de barras configurado no monitoramento de sono.';
+
+  @override
+  String get alarmMissionNotConfigured =>
+      'Configure uma missão de código de barras nas configurações de sono antes de usá-la.';
+
+  @override
+  String get alarmSaving => 'Salvando…';
+
+  @override
+  String get alarmSave => 'Salvar alarme';
+
+  @override
+  String get alarmWeekMon => 'Seg';
+
+  @override
+  String get alarmWeekTue => 'Ter';
+
+  @override
+  String get alarmWeekWed => 'Qua';
+
+  @override
+  String get alarmWeekThu => 'Qui';
+
+  @override
+  String get alarmWeekFri => 'Sex';
+
+  @override
+  String get alarmWeekSat => 'Sáb';
+
+  @override
+  String get alarmWeekSun => 'Dom';
+
+  @override
+  String get sleepSettingsAlarmsSection => 'ALARMES';
+
+  @override
+  String get sleepSettingsMaxSnoozesBody =>
+      'O monitoramento de sono sempre usa este limite. Cada alarme tradicional pode definir um limite próprio.';
+
+  @override
+  String get sleepSettingsMaxSnoozesDialogBody =>
+      'Este limite é usado pelo monitoramento de sono e como padrão para novos alarmes.';
+
+  @override
+  String get sleepSettingsAllowedSnoozes => 'Sonecas permitidas';
+
+  @override
+  String get sleepMonitorSnoozesTitle => 'Sonecas do alarme';
+
+  @override
+  String get sleepMonitorSnoozesDisabled =>
+      'Desativadas nas configurações de sono.';
+
+  @override
+  String sleepMonitorSnoozesConfigured(int count) {
+    return 'Até $count soneca(s), conforme as configurações de sono.';
+  }
+
+  @override
   String get aiEmptyTitle => 'Configure um provedor de IA';
 
   @override

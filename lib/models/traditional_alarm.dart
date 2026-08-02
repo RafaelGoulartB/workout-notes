@@ -11,6 +11,7 @@ class TraditionalAlarm {
     required this.enabled,
     required this.snoozeEnabled,
     required this.snoozeMinutes,
+    required this.maxSnoozes,
     required this.requiresMission,
     required this.nextTriggerAt,
     required this.createdAt,
@@ -24,6 +25,7 @@ class TraditionalAlarm {
   final bool enabled;
   final bool snoozeEnabled;
   final int snoozeMinutes;
+  final int maxSnoozes;
   final bool requiresMission;
   final DateTime? nextTriggerAt;
   final DateTime createdAt;
@@ -38,6 +40,7 @@ class TraditionalAlarm {
     bool? enabled,
     bool? snoozeEnabled,
     int? snoozeMinutes,
+    int? maxSnoozes,
     bool? requiresMission,
     DateTime? nextTriggerAt,
     bool clearNextTriggerAt = false,
@@ -50,6 +53,7 @@ class TraditionalAlarm {
     enabled: enabled ?? this.enabled,
     snoozeEnabled: snoozeEnabled ?? this.snoozeEnabled,
     snoozeMinutes: snoozeMinutes ?? this.snoozeMinutes,
+    maxSnoozes: maxSnoozes ?? this.maxSnoozes,
     requiresMission: requiresMission ?? this.requiresMission,
     nextTriggerAt: clearNextTriggerAt
         ? null
@@ -91,6 +95,7 @@ class TraditionalAlarm {
     'enabled': enabled ? 1 : 0,
     'snooze_enabled': snoozeEnabled ? 1 : 0,
     'snooze_minutes': snoozeMinutes,
+    'max_snoozes': maxSnoozes,
     'requires_mission': requiresMission ? 1 : 0,
     'next_trigger_at': nextTriggerAt?.toIso8601String(),
     'created_at': createdAt.toIso8601String(),
@@ -108,6 +113,7 @@ class TraditionalAlarm {
       enabled: (map['enabled'] as int? ?? 0) == 1,
       snoozeEnabled: (map['snooze_enabled'] as int? ?? 0) == 1,
       snoozeMinutes: map['snooze_minutes'] as int? ?? 5,
+      maxSnoozes: map['max_snoozes'] as int? ?? 3,
       requiresMission: (map['requires_mission'] as int? ?? 0) == 1,
       nextTriggerAt: DateTime.tryParse(map['next_trigger_at'] as String? ?? ''),
       createdAt: DateTime.parse(map['created_at']! as String),

@@ -5,6 +5,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/services/sleep_mission_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
+import 'package:workout_notes/services/traditional_alarm_service.dart';
 
 class SleepSettingsScreen extends StatefulWidget {
   const SleepSettingsScreen({super.key});
@@ -17,9 +18,11 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
   final _missions = SleepMissionService();
   final _monitor = SleepMonitorService.instance;
   final _sleepGoalService = SleepGoalService();
+  final _alarmService = TraditionalAlarmService.instance;
   bool _loading = true;
   bool _busy = false;
   int _goalMinutes = SleepGoalService.defaultGoalMinutes;
+  int _globalMaxSnoozes = TraditionalAlarmService.defaultMaxSnoozes;
 
   @override
   void initState() {
@@ -30,9 +33,11 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
   Future<void> _load() async {
     await _missions.load();
     final goalMinutes = await _sleepGoalService.load();
+    final globalMaxSnoozes = await _alarmService.getGlobalMaxSnoozes();
     if (mounted) {
       setState(() {
         _goalMinutes = goalMinutes;
+        _globalMaxSnoozes = globalMaxSnoozes;
         _loading = false;
       });
     }
@@ -142,6 +147,59 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
   static String _formatGoal(int minutes, AppLocalizations loc) =>
       loc.sleepDurationValue(minutes ~/ 60, minutes % 60);
 
+  Future<void> _configureGlobalMaxSnoozes() async {
+    final loc = AppLocalizations.of(context)!;
+    var value = _globalMaxSnoozes;
+    final selected = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(loc.alarmMaxSnoozes),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(loc.sleepSettingsMaxSnoozesDialogBody),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<int>(
+                initialValue: value,
+                decoration: InputDecoration(
+                  labelText: loc.sleepSettingsAllowedSnoozes,
+                ),
+                items: List.generate(
+                  11,
+                  (index) => DropdownMenuItem(
+                    value: index,
+                    child: Text(
+                      index == 0
+                          ? loc.alarmNoSnoozes
+                          : loc.alarmSnoozeTimes(index),
+                    ),
+                  ),
+                ),
+                onChanged: (next) {
+                  if (next != null) setDialogState(() => value = next);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(loc.commonCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, value),
+              child: Text(loc.commonSave),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected == null) return;
+    await _alarmService.setGlobalMaxSnoozes(selected);
+    if (mounted) setState(() => _globalMaxSnoozes = selected);
+  }
+
   Future<void> _remove() async {
     final loc = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
@@ -205,6 +263,30 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: Text(
                         loc.sleepGoalBody,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _SectionHeader(text: loc.sleepSettingsAlarmsSection),
+                const SizedBox(height: 8),
+                _SettingsCard(
+                  children: [
+                    _LinkTile(
+                      icon: Icons.snooze_rounded,
+                      title: loc.alarmMaxSnoozes,
+                      subtitle: _globalMaxSnoozes == 0
+                          ? loc.alarmNoSnoozes
+                          : loc.alarmSnoozeTimes(_globalMaxSnoozes),
+                      onTap: _configureGlobalMaxSnoozes,
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Text(
+                        loc.sleepSettingsMaxSnoozesBody,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),

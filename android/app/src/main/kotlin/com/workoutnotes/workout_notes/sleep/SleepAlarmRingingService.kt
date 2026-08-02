@@ -27,6 +27,7 @@ class SleepAlarmRingingService : Service() {
     companion object {
         const val ACTION_START = "com.workoutnotes.workout_notes.sleep.ALARM_START"
         const val ACTION_DISMISS = "com.workoutnotes.workout_notes.sleep.ALARM_DISMISS"
+        const val ACTION_SNOOZE = "com.workoutnotes.workout_notes.sleep.ALARM_SNOOZE"
         const val ACTION_PAUSE_FOR_EMERGENCY = "com.workoutnotes.workout_notes.sleep.ALARM_PAUSE_FOR_EMERGENCY"
         const val ACTION_RESUME_AFTER_EMERGENCY = "com.workoutnotes.workout_notes.sleep.ALARM_RESUME_AFTER_EMERGENCY"
         const val ACTION_PAUSE_FOR_BARCODE = "com.workoutnotes.workout_notes.sleep.ALARM_PAUSE_FOR_BARCODE"
@@ -60,6 +61,10 @@ class SleepAlarmRingingService : Service() {
             context.startService(Intent(context, SleepAlarmRingingService::class.java).apply {
                 action = ACTION_DISMISS
             })
+        }
+
+        fun snooze(context: Context) {
+            sendAction(context, ACTION_SNOOZE)
         }
 
         fun pauseForEmergency(context: Context) {
@@ -227,6 +232,13 @@ class SleepAlarmRingingService : Service() {
             finishAlarm(SleepMonitorSessionDismiss.BUTTON)
             return START_NOT_STICKY
         }
+        if (action == ACTION_SNOOZE) {
+            if (SleepAlarmScheduler.snooze(this)) {
+                stopRinging()
+                stopSelf()
+            }
+            return START_NOT_STICKY
+        }
         if (intent?.action == ACTION_COMPLETE) {
             val method = intent.getStringExtra(EXTRA_METHOD)
             if (snapshot?.state == SleepAlarmScheduler.STATE_RINGING &&
@@ -357,6 +369,21 @@ class SleepAlarmRingingService : Service() {
                 android.R.drawable.ic_menu_camera,
                 getString(R.string.sleep_alarm_open_mission),
                 activityIntent,
+            )
+        }
+        if (SleepAlarmScheduler.canSnooze(this)) {
+            val snoozeIntent = PendingIntent.getService(
+                this,
+                1206,
+                Intent(this, SleepAlarmRingingService::class.java).apply {
+                    action = ACTION_SNOOZE
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
+            )
+            builder.addAction(
+                android.R.drawable.ic_lock_idle_alarm,
+                "Sonecar",
+                snoozeIntent,
             )
         }
         return builder.build()

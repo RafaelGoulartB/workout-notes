@@ -54,7 +54,7 @@ class TraditionalAlarmRingingService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_SNOOZE -> {
-                if (snapshot.snoozeEnabled) {
+                if (snapshot.snoozeEnabled && snapshot.snoozeCount < snapshot.maxSnoozes) {
                     TraditionalAlarmScheduler.snooze(this, id)
                     finishRinging(); stopSelf()
                 }
@@ -97,7 +97,7 @@ class TraditionalAlarmRingingService : Service() {
             .setContentTitle("Alarme").setContentText(if (snapshot.requiresMission) "Conclua a missão para desligar." else "Hora de acordar.")
             .setCategory(NotificationCompat.CATEGORY_ALARM).setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC).setOngoing(true).setContentIntent(open).setFullScreenIntent(open, true)
-        if (snapshot.snoozeEnabled) {
+        if (snapshot.snoozeEnabled && snapshot.snoozeCount < snapshot.maxSnoozes) {
             val snooze = PendingIntent.getService(this, 1212, Intent(this, TraditionalAlarmRingingService::class.java).apply { action = ACTION_SNOOZE; putExtra(TraditionalAlarmScheduler.EXTRA_ID, snapshot.id) }, PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag())
             builder.addAction(android.R.drawable.ic_lock_idle_alarm, "Sonecar", snooze)
         }

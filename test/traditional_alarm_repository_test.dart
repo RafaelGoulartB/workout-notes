@@ -23,6 +23,7 @@ void main() {
             id TEXT PRIMARY KEY, hour INTEGER NOT NULL, minute INTEGER NOT NULL,
             weekdays_json TEXT NOT NULL, enabled INTEGER NOT NULL,
             snooze_enabled INTEGER NOT NULL, snooze_minutes INTEGER NOT NULL,
+            max_snoozes INTEGER NOT NULL,
             requires_mission INTEGER NOT NULL, next_trigger_at TEXT,
             created_at TEXT NOT NULL, updated_at TEXT NOT NULL
           )
@@ -47,11 +48,13 @@ void main() {
         weekdays: [1, 3, 5],
         snoozeEnabled: true,
         snoozeMinutes: 10,
+        maxSnoozes: 3,
         requiresMission: true,
       );
 
       expect((await repository.getAll()).single.weekdays, [1, 3, 5]);
       expect(alarm.nextTriggerAt, isNotNull);
+      expect(alarm.maxSnoozes, 3);
 
       final next = DateTime(2026, 8, 3, 7, 30);
       await repository.updateNativeSchedule(

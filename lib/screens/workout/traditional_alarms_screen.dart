@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 
 import '../../models/traditional_alarm.dart';
 import '../../services/traditional_alarm_service.dart';
@@ -60,13 +61,13 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
     try {
       if (enabled && !await _service.preparePermissions()) {
         if (mounted) {
-          _message('Permita notificações e alarmes exatos para ativar.');
+          _message(AppLocalizations.of(context)!.alarmPermissionRequired);
         }
         return;
       }
       await _service.setEnabled(alarm, enabled);
     } catch (_) {
-      if (mounted) _message('Não foi possível atualizar o alarme.');
+      if (mounted) _message(AppLocalizations.of(context)!.alarmUpdateError);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -75,20 +76,23 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
   Future<void> _delete(TraditionalAlarm alarm) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Excluir alarme?'),
-        content: const Text('Este alarme deixará de tocar.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Excluir'),
-          ),
-        ],
-      ),
+      builder: (context) {
+        final loc = AppLocalizations.of(context)!;
+        return AlertDialog(
+          title: Text(loc.alarmDeleteTitle),
+          content: Text(loc.alarmDeleteBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(loc.commonCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(loc.alarmDelete),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true) return;
     await _service.delete(alarm);
@@ -98,33 +102,36 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Alarmes')),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: _busy ? null : () => _edit(),
-      icon: const Icon(Icons.add_alarm_rounded),
-      label: const Text('Novo alarme'),
-    ),
-    body: _loading
-        ? const Center(child: CircularProgressIndicator())
-        : _service.alarms.isEmpty
-        ? const _EmptyAlarms()
-        : ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-            itemCount: _service.alarms.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
-            itemBuilder: (_, index) {
-              final alarm = _service.alarms[index];
-              return _AlarmCard(
-                alarm: alarm,
-                disabled: _busy,
-                onTap: () => _edit(alarm),
-                onToggle: (enabled) => _toggle(alarm, enabled),
-                onDelete: () => _delete(alarm),
-              );
-            },
-          ),
-  );
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    return Scaffold(
+      appBar: AppBar(title: Text(loc.alarmTitle)),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _busy ? null : () => _edit(),
+        icon: const Icon(Icons.add_alarm_rounded),
+        label: Text(loc.alarmNew),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _service.alarms.isEmpty
+          ? const _EmptyAlarms()
+          : ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+              itemCount: _service.alarms.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              itemBuilder: (_, index) {
+                final alarm = _service.alarms[index];
+                return _AlarmCard(
+                  alarm: alarm,
+                  disabled: _busy,
+                  onTap: () => _edit(alarm),
+                  onToggle: (enabled) => _toggle(alarm, enabled),
+                  onDelete: () => _delete(alarm),
+                );
+              },
+            ),
+    );
+  }
 }
 
 class _EmptyAlarms extends StatelessWidget {
@@ -143,10 +150,13 @@ class _EmptyAlarms extends StatelessWidget {
             color: Theme.of(context).colorScheme.primary,
           ),
           const SizedBox(height: 16),
-          Text('Nenhum alarme', style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            AppLocalizations.of(context)!.alarmEmptyTitle,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           const SizedBox(height: 8),
-          const Text(
-            'Crie um alarme para acordar no horário certo.',
+          Text(
+            AppLocalizations.of(context)!.alarmEmptyBody,
             textAlign: TextAlign.center,
           ),
         ],
@@ -171,6 +181,7 @@ class _AlarmCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final color = alarm.enabled
         ? Theme.of(context).colorScheme.primary
         : Theme.of(context).colorScheme.onSurfaceVariant;
@@ -195,13 +206,18 @@ class _AlarmCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _days(),
+                      _days(loc),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     if (alarm.enabled && alarm.nextTriggerAt != null) ...[
                       const SizedBox(height: 8),
                       Text(
-                        'Próximo: ${DateFormat('EEE, d MMM • HH:mm', Intl.defaultLocale).format(alarm.nextTriggerAt!.toLocal())}',
+                        loc.alarmNext(
+                          DateFormat(
+                            'EEE, d MMM • HH:mm',
+                            Intl.defaultLocale,
+                          ).format(alarm.nextTriggerAt!.toLocal()),
+                        ),
                         style: Theme.of(context).textTheme.labelMedium,
                       ),
                     ],
@@ -211,12 +227,12 @@ class _AlarmCard extends StatelessWidget {
                         spacing: 8,
                         children: [
                           if (alarm.requiresMission)
-                            const Chip(
+                            Chip(
                               avatar: Icon(
                                 Icons.qr_code_scanner_rounded,
                                 size: 18,
                               ),
-                              label: Text('Missão'),
+                              label: Text(loc.alarmMission),
                             ),
                           if (alarm.snoozeEnabled)
                             Chip(
@@ -224,7 +240,12 @@ class _AlarmCard extends StatelessWidget {
                                 Icons.snooze_rounded,
                                 size: 18,
                               ),
-                              label: Text('${alarm.snoozeMinutes} min'),
+                              label: Text(
+                                loc.alarmSnoozeChip(
+                                  alarm.snoozeMinutes,
+                                  alarm.maxSnoozes,
+                                ),
+                              ),
                             ),
                         ],
                       ),
@@ -242,8 +263,11 @@ class _AlarmCard extends StatelessWidget {
                     onSelected: (value) {
                       if (value == 'delete') onDelete();
                     },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'delete', child: Text('Excluir')),
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Text(loc.alarmDelete),
+                      ),
                     ],
                   ),
                 ],
@@ -260,10 +284,18 @@ class _AlarmCard extends StatelessWidget {
         TimeOfDay(hour: alarm.hour, minute: alarm.minute),
         alwaysUse24HourFormat: true,
       );
-  String _days() {
-    if (alarm.weekdays.isEmpty) return 'Uma vez';
-    if (alarm.weekdays.length == 7) return 'Todos os dias';
-    const names = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+  String _days(AppLocalizations loc) {
+    if (alarm.weekdays.isEmpty) return loc.alarmOneShot;
+    if (alarm.weekdays.length == 7) return loc.alarmEveryDay;
+    final names = [
+      loc.alarmWeekMon,
+      loc.alarmWeekTue,
+      loc.alarmWeekWed,
+      loc.alarmWeekThu,
+      loc.alarmWeekFri,
+      loc.alarmWeekSat,
+      loc.alarmWeekSun,
+    ];
     return alarm.weekdays.map((day) => names[day - 1]).join(', ');
   }
 }
@@ -282,6 +314,7 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
   late Set<int> _days;
   late bool _snoozeEnabled;
   late int _snoozeMinutes;
+  late int _maxSnoozes;
   late bool _requiresMission;
   bool _saving = false;
 
@@ -293,7 +326,15 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
     _days = {...?alarm?.weekdays};
     _snoozeEnabled = alarm?.snoozeEnabled ?? true;
     _snoozeMinutes = alarm?.snoozeMinutes ?? 5;
+    _maxSnoozes =
+        alarm?.maxSnoozes ?? TraditionalAlarmService.defaultMaxSnoozes;
     _requiresMission = alarm?.requiresMission ?? false;
+    if (alarm == null) _loadGlobalDefault();
+  }
+
+  Future<void> _loadGlobalDefault() async {
+    final value = await _service.getGlobalMaxSnoozes();
+    if (mounted) setState(() => _maxSnoozes = value);
   }
 
   Future<void> _save() async {
@@ -301,9 +342,9 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
     if (_requiresMission && !await _service.hasConfiguredMission()) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Configure uma missão de código de barras nas configurações de sono antes de usá-la.',
+              AppLocalizations.of(context)!.alarmMissionNotConfigured,
             ),
           ),
         );
@@ -315,9 +356,9 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
       if (!await _service.preparePermissions()) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               content: Text(
-                'Permita notificações e alarmes exatos para salvar o alarme.',
+                AppLocalizations.of(context)!.alarmPermissionRequired,
               ),
             ),
           );
@@ -331,6 +372,7 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
           weekdays: _days.toList(),
           snoozeEnabled: _snoozeEnabled,
           snoozeMinutes: _snoozeMinutes,
+          maxSnoozes: _maxSnoozes,
           requiresMission: _requiresMission,
         );
       } else {
@@ -341,6 +383,7 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
             weekdays: _days.toList(),
             snoozeEnabled: _snoozeEnabled,
             snoozeMinutes: _snoozeMinutes,
+            maxSnoozes: _maxSnoozes,
             requiresMission: _requiresMission,
           ),
         );
@@ -349,7 +392,7 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Não foi possível salvar o alarme.')),
+          SnackBar(content: Text(AppLocalizations.of(context)!.alarmSaveError)),
         );
       }
     } finally {
@@ -358,98 +401,127 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(widget.alarm == null ? 'Novo alarme' : 'Editar alarme'),
-    ),
-    bottomNavigationBar: SafeArea(
-      minimum: const EdgeInsets.all(16),
-      child: FilledButton(
-        onPressed: _saving ? null : _save,
-        child: Text(_saving ? 'Salvando...' : 'Salvar alarme'),
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.alarm == null ? loc.alarmNew : loc.alarmEdit),
       ),
-    ),
-    body: ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      children: [
-        Center(
-          child: TextButton(
-            onPressed: _pickTime,
-            child: Text(
-              MaterialLocalizations.of(
-                context,
-              ).formatTimeOfDay(_time, alwaysUse24HourFormat: true),
-              style: Theme.of(
-                context,
-              ).textTheme.displayLarge?.copyWith(fontWeight: FontWeight.w700),
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.all(16),
+        child: FilledButton(
+          onPressed: _saving ? null : _save,
+          child: Text(_saving ? loc.alarmSaving : loc.alarmSave),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        children: [
+          Center(
+            child: TextButton(
+              onPressed: _pickTime,
+              child: Text(
+                MaterialLocalizations.of(
+                  context,
+                ).formatTimeOfDay(_time, alwaysUse24HourFormat: true),
+                style: Theme.of(
+                  context,
+                ).textTheme.displayLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 24),
-        Text('Repetir', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: List.generate(7, (index) {
-            final day = index + 1;
-            const names = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D'];
-            return FilterChip(
-              label: Text(names[index]),
-              selected: _days.contains(day),
-              onSelected: (selected) => setState(() {
-                selected ? _days.add(day) : _days.remove(day);
-              }),
-            );
-          }),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          _days.isEmpty
-              ? 'Sem dias: este alarme tocará uma única vez.'
-              : 'Escolha os dias em que o alarme deve tocar.',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: 28),
-        SwitchListTile.adaptive(
-          contentPadding: EdgeInsets.zero,
-          value: _snoozeEnabled,
-          onChanged: (value) => setState(() => _snoozeEnabled = value),
-          title: const Text('Permitir soneca'),
-          subtitle: const Text('Adie o toque antes de desligar o alarme.'),
-        ),
-        if (_snoozeEnabled)
-          ListTile(
+          const SizedBox(height: 24),
+          Text(loc.alarmRepeat, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(7, (index) {
+              final day = index + 1;
+              final names = [
+                loc.alarmWeekMon,
+                loc.alarmWeekTue,
+                loc.alarmWeekWed,
+                loc.alarmWeekThu,
+                loc.alarmWeekFri,
+                loc.alarmWeekSat,
+                loc.alarmWeekSun,
+              ];
+              return FilterChip(
+                label: Text(names[index]),
+                selected: _days.contains(day),
+                onSelected: (selected) => setState(() {
+                  selected ? _days.add(day) : _days.remove(day);
+                }),
+              );
+            }),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _days.isEmpty ? loc.alarmOneShotHelp : loc.alarmDaysHelp,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 28),
+          SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Intervalo da soneca'),
-            trailing: DropdownButton<int>(
-              value: _snoozeMinutes,
-              items: const [5, 10, 15, 20, 30]
-                  .map(
-                    (value) => DropdownMenuItem(
-                      value: value,
-                      child: Text('$value min'),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) setState(() => _snoozeMinutes = value);
-              },
+            value: _snoozeEnabled,
+            onChanged: (value) => setState(() => _snoozeEnabled = value),
+            title: Text(loc.alarmSnoozeEnable),
+            subtitle: Text(loc.alarmSnoozeEnableBody),
+          ),
+          if (_snoozeEnabled)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(loc.alarmSnoozeInterval),
+              trailing: DropdownButton<int>(
+                value: _snoozeMinutes,
+                items: const [5, 10, 15, 20, 30]
+                    .map(
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text('$value min'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) setState(() => _snoozeMinutes = value);
+                },
+              ),
             ),
+          if (_snoozeEnabled)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(loc.alarmMaxSnoozes),
+              trailing: DropdownButton<int>(
+                value: _maxSnoozes,
+                items: List.generate(
+                  11,
+                  (value) => DropdownMenuItem(
+                    value: value,
+                    child: Text(
+                      value == 0
+                          ? loc.alarmNoSnoozes
+                          : loc.alarmSnoozeTimes(value),
+                    ),
+                  ),
+                ),
+                onChanged: (value) {
+                  if (value != null) setState(() => _maxSnoozes = value);
+                },
+              ),
+            ),
+          const Divider(height: 36),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            value: _requiresMission,
+            onChanged: (value) => setState(() => _requiresMission = value),
+            title: Text(loc.alarmRequireMission),
+            subtitle: Text(loc.alarmRequireMissionBody),
           ),
-        const Divider(height: 36),
-        SwitchListTile.adaptive(
-          contentPadding: EdgeInsets.zero,
-          value: _requiresMission,
-          onChanged: (value) => setState(() => _requiresMission = value),
-          title: const Text('Exigir missão para desligar'),
-          subtitle: const Text(
-            'Exige o código de barras configurado no monitoramento de sono.',
-          ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 
   Future<void> _pickTime() async {
     final result = await showTimePicker(context: context, initialTime: _time);

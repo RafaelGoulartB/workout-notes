@@ -3250,6 +3250,151 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sleepMissionOpenSettings => 'Open camera settings';
 
   @override
+  String get alarmTitle => 'Alarms';
+
+  @override
+  String get alarmNew => 'New alarm';
+
+  @override
+  String get alarmEdit => 'Edit alarm';
+
+  @override
+  String get alarmEmptyTitle => 'No alarms';
+
+  @override
+  String get alarmEmptyBody => 'Create an alarm to wake up at the right time.';
+
+  @override
+  String get alarmDeleteTitle => 'Delete alarm?';
+
+  @override
+  String get alarmDeleteBody => 'This alarm will stop ringing.';
+
+  @override
+  String get alarmDelete => 'Delete';
+
+  @override
+  String get alarmPermissionRequired =>
+      'Allow notifications and exact alarms to continue.';
+
+  @override
+  String get alarmUpdateError => 'Could not update the alarm.';
+
+  @override
+  String get alarmSaveError => 'Could not save the alarm.';
+
+  @override
+  String alarmNext(String time) {
+    return 'Next: $time';
+  }
+
+  @override
+  String get alarmMission => 'Mission';
+
+  @override
+  String alarmSnoozeChip(int minutes, int count) {
+    return '$minutes min • ${count}x';
+  }
+
+  @override
+  String get alarmOneShot => 'Once';
+
+  @override
+  String get alarmEveryDay => 'Every day';
+
+  @override
+  String get alarmRepeat => 'Repeat';
+
+  @override
+  String get alarmOneShotHelp => 'No days selected: this alarm will ring once.';
+
+  @override
+  String get alarmDaysHelp => 'Choose the days when this alarm should ring.';
+
+  @override
+  String get alarmSnoozeEnable => 'Allow snooze';
+
+  @override
+  String get alarmSnoozeEnableBody => 'Delay the alarm before dismissing it.';
+
+  @override
+  String get alarmSnoozeInterval => 'Snooze interval';
+
+  @override
+  String get alarmMaxSnoozes => 'Maximum snoozes';
+
+  @override
+  String get alarmNoSnoozes => 'Do not allow';
+
+  @override
+  String alarmSnoozeTimes(int count) {
+    return '$count time(s)';
+  }
+
+  @override
+  String get alarmRequireMission => 'Require a mission to dismiss';
+
+  @override
+  String get alarmRequireMissionBody =>
+      'Requires the barcode configured in sleep monitoring.';
+
+  @override
+  String get alarmMissionNotConfigured =>
+      'Set up a barcode mission in Sleep settings before using it.';
+
+  @override
+  String get alarmSaving => 'Saving…';
+
+  @override
+  String get alarmSave => 'Save alarm';
+
+  @override
+  String get alarmWeekMon => 'Mon';
+
+  @override
+  String get alarmWeekTue => 'Tue';
+
+  @override
+  String get alarmWeekWed => 'Wed';
+
+  @override
+  String get alarmWeekThu => 'Thu';
+
+  @override
+  String get alarmWeekFri => 'Fri';
+
+  @override
+  String get alarmWeekSat => 'Sat';
+
+  @override
+  String get alarmWeekSun => 'Sun';
+
+  @override
+  String get sleepSettingsAlarmsSection => 'ALARMS';
+
+  @override
+  String get sleepSettingsMaxSnoozesBody =>
+      'Sleep monitoring always uses this limit. Each traditional alarm can set its own limit.';
+
+  @override
+  String get sleepSettingsMaxSnoozesDialogBody =>
+      'This limit is used by sleep monitoring and as the default for new alarms.';
+
+  @override
+  String get sleepSettingsAllowedSnoozes => 'Allowed snoozes';
+
+  @override
+  String get sleepMonitorSnoozesTitle => 'Alarm snoozes';
+
+  @override
+  String get sleepMonitorSnoozesDisabled => 'Disabled in Sleep settings.';
+
+  @override
+  String sleepMonitorSnoozesConfigured(int count) {
+    return 'Up to $count snooze(s), according to Sleep settings.';
+  }
+
+  @override
   String get aiEmptyTitle => 'Configure an AI provider';
 
   @override

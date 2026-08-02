@@ -177,6 +177,7 @@ class SleepMonitorService extends ChangeNotifier {
     DateTime? alarmAt,
     SleepMonitoringMode mode = SleepMonitoringMode.alarmWithoutMission,
     SleepMissionConfig? mission,
+    int maxSnoozes = 3,
   }) async {
     if (!_isAndroid) return false;
     if (_state.isActive) return true;
@@ -190,6 +191,7 @@ class SleepMonitorService extends ChangeNotifier {
     }
     try {
       final arguments = <String, dynamic>{'monitor_mode': mode.wireValue};
+      arguments['max_snoozes'] = maxSnoozes.clamp(0, 10);
       if (alarmAt != null) {
         arguments['alarm_at_epoch_ms'] = alarmAt.millisecondsSinceEpoch;
       }

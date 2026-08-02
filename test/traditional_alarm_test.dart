@@ -13,6 +13,7 @@ TraditionalAlarm _alarm({
   enabled: true,
   snoozeEnabled: true,
   snoozeMinutes: 5,
+  maxSnoozes: 3,
   requiresMission: false,
   nextTriggerAt: null,
   createdAt: DateTime(2026),
