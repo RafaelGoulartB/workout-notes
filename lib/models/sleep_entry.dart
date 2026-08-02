@@ -101,9 +101,14 @@ class SleepEntry {
     );
   }
 
+  int get effectiveSleepMinutes =>
+      actualSleepMinutes ?? estimatedSleepMinutes ?? sleepMinutes;
+
   double? get efficiency {
-    if (actualSleepMinutes == null || sleepMinutes <= 0) return null;
-    return actualSleepMinutes! / sleepMinutes * 100;
+    final asleepMinutes = actualSleepMinutes ?? estimatedSleepMinutes;
+    final denominator = timeInBedMinutes ?? sleepMinutes;
+    if (asleepMinutes == null || denominator <= 0) return null;
+    return (asleepMinutes / denominator * 100).clamp(0.0, 100.0);
   }
 
   static String _dateString(DateTime value) =>

@@ -422,11 +422,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sleepMonitorInvalid => 'Invalid signal';
 
   @override
-  String get sleepMonitorDataQuality => 'MVP data quality';
+  String get sleepMonitorDataQuality => 'Capture quality';
 
   @override
-  String get sleepMonitorDataAcceptable =>
-      'Night suitable for the next MVP phase';
+  String get sleepMonitorDataAcceptable => 'Capture quality is good';
 
   @override
   String get sleepMonitorDataAcceptableBody =>
@@ -457,7 +456,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sleepMonitorNoSegmentsBody =>
-      'This session cannot evaluate the MVP. The monitor will now stop with an error if the microphone stops returning data, instead of completing an empty night.';
+      'This session has no usable audio segments. The monitor now stops with an error if the microphone stops returning data, instead of completing an empty night.';
 
   @override
   String get sleepMonitorAverageNoise => 'Average noise score';
@@ -618,6 +617,58 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get sleepInferenceBlockerDigitalSilence =>
       'More than 20% of the period contains digital microphone silence.';
+
+  @override
+  String get sleepStagesTitle => 'Sleep stages';
+
+  @override
+  String get sleepStageAwake => 'Awake';
+
+  @override
+  String get sleepStageSleeping => 'Sleeping';
+
+  @override
+  String get sleepStageDeepEstimated => 'Estimated deep sleep';
+
+  @override
+  String get sleepStageUnknown => 'Insufficient data';
+
+  @override
+  String get sleepStageUnavailable => 'Sleep stages unavailable';
+
+  @override
+  String get sleepStageUnavailableLegacyBody =>
+      'This recording predates acoustic staging. Duration and sleep onset were repaired, but deep sleep cannot be reconstructed without the original spectral signal.';
+
+  @override
+  String get sleepStageModelUnavailableBody =>
+      'This build does not include the licensed and validated local model. The app will not invent deep sleep from noise levels.';
+
+  @override
+  String get sleepStageTimelineSemantics =>
+      'Interactive timeline with awake, sleeping and estimated deep sleep stages';
+
+  @override
+  String get sleepOnsetTime => 'Fell asleep';
+
+  @override
+  String get sleepFinalWake => 'Final wake-up';
+
+  @override
+  String get sleepLatency => 'Sleep latency';
+
+  @override
+  String get sleepAwakenings => 'Awakenings';
+
+  @override
+  String get sleepAnalysisTechnicalDetails => 'Technical details';
+
+  @override
+  String get sleepMonitorPlacementTitle => 'For a reliable analysis';
+
+  @override
+  String get sleepMonitorPlacementBody =>
+      'Keep the phone charging 50–100 cm from your head, point the microphone toward you and never place it under the pillow. Other people, pets, TV or music can reduce confidence.';
 
   @override
   String get commonCancel => 'Cancel';

@@ -25,6 +25,7 @@ class SleepSessionSpool(
         directory.mkdirs()
         writeJson(File(directory, "session.json"), session)
         File(directory, "segments.ndjson").createNewFile()
+        File(directory, "stages.ndjson").createNewFile()
     }
 
     @Synchronized
@@ -39,6 +40,13 @@ class SleepSessionSpool(
         val directory = File(root, segment["session_id"].toString())
         directory.mkdirs()
         File(directory, "segments.ndjson").appendText(codec.encode(segment) + "\n")
+    }
+
+    @Synchronized
+    fun appendStage(stage: Map<String, Any?>) {
+        val directory = File(root, stage["session_id"].toString())
+        directory.mkdirs()
+        File(directory, "stages.ndjson").appendText(codec.encode(stage) + "\n")
     }
 
     @Synchronized
@@ -60,7 +68,23 @@ class SleepSessionSpool(
                 }
             }
         }
-        return mapOf("session" to session, "segments" to segments)
+        val stages = mutableListOf<Map<String, Any?>>()
+        val stageFile = File(directory, "stages.ndjson")
+        if (stageFile.exists()) {
+            stageFile.forEachLine { line ->
+                if (line.isBlank()) return@forEachLine
+                try {
+                    stages += codec.decode(line)
+                } catch (_: Throwable) {
+                    // Keep all complete stage epochs before a partial final line.
+                }
+            }
+        }
+        return mapOf(
+            "session" to session,
+            "segments" to segments,
+            "stage_epochs" to stages,
+        )
     }
 
     @Synchronized

@@ -18,7 +18,7 @@ import '../models/sleep_monitor_session.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 26;
+  static const _dbVersion = 27;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -262,6 +262,18 @@ class DatabaseHelper {
         estimated_sleep_minutes INTEGER,
         noise_event_count INTEGER NOT NULL DEFAULT 0,
         signal_quality_score REAL,
+        analysis_status TEXT NOT NULL DEFAULT 'legacy_unavailable',
+        sleep_onset_at TEXT,
+        final_wake_at TEXT,
+        sleep_latency_minutes INTEGER,
+        awake_minutes INTEGER,
+        sleeping_minutes INTEGER,
+        deep_sleep_minutes INTEGER,
+        unknown_minutes INTEGER,
+        awakening_count INTEGER,
+        sleep_efficiency REAL,
+        stage_confidence REAL,
+        stage_algorithm_version TEXT,
         end_reason TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (sleep_entry_id) REFERENCES sleep_entries(id) ON DELETE CASCADE
@@ -279,6 +291,22 @@ class DatabaseHelper {
         classification TEXT NOT NULL,
         valid_fraction REAL NOT NULL,
         noise_burst_count INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (session_id) REFERENCES sleep_monitor_sessions(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE sleep_stage_epochs (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        duration_seconds INTEGER NOT NULL,
+        stage TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        awake_probability REAL,
+        sleeping_probability REAL,
+        deep_probability REAL,
+        algorithm_version TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'acoustic_model',
         FOREIGN KEY (session_id) REFERENCES sleep_monitor_sessions(id) ON DELETE CASCADE
       )
     ''');
@@ -395,6 +423,9 @@ class DatabaseHelper {
     );
     await db.execute(
       'CREATE INDEX idx_sleep_monitor_segments_session_started ON sleep_monitor_segments(session_id, started_at ASC)',
+    );
+    await db.execute(
+      'CREATE UNIQUE INDEX idx_sleep_stage_epochs_session_started ON sleep_stage_epochs(session_id, started_at ASC)',
     );
     await db.execute(
       'CREATE INDEX idx_ai_chat_messages_thread ON ai_chat_messages(thread_id, created_at ASC)',
@@ -1795,6 +1826,49 @@ class DatabaseHelper {
           'key': 'alarm_global_snooze_enabled',
           'value': 'true',
         }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      } catch (_) {}
+    }
+    if (oldVersion < 27) {
+      for (final statement in [
+        "ALTER TABLE sleep_monitor_sessions ADD COLUMN analysis_status TEXT NOT NULL DEFAULT 'legacy_unavailable'",
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN sleep_onset_at TEXT',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN final_wake_at TEXT',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN sleep_latency_minutes INTEGER',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN awake_minutes INTEGER',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN sleeping_minutes INTEGER',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN deep_sleep_minutes INTEGER',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN unknown_minutes INTEGER',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN awakening_count INTEGER',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN sleep_efficiency REAL',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN stage_confidence REAL',
+        'ALTER TABLE sleep_monitor_sessions ADD COLUMN stage_algorithm_version TEXT',
+      ]) {
+        try {
+          await db.execute(statement);
+        } catch (_) {}
+      }
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS sleep_stage_epochs (
+            id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            duration_seconds INTEGER NOT NULL,
+            stage TEXT NOT NULL,
+            confidence REAL NOT NULL,
+            awake_probability REAL,
+            sleeping_probability REAL,
+            deep_probability REAL,
+            algorithm_version TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT 'acoustic_model',
+            FOREIGN KEY (session_id) REFERENCES sleep_monitor_sessions(id) ON DELETE CASCADE
+          )
+        ''');
+      } catch (_) {}
+      try {
+        await db.execute(
+          'CREATE UNIQUE INDEX IF NOT EXISTS idx_sleep_stage_epochs_session_started ON sleep_stage_epochs(session_id, started_at ASC)',
+        );
       } catch (_) {}
     }
   }

@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/models/sleep_night_summary.dart';
+import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
@@ -19,6 +21,7 @@ import 'package:workout_notes/widgets/sleep/sleep_goal_metrics_card.dart';
 
 import 'package:workout_notes/widgets/sleep/sleep_schedule_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_weekly_summary_card.dart';
+import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
 
 import 'sleep_monitor_result_screen.dart';
 import 'sleep_monitor_screen.dart';
@@ -39,6 +42,8 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   final _sleepGoalService = SleepGoalService();
   List<SleepEntry> _entries = const [];
   SleepDashboardStats? _stats;
+  SleepNightSummary? _latestNight;
+  Map<String, SleepNightSummary> _nightSummaries = const {};
   bool _isLoading = true;
   int _historyDisplayCount = 5;
   int _lastRecoveryCount = 0;
@@ -106,11 +111,22 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         referenceDate: _weekEnd,
       );
       final sleepGoalMinutes = await _sleepGoalService.load();
+      final nightSummaries = await _monitorRepository.getNightSummaries(
+        limit: 500,
+      );
+      final summariesByEntry = {
+        for (final summary in nightSummaries) summary.entry.id: summary,
+      };
+      final latestNight = stats.latest == null
+          ? null
+          : summariesByEntry[stats.latest!.id];
       if (!mounted) return;
       setState(() {
         _entries = entries;
         _stats = stats;
         _sleepGoalMinutes = sleepGoalMinutes;
+        _latestNight = latestNight;
+        _nightSummaries = summariesByEntry;
         _historyDisplayCount = 5;
         _isLoading = false;
       });
@@ -199,6 +215,14 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
           ),
           const SizedBox(height: 16),
           SleepLatestCard(entry: latest, onTap: () => _showDetails(latest)),
+          if (_latestNight?.session != null) ...[
+            const SizedBox(height: 16),
+            SleepStageCard(
+              session: _latestNight!.session!,
+              stages: _latestNight!.stages,
+              compact: true,
+            ),
+          ],
           const SizedBox(height: 16),
         ],
         SleepWeeklySummaryCard(
@@ -317,6 +341,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     };
     final recordedSpots = <FlSpot>[];
     final actualSpots = <FlSpot>[];
+    final deepSpots = <FlSpot>[];
     for (var index = 0; index < 30; index++) {
       final date = start.add(Duration(days: index));
       final entry = byDate[_dateString(date)];
@@ -325,6 +350,13 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       if (entry.actualSleepMinutes != null) {
         actualSpots.add(
           FlSpot(index.toDouble(), entry.actualSleepMinutes! / 60),
+        );
+      }
+      final stageSession = _nightSummaries[entry.id]?.session;
+      if (stageSession?.deepSleepMinutes != null &&
+          (stageSession?.stageConfidence ?? 0) >= 0.6) {
+        deepSpots.add(
+          FlSpot(index.toDouble(), stageSession!.deepSleepMinutes! / 60),
         );
       }
     }
@@ -338,6 +370,8 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
           items: [
             (theme.colorScheme.primary, loc.sleepChartRecorded),
             (Colors.indigo, loc.sleepChartActual),
+            if (deepSpots.isNotEmpty)
+              (Colors.deepPurple, loc.sleepStageDeepEstimated),
           ],
         ),
         const SizedBox(height: 12),
@@ -392,6 +426,8 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                 _lineData(recordedSpots, theme.colorScheme.primary),
                 if (actualSpots.isNotEmpty)
                   _lineData(actualSpots, Colors.indigo),
+                if (deepSpots.isNotEmpty)
+                  _lineData(deepSpots, Colors.deepPurple),
               ],
             ),
           ),
@@ -425,6 +461,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _SleepHistoryCard(
                   entry: entry,
+                  summary: _nightSummaries[entry.id],
                   loc: loc,
                   onTap: () => _showDetails(entry),
                 ),
@@ -717,11 +754,13 @@ class _ChartLegend extends StatelessWidget {
 
 class _SleepHistoryCard extends StatelessWidget {
   final SleepEntry entry;
+  final SleepNightSummary? summary;
   final AppLocalizations loc;
   final VoidCallback onTap;
 
   const _SleepHistoryCard({
     required this.entry,
+    required this.summary,
     required this.loc,
     required this.onTap,
   });
@@ -789,6 +828,27 @@ class _SleepHistoryCard extends StatelessWidget {
                           color: theme.colorScheme.primary,
                         ),
                       ),
+                    if (summary?.hasStages ?? false) ...[
+                      const SizedBox(height: 7),
+                      _StageMiniComposition(session: summary!.session!),
+                      const SizedBox(height: 4),
+                      Text(
+                        _stageTotals(summary!.session!, loc),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ] else if (summary?.session != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        loc.sleepStageUnavailable,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -809,6 +869,61 @@ class _SleepHistoryCard extends StatelessWidget {
     );
   }
 }
+
+class _StageMiniComposition extends StatelessWidget {
+  final SleepMonitorSession session;
+
+  const _StageMiniComposition({required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final awake = session.awakeMinutes ?? 0;
+    final sleeping = session.sleepingMinutes ?? 0;
+    final deep = session.deepSleepMinutes ?? 0;
+    final unknown = session.unknownMinutes ?? 0;
+    final total = awake + sleeping + deep + unknown;
+    if (total <= 0) return const SizedBox.shrink();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(99),
+      child: SizedBox(
+        height: 6,
+        child: Row(
+          children: [
+            if (awake > 0)
+              Expanded(
+                flex: awake,
+                child: Container(color: Colors.orange),
+              ),
+            if (sleeping > 0)
+              Expanded(
+                flex: sleeping,
+                child: Container(color: Colors.lightBlue),
+              ),
+            if (deep > 0)
+              Expanded(
+                flex: deep,
+                child: Container(color: Colors.indigo),
+              ),
+            if (unknown > 0)
+              Expanded(
+                flex: unknown,
+                child: Container(color: Colors.grey),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _stageTotals(SleepMonitorSession session, AppLocalizations loc) {
+  final sleeping = session.sleepingMinutes ?? 0;
+  final deep = session.deepSleepMinutes ?? 0;
+  return '${loc.sleepStageSleeping} ${_compactMinutes(sleeping)} \u00b7 ${loc.sleepStageDeepEstimated} ${_compactMinutes(deep)}';
+}
+
+String _compactMinutes(int minutes) =>
+    minutes >= 60 ? '${minutes ~/ 60}h ${minutes % 60}min' : '${minutes}min';
 
 class _DetailRow extends StatelessWidget {
   final IconData icon;

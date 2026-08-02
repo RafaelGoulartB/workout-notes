@@ -423,11 +423,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get sleepMonitorInvalid => 'Sinal inválido';
 
   @override
-  String get sleepMonitorDataQuality => 'Qualidade dos dados do MVP';
+  String get sleepMonitorDataQuality => 'Qualidade da captura';
 
   @override
-  String get sleepMonitorDataAcceptable =>
-      'Noite adequada para a próxima fase do MVP';
+  String get sleepMonitorDataAcceptable => 'A captura desta noite está boa';
 
   @override
   String get sleepMonitorDataAcceptableBody =>
@@ -459,7 +458,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get sleepMonitorNoSegmentsBody =>
-      'Esta sessão não permite avaliar o MVP. Agora o monitor encerra com erro quando o microfone deixa de retornar dados, em vez de concluir uma noite vazia.';
+      'Esta sessão não contém segmentos de áudio utilizáveis. O monitor agora encerra com erro quando o microfone deixa de retornar dados, em vez de concluir uma noite vazia.';
 
   @override
   String get sleepMonitorAverageNoise => 'Ruído médio';
@@ -620,6 +619,58 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get sleepInferenceBlockerDigitalSilence =>
       'Mais de 20% do período contém silêncio digital do microfone.';
+
+  @override
+  String get sleepStagesTitle => 'Fases do sono';
+
+  @override
+  String get sleepStageAwake => 'Acordado';
+
+  @override
+  String get sleepStageSleeping => 'Dormindo';
+
+  @override
+  String get sleepStageDeepEstimated => 'Sono profundo estimado';
+
+  @override
+  String get sleepStageUnknown => 'Sem dados suficientes';
+
+  @override
+  String get sleepStageUnavailable => 'Fases do sono indisponíveis';
+
+  @override
+  String get sleepStageUnavailableLegacyBody =>
+      'Esta gravação é anterior à análise acústica por fases. A duração e o início do sono foram reparados, mas o sono profundo não pode ser reconstruído sem o sinal espectral original.';
+
+  @override
+  String get sleepStageModelUnavailableBody =>
+      'Esta versão não contém o modelo local licenciado e validado. O app não inventará sono profundo a partir do nível de ruído.';
+
+  @override
+  String get sleepStageTimelineSemantics =>
+      'Linha do tempo interativa com as fases acordado, dormindo e sono profundo estimado';
+
+  @override
+  String get sleepOnsetTime => 'Dormiu';
+
+  @override
+  String get sleepFinalWake => 'Acordou';
+
+  @override
+  String get sleepLatency => 'Latência do sono';
+
+  @override
+  String get sleepAwakenings => 'Despertares';
+
+  @override
+  String get sleepAnalysisTechnicalDetails => 'Detalhes técnicos';
+
+  @override
+  String get sleepMonitorPlacementTitle => 'Para uma análise confiável';
+
+  @override
+  String get sleepMonitorPlacementBody =>
+      'Deixe o celular carregando entre 50 e 100 cm da cabeça, com o microfone apontado para você, e nunca sob o travesseiro. Outras pessoas, pets, TV ou música podem reduzir a confiança.';
 
   @override
   String get commonCancel => 'Cancelar';

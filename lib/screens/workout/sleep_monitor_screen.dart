@@ -240,7 +240,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
             ? loc.sleepAlarmSectionTitle
             : loc.sleepMonitorModeOnly,
       ),
-      const SizedBox(height: 20),
+      const SizedBox(height: 16),
       if (alarmAt != null)
         _AlarmClockCard(
           time: _formatTime(alarmAt),
@@ -266,6 +266,11 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
             : _modeBody(loc, _selectedMode),
         icon: _modeIcon(_selectedMode),
         onTap: _showModePicker,
+      ),
+      const SizedBox(height: 10),
+      _MonitoringOnlyCard(
+        title: loc.sleepMonitorPlacementTitle,
+        body: loc.sleepMonitorPlacementBody,
       ),
       if (_selectedMode.hasAlarm) ...[
         const SizedBox(height: 10),

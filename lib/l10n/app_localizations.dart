@@ -821,13 +821,13 @@ abstract class AppLocalizations {
   /// No description provided for @sleepMonitorDataQuality.
   ///
   /// In en, this message translates to:
-  /// **'MVP data quality'**
+  /// **'Capture quality'**
   String get sleepMonitorDataQuality;
 
   /// No description provided for @sleepMonitorDataAcceptable.
   ///
   /// In en, this message translates to:
-  /// **'Night suitable for the next MVP phase'**
+  /// **'Capture quality is good'**
   String get sleepMonitorDataAcceptable;
 
   /// No description provided for @sleepMonitorDataAcceptableBody.
@@ -881,7 +881,7 @@ abstract class AppLocalizations {
   /// No description provided for @sleepMonitorNoSegmentsBody.
   ///
   /// In en, this message translates to:
-  /// **'This session cannot evaluate the MVP. The monitor will now stop with an error if the microphone stops returning data, instead of completing an empty night.'**
+  /// **'This session has no usable audio segments. The monitor now stops with an error if the microphone stops returning data, instead of completing an empty night.'**
   String get sleepMonitorNoSegmentsBody;
 
   /// No description provided for @sleepMonitorAverageNoise.
@@ -1165,6 +1165,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'More than 20% of the period contains digital microphone silence.'**
   String get sleepInferenceBlockerDigitalSilence;
+
+  /// No description provided for @sleepStagesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep stages'**
+  String get sleepStagesTitle;
+
+  /// No description provided for @sleepStageAwake.
+  ///
+  /// In en, this message translates to:
+  /// **'Awake'**
+  String get sleepStageAwake;
+
+  /// No description provided for @sleepStageSleeping.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleeping'**
+  String get sleepStageSleeping;
+
+  /// No description provided for @sleepStageDeepEstimated.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated deep sleep'**
+  String get sleepStageDeepEstimated;
+
+  /// No description provided for @sleepStageUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Insufficient data'**
+  String get sleepStageUnknown;
+
+  /// No description provided for @sleepStageUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep stages unavailable'**
+  String get sleepStageUnavailable;
+
+  /// No description provided for @sleepStageUnavailableLegacyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This recording predates acoustic staging. Duration and sleep onset were repaired, but deep sleep cannot be reconstructed without the original spectral signal.'**
+  String get sleepStageUnavailableLegacyBody;
+
+  /// No description provided for @sleepStageModelUnavailableBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This build does not include the licensed and validated local model. The app will not invent deep sleep from noise levels.'**
+  String get sleepStageModelUnavailableBody;
+
+  /// No description provided for @sleepStageTimelineSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Interactive timeline with awake, sleeping and estimated deep sleep stages'**
+  String get sleepStageTimelineSemantics;
+
+  /// No description provided for @sleepOnsetTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Fell asleep'**
+  String get sleepOnsetTime;
+
+  /// No description provided for @sleepFinalWake.
+  ///
+  /// In en, this message translates to:
+  /// **'Final wake-up'**
+  String get sleepFinalWake;
+
+  /// No description provided for @sleepLatency.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep latency'**
+  String get sleepLatency;
+
+  /// No description provided for @sleepAwakenings.
+  ///
+  /// In en, this message translates to:
+  /// **'Awakenings'**
+  String get sleepAwakenings;
+
+  /// No description provided for @sleepAnalysisTechnicalDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical details'**
+  String get sleepAnalysisTechnicalDetails;
+
+  /// No description provided for @sleepMonitorPlacementTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'For a reliable analysis'**
+  String get sleepMonitorPlacementTitle;
+
+  /// No description provided for @sleepMonitorPlacementBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the phone charging 50–100 cm from your head, point the microphone toward you and never place it under the pillow. Other people, pets, TV or music can reduce confidence.'**
+  String get sleepMonitorPlacementBody;
 
   /// No description provided for @commonCancel.
   ///

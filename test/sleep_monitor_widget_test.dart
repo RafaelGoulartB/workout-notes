@@ -267,6 +267,12 @@ void main() {
       _localized(SleepMonitorResultScreen(sessionId: session.id)),
     );
     await _pumpUntilLoaded(tester);
+    await tester.scrollUntilVisible(
+      find.text('Night analysis'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pump();
 
     expect(find.text('Night analysis'), findsOneWidget);
     expect(find.text('Fell asleep'), findsWidgets);
@@ -307,6 +313,13 @@ void main() {
       _localized(SleepMonitorResultScreen(sessionId: session.id)),
     );
     await _pumpUntilLoaded(tester);
+    await tester.scrollUntilVisible(
+      find.text('Technical details'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Technical details'));
+    await tester.pumpAndSettle();
 
     expect(
       find.text(

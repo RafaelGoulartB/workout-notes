@@ -6,6 +6,12 @@ class SleepMonitorSession {
   static const defaultAlgorithmVersion = 'audio-noise-v1';
   static const defaultSensorMode = 'audio';
 
+  static const analysisAvailable = 'available';
+  static const analysisInsufficient = 'insufficient_data';
+  static const analysisLegacyUnavailable = 'legacy_unavailable';
+  static const analysisModelUnavailable = 'model_unavailable';
+  static const analysisFailed = 'failed';
+
   static const starting = 'starting';
   static const running = 'running';
   static const stopping = 'stopping';
@@ -62,6 +68,18 @@ class SleepMonitorSession {
   final double? signalQualityScore;
   final String? endReason;
   final DateTime createdAt;
+  final String? analysisStatus;
+  final DateTime? sleepOnsetAt;
+  final DateTime? finalWakeAt;
+  final int? sleepLatencyMinutes;
+  final int? awakeMinutes;
+  final int? sleepingMinutes;
+  final int? deepSleepMinutes;
+  final int? unknownMinutes;
+  final int? awakeningCount;
+  final double? sleepEfficiency;
+  final double? stageConfidence;
+  final String? stageAlgorithmVersion;
 
   const SleepMonitorSession({
     required this.id,
@@ -86,7 +104,24 @@ class SleepMonitorSession {
     required this.signalQualityScore,
     required this.endReason,
     required this.createdAt,
+    this.analysisStatus,
+    this.sleepOnsetAt,
+    this.finalWakeAt,
+    this.sleepLatencyMinutes,
+    this.awakeMinutes,
+    this.sleepingMinutes,
+    this.deepSleepMinutes,
+    this.unknownMinutes,
+    this.awakeningCount,
+    this.sleepEfficiency,
+    this.stageConfidence,
+    this.stageAlgorithmVersion,
   });
+
+  bool get hasSleepStages =>
+      analysisStatus == analysisAvailable &&
+      sleepingMinutes != null &&
+      deepSleepMinutes != null;
 
   bool get isActive =>
       status == starting || status == running || status == stopping;
@@ -114,6 +149,18 @@ class SleepMonitorSession {
     int? noiseEventCount,
     double? signalQualityScore,
     String? endReason,
+    String? analysisStatus,
+    DateTime? sleepOnsetAt,
+    DateTime? finalWakeAt,
+    int? sleepLatencyMinutes,
+    int? awakeMinutes,
+    int? sleepingMinutes,
+    int? deepSleepMinutes,
+    int? unknownMinutes,
+    int? awakeningCount,
+    double? sleepEfficiency,
+    double? stageConfidence,
+    String? stageAlgorithmVersion,
   }) {
     return SleepMonitorSession(
       id: id,
@@ -139,6 +186,19 @@ class SleepMonitorSession {
       signalQualityScore: signalQualityScore ?? this.signalQualityScore,
       endReason: endReason ?? this.endReason,
       createdAt: createdAt,
+      analysisStatus: analysisStatus ?? this.analysisStatus,
+      sleepOnsetAt: sleepOnsetAt ?? this.sleepOnsetAt,
+      finalWakeAt: finalWakeAt ?? this.finalWakeAt,
+      sleepLatencyMinutes: sleepLatencyMinutes ?? this.sleepLatencyMinutes,
+      awakeMinutes: awakeMinutes ?? this.awakeMinutes,
+      sleepingMinutes: sleepingMinutes ?? this.sleepingMinutes,
+      deepSleepMinutes: deepSleepMinutes ?? this.deepSleepMinutes,
+      unknownMinutes: unknownMinutes ?? this.unknownMinutes,
+      awakeningCount: awakeningCount ?? this.awakeningCount,
+      sleepEfficiency: sleepEfficiency ?? this.sleepEfficiency,
+      stageConfidence: stageConfidence ?? this.stageConfidence,
+      stageAlgorithmVersion:
+          stageAlgorithmVersion ?? this.stageAlgorithmVersion,
     );
   }
 
@@ -172,6 +232,28 @@ class SleepMonitorSession {
     }
     if (alarmDismissedAt != null) {
       map['alarm_dismissed_at'] = alarmDismissedAt!.toIso8601String();
+    }
+    if (analysisStatus != null) map['analysis_status'] = analysisStatus;
+    if (sleepOnsetAt != null) {
+      map['sleep_onset_at'] = sleepOnsetAt!.toIso8601String();
+    }
+    if (finalWakeAt != null) {
+      map['final_wake_at'] = finalWakeAt!.toIso8601String();
+    }
+    if (sleepLatencyMinutes != null) {
+      map['sleep_latency_minutes'] = sleepLatencyMinutes;
+    }
+    if (awakeMinutes != null) map['awake_minutes'] = awakeMinutes;
+    if (sleepingMinutes != null) map['sleeping_minutes'] = sleepingMinutes;
+    if (deepSleepMinutes != null) {
+      map['deep_sleep_minutes'] = deepSleepMinutes;
+    }
+    if (unknownMinutes != null) map['unknown_minutes'] = unknownMinutes;
+    if (awakeningCount != null) map['awakening_count'] = awakeningCount;
+    if (sleepEfficiency != null) map['sleep_efficiency'] = sleepEfficiency;
+    if (stageConfidence != null) map['stage_confidence'] = stageConfidence;
+    if (stageAlgorithmVersion != null) {
+      map['stage_algorithm_version'] = stageAlgorithmVersion;
     }
     return map;
   }
@@ -209,6 +291,22 @@ class SleepMonitorSession {
       signalQualityScore: (map['signal_quality_score'] as num?)?.toDouble(),
       endReason: map['end_reason'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
+      analysisStatus: map['analysis_status'] as String?,
+      sleepOnsetAt: (map['sleep_onset_at'] as String?) == null
+          ? null
+          : DateTime.parse(map['sleep_onset_at'] as String),
+      finalWakeAt: (map['final_wake_at'] as String?) == null
+          ? null
+          : DateTime.parse(map['final_wake_at'] as String),
+      sleepLatencyMinutes: (map['sleep_latency_minutes'] as num?)?.toInt(),
+      awakeMinutes: (map['awake_minutes'] as num?)?.toInt(),
+      sleepingMinutes: (map['sleeping_minutes'] as num?)?.toInt(),
+      deepSleepMinutes: (map['deep_sleep_minutes'] as num?)?.toInt(),
+      unknownMinutes: (map['unknown_minutes'] as num?)?.toInt(),
+      awakeningCount: (map['awakening_count'] as num?)?.toInt(),
+      sleepEfficiency: (map['sleep_efficiency'] as num?)?.toDouble(),
+      stageConfidence: (map['stage_confidence'] as num?)?.toDouble(),
+      stageAlgorithmVersion: map['stage_algorithm_version'] as String?,
     );
   }
 

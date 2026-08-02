@@ -51,7 +51,7 @@ class SleepMonitorBridge(private val context: Context) :
                     "exact_alarm_granted" to SleepAlarmScheduler.canScheduleExact(context),
                     "full_screen_intent_granted" to
                         SleepAlarmScheduler.canUseFullScreenIntent(context),
-                ),
+                ) + SleepStageModelGate.capabilities(context),
             )
             "getAlarmCapabilities" -> result.success(alarmCapabilities())
             "getState" -> result.success(SleepMonitoringService.currentState(context))
