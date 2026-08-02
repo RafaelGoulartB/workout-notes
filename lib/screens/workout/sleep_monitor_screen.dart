@@ -218,7 +218,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
                             ? null
                             : () => _start(alarmAt),
                         icon: _busyIcon(Icons.bedtime_rounded),
-                        label: Text(_startLabel(loc, alarmAt)),
+                        label: Text(loc.sleepMonitorStart),
                       ),
               ),
             ),
@@ -609,16 +609,6 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
       default:
         return loc.sleepMonitorGenericError;
     }
-  }
-
-  String _startLabel(AppLocalizations loc, DateTime? alarmAt) {
-    if (_selectedMode == SleepMonitoringMode.monitoringOnly) {
-      return loc.sleepMonitorStartOnly;
-    }
-    if (_selectedMode == SleepMonitoringMode.alarmWithMission) {
-      return loc.sleepMonitorStartWithMission(_formatTime(alarmAt!));
-    }
-    return loc.sleepMonitorStartWithAlarm(_formatTime(alarmAt!));
   }
 
   Future<void> _showModePicker() async {
