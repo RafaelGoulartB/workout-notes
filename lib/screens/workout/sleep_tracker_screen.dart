@@ -22,6 +22,7 @@ import 'package:workout_notes/widgets/sleep/sleep_weekly_summary_card.dart';
 
 import 'sleep_monitor_result_screen.dart';
 import 'sleep_monitor_screen.dart';
+import 'traditional_alarms_screen.dart';
 import 'sleep_settings_screen.dart';
 
 class SleepTrackerScreen extends StatefulWidget {
@@ -136,6 +137,11 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         centerTitle: false,
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            tooltip: 'Alarmes',
+            icon: const Icon(Icons.alarm_rounded),
+            onPressed: _openTraditionalAlarms,
+          ),
           IconButton(
             tooltip: loc.sleepSettingsTitle,
             icon: const Icon(Icons.settings_outlined),
@@ -260,6 +266,14 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
     final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
     return '$hours:$minutes:$seconds';
+  }
+
+  Future<void> _openTraditionalAlarms() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TraditionalAlarmsScreen()),
+    );
+    if (mounted) await _load();
   }
 
   Future<void> _openSleepSettings() async {

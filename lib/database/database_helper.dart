@@ -11,13 +11,14 @@ import '../repositories/export_import_repository.dart';
 import '../repositories/goal_repository.dart';
 import '../repositories/sleep_repository.dart';
 import '../repositories/sleep_monitor_repository.dart';
+import '../repositories/traditional_alarm_repository.dart';
 import '../models/sleep_entry.dart';
 import '../models/sleep_monitor_segment.dart';
 import '../models/sleep_monitor_session.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 23;
+  static const _dbVersion = 24;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -35,6 +36,8 @@ class DatabaseHelper {
   late final GoalRepository goalRepo = GoalRepository();
   late final SleepRepository sleepRepo = SleepRepository();
   late final SleepMonitorRepository sleepMonitorRepo = SleepMonitorRepository();
+  late final TraditionalAlarmRepository traditionalAlarmRepo =
+      TraditionalAlarmRepository();
 
   DatabaseHelper._();
 
@@ -280,6 +283,22 @@ class DatabaseHelper {
       )
     ''');
 
+    // Standalone wake-up alarms.
+    await db.execute('''
+      CREATE TABLE traditional_alarms (
+        id TEXT PRIMARY KEY,
+        hour INTEGER NOT NULL,
+        minute INTEGER NOT NULL,
+        weekdays_json TEXT NOT NULL DEFAULT '[]',
+        enabled INTEGER NOT NULL DEFAULT 1,
+        snooze_enabled INTEGER NOT NULL DEFAULT 1,
+        snooze_minutes INTEGER NOT NULL DEFAULT 5,
+        requires_mission INTEGER NOT NULL DEFAULT 0,
+        next_trigger_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
     // App settings
     await db.execute('''
       CREATE TABLE app_settings (
@@ -378,6 +397,9 @@ class DatabaseHelper {
     );
     await db.execute(
       'CREATE INDEX idx_ai_chat_messages_thread ON ai_chat_messages(thread_id, created_at ASC)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_traditional_alarms_next_trigger ON traditional_alarms(enabled, next_trigger_at ASC)',
     );
     await db.execute(
       'CREATE INDEX idx_ai_chat_threads_updated ON ai_chat_threads(updated_at DESC)',
@@ -1723,13 +1745,34 @@ class DatabaseHelper {
         'sleep_monitor_default_mode': 'alarm_without_mission',
       }.entries) {
         try {
-          await db.insert(
-            'app_settings',
-            {'key': entry.key, 'value': entry.value},
-            conflictAlgorithm: ConflictAlgorithm.ignore,
-          );
+          await db.insert('app_settings', {
+            'key': entry.key,
+            'value': entry.value,
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
         } catch (_) {}
       }
+    }
+    if (oldVersion < 24) {
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS traditional_alarms (
+            id TEXT PRIMARY KEY,
+            hour INTEGER NOT NULL,
+            minute INTEGER NOT NULL,
+            weekdays_json TEXT NOT NULL DEFAULT '[]',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            snooze_enabled INTEGER NOT NULL DEFAULT 1,
+            snooze_minutes INTEGER NOT NULL DEFAULT 5,
+            requires_mission INTEGER NOT NULL DEFAULT 0,
+            next_trigger_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_traditional_alarms_next_trigger ON traditional_alarms(enabled, next_trigger_at ASC)',
+        );
+      } catch (_) {}
     }
   }
 

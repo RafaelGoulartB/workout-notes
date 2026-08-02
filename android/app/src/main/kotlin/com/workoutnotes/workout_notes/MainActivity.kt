@@ -5,9 +5,11 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import com.workoutnotes.workout_notes.sleep.SleepMonitorBridge
+import com.workoutnotes.workout_notes.sleep.TraditionalAlarmBridge
 
 class MainActivity : FlutterActivity() {
     private var sleepMonitorBridge: SleepMonitorBridge? = null
+    private lateinit var traditionalAlarmBridge: TraditionalAlarmBridge
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -21,6 +23,11 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             "workout_notes/sleep_monitor/events",
         ).setStreamHandler(bridge)
+        traditionalAlarmBridge = TraditionalAlarmBridge(applicationContext)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "workout_notes/traditional_alarms/methods",
+        ).setMethodCallHandler(traditionalAlarmBridge)
     }
 
     override fun onResume() {

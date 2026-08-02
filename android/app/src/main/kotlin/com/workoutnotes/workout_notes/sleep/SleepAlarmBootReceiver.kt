@@ -12,6 +12,7 @@ class SleepAlarmBootReceiver : BroadcastReceiver() {
             intent?.action == Intent.ACTION_MY_PACKAGE_REPLACED
         ) {
             SleepAlarmScheduler.restore(context)
+            TraditionalAlarmScheduler.restore(context)
         }
     }
 }
