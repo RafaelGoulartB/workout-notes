@@ -6214,6 +6214,18 @@ abstract class AppLocalizations {
   /// **'ALARMS'**
   String get sleepSettingsAlarmsSection;
 
+  /// No description provided for @sleepSettingsSnoozeToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow snoozes'**
+  String get sleepSettingsSnoozeToggle;
+
+  /// No description provided for @sleepSettingsSnoozeToggleBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Controls snoozes in sleep monitoring and the default for new alarms.'**
+  String get sleepSettingsSnoozeToggleBody;
+
   /// No description provided for @sleepSettingsMaxSnoozesBody.
   ///
   /// In en, this message translates to:

@@ -1114,6 +1114,8 @@
   "alarmWeekSun": "Sun",
 
   "sleepSettingsAlarmsSection": "ALARMS",
+  "sleepSettingsSnoozeToggle": "Allow snoozes",
+  "sleepSettingsSnoozeToggleBody": "Controls snoozes in sleep monitoring and the default for new alarms.",
   "sleepSettingsMaxSnoozesBody": "Sleep monitoring always uses this limit. Each traditional alarm can set its own limit.",
   "sleepSettingsMaxSnoozesDialogBody": "This limit is used by sleep monitoring and as the default for new alarms.",
   "sleepSettingsAllowedSnoozes": "Allowed snoozes",

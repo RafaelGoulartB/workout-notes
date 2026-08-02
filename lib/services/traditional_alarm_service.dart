@@ -164,6 +164,7 @@ class TraditionalAlarmService extends ChangeNotifier {
   }
 
   static const globalMaxSnoozesKey = 'alarm_global_max_snoozes';
+  static const globalSnoozeEnabledKey = 'alarm_global_snooze_enabled';
   static const defaultMaxSnoozes = 3;
 
   Future<int> getGlobalMaxSnoozes() async {
@@ -173,6 +174,12 @@ class TraditionalAlarmService extends ChangeNotifier {
 
   Future<void> setGlobalMaxSnoozes(int value) =>
       _settings.setSetting(globalMaxSnoozesKey, value.clamp(0, 10).toString());
+
+  Future<bool> getGlobalSnoozeEnabled() async =>
+      (await _settings.getSetting(globalSnoozeEnabledKey)) != 'false';
+
+  Future<void> setGlobalSnoozeEnabled(bool enabled) =>
+      _settings.setSetting(globalSnoozeEnabledKey, enabled ? 'true' : 'false');
 
   /// The SQLite write already succeeded when this is called. A temporary
   /// platform-channel failure (for example during an Android hot restart) must

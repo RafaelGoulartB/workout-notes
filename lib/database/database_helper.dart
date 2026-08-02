@@ -18,7 +18,7 @@ import '../models/sleep_monitor_session.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 25;
+  static const _dbVersion = 26;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -1789,6 +1789,14 @@ class DatabaseHelper {
         }, conflictAlgorithm: ConflictAlgorithm.ignore);
       } catch (_) {}
     }
+    if (oldVersion < 26) {
+      try {
+        await db.insert('app_settings', {
+          'key': 'alarm_global_snooze_enabled',
+          'value': 'true',
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      } catch (_) {}
+    }
   }
 
   Future<void> _seedData(Database db) async {
@@ -1865,6 +1873,10 @@ class DatabaseHelper {
     batch.insert('app_settings', {
       'key': 'alarm_global_max_snoozes',
       'value': '3',
+    });
+    batch.insert('app_settings', {
+      'key': 'alarm_global_snooze_enabled',
+      'value': 'true',
     });
     batch.insert('app_settings', {
       'key': 'notification_rest_timer_enabled',

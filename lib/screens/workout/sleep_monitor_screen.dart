@@ -36,6 +36,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   TimeOfDay _selectedTime = const TimeOfDay(hour: 7, minute: 0);
   SleepMonitoringMode _selectedMode = SleepMonitoringMode.alarmWithoutMission;
   int _globalMaxSnoozes = TraditionalAlarmService.defaultMaxSnoozes;
+  bool _globalSnoozeEnabled = true;
   bool _isBusy = false;
   bool _loading = true;
   bool _openingResult = false;
@@ -92,8 +93,9 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     }
     await _service.getAlarmCapabilities();
     await _missions.load();
-    final globalMaxSnoozes = await TraditionalAlarmService.instance
-        .getGlobalMaxSnoozes();
+    final alarmSettings = TraditionalAlarmService.instance;
+    final globalMaxSnoozes = await alarmSettings.getGlobalMaxSnoozes();
+    final globalSnoozeEnabled = await alarmSettings.getGlobalSnoozeEnabled();
     final defaultAlarm = SleepAlarmTime.defaultAlarm();
     if (!mounted) return;
     setState(() {
@@ -105,6 +107,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
           ? SleepMonitoringMode.alarmWithoutMission
           : remembered;
       _globalMaxSnoozes = globalMaxSnoozes;
+      _globalSnoozeEnabled = globalSnoozeEnabled;
       _loading = false;
     });
   }
@@ -268,7 +271,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         const SizedBox(height: 10),
         _MonitoringOnlyCard(
           title: loc.sleepMonitorSnoozesTitle,
-          body: _globalMaxSnoozes == 0
+          body: !_globalSnoozeEnabled || _globalMaxSnoozes == 0
               ? loc.sleepMonitorSnoozesDisabled
               : loc.sleepMonitorSnoozesConfigured(_globalMaxSnoozes),
         ),
@@ -513,8 +516,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         alarmAt: alarmAt,
         mode: _selectedMode,
         mission: _missions.config,
-        maxSnoozes: await TraditionalAlarmService.instance
-            .getGlobalMaxSnoozes(),
+        maxSnoozes: _globalSnoozeEnabled ? _globalMaxSnoozes : 0,
       );
       if (!started && mounted) {
         _showMessage(_localizedError(loc, _service.state.errorCode));
@@ -673,6 +675,15 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
       MaterialPageRoute(builder: (_) => const SleepSettingsScreen()),
     );
     await _reloadMission();
+    final alarmSettings = TraditionalAlarmService.instance;
+    final maxSnoozes = await alarmSettings.getGlobalMaxSnoozes();
+    final snoozeEnabled = await alarmSettings.getGlobalSnoozeEnabled();
+    if (mounted) {
+      setState(() {
+        _globalMaxSnoozes = maxSnoozes;
+        _globalSnoozeEnabled = snoozeEnabled;
+      });
+    }
   }
 
   String _modeTitle(AppLocalizations loc, SleepMonitoringMode mode) {

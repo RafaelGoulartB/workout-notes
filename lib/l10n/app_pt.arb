@@ -1115,6 +1115,8 @@
   "alarmWeekSun": "Dom",
 
   "sleepSettingsAlarmsSection": "ALARMES",
+  "sleepSettingsSnoozeToggle": "Permitir sonecas",
+  "sleepSettingsSnoozeToggleBody": "Controla as sonecas do monitoramento de sono e o padrão para novos alarmes.",
   "sleepSettingsMaxSnoozesBody": "O monitoramento de sono sempre usa este limite. Cada alarme tradicional pode definir um limite próprio.",
   "sleepSettingsMaxSnoozesDialogBody": "Este limite é usado pelo monitoramento de sono e como padrão para novos alarmes.",
   "sleepSettingsAllowedSnoozes": "Sonecas permitidas",

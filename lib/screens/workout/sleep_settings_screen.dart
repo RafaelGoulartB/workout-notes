@@ -23,6 +23,7 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
   bool _busy = false;
   int _goalMinutes = SleepGoalService.defaultGoalMinutes;
   int _globalMaxSnoozes = TraditionalAlarmService.defaultMaxSnoozes;
+  bool _globalSnoozeEnabled = true;
 
   @override
   void initState() {
@@ -34,10 +35,12 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
     await _missions.load();
     final goalMinutes = await _sleepGoalService.load();
     final globalMaxSnoozes = await _alarmService.getGlobalMaxSnoozes();
+    final globalSnoozeEnabled = await _alarmService.getGlobalSnoozeEnabled();
     if (mounted) {
       setState(() {
         _goalMinutes = goalMinutes;
         _globalMaxSnoozes = globalMaxSnoozes;
+        _globalSnoozeEnabled = globalSnoozeEnabled;
         _loading = false;
       });
     }
@@ -200,6 +203,11 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
     if (mounted) setState(() => _globalMaxSnoozes = selected);
   }
 
+  Future<void> _setGlobalSnoozeEnabled(bool enabled) async {
+    await _alarmService.setGlobalSnoozeEnabled(enabled);
+    if (mounted) setState(() => _globalSnoozeEnabled = enabled);
+  }
+
   Future<void> _remove() async {
     final loc = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
@@ -275,13 +283,25 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                 const SizedBox(height: 8),
                 _SettingsCard(
                   children: [
+                    SwitchListTile.adaptive(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                      ),
+                      value: _globalSnoozeEnabled,
+                      onChanged: _setGlobalSnoozeEnabled,
+                      title: Text(loc.sleepSettingsSnoozeToggle),
+                      subtitle: Text(loc.sleepSettingsSnoozeToggleBody),
+                    ),
+                    const Divider(height: 1),
                     _LinkTile(
                       icon: Icons.snooze_rounded,
                       title: loc.alarmMaxSnoozes,
                       subtitle: _globalMaxSnoozes == 0
                           ? loc.alarmNoSnoozes
                           : loc.alarmSnoozeTimes(_globalMaxSnoozes),
-                      onTap: _configureGlobalMaxSnoozes,
+                      onTap: _globalSnoozeEnabled
+                          ? _configureGlobalMaxSnoozes
+                          : null,
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

@@ -333,8 +333,14 @@ class _AlarmEditorScreenState extends State<_AlarmEditorScreen> {
   }
 
   Future<void> _loadGlobalDefault() async {
-    final value = await _service.getGlobalMaxSnoozes();
-    if (mounted) setState(() => _maxSnoozes = value);
+    final maxSnoozes = await _service.getGlobalMaxSnoozes();
+    final snoozeEnabled = await _service.getGlobalSnoozeEnabled();
+    if (mounted) {
+      setState(() {
+        _maxSnoozes = maxSnoozes;
+        _snoozeEnabled = snoozeEnabled;
+      });
+    }
   }
 
   Future<void> _save() async {

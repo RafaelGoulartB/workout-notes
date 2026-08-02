@@ -3389,6 +3389,13 @@ class AppLocalizationsPt extends AppLocalizations {
   String get sleepSettingsAlarmsSection => 'ALARMES';
 
   @override
+  String get sleepSettingsSnoozeToggle => 'Permitir sonecas';
+
+  @override
+  String get sleepSettingsSnoozeToggleBody =>
+      'Controla as sonecas do monitoramento de sono e o padrão para novos alarmes.';
+
+  @override
   String get sleepSettingsMaxSnoozesBody =>
       'O monitoramento de sono sempre usa este limite. Cada alarme tradicional pode definir um limite próprio.';
 

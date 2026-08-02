@@ -3373,6 +3373,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sleepSettingsAlarmsSection => 'ALARMS';
 
   @override
+  String get sleepSettingsSnoozeToggle => 'Allow snoozes';
+
+  @override
+  String get sleepSettingsSnoozeToggleBody =>
+      'Controls snoozes in sleep monitoring and the default for new alarms.';
+
+  @override
   String get sleepSettingsMaxSnoozesBody =>
       'Sleep monitoring always uses this limit. Each traditional alarm can set its own limit.';
 
