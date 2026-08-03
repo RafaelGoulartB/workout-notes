@@ -20,6 +20,7 @@ object SleepAlarmScheduler {
     const val EXTRA_MISSION_HASH = "mission_hash"
     const val EXTRA_MISSION_SALT = "mission_salt"
     const val EXTRA_MISSION_FORMAT = "mission_format"
+    const val EXTRA_MAX_SNOOZES = "max_snoozes"
 
     private const val PREFS_NAME = "sleep_alarm_schedule"
     private const val KEY_ALARM_AT = "alarm_at_epoch_ms"
@@ -29,6 +30,8 @@ object SleepAlarmScheduler {
     private const val KEY_MISSION_HASH = "mission_hash"
     private const val KEY_MISSION_SALT = "mission_salt"
     private const val KEY_MISSION_FORMAT = "mission_format"
+    private const val KEY_MAX_SNOOZES = "max_snoozes"
+    private const val KEY_SNOOZE_COUNT = "snooze_count"
     private const val KEY_STATE = "state"
     private const val KEY_EMERGENCY_TAPS = "emergency_taps"
     private const val KEY_EMERGENCY_DEADLINE = "emergency_deadline_epoch_ms"
@@ -89,6 +92,8 @@ object SleepAlarmScheduler {
         val missionSalt: String?,
         val missionFormat: String?,
         val state: String,
+        val maxSnoozes: Int,
+        val snoozeCount: Int,
     ) {
         val requiresMission: Boolean get() = monitorMode == "alarm_with_mission"
     }
@@ -102,6 +107,8 @@ object SleepAlarmScheduler {
         missionHash: String? = null,
         missionSalt: String? = null,
         missionFormat: String? = null,
+        maxSnoozes: Int = 3,
+        snoozeCount: Int = 0,
     ) {
         require(alarmAtMillis > System.currentTimeMillis()) { "Alarm must be in the future" }
         if (!canScheduleExact(context)) {
@@ -138,6 +145,8 @@ object SleepAlarmScheduler {
             .putString(KEY_MISSION_HASH, missionHash)
             .putString(KEY_MISSION_SALT, missionSalt)
             .putString(KEY_MISSION_FORMAT, missionFormat)
+            .putInt(KEY_MAX_SNOOZES, maxSnoozes.coerceIn(0, 10))
+            .putInt(KEY_SNOOZE_COUNT, snoozeCount.coerceAtLeast(0))
             .putString(KEY_STATE, STATE_SCHEDULED)
             .putInt(KEY_EMERGENCY_TAPS, 0)
             .remove(KEY_EMERGENCY_DEADLINE)
@@ -182,6 +191,29 @@ object SleepAlarmScheduler {
             .remove(KEY_BARCODE_PAUSE_ATTEMPTS)
             .remove(KEY_BARCODE_PAUSE_ACTIVE)
             .apply()
+    }
+
+    fun canSnooze(context: Context): Boolean {
+        val snapshot = read(context) ?: return false
+        return snapshot.state == STATE_RINGING && snapshot.snoozeCount < snapshot.maxSnoozes
+    }
+
+    fun snooze(context: Context): Boolean {
+        val snapshot = read(context) ?: return false
+        if (!canSnooze(context)) return false
+        schedule(
+            context,
+            System.currentTimeMillis() + 5 * 60_000L,
+            snapshot.sessionId,
+            snapshot.monitorMode,
+            snapshot.missionType,
+            snapshot.missionHash,
+            snapshot.missionSalt,
+            snapshot.missionFormat,
+            snapshot.maxSnoozes,
+            snapshot.snoozeCount + 1,
+        )
+        return true
     }
 
     fun emergencyTaps(context: Context): Int =
@@ -299,6 +331,8 @@ object SleepAlarmScheduler {
                 stored.missionHash,
                 stored.missionSalt,
                 stored.missionFormat,
+                stored.maxSnoozes,
+                stored.snoozeCount,
             )
         } catch (_: Throwable) {
             // Keep the durable schedule so a later boot or permission grant can retry.
@@ -320,6 +354,8 @@ object SleepAlarmScheduler {
                 prefs.getString(KEY_MISSION_SALT, null),
                 prefs.getString(KEY_MISSION_FORMAT, null),
                 prefs.getString(KEY_STATE, STATE_SCHEDULED) ?: STATE_SCHEDULED,
+                prefs.getInt(KEY_MAX_SNOOZES, 3),
+                prefs.getInt(KEY_SNOOZE_COUNT, 0),
             )
         } else {
             null

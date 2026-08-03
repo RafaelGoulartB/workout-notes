@@ -160,6 +160,20 @@ class SleepAlarmActivity : Activity() {
             }
         }
         root.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
+        if (SleepAlarmScheduler.canSnooze(this)) {
+            root.addView(Button(this).apply {
+                text = "Sonecar (5 min)"
+                textSize = 16f
+                isAllCaps = false
+                setOnClickListener {
+                    SleepAlarmRingingService.snooze(this@SleepAlarmActivity)
+                    finishAndRemoveTask()
+                }
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(52),
+            ))
+        }
         if (protectedAlarm) {
             root.addView(Button(this).apply {
                 text = getString(R.string.sleep_alarm_open_mission)

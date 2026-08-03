@@ -46,6 +46,20 @@
             android:name="flutterEmbedding"
             android:value="2" />
         <service
+            android:name=".sleep.TraditionalAlarmRingingService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <activity
+            android:name=".sleep.TraditionalAlarmActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+        <receiver
+            android:name=".sleep.TraditionalAlarmReceiver"
+            android:exported="false" />
+        <service
             android:name=".sleep.SleepMonitoringService"
             android:exported="false"
             android:foregroundServiceType="microphone" />

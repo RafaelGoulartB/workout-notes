@@ -4,6 +4,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
+import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
 
@@ -61,6 +62,18 @@ void main() {
               noise_event_count INTEGER NOT NULL DEFAULT 0,
               signal_quality_score REAL,
               end_reason TEXT,
+              analysis_status TEXT NOT NULL DEFAULT 'legacy_unavailable',
+              sleep_onset_at TEXT,
+              final_wake_at TEXT,
+              sleep_latency_minutes INTEGER,
+              awake_minutes INTEGER,
+              sleeping_minutes INTEGER,
+              deep_sleep_minutes INTEGER,
+              unknown_minutes INTEGER,
+              awakening_count INTEGER,
+              sleep_efficiency REAL,
+              stage_confidence REAL,
+              stage_algorithm_version TEXT,
               created_at TEXT NOT NULL,
               FOREIGN KEY (sleep_entry_id) REFERENCES sleep_entries(id) ON DELETE CASCADE
             )
@@ -78,6 +91,23 @@ void main() {
               valid_fraction REAL NOT NULL,
               noise_burst_count INTEGER NOT NULL DEFAULT 0,
               FOREIGN KEY (session_id) REFERENCES sleep_monitor_sessions(id) ON DELETE CASCADE
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE sleep_stage_epochs (
+              id TEXT PRIMARY KEY,
+              session_id TEXT NOT NULL,
+              started_at TEXT NOT NULL,
+              duration_seconds INTEGER NOT NULL,
+              stage TEXT NOT NULL,
+              confidence REAL NOT NULL,
+              awake_probability REAL NOT NULL,
+              sleeping_probability REAL NOT NULL,
+              deep_probability REAL NOT NULL,
+              algorithm_version TEXT NOT NULL,
+              source TEXT NOT NULL DEFAULT 'acoustic_model',
+              FOREIGN KEY (session_id) REFERENCES sleep_monitor_sessions(id) ON DELETE CASCADE,
+              UNIQUE (session_id, started_at)
             )
           ''');
         },
@@ -228,6 +258,136 @@ void main() {
     final entry = await SleepRepository().getByDate(DateTime(2026, 7, 26));
     expect(entry, isNotNull);
   });
+
+  test(
+    'imports validated model stages and derives the nightly summary',
+    () async {
+      final start = DateTime.utc(2026, 8, 1, 22);
+      final spool = _spool(
+        start,
+        status: SleepMonitorSession.completed,
+        segmentCount: 24,
+        durationMinutes: 12,
+      );
+      final sessionMap = spool['session'] as Map<String, dynamic>;
+      sessionMap['algorithm_version'] = 'audio-features-v2';
+      spool['stage_epochs'] = List.generate(24, (index) {
+        final stage = index < 4
+            ? SleepStageType.awake
+            : index < 20
+            ? SleepStageType.sleeping
+            : SleepStageType.deep;
+        return {
+          'id': 'stage-$index',
+          'session_id': 'session-1',
+          'started_at': start
+              .add(Duration(seconds: index * 30))
+              .toIso8601String(),
+          'duration_seconds': 30,
+          'stage': stage.name,
+          'confidence': 0.85,
+          'awake_probability': stage == SleepStageType.awake ? 0.9 : 0.05,
+          'sleeping_probability': stage == SleepStageType.sleeping ? 0.9 : 0.05,
+          'deep_probability': stage == SleepStageType.deep ? 0.9 : 0.05,
+          'algorithm_version': 'acoustic-staging-test',
+          'source': 'acoustic_model',
+        };
+      });
+
+      final imported = await repository.importNativeSpool(spool);
+      final stages = await repository.getStageEpochs(imported.id);
+      final summary = await repository.getNightSummary(imported.sleepEntryId!);
+
+      expect(imported.analysisStatus, SleepMonitorSession.analysisAvailable);
+      expect(stages, hasLength(24));
+      expect(summary, isNotNull);
+      expect(
+        summary!.session?.sleepOnsetAt,
+        start.add(const Duration(minutes: 2)),
+      );
+      expect(summary.session?.sleepingMinutes, 8);
+      expect(summary.session?.deepSleepMinutes, 2);
+      expect(summary.entry.estimatedSleepMinutes, 10);
+      expect(summary.entry.sleepMinutes, 10);
+    },
+  );
+
+  test(
+    'legacy repair replaces the full monitored window with inference',
+    () async {
+      final start = DateTime.utc(2026, 8, 1, 2, 49);
+      const monitoredMinutes = 431;
+      const segmentSeconds = 30;
+      const entryId = 'legacy-entry-01-08';
+      await database.insert('sleep_entries', {
+        'id': entryId,
+        'date': '2026-08-01',
+        'sleep_minutes': monitoredMinutes,
+        'actual_sleep_minutes': null,
+        'bedtime_minutes': 2 * 60 + 49,
+        'wake_time_minutes': 10 * 60,
+        'comment': null,
+        'source': 'monitored',
+        'time_in_bed_minutes': monitoredMinutes,
+        'estimated_sleep_minutes': null,
+        'created_at': start.toIso8601String(),
+      });
+      await database.insert(
+        'sleep_monitor_sessions',
+        SleepMonitorSession(
+          id: 'legacy-01-08',
+          sleepEntryId: entryId,
+          status: SleepMonitorSession.completed,
+          startedAt: start,
+          endedAt: start.add(const Duration(minutes: monitoredMinutes)),
+          utcOffsetStartMinutes: -180,
+          utcOffsetEndMinutes: -180,
+          sensorMode: 'audio',
+          algorithmVersion: SleepMonitorSession.defaultAlgorithmVersion,
+          timeInBedMinutes: monitoredMinutes,
+          quietMinutes: monitoredMinutes - 25,
+          noisyMinutes: 25,
+          estimatedSleepMinutes: null,
+          noiseEventCount: 1,
+          signalQualityScore: 1,
+          endReason: SleepMonitorSession.endUser,
+          createdAt: start,
+        ).toMap(),
+      );
+      final segments = List.generate(monitoredMinutes * 2, (index) {
+        final offsetSeconds = index * segmentSeconds;
+        final noisy = offsetSeconds >= 5 * 60 && offsetSeconds < 30 * 60;
+        return SleepMonitorSegment(
+          id: 'legacy-segment-$index',
+          sessionId: 'legacy-01-08',
+          startedAt: start.add(Duration(seconds: offsetSeconds)),
+          durationSeconds: segmentSeconds,
+          audioRmsDbfs: noisy ? -20 : -50,
+          audioPeakDbfs: noisy ? -8 : -30,
+          noiseScore: noisy ? 20 : 2,
+          classification: noisy ? 'noise' : 'quiet',
+          validFraction: 1,
+          noiseBurstCount: noisy ? 1 : 0,
+        ).toMap();
+      });
+      final batch = database.batch();
+      for (final segment in segments) {
+        batch.insert('sleep_monitor_segments', segment);
+      }
+      await batch.commit(noResult: true);
+
+      await repository.repairSleepEntriesFromSessions();
+
+      final repaired = await SleepRepository().getByDate(DateTime(2026, 8, 1));
+      expect(repaired?.sleepMinutes, inInclusiveRange(399, 402));
+      expect(repaired?.estimatedSleepMinutes, repaired?.sleepMinutes);
+      final repairedSession = await repository.getSession('legacy-01-08');
+      expect(
+        repairedSession?.analysisStatus,
+        SleepMonitorSession.analysisLegacyUnavailable,
+      );
+    },
+  );
 
   test('deleting a sleep entry cascades sessions and segments', () async {
     final imported = await repository.importNativeSpool(

@@ -423,11 +423,10 @@ class AppLocalizationsPt extends AppLocalizations {
   String get sleepMonitorInvalid => 'Sinal inválido';
 
   @override
-  String get sleepMonitorDataQuality => 'Qualidade dos dados do MVP';
+  String get sleepMonitorDataQuality => 'Qualidade da captura';
 
   @override
-  String get sleepMonitorDataAcceptable =>
-      'Noite adequada para a próxima fase do MVP';
+  String get sleepMonitorDataAcceptable => 'A captura desta noite está boa';
 
   @override
   String get sleepMonitorDataAcceptableBody =>
@@ -459,7 +458,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get sleepMonitorNoSegmentsBody =>
-      'Esta sessão não permite avaliar o MVP. Agora o monitor encerra com erro quando o microfone deixa de retornar dados, em vez de concluir uma noite vazia.';
+      'Esta sessão não contém segmentos de áudio utilizáveis. O monitor agora encerra com erro quando o microfone deixa de retornar dados, em vez de concluir uma noite vazia.';
 
   @override
   String get sleepMonitorAverageNoise => 'Ruído médio';
@@ -620,6 +619,58 @@ class AppLocalizationsPt extends AppLocalizations {
   @override
   String get sleepInferenceBlockerDigitalSilence =>
       'Mais de 20% do período contém silêncio digital do microfone.';
+
+  @override
+  String get sleepStagesTitle => 'Fases do sono';
+
+  @override
+  String get sleepStageAwake => 'Acordado';
+
+  @override
+  String get sleepStageSleeping => 'Dormindo';
+
+  @override
+  String get sleepStageDeepEstimated => 'Sono profundo estimado';
+
+  @override
+  String get sleepStageUnknown => 'Sem dados suficientes';
+
+  @override
+  String get sleepStageUnavailable => 'Fases do sono indisponíveis';
+
+  @override
+  String get sleepStageUnavailableLegacyBody =>
+      'Esta gravação é anterior à análise acústica por fases. A duração e o início do sono foram reparados, mas o sono profundo não pode ser reconstruído sem o sinal espectral original.';
+
+  @override
+  String get sleepStageModelUnavailableBody =>
+      'Esta versão não contém o modelo local licenciado e validado. O app não inventará sono profundo a partir do nível de ruído.';
+
+  @override
+  String get sleepStageTimelineSemantics =>
+      'Linha do tempo interativa com as fases acordado, dormindo e sono profundo estimado';
+
+  @override
+  String get sleepOnsetTime => 'Dormiu';
+
+  @override
+  String get sleepFinalWake => 'Acordou';
+
+  @override
+  String get sleepLatency => 'Latência do sono';
+
+  @override
+  String get sleepAwakenings => 'Despertares';
+
+  @override
+  String get sleepAnalysisTechnicalDetails => 'Detalhes técnicos';
+
+  @override
+  String get sleepMonitorPlacementTitle => 'Para uma análise confiável';
+
+  @override
+  String get sleepMonitorPlacementBody =>
+      'Deixe o celular carregando entre 50 e 100 cm da cabeça, com o microfone apontado para você, e nunca sob o travesseiro. Outras pessoas, pets, TV ou música podem reduzir a confiança.';
 
   @override
   String get commonCancel => 'Cancelar';
@@ -3263,6 +3314,160 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get sleepMissionOpenSettings => 'Abrir configurações da câmera';
+
+  @override
+  String get alarmTitle => 'Alarmes';
+
+  @override
+  String get alarmNew => 'Novo alarme';
+
+  @override
+  String get alarmEdit => 'Editar alarme';
+
+  @override
+  String get alarmEmptyTitle => 'Nenhum alarme';
+
+  @override
+  String get alarmEmptyBody => 'Crie um alarme para acordar no horário certo.';
+
+  @override
+  String get alarmDeleteTitle => 'Excluir alarme?';
+
+  @override
+  String get alarmDeleteBody => 'Este alarme deixará de tocar.';
+
+  @override
+  String get alarmDelete => 'Excluir';
+
+  @override
+  String get alarmPermissionRequired =>
+      'Permita notificações e alarmes exatos para continuar.';
+
+  @override
+  String get alarmUpdateError => 'Não foi possível atualizar o alarme.';
+
+  @override
+  String get alarmSaveError => 'Não foi possível salvar o alarme.';
+
+  @override
+  String alarmNext(String time) {
+    return 'Próximo: $time';
+  }
+
+  @override
+  String get alarmMission => 'Missão';
+
+  @override
+  String alarmSnoozeChip(int minutes, int count) {
+    return '$minutes min • ${count}x';
+  }
+
+  @override
+  String get alarmOneShot => 'Uma vez';
+
+  @override
+  String get alarmEveryDay => 'Todos os dias';
+
+  @override
+  String get alarmRepeat => 'Repetir';
+
+  @override
+  String get alarmOneShotHelp => 'Sem dias: este alarme tocará uma única vez.';
+
+  @override
+  String get alarmDaysHelp => 'Escolha os dias em que o alarme deve tocar.';
+
+  @override
+  String get alarmSnoozeEnable => 'Permitir soneca';
+
+  @override
+  String get alarmSnoozeEnableBody =>
+      'Adie o toque antes de desligar o alarme.';
+
+  @override
+  String get alarmSnoozeInterval => 'Intervalo da soneca';
+
+  @override
+  String get alarmMaxSnoozes => 'Máximo de sonecas';
+
+  @override
+  String get alarmNoSnoozes => 'Não permitir';
+
+  @override
+  String alarmSnoozeTimes(int count) {
+    return '$count vez(es)';
+  }
+
+  @override
+  String get alarmRequireMission => 'Exigir missão para desligar';
+
+  @override
+  String get alarmRequireMissionBody =>
+      'Exige o código de barras configurado no monitoramento de sono.';
+
+  @override
+  String get alarmMissionNotConfigured =>
+      'Configure uma missão de código de barras nas configurações de sono antes de usá-la.';
+
+  @override
+  String get alarmSaving => 'Salvando…';
+
+  @override
+  String get alarmSave => 'Salvar alarme';
+
+  @override
+  String get alarmWeekMon => 'Seg';
+
+  @override
+  String get alarmWeekTue => 'Ter';
+
+  @override
+  String get alarmWeekWed => 'Qua';
+
+  @override
+  String get alarmWeekThu => 'Qui';
+
+  @override
+  String get alarmWeekFri => 'Sex';
+
+  @override
+  String get alarmWeekSat => 'Sáb';
+
+  @override
+  String get alarmWeekSun => 'Dom';
+
+  @override
+  String get sleepSettingsAlarmsSection => 'ALARMES';
+
+  @override
+  String get sleepSettingsSnoozeToggle => 'Permitir sonecas';
+
+  @override
+  String get sleepSettingsSnoozeToggleBody =>
+      'Controla as sonecas do monitoramento de sono e o padrão para novos alarmes.';
+
+  @override
+  String get sleepSettingsMaxSnoozesBody =>
+      'O monitoramento de sono sempre usa este limite. Cada alarme tradicional pode definir um limite próprio.';
+
+  @override
+  String get sleepSettingsMaxSnoozesDialogBody =>
+      'Este limite é usado pelo monitoramento de sono e como padrão para novos alarmes.';
+
+  @override
+  String get sleepSettingsAllowedSnoozes => 'Sonecas permitidas';
+
+  @override
+  String get sleepMonitorSnoozesTitle => 'Sonecas do alarme';
+
+  @override
+  String get sleepMonitorSnoozesDisabled =>
+      'Desativadas nas configurações de sono.';
+
+  @override
+  String sleepMonitorSnoozesConfigured(int count) {
+    return 'Até $count soneca(s), conforme as configurações de sono.';
+  }
 
   @override
   String get aiEmptyTitle => 'Configure um provedor de IA';

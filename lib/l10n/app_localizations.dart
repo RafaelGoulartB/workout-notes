@@ -821,13 +821,13 @@ abstract class AppLocalizations {
   /// No description provided for @sleepMonitorDataQuality.
   ///
   /// In en, this message translates to:
-  /// **'MVP data quality'**
+  /// **'Capture quality'**
   String get sleepMonitorDataQuality;
 
   /// No description provided for @sleepMonitorDataAcceptable.
   ///
   /// In en, this message translates to:
-  /// **'Night suitable for the next MVP phase'**
+  /// **'Capture quality is good'**
   String get sleepMonitorDataAcceptable;
 
   /// No description provided for @sleepMonitorDataAcceptableBody.
@@ -881,7 +881,7 @@ abstract class AppLocalizations {
   /// No description provided for @sleepMonitorNoSegmentsBody.
   ///
   /// In en, this message translates to:
-  /// **'This session cannot evaluate the MVP. The monitor will now stop with an error if the microphone stops returning data, instead of completing an empty night.'**
+  /// **'This session has no usable audio segments. The monitor now stops with an error if the microphone stops returning data, instead of completing an empty night.'**
   String get sleepMonitorNoSegmentsBody;
 
   /// No description provided for @sleepMonitorAverageNoise.
@@ -1165,6 +1165,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'More than 20% of the period contains digital microphone silence.'**
   String get sleepInferenceBlockerDigitalSilence;
+
+  /// No description provided for @sleepStagesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep stages'**
+  String get sleepStagesTitle;
+
+  /// No description provided for @sleepStageAwake.
+  ///
+  /// In en, this message translates to:
+  /// **'Awake'**
+  String get sleepStageAwake;
+
+  /// No description provided for @sleepStageSleeping.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleeping'**
+  String get sleepStageSleeping;
+
+  /// No description provided for @sleepStageDeepEstimated.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated deep sleep'**
+  String get sleepStageDeepEstimated;
+
+  /// No description provided for @sleepStageUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Insufficient data'**
+  String get sleepStageUnknown;
+
+  /// No description provided for @sleepStageUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep stages unavailable'**
+  String get sleepStageUnavailable;
+
+  /// No description provided for @sleepStageUnavailableLegacyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This recording predates acoustic staging. Duration and sleep onset were repaired, but deep sleep cannot be reconstructed without the original spectral signal.'**
+  String get sleepStageUnavailableLegacyBody;
+
+  /// No description provided for @sleepStageModelUnavailableBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This build does not include the licensed and validated local model. The app will not invent deep sleep from noise levels.'**
+  String get sleepStageModelUnavailableBody;
+
+  /// No description provided for @sleepStageTimelineSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Interactive timeline with awake, sleeping and estimated deep sleep stages'**
+  String get sleepStageTimelineSemantics;
+
+  /// No description provided for @sleepOnsetTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Fell asleep'**
+  String get sleepOnsetTime;
+
+  /// No description provided for @sleepFinalWake.
+  ///
+  /// In en, this message translates to:
+  /// **'Final wake-up'**
+  String get sleepFinalWake;
+
+  /// No description provided for @sleepLatency.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep latency'**
+  String get sleepLatency;
+
+  /// No description provided for @sleepAwakenings.
+  ///
+  /// In en, this message translates to:
+  /// **'Awakenings'**
+  String get sleepAwakenings;
+
+  /// No description provided for @sleepAnalysisTechnicalDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical details'**
+  String get sleepAnalysisTechnicalDetails;
+
+  /// No description provided for @sleepMonitorPlacementTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'For a reliable analysis'**
+  String get sleepMonitorPlacementTitle;
+
+  /// No description provided for @sleepMonitorPlacementBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the phone charging 50–100 cm from your head, point the microphone toward you and never place it under the pillow. Other people, pets, TV or music can reduce confidence.'**
+  String get sleepMonitorPlacementBody;
 
   /// No description provided for @commonCancel.
   ///
@@ -5985,6 +6081,282 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open camera settings'**
   String get sleepMissionOpenSettings;
+
+  /// No description provided for @alarmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarms'**
+  String get alarmTitle;
+
+  /// No description provided for @alarmNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New alarm'**
+  String get alarmNew;
+
+  /// No description provided for @alarmEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit alarm'**
+  String get alarmEdit;
+
+  /// No description provided for @alarmEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No alarms'**
+  String get alarmEmptyTitle;
+
+  /// No description provided for @alarmEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Create an alarm to wake up at the right time.'**
+  String get alarmEmptyBody;
+
+  /// No description provided for @alarmDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete alarm?'**
+  String get alarmDeleteTitle;
+
+  /// No description provided for @alarmDeleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This alarm will stop ringing.'**
+  String get alarmDeleteBody;
+
+  /// No description provided for @alarmDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get alarmDelete;
+
+  /// No description provided for @alarmPermissionRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow notifications and exact alarms to continue.'**
+  String get alarmPermissionRequired;
+
+  /// No description provided for @alarmUpdateError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update the alarm.'**
+  String get alarmUpdateError;
+
+  /// No description provided for @alarmSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the alarm.'**
+  String get alarmSaveError;
+
+  /// No description provided for @alarmNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next: {time}'**
+  String alarmNext(String time);
+
+  /// No description provided for @alarmMission.
+  ///
+  /// In en, this message translates to:
+  /// **'Mission'**
+  String get alarmMission;
+
+  /// No description provided for @alarmSnoozeChip.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min • {count}x'**
+  String alarmSnoozeChip(int minutes, int count);
+
+  /// No description provided for @alarmOneShot.
+  ///
+  /// In en, this message translates to:
+  /// **'Once'**
+  String get alarmOneShot;
+
+  /// No description provided for @alarmEveryDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Every day'**
+  String get alarmEveryDay;
+
+  /// No description provided for @alarmRepeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat'**
+  String get alarmRepeat;
+
+  /// No description provided for @alarmOneShotHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'No days selected: this alarm will ring once.'**
+  String get alarmOneShotHelp;
+
+  /// No description provided for @alarmDaysHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the days when this alarm should ring.'**
+  String get alarmDaysHelp;
+
+  /// No description provided for @alarmSnoozeEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow snooze'**
+  String get alarmSnoozeEnable;
+
+  /// No description provided for @alarmSnoozeEnableBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Delay the alarm before dismissing it.'**
+  String get alarmSnoozeEnableBody;
+
+  /// No description provided for @alarmSnoozeInterval.
+  ///
+  /// In en, this message translates to:
+  /// **'Snooze interval'**
+  String get alarmSnoozeInterval;
+
+  /// No description provided for @alarmMaxSnoozes.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum snoozes'**
+  String get alarmMaxSnoozes;
+
+  /// No description provided for @alarmNoSnoozes.
+  ///
+  /// In en, this message translates to:
+  /// **'Do not allow'**
+  String get alarmNoSnoozes;
+
+  /// No description provided for @alarmSnoozeTimes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} time(s)'**
+  String alarmSnoozeTimes(int count);
+
+  /// No description provided for @alarmRequireMission.
+  ///
+  /// In en, this message translates to:
+  /// **'Require a mission to dismiss'**
+  String get alarmRequireMission;
+
+  /// No description provided for @alarmRequireMissionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Requires the barcode configured in sleep monitoring.'**
+  String get alarmRequireMissionBody;
+
+  /// No description provided for @alarmMissionNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up a barcode mission in Sleep settings before using it.'**
+  String get alarmMissionNotConfigured;
+
+  /// No description provided for @alarmSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get alarmSaving;
+
+  /// No description provided for @alarmSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save alarm'**
+  String get alarmSave;
+
+  /// No description provided for @alarmWeekMon.
+  ///
+  /// In en, this message translates to:
+  /// **'Mon'**
+  String get alarmWeekMon;
+
+  /// No description provided for @alarmWeekTue.
+  ///
+  /// In en, this message translates to:
+  /// **'Tue'**
+  String get alarmWeekTue;
+
+  /// No description provided for @alarmWeekWed.
+  ///
+  /// In en, this message translates to:
+  /// **'Wed'**
+  String get alarmWeekWed;
+
+  /// No description provided for @alarmWeekThu.
+  ///
+  /// In en, this message translates to:
+  /// **'Thu'**
+  String get alarmWeekThu;
+
+  /// No description provided for @alarmWeekFri.
+  ///
+  /// In en, this message translates to:
+  /// **'Fri'**
+  String get alarmWeekFri;
+
+  /// No description provided for @alarmWeekSat.
+  ///
+  /// In en, this message translates to:
+  /// **'Sat'**
+  String get alarmWeekSat;
+
+  /// No description provided for @alarmWeekSun.
+  ///
+  /// In en, this message translates to:
+  /// **'Sun'**
+  String get alarmWeekSun;
+
+  /// No description provided for @sleepSettingsAlarmsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'ALARMS'**
+  String get sleepSettingsAlarmsSection;
+
+  /// No description provided for @sleepSettingsSnoozeToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow snoozes'**
+  String get sleepSettingsSnoozeToggle;
+
+  /// No description provided for @sleepSettingsSnoozeToggleBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Controls snoozes in sleep monitoring and the default for new alarms.'**
+  String get sleepSettingsSnoozeToggleBody;
+
+  /// No description provided for @sleepSettingsMaxSnoozesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep monitoring always uses this limit. Each traditional alarm can set its own limit.'**
+  String get sleepSettingsMaxSnoozesBody;
+
+  /// No description provided for @sleepSettingsMaxSnoozesDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This limit is used by sleep monitoring and as the default for new alarms.'**
+  String get sleepSettingsMaxSnoozesDialogBody;
+
+  /// No description provided for @sleepSettingsAllowedSnoozes.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed snoozes'**
+  String get sleepSettingsAllowedSnoozes;
+
+  /// No description provided for @sleepMonitorSnoozesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarm snoozes'**
+  String get sleepMonitorSnoozesTitle;
+
+  /// No description provided for @sleepMonitorSnoozesDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled in Sleep settings.'**
+  String get sleepMonitorSnoozesDisabled;
+
+  /// No description provided for @sleepMonitorSnoozesConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to {count} snooze(s), according to Sleep settings.'**
+  String sleepMonitorSnoozesConfigured(int count);
 
   /// No description provided for @aiEmptyTitle.
   ///

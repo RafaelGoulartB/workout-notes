@@ -95,10 +95,13 @@ void main() {
         home: SleepMonitorScreen(),
       ),
     );
-    await tester.runAsync(
-      () => Future<void>.delayed(const Duration(milliseconds: 100)),
-    );
-    await tester.pump();
+    for (var attempt = 0; attempt < 40; attempt++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      if (find.text('Your wake-up time').evaluate().isNotEmpty) break;
+    }
 
     final renderedText = tester
         .widgetList<Text>(find.byType(Text))

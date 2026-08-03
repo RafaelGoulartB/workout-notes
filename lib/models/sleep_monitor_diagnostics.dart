@@ -39,7 +39,7 @@ class SleepMonitorDiagnostics {
   bool get hasData => segmentCount > 0 && capturedDurationSeconds > 0;
 
   /// A field-test night needs enough duration and coverage to reveal Android
-  /// background-capture problems before advancing the MVP.
+  /// background-capture problems before enabling release staging.
   bool get isAcceptableForNextPhase => inferenceBlockers.isEmpty;
 
   bool get isSuitableForInference => inferenceBlockers.isEmpty;

@@ -105,7 +105,7 @@ void main() {
       expect(payload, isNot(contains('session_with_exact_timestamps')));
       expect(payload, isNot(contains('associated_sleep_entry')));
       expect(payload['segments_relative'].single['offset_seconds'], 30);
-      expect(payload['schema_version'], 2);
+      expect(payload['schema_version'], 3);
       expect(payload['sleep_inference']['sleep_onset_offset_seconds'], 30 * 60);
       expect(payload, isNot(contains('sleep_inference_with_exact_timestamps')));
       final encoded = jsonEncode(payload);

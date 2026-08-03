@@ -51,7 +51,7 @@ class SleepMonitorBridge(private val context: Context) :
                     "exact_alarm_granted" to SleepAlarmScheduler.canScheduleExact(context),
                     "full_screen_intent_granted" to
                         SleepAlarmScheduler.canUseFullScreenIntent(context),
-                ),
+                ) + SleepStageModelGate.capabilities(context),
             )
             "getAlarmCapabilities" -> result.success(alarmCapabilities())
             "getState" -> result.success(SleepMonitoringService.currentState(context))
@@ -244,6 +244,7 @@ class SleepMonitorBridge(private val context: Context) :
         val missionHash = call.argument<String>(SleepAlarmScheduler.EXTRA_MISSION_HASH)
         val missionSalt = call.argument<String>(SleepAlarmScheduler.EXTRA_MISSION_SALT)
         val missionFormat = call.argument<String>(SleepAlarmScheduler.EXTRA_MISSION_FORMAT)
+        val maxSnoozes = (call.argument<Int>(SleepAlarmScheduler.EXTRA_MAX_SNOOZES) ?: 3).coerceIn(0, 10)
         if (monitorMode == "alarm_with_mission" &&
             (missionType != "barcode" || missionHash.isNullOrBlank() ||
                 missionSalt.isNullOrBlank() || missionFormat.isNullOrBlank())
@@ -270,6 +271,7 @@ class SleepMonitorBridge(private val context: Context) :
                     missionHash,
                     missionSalt,
                     missionFormat,
+                    maxSnoozes,
                 )
             }
             val intent = Intent(context, SleepMonitoringService::class.java).apply {
@@ -342,6 +344,8 @@ class SleepMonitorBridge(private val context: Context) :
                 snapshot.missionHash,
                 snapshot.missionSalt,
                 snapshot.missionFormat,
+                snapshot.maxSnoozes,
+                snapshot.snoozeCount,
             )
             result.success(SleepMonitoringService.updateAlarm(alarmAt))
         } catch (error: SecurityException) {

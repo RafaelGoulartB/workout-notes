@@ -10,6 +10,7 @@ import '../models/sleep_inference.dart';
 import '../models/sleep_monitor_diagnostics.dart';
 import '../models/sleep_monitor_segment.dart';
 import '../models/sleep_monitor_session.dart';
+import '../models/sleep_stage_epoch.dart';
 
 typedef DiagnosticDirectoryProvider = Future<Directory> Function();
 typedef DiagnosticShareCallback =
@@ -36,6 +37,7 @@ class SleepDiagnosticExportService {
     required SleepInferenceResult inference,
     required SleepEntry? entry,
     required bool includePersonalData,
+    List<SleepStageEpoch> stages = const [],
     Map<String, dynamic>? deviceInfo,
   }) async {
     final generatedAt = DateTime.now().toUtc();
@@ -46,6 +48,7 @@ class SleepDiagnosticExportService {
       inference: inference,
       entry: entry,
       includePersonalData: includePersonalData,
+      stages: stages,
       deviceInfo: deviceInfo,
       generatedAt: generatedAt,
     );
@@ -71,6 +74,7 @@ class SleepDiagnosticExportService {
     required SleepInferenceResult inference,
     required SleepEntry? entry,
     required bool includePersonalData,
+    List<SleepStageEpoch> stages = const [],
     required DateTime generatedAt,
     Map<String, dynamic>? deviceInfo,
   }) {
@@ -88,6 +92,23 @@ class SleepDiagnosticExportService {
         'classification': segment.classification,
         'valid_fraction': segment.validFraction,
         'noise_burst_count': segment.noiseBurstCount,
+      };
+    }).toList();
+    final relativeStages = stages.indexed.map((indexed) {
+      final (index, stage) = indexed;
+      return {
+        'index': index,
+        'offset_seconds': stage.startedAt
+            .difference(session.startedAt)
+            .inSeconds,
+        'duration_seconds': stage.durationSeconds,
+        'stage': stage.stage.name,
+        'confidence': stage.confidence,
+        'awake_probability': stage.awakeProbability,
+        'sleeping_probability': stage.sleepingProbability,
+        'deep_probability': stage.deepProbability,
+        'algorithm_version': stage.algorithmVersion,
+        'source': stage.source,
       };
     }).toList();
     final relativeInference = {
@@ -123,7 +144,7 @@ class SleepDiagnosticExportService {
 
     return {
       'schema': 'workout_notes_sleep_diagnostic',
-      'schema_version': 2,
+      'schema_version': 3,
       'generated_at_utc': generatedAt.toUtc().toIso8601String(),
       'privacy': {
         'personal_data_included': includePersonalData,
@@ -164,6 +185,22 @@ class SleepDiagnosticExportService {
         'estimated_sleep_minutes': session.estimatedSleepMinutes,
         'noise_event_count': session.noiseEventCount,
         'signal_quality_score': session.signalQualityScore,
+        'analysis_status': session.analysisStatus,
+        'sleep_onset_offset_seconds': session.sleepOnsetAt
+            ?.difference(session.startedAt)
+            .inSeconds,
+        'final_wake_offset_seconds': session.finalWakeAt
+            ?.difference(session.startedAt)
+            .inSeconds,
+        'sleep_latency_minutes': session.sleepLatencyMinutes,
+        'awake_minutes': session.awakeMinutes,
+        'sleeping_minutes': session.sleepingMinutes,
+        'deep_sleep_minutes': session.deepSleepMinutes,
+        'unknown_minutes': session.unknownMinutes,
+        'awakening_count': session.awakeningCount,
+        'sleep_efficiency': session.sleepEfficiency,
+        'stage_confidence': session.stageConfidence,
+        'stage_algorithm_version': session.stageAlgorithmVersion,
       },
       'diagnostics': {
         'session_duration_seconds': diagnostics.sessionDurationSeconds,
@@ -181,11 +218,15 @@ class SleepDiagnosticExportService {
         'inference_blockers': diagnostics.inferenceBlockers,
       },
       'sleep_inference': relativeInference,
+      'sleep_stages_relative': relativeStages,
       'segments_relative': relativeSegments,
       if (includePersonalData) ...{
         'session_with_exact_timestamps': session.toMap(),
         'segments_with_exact_timestamps': segments
             .map((segment) => segment.toMap())
+            .toList(),
+        'sleep_stages_with_exact_timestamps': stages
+            .map((stage) => stage.toMap())
             .toList(),
         'associated_sleep_entry': entry?.toMap(),
         'sleep_inference_with_exact_timestamps': {
@@ -205,6 +246,7 @@ class SleepDiagnosticExportService {
       },
       'not_collected': {
         'raw_audio': true,
+        'persisted_spectrograms': true,
         'movement_or_accelerometer': true,
         'heart_rate': true,
         'battery_start_and_end': true,

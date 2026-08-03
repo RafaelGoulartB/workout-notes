@@ -9,11 +9,13 @@ import 'package:workout_notes/models/sleep_inference.dart';
 import 'package:workout_notes/models/sleep_monitor_diagnostics.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
+import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
 import 'package:workout_notes/services/sleep_diagnostic_export_service.dart';
 import 'package:workout_notes/services/sleep_inference_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
+import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
 
 class SleepMonitorResultScreen extends StatefulWidget {
   final String sessionId;
@@ -33,6 +35,7 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
   List<SleepMonitorSegment> _segments = const [];
   SleepMonitorDiagnostics? _diagnostics;
   SleepInferenceResult? _inference;
+  List<SleepStageEpoch> _stages = const [];
   bool _isLoading = true;
   bool _isExporting = false;
 
@@ -49,6 +52,7 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
       return;
     }
     final segments = await _repository.getSegments(widget.sessionId);
+    final stages = await _repository.getStageEpochs(widget.sessionId);
     final entry = session.sleepEntryId == null
         ? null
         : await _sleepRepository.getById(session.sleepEntryId!);
@@ -65,6 +69,7 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
       _entry = entry;
       _diagnostics = diagnostics;
       _inference = inference;
+      _stages = stages;
       _isLoading = false;
     });
   }
@@ -119,73 +124,111 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
             loc: loc,
           ),
           const SizedBox(height: 12),
-          _DataQualityCard(diagnostics: diagnostics, loc: loc),
+          SleepStageCard(session: session, stages: _stages),
           const SizedBox(height: 12),
-          _InferenceSummaryCard(
-            session: session,
-            inference: inference,
-            loc: loc,
-          ),
-          const SizedBox(height: 12),
-          _ResultCard(
-            title: loc.sleepMonitorTimeline,
-            icon: Icons.timeline,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SleepMonitorTimeline(
-                  segments: _segments,
-                  session: session,
-                  inference: inference,
-                  emptyTitle: loc.sleepMonitorNoSegments,
-                  emptyBody: loc.sleepMonitorNoSegmentsBody,
-                ),
-                if (_segments.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _Legend(loc: loc),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${loc.sleepMonitorStartTime}: ${_formatTime(session.startedAt, session.utcOffsetStartMinutes)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      Text(
-                        '${loc.sleepMonitorEndTime}: ${_formatTime(session.endedAt ?? session.startedAt, session.utcOffsetEndMinutes ?? session.utcOffsetStartMinutes)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _ResultCard(
-            title: loc.sleepMonitorNoiseGraph,
-            icon: Icons.show_chart,
-            child: SleepNoiseChart(
-              segments: _segments,
-              session: session,
-              inference: inference,
-              emptyTitle: loc.sleepMonitorNoSegments,
-              noiseScoreLabel: loc.sleepMonitorNoiseScore,
-              thresholdLabel: loc.sleepMonitorThreshold,
-            ),
-          ),
-          if (inference.isAvailable &&
-              inference.events.any(
-                (event) =>
-                    event.type != SleepInferenceEventType.transientActivity,
-              )) ...[
-            const SizedBox(height: 12),
-            _InferenceEventsCard(
+          if (_stages.isEmpty) ...[
+            _InferenceSummaryCard(
               session: session,
               inference: inference,
               loc: loc,
             ),
+            const SizedBox(height: 12),
           ],
+          Card(
+            margin: EdgeInsets.zero,
+            child: ExpansionTile(
+              leading: const Icon(Icons.tune_rounded),
+              title: Text(
+                loc.sleepAnalysisTechnicalDetails,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+              children: [
+                _DataQualityCard(diagnostics: diagnostics, loc: loc),
+                const SizedBox(height: 12),
+                _ResultCard(
+                  title: loc.sleepMonitorTimeline,
+                  icon: Icons.timeline,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SleepMonitorTimeline(
+                        segments: _segments,
+                        session: session,
+                        inference: inference,
+                        emptyTitle: loc.sleepMonitorNoSegments,
+                        emptyBody: loc.sleepMonitorNoSegmentsBody,
+                      ),
+                      if (_segments.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _Legend(loc: loc),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                '${loc.sleepMonitorStartTime}: ${_formatTime(session.startedAt, session.utcOffsetStartMinutes)}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                '${loc.sleepMonitorEndTime}: ${_formatTime(session.endedAt ?? session.startedAt, session.utcOffsetEndMinutes ?? session.utcOffsetStartMinutes)}',
+                                textAlign: TextAlign.end,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _ResultCard(
+                  title: loc.sleepMonitorNoiseGraph,
+                  icon: Icons.show_chart,
+                  child: SleepNoiseChart(
+                    segments: _segments,
+                    session: session,
+                    inference: inference,
+                    emptyTitle: loc.sleepMonitorNoSegments,
+                    noiseScoreLabel: loc.sleepMonitorNoiseScore,
+                    thresholdLabel: loc.sleepMonitorThreshold,
+                  ),
+                ),
+                if (inference.isAvailable &&
+                    inference.events.any(
+                      (event) =>
+                          event.type !=
+                          SleepInferenceEventType.transientActivity,
+                    )) ...[
+                  const SizedBox(height: 12),
+                  _InferenceEventsCard(
+                    session: session,
+                    inference: inference,
+                    loc: loc,
+                  ),
+                ],
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _isExporting ? null : _exportDiagnostic,
+                    icon: _isExporting
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.ios_share_outlined),
+                    label: Text(loc.sleepMonitorExportDiagnostic),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 12),
           Card(
             color: Theme.of(context).colorScheme.tertiaryContainer,
@@ -193,17 +236,6 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
               padding: const EdgeInsets.all(14),
               child: Text(loc.sleepMonitorEstimateWarning),
             ),
-          ),
-          const SizedBox(height: 14),
-          FilledButton.tonalIcon(
-            onPressed: _isExporting ? null : _exportDiagnostic,
-            icon: _isExporting
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.ios_share_outlined),
-            label: Text(loc.sleepMonitorExportDiagnostic),
           ),
         ],
       ),
@@ -278,6 +310,7 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
               diagnostics: diagnostics,
             ),
         entry: _entry,
+        stages: _stages,
         includePersonalData: scope == _DiagnosticExportScope.personal,
         deviceInfo: capabilities,
       );

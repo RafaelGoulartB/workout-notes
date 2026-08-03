@@ -252,6 +252,10 @@ class SleepMonitoringService : Service() {
             "estimated_sleep_minutes" to null,
             "noise_event_count" to 0,
             "signal_quality_score" to null,
+            "analysis_status" to if (
+                SleepStageModelGate.capabilities(this)["sleep_staging_available"] == true
+            ) "pending" else "model_unavailable",
+            "stage_algorithm_version" to null,
             "end_reason" to null,
             "created_at" to start.toString(),
         )
