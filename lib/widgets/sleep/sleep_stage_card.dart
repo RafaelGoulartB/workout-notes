@@ -132,8 +132,6 @@ class _UnavailableState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final modelMissing =
-        session.analysisStatus == SleepMonitorSession.analysisModelUnavailable;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -155,17 +153,24 @@ class _UnavailableState extends StatelessWidget {
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  modelMissing
-                      ? loc.sleepStageModelUnavailableBody
-                      : loc.sleepStageUnavailableLegacyBody,
-                ),
+                Text(_unavailableBody(loc, session.analysisStatus)),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _unavailableBody(AppLocalizations loc, String? analysisStatus) {
+    switch (analysisStatus) {
+      case SleepMonitorSession.analysisInsufficient:
+        return loc.sleepStageInsufficientBody;
+      case SleepMonitorSession.analysisModelUnavailable:
+        return loc.sleepStageModelUnavailableBody;
+      default:
+        return loc.sleepStageUnavailableLegacyBody;
+    }
   }
 }
 

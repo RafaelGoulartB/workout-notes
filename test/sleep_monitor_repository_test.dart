@@ -7,6 +7,7 @@ import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
+import 'package:workout_notes/services/sleep_stage_engine.dart';
 
 void main() {
   late Database database;
@@ -90,6 +91,18 @@ void main() {
               classification TEXT NOT NULL,
               valid_fraction REAL NOT NULL,
               noise_burst_count INTEGER NOT NULL DEFAULT 0,
+              spectral_band_energy_0 REAL,
+              spectral_band_energy_1 REAL,
+              spectral_band_energy_2 REAL,
+              spectral_band_energy_3 REAL,
+              spectral_band_energy_4 REAL,
+              spectral_flatness REAL,
+              spectral_centroid_hz REAL,
+              breathing_regularity REAL,
+              breathing_rate_hz REAL,
+              motion_active_seconds REAL,
+              motion_mean_deviation_g REAL,
+              motion_max_deviation_g REAL,
               FOREIGN KEY (session_id) REFERENCES sleep_monitor_sessions(id) ON DELETE CASCADE
             )
           ''');
@@ -312,6 +325,39 @@ void main() {
     },
   );
 
+  test('runs the heuristic engine and persists stages for feature nights', () async {
+    final start = DateTime.utc(2026, 8, 2, 22);
+    final imported = await repository.importNativeSpool(_featureSpool(start));
+    final stages = await repository.getStageEpochs(imported.id);
+
+    expect(imported.analysisStatus, SleepMonitorSession.analysisAvailable);
+    expect(imported.stageAlgorithmVersion, SleepStageEngine.algorithmVersion);
+    expect(stages, isNotEmpty);
+    expect(
+      stages.where((epoch) => epoch.stage != SleepStageType.unknown),
+      isNotEmpty,
+    );
+    expect(stages.first.source, SleepStageEngine.source);
+    final summary = await repository.getNightSummary(imported.sleepEntryId!);
+    expect(summary, isNotNull);
+    expect(summary!.session?.sleepingMinutes, isNotNull);
+    expect(summary.session?.deepSleepMinutes, isNotNull);
+  });
+
+  test('keeps legacy noise nights as legacy_unavailable', () async {
+    final imported = await repository.importNativeSpool(
+      _spool(
+        DateTime.utc(2026, 8, 2, 22),
+        status: SleepMonitorSession.completed,
+        segmentCount: 8,
+        durationMinutes: 4,
+      ),
+    );
+
+    expect(imported.analysisStatus, SleepMonitorSession.analysisLegacyUnavailable);
+    expect(await repository.getStageEpochs(imported.id), isEmpty);
+  });
+
   test(
     'legacy repair replaces the full monitored window with inference',
     () async {
@@ -401,6 +447,66 @@ void main() {
     expect(await database.query('sleep_monitor_sessions'), isEmpty);
     expect(await database.query('sleep_monitor_segments'), isEmpty);
   });
+}
+
+/// A 4-hour night carrying v28 spectral + motion features (audio-features-v2)
+/// with no native stage epochs, so the heuristic engine must run on import.
+Map<String, dynamic> _featureSpool(DateTime start) {
+  const hours = 4;
+  const segmentCount = hours * 2 * 60;
+  final segments = List.generate(segmentCount, (index) {
+    final offsetSeconds = index * 30;
+    final awake =
+        offsetSeconds < 4 * 60 || offsetSeconds >= (hours * 3600 - 4 * 60);
+    return {
+      'id': 'feature-segment-$index',
+      'session_id': 'feature-session',
+      'started_at': start.add(Duration(seconds: offsetSeconds)).toIso8601String(),
+      'duration_seconds': 30,
+      'audio_rms_dbfs': awake ? -25 : -40,
+      'audio_peak_dbfs': awake ? -10 : -25,
+      'noise_score': awake ? 14 : 2,
+      'classification': awake ? 'noise' : 'quiet',
+      'valid_fraction': 1.0,
+      'noise_burst_count': awake ? 10 : 0,
+      'spectral_band_energy_0': 20.0,
+      'spectral_band_energy_1': 30.0,
+      'spectral_band_energy_2': 40.0,
+      'spectral_band_energy_3': awake ? 120.0 : 5.0,
+      'spectral_band_energy_4': awake ? 80.0 : 2.0,
+      'spectral_flatness': awake ? 0.7 : 0.3,
+      'spectral_centroid_hz': 1200.0,
+      'breathing_regularity': awake ? 0.1 : 0.4,
+      'breathing_rate_hz': 0.25,
+      'motion_active_seconds': awake ? 15.0 : 0.5,
+      'motion_mean_deviation_g': 0.02,
+      'motion_max_deviation_g': 0.05,
+    };
+  });
+  final end = start.add(const Duration(hours: hours));
+  return {
+    'session': {
+      'id': 'feature-session',
+      'sleep_entry_id': null,
+      'status': SleepMonitorSession.completed,
+      'started_at': start.toIso8601String(),
+      'ended_at': end.toIso8601String(),
+      'alarm_at': null,
+      'utc_offset_start_minutes': 0,
+      'utc_offset_end_minutes': 0,
+      'sensor_mode': 'audio',
+      'algorithm_version': 'audio-features-v2',
+      'time_in_bed_minutes': hours * 60,
+      'quiet_minutes': hours * 60 - 8,
+      'noisy_minutes': 8,
+      'estimated_sleep_minutes': null,
+      'noise_event_count': 0,
+      'signal_quality_score': 1.0,
+      'end_reason': 'user',
+      'created_at': start.toIso8601String(),
+    },
+    'segments': segments,
+  };
 }
 
 Map<String, dynamic> _spool(

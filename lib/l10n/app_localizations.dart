@@ -1208,10 +1208,16 @@ abstract class AppLocalizations {
   /// **'This recording predates acoustic staging. Duration and sleep onset were repaired, but deep sleep cannot be reconstructed without the original spectral signal.'**
   String get sleepStageUnavailableLegacyBody;
 
+  /// No description provided for @sleepStageInsufficientBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This night didn\'t meet the quality criteria for estimating sleep stages. Total sleep and onset were still estimated from sound levels.'**
+  String get sleepStageInsufficientBody;
+
   /// No description provided for @sleepStageModelUnavailableBody.
   ///
   /// In en, this message translates to:
-  /// **'This build does not include the licensed and validated local model. The app will not invent deep sleep from noise levels.'**
+  /// **'This recording is missing the spectral signal required to estimate sleep stages.'**
   String get sleepStageModelUnavailableBody;
 
   /// No description provided for @sleepStageTimelineSemantics.

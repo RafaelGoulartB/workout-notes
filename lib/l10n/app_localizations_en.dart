@@ -641,8 +641,12 @@ class AppLocalizationsEn extends AppLocalizations {
       'This recording predates acoustic staging. Duration and sleep onset were repaired, but deep sleep cannot be reconstructed without the original spectral signal.';
 
   @override
+  String get sleepStageInsufficientBody =>
+      'This night didn\'t meet the quality criteria for estimating sleep stages. Total sleep and onset were still estimated from sound levels.';
+
+  @override
   String get sleepStageModelUnavailableBody =>
-      'This build does not include the licensed and validated local model. The app will not invent deep sleep from noise levels.';
+      'This recording is missing the spectral signal required to estimate sleep stages.';
 
   @override
   String get sleepStageTimelineSemantics =>

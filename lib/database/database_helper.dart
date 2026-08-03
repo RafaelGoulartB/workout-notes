@@ -18,7 +18,7 @@ import '../models/sleep_monitor_session.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 27;
+  static const _dbVersion = 28;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -291,6 +291,18 @@ class DatabaseHelper {
         classification TEXT NOT NULL,
         valid_fraction REAL NOT NULL,
         noise_burst_count INTEGER NOT NULL DEFAULT 0,
+        spectral_band_energy_0 REAL,
+        spectral_band_energy_1 REAL,
+        spectral_band_energy_2 REAL,
+        spectral_band_energy_3 REAL,
+        spectral_band_energy_4 REAL,
+        spectral_flatness REAL,
+        spectral_centroid_hz REAL,
+        breathing_regularity REAL,
+        breathing_rate_hz REAL,
+        motion_active_seconds REAL,
+        motion_mean_deviation_g REAL,
+        motion_max_deviation_g REAL,
         FOREIGN KEY (session_id) REFERENCES sleep_monitor_sessions(id) ON DELETE CASCADE
       )
     ''');
@@ -1870,6 +1882,26 @@ class DatabaseHelper {
           'CREATE UNIQUE INDEX IF NOT EXISTS idx_sleep_stage_epochs_session_started ON sleep_stage_epochs(session_id, started_at ASC)',
         );
       } catch (_) {}
+    }
+    if (oldVersion < 28) {
+      for (final statement in const [
+        'ALTER TABLE sleep_monitor_segments ADD COLUMN spectral_band_energy_0 REAL',
+        'ALTER TABLE sleep_monitor_segments ADD COLUMN spectral_band_energy_1 REAL',
+        'ALTER TABLE sleep_monitor_segments ADD COLUMN spectral_band_energy_2 REAL',
+        'ALTER TABLE sleep_monitor_segments ADD COLUMN spectral_band_energy_3 REAL',
+        'ALTER TABLE sleep_monitor_segments ADD COLUMN spectral_band_energy_4 REAL',
+        'ALTER TABLE sleep_monitor_segments ADD COLUMN spectral_flatness REAL',
+        'ALTER TABLE sleep_monitor_segments ADD COLUMN spectral_centroid_hz REAL',
+        'ALTER TABLE sleep_monitor_segments ADD COLUMN breathing_regularity REAL',
+        'ALTER TABLE sleep_monitor_segments ADD COLUMN breathing_rate_hz REAL',
+        'ALTER TABLE sleep_monitor_segments ADD COLUMN motion_active_seconds REAL',
+        'ALTER TABLE sleep_monitor_segments ADD COLUMN motion_mean_deviation_g REAL',
+        'ALTER TABLE sleep_monitor_segments ADD COLUMN motion_max_deviation_g REAL',
+      ]) {
+        try {
+          await db.execute(statement);
+        } catch (_) {}
+      }
     }
   }
 

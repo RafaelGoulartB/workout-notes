@@ -11,6 +11,7 @@ import '../models/sleep_monitor_diagnostics.dart';
 import '../models/sleep_monitor_segment.dart';
 import '../models/sleep_monitor_session.dart';
 import '../models/sleep_stage_epoch.dart';
+import '../services/sleep_stage_engine.dart';
 
 typedef DiagnosticDirectoryProvider = Future<Directory> Function();
 typedef DiagnosticShareCallback =
@@ -92,6 +93,18 @@ class SleepDiagnosticExportService {
         'classification': segment.classification,
         'valid_fraction': segment.validFraction,
         'noise_burst_count': segment.noiseBurstCount,
+        'spectral_band_energy_0': segment.spectralBandEnergy0,
+        'spectral_band_energy_1': segment.spectralBandEnergy1,
+        'spectral_band_energy_2': segment.spectralBandEnergy2,
+        'spectral_band_energy_3': segment.spectralBandEnergy3,
+        'spectral_band_energy_4': segment.spectralBandEnergy4,
+        'spectral_flatness': segment.spectralFlatness,
+        'spectral_centroid_hz': segment.spectralCentroidHz,
+        'breathing_regularity': segment.breathingRegularity,
+        'breathing_rate_hz': segment.breathingRateHz,
+        'motion_active_seconds': segment.motionActiveSeconds,
+        'motion_mean_deviation_g': segment.motionMeanDeviationG,
+        'motion_max_deviation_g': segment.motionMaxDeviationG,
       };
     }).toList();
     final relativeStages = stages.indexed.map((indexed) {
@@ -144,7 +157,7 @@ class SleepDiagnosticExportService {
 
     return {
       'schema': 'workout_notes_sleep_diagnostic',
-      'schema_version': 3,
+      'schema_version': 4,
       'generated_at_utc': generatedAt.toUtc().toIso8601String(),
       'privacy': {
         'personal_data_included': includePersonalData,
@@ -218,6 +231,10 @@ class SleepDiagnosticExportService {
         'inference_blockers': diagnostics.inferenceBlockers,
       },
       'sleep_inference': relativeInference,
+      'sleep_stage_engine': {
+        'algorithm_version': SleepStageEngine.algorithmVersion,
+        'parameters': SleepStageEngine.parameters,
+      },
       'sleep_stages_relative': relativeStages,
       'segments_relative': relativeSegments,
       if (includePersonalData) ...{
@@ -247,7 +264,8 @@ class SleepDiagnosticExportService {
       'not_collected': {
         'raw_audio': true,
         'persisted_spectrograms': true,
-        'movement_or_accelerometer': true,
+        'movement_or_accelerometer': false,
+        'raw_accelerometer_timeseries': true,
         'heart_rate': true,
         'battery_start_and_end': true,
       },

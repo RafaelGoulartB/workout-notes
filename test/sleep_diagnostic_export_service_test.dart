@@ -9,6 +9,7 @@ import 'package:workout_notes/models/sleep_monitor_diagnostics.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/services/sleep_diagnostic_export_service.dart';
+import 'package:workout_notes/services/sleep_stage_engine.dart';
 
 void main() {
   late SleepMonitorSession session;
@@ -31,6 +32,18 @@ void main() {
         classification: 'quiet',
         validFraction: 1,
         noiseBurstCount: 0,
+        spectralBandEnergy0: 20,
+        spectralBandEnergy1: 30,
+        spectralBandEnergy2: 40,
+        spectralBandEnergy3: 5,
+        spectralBandEnergy4: 2,
+        spectralFlatness: 0.3,
+        spectralCentroidHz: 1200,
+        breathingRegularity: 0.4,
+        breathingRateHz: 0.25,
+        motionActiveSeconds: 0.5,
+        motionMeanDeviationG: 0.02,
+        motionMaxDeviationG: 0.05,
       ),
     ];
     session = SleepMonitorSession(
@@ -104,9 +117,19 @@ void main() {
       expect(payload['privacy']['personal_data_included'], isFalse);
       expect(payload, isNot(contains('session_with_exact_timestamps')));
       expect(payload, isNot(contains('associated_sleep_entry')));
-      expect(payload['segments_relative'].single['offset_seconds'], 30);
-      expect(payload['schema_version'], 3);
+      final relative = payload['segments_relative'].single as Map;
+      expect(relative['offset_seconds'], 30);
+      expect(relative['spectral_flatness'], 0.3);
+      expect(relative['breathing_regularity'], 0.4);
+      expect(relative['motion_active_seconds'], 0.5);
+      expect(payload['schema_version'], 4);
       expect(payload['sleep_inference']['sleep_onset_offset_seconds'], 30 * 60);
+      expect(
+        payload['sleep_stage_engine']['algorithm_version'],
+        SleepStageEngine.algorithmVersion,
+      );
+      expect(payload['not_collected']['movement_or_accelerometer'], isFalse);
+      expect(payload['not_collected']['raw_accelerometer_timeseries'], isTrue);
       expect(payload, isNot(contains('sleep_inference_with_exact_timestamps')));
       final encoded = jsonEncode(payload);
       expect(encoded, isNot(contains('Personal sleep note')));

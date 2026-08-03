@@ -167,6 +167,7 @@ class SleepMonitoringService : Service() {
     private lateinit var spool: SleepSessionSpool
     private var session: MutableMap<String, Any?>? = null
     private var processor: AudioSignalProcessor? = null
+    private var motionAggregator: MotionAggregator? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var finished = false
     @Volatile private var finishing = false
@@ -245,7 +246,7 @@ class SleepMonitoringService : Service() {
             "utc_offset_start_minutes" to offset,
             "utc_offset_end_minutes" to null,
             "sensor_mode" to "audio",
-            "algorithm_version" to "audio-noise-v1",
+            "algorithm_version" to "audio-features-v2",
             "time_in_bed_minutes" to null,
             "quiet_minutes" to null,
             "noisy_minutes" to null,
@@ -269,10 +270,14 @@ class SleepMonitoringService : Service() {
 
         try {
             acquireWakeLock()
+            val motion = MotionAggregator.from(this)
+            motion.register()
+            motionAggregator = motion
             processor = AudioSignalProcessor(
                 sessionId,
                 onSegment = ::onSegment,
                 onError = { finish("audio_error", "failed") },
+                onMotionSnapshot = { motion.snapshotAndReset() },
             )
             processor?.start()
             session!!["status"] = "running"
@@ -376,6 +381,8 @@ class SleepMonitoringService : Service() {
 
     private fun releaseResources() {
         processor = null
+        motionAggregator?.unregister()
+        motionAggregator = null
         wakeLock?.let { lock ->
             if (lock.isHeld) lock.release()
         }

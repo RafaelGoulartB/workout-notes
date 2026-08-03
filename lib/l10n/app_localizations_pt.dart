@@ -643,8 +643,12 @@ class AppLocalizationsPt extends AppLocalizations {
       'Esta gravação é anterior à análise acústica por fases. A duração e o início do sono foram reparados, mas o sono profundo não pode ser reconstruído sem o sinal espectral original.';
 
   @override
+  String get sleepStageInsufficientBody =>
+      'Esta noite não atingiu os critérios de qualidade para estimar as fases do sono. A duração total e o início do sono ainda foram estimados pelos níveis de som.';
+
+  @override
   String get sleepStageModelUnavailableBody =>
-      'Esta versão não contém o modelo local licenciado e validado. O app não inventará sono profundo a partir do nível de ruído.';
+      'Esta gravação não contém o sinal espectral necessário para estimar as fases do sono.';
 
   @override
   String get sleepStageTimelineSemantics =>
