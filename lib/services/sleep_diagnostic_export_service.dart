@@ -157,7 +157,7 @@ class SleepDiagnosticExportService {
 
     return {
       'schema': 'workout_notes_sleep_diagnostic',
-      'schema_version': 4,
+      'schema_version': 5,
       'generated_at_utc': generatedAt.toUtc().toIso8601String(),
       'privacy': {
         'personal_data_included': includePersonalData,
@@ -234,6 +234,23 @@ class SleepDiagnosticExportService {
       'sleep_stage_engine': {
         'algorithm_version': SleepStageEngine.algorithmVersion,
         'parameters': SleepStageEngine.parameters,
+      },
+      'sleep_window': {
+        'window_discovered':
+            session.analysisStatus == SleepMonitorSession.analysisAvailable &&
+            session.sleepOnsetAt != null,
+        'onset_offset_seconds': session.sleepOnsetAt
+            ?.difference(session.startedAt)
+            .inSeconds,
+        'final_wake_offset_seconds': session.finalWakeAt
+            ?.difference(session.startedAt)
+            .inSeconds,
+        'awake_minutes': session.awakeMinutes,
+        'sleep_minutes':
+            session.sleepingMinutes != null && session.deepSleepMinutes != null
+                ? session.sleepingMinutes! + session.deepSleepMinutes!
+                : null,
+        'deep_minutes': session.deepSleepMinutes,
       },
       'sleep_stages_relative': relativeStages,
       'segments_relative': relativeSegments,

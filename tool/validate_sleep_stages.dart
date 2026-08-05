@@ -39,6 +39,10 @@ Future<void> main(List<String> args) async {
     stdout.writeln(_template);
     return;
   }
+  if (args.length == 2 && args.first == '--self') {
+    await _selfCheck(args[1]);
+    return;
+  }
   if (args.length != 2) {
     stderr.writeln(
       'Usage: dart run tool/validate_sleep_stages.dart <diagnostic.json> <diary.json>',
@@ -95,6 +99,80 @@ Future<void> main(List<String> args) async {
   }
   stdout.writeln();
   stdout.writeln(nightErrorsBlock(engineResult.epochs, session, summary, truth));
+}
+
+/// Re-stages a diagnostic without any manual diary, comparing the current
+/// engine against the values the recording itself shipped (schema v5).
+Future<void> _selfCheck(String path) async {
+  final diagnostic = _readJson(path);
+  final segments = segmentsFromDiagnostic(diagnostic);
+  if (!segments.any((segment) => segment.hasSpectralFeatures)) {
+    stderr.writeln(
+      'The diagnostic predates spectral features (schema_version < 4).',
+    );
+    exit(1);
+  }
+  final start = sessionStart(diagnostic);
+  final session = sessionFromDiagnostic(diagnostic, start);
+  final sessionEnd = session.endedAt ?? session.startedAt;
+  final technical = diagnostic['session_technical'] as Map<String, dynamic>?;
+  final refOnset = (technical?['sleep_onset_offset_seconds'] as num?)?.toInt();
+  final refWake = (technical?['final_wake_offset_seconds'] as num?)?.toInt();
+  final refSleep = (technical?['sleeping_minutes'] as num?)?.toInt();
+  final refDeep = (technical?['deep_sleep_minutes'] as num?)?.toInt();
+  final refTotal = (technical?['estimated_sleep_minutes'] as num?)?.toInt();
+  final refAwake = (technical?['awake_minutes'] as num?)?.toInt();
+
+  final result = const SleepStageEngine().run(
+    session: session,
+    segments: segments,
+  );
+  if (!result.ran) {
+    stderr.writeln('Engine could not stage this night: ${result.blockers}');
+    exit(1);
+  }
+  final summary = const SleepStageAnalysisService().summarize(
+    sessionStart: start,
+    sessionEnd: sessionEnd,
+    epochs: result.epochs,
+  );
+
+  stdout.writeln('=== Self-check (recorded vs current engine) ===');
+  stdout.writeln('Engine:            ${SleepStageEngine.algorithmVersion}');
+  stdout.writeln(
+    'Window:            onset=${_offMin(result.window.onsetAt, start)} '
+    'finalWake=${_offMin(result.window.finalWakeAt, start)} '
+    'discovered=${result.window.discovered}',
+  );
+  stdout.writeln(
+    'Sleep onset:       engine ${_minDelta(summary?.sleepOnsetAt, start)} '
+    'vs recorded ${_minDeltaRef(refOnset)}',
+  );
+  stdout.writeln(
+    'Final wake:        engine ${_minDelta(summary?.finalWakeAt, start)} '
+    'vs recorded ${_minDeltaRef(refWake)}',
+  );
+  stdout.writeln(
+    'Sleep minutes:     engine ${summary?.estimatedSleepMinutes} '
+    'vs recorded $refTotal (sleeping $refSleep, deep $refDeep)',
+  );
+  stdout.writeln('Deep minutes:      engine ${summary?.deepSleepMinutes}');
+  stdout.writeln('Awake minutes:     engine ${summary?.awakeMinutes} vs recorded $refAwake');
+}
+
+String _offMin(DateTime? value, DateTime start) {
+  if (value == null) return '--';
+  return '${value.difference(start).inMinutes}m';
+}
+
+String _minDelta(DateTime? value, DateTime start) {
+  if (value == null) return '--';
+  return '${value.difference(start).inMinutes} min';
+}
+
+String _minDeltaRef(int? offsetSeconds) {
+  if (offsetSeconds == null) return '--';
+  return '${offsetSeconds ~/ 60} min';
 }
 
 const String _template = '''

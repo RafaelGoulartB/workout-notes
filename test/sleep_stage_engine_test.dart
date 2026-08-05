@@ -3,9 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
+import 'package:workout_notes/services/sleep_stage_analysis_service.dart';
 import 'package:workout_notes/services/sleep_stage_engine.dart';
 
-enum _Kind { awake, sleeping, deep }
+enum _Kind { awake, sleeping, deep, quietStill }
 
 void main() {
   const engine = SleepStageEngine();
@@ -256,6 +257,133 @@ void main() {
       expect(sum, closeTo(1, 0.001), reason: 'epoch at ${epoch.startedAt}');
     }
   });
+
+  test('sleep window relabels quiet pre-sleep and post-wake time as awake', () {
+    final start = DateTime.utc(2026, 8, 1, 22);
+    final end = start.add(const Duration(minutes: 390));
+    final segments = _night(start, [
+      (Duration.zero, const Duration(minutes: 45), _Kind.awake),
+      (const Duration(minutes: 45), const Duration(minutes: 240), _Kind.sleeping),
+      (const Duration(minutes: 240), const Duration(minutes: 360), _Kind.deep),
+      (const Duration(minutes: 360), const Duration(minutes: 370), _Kind.awake),
+      // Quiet and still after the final wake: must not count as sleep.
+      (const Duration(minutes: 370), const Duration(minutes: 390), _Kind.quietStill),
+    ]);
+    final session = _session(start, end);
+    final result = engine.run(
+      session: session,
+      segments: segments,
+      onset: start.add(const Duration(minutes: 45)),
+    );
+
+    expect(result.ran, isTrue);
+    expect(result.window.discovered, isTrue);
+    expect(
+      result.window.onsetAt!.difference(start).inMinutes,
+      inInclusiveRange(40, 48),
+      reason: 'onset lands at the end of the pre-sleep awake block',
+    );
+    expect(
+      result.window.finalWakeAt!.difference(start).inMinutes,
+      inInclusiveRange(355, 370),
+      reason: 'final wake lands inside the terminal awake cluster',
+    );
+    expect(
+      _fraction(result, SleepStageType.awake,
+          start, start.add(const Duration(minutes: 45))),
+      greaterThan(0.9),
+      reason: 'pre-onset awake time stays awake',
+    );
+    expect(
+      _fraction(result, SleepStageType.awake,
+          start.add(const Duration(minutes: 370)), end),
+      greaterThan(0.9),
+      reason: 'quiet post-wake stretch is not counted as sleep',
+    );
+    final summary = const SleepStageAnalysisService().summarize(
+      sessionStart: start,
+      sessionEnd: end,
+      epochs: result.epochs,
+    )!;
+    expect(
+      summary.estimatedSleepMinutes,
+      inInclusiveRange(300, 325),
+      reason: 'sleep totals exclude pre-sleep and post-wake',
+    );
+  });
+
+  test('estimates deep sleep from quiet low-frequency windows without breathing regularity', () {
+    final start = DateTime.utc(2026, 8, 1, 22);
+    final end = start.add(const Duration(hours: 6));
+    final segments = _night(start, [
+      (Duration.zero, const Duration(minutes: 30), _Kind.awake),
+      (const Duration(minutes: 30), const Duration(hours: 3), _Kind.quietStill),
+      (const Duration(hours: 3), const Duration(hours: 6), _Kind.quietStill),
+    ]);
+    final result = engine.run(
+      session: _session(start, end),
+      segments: segments,
+      onset: start.add(const Duration(minutes: 30)),
+    );
+
+    expect(result.ran, isTrue);
+    expect(
+      _fraction(result, SleepStageType.deep,
+          start.add(const Duration(minutes: 50)),
+          start.add(const Duration(hours: 2))),
+      greaterThan(0.4),
+      reason: 'first-half quiet still windows become deep blocks',
+    );
+    expect(
+      _fraction(result, SleepStageType.deep,
+          start.add(const Duration(hours: 4)), end),
+      lessThan(0.3),
+      reason: 'late quiet stays light sleep',
+    );
+  });
+
+  test('does not treat the opening minutes as sleep (cold-start guard)', () {
+    final start = DateTime.utc(2026, 8, 1, 22);
+    final end = start.add(const Duration(hours: 4));
+    final segments = _night(start, [
+      (Duration.zero, const Duration(hours: 4), _Kind.sleeping),
+    ]);
+    final result = engine.run(
+      session: _session(start, end),
+      segments: segments,
+    );
+
+    expect(result.window.onsetAt, isNotNull);
+    expect(
+      result.window.onsetAt!.difference(start).inMinutes,
+      greaterThanOrEqualTo(8),
+    );
+    expect(
+      _fraction(result, SleepStageType.awake,
+          start, start.add(const Duration(minutes: 8))),
+      greaterThan(0.6),
+      reason: 'opening minutes are awake by default',
+    );
+  });
+
+  test('forces the final moments before stopping the monitor awake', () {
+    final start = DateTime.utc(2026, 8, 1, 22);
+    final end = start.add(const Duration(hours: 4));
+    final segments = _night(start, [
+      (Duration.zero, const Duration(hours: 4), _Kind.sleeping),
+    ]);
+    final result = engine.run(
+      session: _session(start, end),
+      segments: segments,
+    );
+
+    expect(
+      _fraction(result, SleepStageType.awake,
+          end.subtract(const Duration(minutes: 2)), end),
+      greaterThan(0.5),
+      reason: 'stopping the monitor implies waking up',
+    );
+  });
 }
 
 SleepMonitorSession _session(DateTime start, DateTime end) {
@@ -311,8 +439,15 @@ SleepMonitorSegment _segment({
     _Kind.awake => (12.0, 15, [20, 30, 40, 120, 80], 0.7, 0.1, 15.0),
     _Kind.sleeping => (2.0, 1, [100, 30, 20, 5, 2], 0.3, 0.35, 0.5),
     _Kind.deep => (1.0, 0, [100, 30, 20, 5, 2], 0.05, 0.75, 0.2),
+    // Still, quiet, low-frequency dominant, no audible breathing regularity
+    // (the phone is far from the face): the profile of a real quiet night.
+    _Kind.quietStill => (1.5, 0, [100, 30, 10, 3, 1], 0.9, 0.0, 0.0),
   };
   final motionValue = motionOverride ?? motion;
+  final meanDev = switch (kind) {
+    _Kind.quietStill => 0.0003,
+    _ => 0.02,
+  };
   return SleepMonitorSegment(
     id: 'seg-$index',
     sessionId: 'session-1',
@@ -334,7 +469,7 @@ SleepMonitorSegment _segment({
     breathingRegularity: regularity,
     breathingRateHz: 0.25,
     motionActiveSeconds: withMotion ? motionValue : null,
-    motionMeanDeviationG: withMotion ? 0.02 : null,
+    motionMeanDeviationG: withMotion ? meanDev : null,
     motionMaxDeviationG: withMotion ? 0.05 : null,
   );
 }

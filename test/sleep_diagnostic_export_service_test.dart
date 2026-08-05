@@ -64,6 +64,18 @@ void main() {
       signalQualityScore: 1,
       endReason: SleepMonitorSession.endUser,
       createdAt: start,
+      analysisStatus: SleepMonitorSession.analysisAvailable,
+      sleepOnsetAt: start.add(const Duration(minutes: 30)),
+      finalWakeAt: start.add(const Duration(hours: 3)),
+      sleepLatencyMinutes: 30,
+      awakeMinutes: 10,
+      sleepingMinutes: 170,
+      deepSleepMinutes: 60,
+      unknownMinutes: 0,
+      awakeningCount: 1,
+      sleepEfficiency: 95.8,
+      stageConfidence: 0.8,
+      stageAlgorithmVersion: SleepStageEngine.algorithmVersion,
     );
     diagnostics = SleepMonitorDiagnostics.fromSession(session, segments);
     inference = SleepInferenceResult(
@@ -122,7 +134,13 @@ void main() {
       expect(relative['spectral_flatness'], 0.3);
       expect(relative['breathing_regularity'], 0.4);
       expect(relative['motion_active_seconds'], 0.5);
-      expect(payload['schema_version'], 4);
+      expect(payload['schema_version'], 5);
+      final window = payload['sleep_window'] as Map;
+      expect(window['window_discovered'], isTrue);
+      expect(window['onset_offset_seconds'], 30 * 60);
+      expect(window['final_wake_offset_seconds'], 3 * 60 * 60);
+      expect(window['sleep_minutes'], 230);
+      expect(window['deep_minutes'], 60);
       expect(payload['sleep_inference']['sleep_onset_offset_seconds'], 30 * 60);
       expect(
         payload['sleep_stage_engine']['algorithm_version'],

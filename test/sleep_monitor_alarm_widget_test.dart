@@ -118,7 +118,7 @@ void main() {
     expect(find.text('− 15 min'), findsOneWidget);
     expect(find.text('+ 15 min'), findsOneWidget);
     expect(find.byIcon(Icons.unfold_more_rounded), findsOneWidget);
-    expect(find.textContaining('Start and wake at'), findsOneWidget);
+    expect(find.text('Start monitoring'), findsOneWidget);
 
     await tester.drag(find.byType(ListView), const Offset(0, -350));
     await tester.pump();

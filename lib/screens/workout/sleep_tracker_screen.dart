@@ -106,6 +106,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     if (mounted) setState(() => _isLoading = true);
     try {
       await _monitorRepository.repairSleepEntriesFromSessions();
+      await _monitorRepository.restageSleepStageEpochs();
       final entries = await _repository.getEntries(limit: 500);
       final stats = await _repository.getDashboardStats(
         referenceDate: _weekEnd,

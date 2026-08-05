@@ -344,6 +344,62 @@ void main() {
     expect(summary.session?.deepSleepMinutes, isNotNull);
   });
 
+  test('restageSleepStageEpochs re-stages stale feature nights and fixes aggregates', () async {
+    final start = DateTime.utc(2026, 8, 3, 22);
+    final imported = await repository.importNativeSpool(_featureSpool(start));
+    // Simulate an older import that left the session un-staged.
+    await database.delete(
+      'sleep_stage_epochs',
+      where: 'session_id = ?',
+      whereArgs: [imported.id],
+    );
+    await database.update(
+      'sleep_monitor_sessions',
+      {'analysis_status': SleepMonitorSession.analysisLegacyUnavailable},
+      where: 'id = ?',
+      whereArgs: [imported.id],
+    );
+    expect(await repository.getStageEpochs(imported.id), isEmpty);
+
+    await repository.restageSleepStageEpochs();
+
+    final reimported = await repository.getSession(imported.id);
+    final stages = await repository.getStageEpochs(imported.id);
+    expect(reimported!.analysisStatus, SleepMonitorSession.analysisAvailable);
+    expect(reimported.stageAlgorithmVersion, SleepStageEngine.algorithmVersion);
+    expect(stages, isNotEmpty);
+    // The linked sleep entry follows the re-staged sleep total.
+    final entryRows = await database.query(
+      'sleep_entries',
+      where: 'id = ?',
+      whereArgs: [reimported.sleepEntryId],
+      limit: 1,
+    );
+    expect(entryRows, isNotEmpty);
+    expect(
+      (entryRows.first['sleep_minutes'] as num),
+      reimported.estimatedSleepMinutes!,
+    );
+  });
+
+  test('restageSleepStageEpochs leaves legacy nights untouched', () async {
+    final imported = await repository.importNativeSpool(
+      _spool(
+        DateTime.utc(2026, 8, 3, 22),
+        status: SleepMonitorSession.completed,
+        segmentCount: 8,
+        durationMinutes: 4,
+      ),
+    );
+    await repository.restageSleepStageEpochs();
+    final session = await repository.getSession(imported.id);
+    expect(
+      session!.analysisStatus,
+      SleepMonitorSession.analysisLegacyUnavailable,
+    );
+    expect(await repository.getStageEpochs(imported.id), isEmpty);
+  });
+
   test('keeps legacy noise nights as legacy_unavailable', () async {
     final imported = await repository.importNativeSpool(
       _spool(

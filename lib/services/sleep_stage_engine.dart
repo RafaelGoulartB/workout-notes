@@ -20,13 +20,14 @@ import '../models/sleep_stage_type.dart';
 ///
 /// The emitted epochs feed [SleepStageAnalysisService.summarize] unchanged.
 class SleepStageEngine {
-  static const algorithmVersion = 'dart-heuristic-fusion-v1';
+  static const algorithmVersion = 'dart-heuristic-fusion-v2';
   static const source = 'heuristic_fusion';
 
   // Feature normalization denominators.
   static const noiseNormalizer = 15.0;
   static const burstNormalizer = 20.0;
   static const motionNormalizer = 20.0;
+  static const microMotionNormalizer = 0.05; // g; sub-threshold micro-motion
 
   // Scoring weights.
   static const awakeNoiseWeight = 1.2;
@@ -34,27 +35,56 @@ class SleepStageEngine {
   static const awakeHfWeight = 1.4;
   static const awakeMotionWeight = 2.2;
   static const awakeRegWeight = 0.8;
+  // Sub-threshold micro-motion (below the 0.05 g active threshold) still
+  // correlates with being awake and restless; feeds the awake logit when
+  // actigraphy is available.
+  static const awakeMicroMotionWeight = 1.5;
 
   // Deep sleep requires clearly regular slow breathing; applying the weight to
   // regularity^2 makes light sleep (reg ~0.3) fall well short while deep sleep
   // (reg >= 0.7) crosses the threshold.
   static const deepRegWeight = 2.4;
-  static const deepLfWeight = 0.7;
+  static const deepLfWeight = 1.0;
   static const deepToneWeight = 0.8;
   static const deepMotionWeight = 1.0;
   static const deepBurstWeight = 1.2;
   static const deepNoiseWeight = 0.8;
   static const deepHfWeight = 0.5;
+  // Quiet-stability deep term: still, low-noise, low-frequency-dominant
+  // windows can indicate deep sleep even when breathing regularity is not
+  // audible (phone far from the face, where breathingRegularity == 0). The term
+  // is gated by low-frequency dominance (real quiet nights are ~0.8) and
+  // weighted so clean quiet windows in the first half clearly beat light sleep,
+  // while windows with bursts/noise stay light.
+  static const deepQuietWeight = 1.7;
+  static const deepLfDominanceThreshold = 0.7;
 
   static const sleepMotionWeight = 1.4;
   static const sleepBurstWeight = 0.9;
   static const sleepNoiseWeight = 0.3;
-  static const sleepBias = 0.4;
+  static const sleepRegWeight = 0.9;
+  static const sleepBias = 0.25;
 
   // Sleep-architecture priors.
   static const deepGateMinutes = 20;
   static const deepGateLogit = -5.0;
-  static const deepPriorStart = 0.8;
+  static const deepPriorStart = 0.5;
+
+  // Session-edge priors: the first minutes are awake by default (you just set
+  // the phone down), and the last ~90s before stopping the monitor are awake
+  // (stopping requires waking). These bound the overcount of quiet edge time.
+  static const coldStartMinutes = 8;
+  static const coldStartPriorMax = 2.0;
+  static const terminalGuardSeconds = 90;
+  static const terminalAwakePriorMax = 3.0;
+
+  // Sleep-window discovery (on 30s scorable windows).
+  static const onsetSustainedWindows = 20; // 10 minutes
+  static const onsetMinAsleepWindows = 12;
+  static const onsetMeanSleepProbability = 0.5;
+  static const finalWakeSustainedWindows = 10; // 5 minutes
+  static const finalWakeMinAwakeWindows = 6;
+  static const finalWakeSearchFraction = 0.30;
 
   // Confidence blending.
   static const confidencePosteriorWeight = 0.55;
@@ -68,11 +98,13 @@ class SleepStageEngine {
     'noise_normalizer': noiseNormalizer,
     'burst_normalizer': burstNormalizer,
     'motion_normalizer': motionNormalizer,
+    'micro_motion_normalizer': microMotionNormalizer,
     'awake_noise_weight': awakeNoiseWeight,
     'awake_burst_weight': awakeBurstWeight,
     'awake_hf_weight': awakeHfWeight,
     'awake_motion_weight': awakeMotionWeight,
     'awake_reg_weight': awakeRegWeight,
+    'awake_micro_motion_weight': awakeMicroMotionWeight,
     'deep_reg_weight': deepRegWeight,
     'deep_lf_weight': deepLfWeight,
     'deep_tone_weight': deepToneWeight,
@@ -80,12 +112,25 @@ class SleepStageEngine {
     'deep_burst_weight': deepBurstWeight,
     'deep_noise_weight': deepNoiseWeight,
     'deep_hf_weight': deepHfWeight,
+    'deep_quiet_weight': deepQuietWeight,
+    'deep_lf_dominance_threshold': deepLfDominanceThreshold,
     'sleep_motion_weight': sleepMotionWeight,
     'sleep_burst_weight': sleepBurstWeight,
     'sleep_noise_weight': sleepNoiseWeight,
+    'sleep_reg_weight': sleepRegWeight,
     'sleep_bias': sleepBias,
     'deep_gate_minutes': deepGateMinutes,
     'deep_prior_start': deepPriorStart,
+    'cold_start_minutes': coldStartMinutes,
+    'cold_start_prior_max': coldStartPriorMax,
+    'terminal_guard_seconds': terminalGuardSeconds,
+    'terminal_awake_prior_max': terminalAwakePriorMax,
+    'onset_sustained_windows': onsetSustainedWindows,
+    'onset_min_asleep_windows': onsetMinAsleepWindows,
+    'onset_mean_sleep_probability': onsetMeanSleepProbability,
+    'final_wake_sustained_windows': finalWakeSustainedWindows,
+    'final_wake_min_awake_windows': finalWakeMinAwakeWindows,
+    'final_wake_search_fraction': finalWakeSearchFraction,
     'confidence_posterior_weight': confidencePosteriorWeight,
     'confidence_margin_weight': confidenceMarginWeight,
     'confidence_quality_weight': confidenceQualityWeight,
@@ -129,12 +174,16 @@ class SleepStageEngine {
       for (var k = 0; k < scorable.length; k++) scorable[k]: k,
     };
 
+    final scorableFeatures = [
+      for (final index in scorable) windowFeatures[index]!,
+    ];
     final viterbi = _ViterbiPass(
-      [for (final index in scorable) windowFeatures[index]!],
+      scorableFeatures,
       session,
       sessionEnd,
       onset,
     ).run();
+    final window = _discoverWindow(scorableFeatures, viterbi, session);
 
     final epochs = <SleepStageEpoch>[];
     final uuid = const Uuid();
@@ -155,7 +204,7 @@ class SleepStageEngine {
           sessionId: session.id,
           startedAt: segment.startedAt,
           durationSeconds: segment.durationSeconds,
-          stage: stage,
+          stage: _applyWindow(stage, segment, session, sessionEnd, window),
           confidence: confidence,
           awakeProbability: probs.awake,
           sleepingProbability: probs.sleeping,
@@ -174,7 +223,104 @@ class SleepStageEngine {
       validEpochs: scorable.length,
       unknownEpochs: epochs.length - known,
       coverage: epochs.isEmpty ? 0 : known / epochs.length,
+      window: window,
     );
+  }
+
+  /// Finds the sleep window [SleepWindow] from the Viterbi posterior labels.
+  ///
+  /// Onset is the first sustained asleep stretch (≥[onsetMinAsleepWindows] of
+  /// [onsetSustainedWindows] consecutive windows, mean P(sleep) above the
+  /// threshold) that starts after the cold-start guard. Final wake is the last
+  /// sustained awake stretch within the final
+  /// [finalWakeSearchFraction] of the session.
+  SleepWindow _discoverWindow(
+    List<_WindowFeatures> features,
+    _ViterbiResult viterbi,
+    SleepMonitorSession session,
+  ) {
+    final coldStart = session.startedAt.add(
+      const Duration(minutes: coldStartMinutes),
+    );
+    DateTime? onsetAt;
+    for (var i = 0; i + onsetSustainedWindows <= features.length; i++) {
+      if (features[i].startedAt.isBefore(coldStart)) continue;
+      var asleep = 0;
+      var sleepProbability = 0.0;
+      for (var k = i; k < i + onsetSustainedWindows; k++) {
+        final (stage, _, probs) = viterbi.epochAt(k);
+        if (stage != SleepStageType.awake) asleep++;
+        sleepProbability += probs.sleeping + probs.deep;
+      }
+      if (asleep < onsetMinAsleepWindows ||
+          sleepProbability / onsetSustainedWindows <
+              onsetMeanSleepProbability) {
+        continue;
+      }
+      // Onset must be sustained: a brief quiet stretch followed by real
+      // activity is settling-in time, not sleep. Accept only when the ~20
+      // minutes after the run stay calm.
+      var activityAfter = 0;
+      final horizon =
+          math.min(i + onsetSustainedWindows + 40, features.length);
+      for (var k = i + onsetSustainedWindows; k < horizon; k++) {
+        if (_isActivity(features[k])) activityAfter++;
+      }
+      if (activityAfter <= 3) {
+        onsetAt = features[i].startedAt;
+        break;
+      }
+    }
+
+    DateTime? finalWakeAt;
+    final searchStart = features.length -
+        (features.length * finalWakeSearchFraction).round();
+    for (var i = searchStart;
+        i + finalWakeSustainedWindows <= features.length;
+        i++) {
+      var awake = 0;
+      for (var k = i; k < i + finalWakeSustainedWindows; k++) {
+        final (stage, _, _) = viterbi.epochAt(k);
+        if (stage == SleepStageType.awake) awake++;
+      }
+      if (awake >= finalWakeMinAwakeWindows) {
+        // Keep scanning so finalWake lands on the last qualifying run.
+        finalWakeAt = features[i].startedAt;
+      }
+    }
+    return SleepWindow(onsetAt: onsetAt, finalWakeAt: finalWakeAt);
+  }
+
+  /// A window counts as "activity" when it carries a clear awake signal.
+  bool _isActivity(_WindowFeatures f) =>
+      f.nNoise >= 0.5 || f.nBurst >= 0.3 || f.motion >= 0.15;
+
+  /// Honest-edges pass: time before onset, after final wake, and in the last
+  /// [terminalGuardSeconds] is awake by construction (you interacted with the
+  /// phone to start/stop the monitor), even when the features look quiet.
+  SleepStageType _applyWindow(
+    SleepStageType stage,
+    SleepMonitorSegment segment,
+    SleepMonitorSession session,
+    DateTime sessionEnd,
+    SleepWindow window,
+  ) {
+    if (window.onsetAt != null && segment.startedAt.isBefore(window.onsetAt!)) {
+      return SleepStageType.awake;
+    }
+    if (window.finalWakeAt != null &&
+        !segment.startedAt.isBefore(window.finalWakeAt!)) {
+      return SleepStageType.awake;
+    }
+    final terminalGuard = sessionEnd.subtract(
+      const Duration(seconds: terminalGuardSeconds),
+    );
+    if (segment.startedAt
+        .add(Duration(seconds: segment.durationSeconds))
+        .isAfter(terminalGuard)) {
+      return SleepStageType.awake;
+    }
+    return stage;
   }
 
   /// Returns normalized features for a scorable window, or null when the
@@ -198,16 +344,23 @@ class SleepStageEngine {
         (segment.spectralBandEnergy1 ?? 0);
     final regularity = segment.breathingRegularity ?? 0;
     final motionSeconds = segment.motionActiveSeconds ?? 0;
+    final microMotionDeviation = segment.motionMeanDeviationG;
+    final lowFreqFraction = (lowFreq / totalBand).clamp(0.0, 1.0);
 
     return _WindowFeatures(
       startedAt: segment.startedAt,
       nNoise: (segment.noiseScore! / noiseNormalizer).clamp(0.0, 1.0),
       nBurst: (segment.noiseBurstCount / burstNormalizer).clamp(0.0, 1.0),
       highFreqFraction: (highFreq / totalBand).clamp(0.0, 1.0),
-      lowFreqFraction: (lowFreq / totalBand).clamp(0.0, 1.0),
+      lowFreqFraction: lowFreqFraction,
+      lowFreqDominance: (lowFreqFraction / deepLfDominanceThreshold)
+          .clamp(0.0, 1.0),
       tone: (1 - flatness).clamp(0.0, 1.0),
       regularity: regularity.clamp(0.0, 1.0),
       motion: (motionSeconds / motionNormalizer).clamp(0.0, 1.0),
+      microMotion: microMotionDeviation == null
+          ? 0.0
+          : (microMotionDeviation / microMotionNormalizer).clamp(0.0, 1.0),
       signalQuality: segment.validFraction.clamp(0.0, 1.0),
     );
   }
@@ -221,6 +374,7 @@ class SleepStageEngineResult {
   final int validEpochs;
   final int unknownEpochs;
   final double coverage;
+  final SleepWindow window;
 
   const SleepStageEngineResult({
     required this.ran,
@@ -229,7 +383,22 @@ class SleepStageEngineResult {
     this.validEpochs = 0,
     this.unknownEpochs = 0,
     this.coverage = 0,
+    this.window = const SleepWindow(),
   });
+}
+
+/// The detected sleep period. [onsetAt] is the start of the first sustained
+/// asleep stretch; [finalWakeAt] the start of the last sustained awake stretch.
+/// Time outside the window is re-labelled awake so the hypnogram and totals do
+/// not count quiet edge time (reading in bed, lying still after waking) as
+/// sleep.
+class SleepWindow {
+  final DateTime? onsetAt;
+  final DateTime? finalWakeAt;
+
+  const SleepWindow({this.onsetAt, this.finalWakeAt});
+
+  bool get discovered => onsetAt != null && finalWakeAt != null;
 }
 
 /// Probability triple for an epoch. Zeros when the window is unknown.
@@ -249,9 +418,11 @@ class _WindowFeatures {
   final double nBurst;
   final double highFreqFraction;
   final double lowFreqFraction;
+  final double lowFreqDominance;
   final double tone;
   final double regularity;
   final double motion;
+  final double microMotion;
   final double signalQuality;
 
   const _WindowFeatures({
@@ -260,9 +431,11 @@ class _WindowFeatures {
     required this.nBurst,
     required this.highFreqFraction,
     required this.lowFreqFraction,
+    required this.lowFreqDominance,
     required this.tone,
     required this.regularity,
     required this.motion,
+    required this.microMotion,
     required this.signalQuality,
   });
 }
@@ -276,7 +449,7 @@ class _ViterbiPass {
 
   static const _transition = <List<double>>[
     [0.90, 0.10, 0.00], // awake -> sleeping is the only exit
-    [0.03, 0.94, 0.03], // sleeping -> deep and -> awake
+    [0.04, 0.91, 0.05], // sleeping -> deep and -> awake
     [0.01, 0.07, 0.92], // deep stays long
   ];
   static const _initial = [0.6, 0.3, 0.1];
@@ -408,21 +581,50 @@ class _ViterbiPass {
       awake: SleepStageEngine.awakeNoiseWeight * f.nNoise +
           SleepStageEngine.awakeBurstWeight * f.nBurst +
           SleepStageEngine.awakeHfWeight * f.highFreqFraction +
-          SleepStageEngine.awakeMotionWeight * f.motion -
-          SleepStageEngine.awakeRegWeight * f.regularity,
+          SleepStageEngine.awakeMotionWeight * f.motion +
+          SleepStageEngine.awakeMicroMotionWeight * f.microMotion -
+          SleepStageEngine.awakeRegWeight * f.regularity +
+          _startAwakePrior(f) +
+          _terminalAwakePrior(f),
       sleeping: SleepStageEngine.sleepMotionWeight * (1 - f.motion) +
           SleepStageEngine.sleepBurstWeight * (1 - f.nBurst) +
           SleepStageEngine.sleepNoiseWeight * (1 - f.nNoise) +
+          SleepStageEngine.sleepRegWeight * f.regularity +
           SleepStageEngine.sleepBias,
       deep: SleepStageEngine.deepRegWeight * regSquared +
           SleepStageEngine.deepLfWeight * f.lowFreqFraction +
-          SleepStageEngine.deepToneWeight * f.tone -
+          SleepStageEngine.deepToneWeight * f.tone +
+          SleepStageEngine.deepQuietWeight *
+              (1 - f.nNoise) *
+              (1 - f.nBurst) *
+              (1 - f.motion) *
+              f.lowFreqDominance -
           SleepStageEngine.deepMotionWeight * f.motion -
           SleepStageEngine.deepBurstWeight * f.nBurst -
           SleepStageEngine.deepNoiseWeight * f.nNoise -
           SleepStageEngine.deepHfWeight * f.highFreqFraction +
           deepPrior,
     );
+  }
+
+  /// Awake bias over the first [coldStartMinutes] of the session: you just set
+  /// the phone down, so onset is unlikely in the opening minutes.
+  double _startAwakePrior(_WindowFeatures f) {
+    final elapsedSeconds =
+        f.startedAt.difference(_session.startedAt).inSeconds;
+    final windowSeconds = SleepStageEngine.coldStartMinutes * 60;
+    if (elapsedSeconds >= windowSeconds) return 0.0;
+    return SleepStageEngine.coldStartPriorMax *
+        (1 - elapsedSeconds / windowSeconds);
+  }
+
+  /// Awake bias over the last [terminalGuardSeconds]: stopping the monitor
+  /// requires waking up and interacting with the phone.
+  double _terminalAwakePrior(_WindowFeatures f) {
+    final remainingSeconds = _sessionEnd.difference(f.startedAt).inSeconds;
+    if (remainingSeconds >= SleepStageEngine.terminalGuardSeconds) return 0.0;
+    return SleepStageEngine.terminalAwakePriorMax *
+        (1 - remainingSeconds / SleepStageEngine.terminalGuardSeconds);
   }
 
   /// Deep is structurally unlikely right after sleep onset and, across the
