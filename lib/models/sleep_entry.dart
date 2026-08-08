@@ -23,7 +23,7 @@ class SleepEntry {
     this.bedtimeMinutes,
     this.wakeTimeMinutes,
     this.comment,
-    this.source = 'manual',
+    this.source = 'monitored',
     this.timeInBedMinutes,
     this.estimatedSleepMinutes,
     required this.createdAt,
@@ -101,9 +101,14 @@ class SleepEntry {
     );
   }
 
+  int get effectiveSleepMinutes =>
+      actualSleepMinutes ?? estimatedSleepMinutes ?? sleepMinutes;
+
   double? get efficiency {
-    if (actualSleepMinutes == null || sleepMinutes <= 0) return null;
-    return actualSleepMinutes! / sleepMinutes * 100;
+    final asleepMinutes = actualSleepMinutes ?? estimatedSleepMinutes;
+    final denominator = timeInBedMinutes ?? sleepMinutes;
+    if (asleepMinutes == null || denominator <= 0) return null;
+    return (asleepMinutes / denominator * 100).clamp(0.0, 100.0);
   }
 
   static String _dateString(DateTime value) =>
@@ -122,6 +127,8 @@ class SleepDashboardStats {
   final int recordedDays30Days;
   final double? efficiency7Days;
   final double? efficiency30Days;
+  final double? regularity7Days;
+  final int regularitySampleCount;
 
   const SleepDashboardStats({
     required this.latest,
@@ -135,6 +142,8 @@ class SleepDashboardStats {
     required this.recordedDays30Days,
     required this.efficiency7Days,
     required this.efficiency30Days,
+    required this.regularity7Days,
+    required this.regularitySampleCount,
   });
 }
 

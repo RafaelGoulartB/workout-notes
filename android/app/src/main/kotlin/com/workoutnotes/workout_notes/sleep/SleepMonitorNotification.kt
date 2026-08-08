@@ -39,7 +39,11 @@ object SleepMonitorNotification {
         )
     }
 
-    fun build(context: Context, startedAt: Long): Notification {
+    fun build(
+        context: Context,
+        startedAt: Long,
+        monitorMode: String = "alarm_without_mission",
+    ): Notification {
         ensureChannel(context)
         val openIntent = PendingIntent.getActivity(
             context,
@@ -58,7 +62,7 @@ object SleepMonitorNotification {
             PendingIntent.FLAG_UPDATE_CURRENT or pendingIntentImmutable(),
         )
         val pt = context.resources.configuration.locales[0].language == "pt"
-        return NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle(if (pt) "Monitorando sono" else "Monitoring sleep")
             .setContentText(
@@ -70,8 +74,14 @@ object SleepMonitorNotification {
             .setShowWhen(true)
             .setWhen(startedAt)
             .setUsesChronometer(true)
-            .addAction(android.R.drawable.ic_media_pause, if (pt) "Parar" else "Stop", stopIntent)
-            .build()
+        if (monitorMode != "alarm_with_mission") {
+            builder.addAction(
+                android.R.drawable.ic_media_pause,
+                if (pt) "Parar" else "Stop",
+                stopIntent,
+            )
+        }
+        return builder.build()
     }
 
     private fun pendingIntentImmutable(): Int =

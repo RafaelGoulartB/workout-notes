@@ -7,6 +7,7 @@ import 'l10n/app_localizations.dart';
 import 'navigation/ai_coach_navigation.dart';
 import 'services/notification_service.dart';
 import 'services/sleep_monitor_service.dart';
+import 'services/traditional_alarm_service.dart';
 import 'screens/workout/ai_chat_screen.dart';
 import 'screens/main_shell.dart';
 import 'state/ai_chat_service.dart';
@@ -107,6 +108,7 @@ void main() async {
   await WorkoutNotesApp.aiSettings.load();
   await AiChatService.bootstrap(settings: WorkoutNotesApp.aiSettings);
   await SleepMonitorService.instance.initialize();
+  await TraditionalAlarmService.instance.initialize();
 
   runApp(
     WorkoutNotesApp(

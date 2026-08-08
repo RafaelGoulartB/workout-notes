@@ -6,6 +6,9 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'base_repository.dart';
 
+double _normalizeWorkoutDecimal(double value, int decimals) =>
+    double.tryParse(value.toStringAsFixed(decimals)) ?? 0;
+
 /// Repository for workouts, exercise entries, and sets CRUD operations.
 class WorkoutRepository extends BaseRepository {
   // ===================================================================
@@ -339,7 +342,8 @@ class WorkoutRepository extends BaseRepository {
     final db = await this.db;
     return db.rawQuery(
       'SELECT ee.*, e.name as exercise_name, e.locale_key as exercise_locale_key, e.category_id, '
-      'ec.name as category_name, ec.color as category_color, ec.energy_system as category_energy, e.type as exercise_type '
+      'ec.name as category_name, ec.color as category_color, ec.energy_system as category_energy, '
+      'e.type as exercise_type, e.weight_increment '
       'FROM exercise_entries ee '
       'JOIN exercises e ON ee.exercise_id = e.id '
       'LEFT JOIN exercise_categories ec ON e.category_id = ec.id '
@@ -862,13 +866,17 @@ class WorkoutRepository extends BaseRepository {
   }) async {
     final db = await this.db;
     final updates = <String, dynamic>{};
-    if (weight != null) updates['weight'] = weight;
+    if (weight != null) {
+      updates['weight'] = _normalizeWorkoutDecimal(weight, 2);
+    }
     if (reps != null) updates['reps'] = reps;
-    if (distance != null) updates['distance'] = distance;
+    if (distance != null) {
+      updates['distance'] = _normalizeWorkoutDecimal(distance, 2);
+    }
     if (timeSeconds != null) updates['time_seconds'] = timeSeconds;
     if (isComplete != null) updates['is_complete'] = isComplete ? 1 : 0;
     if (isWarmup != null) updates['is_warmup'] = isWarmup ? 1 : 0;
-    if (rpe != null) updates['rpe'] = rpe;
+    if (rpe != null) updates['rpe'] = _normalizeWorkoutDecimal(rpe, 1);
     if (comment != null) updates['comment'] = comment;
 
     if (updates.isNotEmpty) {

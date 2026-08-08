@@ -11,6 +11,22 @@ class SleepMonitorSegment {
   final double validFraction;
   final int noiseBurstCount;
 
+  // v28 spectral features (audio-features-v2). Null on older recordings.
+  final double? spectralBandEnergy0;
+  final double? spectralBandEnergy1;
+  final double? spectralBandEnergy2;
+  final double? spectralBandEnergy3;
+  final double? spectralBandEnergy4;
+  final double? spectralFlatness;
+  final double? spectralCentroidHz;
+  final double? breathingRegularity;
+  final double? breathingRateHz;
+
+  // v28 actigraphy aggregates. Null when no accelerometer was available.
+  final double? motionActiveSeconds;
+  final double? motionMeanDeviationG;
+  final double? motionMaxDeviationG;
+
   const SleepMonitorSegment({
     required this.id,
     required this.sessionId,
@@ -22,11 +38,30 @@ class SleepMonitorSegment {
     required this.classification,
     required this.validFraction,
     required this.noiseBurstCount,
+    this.spectralBandEnergy0,
+    this.spectralBandEnergy1,
+    this.spectralBandEnergy2,
+    this.spectralBandEnergy3,
+    this.spectralBandEnergy4,
+    this.spectralFlatness,
+    this.spectralCentroidHz,
+    this.breathingRegularity,
+    this.breathingRateHz,
+    this.motionActiveSeconds,
+    this.motionMeanDeviationG,
+    this.motionMaxDeviationG,
   });
 
   bool get isQuiet => classification == 'quiet';
   bool get isNoise => classification == 'noise';
   bool get isInvalid => classification == 'invalid';
+
+  /// Whether this recording carries the v28 spectral features needed by the
+  /// heuristic staging engine (audio-features-v2 nights).
+  bool get hasSpectralFeatures => spectralFlatness != null;
+
+  /// Whether actigraphy aggregates were captured for this recording.
+  bool get hasMotionFeatures => motionActiveSeconds != null;
 
   Map<String, dynamic> toMap() => {
     'id': id,
@@ -39,6 +74,18 @@ class SleepMonitorSegment {
     'classification': classification,
     'valid_fraction': validFraction,
     'noise_burst_count': noiseBurstCount,
+    if (spectralBandEnergy0 != null) 'spectral_band_energy_0': spectralBandEnergy0,
+    if (spectralBandEnergy1 != null) 'spectral_band_energy_1': spectralBandEnergy1,
+    if (spectralBandEnergy2 != null) 'spectral_band_energy_2': spectralBandEnergy2,
+    if (spectralBandEnergy3 != null) 'spectral_band_energy_3': spectralBandEnergy3,
+    if (spectralBandEnergy4 != null) 'spectral_band_energy_4': spectralBandEnergy4,
+    if (spectralFlatness != null) 'spectral_flatness': spectralFlatness,
+    if (spectralCentroidHz != null) 'spectral_centroid_hz': spectralCentroidHz,
+    if (breathingRegularity != null) 'breathing_regularity': breathingRegularity,
+    if (breathingRateHz != null) 'breathing_rate_hz': breathingRateHz,
+    if (motionActiveSeconds != null) 'motion_active_seconds': motionActiveSeconds,
+    if (motionMeanDeviationG != null) 'motion_mean_deviation_g': motionMeanDeviationG,
+    if (motionMaxDeviationG != null) 'motion_max_deviation_g': motionMaxDeviationG,
   };
 
   factory SleepMonitorSegment.fromMap(Map<String, dynamic> map) {
@@ -53,6 +100,18 @@ class SleepMonitorSegment {
       classification: map['classification'] as String,
       validFraction: (map['valid_fraction'] as num).toDouble(),
       noiseBurstCount: (map['noise_burst_count'] as num?)?.toInt() ?? 0,
+      spectralBandEnergy0: (map['spectral_band_energy_0'] as num?)?.toDouble(),
+      spectralBandEnergy1: (map['spectral_band_energy_1'] as num?)?.toDouble(),
+      spectralBandEnergy2: (map['spectral_band_energy_2'] as num?)?.toDouble(),
+      spectralBandEnergy3: (map['spectral_band_energy_3'] as num?)?.toDouble(),
+      spectralBandEnergy4: (map['spectral_band_energy_4'] as num?)?.toDouble(),
+      spectralFlatness: (map['spectral_flatness'] as num?)?.toDouble(),
+      spectralCentroidHz: (map['spectral_centroid_hz'] as num?)?.toDouble(),
+      breathingRegularity: (map['breathing_regularity'] as num?)?.toDouble(),
+      breathingRateHz: (map['breathing_rate_hz'] as num?)?.toDouble(),
+      motionActiveSeconds: (map['motion_active_seconds'] as num?)?.toDouble(),
+      motionMeanDeviationG: (map['motion_mean_deviation_g'] as num?)?.toDouble(),
+      motionMaxDeviationG: (map['motion_max_deviation_g'] as num?)?.toDouble(),
     );
   }
 }

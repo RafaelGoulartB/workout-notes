@@ -16,6 +16,7 @@ class AudioSignalProcessor(
     private val sessionId: String,
     private val onSegment: (Map<String, Any?>) -> Unit,
     private val onError: (Throwable) -> Unit,
+    private val onMotionSnapshot: (() -> Map<String, Any?>)? = null,
 ) {
     companion object {
         const val SAMPLE_RATE = 16_000
@@ -76,6 +77,8 @@ class AudioSignalProcessor(
     private var peak = 0.0
     private var bursts = 0
     private val noiseBaseline = AdaptiveNoiseBaseline()
+    private val spectral = SpectralAnalyzer()
+    private val breathing = BreathingAnalyzer()
     private var activeSampleRate = SAMPLE_RATE
 
     @Synchronized
@@ -200,7 +203,16 @@ class AudioSignalProcessor(
         sumSquares += bufferRms * bufferRms * length
         peak = max(peak, Math.pow(10.0, maxDb / 20.0))
         noiseBaseline.observe(db)
-        if (noiseBaseline.isCalibrated && db > noiseBaseline.value + NOISE_DELTA_DB) {
+        // Digital silence carries no spectral structure; skipping it keeps the
+        // per-window features null so the Dart side can mark it unknown.
+        if (db > -118.0) {
+            spectral.add(buffer, length)
+            breathing.add(buffer, length)
+        }
+        if (db > -118.0 &&
+            noiseBaseline.isCalibrated &&
+            db > noiseBaseline.value + NOISE_DELTA_DB
+        ) {
             bursts++
         }
     }
@@ -218,20 +230,25 @@ class AudioSignalProcessor(
         val noiseScore = noiseBaseline.noiseScore(rmsDb)
         val classification = classify(validFraction, noiseScore)
         val startedAt = windowStartedAt
-        onSegment(
-            mapOf(
-                "id" to UUID.randomUUID().toString(),
-                "session_id" to sessionId,
-                "started_at" to java.time.Instant.ofEpochMilli(startedAt).toString(),
-                "duration_seconds" to max(1L, (now - startedAt) / 1_000L).toInt(),
-                "audio_rms_dbfs" to rmsDb,
-                "audio_peak_dbfs" to peakDb,
-                "noise_score" to noiseScore,
-                "classification" to classification,
-                "valid_fraction" to validFraction,
-                "noise_burst_count" to bursts,
-            ),
+        val segment = mutableMapOf<String, Any?>(
+            "id" to UUID.randomUUID().toString(),
+            "session_id" to sessionId,
+            "started_at" to java.time.Instant.ofEpochMilli(startedAt).toString(),
+            "duration_seconds" to max(1L, (now - startedAt) / 1_000L).toInt(),
+            "audio_rms_dbfs" to rmsDb,
+            "audio_peak_dbfs" to peakDb,
+            "noise_score" to noiseScore,
+            "classification" to classification,
+            "valid_fraction" to validFraction,
+            "noise_burst_count" to bursts,
         )
+        segment.putAll(spectral.snapshot())
+        val breathingSnapshot = breathing.snapshot()
+        segment["breathing_regularity"] = breathingSnapshot.first
+        segment["breathing_rate_hz"] = breathingSnapshot.second
+        val motion = onMotionSnapshot?.invoke()
+        if (motion != null) segment.putAll(motion)
+        onSegment(segment)
         windowStartedAt = now
         windowSamples = 0
         validSamples = 0
@@ -260,6 +277,9 @@ internal class AdaptiveNoiseBaseline(
 
     fun observe(dbfs: Double) {
         if (!dbfs.isFinite()) return
+        // Ignore the codec noise floor so calibration tracks real ambient
+        // noise instead of drifting toward digital silence.
+        if (dbfs <= -118.0) return
         if (!isCalibrated) {
             calibrationValues += dbfs
             if (calibrationValues.size >= calibrationSampleCount) {

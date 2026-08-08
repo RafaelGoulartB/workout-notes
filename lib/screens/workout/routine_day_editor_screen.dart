@@ -5,6 +5,7 @@ import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/widgets/category_timeline_bar.dart';
 import 'package:workout_notes/widgets/exercise_picker_sheet.dart';
+import 'package:workout_notes/widgets/workout/set_editor_fields.dart';
 import 'package:workout_notes/screens/workout/exercise_detail_tabs_screen.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
 import 'package:workout_notes/utils/workout_estimator.dart';
@@ -419,6 +420,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
     // No previous set — open editor with defaults
     final result = await _showSetEditor(
       exerciseType: exercise['exercise_type'] as String? ?? 'weightReps',
+      weightIncrement: (exercise['weight_increment'] as num?)?.toDouble() ?? 1,
       exerciseName: _resolveExerciseName(exercise),
       weight: 0,
       reps: 0,
@@ -450,6 +452,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
 
     final result = await _showSetEditor(
       exerciseType: exerciseType,
+      weightIncrement: (exercise['weight_increment'] as num?)?.toDouble() ?? 1,
       exerciseName: _resolveExerciseName(exercise),
       weight: (setData['weight'] as num?)?.toDouble() ?? 0,
       reps: (setData['reps'] as int?) ?? 0,
@@ -480,6 +483,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
 
   Future<Map<String, dynamic>?> _showSetEditor({
     required String exerciseType,
+    required double weightIncrement,
     required String exerciseName,
     required double weight,
     required int reps,
@@ -574,32 +578,22 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                 const SizedBox(height: 16),
 
                 // Field controls (same as active workout)
-                ..._buildFieldControls(
-                  ctx,
-                  setSheetState,
-                  exerciseType,
-                  editWeight,
-                  editReps,
-                  editDistance,
-                  editTime,
-                  (String key, dynamic value) {
-                    setSheetState(() {
-                      switch (key) {
-                        case 'weight':
-                          editWeight = (value as double).clamp(0, 999);
-                          break;
-                        case 'reps':
-                          editReps = (value as int).clamp(0, 999);
-                          break;
-                        case 'distance':
-                          editDistance = (value as double).clamp(0, 999);
-                          break;
-                        case 'time_seconds':
-                          editTime = (value as int).clamp(0, 99999);
-                          break;
-                      }
-                    });
-                  },
+                WorkoutSetFieldControls(
+                  exerciseType: exerciseType,
+                  weight: editWeight,
+                  reps: editReps,
+                  distance: editDistance,
+                  timeSeconds: editTime,
+                  weightIncrement: weightIncrement,
+                  showPace: true,
+                  onWeightChanged: (value) =>
+                      setSheetState(() => editWeight = value),
+                  onRepsChanged: (value) =>
+                      setSheetState(() => editReps = value),
+                  onDistanceChanged: (value) =>
+                      setSheetState(() => editDistance = value),
+                  onTimeChanged: (value) =>
+                      setSheetState(() => editTime = value),
                 ),
 
                 const SizedBox(height: 20),
@@ -633,493 +627,6 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  /// Builds field controls for the given exercise type.
-  /// Mirrors the active workout's _buildFieldControls.
-  List<Widget> _buildFieldControls(
-    BuildContext ctx,
-    StateSetter setSheetState,
-    String type,
-    double weight,
-    int reps,
-    double distance,
-    int timeSeconds,
-    void Function(String key, dynamic value) onFieldChange,
-  ) {
-    final fields = getFieldsForType(type);
-    final keys = fields.keys.toList();
-    final widgets = <Widget>[];
-
-    for (final key in keys) {
-      if (key == 'weight') {
-        widgets.add(
-          _buildWeightControl(
-            ctx,
-            setSheetState,
-            weight,
-            (v) => onFieldChange('weight', v),
-          ),
-        );
-      } else if (key == 'reps') {
-        widgets.add(
-          _buildRepsControl(
-            ctx,
-            setSheetState,
-            reps,
-            (v) => onFieldChange('reps', v),
-          ),
-        );
-      } else if (key == 'distance') {
-        widgets.add(
-          _buildDistanceControl(
-            ctx,
-            setSheetState,
-            distance,
-            (v) => onFieldChange('distance', v),
-          ),
-        );
-      } else if (key == 'time_seconds') {
-        widgets.add(
-          _buildTimeControl(
-            ctx,
-            setSheetState,
-            timeSeconds,
-            (v) => onFieldChange('time_seconds', v),
-          ),
-        );
-      }
-    }
-    return widgets;
-  }
-
-  // ===================== FIELD CONTROLS (mirror active workout) =====================
-
-  Widget _buildWeightControl(
-    BuildContext ctx,
-    StateSetter setSheetState,
-    double weight,
-    void Function(double) onChanged,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 16),
-        Text(
-          AppLocalizations.of(ctx)!.activeWorkoutWeight,
-          style: Theme.of(
-            ctx,
-          ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            _stepperButton(
-              ctx,
-              Icons.remove,
-              onTap: () => onChanged(weight - 2.5),
-            ),
-            const SizedBox(width: 6),
-            _stepperButton(
-              ctx,
-              Icons.remove,
-              small: true,
-              onTap: () => onChanged(weight - 0.5),
-            ),
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _quickEditNumber(ctx, weight, false, onChanged),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      ctx,
-                    ).colorScheme.surfaceContainerHighest.withAlpha(120),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Text(
-                      weight.toStringAsFixed(1),
-                      style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            _stepperButton(
-              ctx,
-              Icons.add,
-              small: true,
-              onTap: () => onChanged(weight + 0.5),
-            ),
-            const SizedBox(width: 6),
-            _stepperButton(
-              ctx,
-              Icons.add,
-              onTap: () => onChanged(weight + 2.5),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 4,
-          runSpacing: 4,
-          children: [20, 30, 40, 50, 60, 80, 100, 120]
-              .map(
-                (v) => ActionChip(
-                  label: Text('$v', style: const TextStyle(fontSize: 10)),
-                  onPressed: () => onChanged(v.toDouble()),
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              )
-              .toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRepsControl(
-    BuildContext ctx,
-    StateSetter setSheetState,
-    int reps,
-    void Function(int) onChanged,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 14),
-        Text(
-          AppLocalizations.of(ctx)!.activeWorkoutReps,
-          style: Theme.of(
-            ctx,
-          ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            _stepperButton(ctx, Icons.remove, onTap: () => onChanged(reps - 1)),
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _quickEditNumber(
-                  ctx,
-                  reps.toDouble(),
-                  true,
-                  (v) => onChanged(v.round()),
-                ),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      ctx,
-                    ).colorScheme.surfaceContainerHighest.withAlpha(120),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '$reps',
-                      style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            _stepperButton(ctx, Icons.add, onTap: () => onChanged(reps + 1)),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 4,
-          runSpacing: 4,
-          children: [1, 3, 5, 8, 10, 12, 15, 20]
-              .map(
-                (v) => ActionChip(
-                  label: Text('$v', style: const TextStyle(fontSize: 10)),
-                  onPressed: () => onChanged(v),
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              )
-              .toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDistanceControl(
-    BuildContext ctx,
-    StateSetter setSheetState,
-    double distance,
-    void Function(double) onChanged,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 16),
-        Text(
-          AppLocalizations.of(ctx)!.activeWorkoutDistance,
-          style: Theme.of(
-            ctx,
-          ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            _stepperButton(
-              ctx,
-              Icons.remove,
-              small: true,
-              onTap: () => onChanged((distance - 0.1).clamp(0, 999)),
-            ),
-            _stepperButton(
-              ctx,
-              Icons.remove,
-              onTap: () => onChanged((distance - 0.5).clamp(0, 999)),
-            ),
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _quickEditNumber(
-                  ctx,
-                  distance,
-                  false,
-                  onChanged,
-                  title: 'Digite a distância',
-                  suffix: ' km',
-                ),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      ctx,
-                    ).colorScheme.surfaceContainerHighest.withAlpha(120),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Text(
-                      distance.toStringAsFixed(1),
-                      style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            _stepperButton(
-              ctx,
-              Icons.add,
-              onTap: () => onChanged((distance + 0.5).clamp(0, 999)),
-            ),
-            _stepperButton(
-              ctx,
-              Icons.add,
-              small: true,
-              onTap: () => onChanged((distance + 0.1).clamp(0, 999)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 4,
-          runSpacing: 4,
-          children: [1.0, 2.0, 3.0, 5.0, 10.0]
-              .map(
-                (v) => ActionChip(
-                  label: Text(
-                    v.toStringAsFixed(1),
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                  onPressed: () => onChanged(v),
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              )
-              .toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTimeControl(
-    BuildContext ctx,
-    StateSetter setSheetState,
-    int timeSeconds,
-    void Function(int) onChanged,
-  ) {
-    final minutes = timeSeconds ~/ 60;
-    final seconds = timeSeconds % 60;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 16),
-        Text(
-          AppLocalizations.of(ctx)!.activeWorkoutTime,
-          style: Theme.of(
-            ctx,
-          ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            _stepperButton(
-              ctx,
-              Icons.remove,
-              onTap: () => onChanged((timeSeconds - 30).clamp(0, 99999)),
-            ),
-            _stepperButton(
-              ctx,
-              Icons.remove,
-              small: true,
-              onTap: () => onChanged((timeSeconds - 5).clamp(0, 99999)),
-            ),
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _quickEditNumber(
-                  ctx,
-                  timeSeconds.toDouble(),
-                  true,
-                  (v) => onChanged(v.round()),
-                  title: 'Digite o tempo (segundos)',
-                  suffix: ' s',
-                ),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Theme.of(
-                      ctx,
-                    ).colorScheme.surfaceContainerHighest.withAlpha(120),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Text(
-                      timeSeconds >= 60
-                          ? '$minutes:${seconds.toString().padLeft(2, '0')}'
-                          : '${timeSeconds}s',
-                      style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            _stepperButton(
-              ctx,
-              Icons.add,
-              small: true,
-              onTap: () => onChanged((timeSeconds + 5).clamp(0, 99999)),
-            ),
-            _stepperButton(
-              ctx,
-              Icons.add,
-              onTap: () => onChanged((timeSeconds + 30).clamp(0, 99999)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 4,
-          runSpacing: 4,
-          children: [30, 60, 120, 180, 300, 600]
-              .map(
-                (v) => ActionChip(
-                  label: Text(
-                    v >= 60 ? '${v ~/ 60}min' : '${v}s',
-                    style: const TextStyle(fontSize: 10),
-                  ),
-                  onPressed: () => onChanged(v),
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              )
-              .toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _stepperButton(
-    BuildContext ctx,
-    IconData icon, {
-    VoidCallback? onTap,
-    bool small = false,
-  }) {
-    final size = small ? 36.0 : 48.0;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Theme.of(ctx).colorScheme.outlineVariant.withAlpha(120),
-          ),
-        ),
-        child: Icon(
-          icon,
-          size: small ? 18 : 24,
-          color: Theme.of(ctx).colorScheme.onSurface,
-        ),
-      ),
-    );
-  }
-
-  void _quickEditNumber(
-    BuildContext ctx,
-    double current,
-    bool isInt,
-    void Function(double) onSet, {
-    String? title,
-    String? suffix,
-  }) {
-    final ctl = TextEditingController(
-      text: isInt ? current.round().toString() : current.toStringAsFixed(1),
-    );
-    showDialog(
-      context: ctx,
-      builder: (ctx) => AlertDialog(
-        title: Text(title ?? AppLocalizations.of(ctx)!.activeWorkoutOK),
-        content: TextField(
-          controller: ctl,
-          keyboardType: TextInputType.numberWithOptions(decimal: !isInt),
-          autofocus: true,
-          decoration: InputDecoration(
-            border: const OutlineInputBorder(),
-            suffixText: suffix ?? (isInt ? ' reps' : ' kg'),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(AppLocalizations.of(ctx)!.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () {
-              final parsed = double.tryParse(ctl.text.replaceAll(',', '.'));
-              if (parsed != null && parsed >= 0) {
-                onSet(isInt ? parsed.roundToDouble() : parsed);
-              }
-              Navigator.pop(ctx);
-            },
-            child: Text(AppLocalizations.of(ctx)!.activeWorkoutOK),
-          ),
-        ],
       ),
     );
   }

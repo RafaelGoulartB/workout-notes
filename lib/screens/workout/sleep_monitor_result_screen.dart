@@ -5,15 +5,17 @@ import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/models/sleep_inference.dart';
 import 'package:workout_notes/models/sleep_monitor_diagnostics.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
+import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
 import 'package:workout_notes/services/sleep_diagnostic_export_service.dart';
+import 'package:workout_notes/services/sleep_inference_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
-
-import 'sleep_entry_sheet.dart';
+import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
 
 class SleepMonitorResultScreen extends StatefulWidget {
   final String sessionId;
@@ -31,6 +33,9 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
   SleepMonitorSession? _session;
   SleepEntry? _entry;
   List<SleepMonitorSegment> _segments = const [];
+  SleepMonitorDiagnostics? _diagnostics;
+  SleepInferenceResult? _inference;
+  List<SleepStageEpoch> _stages = const [];
   bool _isLoading = true;
   bool _isExporting = false;
 
@@ -47,14 +52,24 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
       return;
     }
     final segments = await _repository.getSegments(widget.sessionId);
+    final stages = await _repository.getStageEpochs(widget.sessionId);
     final entry = session.sleepEntryId == null
         ? null
         : await _sleepRepository.getById(session.sleepEntryId!);
+    final diagnostics = SleepMonitorDiagnostics.fromSession(session, segments);
+    final inference = const SleepInferenceService().analyze(
+      session: session,
+      segments: segments,
+      diagnostics: diagnostics,
+    );
     if (!mounted) return;
     setState(() {
       _session = session;
       _segments = segments;
       _entry = entry;
+      _diagnostics = diagnostics;
+      _inference = inference;
+      _stages = stages;
       _isLoading = false;
     });
   }
@@ -88,7 +103,15 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
     AppLocalizations loc,
     SleepMonitorSession session,
   ) {
-    final diagnostics = SleepMonitorDiagnostics.fromSession(session, _segments);
+    final diagnostics =
+        _diagnostics ?? SleepMonitorDiagnostics.fromSession(session, _segments);
+    final inference =
+        _inference ??
+        const SleepInferenceService().analyze(
+          session: session,
+          segments: _segments,
+          diagnostics: diagnostics,
+        );
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
@@ -101,49 +124,109 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
             loc: loc,
           ),
           const SizedBox(height: 12),
-          _DataQualityCard(diagnostics: diagnostics, loc: loc),
+          SleepStageCard(session: session, stages: _stages),
           const SizedBox(height: 12),
-          _ResultCard(
-            title: loc.sleepMonitorTimeline,
-            icon: Icons.timeline,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (_stages.isEmpty) ...[
+            _InferenceSummaryCard(
+              session: session,
+              inference: inference,
+              loc: loc,
+            ),
+            const SizedBox(height: 12),
+          ],
+          Card(
+            margin: EdgeInsets.zero,
+            child: ExpansionTile(
+              leading: const Icon(Icons.tune_rounded),
+              title: Text(
+                loc.sleepAnalysisTechnicalDetails,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
               children: [
-                SleepMonitorTimeline(
-                  segments: _segments,
-                  emptyTitle: loc.sleepMonitorNoSegments,
-                  emptyBody: loc.sleepMonitorNoSegmentsBody,
-                ),
-                if (_segments.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _Legend(loc: loc),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                _DataQualityCard(diagnostics: diagnostics, loc: loc),
+                const SizedBox(height: 12),
+                _ResultCard(
+                  title: loc.sleepMonitorTimeline,
+                  icon: Icons.timeline,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${loc.sleepMonitorStartTime}: ${_formatTime(session.startedAt, session.utcOffsetStartMinutes)}',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      SleepMonitorTimeline(
+                        segments: _segments,
+                        session: session,
+                        inference: inference,
+                        emptyTitle: loc.sleepMonitorNoSegments,
+                        emptyBody: loc.sleepMonitorNoSegmentsBody,
                       ),
-                      Text(
-                        '${loc.sleepMonitorEndTime}: ${_formatTime(session.endedAt ?? session.startedAt, session.utcOffsetEndMinutes ?? session.utcOffsetStartMinutes)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
+                      if (_segments.isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _Legend(loc: loc),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                '${loc.sleepMonitorStartTime}: ${_formatTime(session.startedAt, session.utcOffsetStartMinutes)}',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                '${loc.sleepMonitorEndTime}: ${_formatTime(session.endedAt ?? session.startedAt, session.utcOffsetEndMinutes ?? session.utcOffsetStartMinutes)}',
+                                textAlign: TextAlign.end,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
+                ),
+                const SizedBox(height: 12),
+                _ResultCard(
+                  title: loc.sleepMonitorNoiseGraph,
+                  icon: Icons.show_chart,
+                  child: SleepNoiseChart(
+                    segments: _segments,
+                    session: session,
+                    inference: inference,
+                    emptyTitle: loc.sleepMonitorNoSegments,
+                    noiseScoreLabel: loc.sleepMonitorNoiseScore,
+                    thresholdLabel: loc.sleepMonitorThreshold,
+                  ),
+                ),
+                if (inference.isAvailable &&
+                    inference.events.any(
+                      (event) =>
+                          event.type !=
+                          SleepInferenceEventType.transientActivity,
+                    )) ...[
+                  const SizedBox(height: 12),
+                  _InferenceEventsCard(
+                    session: session,
+                    inference: inference,
+                    loc: loc,
+                  ),
                 ],
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonalIcon(
+                    onPressed: _isExporting ? null : _exportDiagnostic,
+                    icon: _isExporting
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.ios_share_outlined),
+                    label: Text(loc.sleepMonitorExportDiagnostic),
+                  ),
+                ),
               ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _ResultCard(
-            title: loc.sleepMonitorNoiseGraph,
-            icon: Icons.show_chart,
-            child: SleepNoiseChart(
-              segments: _segments,
-              emptyTitle: loc.sleepMonitorNoSegments,
-              noiseScoreLabel: loc.sleepMonitorNoiseScore,
-              thresholdLabel: loc.sleepMonitorThreshold,
             ),
           ),
           const SizedBox(height: 12),
@@ -154,38 +237,8 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
               child: Text(loc.sleepMonitorEstimateWarning),
             ),
           ),
-          const SizedBox(height: 14),
-          FilledButton.tonalIcon(
-            onPressed: _isExporting ? null : _exportDiagnostic,
-            icon: _isExporting
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.ios_share_outlined),
-            label: Text(loc.sleepMonitorExportDiagnostic),
-          ),
-          if (_entry != null) ...[
-            const SizedBox(height: 14),
-            OutlinedButton.icon(
-              onPressed: _editManualEntry,
-              icon: const Icon(Icons.edit_outlined),
-              label: Text(loc.sleepMonitorEditManual),
-            ),
-          ],
         ],
       ),
-    );
-  }
-
-  Future<void> _editManualEntry() async {
-    final entry = _entry;
-    if (entry == null) return;
-    await showSleepEntrySheet(
-      context,
-      repository: _sleepRepository,
-      existing: entry,
-      onSaved: _load,
     );
   }
 
@@ -249,7 +302,15 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
         session: session,
         segments: _segments,
         diagnostics: diagnostics,
+        inference:
+            _inference ??
+            const SleepInferenceService().analyze(
+              session: session,
+              segments: _segments,
+              diagnostics: diagnostics,
+            ),
         entry: _entry,
+        stages: _stages,
         includePersonalData: scope == _DiagnosticExportScope.personal,
         deviceInfo: capabilities,
       );
@@ -387,6 +448,10 @@ class _SessionSummaryCard extends StatelessWidget {
         _percentage(diagnostics.timelineCoverage),
       ),
       (loc.sleepMonitorSignalCoverage, _percentage(diagnostics.signalCoverage)),
+      (
+        loc.sleepMonitorDigitalSilence,
+        _percentage(diagnostics.digitalSilenceFraction),
+      ),
       (loc.sleepMonitorQuietPeriod, _duration(diagnostics.quietSeconds)),
       (loc.sleepMonitorNoisyPeriod, _duration(diagnostics.noisySeconds)),
       (loc.sleepMonitorNoiseEvents, '${session.noiseEventCount}'),
@@ -498,7 +563,9 @@ class _DataQualityCard extends StatelessWidget {
                   Text(
                     acceptable
                         ? loc.sleepMonitorDataAcceptableBody
-                        : loc.sleepMonitorDataInsufficientBody,
+                        : diagnostics.inferenceBlockers
+                              .map((blocker) => _blockerText(loc, blocker))
+                              .join('\n'),
                     style: TextStyle(color: foreground),
                   ),
                 ],
@@ -506,6 +573,157 @@ class _DataQualityCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  String _blockerText(AppLocalizations loc, String blocker) {
+    return switch (blocker) {
+      'too_short' => loc.sleepInferenceBlockerTooShort,
+      'low_timeline_coverage' => loc.sleepInferenceBlockerLowTimelineCoverage,
+      'low_signal_coverage' => loc.sleepInferenceBlockerLowSignalCoverage,
+      'too_many_invalid_segments' => loc.sleepInferenceBlockerInvalidSegments,
+      'digital_silence' => loc.sleepInferenceBlockerDigitalSilence,
+      _ => loc.sleepMonitorDataInsufficientBody,
+    };
+  }
+}
+
+class _InferenceSummaryCard extends StatelessWidget {
+  final SleepMonitorSession session;
+  final SleepInferenceResult inference;
+  final AppLocalizations loc;
+
+  const _InferenceSummaryCard({
+    required this.session,
+    required this.inference,
+    required this.loc,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!inference.isAvailable) {
+      return _ResultCard(
+        title: loc.sleepInferenceTitle,
+        icon: Icons.bedtime_outlined,
+        child: Text(loc.sleepInferenceInsufficient),
+      );
+    }
+    final onset = inference.sleepOnsetAt;
+    final values = [
+      (
+        loc.sleepInferenceSleptAt,
+        onset == null
+            ? loc.sleepInferenceOnsetUnknown
+            : _wallTime(onset, session.utcOffsetStartMinutes),
+      ),
+      (
+        loc.sleepInferenceSettling,
+        inference.settlingSeconds == null
+            ? '—'
+            : _duration(inference.settlingSeconds!),
+      ),
+      (loc.sleepInferenceAwakenings, '${inference.awakenings.length}'),
+      (
+        loc.sleepInferenceEstimatedSleep,
+        inference.estimatedSleepSeconds == null
+            ? '—'
+            : _duration(inference.estimatedSleepSeconds!),
+      ),
+    ];
+    return _ResultCard(
+      title: loc.sleepInferenceTitle,
+      icon: Icons.bedtime_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: values
+                .map(
+                  (value) => SizedBox(
+                    width: 142,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          value.$1,
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          value.$2,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 14),
+          Chip(
+            avatar: const Icon(Icons.analytics_outlined, size: 18),
+            label: Text(
+              '${loc.sleepInferenceConfidence}: '
+              '${_confidenceLabel(loc, inference.confidence)}',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InferenceEventsCard extends StatelessWidget {
+  final SleepMonitorSession session;
+  final SleepInferenceResult inference;
+  final AppLocalizations loc;
+
+  const _InferenceEventsCard({
+    required this.session,
+    required this.inference,
+    required this.loc,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _ResultCard(
+      title: loc.sleepInferenceEventsTitle,
+      icon: Icons.notifications_active_outlined,
+      child: Column(
+        children: inference.events
+            .where(
+              (event) =>
+                  event.type != SleepInferenceEventType.transientActivity,
+            )
+            .map((event) {
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: _eventColor(event.type).withAlpha(34),
+                  child: Icon(
+                    _eventIcon(event.type),
+                    color: _eventColor(event.type),
+                  ),
+                ),
+                title: Text(_eventLabel(loc, event.type)),
+                subtitle: Text(
+                  '${_wallTime(event.startedAt, session.utcOffsetStartMinutes)} · '
+                  '${_duration(event.durationSeconds)} · '
+                  '${loc.sleepInferencePeak}: '
+                  '${event.peakNoiseScore.toStringAsFixed(1)}\n'
+                  '${_reasonLabel(loc, event.reason)}',
+                ),
+                trailing: Text(
+                  _confidenceLabel(loc, event.confidence),
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              );
+            })
+            .toList(),
       ),
     );
   }
@@ -559,12 +777,16 @@ class _ResultCard extends StatelessWidget {
 
 class SleepMonitorTimeline extends StatelessWidget {
   final List<SleepMonitorSegment> segments;
+  final SleepMonitorSession session;
+  final SleepInferenceResult inference;
   final String? emptyTitle;
   final String? emptyBody;
 
   const SleepMonitorTimeline({
     super.key,
     required this.segments,
+    required this.session,
+    required this.inference,
     this.emptyTitle,
     this.emptyBody,
   });
@@ -581,7 +803,9 @@ class SleepMonitorTimeline extends StatelessWidget {
         width: double.infinity,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: CustomPaint(painter: _SleepTimelinePainter(segments)),
+          child: CustomPaint(
+            painter: _SleepTimelinePainter(segments, session, inference),
+          ),
         ),
       ),
     );
@@ -590,19 +814,23 @@ class SleepMonitorTimeline extends StatelessWidget {
 
 class _SleepTimelinePainter extends CustomPainter {
   final List<SleepMonitorSegment> segments;
+  final SleepMonitorSession session;
+  final SleepInferenceResult inference;
 
-  const _SleepTimelinePainter(this.segments);
+  const _SleepTimelinePainter(this.segments, this.session, this.inference);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final totalSeconds = segments.fold<int>(
-      0,
-      (sum, segment) => sum + segment.durationSeconds.clamp(1, 3600),
-    );
+    final sessionEnd = session.endedAt ?? segments.last.startedAt;
+    final totalSeconds = sessionEnd.difference(session.startedAt).inSeconds;
     if (totalSeconds <= 0) return;
-    var left = 0.0;
     for (final segment in segments) {
       final duration = segment.durationSeconds.clamp(1, 3600);
+      final offset = segment.startedAt
+          .difference(session.startedAt)
+          .inSeconds
+          .clamp(0, totalSeconds);
+      final left = size.width * offset / totalSeconds;
       final width = size.width * duration / totalSeconds;
       final color = switch (segment.classification) {
         'noise' => Colors.orange,
@@ -613,17 +841,92 @@ class _SleepTimelinePainter extends CustomPainter {
         Rect.fromLTWH(left, 0, math.max(width, 0.5), size.height),
         Paint()..color = color,
       );
-      left += width;
     }
+
+    _drawRange(
+      canvas,
+      size,
+      totalSeconds,
+      session.startedAt,
+      session.startedAt.add(
+        const Duration(seconds: SleepInferenceService.preparationSeconds),
+      ),
+      Colors.blue.withAlpha(65),
+    );
+    final settlingStart = inference.settlingStartedAt;
+    final settlingEnd = inference.settlingEndedAt;
+    if (settlingStart != null && settlingEnd != null) {
+      _drawRange(
+        canvas,
+        size,
+        totalSeconds,
+        settlingStart,
+        settlingEnd,
+        Colors.purple.withAlpha(55),
+      );
+    }
+    for (final event in inference.events) {
+      if (event.type == SleepInferenceEventType.transientActivity) continue;
+      final left = _x(event.startedAt, size, totalSeconds);
+      final right = _x(event.endedAt, size, totalSeconds);
+      canvas.drawRect(
+        Rect.fromLTRB(
+          left,
+          size.height - 8,
+          math.max(left + 2, right),
+          size.height,
+        ),
+        Paint()..color = _eventColor(event.type),
+      );
+    }
+    final onset = inference.sleepOnsetAt;
+    if (onset != null) {
+      final x = _x(onset, size, totalSeconds);
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x, size.height),
+        Paint()
+          ..color = Colors.lightBlueAccent
+          ..strokeWidth = 3,
+      );
+    }
+  }
+
+  void _drawRange(
+    Canvas canvas,
+    Size size,
+    int totalSeconds,
+    DateTime start,
+    DateTime end,
+    Color color,
+  ) {
+    final left = _x(start, size, totalSeconds);
+    final right = _x(end, size, totalSeconds);
+    canvas.drawRect(
+      Rect.fromLTRB(left, 0, math.max(left, right), size.height),
+      Paint()..color = color,
+    );
+  }
+
+  double _x(DateTime value, Size size, int totalSeconds) {
+    final seconds = value
+        .difference(session.startedAt)
+        .inSeconds
+        .clamp(0, totalSeconds);
+    return size.width * seconds / totalSeconds;
   }
 
   @override
   bool shouldRepaint(_SleepTimelinePainter oldDelegate) =>
-      oldDelegate.segments != segments;
+      oldDelegate.segments != segments ||
+      oldDelegate.session != session ||
+      oldDelegate.inference != inference;
 }
 
 class SleepNoiseChart extends StatelessWidget {
   final List<SleepMonitorSegment> segments;
+  final SleepMonitorSession session;
+  final SleepInferenceResult inference;
   final String emptyTitle;
   final String noiseScoreLabel;
   final String thresholdLabel;
@@ -631,6 +934,8 @@ class SleepNoiseChart extends StatelessWidget {
   const SleepNoiseChart({
     super.key,
     required this.segments,
+    required this.session,
+    required this.inference,
     required this.emptyTitle,
     required this.noiseScoreLabel,
     required this.thresholdLabel,
@@ -642,7 +947,7 @@ class SleepNoiseChart extends StatelessWidget {
         .where((segment) => segment.noiseScore != null)
         .toList();
     if (scored.isEmpty) return _EmptyData(title: emptyTitle);
-    final start = scored.first.startedAt;
+    final start = session.startedAt;
     final spots = scored
         .map(
           (segment) => FlSpot(
@@ -696,6 +1001,30 @@ class SleepNoiseChart extends StatelessWidget {
                     strokeWidth: 1.5,
                     dashArray: [5, 4],
                   ),
+                ],
+                verticalLines: [
+                  if (inference.sleepOnsetAt != null)
+                    VerticalLine(
+                      x:
+                          inference.sleepOnsetAt!.difference(start).inSeconds /
+                          60.0,
+                      color: Colors.lightBlue,
+                      strokeWidth: 2,
+                    ),
+                  ...inference.events
+                      .where(
+                        (event) =>
+                            event.type == SleepInferenceEventType.awakening ||
+                            event.type == SleepInferenceEventType.finalActivity,
+                      )
+                      .map(
+                        (event) => VerticalLine(
+                          x: event.startedAt.difference(start).inSeconds / 60.0,
+                          color: _eventColor(event.type),
+                          strokeWidth: 1.5,
+                          dashArray: [4, 3],
+                        ),
+                      ),
                 ],
               ),
               titlesData: FlTitlesData(
@@ -789,6 +1118,72 @@ class _EmptyData extends StatelessWidget {
   }
 }
 
+String _wallTime(DateTime value, int offsetMinutes) {
+  final wallClock = value.toUtc().add(Duration(minutes: offsetMinutes));
+  final hour = wallClock.hour.toString().padLeft(2, '0');
+  final minute = wallClock.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
+}
+
+String _duration(int seconds) {
+  final safeSeconds = seconds.clamp(0, 16 * 60 * 60);
+  final hours = safeSeconds ~/ 3600;
+  final minutes = (safeSeconds % 3600) ~/ 60;
+  if (hours == 0) return '$minutes min';
+  return '${hours}h ${minutes.toString().padLeft(2, '0')}min';
+}
+
+String _confidenceLabel(
+  AppLocalizations loc,
+  SleepInferenceConfidence confidence,
+) {
+  return switch (confidence) {
+    SleepInferenceConfidence.low => loc.sleepInferenceConfidenceLow,
+    SleepInferenceConfidence.medium => loc.sleepInferenceConfidenceMedium,
+  };
+}
+
+String _eventLabel(AppLocalizations loc, SleepInferenceEventType type) {
+  return switch (type) {
+    SleepInferenceEventType.transientActivity =>
+      loc.sleepInferenceEventTransient,
+    SleepInferenceEventType.prolongedActivity =>
+      loc.sleepInferenceEventProlonged,
+    SleepInferenceEventType.awakening => loc.sleepInferenceEventAwakening,
+    SleepInferenceEventType.finalActivity =>
+      loc.sleepInferenceEventFinalActivity,
+  };
+}
+
+String _reasonLabel(AppLocalizations loc, String reason) {
+  return switch (reason) {
+    'short_activity' => loc.sleepInferenceReasonShort,
+    'sustained_activity' => loc.sleepInferenceReasonSustained,
+    'sustained_activity_with_quiet_recovery' =>
+      loc.sleepInferenceReasonAwakening,
+    'sustained_activity_near_end' => loc.sleepInferenceReasonFinal,
+    _ => reason,
+  };
+}
+
+Color _eventColor(SleepInferenceEventType type) {
+  return switch (type) {
+    SleepInferenceEventType.transientActivity => Colors.amber,
+    SleepInferenceEventType.prolongedActivity => Colors.deepOrange,
+    SleepInferenceEventType.awakening => Colors.redAccent,
+    SleepInferenceEventType.finalActivity => Colors.purple,
+  };
+}
+
+IconData _eventIcon(SleepInferenceEventType type) {
+  return switch (type) {
+    SleepInferenceEventType.transientActivity => Icons.graphic_eq,
+    SleepInferenceEventType.prolongedActivity => Icons.waves,
+    SleepInferenceEventType.awakening => Icons.visibility_outlined,
+    SleepInferenceEventType.finalActivity => Icons.alarm_outlined,
+  };
+}
+
 class _SourceBadge extends StatelessWidget {
   final String label;
 
@@ -817,6 +1212,18 @@ class _Legend extends StatelessWidget {
         _LegendItem(color: Colors.teal, label: loc.sleepMonitorQuiet),
         _LegendItem(color: Colors.orange, label: loc.sleepMonitorNoise),
         _LegendItem(color: Colors.grey, label: loc.sleepMonitorInvalid),
+        _LegendItem(
+          color: Colors.blue.withAlpha(150),
+          label: loc.sleepInferencePreparation,
+        ),
+        _LegendItem(
+          color: Colors.purple.withAlpha(150),
+          label: loc.sleepInferenceSettling,
+        ),
+        _LegendItem(
+          color: Colors.lightBlueAccent,
+          label: loc.sleepInferenceSleptAt,
+        ),
       ],
     );
   }
