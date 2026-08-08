@@ -1073,8 +1073,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(AppLocalizations.of(context)!.activeWorkoutTitle),
-        centerTitle: true,
         actions: [
           if (_timerService.isActive)
             GestureDetector(
