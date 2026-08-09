@@ -405,11 +405,12 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                     ),
                     const SizedBox(height: 14),
                     if (_current != null)
-                      Container(
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.errorContainer.withAlpha(60),
+                      Material(
+                        color: theme.colorScheme.errorContainer.withAlpha(60),
+                        shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
+                        clipBehavior: Clip.antiAlias,
                         child: ListTile(
                           leading: Icon(
                             Icons.delete_outline,
