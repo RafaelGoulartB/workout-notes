@@ -3490,6 +3490,54 @@ class AppLocalizationsPt extends AppLocalizations {
   String get nutritionTitle => 'Alimentação';
 
   @override
+  String get nutritionChooseDate => 'Escolher um dia';
+
+  @override
+  String get nutritionHomeDiary => 'Diário alimentar';
+
+  @override
+  String get nutritionHomeDiarySubtitle => 'Ver e registrar refeições de hoje';
+
+  @override
+  String get nutritionHomeManualFood => 'Novo alimento';
+
+  @override
+  String get nutritionHomeManualFoodSubtitle => 'Cadastrar manualmente';
+
+  @override
+  String get nutritionHomeSectionQuickActions => 'AÇÕES RÁPIDAS';
+
+  @override
+  String get nutritionHomeSectionTools => 'FERRAMENTAS';
+
+  @override
+  String get nutritionHomeSummarySubtitle =>
+      'Toque para ver as refeições de hoje';
+
+  @override
+  String get nutritionFoodLibraryTitle => 'Alimentos';
+
+  @override
+  String get nutritionFoodLibrarySearchHint => 'Buscar alimentos salvos';
+
+  @override
+  String get nutritionFoodLibraryClearSearch => 'Limpar busca';
+
+  @override
+  String get nutritionFoodLibraryEmptyTitle => 'Nenhum alimento salvo';
+
+  @override
+  String get nutritionFoodLibraryEmptySubtitle =>
+      'Os alimentos cadastrados ou usados nas refeições aparecerão aqui.';
+
+  @override
+  String get nutritionFoodLibraryNoResults => 'Nenhum alimento encontrado';
+
+  @override
+  String get nutritionFoodLibraryNoResultsSubtitle =>
+      'Tente buscar por outro nome ou marca.';
+
+  @override
   String get nutritionEmptyTitle => 'Nenhuma refeição registrada hoje';
 
   @override

@@ -231,7 +231,7 @@ void main() {
     await database.close();
   });
 
-  testWidgets('Nutrition home keeps settings visible and groups utilities', (
+  testWidgets('Nutrition home opens meal details from the summary card', (
     tester,
   ) async {
     await tester.runAsync(() async {
@@ -240,18 +240,25 @@ void main() {
       await tester.pump();
     });
     final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
-    final utilitiesMenu = find.byTooltip(loc.nutritionMoreOptions);
 
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
-    expect(utilitiesMenu, findsOneWidget);
-    expect(find.byIcon(Icons.content_copy_outlined), findsNothing);
-
-    await tester.tap(utilitiesMenu);
-    await tester.pumpAndSettle();
-
+    expect(find.byIcon(Icons.calendar_month_outlined), findsOneWidget);
+    expect(find.text(loc.nutritionSummaryTitle), findsOneWidget);
     expect(find.text(loc.nutritionProgressTitle), findsOneWidget);
     expect(find.text(loc.nutritionSavedMeals), findsOneWidget);
-    expect(find.text(loc.nutritionCopyPreviousDay), findsOneWidget);
+    expect(find.text(loc.nutritionFoodLibraryTitle), findsOneWidget);
+    expect(find.text(loc.nutritionMealBreakfast), findsNothing);
+
+    await tester.tap(find.text(loc.nutritionSummaryTitle));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text(loc.nutritionHomeDiary), findsOneWidget);
+    expect(find.text(loc.nutritionAddManually), findsNothing);
+    expect(find.byType(FloatingActionButton), findsNothing);
   });
 
   testWidgets(

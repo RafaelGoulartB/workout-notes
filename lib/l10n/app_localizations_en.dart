@@ -3473,6 +3473,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nutritionTitle => 'Nutrition';
 
   @override
+  String get nutritionChooseDate => 'Choose a day';
+
+  @override
+  String get nutritionHomeDiary => 'Food diary';
+
+  @override
+  String get nutritionHomeDiarySubtitle => 'View and log today\'s meals';
+
+  @override
+  String get nutritionHomeManualFood => 'New food';
+
+  @override
+  String get nutritionHomeManualFoodSubtitle => 'Add it manually';
+
+  @override
+  String get nutritionHomeSectionQuickActions => 'QUICK ACTIONS';
+
+  @override
+  String get nutritionHomeSectionTools => 'TOOLS';
+
+  @override
+  String get nutritionHomeSummarySubtitle => 'Tap to view today\'s meals';
+
+  @override
+  String get nutritionFoodLibraryTitle => 'Foods';
+
+  @override
+  String get nutritionFoodLibrarySearchHint => 'Search saved foods';
+
+  @override
+  String get nutritionFoodLibraryClearSearch => 'Clear search';
+
+  @override
+  String get nutritionFoodLibraryEmptyTitle => 'No foods saved yet';
+
+  @override
+  String get nutritionFoodLibraryEmptySubtitle =>
+      'Foods you create or use in meals will appear here.';
+
+  @override
+  String get nutritionFoodLibraryNoResults => 'No foods found';
+
+  @override
+  String get nutritionFoodLibraryNoResultsSubtitle =>
+      'Try searching with another name or brand.';
+
+  @override
   String get nutritionEmptyTitle => 'No food logged today';
 
   @override

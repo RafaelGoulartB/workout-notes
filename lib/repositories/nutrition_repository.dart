@@ -305,6 +305,18 @@ class NutritionRepository extends BaseRepository {
     return _hydrateResults(rows);
   }
 
+  /// All foods cached in the local library, favorites first and then
+  /// alphabetically. Used by the standalone food-library screen.
+  Future<List<FoodSearchResultLite>> getAllFoods({int limit = 500}) async {
+    final db = await this.db;
+    final rows = await db.query(
+      'foods',
+      orderBy: 'is_favorite DESC, name COLLATE NOCASE ASC',
+      limit: limit,
+    );
+    return _hydrateResults(rows);
+  }
+
   /// Most recently logged foods (`last_used_at DESC`; nulls sort last).
   Future<List<FoodSearchResultLite>> getRecentFoods({int limit = 12}) async {
     final db = await this.db;
@@ -1101,7 +1113,9 @@ class NutritionRepository extends BaseRepository {
     DatabaseExecutor db,
     List<SavedMealItem> items,
   ) async {
-    if (items.isEmpty) return (totals: null, byItem: <String, NutritionValues>{});
+    if (items.isEmpty) {
+      return (totals: null, byItem: <String, NutritionValues>{});
+    }
     final variantIds = <String>[];
     for (final item in items) {
       if (item.foodVariantId != null) variantIds.add(item.foodVariantId!);
@@ -1141,8 +1155,7 @@ class NutritionRepository extends BaseRepository {
           ? null
           : variants[item.foodVariantId];
       if (variant == null) continue;
-      final servings =
-          servingsByVariant[variant.id] ?? const <FoodServing>[];
+      final servings = servingsByVariant[variant.id] ?? const <FoodServing>[];
       final serving = servings.firstWhereOrNull(
         (s) => s.label == item.unit || s.unit == item.unit,
       );

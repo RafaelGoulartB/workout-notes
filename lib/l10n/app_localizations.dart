@@ -6394,6 +6394,96 @@ abstract class AppLocalizations {
   /// **'Nutrition'**
   String get nutritionTitle;
 
+  /// No description provided for @nutritionChooseDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a day'**
+  String get nutritionChooseDate;
+
+  /// No description provided for @nutritionHomeDiary.
+  ///
+  /// In en, this message translates to:
+  /// **'Food diary'**
+  String get nutritionHomeDiary;
+
+  /// No description provided for @nutritionHomeDiarySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'View and log today\'s meals'**
+  String get nutritionHomeDiarySubtitle;
+
+  /// No description provided for @nutritionHomeManualFood.
+  ///
+  /// In en, this message translates to:
+  /// **'New food'**
+  String get nutritionHomeManualFood;
+
+  /// No description provided for @nutritionHomeManualFoodSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add it manually'**
+  String get nutritionHomeManualFoodSubtitle;
+
+  /// No description provided for @nutritionHomeSectionQuickActions.
+  ///
+  /// In en, this message translates to:
+  /// **'QUICK ACTIONS'**
+  String get nutritionHomeSectionQuickActions;
+
+  /// No description provided for @nutritionHomeSectionTools.
+  ///
+  /// In en, this message translates to:
+  /// **'TOOLS'**
+  String get nutritionHomeSectionTools;
+
+  /// No description provided for @nutritionHomeSummarySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to view today\'s meals'**
+  String get nutritionHomeSummarySubtitle;
+
+  /// No description provided for @nutritionFoodLibraryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Foods'**
+  String get nutritionFoodLibraryTitle;
+
+  /// No description provided for @nutritionFoodLibrarySearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search saved foods'**
+  String get nutritionFoodLibrarySearchHint;
+
+  /// No description provided for @nutritionFoodLibraryClearSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get nutritionFoodLibraryClearSearch;
+
+  /// No description provided for @nutritionFoodLibraryEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No foods saved yet'**
+  String get nutritionFoodLibraryEmptyTitle;
+
+  /// No description provided for @nutritionFoodLibraryEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Foods you create or use in meals will appear here.'**
+  String get nutritionFoodLibraryEmptySubtitle;
+
+  /// No description provided for @nutritionFoodLibraryNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No foods found'**
+  String get nutritionFoodLibraryNoResults;
+
+  /// No description provided for @nutritionFoodLibraryNoResultsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Try searching with another name or brand.'**
+  String get nutritionFoodLibraryNoResultsSubtitle;
+
   /// No description provided for @nutritionEmptyTitle.
   ///
   /// In en, this message translates to:

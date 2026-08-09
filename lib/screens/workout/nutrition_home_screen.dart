@@ -14,6 +14,7 @@ import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
 
 import 'food_quantity_sheet.dart';
+import 'food_library_screen.dart';
 import 'food_search_screen.dart';
 import 'manual_food_screen.dart';
 import 'nutrition_progress_screen.dart';
@@ -23,8 +24,8 @@ import 'saved_meals_screen.dart';
 
 enum _NutritionMenuAction { progress, savedMeals, copyPreviousDay }
 
-/// Daily nutrition screen. Lists the four meals, shows the daily
-/// summary and surfaces the goal progress when one is configured.
+/// Nutrition dashboard. It mirrors the workout home hierarchy: a compact
+/// daily overview, prominent quick actions and a separate tools section.
 class NutritionHomeScreen extends StatefulWidget {
   const NutritionHomeScreen({super.key});
 
@@ -34,9 +35,639 @@ class NutritionHomeScreen extends StatefulWidget {
 
 class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   final NutritionRepository _repository = NutritionRepository();
+  DailyNutritionSummary _summary = DailyNutritionSummary.empty;
+  NutritionGoal? _goal;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    try {
+      final results = await Future.wait([
+        _repository.getDailySummary(_dateString(DateTime.now())),
+        _repository.getActiveGoal(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _summary = results[0] as DailyNutritionSummary;
+        _goal = results[1] as NutritionGoal?;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _openDay([DateTime? date]) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            NutritionDayDetailScreen(initialDate: date ?? DateTime.now()),
+      ),
+    );
+    await _load();
+  }
+
+  Future<void> _pickDay() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2018),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    if (picked == null || !mounted) return;
+    await _openDay(picked);
+  }
+
+  Future<void> _openSettings() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => NutritionSettingsScreen(repository: _repository),
+      ),
+    );
+    await _load();
+  }
+
+  Future<void> _openProgress() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const NutritionProgressScreen()));
+  }
+
+  Future<void> _openSavedMeals() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SavedMealsScreen(repository: _repository),
+      ),
+    );
+    await _load();
+  }
+
+  Future<void> _openFoodLibrary() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FoodLibraryScreen(repository: _repository),
+      ),
+    );
+    await _load();
+  }
+
+  Future<void> _openManualFood() async {
+    await Navigator.of(context).push<Food>(
+      MaterialPageRoute(
+        builder: (_) => ManualFoodScreen(repository: _repository),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          DateFormat('EEEE, d MMMM', Intl.defaultLocale).format(DateTime.now()),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        centerTitle: false,
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            tooltip: loc.nutritionChooseDate,
+            onPressed: _pickDay,
+            icon: const Icon(Icons.calendar_month_outlined),
+          ),
+          IconButton(
+            tooltip: loc.nutritionSettingsTitle,
+            onPressed: _openSettings,
+            icon: const Icon(Icons.settings_outlined),
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: _NutritionDashboardSummaryCard(
+                      summary: _summary,
+                      goal: _goal,
+                      onTap: _openDay,
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _NutritionSectionHeader(
+                      text: loc.nutritionHomeSectionQuickActions,
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _NutritionActionCard(
+                              icon: Icons.menu_book_outlined,
+                              title: loc.nutritionHomeDiary,
+                              subtitle: loc.nutritionHomeDiarySubtitle,
+                              color: theme.colorScheme.primary,
+                              onTap: _openDay,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _NutritionActionCard(
+                              icon: Icons.add_rounded,
+                              title: loc.nutritionHomeManualFood,
+                              subtitle: loc.nutritionHomeManualFoodSubtitle,
+                              color: theme.colorScheme.secondary,
+                              onTap: _openManualFood,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ).animate().fadeIn(duration: 350.ms, delay: 180.ms),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _NutritionSectionHeader(
+                      text: loc.nutritionHomeSectionTools,
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _NutritionToolsCard(
+                      onProgress: _openProgress,
+                      onSavedMeals: _openSavedMeals,
+                      onFoods: _openFoodLibrary,
+                    ).animate().fadeIn(duration: 350.ms, delay: 240.ms),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                ],
+              ),
+            ),
+    );
+  }
+
+  static String _dateString(DateTime value) => DateTime(
+    value.year,
+    value.month,
+    value.day,
+  ).toIso8601String().substring(0, 10);
+}
+
+class _NutritionDashboardSummaryCard extends StatelessWidget {
+  final DailyNutritionSummary summary;
+  final NutritionGoal? goal;
+  final VoidCallback onTap;
+
+  const _NutritionDashboardSummaryCard({
+    required this.summary,
+    required this.goal,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final calories = summary.consumed.calories ?? 0;
+    final calorieGoal = goal?.calories;
+    final progress = calorieGoal == null || calorieGoal <= 0
+        ? null
+        : (calories / calorieGoal).clamp(0.0, 1.0).toDouble();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                theme.colorScheme.surfaceContainerHighest.withAlpha(200),
+                theme.colorScheme.surfaceContainerLow,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 14, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.local_fire_department_outlined,
+                        size: 20,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          loc.nutritionSummaryTitle,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    loc.nutritionConsumedKcal(_format(calories, 0)),
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    _goalLabel(loc, calories, calorieGoal),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (progress != null) ...[
+                    const SizedBox(height: 10),
+                    LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 6,
+                      borderRadius: BorderRadius.circular(999),
+                      backgroundColor:
+                          theme.colorScheme.surfaceContainerHighest,
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _NutritionMacroStat(
+                          label: loc.nutritionProgressProtein,
+                          value: summary.consumed.proteinG,
+                        ),
+                      ),
+                      Expanded(
+                        child: _NutritionMacroStat(
+                          label: loc.nutritionProgressCarbs,
+                          value: summary.consumed.carbsG,
+                        ),
+                      ),
+                      Expanded(
+                        child: _NutritionMacroStat(
+                          label: loc.nutritionProgressFat,
+                          value: summary.consumed.fatG,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Divider(
+                    height: 1,
+                    color: theme.colorScheme.outlineVariant.withAlpha(80),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.touch_app_outlined,
+                        size: 15,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          loc.nutritionHomeSummarySubtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 300.ms, delay: 80.ms).slideY(begin: 0.04);
+  }
+
+  static String _goalLabel(
+    AppLocalizations loc,
+    double calories,
+    double? goal,
+  ) {
+    if (goal == null) return loc.nutritionGoalNoGoal;
+    final remaining = goal - calories;
+    return remaining >= 0
+        ? loc.nutritionGoalRemaining(_format(remaining, 0))
+        : loc.nutritionGoalSurplus(_format(-remaining, 0));
+  }
+
+  static String _format(double value, int decimals) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(decimals == 0 ? 1 : decimals);
+  }
+}
+
+class _NutritionMacroStat extends StatelessWidget {
+  final String label;
+  final double? value;
+
+  const _NutritionMacroStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final formatted = value == null
+        ? '—'
+        : value! == value!.roundToDouble()
+        ? value!.toStringAsFixed(0)
+        : value!.toStringAsFixed(1);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$formatted g',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+}
+
+class _NutritionSectionHeader extends StatelessWidget {
+  final String text;
+
+  const _NutritionSectionHeader({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 10),
+      child: Text(
+        text,
+        style: theme.textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.5,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _NutritionActionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _NutritionActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(70)),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: 142,
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(35),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(icon, color: color),
+                ),
+                const Spacer(),
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NutritionToolsCard extends StatelessWidget {
+  final VoidCallback onProgress;
+  final VoidCallback onSavedMeals;
+  final VoidCallback onFoods;
+
+  const _NutritionToolsCard({
+    required this.onProgress,
+    required this.onSavedMeals,
+    required this.onFoods,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(
+            color: theme.colorScheme.outlineVariant.withAlpha(70),
+          ),
+        ),
+        child: SizedBox(
+          height: 225,
+          child: Column(
+            children: [
+              SizedBox(
+                height: 112,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _NutritionToolTile(
+                        icon: Icons.insights_outlined,
+                        label: loc.nutritionProgressTitle,
+                        onTap: onProgress,
+                      ),
+                    ),
+                    VerticalDivider(
+                      width: 1,
+                      color: theme.colorScheme.outlineVariant.withAlpha(70),
+                    ),
+                    Expanded(
+                      child: _NutritionToolTile(
+                        icon: Icons.restaurant_menu_outlined,
+                        label: loc.nutritionSavedMeals,
+                        onTap: onSavedMeals,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(
+                height: 1,
+                color: theme.colorScheme.outlineVariant.withAlpha(70),
+              ),
+              SizedBox(
+                height: 112,
+                child: _NutritionToolTile(
+                  icon: Icons.fastfood_outlined,
+                  label: loc.nutritionFoodLibraryTitle,
+                  onTap: onFoods,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NutritionToolTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _NutritionToolTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withAlpha(90),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: theme.colorScheme.primary, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Daily food diary. This is opened from the nutrition dashboard so meal
+/// management stays focused and does not overwhelm the primary tab.
+class NutritionDayDetailScreen extends StatefulWidget {
+  final DateTime? initialDate;
+
+  const NutritionDayDetailScreen({super.key, this.initialDate});
+
+  @override
+  State<NutritionDayDetailScreen> createState() =>
+      _NutritionDayDetailScreenState();
+}
+
+class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
+  final NutritionRepository _repository = NutritionRepository();
   final NutritionGateway _gateway = OpenFoodFactsGateway();
 
-  DateTime _selectedDate = _dateOnly(DateTime.now());
+  late DateTime _selectedDate;
   List<MealLogWithItems> _meals = const [];
   DailyNutritionSummary _summary = DailyNutritionSummary.empty;
   NutritionGoal? _goal;
@@ -46,6 +677,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedDate = _dateOnly(widget.initialDate ?? DateTime.now());
     _load();
   }
 
@@ -403,29 +1035,13 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     );
   }
 
-  Future<void> _openManualFood() async {
-    final created = await Navigator.of(context).push<Food>(
-      MaterialPageRoute(
-        builder: (_) => ManualFoodScreen(repository: _repository),
-      ),
-    );
-    if (created == null) return;
-    if (!mounted) return;
-    final loc = AppLocalizations.of(context)!;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(loc.nutritionManualSaved)));
-  }
-
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.nutritionTitle),
-        centerTitle: false,
-        automaticallyImplyLeading: false,
+        title: Text(loc.nutritionHomeDiary),
         actions: [
           IconButton(
             tooltip: loc.nutritionSettingsTitle,
@@ -479,41 +1095,37 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: _DateNavigator(
-                      date: _selectedDate,
-                      // Always navigable: disabling the arrow on empty
-                      // days made it fall back to "go to today", so the
-                      // user could never reach a previous day from an
-                      // empty one.
-                      onPrevious: () => _changeDay(-1),
-                      onNext: () => _changeDay(1),
-                      onJumpToday: _jumpToToday,
-                      onPickDate: _pickDate,
+          : IgnorePointer(
+              ignoring: _isMutating,
+              child: RefreshIndicator(
+                onRefresh: _load,
+                child: CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: _DateNavigator(
+                        date: _selectedDate,
+                        // Always navigable: disabling the arrow on empty
+                        // days made it fall back to "go to today", so the
+                        // user could never reach a previous day from an
+                        // empty one.
+                        onPrevious: () => _changeDay(-1),
+                        onNext: () => _changeDay(1),
+                        onJumpToday: _jumpToToday,
+                        onPickDate: _pickDate,
+                      ),
                     ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _DailySummaryCard(
-                      summary: _summary,
-                      goal: _goal,
-                      onConfigureGoal: _openSettings,
-                    ).animate().fadeIn(duration: 250.ms),
-                  ),
-                  ..._buildMealSlivers(loc, theme),
-                  const SliverToBoxAdapter(child: SizedBox(height: 96)),
-                ],
+                    SliverToBoxAdapter(
+                      child: _DailySummaryCard(
+                        summary: _summary,
+                        goal: _goal,
+                        onConfigureGoal: _openSettings,
+                      ).animate().fadeIn(duration: 250.ms),
+                    ),
+                    ..._buildMealSlivers(loc, theme),
+                    const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                  ],
+                ),
               ),
-            ),
-      floatingActionButton: _isMutating
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: _openManualFood,
-              icon: const Icon(Icons.add),
-              label: Text(loc.nutritionAddManually),
             ),
     );
   }
