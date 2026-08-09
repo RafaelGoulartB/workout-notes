@@ -5,8 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
-import 'package:workout_notes/models/nutrition/food_serving.dart';
-import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
@@ -18,7 +16,10 @@ import 'package:workout_notes/services/open_food_facts_gateway.dart';
 import 'food_quantity_sheet.dart';
 import 'food_search_screen.dart';
 import 'manual_food_screen.dart';
+import 'nutrition_progress_screen.dart';
 import 'nutrition_settings_screen.dart';
+import 'saved_meal_editor_screen.dart';
+import 'saved_meals_screen.dart';
 
 /// Daily nutrition screen. Lists the four meals, shows the daily
 /// summary and surfaces the goal progress when one is configured.
@@ -96,8 +97,11 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   Future<void> _addItem(String mealType) async {
     final result = await Navigator.of(context).push<NutritionSelection>(
       MaterialPageRoute(
-        builder: (_) =>
-            FoodSearchScreen(gateway: _gateway, repository: _repository),
+        builder: (_) => FoodSearchScreen(
+          gateway: _gateway,
+          repository: _repository,
+          mealType: mealType,
+        ),
       ),
     );
     if (result == null) return;
@@ -255,6 +259,146 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     await _load();
   }
 
+  Future<void> _openProgress() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const NutritionProgressScreen()),
+    );
+  }
+
+  Future<void> _openSavedMeals() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => SavedMealsScreen(repository: _repository)),
+    );
+    await _load();
+  }
+
+  /// Copies the meals of the previous day into the selected day. The
+  /// user picks which meal types to carry over via a checkbox dialog.
+  Future<void> _copyPreviousDay() async {
+    final loc = AppLocalizations.of(context)!;
+    final yesterday = _dateString(
+      _dateOnly(_selectedDate.subtract(const Duration(days: 1))),
+    );
+    final source = (await _repository.getDayMeals(yesterday))
+        .where((m) => m.items.isNotEmpty)
+        .toList();
+    if (source.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.nutritionCopyNothingToCopy)),
+      );
+      return;
+    }
+    final selected = <String>{for (final m in source) m.log.mealType};
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(loc.nutritionCopyTitle),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final m in source)
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(_mealLabel(loc, m.log.mealType)),
+                  subtitle: Text(loc.nutritionItemCount(m.items.length)),
+                  value: selected.contains(m.log.mealType),
+                  onChanged: (checked) => setDialogState(() {
+                    if (checked ?? false) {
+                      selected.add(m.log.mealType);
+                    } else {
+                      selected.remove(m.log.mealType);
+                    }
+                  }),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(loc.nutritionCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(loc.nutritionCopyConfirm),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+    var count = 0;
+    for (final m in source) {
+      if (!selected.contains(m.log.mealType)) continue;
+      count += await _repository.copyItemsToMeal(
+        date: _dateString(_selectedDate),
+        mealType: m.log.mealType,
+        items: m.items,
+      );
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.nutritionCopiedItems(count))));
+    await _load();
+  }
+
+  /// Repeats the most recent instance of [mealType] (before the
+  /// selected day) into the selected day.
+  Future<void> _repeatMeal(String mealType) async {
+    final loc = AppLocalizations.of(context)!;
+    final items = await _repository.getLatestMealItems(
+      mealType,
+      beforeDate: _dateString(_selectedDate),
+    );
+    if (items.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.nutritionRepeatNoPrevious)),
+      );
+      return;
+    }
+    final count = await _repository.copyItemsToMeal(
+      date: _dateString(_selectedDate),
+      mealType: mealType,
+      items: items,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.nutritionCopiedItems(count))));
+    await _load();
+  }
+
+  /// Saves the current day's [mealType] as a meal template.
+  Future<void> _saveMealFromDay(String mealType) async {
+    final loc = AppLocalizations.of(context)!;
+    final meals = await _repository.getDayMeals(_dateString(_selectedDate));
+    final meal = meals.where((m) => m.log.mealType == mealType).toList();
+    if (meal.isEmpty || meal.first.items.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.nutritionSaveMealEmpty)),
+      );
+      return;
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SavedMealEditorScreen(
+          repository: _repository,
+          initialName: _mealLabel(loc, mealType),
+          initialMealType: mealType,
+          initialItems: meal.first.items
+              .map(SavedMealItemDraft.fromMealLogItem)
+              .toList(),
+        ),
+      ),
+    );
+  }
+
   Future<void> _openManualFood() async {
     final created = await Navigator.of(context).push<Food>(
       MaterialPageRoute(
@@ -278,6 +422,21 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         title: Text(loc.nutritionTitle),
         centerTitle: true,
         actions: [
+          IconButton(
+            tooltip: loc.nutritionCopyPreviousDay,
+            onPressed: _copyPreviousDay,
+            icon: const Icon(Icons.content_copy_outlined),
+          ),
+          IconButton(
+            tooltip: loc.nutritionSavedMeals,
+            onPressed: _openSavedMeals,
+            icon: const Icon(Icons.restaurant_menu_outlined),
+          ),
+          IconButton(
+            tooltip: loc.nutritionProgressTitle,
+            onPressed: _openProgress,
+            icon: const Icon(Icons.insights_outlined),
+          ),
           IconButton(
             tooltip: loc.nutritionConfigureGoal,
             onPressed: _openSettings,
@@ -353,6 +512,8 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
             onAdd: () => _addItem(type),
             onEdit: _editItem,
             onDelete: _deleteItem,
+            onRepeat: () => _repeatMeal(type),
+            onSaveAsMeal: () => _saveMealFromDay(type),
           ),
         ),
       );
@@ -556,6 +717,37 @@ class _DailySummaryCard extends StatelessWidget {
                 goal: goal?.fatG,
                 color: theme.colorScheme.primary,
               ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MiniNutrientStat(
+                      label: loc.nutritionProgressFiber,
+                      value: summary.consumed.fiberG,
+                      suffix: 'g',
+                      icon: Icons.grass,
+                    ),
+                  ),
+                  Expanded(
+                    child: _MiniNutrientStat(
+                      label: loc.nutritionProgressSugars,
+                      value: summary.consumed.sugarsG,
+                      suffix: 'g',
+                      icon: Icons.cookie_outlined,
+                    ),
+                  ),
+                  Expanded(
+                    child: _MiniNutrientStat(
+                      label: loc.nutritionProgressSodium,
+                      value: summary.consumed.sodiumMg,
+                      suffix: 'mg',
+                      icon: Icons.water_drop_outlined,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -649,8 +841,51 @@ class _MacroProgress extends StatelessWidget {
   }
 }
 
-class _IncompleteWarning extends StatelessWidget {
+class _MiniNutrientStat extends StatelessWidget {  final String label;
+  final double? value;
+  final String suffix;
+  final IconData icon;
+
+  const _MiniNutrientStat({
+    required this.label,
+    required this.value,
+    required this.suffix,
+    required this.icon,
+  });
+
   @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
+        const SizedBox(height: 4),
+        Text(
+          value == null ? '—' : '${_format(value!)} $suffix',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  static String _format(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toStringAsFixed(0);
+    }
+    return value.toStringAsFixed(1);
+  }
+}
+
+class _IncompleteWarning extends StatelessWidget {  @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
@@ -689,6 +924,8 @@ class _MealSection extends StatelessWidget {
   final VoidCallback onAdd;
   final void Function(MealLogItem item) onEdit;
   final void Function(MealLogItem item) onDelete;
+  final VoidCallback onRepeat;
+  final VoidCallback onSaveAsMeal;
 
   const _MealSection({
     required this.title,
@@ -697,6 +934,8 @@ class _MealSection extends StatelessWidget {
     required this.onAdd,
     required this.onEdit,
     required this.onDelete,
+    required this.onRepeat,
+    required this.onSaveAsMeal,
   });
 
   @override
@@ -711,7 +950,7 @@ class _MealSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+              padding: const EdgeInsets.fromLTRB(16, 6, 4, 0),
               child: Row(
                 children: [
                   Expanded(
@@ -737,6 +976,38 @@ class _MealSection extends StatelessWidget {
                     onPressed: onAdd,
                     icon: const Icon(Icons.add, size: 18),
                     label: Text(loc.nutritionAddItem),
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: loc.nutritionMealMenu,
+                    icon: const Icon(Icons.more_vert),
+                    onSelected: (action) {
+                      switch (action) {
+                        case 'repeat':
+                          onRepeat();
+                        case 'save':
+                          onSaveAsMeal();
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      PopupMenuItem(
+                        value: 'repeat',
+                        child: ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.replay_outlined),
+                          title: Text(loc.nutritionRepeatMeal),
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'save',
+                        child: ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.bookmark_add_outlined),
+                          title: Text(loc.nutritionSaveMeal),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -838,32 +1109,4 @@ class _MealItemTile extends StatelessWidget {
       ],
     );
   }
-}
-
-/// Helper used by the home screen to present the quantity modal. The
-/// function lives in this file so it has access to the same imports as
-/// the surrounding screen.
-Future<NutritionQuantitySelection?> showFoodQuantitySheet({
-  required BuildContext context,
-  required Food food,
-  required FoodVariant? primaryVariant,
-  required List<FoodServing> servings,
-  MealLogItem? existing,
-}) async {
-  if (primaryVariant == null) {
-    return null;
-  }
-  return showModalBottomSheet<NutritionQuantitySelection>(
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (sheetContext) {
-      return FoodQuantitySheet(
-        food: food,
-        primaryVariant: primaryVariant,
-        servings: servings,
-        existing: existing,
-      );
-    },
-  );
 }

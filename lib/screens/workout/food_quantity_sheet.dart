@@ -9,6 +9,33 @@ import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/utils/nutrition_conversion.dart';
 
+/// Helper to present the quantity modal for [food]. Returns the
+/// user's selection or null when dismissed.
+Future<NutritionQuantitySelection?> showFoodQuantitySheet({
+  required BuildContext context,
+  required Food food,
+  required FoodVariant? primaryVariant,
+  required List<FoodServing> servings,
+  MealLogItem? existing,
+}) async {
+  if (primaryVariant == null) {
+    return null;
+  }
+  return showModalBottomSheet<NutritionQuantitySelection>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (sheetContext) {
+      return FoodQuantitySheet(
+        food: food,
+        primaryVariant: primaryVariant,
+        servings: servings,
+        existing: existing,
+      );
+    },
+  );
+}
+
 /// Bottom sheet that captures quantity, unit and (when needed) the
 /// serving used. Previews the consumed values in real time and only
 /// enables the save action when the conversion succeeds.
