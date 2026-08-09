@@ -317,6 +317,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(loc.nutritionSearchTitle),
@@ -339,21 +340,26 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: TextField(
                 controller: _controller,
                 autofocus: true,
                 decoration: InputDecoration(
                   hintText: loc.nutritionSearchHint,
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: const Icon(Icons.search_rounded),
                   suffixIcon: IconButton(
                     tooltip: loc.nutritionSearchTitle,
                     onPressed: _isSearchingRemote
                         ? null
                         : () => _searchRemote(_controller.text),
-                    icon: const Icon(Icons.arrow_forward),
+                    icon: const Icon(Icons.arrow_forward_rounded),
                   ),
-                  border: const OutlineInputBorder(),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerHighest
+                      .withAlpha(80),
                 ),
                 textInputAction: TextInputAction.search,
                 onSubmitted: _searchRemote,
@@ -361,11 +367,11 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             ),
             if (_showQueryTooShort)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                 child: Text(
                   loc.nutritionSearchQueryTooShort,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -380,6 +386,9 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                     onPressed: _manualEntry,
                     icon: const Icon(Icons.edit_outlined),
                     label: Text(loc.nutritionAddManually),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                    ),
                   ),
                 ),
               ),
@@ -390,6 +399,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   }
 
   Widget _buildResults(AppLocalizations loc) {
+    final theme = Theme.of(context);
     final hasAny = _localResults.isNotEmpty || _remoteResults.isNotEmpty;
     final hasRemoteBanner = _remoteError != null || _isSearchingRemote;
     return CustomScrollView(
@@ -419,20 +429,26 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
           SliverToBoxAdapter(
             child: _SectionHeader(text: loc.nutritionSearchLocalResults),
           ),
-          SliverList.separated(
-            itemCount: _localResults.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
-            itemBuilder: (_, index) => _FoodRow(result: _localResults[index]),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            sliver: SliverList.separated(
+              itemCount: _localResults.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 6),
+              itemBuilder: (_, index) => _FoodCard(result: _localResults[index]),
+            ),
           ),
         ],
         if (_remoteResults.isNotEmpty) ...[
           SliverToBoxAdapter(
             child: _SectionHeader(text: loc.nutritionSearchRemoteResults),
           ),
-          SliverList.separated(
-            itemCount: _remoteResults.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
-            itemBuilder: (_, index) => _FoodRow(result: _remoteResults[index]),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+            sliver: SliverList.separated(
+              itemCount: _remoteResults.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 6),
+              itemBuilder: (_, index) => _FoodCard(result: _remoteResults[index]),
+            ),
           ),
         ],
         if (!hasAny && !hasRemoteBanner && !_showQueryTooShort)
@@ -440,71 +456,160 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             hasScrollBody: false,
             child: Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  loc.nutritionSearchEmpty,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.restaurant_menu_rounded,
+                      size: 80,
+                      color: theme.colorScheme.primary.withAlpha(80),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      loc.nutritionSearchEmpty,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      loc.nutritionSearchEmptyHint,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+        if (hasAny) const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );
   }
 }
 
-class _FoodRow extends StatelessWidget {
+class _FoodCard extends StatelessWidget {
   final FoodSearchResult result;
 
-  const _FoodRow({required this.result});
+  const _FoodCard({required this.result});
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final variant = result.primaryVariant;
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: theme.colorScheme.primaryContainer,
-        child: Icon(
-          Icons.restaurant_outlined,
-          color: theme.colorScheme.onPrimaryContainer,
+    final isManual = result.food.isManual;
+    final sourceColor = isManual
+        ? theme.colorScheme.tertiaryContainer
+        : theme.colorScheme.secondaryContainer;
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant.withAlpha(80),
         ),
       ),
-      title: Text(result.food.name),
-      subtitle: Text(
-        [
-          if (result.food.brand != null && result.food.brand!.isNotEmpty)
-            result.food.brand!,
-          if (variant != null)
-            loc.nutritionPer100g(
-              variant.referenceAmount.toStringAsFixed(0),
-              variant.referenceUnit,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          Navigator.of(context).pop(
+            NutritionSelection(
+              food: result.food,
+              primaryVariant: variant,
+              servings: result.servings,
             ),
-          if (variant?.values.calories != null)
-            '${variant!.values.calories!.toStringAsFixed(0)} kcal',
-        ].join(' · '),
-      ),
-      trailing: Text(
-        result.food.isManual
-            ? loc.nutritionSourceManual
-            : loc.nutritionSourceGateway,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withAlpha(80),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.restaurant_outlined,
+                  color: theme.colorScheme.onPrimaryContainer,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      result.food.name,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (result.food.brand != null &&
+                            result.food.brand!.isNotEmpty)
+                          result.food.brand!,
+                        if (variant != null)
+                          loc.nutritionPer100g(
+                            variant.referenceAmount.toStringAsFixed(0),
+                            variant.referenceUnit,
+                          ),
+                        if (variant?.values.calories != null)
+                          '${variant!.values.calories!.toStringAsFixed(0)} kcal',
+                      ].join(' · '),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: sourceColor.withAlpha(90),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  isManual
+                      ? loc.nutritionSourceManual
+                      : loc.nutritionSourceGateway,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: isManual
+                        ? theme.colorScheme.onTertiaryContainer
+                        : theme.colorScheme.onSecondaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurfaceVariant.withAlpha(140),
+              ),
+            ],
+          ),
         ),
       ),
-      onTap: () {
-        Navigator.of(context).pop(
-          NutritionSelection(
-            food: result.food,
-            primaryVariant: variant,
-            servings: result.servings,
-          ),
-        );
-      },
     );
   }
 }
@@ -516,7 +621,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      padding: const EdgeInsets.fromLTRB(20, 16, 16, 8),
       child: Text(
         text,
         style: theme.textTheme.labelMedium?.copyWith(
@@ -535,20 +640,26 @@ class _InfoBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      color: theme.colorScheme.surfaceContainerHighest,
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withAlpha(70),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

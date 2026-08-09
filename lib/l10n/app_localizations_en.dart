@@ -3817,6 +3817,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nutritionManualSaved => 'Food saved to your library';
 
   @override
+  String get nutritionManualSectionInfo => 'Food details';
+
+  @override
+  String get nutritionManualSectionMacros => 'Nutrition values';
+
+  @override
+  String get nutritionManualServingsHint =>
+      'Add common portions (e.g. slice, cup) to make logging easier.';
+
+  @override
   String get nutritionSettingsTitle => 'Nutrition goal';
 
   @override
@@ -3850,6 +3860,12 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get nutritionSettingsEmpty =>
       'Leave any field blank to skip that target.';
+
+  @override
+  String get nutritionSettingsSectionTarget => 'Daily target';
+
+  @override
+  String get nutritionSettingsFromMacros => 'estimated from macros';
 
   @override
   String get exportNutritionCsv => 'Nutrition CSV';

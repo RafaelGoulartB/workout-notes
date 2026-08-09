@@ -1254,6 +1254,9 @@
   "nutritionManualServingGrams": "Equivalente em gramas (opcional)",
   "nutritionManualAddServing": "Adicionar porção",
   "nutritionManualSaved": "Alimento salvo na sua biblioteca",
+  "nutritionManualSectionInfo": "Informações do alimento",
+  "nutritionManualSectionMacros": "Valores nutricionais",
+  "nutritionManualServingsHint": "Adicione porções comuns (ex: fatia, xícara) para facilitar o registro.",
 
   "nutritionSettingsTitle": "Meta de alimentação",
   "nutritionSettingsSubtitle": "Defina um alvo diário para calorias e macros. Os valores ficam apenas no seu dispositivo.",
@@ -1266,6 +1269,8 @@
   "nutritionSettingsClear": "Remover meta",
   "nutritionSettingsCleared": "Meta removida",
   "nutritionSettingsEmpty": "Deixe qualquer campo em branco para ignorar esse alvo.",
+  "nutritionSettingsSectionTarget": "Alvo diário",
+  "nutritionSettingsFromMacros": "estimado a partir dos macros",
 
   "exportNutritionCsv": "CSV de alimentação",
   "exportNutritionCsvSubtitle": "Exporta o histórico de refeições (data, refeição, alimento, macros) — filtrável por intervalo de datas",

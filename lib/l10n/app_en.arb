@@ -1280,6 +1280,9 @@
   "nutritionManualServingGrams": "Grams equivalent (optional)",
   "nutritionManualAddServing": "Add portion",
   "nutritionManualSaved": "Food saved to your library",
+  "nutritionManualSectionInfo": "Food details",
+  "nutritionManualSectionMacros": "Nutrition values",
+  "nutritionManualServingsHint": "Add common portions (e.g. slice, cup) to make logging easier.",
 
   "nutritionSettingsTitle": "Nutrition goal",
   "nutritionSettingsSubtitle": "Set a daily target for calories and macros. The values are stored locally.",
@@ -1292,6 +1295,8 @@
   "nutritionSettingsClear": "Remove goal",
   "nutritionSettingsCleared": "Goal removed",
   "nutritionSettingsEmpty": "Leave any field blank to skip that target.",
+  "nutritionSettingsSectionTarget": "Daily target",
+  "nutritionSettingsFromMacros": "estimated from macros",
 
   "exportNutritionCsv": "Nutrition CSV",
   "exportNutritionCsvSubtitle": "Export the meal log history (date, meal, food, macros) — filterable by date range",

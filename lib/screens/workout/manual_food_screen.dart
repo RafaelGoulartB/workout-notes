@@ -5,6 +5,7 @@ import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/widgets/form_section_card.dart';
 
 /// Form for adding a new food manually to the local cache. The new
 /// food is persisted via [NutritionRepository.createManualFood] and
@@ -233,7 +234,13 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
         actions: [
           TextButton(
             onPressed: _isSaving ? null : _save,
-            child: Text(loc.nutritionSave),
+            child: _isSaving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(loc.nutritionSave),
           ),
         ],
       ),
@@ -241,164 +248,277 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
         child: Form(
           key: _formKey,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: loc.nutritionManualName,
-                  hintText: loc.nutritionManualNameHint,
-                  border: const OutlineInputBorder(),
-                ),
-                validator: _validateRequired,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _brandController,
-                decoration: InputDecoration(
-                  labelText: loc.nutritionManualBrand,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _barcodeController,
-                decoration: InputDecoration(
-                  labelText: loc.nutritionManualBarcode,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
+              FormSectionCard(
+                icon: Icons.fastfood_outlined,
+                title: loc.nutritionManualSectionInfo,
                 children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextFormField(
-                      controller: _referenceAmountController,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: loc.nutritionManualReference,
-                        hintText: loc.nutritionManualReferenceHint,
-                        border: const OutlineInputBorder(),
-                      ),
-                      validator: (v) => _validateNumber(v, allowZero: false),
+                  FormFieldLabel(text: loc.nutritionManualName),
+                  TextFormField(
+                    controller: _nameController,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: _fieldDecoration(
+                      hint: loc.nutritionManualNameHint,
                     ),
+                    validator: _validateRequired,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _referenceUnitController,
-                      decoration: InputDecoration(
-                        labelText: loc.nutritionUnit,
-                        border: const OutlineInputBorder(),
-                      ),
-                      validator: _validateRequired,
-                    ),
+                  const SizedBox(height: 16),
+                  FormFieldLabel(text: loc.nutritionManualBrand),
+                  TextFormField(
+                    controller: _brandController,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: _fieldDecoration(),
+                  ),
+                  const SizedBox(height: 16),
+                  FormFieldLabel(text: loc.nutritionManualBarcode),
+                  TextFormField(
+                    controller: _barcodeController,
+                    keyboardType: TextInputType.number,
+                    decoration: _fieldDecoration(),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              _NumberField(
-                controller: _caloriesController,
-                label: loc.nutritionManualCalories,
-                validator: _validateNumber,
-                allowDecimal: true,
-              ),
-              const SizedBox(height: 12),
-              _NumberField(
-                controller: _proteinController,
-                label: loc.nutritionManualProtein,
-                validator: _validateNumber,
-                allowDecimal: true,
-              ),
-              const SizedBox(height: 12),
-              _NumberField(
-                controller: _carbsController,
-                label: loc.nutritionManualCarbs,
-                validator: _validateNumber,
-                allowDecimal: true,
-              ),
-              const SizedBox(height: 12),
-              _NumberField(
-                controller: _fatController,
-                label: loc.nutritionManualFat,
-                validator: _validateNumber,
-                allowDecimal: true,
-              ),
-              const SizedBox(height: 12),
-              _NumberField(
-                controller: _fiberController,
-                label: loc.nutritionManualFiber,
-                validator: _validateNumber,
-                allowDecimal: true,
-                optional: true,
-              ),
-              const SizedBox(height: 12),
-              _NumberField(
-                controller: _sugarsController,
-                label: loc.nutritionManualSugars,
-                validator: _validateNumber,
-                allowDecimal: true,
-                optional: true,
-              ),
-              const SizedBox(height: 12),
-              _NumberField(
-                controller: _sodiumController,
-                label: loc.nutritionManualSodium,
-                validator: _validateNumber,
-                allowDecimal: true,
-                optional: true,
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile(
-                value: _isEstimated,
-                onChanged: (v) => setState(() => _isEstimated = v),
-                title: Text(loc.nutritionManualIsEstimated),
-                contentPadding: EdgeInsets.zero,
-              ),
-              const Divider(height: 32),
-              Row(
+              const SizedBox(height: 14),
+              FormSectionCard(
+                icon: Icons.bar_chart_rounded,
+                title: loc.nutritionManualSectionMacros,
                 children: [
-                  Expanded(
-                    child: Text(
-                      loc.nutritionServingsAvailable,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: _addServing,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: Text(loc.nutritionManualAddServing),
-                  ),
-                ],
-              ),
-              if (_servings.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    loc.nutritionSettingsEmpty,
+                  Text(
+                    loc.nutritionManualReferenceHint,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                )
-              else
-                Column(
-                  children: List.generate(_servings.length, (i) {
-                    return _ManualServingRow(
-                      draft: _servings[i],
-                      onRemove: () => _removeServing(i),
-                    );
-                  }),
-                ),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: _NumberField(
+                          controller: _referenceAmountController,
+                          label: loc.nutritionManualReference,
+                          validator: (v) => _validateNumber(
+                            v,
+                            allowZero: false,
+                          ),
+                          allowDecimal: true,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _NumberField(
+                          controller: _referenceUnitController,
+                          label: loc.nutritionUnit,
+                          validator: _validateRequired,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _MacroFieldRow(
+                    children: [
+                      _NumberField(
+                        controller: _caloriesController,
+                        label: loc.nutritionManualCalories,
+                        validator: _validateNumber,
+                        allowDecimal: true,
+                      ),
+                      _NumberField(
+                        controller: _proteinController,
+                        label: loc.nutritionManualProtein,
+                        validator: _validateNumber,
+                        allowDecimal: true,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _MacroFieldRow(
+                    children: [
+                      _NumberField(
+                        controller: _carbsController,
+                        label: loc.nutritionManualCarbs,
+                        validator: _validateNumber,
+                        allowDecimal: true,
+                      ),
+                      _NumberField(
+                        controller: _fatController,
+                        label: loc.nutritionManualFat,
+                        validator: _validateNumber,
+                        allowDecimal: true,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _MacroFieldRow(
+                    children: [
+                      _NumberField(
+                        controller: _fiberController,
+                        label: loc.nutritionManualFiber,
+                        validator: _validateNumber,
+                        allowDecimal: true,
+                        optional: true,
+                      ),
+                      _NumberField(
+                        controller: _sugarsController,
+                        label: loc.nutritionManualSugars,
+                        validator: _validateNumber,
+                        allowDecimal: true,
+                        optional: true,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _NumberField(
+                    controller: _sodiumController,
+                    label: loc.nutritionManualSodium,
+                    validator: _validateNumber,
+                    allowDecimal: true,
+                    optional: true,
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 8, 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withAlpha(60),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: SwitchListTile(
+                      value: _isEstimated,
+                      onChanged: (v) => setState(() => _isEstimated = v),
+                      title: Text(loc.nutritionManualIsEstimated),
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              FormSectionCard(
+                icon: Icons.restaurant_menu_rounded,
+                title: loc.nutritionServingsAvailable,
+                children: [
+                  Text(
+                    loc.nutritionManualServingsHint,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_servings.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 20,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest
+                            .withAlpha(50),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: theme.colorScheme.outlineVariant
+                              .withAlpha(80),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.lunch_dining_outlined,
+                            size: 28,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            loc.nutritionManualServingsHint,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Column(
+                      children: List.generate(_servings.length, (i) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _ManualServingCard(
+                            index: i,
+                            draft: _servings[i],
+                            onRemove: () => _removeServing(i),
+                          ),
+                        );
+                      }),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: _addServing,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: Text(loc.nutritionManualAddServing),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
       ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FilledButton.icon(
+            onPressed: _isSaving ? null : _save,
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.check_rounded),
+            label: Text(loc.nutritionSave),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _fieldDecoration({String? hint}) {
+    final theme = Theme.of(context);
+    return InputDecoration(
+      hintText: hint,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      filled: true,
+      fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+    );
+  }
+}
+
+class _MacroFieldRow extends StatelessWidget {
+  final List<Widget> children;
+
+  const _MacroFieldRow({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) const SizedBox(width: 12),
+          Expanded(child: children[i]),
+        ],
+      ],
     );
   }
 }
@@ -420,12 +540,15 @@ class _NumberField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return TextFormField(
       controller: controller,
       keyboardType: TextInputType.numberWithOptions(decimal: allowDecimal),
       decoration: InputDecoration(
         labelText: label,
-        border: const OutlineInputBorder(),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        filled: true,
+        fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
       ),
       validator: (v) {
         if (optional && (v == null || v.trim().isEmpty)) return null;
@@ -453,73 +576,155 @@ class _ManualServingDraft {
   }
 }
 
-class _ManualServingRow extends StatelessWidget {
+class _ManualServingCard extends StatelessWidget {
+  final int index;
   final _ManualServingDraft draft;
   final VoidCallback onRemove;
 
-  const _ManualServingRow({required this.draft, required this.onRemove});
+  const _ManualServingCard({
+    required this.index,
+    required this.draft,
+    required this.onRemove,
+  });
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 4, 8, 14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withAlpha(80),
+        ),
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextFormField(
-            controller: draft.labelController,
-            decoration: InputDecoration(
-              labelText: loc.nutritionManualServingLabel,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                child: TextFormField(
-                  controller: draft.quantityController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: loc.nutritionQuantity,
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextFormField(
-                  controller: draft.unitController,
-                  decoration: InputDecoration(
-                    labelText: loc.nutritionUnit,
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: draft.gramsController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: loc.nutritionManualServingGrams,
-                    border: const OutlineInputBorder(),
+                child: Text(
+                  '${loc.nutritionServingsAvailable} ${index + 1}',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
               IconButton(
                 onPressed: onRemove,
-                icon: const Icon(Icons.delete_outline),
+                tooltip: loc.commonDelete,
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  Icons.delete_outline,
+                  size: 20,
+                  color: theme.colorScheme.error.withAlpha(180),
+                ),
               ),
             ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: draft.labelController,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    labelText: loc.nutritionManualServingLabel,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor:
+                        theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: draft.quantityController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: loc.nutritionQuantity,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest
+                              .withAlpha(60),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: draft.unitController,
+                        textCapitalization: TextCapitalization.none,
+                        decoration: InputDecoration(
+                          labelText: loc.nutritionUnit,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest
+                              .withAlpha(60),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: draft.gramsController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: loc.nutritionManualServingGrams,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest
+                              .withAlpha(60),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: draft.mlController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: loc.nutritionUnitMilliliters,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest
+                              .withAlpha(60),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),

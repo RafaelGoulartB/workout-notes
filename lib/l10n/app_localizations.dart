@@ -7012,6 +7012,24 @@ abstract class AppLocalizations {
   /// **'Food saved to your library'**
   String get nutritionManualSaved;
 
+  /// No description provided for @nutritionManualSectionInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Food details'**
+  String get nutritionManualSectionInfo;
+
+  /// No description provided for @nutritionManualSectionMacros.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition values'**
+  String get nutritionManualSectionMacros;
+
+  /// No description provided for @nutritionManualServingsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add common portions (e.g. slice, cup) to make logging easier.'**
+  String get nutritionManualServingsHint;
+
   /// No description provided for @nutritionSettingsTitle.
   ///
   /// In en, this message translates to:
@@ -7077,6 +7095,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Leave any field blank to skip that target.'**
   String get nutritionSettingsEmpty;
+
+  /// No description provided for @nutritionSettingsSectionTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily target'**
+  String get nutritionSettingsSectionTarget;
+
+  /// No description provided for @nutritionSettingsFromMacros.
+  ///
+  /// In en, this message translates to:
+  /// **'estimated from macros'**
+  String get nutritionSettingsFromMacros;
 
   /// No description provided for @exportNutritionCsv.
   ///
