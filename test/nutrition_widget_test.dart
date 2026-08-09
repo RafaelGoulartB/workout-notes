@@ -85,6 +85,25 @@ Future<void> _installSchema(Database db) async {
     )
   ''');
   await db.execute('''
+    CREATE TABLE meal_types (
+      id TEXT PRIMARY KEY,
+      key TEXT UNIQUE NOT NULL,
+      name TEXT,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )
+  ''');
+  final now = DateTime.now().toIso8601String();
+  for (var i = 0; i < 4; i++) {
+    await db.insert('meal_types', {
+      'id': ['breakfast', 'lunch', 'dinner', 'snacks'][i],
+      'key': ['breakfast', 'lunch', 'dinner', 'snacks'][i],
+      'name': null,
+      'order_index': i,
+      'created_at': now,
+    });
+  }
+  await db.execute('''
     CREATE TABLE meal_log_items (
       id TEXT PRIMARY KEY,
       meal_log_id TEXT NOT NULL,
@@ -249,9 +268,11 @@ void main() {
     expect(find.text(loc.nutritionFoodLibraryTitle), findsOneWidget);
     expect(find.text(loc.nutritionMealBreakfast), findsNothing);
 
-    await tester.tap(find.text(loc.nutritionSummaryTitle));
     await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.tap(find.text(loc.nutritionSummaryTitle));
+      await tester.pump();
+      // Let the day screen's async DB load complete (real I/O).
+      await Future<void>.delayed(const Duration(milliseconds: 150));
       await tester.pump();
     });
     await tester.pump(const Duration(milliseconds: 500));

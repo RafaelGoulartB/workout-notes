@@ -28,7 +28,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 30;
+  static const _dbVersion = 31;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -472,7 +472,38 @@ class DatabaseHelper {
     );
 
     // Seed data
+    await _seedMealTypes(db);
     await _seedData(db);
+  }
+
+  /// Seeds the four legacy meal types (breakfast → snacks) so upgraded
+  /// and fresh databases always have a working catalog. `name` stays
+  /// NULL: the UI resolves those keys to localized labels, and the user
+  /// can rename them later. Idempotent via `INSERT OR IGNORE` on `key`.
+  static Future<void> _seedMealTypes(Database db) async {
+    final now = DateTime.now().toIso8601String();
+    final rows = <Map<String, dynamic>>[
+      {'key': 'breakfast', 'order_index': 0},
+      {'key': 'lunch', 'order_index': 1},
+      {'key': 'dinner', 'order_index': 2},
+      {'key': 'snacks', 'order_index': 3},
+    ];
+    for (var i = 0; i < rows.length; i++) {
+      final row = rows[i];
+      try {
+        await db.insert(
+          'meal_types',
+          {
+            'id': row['key'],
+            'key': row['key'],
+            'name': null,
+            'order_index': row['order_index'],
+            'created_at': now,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      } catch (_) {}
+    }
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -1950,6 +1981,15 @@ class DatabaseHelper {
         );
       } catch (_) {}
     }
+    if (oldVersion < 31) {
+      // Nutrition v31: user-defined meal types catalog. The table is
+      // created by the idempotent schema helper; the legacy four types
+      // are seeded so existing meal_logs keep their sections.
+      try {
+        await _createNutritionSchema(db);
+      } catch (_) {}
+      await _seedMealTypes(db);
+    }
   }
 
   /// Creates the full nutrition module schema (v22) using
@@ -2012,6 +2052,19 @@ class DatabaseHelper {
         notes TEXT,
         created_at TEXT NOT NULL,
         UNIQUE(date, meal_type)
+      )
+    ''');
+    // User-defined meal types (v31). The catalog is managed in the
+    // nutrition settings; the diary renders one section per type. The
+    // four legacy keys are seeded with `name = NULL`, which resolves to
+    // a localized label; renamed/custom types carry their own name.
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS meal_types (
+        id TEXT PRIMARY KEY,
+        key TEXT UNIQUE NOT NULL,
+        name TEXT,
+        order_index INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
       )
     ''');
     await db.execute('''
@@ -2085,6 +2138,7 @@ class DatabaseHelper {
       'CREATE INDEX IF NOT EXISTS idx_food_servings_variant ON food_servings(food_variant_id)',
       'CREATE INDEX IF NOT EXISTS idx_meal_logs_date ON meal_logs(date)',
       'CREATE INDEX IF NOT EXISTS idx_meal_log_items_meal ON meal_log_items(meal_log_id, created_at ASC)',
+      'CREATE INDEX IF NOT EXISTS idx_meal_types_order ON meal_types(order_index)',
       'CREATE INDEX IF NOT EXISTS idx_nutrition_goals_active ON nutrition_goals(is_active)',
       'CREATE INDEX IF NOT EXISTS idx_saved_meal_items_meal ON saved_meal_items(saved_meal_id, order_index ASC)',
     ]) {

@@ -358,7 +358,7 @@ class ExportService {
     for (final row in rows) {
       csvRows.add(<String>[
         row.date,
-        _mealLabel(row.mealType, mealHeader),
+        _mealLabel(row.mealName, row.mealType, mealHeader),
         row.food,
         row.brand ?? '',
         _formatQuantity(row.quantity),
@@ -405,7 +405,14 @@ class ExportService {
     'snacks': loc.nutritionMealSnacks,
   };
 
-  static String _mealLabel(String mealType, Map<String, String> labels) {
+  /// The custom per-day meal section name when present; otherwise the
+  /// localized legacy label; otherwise the raw key.
+  static String _mealLabel(
+    String? mealName,
+    String mealType,
+    Map<String, String> labels,
+  ) {
+    if (mealName != null && mealName.trim().isNotEmpty) return mealName;
     return labels[mealType] ?? mealType;
   }
 

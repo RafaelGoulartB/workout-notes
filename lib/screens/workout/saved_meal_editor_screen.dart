@@ -4,7 +4,6 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
-import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
@@ -51,7 +50,6 @@ class SavedMealEditorScreen extends StatefulWidget {
   final NutritionRepository repository;
   final String? savedMealId;
   final String? initialName;
-  final String? initialMealType;
   final double initialPortions;
   final List<SavedMealItemDraft> initialItems;
 
@@ -60,7 +58,6 @@ class SavedMealEditorScreen extends StatefulWidget {
     required this.repository,
     this.savedMealId,
     this.initialName,
-    this.initialMealType,
     this.initialPortions = 1,
     this.initialItems = const [],
   });
@@ -73,7 +70,6 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _portionsController = TextEditingController(text: '1');
-  String? _mealType;
   late List<_Ingredient> _ingredients;
   bool _isSaving = false;
 
@@ -81,7 +77,6 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
   void initState() {
     super.initState();
     _nameController.text = widget.initialName ?? '';
-    _mealType = widget.initialMealType;
     if (widget.initialPortions != 1) {
       _portionsController.text = widget.initialPortions
           .toStringAsFixed(
@@ -222,7 +217,6 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
       await widget.repository.saveSavedMeal(
         id: widget.savedMealId,
         name: _nameController.text,
-        mealType: _mealType,
         portions: portions,
         items: [
           for (final ingredient in _ingredients)
@@ -249,21 +243,6 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
-  }
-
-  static String _mealLabel(AppLocalizations loc, String? type) {
-    if (type == null) return loc.nutritionSavedMealNoType;
-    switch (type) {
-      case MealType.breakfast:
-        return loc.nutritionMealBreakfast;
-      case MealType.lunch:
-        return loc.nutritionMealLunch;
-      case MealType.dinner:
-        return loc.nutritionMealDinner;
-      case MealType.snacks:
-        return loc.nutritionMealSnacks;
-    }
-    return type;
   }
 
   @override
@@ -313,68 +292,29 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
                   : null,
             ),
             const SizedBox(height: 14),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _mealType,
-                    decoration: InputDecoration(
-                      labelText: loc.nutritionSavedMealMealType,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: theme.colorScheme.surfaceContainerHighest
-                          .withAlpha(60),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                    ),
-                    items: [
-                      DropdownMenuItem(
-                        value: null,
-                        child: Text(loc.nutritionSavedMealNoType),
-                      ),
-                      for (final type in MealType.displayOrder)
-                        DropdownMenuItem(
-                          value: type,
-                          child: Text(_mealLabel(loc, type)),
-                        ),
-                    ],
-                    onChanged: (value) => setState(() => _mealType = value),
-                  ),
+            TextFormField(
+              controller: _portionsController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(
+                labelText: loc.nutritionSavedMealPortions,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 110,
-                  child: TextFormField(
-                    controller: _portionsController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: loc.nutritionSavedMealPortions,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: theme.colorScheme.surfaceContainerHighest
-                          .withAlpha(60),
-                    ),
-                    validator: (value) {
-                      final parsed = double.tryParse(
-                        (value ?? '').trim().replaceAll(',', '.'),
-                      );
-                      if (parsed == null || parsed <= 0) {
-                        return loc.nutritionInvalidQuantity;
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-              ],
+                filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHighest
+                    .withAlpha(60),
+              ),
+              validator: (value) {
+                final parsed = double.tryParse(
+                  (value ?? '').trim().replaceAll(',', '.'),
+                );
+                if (parsed == null || parsed <= 0) {
+                  return loc.nutritionInvalidQuantity;
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 20),
             Row(

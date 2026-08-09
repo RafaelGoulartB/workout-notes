@@ -10,6 +10,7 @@ import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
+import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/models/nutrition/saved_meal.dart';
@@ -334,7 +335,6 @@ class NutritionRepository extends BaseRepository {
     String mealType, {
     int limit = 12,
   }) async {
-    _validateMealType(mealType);
     final db = await this.db;
     final rows = await db.rawQuery(
       '''
@@ -353,16 +353,96 @@ class NutritionRepository extends BaseRepository {
   }
 
   // ===================================================================
+  // Meal type catalog (managed in the nutrition settings)
+  // ===================================================================
+
+  /// All configured meal types, in display order. The four legacy keys
+  /// are seeded with `name` null and resolve to localized labels.
+  Future<List<MealTypeDefinition>> getMealTypes() async {
+    final db = await this.db;
+    final rows = await db.query(
+      'meal_types',
+      orderBy: 'order_index ASC',
+    );
+    return rows.map(MealTypeDefinition.fromMap).toList();
+  }
+
+  /// Creates a new meal type with a random key and appends it to the
+  /// catalog.
+  Future<MealTypeDefinition> createMealType(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw const NutritionValidationException('meal_name_required');
+    }
+    final db = await this.db;
+    final count = Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM meal_types'),
+        ) ??
+        0;
+    final type = MealTypeDefinition(
+      id: _uuid.v4(),
+      key: _uuid.v4(),
+      name: trimmed,
+      orderIndex: count,
+      createdAt: DateTime.now(),
+    );
+    await db.insert('meal_types', type.toMap());
+    return type;
+  }
+
+  /// Renames a meal type in the catalog. Existing logs keep their own
+  /// name snapshot — only sections created afterwards use the new name.
+  Future<void> renameMealType(String id, String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw const NutritionValidationException('meal_name_required');
+    }
+    final db = await this.db;
+    await db.update(
+      'meal_types',
+      {'name': trimmed},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Deletes a meal type from the catalog. Logged history is preserved:
+  /// existing sections stay visible in their days with their stored
+  /// name snapshots; only days after the deletion stop showing a new
+  /// section for this type.
+  Future<void> deleteMealType(String id) async {
+    final db = await this.db;
+    await db.delete('meal_types', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Reorders the catalog by writing [ids] in the given order.
+  Future<void> reorderMealTypes(List<String> ids) async {
+    final db = await this.db;
+    await db.transaction((txn) async {
+      for (var i = 0; i < ids.length; i++) {
+        await txn.update(
+          'meal_types',
+          {'order_index': i},
+          where: 'id = ?',
+          whereArgs: [ids[i]],
+        );
+      }
+    });
+  }
+
+  // ===================================================================
   // Meal logs
   // ===================================================================
 
   /// Returns the [MealLog] for (date, mealType) or creates it lazily.
+  /// When a new log is created and [name] is provided it becomes the
+  /// section's display name; an existing log is never renamed here.
   Future<MealLog> ensureMealLog({
     required String date,
     required String mealType,
+    String? name,
   }) async {
     _validateDate(date);
-    _validateMealType(mealType);
     final db = await this.db;
     final existing = await db.query(
       'meal_logs',
@@ -375,6 +455,7 @@ class NutritionRepository extends BaseRepository {
       id: _uuid.v4(),
       date: date,
       mealType: mealType,
+      name: name,
       createdAt: DateTime.now(),
     );
     await db.insert('meal_logs', log.toMap());
@@ -382,7 +463,9 @@ class NutritionRepository extends BaseRepository {
   }
 
   /// Adds a food to a meal, recomputing the consumed nutrition from
-  /// the [conversion] provided by the UI.
+  /// the [conversion] provided by the UI. [name] snapshots the meal
+  /// type's display name onto a newly created log, so later renames in
+  /// the catalog never rewrite past days.
   Future<MealLogItem> addMealLogItem({
     required String date,
     required String mealType,
@@ -390,8 +473,13 @@ class NutritionRepository extends BaseRepository {
     required FoodVariant variant,
     required NutritionConversion conversion,
     List<FoodServing> availableServings = const [],
+    String? name,
   }) async {
-    final log = await ensureMealLog(date: date, mealType: mealType);
+    final log = await ensureMealLog(
+      date: date,
+      mealType: mealType,
+      name: name,
+    );
     final db = await this.db;
     final consumed = conversion.apply(variant.values);
     final serving = availableServings.firstWhereOrNull(
@@ -547,7 +635,6 @@ class NutritionRepository extends BaseRepository {
     String mealType, {
     String? beforeDate,
   }) async {
-    _validateMealType(mealType);
     final db = await this.db;
     final where = <String>['meal_type = ?'];
     final args = <Object?>[mealType];
@@ -572,16 +659,48 @@ class NutritionRepository extends BaseRepository {
     return items.map(MealLogItem.fromMap).toList();
   }
 
+  /// Returns the display name of the most recent meal of [mealType]
+  /// logged before [beforeDate] (exclusive), or null when there is no
+  /// previous instance or it has no custom name. Used by "repeat this
+  /// meal" so the copied section keeps the same name.
+  Future<String?> getLatestMealName(
+    String mealType, {
+    String? beforeDate,
+  }) async {
+    final db = await this.db;
+    final where = <String>['meal_type = ?'];
+    final args = <Object?>[mealType];
+    if (beforeDate != null) {
+      where.add('date < ?');
+      args.add(beforeDate);
+    }
+    final logs = await db.query(
+      'meal_logs',
+      where: where.join(' AND '),
+      whereArgs: args,
+      orderBy: 'date DESC',
+      limit: 1,
+    );
+    if (logs.isEmpty) return null;
+    return logs.first['name'] as String?;
+  }
+
   /// Clones [items] into the meal (date, mealType), preserving each
   /// item's snapshot verbatim so past data stays editable and auditable.
-  /// New ids are assigned; `created_at` is set to now.
+  /// New ids are assigned; `created_at` is set to now. [name] is used
+  /// only when the target log does not exist yet.
   Future<int> copyItemsToMeal({
     required String date,
     required String mealType,
     required List<MealLogItem> items,
+    String? name,
   }) async {
     if (items.isEmpty) return 0;
-    final log = await ensureMealLog(date: date, mealType: mealType);
+    final log = await ensureMealLog(
+      date: date,
+      mealType: mealType,
+      name: name,
+    );
     final db = await this.db;
     final now = DateTime.now();
     await db.transaction((txn) async {
@@ -648,11 +767,14 @@ class NutritionRepository extends BaseRepository {
         ),
       );
     }
-    // Stable display order: breakfast → lunch → dinner → snacks.
+    // Order by creation so sections appear in the order they were
+    // added to the day (custom meal sections have no fixed order).
     result.sort(
-      (a, b) => MealType.displayOrder
-          .indexOf(a.log.mealType)
-          .compareTo(MealType.displayOrder.indexOf(b.log.mealType)),
+      (a, b) {
+        final byTime = a.log.createdAt.compareTo(b.log.createdAt);
+        if (byTime != 0) return byTime;
+        return a.log.id.compareTo(b.log.id);
+      },
     );
     return result;
   }
@@ -931,21 +1053,27 @@ class NutritionRepository extends BaseRepository {
     await db.delete('saved_meals', where: 'id = ?', whereArgs: [id]);
   }
 
-  /// Logs every ingredient of [savedMealId] into (date, mealType),
-  /// scaling quantities by the meal's portion count. Returns the number
-  /// of items added and the number skipped because their food was
-  /// deleted from the cache.
+  /// Logs every ingredient of [savedMealId] into the (date, mealType)
+  /// section, scaling quantities by the meal's portion count. [mealName]
+  /// snapshots the meal type's display name onto a newly created log.
+  /// Returns the number of items added and the number skipped because
+  /// their food was deleted from the cache.
   Future<({int added, int skipped})> addSavedMealToDate({
     required String date,
     required String mealType,
+    String? mealName,
     required String savedMealId,
   }) async {
     _validateDate(date);
-    _validateMealType(mealType);
     final meal = await getSavedMeal(savedMealId);
     if (meal == null) {
       throw const NutritionValidationException('saved_meal_not_found');
     }
+    final section = await ensureMealLog(
+      date: date,
+      mealType: mealType,
+      name: mealName,
+    );
     var added = 0;
     var skipped = 0;
     for (final item in meal.items) {
@@ -986,7 +1114,7 @@ class NutritionRepository extends BaseRepository {
       }
       await addMealLogItem(
         date: date,
-        mealType: mealType,
+        mealType: section.mealType,
         food: details.food,
         variant: variant,
         conversion: conversion,
@@ -1023,6 +1151,7 @@ class NutritionRepository extends BaseRepository {
       SELECT
         ml.date as date,
         ml.meal_type as meal_type,
+        ml.name as meal_name,
         mli.food_name_snapshot as food,
         mli.brand_snapshot as brand,
         mli.quantity as quantity,
@@ -1270,12 +1399,6 @@ class NutritionRepository extends BaseRepository {
     }
   }
 
-  static void _validateMealType(String mealType) {
-    if (!MealType.all.contains(mealType)) {
-      throw const NutritionValidationException('invalid_meal_type');
-    }
-  }
-
   static String _dateString(DateTime value) => DateTime(
     value.year,
     value.month,
@@ -1371,6 +1494,9 @@ class SavedMealItemDraft {
 class NutritionExportRow {
   final String date;
   final String mealType;
+
+  /// Custom display name of the meal section (null for legacy rows).
+  final String? mealName;
   final String food;
   final String? brand;
   final double quantity;
@@ -1389,6 +1515,7 @@ class NutritionExportRow {
   const NutritionExportRow({
     required this.date,
     required this.mealType,
+    this.mealName,
     required this.food,
     this.brand,
     required this.quantity,
@@ -1421,6 +1548,7 @@ class NutritionExportRow {
     return NutritionExportRow(
       date: (map['date'] as String?) ?? '',
       mealType: (map['meal_type'] as String?) ?? '',
+      mealName: map['meal_name'] as String?,
       food: (map['food'] as String?) ?? '',
       brand: map['brand'] as String?,
       quantity: (map['quantity'] as num?)?.toDouble() ?? 0,

@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
+import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/saved_meal.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
@@ -22,6 +23,7 @@ class SavedMealsScreen extends StatefulWidget {
 
 class _SavedMealsScreenState extends State<SavedMealsScreen> {
   List<SavedMealWithItems> _meals = const [];
+  List<MealTypeDefinition> _mealTypes = const [];
   bool _isLoading = true;
   bool _isLogging = false;
 
@@ -35,10 +37,14 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final meals = await widget.repository.getSavedMeals();
+      final results = await Future.wait([
+        widget.repository.getSavedMeals(),
+        widget.repository.getMealTypes(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _meals = meals;
+        _meals = results[0] as List<SavedMealWithItems>;
+        _mealTypes = results[1] as List<MealTypeDefinition>;
         _isLoading = false;
       });
     } catch (_) {
@@ -63,7 +69,6 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
           repository: widget.repository,
           savedMealId: meal.meal.id,
           initialName: meal.meal.name,
-          initialMealType: meal.meal.mealType,
           initialPortions: meal.meal.portions,
           initialItems: [
             for (final item in meal.items)
@@ -114,32 +119,39 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
     await _load();
   }
 
-  /// Logs [meal] into today. When the template has no meal type the
-  /// user picks one first.
+  /// Logs [meal] into today. The user picks which configured meal type
+  /// the template goes into (the meal types are managed in the
+  /// nutrition settings).
   Future<void> _logToday(SavedMealWithItems meal) async {
     final loc = AppLocalizations.of(context)!;
-    var mealType = meal.meal.mealType;
-    if (mealType == null) {
-      mealType = await showDialog<String>(
-        context: context,
-        builder: (ctx) => SimpleDialog(
-          title: Text(loc.nutritionSavedMealPickMeal),
-          children: [
-            for (final type in MealType.displayOrder)
-              SimpleDialogOption(
-                onPressed: () => Navigator.pop(ctx, type),
-                child: Text(_mealLabel(loc, type)),
-              ),
-          ],
-        ),
+    if (_mealTypes.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.nutritionSavedMealNoMealTypes)),
       );
-      if (mealType == null) return;
+      return;
     }
+    final mealType = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(loc.nutritionSavedMealPickMeal),
+        children: [
+          for (final type in _mealTypes)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, type.key),
+              child: Text(type.displayName(loc)),
+            ),
+        ],
+      ),
+    );
+    if (mealType == null || !mounted) return;
+    final type = _mealTypes.firstWhere((t) => t.key == mealType);
     setState(() => _isLogging = true);
     try {
       final result = await widget.repository.addSavedMealToDate(
         date: _todayString(),
         mealType: mealType,
+        mealName: type.displayName(loc),
         savedMealId: meal.meal.id,
       );
       if (!mounted) return;
@@ -159,20 +171,6 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
     } finally {
       if (mounted) setState(() => _isLogging = false);
     }
-  }
-
-  static String _mealLabel(AppLocalizations loc, String type) {
-    switch (type) {
-      case MealType.breakfast:
-        return loc.nutritionMealBreakfast;
-      case MealType.lunch:
-        return loc.nutritionMealLunch;
-      case MealType.dinner:
-        return loc.nutritionMealDinner;
-      case MealType.snacks:
-        return loc.nutritionMealSnacks;
-    }
-    return type;
   }
 
   static String _todayString() {

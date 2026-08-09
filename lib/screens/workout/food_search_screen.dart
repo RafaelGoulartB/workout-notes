@@ -23,12 +23,18 @@ class FoodSearchScreen extends StatefulWidget {
   final bool enableManualButton;
   final String? mealType;
 
+  /// Display name of the meal section this search adds items to (free
+  /// text on newer builds; legacy fixed types fall back to the
+  /// localized label).
+  final String? mealName;
+
   const FoodSearchScreen({
     super.key,
     required this.gateway,
     required this.repository,
     this.enableManualButton = true,
     this.mealType,
+    this.mealName,
   });
 
   @override
@@ -659,6 +665,8 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   }
 
   String _mealLabel(AppLocalizations loc) {
+    final name = widget.mealName;
+    if (name != null && name.trim().isNotEmpty) return name;
     switch (widget.mealType) {
       case MealType.breakfast:
         return loc.nutritionMealBreakfast;

@@ -1,22 +1,21 @@
-/// Stable identifiers for meal types.
+import 'package:workout_notes/l10n/app_localizations.dart';
+
+/// Legacy stable identifiers for meal types.
 ///
-/// The values are persisted in [MealLog.mealType] and never translated.
-/// The UI maps each value to a localized label.
+/// These values were the only meal types when the app shipped, and rows
+/// created back then still carry them in [MealLog.mealType]. New meals are
+/// created by the user with a free name and a random uuid as [MealLog.mealType];
+/// when [MealLog.name] is null (legacy rows only), the UI maps these keys to a
+/// localized label.
 class MealType {
   static const String breakfast = 'breakfast';
   static const String lunch = 'lunch';
   static const String dinner = 'dinner';
   static const String snacks = 'snacks';
 
-  static const List<String> all = <String>[breakfast, lunch, dinner, snacks];
-
-  /// Order in which meal types are displayed in the daily screen.
-  static const List<String> displayOrder = <String>[
-    breakfast,
-    lunch,
-    dinner,
-    snacks,
-  ];
+  /// Whether [value] is one of the legacy fixed meal type keys.
+  static bool isLegacy(String value) =>
+      value == breakfast || value == lunch || value == dinner || value == snacks;
 }
 
 /// A meal of a day. There is at most one [MealLog] for each pair
@@ -37,6 +36,26 @@ class MealLog {
     this.notes,
     required this.createdAt,
   });
+
+  /// Display label of this log's section: the name snapshot taken when
+  /// the log was created, otherwise the localized legacy label,
+  /// otherwise the raw key. Used for sections whose meal type was
+  /// deleted from the catalog — history stays visible with its name.
+  String displayName(AppLocalizations loc) {
+    final snapshot = name;
+    if (snapshot != null && snapshot.trim().isNotEmpty) return snapshot;
+    switch (mealType) {
+      case MealType.breakfast:
+        return loc.nutritionMealBreakfast;
+      case MealType.lunch:
+        return loc.nutritionMealLunch;
+      case MealType.dinner:
+        return loc.nutritionMealDinner;
+      case MealType.snacks:
+        return loc.nutritionMealSnacks;
+    }
+    return mealType;
+  }
 
   MealLog copyWith({
     String? id,

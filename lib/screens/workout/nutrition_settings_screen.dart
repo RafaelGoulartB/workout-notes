@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
@@ -9,7 +10,8 @@ import 'package:workout_notes/widgets/form_section_card.dart';
 
 import 'nutrition_goal_suggest_sheet.dart';
 
-/// Screen for managing the user-defined daily nutrition goal.
+/// Screen for managing the daily nutrition goal and the meal types
+/// catalog (the sections rendered by the food diary).
 class NutritionSettingsScreen extends StatefulWidget {
   final NutritionRepository repository;
 
@@ -31,6 +33,7 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   NutritionGoal? _current;
+  List<MealTypeDefinition> _mealTypes = const [];
 
   @override
   void initState() {
@@ -48,10 +51,15 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
   }
 
   Future<void> _load() async {
-    final goal = await widget.repository.getActiveGoal();
+    final results = await Future.wait([
+      widget.repository.getActiveGoal(),
+      widget.repository.getMealTypes(),
+    ]);
+    final goal = results[0] as NutritionGoal?;
     if (!mounted) return;
     setState(() {
       _current = goal;
+      _mealTypes = results[1] as List<MealTypeDefinition>;
       _isLoading = false;
       if (goal != null) {
         _caloriesController.text = _format(goal.calories);
@@ -173,6 +181,120 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     if (value == null || value.isNaN || value.isInfinite) return null;
     if (value <= 0) return null;
     return value;
+  }
+
+  // ===================================================================
+  // Meal types catalog
+  // ===================================================================
+
+  Future<void> _addMealType() async {
+    final loc = AppLocalizations.of(context)!;
+    final name = await _promptMealTypeName(title: loc.nutritionNewMealTitle);
+    if (name == null) return;
+    if (!mounted) return;
+    try {
+      await widget.repository.createMealType(name);
+      await _loadMealTypes();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.nutritionMealAdded)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+    }
+  }
+
+  Future<void> _renameMealType(MealTypeDefinition type) async {
+    final loc = AppLocalizations.of(context)!;
+    final name = await _promptMealTypeName(
+      title: loc.nutritionRenameMealTitle,
+      initial: type.displayName(loc),
+    );
+    if (name == null) return;
+    if (!mounted) return;
+    try {
+      await widget.repository.renameMealType(type.id, name);
+      await _loadMealTypes();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+    }
+  }
+
+  Future<void> _deleteMealType(MealTypeDefinition type) async {
+    final loc = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.nutritionDeleteMeal),
+        content: Text(
+          loc.nutritionMealTypeDeleteConfirm(type.displayName(loc)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(loc.nutritionCancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(loc.commonDelete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+    try {
+      await widget.repository.deleteMealType(type.id);
+      await _loadMealTypes();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+    }
+  }
+
+  Future<void> _moveMealType(MealTypeDefinition type, int delta) async {
+    final index = _mealTypes.indexWhere((t) => t.id == type.id);
+    final target = index + delta;
+    if (index < 0 || target < 0 || target >= _mealTypes.length) return;
+    final reordered = [..._mealTypes];
+    final item = reordered.removeAt(index);
+    reordered.insert(target, item);
+    setState(() => _mealTypes = reordered);
+    try {
+      await widget.repository.reorderMealTypes(
+        [for (final t in reordered) t.id],
+      );
+    } catch (_) {
+      await _loadMealTypes();
+    }
+  }
+
+  Future<void> _loadMealTypes() async {
+    final types = await widget.repository.getMealTypes();
+    if (!mounted) return;
+    setState(() => _mealTypes = types);
+  }
+
+  Future<String?> _promptMealTypeName({
+    required String title,
+    String? initial,
+  }) {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => _MealTypeNameDialog(title: title, initial: initial),
+    );
   }
 
   /// Live values read from the form while editing, used by the
@@ -303,6 +425,51 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                           onTap: _isSaving ? null : _clear,
                         ),
                       ),
+                    const SizedBox(height: 14),
+                    FormSectionCard(
+                      icon: Icons.restaurant_outlined,
+                      title: loc.nutritionMealTypesTitle,
+                      children: [
+                        Text(
+                          loc.nutritionMealTypesSubtitle,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (_mealTypes.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Text(
+                              loc.nutritionMealTypeEmpty,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          )
+                        else
+                          for (var i = 0; i < _mealTypes.length; i++)
+                            _MealTypeTile(
+                              type: _mealTypes[i],
+                              canMoveUp: i > 0,
+                              canMoveDown: i < _mealTypes.length - 1,
+                              onMoveUp: () => _moveMealType(_mealTypes[i], -1),
+                              onMoveDown: () =>
+                                  _moveMealType(_mealTypes[i], 1),
+                              onRename: () => _renameMealType(_mealTypes[i]),
+                              onDelete: () => _deleteMealType(_mealTypes[i]),
+                            ),
+                        const SizedBox(height: 4),
+                        OutlinedButton.icon(
+                          onPressed: _addMealType,
+                          icon: const Icon(Icons.add),
+                          label: Text(loc.nutritionAddMeal),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -609,6 +776,148 @@ class _NumberField extends StatelessWidget {
       ),
       validator: validator,
       onChanged: onChanged,
+    );
+  }
+}
+
+/// One row of the meal types catalog: name, reorder arrows, edit and
+/// delete actions.
+class _MealTypeTile extends StatelessWidget {
+  final MealTypeDefinition type;
+  final bool canMoveUp;
+  final bool canMoveDown;
+  final VoidCallback onMoveUp;
+  final VoidCallback onMoveDown;
+  final VoidCallback onRename;
+  final VoidCallback onDelete;
+
+  const _MealTypeTile({
+    required this.type,
+    required this.canMoveUp,
+    required this.canMoveDown,
+    required this.onMoveUp,
+    required this.onMoveDown,
+    required this.onRename,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        IconButton(
+          tooltip: loc.nutritionMealTypeMoveUp,
+          onPressed: canMoveUp ? onMoveUp : null,
+          icon: const Icon(Icons.arrow_upward, size: 20),
+        ),
+        IconButton(
+          tooltip: loc.nutritionMealTypeMoveDown,
+          onPressed: canMoveDown ? onMoveDown : null,
+          icon: const Icon(Icons.arrow_downward, size: 20),
+        ),
+        Expanded(
+          child: Text(
+            type.displayName(loc),
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        IconButton(
+          tooltip: loc.nutritionRenameMeal,
+          onPressed: onRename,
+          icon: const Icon(Icons.edit_outlined, size: 20),
+        ),
+        IconButton(
+          tooltip: loc.nutritionDeleteMeal,
+          onPressed: onDelete,
+          icon: Icon(
+            Icons.delete_outline,
+            size: 20,
+            color: theme.colorScheme.error,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Dialog for typing a meal type name. Owns its [TextEditingController]
+/// so it is disposed only when the route is fully unmounted — disposing
+/// it right after `showDialog` returns would run while the exit
+/// animation still has the field attached and crash with a framework
+/// assertion.
+class _MealTypeNameDialog extends StatefulWidget {
+  final String title;
+  final String? initial;
+
+  const _MealTypeNameDialog({required this.title, this.initial});
+
+  @override
+  State<_MealTypeNameDialog> createState() => _MealTypeNameDialogState();
+}
+
+class _MealTypeNameDialogState extends State<_MealTypeNameDialog> {
+  late final TextEditingController _controller;
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initial ?? '');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() ?? false) {
+      Navigator.of(context).pop(_controller.text.trim());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _controller,
+          autofocus: true,
+          maxLength: 40,
+          decoration: InputDecoration(
+            labelText: loc.nutritionMealName,
+            hintText: loc.nutritionMealNameHint,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          textInputAction: TextInputAction.done,
+          validator: (value) =>
+              (value == null || value.trim().isEmpty)
+              ? loc.nutritionMealNameRequired
+              : null,
+          onFieldSubmitted: (_) => _submit(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(loc.nutritionCancel),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(loc.nutritionSave),
+        ),
+      ],
     );
   }
 }

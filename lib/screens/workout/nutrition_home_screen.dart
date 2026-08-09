@@ -6,6 +6,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
+import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
@@ -20,7 +21,12 @@ import 'nutrition_settings_screen.dart';
 import 'saved_meal_editor_screen.dart';
 import 'saved_meals_screen.dart';
 
-enum _NutritionMenuAction { progress, savedMeals, copyPreviousDay }
+enum _NutritionMenuAction {
+  progress,
+  savedMeals,
+  copyPreviousDay,
+  manageMeals,
+}
 
 /// Nutrition dashboard with a compact daily overview and tools section.
 class NutritionHomeScreen extends StatefulWidget {
@@ -554,6 +560,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
   final NutritionGateway _gateway = OpenFoodFactsGateway();
 
   late DateTime _selectedDate;
+  List<MealTypeDefinition> _mealTypes = const [];
   List<MealLogWithItems> _meals = const [];
   DailyNutritionSummary _summary = DailyNutritionSummary.empty;
   NutritionGoal? _goal;
@@ -573,15 +580,17 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
     try {
       final date = _dateString(_selectedDate);
       final results = await Future.wait([
+        _repository.getMealTypes(),
         _repository.getDayMeals(date),
         _repository.getDailySummary(date),
         _repository.getActiveGoal(),
       ]);
       if (!mounted) return;
       setState(() {
-        _meals = results[0] as List<MealLogWithItems>;
-        _summary = results[1] as DailyNutritionSummary;
-        _goal = results[2] as NutritionGoal?;
+        _mealTypes = results[0] as List<MealTypeDefinition>;
+        _meals = results[1] as List<MealLogWithItems>;
+        _summary = results[2] as DailyNutritionSummary;
+        _goal = results[3] as NutritionGoal?;
         _isLoading = false;
       });
     } catch (_) {
@@ -614,13 +623,14 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
     await _load();
   }
 
-  Future<void> _addItem(String mealType) async {
+  Future<void> _addItem(String mealType, String mealLabel) async {
     final result = await Navigator.of(context).push<NutritionSelection>(
       MaterialPageRoute(
         builder: (_) => FoodSearchScreen(
           gateway: _gateway,
           repository: _repository,
           mealType: mealType,
+          mealName: mealLabel,
         ),
       ),
     );
@@ -633,11 +643,12 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
       servings: result.servings,
     );
     if (quantity == null) return;
-    await _persistAdd(mealType, quantity);
+    await _persistAdd(mealType, mealLabel, quantity);
   }
 
   Future<void> _persistAdd(
     String mealType,
+    String mealLabel,
     NutritionQuantitySelection selection,
   ) async {
     final loc = AppLocalizations.of(context)!;
@@ -651,6 +662,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
       await _repository.addMealLogItem(
         date: _dateString(_selectedDate),
         mealType: mealType,
+        name: mealLabel,
         food: upserted,
         variant: selection.variant,
         conversion: selection.conversion,
@@ -824,7 +836,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
               for (final m in source)
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(_mealLabel(loc, m.log.mealType)),
+                  title: Text(m.log.displayName(loc)),
                   subtitle: Text(loc.nutritionItemCount(m.items.length)),
                   value: selected.contains(m.log.mealType),
                   onChanged: (checked) => setDialogState(() {
@@ -857,6 +869,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
       count += await _repository.copyItemsToMeal(
         date: _dateString(_selectedDate),
         mealType: m.log.mealType,
+        name: m.log.name,
         items: m.items,
       );
     }
@@ -867,13 +880,14 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
     await _load();
   }
 
-  /// Repeats the most recent instance of [mealType] (before the
-  /// selected day) into the selected day.
-  Future<void> _repeatMeal(String mealType) async {
+  /// Repeats the most recent instance of [meal]'s type (before the
+  /// selected day) into the selected day, keeping the section name.
+  Future<void> _repeatMeal(MealLogWithItems meal) async {
     final loc = AppLocalizations.of(context)!;
+    final before = _dateString(_selectedDate);
     final items = await _repository.getLatestMealItems(
-      mealType,
-      beforeDate: _dateString(_selectedDate),
+      meal.log.mealType,
+      beforeDate: before,
     );
     if (items.isEmpty) {
       if (!mounted) return;
@@ -882,9 +896,14 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
       ).showSnackBar(SnackBar(content: Text(loc.nutritionRepeatNoPrevious)));
       return;
     }
+    final name = await _repository.getLatestMealName(
+      meal.log.mealType,
+      beforeDate: before,
+    );
     final count = await _repository.copyItemsToMeal(
-      date: _dateString(_selectedDate),
-      mealType: mealType,
+      date: before,
+      mealType: meal.log.mealType,
+      name: name,
       items: items,
     );
     if (!mounted) return;
@@ -894,12 +913,10 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
     await _load();
   }
 
-  /// Saves the current day's [mealType] as a meal template.
-  Future<void> _saveMealFromDay(String mealType) async {
+  /// Saves [meal]'s items as a meal template.
+  Future<void> _saveMealFromDay(MealLogWithItems meal) async {
     final loc = AppLocalizations.of(context)!;
-    final meals = await _repository.getDayMeals(_dateString(_selectedDate));
-    final meal = meals.where((m) => m.log.mealType == mealType).toList();
-    if (meal.isEmpty || meal.first.items.isEmpty) {
+    if (meal.items.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -911,9 +928,8 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
       MaterialPageRoute(
         builder: (_) => SavedMealEditorScreen(
           repository: _repository,
-          initialName: _mealLabel(loc, mealType),
-          initialMealType: mealType,
-          initialItems: meal.first.items
+          initialName: meal.log.displayName(loc),
+          initialItems: meal.items
               .map(SavedMealItemDraft.fromMealLogItem)
               .toList(),
         ),
@@ -947,9 +963,20 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
                 case _NutritionMenuAction.copyPreviousDay:
                   _copyPreviousDay();
                   break;
+                case _NutritionMenuAction.manageMeals:
+                  _openSettings();
+                  break;
               }
             },
             itemBuilder: (context) => [
+              PopupMenuItem(
+                value: _NutritionMenuAction.manageMeals,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.restaurant_outlined),
+                  title: Text(loc.nutritionDiaryManageMeals),
+                ),
+              ),
               PopupMenuItem(
                 value: _NutritionMenuAction.progress,
                 child: ListTile(
@@ -1016,52 +1043,62 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
     );
   }
 
+  /// Renders one section per configured meal type (in catalog order),
+  /// then any leftover sections whose type was deleted from the catalog
+  /// — history stays visible with its stored name.
   List<Widget> _buildMealSlivers(AppLocalizations loc, ThemeData theme) {
-    final widgets = <Widget>[];
-    final presentTypes = {for (final m in _meals) m.log.mealType};
-    for (final type in MealType.displayOrder) {
-      final meal = _meals.firstWhere(
-        (m) => m.log.mealType == type,
-        orElse: () => MealLogWithItems(
-          log: MealLog(
-            id: '',
-            date: _dateString(_selectedDate),
-            mealType: type,
-            createdAt: DateTime.now(),
-          ),
-          items: const [],
+    final configuredKeys = {for (final type in _mealTypes) type.key};
+    final orphanMeals = _meals
+        .where((m) => !configuredKeys.contains(m.log.mealType))
+        .toList();
+    if (_mealTypes.isEmpty && orphanMeals.isEmpty) {
+      return [
+        SliverToBoxAdapter(
+          child: _EmptyDayCard(onConfigureMeals: _openSettings),
         ),
-      );
-      widgets.add(
+      ];
+    }
+    return [
+      for (final type in _mealTypes)
         SliverToBoxAdapter(
           child: _MealSection(
-            title: _mealLabel(loc, type),
-            meal: meal,
-            isEmpty: !presentTypes.contains(type),
-            onAdd: () => _addItem(type),
+            title: type.displayName(loc),
+            meal: _mealFor(type.key),
+            onAdd: () => _addItem(type.key, type.displayName(loc)),
             onEdit: _editItem,
             onDelete: _deleteItem,
-            onRepeat: () => _repeatMeal(type),
-            onSaveAsMeal: () => _saveMealFromDay(type),
+            onRepeat: () => _repeatMeal(_mealFor(type.key)),
+            onSaveAsMeal: () => _saveMealFromDay(_mealFor(type.key)),
           ),
         ),
-      );
-    }
-    return widgets;
+      for (final meal in orphanMeals)
+        SliverToBoxAdapter(
+          child: _MealSection(
+            title: meal.log.displayName(loc),
+            meal: meal,
+            onAdd: () => _addItem(meal.log.mealType, meal.log.displayName(loc)),
+            onEdit: _editItem,
+            onDelete: _deleteItem,
+            onRepeat: () => _repeatMeal(meal),
+            onSaveAsMeal: () => _saveMealFromDay(meal),
+          ),
+        ),
+    ];
   }
 
-  static String _mealLabel(AppLocalizations loc, String type) {
-    switch (type) {
-      case MealType.breakfast:
-        return loc.nutritionMealBreakfast;
-      case MealType.lunch:
-        return loc.nutritionMealLunch;
-      case MealType.dinner:
-        return loc.nutritionMealDinner;
-      case MealType.snacks:
-        return loc.nutritionMealSnacks;
+  MealLogWithItems _mealFor(String mealType) {
+    for (final meal in _meals) {
+      if (meal.log.mealType == mealType) return meal;
     }
-    return type;
+    return MealLogWithItems(
+      log: MealLog(
+        id: '',
+        date: _dateString(_selectedDate),
+        mealType: mealType,
+        createdAt: DateTime.now(),
+      ),
+      items: const [],
+    );
   }
 
   static DateTime _dateOnly(DateTime value) =>
@@ -1418,7 +1455,6 @@ class _MiniNutrientStat extends StatelessWidget {
 class _MealSection extends StatelessWidget {
   final String title;
   final MealLogWithItems meal;
-  final bool isEmpty;
   final VoidCallback onAdd;
   final void Function(MealLogItem item) onEdit;
   final void Function(MealLogItem item) onDelete;
@@ -1428,7 +1464,6 @@ class _MealSection extends StatelessWidget {
   const _MealSection({
     required this.title,
     required this.meal,
-    required this.isEmpty,
     required this.onAdd,
     required this.onEdit,
     required this.onDelete,
@@ -1513,19 +1548,12 @@ class _MealSection extends StatelessWidget {
             if (meal.items.isEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                child: isEmpty
-                    ? Text(
-                        loc.nutritionEmptySubtitle,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      )
-                    : Text(
-                        loc.nutritionEmptySubtitle,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                child: Text(
+                  loc.nutritionEmptySubtitle,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               )
             else
               ...meal.items.asMap().entries.map(
@@ -1536,11 +1564,61 @@ class _MealSection extends StatelessWidget {
                   onDelete: () => onDelete(entry.value),
                 ),
               ),
-            if (meal.items.isEmpty)
-              const SizedBox(height: 4)
-            else
-              const SizedBox(height: 4),
+            const SizedBox(height: 4),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown when the selected day has no meal sections yet.
+class _EmptyDayCard extends StatelessWidget {
+  final VoidCallback onConfigureMeals;
+
+  const _EmptyDayCard({required this.onConfigureMeals});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
+          child: Column(
+            children: [
+              Icon(
+                Icons.restaurant_menu_rounded,
+                size: 56,
+                color: theme.colorScheme.primary.withAlpha(140),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                loc.nutritionNoMealsTitle,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                loc.nutritionNoMealsSubtitle,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: onConfigureMeals,
+                icon: const Icon(Icons.settings_outlined),
+                label: Text(loc.nutritionDiaryManageMeals),
+              ),
+            ],
+          ),
         ),
       ),
     );

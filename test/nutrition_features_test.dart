@@ -243,6 +243,7 @@ void main() {
       final result = await repository.addSavedMealToDate(
         date: '2026-08-09',
         mealType: 'lunch',
+        mealName: 'Almoço',
         savedMealId: saved.id,
       );
       expect(result.added, 1);
@@ -278,6 +279,7 @@ void main() {
       final result = await repository.addSavedMealToDate(
         date: '2026-08-09',
         mealType: 'lunch',
+        mealName: 'Almoço',
         savedMealId: saved.id,
       );
       expect(result.added, 1);
@@ -450,6 +452,223 @@ void main() {
       );
     });
   });
+
+  // ===================================================================
+  // Meal types catalog (configured in the nutrition settings)
+  // ===================================================================
+
+  group('meal types catalog', () {
+    test('seeded legacy types are returned in order', () async {
+      final types = await repository.getMealTypes();
+      expect(
+        types.map((t) => t.key),
+        ['breakfast', 'lunch', 'dinner', 'snacks'],
+      );
+      expect(types.map((t) => t.orderIndex), [0, 1, 2, 3]);
+      expect(types.every((t) => t.name == null), isTrue);
+    });
+
+    test('createMealType appends a custom type and rejects empty names',
+        () async {
+      final created = await repository.createMealType('Pré-treino');
+      expect(created.name, 'Pré-treino');
+      expect(
+        created.key,
+        isNot(anyOf('breakfast', 'lunch', 'dinner', 'snacks')),
+      );
+
+      final types = await repository.getMealTypes();
+      expect(types, hasLength(5));
+      expect(types.last.name, 'Pré-treino');
+      expect(types.last.orderIndex, 4);
+
+      await expectLater(
+        repository.createMealType('   '),
+        throwsA(isA<NutritionValidationException>()),
+      );
+    });
+
+    test('renameMealType only affects the catalog; logs keep snapshots',
+        () async {
+      final banana = await createFood('Banana', calories: 90);
+      // Logged BEFORE the rename: the section keeps its old snapshot.
+      await repository.addMealLogItem(
+        date: '2026-08-05',
+        mealType: 'breakfast',
+        name: 'Café da manhã',
+        food: banana,
+        variant: await variantOf(banana),
+        conversion: NutritionConversion(
+          quantity: 100,
+          unit: 'g',
+          referenceAmount: 100,
+          referenceUnit: 'g',
+        ),
+      );
+      final types = await repository.getMealTypes();
+      final breakfast = types.firstWhere((t) => t.key == 'breakfast');
+      await repository.renameMealType(breakfast.id, 'Pré-treino');
+
+      final renamed = await repository.getMealTypes();
+      expect(renamed.firstWhere((t) => t.key == 'breakfast').name, 'Pré-treino');
+
+      // The existing log keeps the snapshot taken at log time.
+      final day = await repository.getDayMeals('2026-08-05');
+      expect(day.single.log.name, 'Café da manhã');
+
+      // A new log takes the new catalog name as snapshot.
+      await repository.addMealLogItem(
+        date: '2026-08-06',
+        mealType: 'breakfast',
+        name: 'Pré-treino',
+        food: banana,
+        variant: await variantOf(banana),
+        conversion: NutritionConversion(
+          quantity: 100,
+          unit: 'g',
+          referenceAmount: 100,
+          referenceUnit: 'g',
+        ),
+      );
+      final nextDay = await repository.getDayMeals('2026-08-06');
+      expect(nextDay.single.log.name, 'Pré-treino');
+    });
+
+    test('deleteMealType keeps the logged history visible', () async {
+      final banana = await createFood('Banana', calories: 90);
+      await repository.addMealLogItem(
+        date: '2026-08-05',
+        mealType: 'dinner',
+        name: 'Jantar',
+        food: banana,
+        variant: await variantOf(banana),
+        conversion: NutritionConversion(
+          quantity: 100,
+          unit: 'g',
+          referenceAmount: 100,
+          referenceUnit: 'g',
+        ),
+      );
+      final types = await repository.getMealTypes();
+      final dinner = types.firstWhere((t) => t.key == 'dinner');
+      await repository.deleteMealType(dinner.id);
+
+      expect(
+        (await repository.getMealTypes()).any((t) => t.key == 'dinner'),
+        isFalse,
+      );
+      // The day still exposes the section with its stored name.
+      final day = await repository.getDayMeals('2026-08-05');
+      expect(day.single.log.mealType, 'dinner');
+      expect(day.single.log.name, 'Jantar');
+      expect(day.single.items, hasLength(1));
+    });
+
+    test('reorderMealTypes writes the given order', () async {
+      final types = await repository.getMealTypes();
+      final reversed = types.reversed.map((t) => t.id).toList();
+      await repository.reorderMealTypes(reversed);
+
+      final reordered = await repository.getMealTypes();
+      expect(
+        reordered.map((t) => t.key),
+        ['snacks', 'dinner', 'lunch', 'breakfast'],
+      );
+      expect(reordered.map((t) => t.orderIndex), [0, 1, 2, 3]);
+    });
+
+    test('addSavedMealToDate snapshots the meal name onto the section',
+        () async {
+      final rice = await createFood('Arroz', calories: 130);
+      final saved = await repository.saveSavedMeal(
+        name: 'Marmita',
+        items: [
+          SavedMealItemDraft(
+            foodId: rice.id,
+            foodVariantId: (await variantOf(rice)).id,
+            foodNameSnapshot: rice.name,
+            quantity: 200,
+            unit: 'g',
+          ),
+        ],
+      );
+      final result = await repository.addSavedMealToDate(
+        date: '2026-08-09',
+        mealType: 'lunch',
+        mealName: 'Almoço',
+        savedMealId: saved.id,
+      );
+      expect(result.added, 1);
+      final day = await repository.getDayMeals('2026-08-09');
+      expect(day.single.log.name, 'Almoço');
+      expect(day.single.log.mealType, 'lunch');
+      expect(day.single.items, hasLength(1));
+      expect(day.single.items.first.calories, 260);
+    });
+
+    test('copyItemsToMeal carries the name into a new day', () async {
+      final banana = await createFood('Banana', calories: 90);
+      await logMeal('2026-08-08', 'breakfast', banana, quantity: 100);
+      final source = await repository.getDayMeals('2026-08-08');
+      expect(source.single.items, hasLength(1));
+
+      await repository.copyItemsToMeal(
+        date: '2026-08-09',
+        mealType: source.single.log.mealType,
+        name: 'Café da manhã',
+        items: source.single.items,
+      );
+
+      final target = await repository.getDayMeals('2026-08-09');
+      expect(target.single.log.name, 'Café da manhã');
+      expect(target.single.items, hasLength(1));
+    });
+
+    test('copying into a day with an existing section keeps its name',
+        () async {
+      final banana = await createFood('Banana', calories: 90);
+      await logMeal('2026-08-08', 'lunch', banana);
+      final source = await repository.getDayMeals('2026-08-08');
+
+      await repository.ensureMealLog(
+        date: '2026-08-09',
+        mealType: source.single.log.mealType,
+        name: 'Jantar',
+      );
+      await repository.copyItemsToMeal(
+        date: '2026-08-09',
+        mealType: source.single.log.mealType,
+        name: 'Outro nome',
+        items: source.single.items,
+      );
+
+      final target = await repository.getDayMeals('2026-08-09');
+      expect(target.single.log.name, 'Jantar');
+      expect(target.single.items, hasLength(1));
+    });
+
+    test('getLatestMealName returns the previous custom name', () async {
+      await repository.ensureMealLog(
+        date: '2026-08-05',
+        mealType: 'lunch',
+        name: 'Almoço',
+      );
+      expect(
+        await repository.getLatestMealName(
+          'lunch',
+          beforeDate: '2026-08-08',
+        ),
+        'Almoço',
+      );
+      expect(
+        await repository.getLatestMealName(
+          'lunch',
+          beforeDate: '2026-08-04',
+        ),
+        isNull,
+      );
+    });
+  });
 }
 
 /// Production-like nutrition schema used by these tests.
@@ -512,6 +731,25 @@ Future<void> _installNutritionSchema(Database db) async {
       UNIQUE(date, meal_type)
     )
   ''');
+  await db.execute('''
+    CREATE TABLE meal_types (
+      id TEXT PRIMARY KEY,
+      key TEXT UNIQUE NOT NULL,
+      name TEXT,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )
+  ''');
+  final now = DateTime.now().toIso8601String();
+  for (var i = 0; i < 4; i++) {
+    await db.insert('meal_types', {
+      'id': ['breakfast', 'lunch', 'dinner', 'snacks'][i],
+      'key': ['breakfast', 'lunch', 'dinner', 'snacks'][i],
+      'name': null,
+      'order_index': i,
+      'created_at': now,
+    });
+  }
   await db.execute('''
     CREATE TABLE meal_log_items (
       id TEXT PRIMARY KEY,
