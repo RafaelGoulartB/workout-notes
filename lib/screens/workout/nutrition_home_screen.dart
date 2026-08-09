@@ -1069,7 +1069,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
             onDelete: _deleteItem,
             onRepeat: () => _repeatMeal(_mealFor(type.key)),
             onSaveAsMeal: () => _saveMealFromDay(_mealFor(type.key)),
-          ),
+          ).animate().fadeIn(duration: 250.ms, delay: 40.ms).slideY(begin: 0.02),
         ),
       for (final meal in orphanMeals)
         SliverToBoxAdapter(
@@ -1081,7 +1081,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
             onDelete: _deleteItem,
             onRepeat: () => _repeatMeal(meal),
             onSaveAsMeal: () => _saveMealFromDay(meal),
-          ),
+          ).animate().fadeIn(duration: 250.ms, delay: 40.ms).slideY(begin: 0.02),
         ),
     ];
   }
@@ -1127,16 +1127,16 @@ class _DateNavigator extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final today = _dateOnly(DateTime.now());
-    final isToday = _dateOnly(date) == today;
+    final isToday = _dateOnly(date) == _dateOnly(DateTime.now());
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
       child: Row(
         children: [
           IconButton(
             tooltip: loc.nutritionPreviousDay,
             onPressed: onPrevious ?? onJumpToday,
-            icon: const Icon(Icons.chevron_left),
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.chevron_left_rounded),
           ),
           Expanded(
             child: InkWell(
@@ -1144,19 +1144,35 @@ class _DateNavigator extends StatelessWidget {
               onTap: onPickDate,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                child: Column(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      DateFormat.yMMMMEEEEd(Intl.defaultLocale).format(date),
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+                    Flexible(
+                      child: Text(
+                        DateFormat.yMMMMEEEEd(Intl.defaultLocale).format(date),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                    if (!isToday)
-                      TextButton(
+                    if (!isToday) ...[
+                      const SizedBox(width: 8),
+                      FilledButton.tonal(
                         onPressed: onJumpToday,
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          minimumSize: const Size(0, 26),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          textStyle: theme.textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                          shape: const StadiumBorder(),
+                        ),
                         child: Text(loc.nutritionJumpToday),
                       ),
+                    ],
                   ],
                 ),
               ),
@@ -1165,7 +1181,8 @@ class _DateNavigator extends StatelessWidget {
           IconButton(
             tooltip: loc.nutritionNextDay,
             onPressed: onNext,
-            icon: const Icon(Icons.chevron_right),
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.chevron_right_rounded),
           ),
         ],
       ),
@@ -1176,6 +1193,8 @@ class _DateNavigator extends StatelessWidget {
       DateTime(value.year, value.month, value.day);
 }
 
+/// Compact MyFitnessPal-style summary: calorie count with a progress
+/// bar, macro mini-stats and a micronutrient footer row.
 class _DailySummaryCard extends StatelessWidget {
   final DailyNutritionSummary summary;
   final NutritionGoal? goal;
@@ -1191,12 +1210,22 @@ class _DailySummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final calories = summary.consumed.calories;
+    final calories = summary.consumed.calories ?? 0;
+    final calorieGoal = goal?.calories;
+    final hasGoal = calorieGoal != null && calorieGoal > 0;
+    final fraction = hasGoal ? (calories / calorieGoal).clamp(0.0, 1.0) : null;
+    final percent = hasGoal ? (calories / calorieGoal * 100).round() : null;
+    final hasMicro = summary.consumed.fiberG != null ||
+        summary.consumed.sugarsG != null ||
+        summary.consumed.sodiumMg != null;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
       child: Card(
+        margin: EdgeInsets.zero,
+        clipBehavior: Clip.antiAlias,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1205,53 +1234,168 @@ class _DailySummaryCard extends StatelessWidget {
                   Icon(
                     Icons.local_fire_department_outlined,
                     color: theme.colorScheme.primary,
-                    size: 22,
+                    size: 18,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Text(
                     loc.nutritionSummaryTitle,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  const Spacer(),
+                  if (percent != null)
+                    Text(
+                      '$percent%',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
                 ],
               ),
-              const SizedBox(height: 12),
-              if (calories == null)
-                Text(
-                  '0 kcal',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    _format(calories),
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 30,
+                    ),
                   ),
-                )
-              else
-                Text(
-                  loc.nutritionConsumedKcal(_formatNumber(calories, 0)),
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      hasGoal ? ' / ${_format(calorieGoal)} kcal' : ' kcal',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (fraction != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: fraction,
+                    minHeight: 7,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      fraction >= 1.0
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.primary,
+                    ),
                   ),
                 ),
-              const SizedBox(height: 6),
-              if (goal?.calories != null)
-                Text(
-                  _remainingText(loc, goal!.calories!, calories ?? 0),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MacroMiniStat(
+                      label: loc.nutritionProgressProtein,
+                      consumed: summary.consumed.proteinG,
+                      goal: goal?.proteinG,
+                      color: theme.colorScheme.tertiary,
+                    ),
                   ),
-                )
-              else
+                  Expanded(
+                    child: _MacroMiniStat(
+                      label: loc.nutritionProgressCarbs,
+                      consumed: summary.consumed.carbsG,
+                      goal: goal?.carbsG,
+                      color: theme.colorScheme.secondary,
+                    ),
+                  ),
+                  Expanded(
+                    child: _MacroMiniStat(
+                      label: loc.nutritionProgressFat,
+                      consumed: summary.consumed.fatG,
+                      goal: goal?.fatG,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              if (hasMicro) ...[
+                const SizedBox(height: 12),
+                Divider(
+                  height: 1,
+                  color: theme.colorScheme.outlineVariant.withAlpha(80),
+                ),
+                const SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 16,
-                      color: theme.colorScheme.onSurfaceVariant,
+                    Expanded(
+                      child: _MiniNutrientStat(
+                        label: loc.nutritionProgressFiber,
+                        value: summary.consumed.fiberG,
+                        suffix: 'g',
+                        icon: Icons.grass,
+                      ),
                     ),
-                    const SizedBox(width: 6),
+                    Expanded(
+                      child: _MiniNutrientStat(
+                        label: loc.nutritionProgressSugars,
+                        value: summary.consumed.sugarsG,
+                        suffix: 'g',
+                        icon: Icons.cookie_outlined,
+                      ),
+                    ),
+                    Expanded(
+                      child: _MiniNutrientStat(
+                        label: loc.nutritionProgressSodium,
+                        value: summary.consumed.sodiumMg,
+                        suffix: 'mg',
+                        icon: Icons.water_drop_outlined,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (summary.hasIncompleteData) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _nutritionWarningColor.withAlpha(28),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 15,
+                        color: _nutritionWarningColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          loc.nutritionIncompleteWarning,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: _nutritionWarningColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (!hasGoal) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
                     Expanded(
                       child: Text(
                         loc.nutritionGoalNoGoal,
-                        style: theme.textTheme.bodyMedium?.copyWith(
+                        style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -1262,58 +1406,7 @@ class _DailySummaryCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              const SizedBox(height: 12),
-              _MacroProgress(
-                label: loc.nutritionProgressProtein,
-                consumed: summary.consumed.proteinG,
-                goal: goal?.proteinG,
-                color: theme.colorScheme.tertiary,
-              ),
-              const SizedBox(height: 8),
-              _MacroProgress(
-                label: loc.nutritionProgressCarbs,
-                consumed: summary.consumed.carbsG,
-                goal: goal?.carbsG,
-                color: theme.colorScheme.secondary,
-              ),
-              const SizedBox(height: 8),
-              _MacroProgress(
-                label: loc.nutritionProgressFat,
-                consumed: summary.consumed.fatG,
-                goal: goal?.fatG,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(height: 12),
-              const Divider(height: 1),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _MiniNutrientStat(
-                      label: loc.nutritionProgressFiber,
-                      value: summary.consumed.fiberG,
-                      suffix: 'g',
-                      icon: Icons.grass,
-                    ),
-                  ),
-                  Expanded(
-                    child: _MiniNutrientStat(
-                      label: loc.nutritionProgressSugars,
-                      value: summary.consumed.sugarsG,
-                      suffix: 'g',
-                      icon: Icons.cookie_outlined,
-                    ),
-                  ),
-                  Expanded(
-                    child: _MiniNutrientStat(
-                      label: loc.nutritionProgressSodium,
-                      value: summary.consumed.sodiumMg,
-                      suffix: 'mg',
-                      icon: Icons.water_drop_outlined,
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ],
           ),
         ),
@@ -1321,33 +1414,21 @@ class _DailySummaryCard extends StatelessWidget {
     );
   }
 
-  static String _remainingText(
-    AppLocalizations loc,
-    double goal,
-    double consumed,
-  ) {
-    final delta = goal - consumed;
-    if (delta >= 0) {
-      return loc.nutritionGoalRemaining(_formatNumber(delta, 0));
-    }
-    return loc.nutritionGoalSurplus(_formatNumber(-delta, 0));
-  }
-
-  static String _formatNumber(double value, int decimals) {
-    if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
-    }
-    return value.toStringAsFixed(decimals);
+  static String _format(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(1);
   }
 }
 
-class _MacroProgress extends StatelessWidget {
+/// Compact per-macro stat: colored dot + label, "x / y g" value and a
+/// thin progress bar when a goal exists.
+class _MacroMiniStat extends StatelessWidget {
   final String label;
   final double? consumed;
   final double? goal;
   final Color color;
 
-  const _MacroProgress({
+  const _MacroMiniStat({
     required this.label,
     required this.consumed,
     required this.goal,
@@ -1361,35 +1442,46 @@ class _MacroProgress extends StatelessWidget {
     final fraction = hasGoal
         ? ((consumed ?? 0) / goal!).clamp(0.0, 1.5).toDouble()
         : 0.0;
+    final value = consumed == null ? '—' : '${_format(consumed!)} g';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
-            Expanded(child: Text(label)),
-            if (consumed != null)
-              Text(
-                '${_format(consumed!)} g',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            if (hasGoal)
-              Text(
-                ' / ${_format(goal!)} g',
-                style: theme.textTheme.bodyMedium?.copyWith(
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
+            ),
           ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          hasGoal ? '$value / ${_format(goal!)} g' : value,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         if (hasGoal) ...[
           const SizedBox(height: 4),
           ClipRRect(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
               value: fraction,
-              minHeight: 6,
+              minHeight: 4,
               backgroundColor: color.withAlpha(40),
               valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
@@ -1400,9 +1492,7 @@ class _MacroProgress extends StatelessWidget {
   }
 
   static String _format(double value) {
-    if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
-    }
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
     return value.toStringAsFixed(1);
   }
 }
@@ -1452,6 +1542,8 @@ class _MiniNutrientStat extends StatelessWidget {
   }
 }
 
+/// One meal section: compact header with per-meal calories, a quick-add
+/// button and a dense item list.
 class _MealSection extends StatelessWidget {
   final String title;
   final MealLogWithItems meal;
@@ -1475,15 +1567,20 @@ class _MealSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final kcalTotal = meal.items.fold<double>(
+      0,
+      (sum, item) => sum + (item.calories ?? 0),
+    );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
       child: Card(
+        margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 4, 0),
+              padding: const EdgeInsets.fromLTRB(14, 8, 6, 4),
               child: Row(
                 children: [
                   Expanded(
@@ -1495,6 +1592,8 @@ class _MealSection extends StatelessWidget {
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           loc.nutritionItemCount(meal.items.length),
@@ -1505,10 +1604,21 @@ class _MealSection extends StatelessWidget {
                       ],
                     ),
                   ),
-                  TextButton.icon(
+                  if (kcalTotal > 0) ...[
+                    Text(
+                      '${_format(kcalTotal)} kcal',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  IconButton(
+                    tooltip: loc.nutritionAddItem,
                     onPressed: onAdd,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: Text(loc.nutritionAddItem),
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.add_circle_outline),
                   ),
                   PopupMenuButton<String>(
                     tooltip: loc.nutritionMealMenu,
@@ -1547,11 +1657,19 @@ class _MealSection extends StatelessWidget {
             ),
             if (meal.items.isEmpty)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                child: Text(
-                  loc.nutritionEmptySubtitle,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                padding: const EdgeInsets.fromLTRB(14, 2, 14, 12),
+                child: SizedBox(
+                  height: 40,
+                  child: TextButton.icon(
+                    onPressed: onAdd,
+                    style: TextButton.styleFrom(
+                      backgroundColor: theme.colorScheme.surfaceContainerLow,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: Text(loc.nutritionAddItem),
                   ),
                 ),
               )
@@ -1564,11 +1682,15 @@ class _MealSection extends StatelessWidget {
                   onDelete: () => onDelete(entry.value),
                 ),
               ),
-            const SizedBox(height: 4),
           ],
         ),
       ),
     );
+  }
+
+  static String _format(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(1);
   }
 }
 
@@ -1625,6 +1747,9 @@ class _EmptyDayCard extends StatelessWidget {
   }
 }
 
+/// Dense item row: food name (with an incomplete-data warning badge),
+/// quantity/brand subtitle, calories on the right and compact edit and
+/// delete actions. Tapping the row opens the quantity sheet to edit.
 class _MealItemTile extends StatelessWidget {
   final MealLogItem item;
   final bool isLast;
@@ -1646,38 +1771,82 @@ class _MealItemTile extends StatelessWidget {
         ? item.quantity.toStringAsFixed(0)
         : item.quantity.toStringAsFixed(1);
     final unitSuffix = item.unit.trim().isEmpty ? '' : ' ${item.unit}';
-    final subtitle = <String>[
+    final subtitleParts = <String>[
       '$qty$unitSuffix',
-      if (item.calories != null)
-        loc.nutritionConsumedKcal(
-          item.calories!.toStringAsFixed(item.calories! < 10 ? 1 : 0),
-        ),
-    ].join(' · ');
+      if (item.brandSnapshot != null && item.brandSnapshot!.trim().isNotEmpty)
+        item.brandSnapshot!,
+    ];
+    final hasWarning = item.hasMissingValues || item.isEstimated;
     return Column(
       children: [
         if (!isLast)
           Divider(
             height: 1,
-            thickness: 1,
-            indent: 16,
-            endIndent: 16,
+            indent: 14,
+            endIndent: 14,
             color: theme.colorScheme.outlineVariant.withAlpha(60),
           ),
         ListTile(
-          title: Text(item.foodNameSnapshot),
-          subtitle: Text(subtitle),
-          trailing: Wrap(
-            spacing: 4,
+          onTap: onEdit,
+          dense: true,
+          visualDensity: VisualDensity.compact,
+          contentPadding: const EdgeInsets.fromLTRB(14, 0, 4, 0),
+          title: Row(
             children: [
+              Flexible(
+                child: Text(
+                  item.foodNameSnapshot,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (hasWarning) ...[
+                const SizedBox(width: 6),
+                Tooltip(
+                  message: loc.nutritionMissingValues,
+                  child: Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: _nutritionWarningColor,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          subtitle: Text(
+            subtitleParts.join(' · '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (item.calories != null)
+                Text(
+                  loc.nutritionConsumedKcal(
+                    item.calories!.toStringAsFixed(item.calories! < 10 ? 1 : 0),
+                  ),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               IconButton(
                 tooltip: loc.nutritionEditItem,
                 onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.edit_outlined, size: 17),
               ),
               IconButton(
                 tooltip: loc.nutritionDeleteItem,
                 onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.delete_outline, size: 17),
               ),
             ],
           ),
@@ -1686,3 +1855,7 @@ class _MealItemTile extends StatelessWidget {
     );
   }
 }
+
+/// Soft amber used for incomplete/estimated data warnings in both
+/// light and dark themes.
+const Color _nutritionWarningColor = Color(0xFFF0A202);
