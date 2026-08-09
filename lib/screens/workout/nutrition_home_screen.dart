@@ -470,8 +470,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                       onConfigureGoal: _openSettings,
                     ).animate().fadeIn(duration: 250.ms),
                   ),
-                  if (_summary.hasIncompleteData)
-                    SliverToBoxAdapter(child: _IncompleteWarning()),
                   ..._buildMealSlivers(loc, theme),
                   const SliverToBoxAdapter(child: SizedBox(height: 96)),
                 ],
@@ -882,38 +880,6 @@ class _MiniNutrientStat extends StatelessWidget {  final String label;
       return value.toStringAsFixed(0);
     }
     return value.toStringAsFixed(1);
-  }
-}
-
-class _IncompleteWarning extends StatelessWidget {  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.tertiaryContainer.withAlpha(110),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        child: Row(
-          children: [
-            Icon(
-              Icons.warning_amber_outlined,
-              color: theme.colorScheme.onTertiaryContainer,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                loc.nutritionIncompleteWarning,
-                style: TextStyle(color: theme.colorScheme.onTertiaryContainer),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
