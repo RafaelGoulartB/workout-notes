@@ -1027,21 +1027,27 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
                         ),
                       ),
                     ),
-                    child: TabBar(
-                      controller: _tabController,
-                      tabs: [
-                        Tab(
-                          icon: const Icon(Icons.menu_book_outlined, size: 20),
-                          text: loc.nutritionDiaryTab,
-                        ),
-                        Tab(
-                          icon: const Icon(
-                            Icons.donut_large_outlined,
-                            size: 20,
+                    child: SizedBox(
+                      height: 44,
+                      child: TabBar(
+                        controller: _tabController,
+                        dividerHeight: 0,
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+                        tabs: [
+                          Tab(
+                            child: _CompactTabLabel(
+                              icon: Icons.menu_book_outlined,
+                              label: loc.nutritionDiaryTab,
+                            ),
                           ),
-                          text: loc.nutritionDailyStatsTab,
-                        ),
-                      ],
+                          Tab(
+                            child: _CompactTabLabel(
+                              icon: Icons.donut_large_outlined,
+                              label: loc.nutritionDailyStatsTab,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   Expanded(
@@ -1054,6 +1060,29 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
                             key: const PageStorageKey('nutrition-diary'),
                             physics: const AlwaysScrollableScrollPhysics(),
                             slivers: [
+                              SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    12,
+                                    16,
+                                    8,
+                                  ),
+                                  child: _StatisticsSectionCard(
+                                    title: loc.nutritionCaloriesTitle,
+                                    icon: Icons.local_fire_department_rounded,
+                                    compact: true,
+                                    child: _CalorieEquation(
+                                      consumed: _summary.consumed.calories ?? 0,
+                                      goal: _goal?.calories,
+                                      carbsG: _summary.consumed.carbsG,
+                                      proteinG: _summary.consumed.proteinG,
+                                      fatG: _summary.consumed.fatG,
+                                      onConfigureGoal: _openSettings,
+                                    ),
+                                  ),
+                                ).animate().fadeIn(duration: 220.ms),
+                              ),
                               ..._buildMealSlivers(loc, theme),
                               const SliverToBoxAdapter(
                                 child: SizedBox(height: 32),
@@ -1067,7 +1096,6 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
                             key: const PageStorageKey('nutrition-statistics'),
                             summary: _summary,
                             goal: _goal,
-                            onConfigureGoal: _openSettings,
                           ),
                         ),
                       ],
@@ -1151,6 +1179,26 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
 
   static String _dateString(DateTime value) =>
       _dateOnly(value).toIso8601String().substring(0, 10);
+}
+
+class _CompactTabLabel extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _CompactTabLabel({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      Icon(icon, size: 17),
+      const SizedBox(width: 7),
+      Flexible(
+        child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
+    ],
+  );
 }
 
 class _DateNavigator extends StatelessWidget {
@@ -1484,13 +1532,11 @@ class _DailySummaryCard extends StatelessWidget {
 class _DailyStatisticsView extends StatelessWidget {
   final DailyNutritionSummary summary;
   final NutritionGoal? goal;
-  final VoidCallback onConfigureGoal;
 
   const _DailyStatisticsView({
     super.key,
     required this.summary,
     required this.goal,
-    required this.onConfigureGoal,
   });
 
   @override
@@ -1501,16 +1547,6 @@ class _DailyStatisticsView extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       children: [
-        _StatisticsSectionCard(
-          title: loc.nutritionCaloriesTitle,
-          icon: Icons.local_fire_department_rounded,
-          child: _CalorieEquation(
-            consumed: values.calories ?? 0,
-            goal: goal?.calories,
-            onConfigureGoal: onConfigureGoal,
-          ),
-        ).animate().fadeIn(duration: 220.ms).slideY(begin: 0.025),
-        const SizedBox(height: 12),
         _StatisticsSectionCard(
           title: loc.nutritionMacrosTitle,
           icon: Icons.donut_large_rounded,
@@ -1601,11 +1637,13 @@ class _StatisticsSectionCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final Widget child;
+  final bool compact;
 
   const _StatisticsSectionCard({
     required this.title,
     required this.icon,
     required this.child,
+    this.compact = false,
   });
 
   @override
@@ -1615,7 +1653,9 @@ class _StatisticsSectionCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        padding: compact
+            ? const EdgeInsets.fromLTRB(14, 10, 14, 10)
+            : const EdgeInsets.fromLTRB(16, 14, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1631,7 +1671,7 @@ class _StatisticsSectionCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: compact ? 9 : 18),
             child,
           ],
         ),
@@ -1643,11 +1683,17 @@ class _StatisticsSectionCard extends StatelessWidget {
 class _CalorieEquation extends StatelessWidget {
   final double consumed;
   final double? goal;
+  final double? carbsG;
+  final double? proteinG;
+  final double? fatG;
   final VoidCallback onConfigureGoal;
 
   const _CalorieEquation({
     required this.consumed,
     required this.goal,
+    this.carbsG,
+    this.proteinG,
+    this.fatG,
     required this.onConfigureGoal,
   });
 
@@ -1657,6 +1703,9 @@ class _CalorieEquation extends StatelessWidget {
     final theme = Theme.of(context);
     final hasGoal = goal != null && goal! > 0;
     final remaining = hasGoal ? goal! - consumed : null;
+    final carbCalories = (carbsG ?? 0) * 4;
+    final proteinCalories = (proteinG ?? 0) * 4;
+    final fatCalories = (fatG ?? 0) * 9;
     return Column(
       children: [
         Row(
@@ -1689,17 +1738,21 @@ class _CalorieEquation extends StatelessWidget {
           ],
         ),
         if (hasGoal) ...[
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: (consumed / goal!).clamp(0.0, 1.0),
-              minHeight: 8,
-              backgroundColor: theme.colorScheme.surfaceContainerHighest,
-            ),
+          const SizedBox(height: 10),
+          _MacroCalorieBar(
+            goalCalories: goal!,
+            carbCalories: carbCalories,
+            proteinCalories: proteinCalories,
+            fatCalories: fatCalories,
+          ),
+          const SizedBox(height: 7),
+          _MacroCalorieLegend(
+            carbCalories: carbCalories,
+            proteinCalories: proteinCalories,
+            fatCalories: fatCalories,
           ),
         ] else ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           TextButton(
             onPressed: onConfigureGoal,
             child: Text(loc.nutritionConfigureGoal),
@@ -1724,7 +1777,7 @@ class _EquationValue extends StatelessWidget {
       children: [
         Text(
           value,
-          style: theme.textTheme.headlineSmall?.copyWith(
+          style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w800,
             color: color,
           ),
@@ -1736,6 +1789,141 @@ class _EquationValue extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+const Color _carbMacroColor = Color(0xFF20A39E);
+const Color _proteinMacroColor = Color(0xFFF29E38);
+const Color _fatMacroColor = Color(0xFF8E44AD);
+
+class _MacroCalorieBar extends StatelessWidget {
+  final double goalCalories;
+  final double carbCalories;
+  final double proteinCalories;
+  final double fatCalories;
+
+  const _MacroCalorieBar({
+    required this.goalCalories,
+    required this.carbCalories,
+    required this.proteinCalories,
+    required this.fatCalories,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final total = carbCalories + proteinCalories + fatCalories;
+    final scale = total > goalCalories && total > 0
+        ? goalCalories / total
+        : 1.0;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: SizedBox(
+        height: 7,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            double widthFor(double calories) =>
+                constraints.maxWidth * calories * scale / goalCalories;
+            return ColoredBox(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: widthFor(carbCalories),
+                    child: const ColoredBox(color: _carbMacroColor),
+                  ),
+                  SizedBox(
+                    width: widthFor(proteinCalories),
+                    child: const ColoredBox(color: _proteinMacroColor),
+                  ),
+                  SizedBox(
+                    width: widthFor(fatCalories),
+                    child: const ColoredBox(color: _fatMacroColor),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _MacroCalorieLegend extends StatelessWidget {
+  final double carbCalories;
+  final double proteinCalories;
+  final double fatCalories;
+
+  const _MacroCalorieLegend({
+    required this.carbCalories,
+    required this.proteinCalories,
+    required this.fatCalories,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _MacroLegendItem(
+          color: _carbMacroColor,
+          label: loc.nutritionProgressCarbs,
+          calories: carbCalories,
+        ),
+        _MacroLegendItem(
+          color: _proteinMacroColor,
+          label: loc.nutritionProgressProtein,
+          calories: proteinCalories,
+        ),
+        _MacroLegendItem(
+          color: _fatMacroColor,
+          label: loc.nutritionProgressFat,
+          calories: fatCalories,
+        ),
+      ],
+    );
+  }
+}
+
+class _MacroLegendItem extends StatelessWidget {
+  final Color color;
+  final String label;
+  final double calories;
+
+  const _MacroLegendItem({
+    required this.color,
+    required this.label,
+    required this.calories,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Flexible(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              '${label.characters.first} ${_formatNutritionNumber(calories)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 10,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
