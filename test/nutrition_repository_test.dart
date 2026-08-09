@@ -173,6 +173,14 @@ void main() {
       expect(results, hasLength(1));
       expect(results.first.food.name, 'Pão integral');
     });
+
+    test('single-word queries never match every branded food', () async {
+      // 'zzz' matches no food name and no brand. With the old empty
+      // brand token the predicate degraded into `LIKE '%%'`, which
+      // matched every food with a brand.
+      final results = await repository.searchLocalFoods('zzz');
+      expect(results, isEmpty);
+    });
   });
 
   group('food upserts and meals', () {
@@ -340,6 +348,99 @@ void main() {
       expect(item.snapshot.foodName, 'Iogurte');
     });
 
+    test(
+      'refreshing the cache keeps the history links of past meals',
+      () async {
+        final now = DateTime.now();
+        Future<Food> upsertYogurt(int calories) =>
+            repository.upsertFoodWithDetails(
+              food: Food(
+                id: 'remote-1',
+                source: 'gateway',
+                externalId: 'gw-1',
+                name: 'Greek Yogurt',
+                searchName: Food.normalizeForSearch('Greek Yogurt'),
+                fetchedAt: now,
+              ),
+              variants: [
+                FoodVariant(
+                  id: 'v_remote',
+                  foodId: 'remote-1',
+                  referenceAmount: 100,
+                  referenceUnit: 'g',
+                  values: NutritionValues(
+                    calories: calories.toDouble(),
+                    proteinG: 10,
+                  ),
+                ),
+              ],
+            );
+
+        final first = await upsertYogurt(60);
+        final details = await repository.getFoodWithDetails(first.id);
+        final variant = details!.variants.first;
+        final item = await repository.addMealLogItem(
+          date: '2026-07-26',
+          mealType: 'breakfast',
+          food: details.food,
+          variant: variant,
+          conversion: NutritionConversion(
+            quantity: 100,
+            unit: 'g',
+            referenceAmount: 100,
+            referenceUnit: 'g',
+          ),
+        );
+        // Re-fetch of the same gateway product: previously this used
+        // REPLACE + delete/recreate, nulling food_id and
+        // food_variant_id of the logged item (ON DELETE SET NULL) and
+        // silently breaking the "edit item" flow.
+        await upsertYogurt(70);
+        final meals = await repository.getDayMeals('2026-07-26');
+        final after = meals.first.items.first;
+        expect(after.foodId, item.foodId);
+        expect(after.foodVariantId, item.foodVariantId);
+        // The item is still editable through its linked food/variant.
+        final reloaded = await repository.getFoodWithDetails(after.foodId!);
+        expect(reloaded, isNotNull);
+        expect(reloaded!.variants.first.values.calories, 70);
+      },
+    );
+
+    test('restoreMealLogItem puts a deleted item back (undo)', () async {
+      final food = await repository.createManualFood(
+        name: 'Castanhas',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(calories: 600, proteinG: 15),
+      );
+      final details = await repository.getFoodWithDetails(food.id);
+      final variant = details!.variants.first;
+      final item = await repository.addMealLogItem(
+        date: '2026-07-26',
+        mealType: 'snacks',
+        food: food,
+        variant: variant,
+        conversion: NutritionConversion(
+          quantity: 30,
+          unit: 'g',
+          referenceAmount: 100,
+          referenceUnit: 'g',
+        ),
+      );
+      await repository.deleteMealLogItem(item.id);
+      var meals = await repository.getDayMeals('2026-07-26');
+      expect(meals.first.items, isEmpty);
+      await repository.restoreMealLogItem(item);
+      meals = await repository.getDayMeals('2026-07-26');
+      expect(meals.first.items, hasLength(1));
+      final restored = meals.first.items.first;
+      expect(restored.id, item.id);
+      expect(restored.foodNameSnapshot, 'Castanhas');
+      expect(restored.calories, closeTo(600 * 0.3, 0.001));
+      expect(restored.snapshot.quantity, 30);
+    });
+
     test('aggregates the daily summary with incomplete flag', () async {
       final food = await repository.createManualFood(
         name: 'Queijo',
@@ -374,6 +475,50 @@ void main() {
   });
 
   group('transactions', () {
+    test('rejects a variant id already owned by another food', () async {
+      final now = DateTime.now();
+      Future<void> upsert({
+        required String foodId,
+        required String externalId,
+      }) async {
+        await repository.upsertFoodWithDetails(
+          food: Food(
+            id: foodId,
+            source: 'gateway',
+            externalId: externalId,
+            name: externalId,
+            searchName: externalId,
+            fetchedAt: now,
+          ),
+          variants: [
+            FoodVariant(
+              id: 'shared-variant',
+              foodId: foodId,
+              referenceAmount: 100,
+              referenceUnit: 'g',
+              values: const NutritionValues(calories: 100),
+            ),
+          ],
+        );
+      }
+
+      await upsert(foodId: 'food-a', externalId: 'a');
+      await expectLater(
+        upsert(foodId: 'food-b', externalId: 'b'),
+        throwsA(
+          isA<NutritionValidationException>().having(
+            (error) => error.code,
+            'code',
+            'variant_id_conflict',
+          ),
+        ),
+      );
+      expect(
+        await repository.getFoodBySource(source: 'gateway', externalId: 'b'),
+        isNull,
+      );
+    });
+
     test('upsertFoodWithDetails rolls back on failure', () async {
       // Insert a parent food with a controlled id, then attempt an
       // upsert that references an invalid foreign key for the variant.
@@ -465,27 +610,30 @@ void main() {
   });
 
   group('AI vision source', () {
-    test('manual food created with ai_vision source keeps the source', () async {
-      final food = await repository.createManualFood(
-        name: 'Iogurte natural',
-        barcode: '7896000000000',
-        source: FoodSource.aiVision,
-        referenceAmount: 100,
-        referenceUnit: 'g',
-        referenceValues: const NutritionValues(
-          calories: 64,
-          proteinG: 5.5,
-          carbsG: 7,
-          fatG: 3.5,
-        ),
-        isEstimated: true,
-      );
-      expect(food.isManual, isFalse);
-      final details = await repository.getFoodWithDetails(food.id);
-      expect(details!.food.source, FoodSource.aiVision);
-      expect(details.variants.first.isEstimated, isTrue);
-      expect(details.food.barcode, '7896000000000');
-    });
+    test(
+      'manual food created with ai_vision source keeps the source',
+      () async {
+        final food = await repository.createManualFood(
+          name: 'Iogurte natural',
+          barcode: '7896000000000',
+          source: FoodSource.aiVision,
+          referenceAmount: 100,
+          referenceUnit: 'g',
+          referenceValues: const NutritionValues(
+            calories: 64,
+            proteinG: 5.5,
+            carbsG: 7,
+            fatG: 3.5,
+          ),
+          isEstimated: true,
+        );
+        expect(food.isManual, isFalse);
+        final details = await repository.getFoodWithDetails(food.id);
+        expect(details!.food.source, FoodSource.aiVision);
+        expect(details.variants.first.isEstimated, isTrue);
+        expect(details.food.barcode, '7896000000000');
+      },
+    );
   });
 
   group('CSV export', () {

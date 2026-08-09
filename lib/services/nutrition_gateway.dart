@@ -165,10 +165,11 @@ class NutritionGatewayFoodPayload {
   }
 
   /// Converts the parsed payload into a domain [FoodSearchResult],
-  /// assigning a fresh local id and the normalized search name.
+  /// assigning fresh/scoped local ids and the normalized search name.
   FoodSearchResult toSearchResult() {
+    final foodId = const Uuid().v4();
     final food = Food(
-      id: const Uuid().v4(),
+      id: foodId,
       source: source,
       externalId: externalId,
       name: name,
@@ -178,16 +179,33 @@ class NutritionGatewayFoodPayload {
       sourceUrl: sourceUrl,
       fetchedAt: DateTime.now(),
     );
-    final primary = variants.isEmpty ? null : variants.first;
+    final remotePrimary = variants.isEmpty ? null : variants.first;
+    final primary = remotePrimary?.copyWith(
+      id: _scopedId('variant', remotePrimary.id),
+      foodId: foodId,
+    );
+    final primaryServings = remotePrimary == null || primary == null
+        ? const <FoodServing>[]
+        : (servings[remotePrimary.id] ?? const <FoodServing>[])
+              .asMap()
+              .entries
+              .map(
+                (entry) => entry.value.copyWith(
+                  id: _scopedId('serving_${entry.key}', entry.value.id),
+                  foodVariantId: primary.id,
+                ),
+              )
+              .toList();
     return FoodSearchResult(
       food: food,
       primaryVariant: primary,
-      servings: primary == null
-          ? const []
-          : servings[primary.id] ?? const [],
+      servings: primaryServings,
       isRemote: true,
     );
   }
+
+  String _scopedId(String kind, String remoteId) =>
+      '$source::$externalId::$kind::$remoteId';
 
   static FoodVariant _parseVariant(Map<String, dynamic> map) {
     final referenceAmount =

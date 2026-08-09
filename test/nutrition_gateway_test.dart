@@ -86,6 +86,13 @@ void main() {
       expect(result.data, isNotNull);
       expect(result.data!.length, 2);
       expect(result.data!.first.food.name, 'Apple');
+      final first = result.data!.first;
+      final second = result.data!.last;
+      expect(first.primaryVariant!.id, isNot(second.primaryVariant!.id));
+      expect(first.primaryVariant!.foodId, first.food.id);
+      expect(second.primaryVariant!.foodId, second.food.id);
+      expect(first.primaryVariant!.id, startsWith('gateway::a::variant::'));
+      expect(second.primaryVariant!.id, startsWith('gateway::b::variant::'));
     });
 
     test('classifies network failures', () async {

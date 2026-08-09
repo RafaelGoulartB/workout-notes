@@ -143,6 +143,56 @@ void main() {
       );
     });
 
+    test('supports free manual units via direct unit match', () {
+      const sliceVariant = FoodVariant(
+        id: 'vs',
+        foodId: 'f1',
+        referenceAmount: 1,
+        referenceUnit: 'fatia',
+        values: NutritionValues(calories: 80, proteinG: 4),
+      );
+      final conv = NutritionConversion(
+        quantity: 2,
+        unit: 'fatia',
+        referenceAmount: 1,
+        referenceUnit: 'fatia',
+      );
+      final result = conv.apply(sliceVariant.values);
+      expect(result.calories, 160);
+      expect(result.proteinG, 8);
+    });
+
+    test('supports per-unit manual units ("unidade") without a serving', () {
+      const unitVariant = FoodVariant(
+        id: 'vu',
+        foodId: 'f1',
+        referenceAmount: 1,
+        referenceUnit: 'unidade',
+        values: NutritionValues(calories: 50, proteinG: 2),
+      );
+      final conv = NutritionConversion(
+        quantity: 3,
+        unit: 'unidade',
+        referenceAmount: 1,
+        referenceUnit: 'unidade',
+      );
+      final result = conv.apply(unitVariant.values);
+      expect(result.calories, 150);
+    });
+
+    test('rejects a custom unit against a gram reference', () {
+      final conv = NutritionConversion(
+        quantity: 2,
+        unit: 'fatia',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+      );
+      expect(
+        () => conv.apply(variant.values),
+        throwsA(isA<NutritionConversionException>()),
+      );
+    });
+
     test('rejects non-positive quantities and reference amounts', () {
       expect(
         () => NutritionConversion(

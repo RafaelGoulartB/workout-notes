@@ -43,13 +43,21 @@ class NutritionConversion {
       throw NutritionConversionException('invalid_numeric_value');
     }
 
-    final normalizedUnit = _normalizeUnit(unit);
-    final normalizedRef = _normalizeUnit(referenceUnit);
+    final normalizedUnit = normalizeUnit(unit);
+    final normalizedRef = normalizeUnit(referenceUnit);
 
     if (normalizedUnit == 'g' && normalizedRef == 'g') {
       return quantity / referenceAmount;
     }
     if (normalizedUnit == 'ml' && normalizedRef == 'ml') {
+      return quantity / referenceAmount;
+    }
+
+    // Direct match of free units (e.g. "fatia" == "fatia", or a
+    // per-serving/per-unit reference unit): no conversion needed.
+    // Must run before the serving branch, which only applies when
+    // the reference is expressed in grams/millilitres.
+    if (normalizedUnit == normalizedRef) {
       return quantity / referenceAmount;
     }
 
@@ -74,11 +82,6 @@ class NutritionConversion {
         return ml / referenceAmount;
       }
       throw NutritionConversionException('unsupported_reference_unit');
-    }
-
-    // Direct match of free units (e.g. "fatia" == "fatia").
-    if (normalizedUnit == normalizedRef) {
-      return quantity / referenceAmount;
     }
 
     throw NutritionConversionException('unsupported_unit_combination');
@@ -114,7 +117,11 @@ class NutritionConversion {
     return result;
   }
 
-  static String _normalizeUnit(String unit) {
+  /// Normalizes a unit string to a canonical token (e.g. "gramas" → "g",
+  /// "porção" → "serving", "unidade" → "unit"). Unknown units are
+  /// returned lower-cased and trimmed so they can participate in
+  /// direct (unit == reference unit) matches.
+  static String normalizeUnit(String unit) {
     final trimmed = unit.trim().toLowerCase();
     switch (trimmed) {
       case 'g':
@@ -153,7 +160,7 @@ class NutritionConversion {
   /// on the variant's reference unit and any serving equivalences.
   static Set<String> availableUnitsFor(FoodVariant variant) {
     final units = <String>{};
-    final normalizedRef = _normalizeUnit(variant.referenceUnit);
+    final normalizedRef = normalizeUnit(variant.referenceUnit);
     if (normalizedRef == 'g' || normalizedRef == 'ml') {
       units.add(normalizedRef);
     }

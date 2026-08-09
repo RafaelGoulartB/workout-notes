@@ -1,10 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/nutrition/food.dart';
+import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_search_result.dart';
+import 'package:workout_notes/models/nutrition/food_variant.dart';
+import 'package:workout_notes/models/nutrition/meal_log_item.dart';
+import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/screens/workout/food_quantity_sheet.dart';
 import 'package:workout_notes/screens/workout/food_search_screen.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 
@@ -113,6 +122,7 @@ Future<void> _installSchema(Database db) async {
 
 class _StubGateway implements NutritionGateway {
   final NutritionGatewayResult<List<FoodSearchResult>> result;
+  int searchCalls = 0;
   _StubGateway(this.result);
 
   @override
@@ -120,6 +130,7 @@ class _StubGateway implements NutritionGateway {
     String query, {
     int limit = 20,
   }) async {
+    searchCalls++;
     return result;
   }
 
@@ -132,6 +143,32 @@ class _StubGateway implements NutritionGateway {
       const NutritionGatewayError('not_supported', 'not used in tests'),
     );
   }
+
+  @override
+  String? get baseUrl => 'https://stub.test';
+}
+
+class _ControlledGateway implements NutritionGateway {
+  final Completer<NutritionGatewayResult<List<FoodSearchResult>>> pending =
+      Completer<NutritionGatewayResult<List<FoodSearchResult>>>();
+  int searchCalls = 0;
+
+  @override
+  Future<NutritionGatewayResult<List<FoodSearchResult>>> search(
+    String query, {
+    int limit = 20,
+  }) {
+    searchCalls++;
+    return pending.future;
+  }
+
+  @override
+  Future<NutritionGatewayResult<FoodSearchResult>> getFood(
+    String source,
+    String externalId,
+  ) async => NutritionGatewayResult.error(
+    const NutritionGatewayError('not_supported', 'not used in tests'),
+  );
 
   @override
   String? get baseUrl => 'https://stub.test';
@@ -158,9 +195,11 @@ void main() {
       ),
     );
     repository = NutritionRepository();
+    DatabaseHelper.overrideDatabase = database;
   });
 
   tearDown(() async {
+    DatabaseHelper.overrideDatabase = null;
     await database.close();
   });
 
@@ -181,6 +220,180 @@ void main() {
       expect(find.text(loc.nutritionAddManually), findsOneWidget);
     },
   );
+
+  testWidgets('Remote search only runs after an explicit submit', (
+    tester,
+  ) async {
+    final gateway = _StubGateway(
+      NutritionGatewayResult.error(
+        const NutritionGatewayError('network', 'offline'),
+      ),
+    );
+    await tester.pumpWidget(
+      _app(FoodSearchScreen(gateway: gateway, repository: repository)),
+    );
+
+    await tester.enterText(find.byType(TextField), 'banana');
+    await tester.pumpAndSettle();
+    expect(gateway.searchCalls, 0);
+
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(gateway.searchCalls, 1);
+  });
+
+  testWidgets('A response is ignored when the typed query has changed', (
+    tester,
+  ) async {
+    final gateway = _ControlledGateway();
+    await tester.pumpWidget(
+      _app(FoodSearchScreen(gateway: gateway, repository: repository)),
+    );
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+    await tester.enterText(find.byType(TextField), 'apple');
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    expect(gateway.searchCalls, 1);
+
+    // A text change invalidates the in-flight request immediately. Keep the
+    // replacement below the local-search threshold so this test isolates the
+    // remote race without starting another SQLite query.
+    await tester.enterText(find.byType(TextField), 'b');
+    await tester.pump();
+    gateway.pending.complete(
+      NutritionGatewayResult.error(
+        const NutritionGatewayError('network', 'stale failure'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(loc.nutritionSearchUnavailable), findsNothing);
+  });
+
+  testWidgets('Quantity resets symmetrically when switching units', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final food = Food(
+      id: 'food',
+      source: FoodSource.manual,
+      externalId: 'food',
+      name: 'Banana',
+      searchName: 'banana',
+      fetchedAt: now,
+    );
+    const variant = FoodVariant(
+      id: 'variant',
+      foodId: 'food',
+      referenceAmount: 100,
+      referenceUnit: 'g',
+      values: NutritionValues(calories: 90),
+    );
+    const serving = FoodServing(
+      id: 'serving',
+      foodVariantId: 'variant',
+      label: '1 unidade',
+      unit: 'serving',
+      gramsEquivalent: 80,
+    );
+    await tester.pumpWidget(
+      _app(
+        Scaffold(
+          body: FoodQuantitySheet(
+            food: food,
+            primaryVariant: variant,
+            servings: const [serving],
+          ),
+        ),
+      ),
+    );
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+    TextField quantityField() => tester.widget(find.byType(TextField));
+
+    expect(quantityField().controller!.text, '100');
+    await tester.tap(find.text(loc.nutritionUnitServing));
+    await tester.pump();
+    expect(quantityField().controller!.text, '1');
+    await tester.tap(find.text(loc.nutritionUnitGrams));
+    await tester.pump();
+    expect(quantityField().controller!.text, '100');
+  });
+
+  testWidgets('Editing a serving restores its conversion automatically', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final food = Food(
+      id: 'food',
+      source: FoodSource.manual,
+      externalId: 'food',
+      name: 'Iogurte',
+      searchName: 'iogurte',
+      fetchedAt: now,
+    );
+    const variant = FoodVariant(
+      id: 'variant',
+      foodId: 'food',
+      referenceAmount: 100,
+      referenceUnit: 'g',
+      values: NutritionValues(calories: 60),
+    );
+    const serving = FoodServing(
+      id: 'serving',
+      foodVariantId: 'variant',
+      label: 'Pote',
+      unit: 'serving',
+      gramsEquivalent: 170,
+    );
+    final snapshot = NutritionSnapshot(
+      version: NutritionSnapshot.currentVersion,
+      source: FoodSource.manual,
+      externalId: 'food',
+      foodName: 'Iogurte',
+      foodBrand: null,
+      variantLabel: null,
+      referenceAmount: 100,
+      referenceUnit: 'g',
+      quantity: 1,
+      unit: 'serving',
+      gramsEquivalent: 170,
+      mlEquivalent: null,
+      consumed: const NutritionValues(calories: 102),
+      isEstimated: false,
+      hasMissingValues: true,
+    );
+    final existing = MealLogItem(
+      id: 'item',
+      mealLogId: 'meal',
+      foodId: 'food',
+      foodVariantId: 'variant',
+      foodNameSnapshot: 'Iogurte',
+      quantity: 1,
+      unit: 'serving',
+      calories: 102,
+      snapshotJson: snapshot.encode(),
+      createdAt: now,
+    );
+    await tester.pumpWidget(
+      _app(
+        Scaffold(
+          body: FoodQuantitySheet(
+            food: food,
+            primaryVariant: variant,
+            servings: const [serving],
+            existing: existing,
+          ),
+        ),
+      ),
+    );
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+    final save = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, loc.nutritionSave),
+    );
+    expect(save.onPressed, isNotNull);
+  });
 
   testWidgets('MainShell renders three tabs (Workout, Sleep, Nutrition)', (
     tester,

@@ -224,12 +224,26 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(loc.nutritionItemDeleted),
-          action: SnackBarAction(label: loc.nutritionUndo, onPressed: () {}),
+          action: SnackBarAction(
+            label: loc.nutritionUndo,
+            onPressed: () => _undoDelete(item),
+          ),
         ),
       );
     } finally {
       if (mounted) setState(() => _isMutating = false);
     }
+  }
+
+  /// Re-inserts a deleted item (the snackbar "undo" action). The
+  /// parent meal log still exists, so the original row can be put
+  /// back with its id, snapshot and links intact.
+  Future<void> _undoDelete(MealLogItem item) async {
+    try {
+      await _repository.restoreMealLogItem(item);
+    } catch (_) {}
+    if (!mounted) return;
+    await _load();
   }
 
   Future<void> _openSettings() async {
@@ -280,10 +294,11 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                   SliverToBoxAdapter(
                     child: _DateNavigator(
                       date: _selectedDate,
-                      onPrevious:
-                          _meals.isEmpty && _summary.consumed.calories == null
-                          ? null
-                          : () => _changeDay(-1),
+                      // Always navigable: disabling the arrow on empty
+                      // days made it fall back to "go to today", so the
+                      // user could never reach a previous day from an
+                      // empty one.
+                      onPrevious: () => _changeDay(-1),
                       onNext: () => _changeDay(1),
                       onJumpToday: _jumpToToday,
                       onPickDate: _pickDate,

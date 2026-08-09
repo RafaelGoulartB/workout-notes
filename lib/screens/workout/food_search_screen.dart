@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -34,14 +32,20 @@ class FoodSearchScreen extends StatefulWidget {
 }
 
 class _FoodSearchScreenState extends State<FoodSearchScreen> {
+  /// Remote searches are explicit (keyboard search action / search icon),
+  /// because the Open Food Facts endpoint must not be used as type-ahead.
+  /// The minimum interval also protects against repeatedly submitting the
+  /// same field faster than the provider's anonymous rate limit.
+  static const Duration _remoteMinInterval = Duration(seconds: 6);
+
   final TextEditingController _controller = TextEditingController();
-  Timer? _debounce;
+  DateTime _lastRemoteSearchAt = DateTime.fromMillisecondsSinceEpoch(0);
+  int _remoteRequestGeneration = 0;
 
   List<FoodSearchResult> _localResults = const [];
   List<FoodSearchResult> _remoteResults = const [];
   bool _isSearchingRemote = false;
   NutritionGatewayError? _remoteError;
-  String _lastQuery = '';
   bool _showQueryTooShort = false;
 
   @override
@@ -52,14 +56,15 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _controller.removeListener(_onChanged);
     _controller.dispose();
     super.dispose();
   }
 
   void _onChanged() {
-    _debounce?.cancel();
+    // Invalidate a request that may still be in flight. Its response must
+    // never be rendered under the newly typed query.
+    _remoteRequestGeneration++;
     final value = _controller.text;
     if (value.trim().length < 2) {
       setState(() {
@@ -71,8 +76,12 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       });
       return;
     }
+    setState(() {
+      _remoteResults = const [];
+      _remoteError = null;
+      _isSearchingRemote = false;
+    });
     _scheduleLocal(value);
-    _scheduleRemote(value);
   }
 
   void _scheduleLocal(String query) {
@@ -89,32 +98,52 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     });
   }
 
-  void _scheduleRemote(String query) {
-    _debounce = Timer(const Duration(milliseconds: 350), () async {
-      if (!mounted || _controller.text != query) return;
-      setState(() {
-        _isSearchingRemote = true;
-        _remoteError = null;
-        _lastQuery = query;
-      });
-      final result = await widget.gateway.search(query);
-      if (!mounted || _controller.text != _lastQuery) return;
-      if (result.error != null) {
-        setState(() {
-          _remoteResults = const [];
-          _remoteError = result.error;
-          _isSearchingRemote = false;
-        });
-        return;
+  Future<void> _searchRemote(String rawQuery) async {
+    final query = rawQuery.trim();
+    if (query.length < 2 || _isSearchingRemote) {
+      if (query.isNotEmpty && query.length < 2 && mounted) {
+        setState(() => _showQueryTooShort = true);
       }
-      final hydrated = await _hydrateRemote(result.data ?? const []);
-      if (!mounted || _controller.text != _lastQuery) return;
-      setState(() {
-        _remoteResults = _mergeWithLocal(hydrated, _localResults);
-        _isSearchingRemote = false;
-        _remoteError = null;
-      });
+      return;
+    }
+
+    final generation = ++_remoteRequestGeneration;
+    setState(() {
+      _isSearchingRemote = true;
+      _remoteError = null;
+      _showQueryTooShort = false;
     });
+
+    final elapsed = DateTime.now().difference(_lastRemoteSearchAt);
+    if (elapsed < _remoteMinInterval) {
+      await Future<void>.delayed(_remoteMinInterval - elapsed);
+    }
+
+    if (!_isCurrentRemoteRequest(generation, query)) return;
+    _lastRemoteSearchAt = DateTime.now();
+    final result = await widget.gateway.search(query);
+    if (!_isCurrentRemoteRequest(generation, query)) return;
+    if (result.error != null) {
+      setState(() {
+        _remoteResults = const [];
+        _remoteError = result.error;
+        _isSearchingRemote = false;
+      });
+      return;
+    }
+    final hydrated = await _hydrateRemote(result.data ?? const []);
+    if (!_isCurrentRemoteRequest(generation, query)) return;
+    setState(() {
+      _remoteResults = _mergeWithLocal(hydrated, _localResults);
+      _isSearchingRemote = false;
+      _remoteError = null;
+    });
+  }
+
+  bool _isCurrentRemoteRequest(int generation, String query) {
+    return mounted &&
+        generation == _remoteRequestGeneration &&
+        _controller.text.trim() == query;
   }
 
   /// Persists each remote result (food + variant + servings) into the
@@ -317,9 +346,17 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                 decoration: InputDecoration(
                   hintText: loc.nutritionSearchHint,
                   prefixIcon: const Icon(Icons.search),
+                  suffixIcon: IconButton(
+                    tooltip: loc.nutritionSearchTitle,
+                    onPressed: _isSearchingRemote
+                        ? null
+                        : () => _searchRemote(_controller.text),
+                    icon: const Icon(Icons.arrow_forward),
+                  ),
                   border: const OutlineInputBorder(),
                 ),
                 textInputAction: TextInputAction.search,
+                onSubmitted: _searchRemote,
               ),
             ),
             if (_showQueryTooShort)

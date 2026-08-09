@@ -192,8 +192,13 @@ class OpenFoodFactsGateway implements NutritionGateway {
       nutriments is Map ? nutriments.cast<String, dynamic>() : null,
     );
 
+    // IDs are scoped to the product code: these are global primary
+    // keys in the local cache, so a shared constant like `off_100g`
+    // would collide between every product and silently drop all but
+    // the first result. Deterministic per-code IDs also keep the
+    // cache upsert idempotent.
     final variant = FoodVariant(
-      id: 'off_100g',
+      id: 'off_${code}_100g',
       foodId: 'pending',
       label: '100 g',
       referenceAmount: 100,
@@ -211,7 +216,7 @@ class OpenFoodFactsGateway implements NutritionGateway {
       final label = _nullableString(product['serving_size']);
       servings[variant.id] = [
         FoodServing(
-          id: 'off_serving',
+          id: 'off_${code}_serving',
           foodVariantId: variant.id,
           label: label ?? '1 serving',
           quantity: 1,
@@ -247,8 +252,16 @@ class OpenFoodFactsGateway implements NutritionGateway {
       fatG: _nonNegativeDouble(nutriments['fat_100g']),
       fiberG: _nonNegativeDouble(nutriments['fiber_100g']),
       sugarsG: _nonNegativeDouble(nutriments['sugars_100g']),
-      sodiumMg: _nonNegativeDouble(nutriments['sodium_100g']),
+      // Open Food Facts reports sodium (like every other nutrient)
+      // per 100 g in *grams*; the app model uses milligrams.
+      sodiumMg: _toMilligrams(nutriments['sodium_100g']),
     );
+  }
+
+  static double? _toMilligrams(dynamic grams) {
+    final value = _nonNegativeDouble(grams);
+    if (value == null) return null;
+    return value * 1000;
   }
 
   Map<String, String> _headers() => {

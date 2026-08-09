@@ -48,10 +48,7 @@ void main() {
         baseUrl: 'https://world.openfoodfacts.org',
       );
       await gateway.getFood(FoodSource.openFoodFacts, '7891234567890');
-      expect(
-        captured.first.path,
-        '/api/v2/product/7891234567890.json',
-      );
+      expect(captured.first.path, '/api/v2/product/7891234567890.json');
     });
   });
 
@@ -75,7 +72,7 @@ void main() {
                   'fat_100g': 2.4,
                   'fiber_100g': 4,
                   'sugars_100g': 0.5,
-                  'sodium_100g': 3,
+                  'sodium_100g': 0.3,
                 },
                 'serving_quantity_g': 50,
                 'serving_size': '1/2 xícara (50 g)',
@@ -109,11 +106,63 @@ void main() {
       expect(variant.values.fatG, 2.4);
       expect(variant.values.fiberG, 4);
       expect(variant.values.sugarsG, 0.5);
-      expect(variant.values.sodiumMg, 3);
+      // OFF reports sodium per 100 g in grams; the model stores mg.
+      expect(variant.values.sodiumMg, 300);
       expect(variant.isEstimated, isFalse);
       expect(row.servings, hasLength(1));
       expect(row.servings.first.gramsEquivalent, 50);
       expect(row.servings.first.label, '1/2 xícara (50 g)');
+    });
+
+    test('scopes variant and serving ids to the product code', () async {
+      final client = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'count': 2,
+            'products': [
+              {
+                'code': '111',
+                'product_name': 'Produto A',
+                'nutriments': {'energy-kcal_100g': 100},
+                'serving_quantity_g': 30,
+              },
+              {
+                'code': '222',
+                'product_name': 'Produto B',
+                'nutriments': {'energy-kcal_100g': 200},
+                'serving_quantity_g': 40,
+              },
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+      final gateway = OpenFoodFactsGateway(
+        client: client,
+        baseUrl: 'https://world.openfoodfacts.org',
+      );
+      final result = await gateway.search('x');
+      final rows = result.data!;
+      expect(rows, hasLength(2));
+      // Shared constants would collide on the global PK and silently
+      // drop every product but the first during the cache upsert.
+      expect(
+        rows.first.primaryVariant!.id,
+        'open_food_facts::111::variant::off_111_100g',
+      );
+      expect(
+        rows.last.primaryVariant!.id,
+        'open_food_facts::222::variant::off_222_100g',
+      );
+      expect(
+        rows.first.servings.first.id,
+        'open_food_facts::111::serving_0::off_111_serving',
+      );
+      expect(
+        rows.last.servings.first.id,
+        'open_food_facts::222::serving_0::off_222_serving',
+      );
     });
 
     test('falls back to English name when pt-BR is missing', () async {
@@ -161,7 +210,10 @@ void main() {
         baseUrl: 'https://world.openfoodfacts.org',
       );
       final result = await gateway.search('suco');
-      expect(result.data!.first.primaryVariant!.values.calories, closeTo(50, 0.01));
+      expect(
+        result.data!.first.primaryVariant!.values.calories,
+        closeTo(50, 0.01),
+      );
     });
 
     test('skips products without code or name', () async {
@@ -268,7 +320,9 @@ void main() {
     });
 
     test('maps malformed JSON to malformed_response', () async {
-      final client = MockClient((request) async => http.Response('not json', 200));
+      final client = MockClient(
+        (request) async => http.Response('not json', 200),
+      );
       final gateway = OpenFoodFactsGateway(
         client: client,
         baseUrl: 'https://world.openfoodfacts.org',

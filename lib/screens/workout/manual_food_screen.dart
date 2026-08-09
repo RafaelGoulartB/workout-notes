@@ -109,10 +109,13 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
             ? 'g'
             : _referenceUnitController.text.trim(),
         referenceValues: NutritionValues(
-          calories: _parseDouble(_caloriesController.text, 0),
-          proteinG: _parseDouble(_proteinController.text, 0),
-          carbsG: _parseDouble(_carbsController.text, 0),
-          fatG: _parseDouble(_fatController.text, 0),
+          // Empty fields stay null ("unknown"), never 0: a blank
+          // macro is different from a measured zero and must keep
+          // flagging the food as incomplete in the UI.
+          calories: _parseDouble(_caloriesController.text, null),
+          proteinG: _parseDouble(_proteinController.text, null),
+          carbsG: _parseDouble(_carbsController.text, null),
+          fatG: _parseDouble(_fatController.text, null),
           fiberG: _parseDouble(_fiberController.text, null),
           sugarsG: _parseDouble(_sugarsController.text, null),
           sodiumMg: _parseDouble(_sodiumController.text, null),

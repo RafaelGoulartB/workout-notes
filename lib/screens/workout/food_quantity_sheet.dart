@@ -52,6 +52,7 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
       _quantityController = TextEditingController(text: _defaultQuantityText());
     }
     _recomputeUnitAvailability();
+    _restoreExistingServing(initial);
     _updatePreview();
   }
 
@@ -74,19 +75,7 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
   }
 
   void _recomputeUnitAvailability() {
-    final available = <String>{};
-    final ref = widget.primaryVariant.referenceUnit.toLowerCase();
-    if (ref == 'g' || ref == 'gram' || ref == 'grams' || ref == 'gramas') {
-      available.add('g');
-    } else if (ref == 'ml' ||
-        ref == 'millilitre' ||
-        ref == 'millilitres' ||
-        ref == 'mililitros') {
-      available.add('ml');
-    }
-    if (widget.servings.isNotEmpty) {
-      available.add('serving');
-    }
+    final available = _computeAvailableUnits();
     if (_unit == null || !available.contains(_unit)) {
       if (available.contains('g')) {
         _unit = 'g';
@@ -94,11 +83,55 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
         _unit = 'ml';
       } else if (available.contains('serving')) {
         _unit = 'serving';
-        _selectedServing = widget.servings.first;
+        _selectedServing = widget.servings.isEmpty
+            ? null
+            : widget.servings.first;
+      } else if (available.contains('unit')) {
+        _unit = 'unit';
+        _selectedServing = null;
       } else {
-        _unit = null;
+        _unit = available.isEmpty ? null : available.first;
       }
     }
+  }
+
+  void _restoreExistingServing(MealLogItem? existing) {
+    if (existing == null || _unit != 'serving' || widget.servings.isEmpty) {
+      return;
+    }
+    final snapshot = existing.snapshot;
+    _selectedServing = widget.servings.firstWhere(
+      (serving) =>
+          serving.gramsEquivalent == snapshot.gramsEquivalent &&
+          serving.mlEquivalent == snapshot.mlEquivalent,
+      orElse: () => widget.servings.first,
+    );
+  }
+
+  /// Units the user can pick for this variant: the reference unit
+  /// (g/ml when it normalizes to one, otherwise the free manual unit
+  /// such as "fatia"), plus "porção" when servings are defined.
+  Set<String> _computeAvailableUnits() {
+    final available = <String>{};
+    final ref = widget.primaryVariant.referenceUnit.trim();
+    final normalizedRef = NutritionConversion.normalizeUnit(ref);
+    if (normalizedRef == 'g') {
+      available.add('g');
+    } else if (normalizedRef == 'ml') {
+      available.add('ml');
+    } else if (normalizedRef == 'serving') {
+      available.add('serving');
+    } else if (normalizedRef == 'unit') {
+      available.add('unit');
+    } else if (ref.isNotEmpty) {
+      // Free manual unit (e.g. "fatia"): the conversion supports a
+      // direct unit == reference match, so surface the unit itself.
+      available.add(ref);
+    }
+    if (widget.servings.isNotEmpty) {
+      available.add('serving');
+    }
+    return available;
   }
 
   void _updatePreview() {
@@ -174,8 +207,21 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
       } else if (value != 'serving') {
         _selectedServing = null;
       }
+      // A number cannot be safely reinterpreted under another unit.
+      // Reset every unit change to that unit's natural default.
+      _quantityController.text = _defaultQuantityForUnit(value);
     });
     _updatePreview();
+  }
+
+  String _defaultQuantityForUnit(String? unit) {
+    final normalizedReference = NutritionConversion.normalizeUnit(
+      widget.primaryVariant.referenceUnit,
+    );
+    final isConvertedServing =
+        unit == 'serving' && normalizedReference != 'serving';
+    final isConvertedUnit = unit == 'unit' && normalizedReference != 'unit';
+    return isConvertedServing || isConvertedUnit ? '1' : _defaultQuantityText();
   }
 
   void _onServingChanged(FoodServing? serving) {
@@ -308,19 +354,7 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
   }
 
   Widget _buildUnitChoices(AppLocalizations loc) {
-    final available = <String>{};
-    final ref = widget.primaryVariant.referenceUnit.toLowerCase();
-    if (ref == 'g' || ref == 'gram' || ref == 'grams' || ref == 'gramas') {
-      available.add('g');
-    } else if (ref == 'ml' ||
-        ref == 'millilitre' ||
-        ref == 'millilitres' ||
-        ref == 'mililitros') {
-      available.add('ml');
-    }
-    if (widget.servings.isNotEmpty) {
-      available.add('serving');
-    }
+    final available = _computeAvailableUnits();
     if (available.isEmpty) {
       return Text(
         loc.nutritionInvalidQuantity,
@@ -349,6 +383,8 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
         return loc.nutritionUnitMilliliters;
       case 'serving':
         return loc.nutritionUnitServing;
+      case 'unit':
+        return loc.nutritionUnitUnit;
       default:
         return value;
     }

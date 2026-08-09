@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
@@ -49,6 +48,10 @@ class NutritionRepository extends BaseRepository {
     final db = await this.db;
     final like = '%${_escapeLike(normalized)}%';
     final brand = _extractBrand(query);
+    // `_extractBrand` always yields a real token (for single-word
+    // queries the word itself), so the brand predicate below can
+    // never degrade into `LIKE '%%'` — which previously matched
+    // every branded food for any single-word query.
     final rows = await db.rawQuery(
       '''
       SELECT f.*,
@@ -64,7 +67,7 @@ class NutritionRepository extends BaseRepository {
       <Object?>[
         normalized,
         '$normalized%',
-        '%${brand.toLowerCase()}%',
+        '%${_escapeLike(brand.toLowerCase())}%',
         like,
         '%${_escapeLike(brand.toLowerCase())}%',
         limit,
@@ -144,23 +147,56 @@ class NutritionRepository extends BaseRepository {
               fetchedAt: food.fetchedAt,
               lastUsedAt: food.lastUsedAt,
             );
-      await txn.insert(
-        'foods',
-        resolvedFood.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      // UPDATE in place (never REPLACE): REPLACE deletes the row
+      // before inserting, which fires `ON DELETE SET NULL` on
+      // meal_log_items and silently breaks the food links of past
+      // meals. Updating keeps the row identity intact.
+      if (existing.isEmpty) {
+        await txn.insert('foods', resolvedFood.toMap());
+      } else {
+        await txn.update(
+          'foods',
+          resolvedFood.toMap(),
+          where: 'id = ?',
+          whereArgs: [resolvedFood.id],
+        );
+      }
 
-      // Replace variants.
-      await txn.delete(
-        'food_variants',
-        where: 'food_id = ?',
-        whereArgs: [resolvedFood.id],
-      );
+      // Upsert variants by id instead of delete + recreate. Deleting a
+      // variant row nulls `food_variant_id` on referenced meal log
+      // items via `ON DELETE SET NULL`, so past meals would silently
+      // lose the link that keeps them editable. Same for the food row.
       for (final variant in variants) {
         final resolved = variant.foodId == resolvedFood.id
             ? variant
             : variant.copyWith(foodId: resolvedFood.id);
-        await txn.insert('food_variants', resolved.toMap());
+        final existingVariant = await txn.query(
+          'food_variants',
+          where: 'id = ?',
+          whereArgs: [resolved.id],
+          limit: 1,
+        );
+        if (existingVariant.isNotEmpty &&
+            existingVariant.first['food_id'] != resolvedFood.id) {
+          throw const NutritionValidationException('variant_id_conflict');
+        }
+        if (existingVariant.isEmpty) {
+          await txn.insert('food_variants', resolved.toMap());
+        } else {
+          await txn.update(
+            'food_variants',
+            resolved.toMap(),
+            where: 'id = ?',
+            whereArgs: [resolved.id],
+          );
+        }
+        // Servings carry no history links, so they can be safely
+        // replaced wholesale.
+        await txn.delete(
+          'food_servings',
+          where: 'food_variant_id = ?',
+          whereArgs: [resolved.id],
+        );
         final list = servings?[variant.id] ?? const <FoodServing>[];
         for (final serving in list) {
           final resolvedServing = serving.foodVariantId == resolved.id
@@ -418,6 +454,14 @@ class NutritionRepository extends BaseRepository {
   Future<void> deleteMealLogItem(String itemId) async {
     final db = await this.db;
     await db.delete('meal_log_items', where: 'id = ?', whereArgs: [itemId]);
+  }
+
+  /// Re-inserts a previously deleted item with its original id (undo).
+  /// The parent meal log is kept by design (deleting an item never
+  /// deletes the log), so the foreign key stays valid.
+  Future<void> restoreMealLogItem(MealLogItem item) async {
+    final db = await this.db;
+    await db.insert('meal_log_items', item.toMap());
   }
 
   /// Returns all meal logs and their items for the given day.
@@ -711,9 +755,13 @@ class NutritionRepository extends BaseRepository {
     }).toList();
   }
 
+  /// Brand token used for ranking/`WHERE` brand matches: the first
+  /// word of the query. Single-word queries use the word itself, so
+  /// the token is never empty (an empty token would produce a
+  /// match-everything `LIKE '%%'` predicate).
   static String _extractBrand(String input) {
     final cleaned = input.trim();
-    if (!cleaned.contains(' ')) return '';
+    if (cleaned.isEmpty) return '';
     return cleaned.split(' ').first;
   }
 
