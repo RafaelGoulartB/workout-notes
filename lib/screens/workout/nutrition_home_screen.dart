@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
-import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
@@ -16,7 +15,6 @@ import 'package:workout_notes/services/open_food_facts_gateway.dart';
 import 'food_quantity_sheet.dart';
 import 'food_library_screen.dart';
 import 'food_search_screen.dart';
-import 'manual_food_screen.dart';
 import 'nutrition_progress_screen.dart';
 import 'nutrition_settings_screen.dart';
 import 'saved_meal_editor_screen.dart';
@@ -24,8 +22,7 @@ import 'saved_meals_screen.dart';
 
 enum _NutritionMenuAction { progress, savedMeals, copyPreviousDay }
 
-/// Nutrition dashboard. It mirrors the workout home hierarchy: a compact
-/// daily overview, prominent quick actions and a separate tools section.
+/// Nutrition dashboard with a compact daily overview and tools section.
 class NutritionHomeScreen extends StatefulWidget {
   const NutritionHomeScreen({super.key});
 
@@ -119,14 +116,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     await _load();
   }
 
-  Future<void> _openManualFood() async {
-    await Navigator.of(context).push<Food>(
-      MaterialPageRoute(
-        builder: (_) => ManualFoodScreen(repository: _repository),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
@@ -172,39 +161,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                   ),
                   SliverToBoxAdapter(
                     child: _NutritionSectionHeader(
-                      text: loc.nutritionHomeSectionQuickActions,
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _NutritionActionCard(
-                              icon: Icons.menu_book_outlined,
-                              title: loc.nutritionHomeDiary,
-                              subtitle: loc.nutritionHomeDiarySubtitle,
-                              color: theme.colorScheme.primary,
-                              onTap: _openDay,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _NutritionActionCard(
-                              icon: Icons.add_rounded,
-                              title: loc.nutritionHomeManualFood,
-                              subtitle: loc.nutritionHomeManualFoodSubtitle,
-                              color: theme.colorScheme.secondary,
-                              onTap: _openManualFood,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ).animate().fadeIn(duration: 350.ms, delay: 180.ms),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _NutritionSectionHeader(
                       text: loc.nutritionHomeSectionTools,
                     ),
                   ),
@@ -213,7 +169,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                       onProgress: _openProgress,
                       onSavedMeals: _openSavedMeals,
                       onFoods: _openFoodLibrary,
-                    ).animate().fadeIn(duration: 350.ms, delay: 240.ms),
+                    ).animate().fadeIn(duration: 350.ms, delay: 160.ms),
                   ),
                   const SliverToBoxAdapter(child: SizedBox(height: 32)),
                 ],
@@ -448,76 +404,6 @@ class _NutritionSectionHeader extends StatelessWidget {
           fontWeight: FontWeight.w700,
           letterSpacing: 1.5,
           color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
-
-class _NutritionActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _NutritionActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(70)),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          height: 142,
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: color.withAlpha(35),
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: Icon(icon, color: color),
-                ),
-                const Spacer(),
-                Text(
-                  title,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );

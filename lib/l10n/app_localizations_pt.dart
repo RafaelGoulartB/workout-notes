@@ -3496,16 +3496,7 @@ class AppLocalizationsPt extends AppLocalizations {
   String get nutritionHomeDiary => 'Diário alimentar';
 
   @override
-  String get nutritionHomeDiarySubtitle => 'Ver e registrar refeições de hoje';
-
-  @override
   String get nutritionHomeManualFood => 'Novo alimento';
-
-  @override
-  String get nutritionHomeManualFoodSubtitle => 'Cadastrar manualmente';
-
-  @override
-  String get nutritionHomeSectionQuickActions => 'AÇÕES RÁPIDAS';
 
   @override
   String get nutritionHomeSectionTools => 'FERRAMENTAS';

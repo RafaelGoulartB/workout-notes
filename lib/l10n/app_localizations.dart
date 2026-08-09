@@ -6406,29 +6406,11 @@ abstract class AppLocalizations {
   /// **'Food diary'**
   String get nutritionHomeDiary;
 
-  /// No description provided for @nutritionHomeDiarySubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'View and log today\'s meals'**
-  String get nutritionHomeDiarySubtitle;
-
   /// No description provided for @nutritionHomeManualFood.
   ///
   /// In en, this message translates to:
   /// **'New food'**
   String get nutritionHomeManualFood;
-
-  /// No description provided for @nutritionHomeManualFoodSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Add it manually'**
-  String get nutritionHomeManualFoodSubtitle;
-
-  /// No description provided for @nutritionHomeSectionQuickActions.
-  ///
-  /// In en, this message translates to:
-  /// **'QUICK ACTIONS'**
-  String get nutritionHomeSectionQuickActions;
 
   /// No description provided for @nutritionHomeSectionTools.
   ///

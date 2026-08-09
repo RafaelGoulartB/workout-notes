@@ -3479,16 +3479,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nutritionHomeDiary => 'Food diary';
 
   @override
-  String get nutritionHomeDiarySubtitle => 'View and log today\'s meals';
-
-  @override
   String get nutritionHomeManualFood => 'New food';
-
-  @override
-  String get nutritionHomeManualFoodSubtitle => 'Add it manually';
-
-  @override
-  String get nutritionHomeSectionQuickActions => 'QUICK ACTIONS';
 
   @override
   String get nutritionHomeSectionTools => 'TOOLS';
