@@ -4,15 +4,20 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
+import 'package:workout_notes/models/nutrition/food.dart';
+import 'package:workout_notes/models/nutrition/food_serving.dart';
+import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/services/barcode_scanner_service.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
 
+import 'barcode_scan_screen.dart';
 import 'food_quantity_sheet.dart';
 import 'food_library_screen.dart';
 import 'food_search_screen.dart';
@@ -23,7 +28,11 @@ import 'saved_meals_screen.dart';
 
 enum _NutritionMenuAction { progress, savedMeals, copyPreviousDay, manageMeals }
 
-/// Nutrition dashboard with a compact daily overview and tools section.
+/// Nutrition dashboard. Shows the day's totals at a glance, a quick
+/// "today" panel with one row per configured meal (so the most common
+/// action — adding a food to the next meal — is a single tap away)
+/// and a tools grid for progress, saved meals, the food library and
+/// settings. Tapping the summary card opens the detailed diary.
 class NutritionHomeScreen extends StatefulWidget {
   const NutritionHomeScreen({super.key});
 
@@ -33,9 +42,16 @@ class NutritionHomeScreen extends StatefulWidget {
 
 class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   final NutritionRepository _repository = NutritionRepository();
+  final NutritionGateway _gateway = OpenFoodFactsGateway();
+  final BarcodeScannerService _barcodeScanner = const BarcodeScannerService();
+
   DailyNutritionSummary _summary = DailyNutritionSummary.empty;
   NutritionGoal? _goal;
+  List<MealTypeDefinition> _mealTypes = const [];
+  List<MealLogWithItems> _meals = const [];
   bool _isLoading = true;
+  bool _isMutating = false;
+  bool _showMeals = true;
 
   @override
   void initState() {
@@ -47,14 +63,19 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     if (!mounted) return;
     setState(() => _isLoading = true);
     try {
+      final date = _dateString(DateTime.now());
       final results = await Future.wait([
-        _repository.getDailySummary(_dateString(DateTime.now())),
+        _repository.getDailySummary(date),
         _repository.getActiveGoal(),
+        _repository.getMealTypes(),
+        _repository.getDayMeals(date),
       ]);
       if (!mounted) return;
       setState(() {
         _summary = results[0] as DailyNutritionSummary;
         _goal = results[1] as NutritionGoal?;
+        _mealTypes = results[2] as List<MealTypeDefinition>;
+        _meals = results[3] as List<MealLogWithItems>;
         _isLoading = false;
       });
     } catch (_) {
@@ -117,6 +138,410 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     await _load();
   }
 
+  /// Total number of food items logged today across all meal sections.
+  int get _totalItemsToday =>
+      _meals.fold<int>(0, (sum, meal) => sum + meal.items.length);
+
+  /// Picks the meal type the user is most likely to want to add to right
+  /// now: the first configured type that has no items yet, otherwise
+  /// the first configured type. Falls back to null when the catalog is
+  /// empty so callers can decide what to do.
+  MealTypeDefinition? _suggestedMealType() {
+    if (_mealTypes.isEmpty) return null;
+    for (final type in _mealTypes) {
+      final has = _meals.any(
+        (m) => m.log.mealType == type.key && m.items.isNotEmpty,
+      );
+      if (!has) return type;
+    }
+    return _mealTypes.first;
+  }
+
+  Future<MealTypeDefinition?> _pickMealTypeSheet(AppLocalizations loc) {
+    return showModalBottomSheet<MealTypeDefinition>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    loc.nutritionHomePickMeal,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                for (final type in _mealTypes) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer.withAlpha(120),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.restaurant_outlined,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    title: Text(type.displayName(loc)),
+                    trailing: Icon(
+                      Icons.chevron_right_rounded,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    onTap: () => Navigator.of(ctx).pop(type),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                  label: Text(loc.nutritionCancel),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Primary "add a food" flow. Asks the user which meal to add to
+  /// when more than one is configured, then opens the food search
+  /// pre-bound to that meal.
+  Future<void> _addQuickFood() async {
+    if (_mealTypes.isEmpty) {
+      // No meal catalog yet: jump straight to the search screen so the
+      // user can still log a food; the diary edit will pick the meal
+      // type at the quantity-sheet step.
+      await _openFoodSearchForMeal(null, null);
+      return;
+    }
+    final selected = _mealTypes.length == 1
+        ? _mealTypes.first
+        : await _pickMealTypeSheet(AppLocalizations.of(context)!);
+    if (selected == null || !mounted) return;
+    await _openFoodSearchForMeal(
+      selected.key,
+      selected.displayName(AppLocalizations.of(context)!),
+    );
+  }
+
+  Future<void> _openFoodSearchForMeal(String? mealType, String? mealLabel) async {
+    final result = await Navigator.of(context).push<NutritionSelection>(
+      MaterialPageRoute(
+        builder: (_) => FoodSearchScreen(
+          gateway: _gateway,
+          repository: _repository,
+          mealType: mealType,
+          mealName: mealLabel,
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    final quantity = await showFoodQuantitySheet(
+      context: context,
+      food: result.food,
+      primaryVariant: result.primaryVariant,
+      servings: result.servings,
+    );
+    if (quantity == null) return;
+    await _persistAdd(
+      result.mealType ?? mealType,
+      result.mealName ?? mealLabel,
+      quantity,
+    );
+  }
+
+  /// Adds a food directly to a specific meal — the action used by the
+  /// per-meal "tap-to-add" buttons in the today's meals list.
+  Future<void> _addToMeal(MealTypeDefinition type) async {
+    final loc = AppLocalizations.of(context)!;
+    await _openFoodSearchForMeal(type.key, type.displayName(loc));
+  }
+
+  /// Scans a barcode and routes the resulting product into the diary.
+  /// Mirrors the food search screen's scan flow but skips the search
+  /// page so the "scan" quick action is a single tap. Falls back to
+  /// opening the food search screen if the catalog is empty (so the
+  /// user can still log the food once they configure a meal type).
+  Future<void> _scanBarcode() async {
+    final loc = AppLocalizations.of(context)!;
+    if (!_barcodeScanner.isSupported) {
+      _showSnack(loc.nutritionScanUnsupported);
+      return;
+    }
+    final raw = await Navigator.of(context).push<String?>(
+      MaterialPageRoute(
+        builder: (_) => BarcodeScanScreen(scanner: _barcodeScanner),
+      ),
+    );
+    if (raw == null || raw.isEmpty || !mounted) return;
+    final productCode = _extractProductCode(raw);
+    if (productCode == null) {
+      _showSnack(loc.nutritionScanInvalid);
+      return;
+    }
+    final target = _suggestedMealType();
+    if (target == null) {
+      _showSnack(loc.nutritionSavedMealNoMealTypes);
+      return;
+    }
+    setState(() => _isMutating = true);
+    try {
+      // 1. Local cache: a known barcode is resolved without a network
+      //    hop.
+      final local = await _repository.getFoodByBarcode(productCode);
+      if (local != null) {
+        if (!mounted) return;
+        await _openQuantityForScanResult(
+          local.food,
+          local.variants,
+          local.servings,
+          target,
+        );
+        return;
+      }
+      // 2. Fall back to the Open Food Facts gateway for unknown codes.
+      final result = await _gateway.getFood(
+        FoodSource.openFoodFacts,
+        productCode,
+      );
+      if (!mounted) return;
+      if (result.error != null) {
+        _showSnack(_barcodeErrorText(result.error!.code));
+        return;
+      }
+      final remote = result.data;
+      final variant = remote?.primaryVariant;
+      if (remote == null || variant == null) {
+        _showSnack(loc.nutritionScanNotFound);
+        return;
+      }
+      final upserted = await _repository.upsertFoodWithDetails(
+        food: remote.food,
+        variants: [variant],
+        servings: {variant.id: remote.servings},
+      );
+      if (!mounted) return;
+      final rehydrated = await _repository.getFoodWithDetails(upserted.id);
+      if (rehydrated == null) {
+        _showSnack(loc.nutritionScanNotFound);
+        return;
+      }
+      await _openQuantityForScanResult(
+        rehydrated.food,
+        rehydrated.variants,
+        rehydrated.servings,
+        target,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack(loc.commonError(e.toString()));
+    } finally {
+      if (mounted) setState(() => _isMutating = false);
+    }
+  }
+
+  /// Opens the quantity sheet for a scan-resolved food, then persists
+  /// it to the supplied meal type.
+  Future<void> _openQuantityForScanResult(
+    Food food,
+    List<FoodVariant> variants,
+    Map<String, List<FoodServing>> servings,
+    MealTypeDefinition target,
+  ) async {
+    if (variants.isEmpty) {
+      _showSnack(AppLocalizations.of(context)!.nutritionFoodNoVariant);
+      return;
+    }
+    final variant = variants.first;
+    if (!mounted) return;
+    final loc = AppLocalizations.of(context)!;
+    final selection = await showFoodQuantitySheet(
+      context: context,
+      food: food,
+      primaryVariant: variant,
+      servings: servings[variant.id] ?? const [],
+    );
+    if (selection == null) return;
+    setState(() => _isMutating = true);
+    try {
+      final upserted = await _repository.upsertFoodWithDetails(
+        food: selection.food,
+        variants: [selection.variant],
+        servings: {selection.variant.id: selection.availableServings},
+      );
+      await _repository.addMealLogItem(
+        date: _dateString(DateTime.now()),
+        mealType: target.key,
+        name: target.displayName(loc),
+        food: upserted,
+        variant: selection.variant,
+        conversion: selection.conversion,
+        availableServings: selection.availableServings,
+      );
+      if (!mounted) return;
+      _showSnack(loc.nutritionItemSaved);
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack(loc.commonError(e.toString()));
+    } finally {
+      if (mounted) setState(() => _isMutating = false);
+      await _load();
+    }
+  }
+
+  /// Pulls the product code out of a raw scan. The scanner may return
+  /// either a plain barcode or an Open Food Facts URL — both are
+  /// accepted by the gateway.
+  static String? _extractProductCode(String raw) {
+    final trimmed = raw.trim();
+    final urlMatch = RegExp(r'/product/(\d+)(?:[/?]|$)').firstMatch(trimmed);
+    if (urlMatch != null) return urlMatch.group(1);
+    final digits = trimmed.replaceAll(RegExp(r'\D'), '');
+    return digits.isEmpty ? null : digits;
+  }
+
+  String _barcodeErrorText(String code) {
+    final loc = AppLocalizations.of(context)!;
+    switch (code) {
+      case 'not_found':
+        return loc.nutritionScanNotFound;
+      case 'rate_limited':
+        return loc.nutritionRateLimited;
+      case 'network':
+        return loc.nutritionScanNetwork;
+      default:
+        return loc.nutritionScanError;
+    }
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _persistAdd(
+    String? mealType,
+    String? mealLabel,
+    NutritionQuantitySelection selection,
+  ) async {
+    final loc = AppLocalizations.of(context)!;
+    final date = _dateString(DateTime.now());
+    // If the user came from the quick-add path and the search screen
+    // didn't bind a meal, fall back to the first configured type so we
+    // always persist to a real section.
+    final resolvedType = mealType ?? _mealTypes.firstOrNull?.key;
+    final resolvedLabel = mealLabel ?? (resolvedType == null
+        ? null
+        : _mealTypes
+              .firstWhere(
+                (t) => t.key == resolvedType,
+                orElse: () => _mealTypes.first,
+              )
+              .displayName(loc));
+    if (resolvedType == null || resolvedLabel == null) {
+      _showSnack(loc.nutritionSavedMealNoMealTypes);
+      return;
+    }
+    setState(() => _isMutating = true);
+    try {
+      final upserted = await _repository.upsertFoodWithDetails(
+        food: selection.food,
+        variants: [selection.variant],
+        servings: {selection.variant.id: selection.availableServings},
+      );
+      await _repository.addMealLogItem(
+        date: date,
+        mealType: resolvedType,
+        name: resolvedLabel,
+        food: upserted,
+        variant: selection.variant,
+        conversion: selection.conversion,
+        availableServings: selection.availableServings,
+      );
+      if (!mounted) return;
+      _showSnack(loc.nutritionItemSaved);
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack(loc.commonError(e.toString()));
+    } finally {
+      if (mounted) setState(() => _isMutating = false);
+      await _load();
+    }
+  }
+
+  /// Renders one section per configured meal type, then any orphan
+  /// sections whose type was deleted from the catalog. Mirrors the
+  /// diary's _buildMealSlivers but in a compact form suitable for the
+  /// home dashboard.
+  List<Widget> _buildMealSlivers(AppLocalizations loc, ThemeData theme) {
+    final configuredKeys = {for (final type in _mealTypes) type.key};
+    final orphanMeals = _meals
+        .where((m) => !configuredKeys.contains(m.log.mealType))
+        .toList();
+    final empty =
+        _mealTypes.isEmpty && orphanMeals.isEmpty && _meals.isEmpty;
+    if (empty) {
+      return [
+        SliverToBoxAdapter(
+          child: _NutritionHomeEmptyMeals(onAdd: _addQuickFood),
+        ),
+      ];
+    }
+    return [
+      for (final type in _mealTypes)
+        SliverToBoxAdapter(
+          child: _NutritionHomeMealRow(
+            title: type.displayName(loc),
+            meal: _mealFor(type.key),
+            onAdd: () => _addToMeal(type),
+          ).animate().fadeIn(duration: 220.ms, delay: 30.ms),
+        ),
+      for (final meal in orphanMeals)
+        SliverToBoxAdapter(
+          child: _NutritionHomeMealRow(
+            title: meal.log.displayName(loc),
+            meal: meal,
+            onAdd: () => _addToMeal(
+              MealTypeDefinition(
+                id: meal.log.mealType,
+                key: meal.log.mealType,
+                name: meal.log.name,
+                orderIndex: 0,
+                createdAt: DateTime.now(),
+              ),
+            ),
+          ).animate().fadeIn(duration: 220.ms, delay: 30.ms),
+        ),
+    ];
+  }
+
+  MealLogWithItems _mealFor(String mealType) {
+    for (final meal in _meals) {
+      if (meal.log.mealType == mealType) return meal;
+    }
+    return MealLogWithItems(
+      log: MealLog(
+        id: '',
+        date: _dateString(DateTime.now()),
+        mealType: mealType,
+        createdAt: DateTime.now(),
+      ),
+      items: const [],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
@@ -147,7 +572,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const _NutritionHomeSkeleton()
           : RefreshIndicator(
               onRefresh: _load,
               child: CustomScrollView(
@@ -158,7 +583,21 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                       summary: _summary,
                       goal: _goal,
                       onTap: _openDay,
+                      onConfigureGoal: _openSettings,
+                    ).animate().fadeIn(duration: 300.ms, delay: 60.ms).slideY(
+                      begin: 0.05,
                     ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _NutritionSectionHeader(
+                      text: loc.nutritionHomeSectionQuickActions,
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _NutritionQuickActionsRow(
+                      onAddFood: _isMutating ? null : _addQuickFood,
+                      onScan: _isMutating ? null : _scanBarcode,
+                    ).animate().fadeIn(duration: 350.ms, delay: 120.ms),
                   ),
                   SliverToBoxAdapter(
                     child: _NutritionSectionHeader(
@@ -166,13 +605,26 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                     ),
                   ),
                   SliverToBoxAdapter(
-                    child: _NutritionToolsCard(
+                    child: _NutritionToolsGrid(
                       onProgress: _openProgress,
                       onSavedMeals: _openSavedMeals,
                       onFoods: _openFoodLibrary,
-                    ).animate().fadeIn(duration: 350.ms, delay: 160.ms),
+                      onSettings: _openSettings,
+                    ).animate().fadeIn(duration: 350.ms, delay: 180.ms),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                  SliverToBoxAdapter(
+                    child: _CollapsibleSectionHeader(
+                      icon: Icons.today_outlined,
+                      iconBg: theme.colorScheme.primaryContainer,
+                      iconFg: theme.colorScheme.onPrimaryContainer,
+                      title: loc.nutritionHomeSectionToday,
+                      count: _totalItemsToday,
+                      expanded: _showMeals,
+                      onTap: () => setState(() => _showMeals = !_showMeals),
+                    ),
+                  ),
+                  if (_showMeals) ..._buildMealSlivers(loc, theme),
+                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
               ),
             ),
@@ -190,11 +642,13 @@ class _NutritionDashboardSummaryCard extends StatelessWidget {
   final DailyNutritionSummary summary;
   final NutritionGoal? goal;
   final VoidCallback onTap;
+  final VoidCallback onConfigureGoal;
 
   const _NutritionDashboardSummaryCard({
     required this.summary,
     required this.goal,
     required this.onTap,
+    required this.onConfigureGoal,
   });
 
   @override
@@ -203,12 +657,13 @@ class _NutritionDashboardSummaryCard extends StatelessWidget {
     final theme = Theme.of(context);
     final calories = summary.consumed.calories ?? 0;
     final calorieGoal = goal?.calories;
-    final progress = calorieGoal == null || calorieGoal <= 0
-        ? null
-        : (calories / calorieGoal).clamp(0.0, 1.0).toDouble();
+    final hasGoal = calorieGoal != null && calorieGoal > 0;
+    final progress = hasGoal
+        ? (calories / calorieGoal).clamp(0.0, 1.0).toDouble()
+        : 0.0;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
@@ -228,14 +683,14 @@ class _NutritionDashboardSummaryCard extends StatelessWidget {
           child: InkWell(
             onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 14, 14),
+              padding: const EdgeInsets.fromLTRB(20, 18, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Row(
                     children: [
                       Icon(
-                        Icons.local_fire_department_outlined,
+                        Icons.local_fire_department_rounded,
                         size: 20,
                         color: theme.colorScheme.primary,
                       ),
@@ -254,84 +709,144 @@ class _NutritionDashboardSummaryCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    loc.nutritionConsumedKcal(_format(calories, 0)),
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                  const SizedBox(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        _format(calories, 0),
+                        style: theme.textTheme.headlineLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 38,
+                          height: 1.0,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          'kcal',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      if (hasGoal)
+                        Text(
+                          '${(progress * 100).round()}%',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: progress > 1
+                                ? theme.colorScheme.error
+                                : theme.colorScheme.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Text(
                     _goalLabel(loc, calories, calorieGoal),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  if (progress != null) ...[
-                    const SizedBox(height: 10),
-                    LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 6,
-                      borderRadius: BorderRadius.circular(999),
-                      backgroundColor:
-                          theme.colorScheme.surfaceContainerHighest,
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: hasGoal ? progress : 0,
+                      minHeight: 8,
+                      backgroundColor: hasGoal
+                          ? theme.colorScheme.surfaceContainerHighest
+                          : theme.colorScheme.surfaceContainerHighest
+                                .withAlpha(180),
+                      color: progress > 1
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.primary,
                     ),
-                  ],
-                  const SizedBox(height: 14),
+                  ),
+                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
                         child: _NutritionMacroStat(
                           label: loc.nutritionProgressProtein,
                           value: summary.consumed.proteinG,
+                          goal: goal?.proteinG,
+                          color: _proteinMacroColor,
                         ),
                       ),
+                      _NutritionStatDivider(theme: theme),
                       Expanded(
                         child: _NutritionMacroStat(
                           label: loc.nutritionProgressCarbs,
                           value: summary.consumed.carbsG,
+                          goal: goal?.carbsG,
+                          color: _carbMacroColor,
                         ),
                       ),
+                      _NutritionStatDivider(theme: theme),
                       Expanded(
                         child: _NutritionMacroStat(
                           label: loc.nutritionProgressFat,
                           value: summary.consumed.fatG,
+                          goal: goal?.fatG,
+                          color: _fatMacroColor,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Divider(
-                    height: 1,
-                    color: theme.colorScheme.outlineVariant.withAlpha(80),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.touch_app_outlined,
-                        size: 15,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          loc.nutritionHomeSummarySubtitle,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                  if (!hasGoal) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      height: 1,
+                      color: theme.colorScheme.outlineVariant.withAlpha(60),
+                    ),
+                    const SizedBox(height: 10),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: onConfigureGoal,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.flag_outlined,
+                              size: 16,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                loc.nutritionHomeConfigureGoalPrompt,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurface,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              loc.nutritionConfigureGoal,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
         ),
       ),
-    ).animate().fadeIn(duration: 300.ms, delay: 80.ms).slideY(begin: 0.04);
+    );
   }
 
   static String _goalLabel(
@@ -352,30 +867,71 @@ class _NutritionDashboardSummaryCard extends StatelessWidget {
   }
 }
 
+/// Color tokens shared with the diary screen so the home stats and
+/// the per-meal macros stay in lockstep.
+const Color _carbMacroColor = Color(0xFF20A39E);
+const Color _proteinMacroColor = Color(0xFFF29E38);
+const Color _fatMacroColor = Color(0xFF8E44AD);
+
+class _NutritionStatDivider extends StatelessWidget {
+  final ThemeData theme;
+  const _NutritionStatDivider({required this.theme});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 36,
+      margin: const EdgeInsets.symmetric(horizontal: 6),
+      color: theme.colorScheme.outlineVariant.withAlpha(70),
+    );
+  }
+}
+
 class _NutritionMacroStat extends StatelessWidget {
   final String label;
   final double? value;
+  final double? goal;
+  final Color color;
 
-  const _NutritionMacroStat({required this.label, required this.value});
+  const _NutritionMacroStat({
+    required this.label,
+    required this.value,
+    required this.color,
+    this.goal,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final formatted = value == null
-        ? 'â€”'
-        : value! == value!.roundToDouble()
-        ? value!.toStringAsFixed(0)
-        : value!.toStringAsFixed(1);
+    final current = value ?? 0;
+    final hasGoal = goal != null && goal! > 0;
+    final progress = hasGoal ? (current / goal!).clamp(0.0, 1.0) : 0.0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          '$formatted g',
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              _format(current),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                height: 1.0,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Text(
+              'g',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(
           label,
           style: theme.textTheme.labelSmall?.copyWith(
@@ -384,8 +940,23 @@ class _NutritionMacroStat extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: hasGoal ? progress : 0,
+            minHeight: 3,
+            backgroundColor: color.withAlpha(35),
+            color: color,
+          ),
+        ),
       ],
     );
+  }
+
+  static String _format(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(1);
   }
 }
 
@@ -398,7 +969,7 @@ class _NutritionSectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 10),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
       child: Text(
         text,
         style: theme.textTheme.labelSmall?.copyWith(
@@ -411,72 +982,261 @@ class _NutritionSectionHeader extends StatelessWidget {
   }
 }
 
-class _NutritionToolsCard extends StatelessWidget {
+/// Two large action cards for the "Quick actions" section. Mirrors
+/// the workout home's _ActionCard so the two tabs feel like one app.
+class _NutritionQuickActionsRow extends StatelessWidget {
+  final VoidCallback? onAddFood;
+  final VoidCallback? onScan;
+
+  const _NutritionQuickActionsRow({required this.onAddFood, required this.onScan});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: _NutritionActionCard(
+              icon: Icons.add_circle_outline_rounded,
+              label: loc.nutritionHomeAddFood,
+              subtitle: loc.nutritionHomeAddFoodSubtitle,
+              color: Theme.of(context).colorScheme.primary,
+              onTap: onAddFood,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _NutritionActionCard(
+              icon: Icons.qr_code_scanner_rounded,
+              label: loc.nutritionHomeScanBarcode,
+              subtitle: loc.nutritionHomeScanBarcodeSubtitle,
+              color: Theme.of(context).colorScheme.secondary,
+              onTap: onScan,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NutritionActionCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _NutritionActionCard({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final disabled = onTap == null;
+    return Opacity(
+      opacity: disabled ? 0.5 : 1,
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(25),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  label,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 2x2 tools grid (4 cells), matching the workout home's
+/// _buildNavGrid so the bottom of both tabs feels identical.
+class _NutritionToolsGrid extends StatelessWidget {
   final VoidCallback onProgress;
   final VoidCallback onSavedMeals;
   final VoidCallback onFoods;
+  final VoidCallback onSettings;
 
-  const _NutritionToolsCard({
+  const _NutritionToolsGrid({
     required this.onProgress,
     required this.onSavedMeals,
     required this.onFoods,
+    required this.onSettings,
   });
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final items = [
+      _NutritionToolItemData(
+        Icons.insights_rounded,
+        loc.nutritionProgressTitle,
+        onProgress,
+      ),
+      _NutritionToolItemData(
+        Icons.bookmark_outline_rounded,
+        loc.nutritionSavedMeals,
+        onSavedMeals,
+      ),
+      _NutritionToolItemData(
+        Icons.fastfood_rounded,
+        loc.nutritionFoodLibraryTitle,
+        onFoods,
+      ),
+      _NutritionToolItemData(
+        Icons.tune_rounded,
+        loc.nutritionSettingsTitle,
+        onSettings,
+      ),
+    ];
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
       child: Card(
-        margin: EdgeInsets.zero,
-        clipBehavior: Clip.antiAlias,
+        elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(70),
+            color: theme.colorScheme.outlineVariant.withAlpha(80),
           ),
         ),
-        child: SizedBox(
-          height: 225,
-          child: Column(
+        clipBehavior: Clip.antiAlias,
+        child: GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          padding: EdgeInsets.zero,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 1.7,
+            mainAxisSpacing: 0,
+            crossAxisSpacing: 0,
+          ),
+          itemCount: items.length,
+          itemBuilder: (ctx, i) {
+            final item = items[i];
+            final isLeft = i % 2 == 0;
+            final isTop = i < 2;
+            return _NutritionToolTile(
+              icon: item.icon,
+              label: item.label,
+              onTap: item.onTap,
+              showLeftBorder: !isLeft,
+              showTopBorder: !isTop,
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _NutritionToolItemData {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  _NutritionToolItemData(this.icon, this.label, this.onTap);
+}
+
+class _NutritionToolTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool showLeftBorder;
+  final bool showTopBorder;
+
+  const _NutritionToolTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.showLeftBorder,
+    required this.showTopBorder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final borderColor = theme.colorScheme.outlineVariant.withAlpha(80);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(
+              left: showLeftBorder
+                  ? BorderSide(color: borderColor)
+                  : BorderSide.none,
+              top: showTopBorder
+                  ? BorderSide(color: borderColor)
+                  : BorderSide.none,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
             children: [
-              SizedBox(
-                height: 112,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _NutritionToolTile(
-                        icon: Icons.insights_outlined,
-                        label: loc.nutritionProgressTitle,
-                        onTap: onProgress,
-                      ),
-                    ),
-                    VerticalDivider(
-                      width: 1,
-                      color: theme.colorScheme.outlineVariant.withAlpha(70),
-                    ),
-                    Expanded(
-                      child: _NutritionToolTile(
-                        icon: Icons.restaurant_menu_outlined,
-                        label: loc.nutritionSavedMeals,
-                        onTap: onSavedMeals,
-                      ),
-                    ),
-                  ],
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withAlpha(120),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 20, color: theme.colorScheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Divider(
-                height: 1,
-                color: theme.colorScheme.outlineVariant.withAlpha(70),
-              ),
-              SizedBox(
-                height: 112,
-                child: _NutritionToolTile(
-                  icon: Icons.fastfood_outlined,
-                  label: loc.nutritionFoodLibraryTitle,
-                  onTap: onFoods,
-                ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ],
           ),
@@ -486,14 +1246,26 @@ class _NutritionToolsCard extends StatelessWidget {
   }
 }
 
-class _NutritionToolTile extends StatelessWidget {
+/// Collapsible header used by the "Today" section. Renders a
+/// small icon chip, a section title, a count pill and an
+/// expand/collapse caret. Matches the workout home's
+/// _CollapsibleSectionHeader visually.
+class _CollapsibleSectionHeader extends StatelessWidget {
   final IconData icon;
-  final String label;
+  final Color iconBg;
+  final Color iconFg;
+  final String title;
+  final int count;
+  final bool expanded;
   final VoidCallback onTap;
 
-  const _NutritionToolTile({
+  const _CollapsibleSectionHeader({
     required this.icon,
-    required this.label,
+    required this.iconBg,
+    required this.iconFg,
+    required this.title,
+    required this.count,
+    required this.expanded,
     required this.onTap,
   });
 
@@ -502,38 +1274,269 @@ class _NutritionToolTile extends StatelessWidget {
     final theme = Theme.of(context);
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
         child: Row(
           children: [
             Container(
-              width: 42,
-              height: 42,
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withAlpha(90),
-                borderRadius: BorderRadius.circular(12),
+                color: iconBg,
+                borderRadius: BorderRadius.circular(6),
               ),
-              child: Icon(icon, color: theme.colorScheme.primary, size: 22),
+              child: Icon(icon, size: 18, color: iconFg),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.5,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            const Spacer(),
+            if (count > 0) ...[
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(999),
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                child: Text(
+                  '$count',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 6),
+            ],
             Icon(
-              Icons.chevron_right_rounded,
-              size: 20,
+              expanded ? Icons.expand_less : Icons.expand_more,
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// One row in the "today" meals list. Shows meal name, calories, item
+/// count and a circular + button that opens the food search bound to
+/// that meal.
+class _NutritionHomeMealRow extends StatelessWidget {
+  final String title;
+  final MealLogWithItems meal;
+  final VoidCallback onAdd;
+
+  const _NutritionHomeMealRow({
+    required this.title,
+    required this.meal,
+    required this.onAdd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final kcal = meal.items.fold<double>(
+      0,
+      (sum, item) => sum + (item.calories ?? 0),
+    );
+    final itemCount = meal.items.length;
+    final hasItems = itemCount > 0;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      child: Material(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onAdd,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: hasItems
+                        ? theme.colorScheme.primaryContainer.withAlpha(140)
+                        : theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    hasItems
+                        ? Icons.restaurant_rounded
+                        : Icons.add_rounded,
+                    color: hasItems
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasItems
+                            ? '${_format(kcal)} kcal · ${loc.nutritionItemCount(itemCount)}'
+                            : loc.nutritionHomeEmptyMeals,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withAlpha(hasItems ? 18 : 28),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.add_rounded,
+                    color: theme.colorScheme.primary,
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _format(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(1);
+  }
+}
+
+/// First-time / empty state for the "today" meals list. Shown when
+/// the meal catalog is empty AND no meals have been logged yet.
+class _NutritionHomeEmptyMeals extends StatelessWidget {
+  final VoidCallback onAdd;
+  const _NutritionHomeEmptyMeals({required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withAlpha(28),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.restaurant_outlined,
+                color: theme.colorScheme.primary,
+                size: 26,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              loc.nutritionHomeEmptyMeals,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              loc.nutritionHomeEmptyMealsSubtitle,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Loading skeleton that mirrors the real layout so the first
+/// paint doesn't cause a visible jump.
+class _NutritionHomeSkeleton extends StatelessWidget {
+  const _NutritionHomeSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.surfaceContainerHighest;
+    BoxDecoration box({double r = 8}) =>
+        BoxDecoration(color: color, borderRadius: BorderRadius.circular(r));
+    Widget line({required double h, double? w, double r = 8}) => Container(
+      height: h,
+      width: w,
+      decoration: box(r: r),
+    );
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+      children: [
+        line(h: 22, w: 160),
+        const SizedBox(height: 14),
+        line(h: 130, r: 20),
+        const SizedBox(height: 22),
+        line(h: 12, w: 100),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: line(h: 100, r: 16)),
+            const SizedBox(width: 12),
+            Expanded(child: line(h: 100, r: 16)),
+          ],
+        ),
+        const SizedBox(height: 22),
+        line(h: 12, w: 80),
+        const SizedBox(height: 12),
+        line(h: 168, r: 16),
+        const SizedBox(height: 22),
+        line(h: 12, w: 80),
+        const SizedBox(height: 8),
+        line(h: 62, r: 14),
+        const SizedBox(height: 6),
+        line(h: 62, r: 14),
+        const SizedBox(height: 6),
+        line(h: 62, r: 14),
+      ],
     );
   }
 }
@@ -1576,10 +2579,6 @@ class _EquationValue extends StatelessWidget {
     );
   }
 }
-
-const Color _carbMacroColor = Color(0xFF20A39E);
-const Color _proteinMacroColor = Color(0xFFF29E38);
-const Color _fatMacroColor = Color(0xFF8E44AD);
 
 class _MacroCalorieBar extends StatelessWidget {
   final double goalCalories;
