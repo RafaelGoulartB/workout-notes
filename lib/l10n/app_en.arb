@@ -1284,7 +1284,7 @@
   "nutritionManualSectionMacros": "Nutrition values",
   "nutritionManualServingsHint": "Add common portions (e.g. slice, cup) to make logging easier.",
 
-  "nutritionSettingsTitle": "Nutrition goal",
+  "nutritionSettingsTitle": "Nutrition settings",
   "nutritionSettingsSubtitle": "Set a daily target for calories and macros. The values are stored locally.",
   "nutritionSettingsCalories": "Daily calories (kcal)",
   "nutritionSettingsProtein": "Protein (g)",
@@ -1300,6 +1300,7 @@
   "nutritionSettingsSuggestSection": "Automatic suggestion",
   "nutritionSettingsSuggestBody": "Estimate daily calories and macros from your body profile using the Mifflin-St Jeor equation.",
   "nutritionSettingsSuggestButton": "Suggest goals",
+  "nutritionMoreOptions": "More nutrition options",
 
   "nutritionSuggestTitle": "Suggest goals from your profile",
   "nutritionSuggestSubtitle": "Mifflin-St Jeor estimate based on weight, height, age and activity level.",

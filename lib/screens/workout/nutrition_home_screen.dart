@@ -21,6 +21,8 @@ import 'nutrition_settings_screen.dart';
 import 'saved_meal_editor_screen.dart';
 import 'saved_meals_screen.dart';
 
+enum _NutritionMenuAction { progress, savedMeals, copyPreviousDay }
+
 /// Daily nutrition screen. Lists the four meals, shows the daily
 /// summary and surfaces the goal progress when one is configured.
 class NutritionHomeScreen extends StatefulWidget {
@@ -260,14 +262,16 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   }
 
   Future<void> _openProgress() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const NutritionProgressScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const NutritionProgressScreen()));
   }
 
   Future<void> _openSavedMeals() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => SavedMealsScreen(repository: _repository)),
+      MaterialPageRoute(
+        builder: (_) => SavedMealsScreen(repository: _repository),
+      ),
     );
     await _load();
   }
@@ -279,14 +283,14 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     final yesterday = _dateString(
       _dateOnly(_selectedDate.subtract(const Duration(days: 1))),
     );
-    final source = (await _repository.getDayMeals(yesterday))
-        .where((m) => m.items.isNotEmpty)
-        .toList();
+    final source = (await _repository.getDayMeals(
+      yesterday,
+    )).where((m) => m.items.isNotEmpty).toList();
     if (source.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.nutritionCopyNothingToCopy)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.nutritionCopyNothingToCopy)));
       return;
     }
     final selected = <String>{for (final m in source) m.log.mealType};
@@ -355,9 +359,9 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     );
     if (items.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.nutritionRepeatNoPrevious)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.nutritionRepeatNoPrevious)));
       return;
     }
     final count = await _repository.copyItemsToMeal(
@@ -379,9 +383,9 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     final meal = meals.where((m) => m.log.mealType == mealType).toList();
     if (meal.isEmpty || meal.first.items.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.nutritionSaveMealEmpty)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.nutritionSaveMealEmpty)));
       return;
     }
     if (!mounted) return;
@@ -420,27 +424,56 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(loc.nutritionTitle),
-        centerTitle: true,
+        centerTitle: false,
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            tooltip: loc.nutritionCopyPreviousDay,
-            onPressed: _copyPreviousDay,
-            icon: const Icon(Icons.content_copy_outlined),
-          ),
-          IconButton(
-            tooltip: loc.nutritionSavedMeals,
-            onPressed: _openSavedMeals,
-            icon: const Icon(Icons.restaurant_menu_outlined),
-          ),
-          IconButton(
-            tooltip: loc.nutritionProgressTitle,
-            onPressed: _openProgress,
-            icon: const Icon(Icons.insights_outlined),
-          ),
-          IconButton(
-            tooltip: loc.nutritionConfigureGoal,
+            tooltip: loc.nutritionSettingsTitle,
             onPressed: _openSettings,
-            icon: const Icon(Icons.flag_outlined),
+            icon: const Icon(Icons.settings_outlined),
+          ),
+          PopupMenuButton<_NutritionMenuAction>(
+            tooltip: loc.nutritionMoreOptions,
+            onSelected: (action) {
+              switch (action) {
+                case _NutritionMenuAction.progress:
+                  _openProgress();
+                  break;
+                case _NutritionMenuAction.savedMeals:
+                  _openSavedMeals();
+                  break;
+                case _NutritionMenuAction.copyPreviousDay:
+                  _copyPreviousDay();
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: _NutritionMenuAction.progress,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.insights_outlined),
+                  title: Text(loc.nutritionProgressTitle),
+                ),
+              ),
+              PopupMenuItem(
+                value: _NutritionMenuAction.savedMeals,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.restaurant_menu_outlined),
+                  title: Text(loc.nutritionSavedMeals),
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: _NutritionMenuAction.copyPreviousDay,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.content_copy_outlined),
+                  title: Text(loc.nutritionCopyPreviousDay),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -839,7 +872,8 @@ class _MacroProgress extends StatelessWidget {
   }
 }
 
-class _MiniNutrientStat extends StatelessWidget {  final String label;
+class _MiniNutrientStat extends StatelessWidget {
+  final String label;
   final double? value;
   final String suffix;
   final IconData icon;

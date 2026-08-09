@@ -15,6 +15,7 @@ import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/screens/workout/food_quantity_sheet.dart';
 import 'package:workout_notes/screens/workout/food_search_screen.dart';
+import 'package:workout_notes/screens/workout/nutrition_home_screen.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 
 Widget _app(Widget child) => MaterialApp(
@@ -228,6 +229,29 @@ void main() {
   tearDown(() async {
     DatabaseHelper.overrideDatabase = null;
     await database.close();
+  });
+
+  testWidgets('Nutrition home keeps settings visible and groups utilities', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(const NutritionHomeScreen()));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+    final utilitiesMenu = find.byTooltip(loc.nutritionMoreOptions);
+
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+    expect(utilitiesMenu, findsOneWidget);
+    expect(find.byIcon(Icons.content_copy_outlined), findsNothing);
+
+    await tester.tap(utilitiesMenu);
+    await tester.pumpAndSettle();
+
+    expect(find.text(loc.nutritionProgressTitle), findsOneWidget);
+    expect(find.text(loc.nutritionSavedMeals), findsOneWidget);
+    expect(find.text(loc.nutritionCopyPreviousDay), findsOneWidget);
   });
 
   testWidgets(

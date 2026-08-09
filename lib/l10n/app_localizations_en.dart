@@ -3827,7 +3827,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Add common portions (e.g. slice, cup) to make logging easier.';
 
   @override
-  String get nutritionSettingsTitle => 'Nutrition goal';
+  String get nutritionSettingsTitle => 'Nutrition settings';
 
   @override
   String get nutritionSettingsSubtitle =>
@@ -3876,6 +3876,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nutritionSettingsSuggestButton => 'Suggest goals';
+
+  @override
+  String get nutritionMoreOptions => 'More nutrition options';
 
   @override
   String get nutritionSuggestTitle => 'Suggest goals from your profile';

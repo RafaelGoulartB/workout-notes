@@ -1258,7 +1258,7 @@
   "nutritionManualSectionMacros": "Valores nutricionais",
   "nutritionManualServingsHint": "Adicione porções comuns (ex: fatia, xícara) para facilitar o registro.",
 
-  "nutritionSettingsTitle": "Meta de alimentação",
+  "nutritionSettingsTitle": "Configurações de alimentação",
   "nutritionSettingsSubtitle": "Defina um alvo diário para calorias e macros. Os valores ficam apenas no seu dispositivo.",
   "nutritionSettingsCalories": "Calorias diárias (kcal)",
   "nutritionSettingsProtein": "Proteína (g)",
@@ -1274,6 +1274,7 @@
   "nutritionSettingsSuggestSection": "Sugestão automática",
   "nutritionSettingsSuggestBody": "Estime as calorias e macros diárias a partir do seu perfil corporal usando a equação Mifflin-St Jeor.",
   "nutritionSettingsSuggestButton": "Sugerir metas",
+  "nutritionMoreOptions": "Mais opções de alimentação",
 
   "nutritionSuggestTitle": "Sugerir metas por perfil",
   "nutritionSuggestSubtitle": "Estimativa Mifflin-St Jeor baseada em peso, altura, idade e nível de atividade.",

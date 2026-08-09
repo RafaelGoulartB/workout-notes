@@ -7033,7 +7033,7 @@ abstract class AppLocalizations {
   /// No description provided for @nutritionSettingsTitle.
   ///
   /// In en, this message translates to:
-  /// **'Nutrition goal'**
+  /// **'Nutrition settings'**
   String get nutritionSettingsTitle;
 
   /// No description provided for @nutritionSettingsSubtitle.
@@ -7125,6 +7125,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Suggest goals'**
   String get nutritionSettingsSuggestButton;
+
+  /// No description provided for @nutritionMoreOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'More nutrition options'**
+  String get nutritionMoreOptions;
 
   /// No description provided for @nutritionSuggestTitle.
   ///

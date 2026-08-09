@@ -3847,7 +3847,7 @@ class AppLocalizationsPt extends AppLocalizations {
       'Adicione porções comuns (ex: fatia, xícara) para facilitar o registro.';
 
   @override
-  String get nutritionSettingsTitle => 'Meta de alimentação';
+  String get nutritionSettingsTitle => 'Configurações de alimentação';
 
   @override
   String get nutritionSettingsSubtitle =>
@@ -3896,6 +3896,9 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get nutritionSettingsSuggestButton => 'Sugerir metas';
+
+  @override
+  String get nutritionMoreOptions => 'Mais opções de alimentação';
 
   @override
   String get nutritionSuggestTitle => 'Sugerir metas por perfil';
