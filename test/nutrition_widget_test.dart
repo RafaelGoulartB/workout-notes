@@ -37,6 +37,7 @@ Future<void> _installSchema(Database db) async {
       source_url TEXT,
       fetched_at TEXT NOT NULL,
       last_used_at TEXT,
+      is_favorite INTEGER NOT NULL DEFAULT 0,
       UNIQUE(source, external_id)
     )
   ''');
@@ -116,6 +117,32 @@ Future<void> _installSchema(Database db) async {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       is_active INTEGER NOT NULL DEFAULT 1
+    )
+  ''');
+  await db.execute('''
+    CREATE TABLE saved_meals (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      meal_type TEXT,
+      portions REAL NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  ''');
+  await db.execute('''
+    CREATE TABLE saved_meal_items (
+      id TEXT PRIMARY KEY,
+      saved_meal_id TEXT NOT NULL,
+      food_id TEXT,
+      food_variant_id TEXT,
+      food_name_snapshot TEXT NOT NULL,
+      brand_snapshot TEXT,
+      quantity REAL NOT NULL,
+      unit TEXT NOT NULL,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (saved_meal_id) REFERENCES saved_meals(id) ON DELETE CASCADE,
+      FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL,
+      FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE SET NULL
     )
   ''');
 }
@@ -211,10 +238,15 @@ void main() {
           const NutritionGatewayError('network', 'offline'),
         ),
       );
-      await tester.pumpWidget(
-        _app(FoodSearchScreen(gateway: gateway, repository: repository)),
-      );
-      await tester.pump();
+      await tester.runAsync(() async {
+        await tester.pumpWidget(
+          _app(FoodSearchScreen(gateway: gateway, repository: repository)),
+        );
+        // The screen loads favorites/recents asynchronously on startup;
+        // let those real-async DB queries complete.
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        await tester.pump();
+      });
       final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
       expect(find.text(loc.nutritionSearchTitle), findsOneWidget);
       expect(find.text(loc.nutritionAddManually), findsOneWidget);
@@ -229,9 +261,13 @@ void main() {
         const NutritionGatewayError('network', 'offline'),
       ),
     );
-    await tester.pumpWidget(
-      _app(FoodSearchScreen(gateway: gateway, repository: repository)),
-    );
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        _app(FoodSearchScreen(gateway: gateway, repository: repository)),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
 
     await tester.enterText(find.byType(TextField), 'banana');
     await tester.pumpAndSettle();
@@ -246,9 +282,13 @@ void main() {
     tester,
   ) async {
     final gateway = _ControlledGateway();
-    await tester.pumpWidget(
-      _app(FoodSearchScreen(gateway: gateway, repository: repository)),
-    );
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        _app(FoodSearchScreen(gateway: gateway, repository: repository)),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
     final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
 
     await tester.enterText(find.byType(TextField), 'apple');

@@ -28,7 +28,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 29;
+  static const _dbVersion = 30;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -1937,6 +1937,19 @@ class DatabaseHelper {
         );
       } catch (_) {}
     }
+    if (oldVersion < 30) {
+      // Nutrition v30: food favorites + saved meal templates. The schema
+      // helper is idempotent (`IF NOT EXISTS`), so new tables are created
+      // here; the `is_favorite` column is additive and guarded.
+      try {
+        await _createNutritionSchema(db);
+      } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE foods ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0',
+        );
+      } catch (_) {}
+    }
   }
 
   /// Creates the full nutrition module schema (v22) using
@@ -1955,6 +1968,7 @@ class DatabaseHelper {
         source_url TEXT,
         fetched_at TEXT NOT NULL,
         last_used_at TEXT,
+        is_favorite INTEGER NOT NULL DEFAULT 0,
         UNIQUE(source, external_id)
       )
     ''');
@@ -2036,6 +2050,32 @@ class DatabaseHelper {
         is_active INTEGER NOT NULL DEFAULT 1
       )
     ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS saved_meals (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        meal_type TEXT,
+        portions REAL NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS saved_meal_items (
+        id TEXT PRIMARY KEY,
+        saved_meal_id TEXT NOT NULL,
+        food_id TEXT,
+        food_variant_id TEXT,
+        food_name_snapshot TEXT NOT NULL,
+        brand_snapshot TEXT,
+        quantity REAL NOT NULL,
+        unit TEXT NOT NULL,
+        order_index INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (saved_meal_id) REFERENCES saved_meals(id) ON DELETE CASCADE,
+        FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL,
+        FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE SET NULL
+      )
+    ''');
 
     for (final statement in <String>[
       'CREATE INDEX IF NOT EXISTS idx_foods_search_name ON foods(search_name)',
@@ -2046,6 +2086,7 @@ class DatabaseHelper {
       'CREATE INDEX IF NOT EXISTS idx_meal_logs_date ON meal_logs(date)',
       'CREATE INDEX IF NOT EXISTS idx_meal_log_items_meal ON meal_log_items(meal_log_id, created_at ASC)',
       'CREATE INDEX IF NOT EXISTS idx_nutrition_goals_active ON nutrition_goals(is_active)',
+      'CREATE INDEX IF NOT EXISTS idx_saved_meal_items_meal ON saved_meal_items(saved_meal_id, order_index ASC)',
     ]) {
       try {
         await db.execute(statement);

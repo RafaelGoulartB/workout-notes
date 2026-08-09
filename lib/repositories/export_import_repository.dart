@@ -8,7 +8,7 @@ import 'base_repository.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
-  static const int currentBackupVersion = 9;
+  static const int currentBackupVersion = 10;
   static const int minimumSupportedBackupVersion = 2;
 
   final Future<Database> Function()? _databaseProvider;
@@ -47,6 +47,8 @@ class ExportImportRepository extends BaseRepository {
       'meal_logs': await _queryIfExists(db, 'meal_logs'),
       'meal_log_items': await _queryIfExists(db, 'meal_log_items'),
       'nutrition_goals': await _queryIfExists(db, 'nutrition_goals'),
+      'saved_meals': await _queryIfExists(db, 'saved_meals'),
+      'saved_meal_items': await _queryIfExists(db, 'saved_meal_items'),
       'sleep_stage_epochs': await _queryIfExists(db, 'sleep_stage_epochs'),
       'traditional_alarms': await _queryIfExists(db, 'traditional_alarms'),
       'settings': await db.query('app_settings'),
@@ -93,6 +95,8 @@ class ExportImportRepository extends BaseRepository {
         'food_variants',
         'foods',
         'nutrition_goals',
+        'saved_meal_items',
+        'saved_meals',
       ]) {
         if (await _tableExists(txn, table)) {
           await txn.delete(table);
@@ -157,6 +161,8 @@ class ExportImportRepository extends BaseRepository {
         'meal_logs',
         'meal_log_items',
         'nutrition_goals',
+        'saved_meals',
+        'saved_meal_items',
       ]) {
         if (await _tableExists(txn, table)) {
           totalRows += await _insertAll(txn, table, data[table]);
@@ -360,6 +366,12 @@ class ExportImportRepository extends BaseRepository {
       await txn.delete('food_variants');
       await txn.delete('foods');
       await txn.delete('nutrition_goals');
+      if (await _tableExists(txn, 'saved_meal_items')) {
+        await txn.delete('saved_meal_items');
+      }
+      if (await _tableExists(txn, 'saved_meals')) {
+        await txn.delete('saved_meals');
+      }
     });
   }
 }

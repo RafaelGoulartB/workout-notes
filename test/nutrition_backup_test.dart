@@ -50,6 +50,7 @@ void main() {
               source_url TEXT,
               fetched_at TEXT NOT NULL,
               last_used_at TEXT,
+              is_favorite INTEGER NOT NULL DEFAULT 0,
               UNIQUE(source, external_id)
             )
           ''');
@@ -129,6 +130,32 @@ void main() {
               created_at TEXT NOT NULL,
               updated_at TEXT NOT NULL,
               is_active INTEGER NOT NULL DEFAULT 1
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE saved_meals (
+              id TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              meal_type TEXT,
+              portions REAL NOT NULL DEFAULT 1,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE saved_meal_items (
+              id TEXT PRIMARY KEY,
+              saved_meal_id TEXT NOT NULL,
+              food_id TEXT,
+              food_variant_id TEXT,
+              food_name_snapshot TEXT NOT NULL,
+              brand_snapshot TEXT,
+              quantity REAL NOT NULL,
+              unit TEXT NOT NULL,
+              order_index INTEGER NOT NULL DEFAULT 0,
+              FOREIGN KEY (saved_meal_id) REFERENCES saved_meals(id) ON DELETE CASCADE,
+              FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL,
+              FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE SET NULL
             )
           ''');
           await db.execute(

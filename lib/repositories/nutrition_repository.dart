@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
@@ -11,6 +12,7 @@ import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
+import 'package:workout_notes/models/nutrition/saved_meal.dart';
 import 'package:workout_notes/utils/nutrition_conversion.dart';
 
 import 'base_repository.dart';
@@ -277,6 +279,68 @@ class NutritionRepository extends BaseRepository {
   }
 
   // ===================================================================
+  // Favorites, recents and meal suggestions
+  // ===================================================================
+
+  /// Marks a food as favorite (or removes the mark).
+  Future<void> setFoodFavorite(String foodId, bool favorite) async {
+    final db = await this.db;
+    await db.update(
+      'foods',
+      {'is_favorite': favorite ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [foodId],
+    );
+  }
+
+  /// Foods the user pinned as favorites, alphabetically.
+  Future<List<FoodSearchResultLite>> getFavoriteFoods({int limit = 20}) async {
+    final db = await this.db;
+    final rows = await db.query(
+      'foods',
+      where: 'is_favorite = 1',
+      orderBy: 'name ASC',
+      limit: limit,
+    );
+    return _hydrateResults(rows);
+  }
+
+  /// Most recently logged foods (`last_used_at DESC`; nulls sort last).
+  Future<List<FoodSearchResultLite>> getRecentFoods({int limit = 12}) async {
+    final db = await this.db;
+    final rows = await db.query(
+      'foods',
+      orderBy: 'last_used_at DESC',
+      limit: limit,
+    );
+    return _hydrateResults(rows);
+  }
+
+  /// Foods most often logged in a given [mealType], by usage count.
+  /// Powers the "suggested for this meal" section of the search screen.
+  Future<List<FoodSearchResultLite>> getMealSuggestions(
+    String mealType, {
+    int limit = 12,
+  }) async {
+    _validateMealType(mealType);
+    final db = await this.db;
+    final rows = await db.rawQuery(
+      '''
+      SELECT f.*, COUNT(mli.id) as use_count
+      FROM meal_log_items mli
+      JOIN meal_logs ml ON mli.meal_log_id = ml.id
+      JOIN foods f ON mli.food_id = f.id
+      WHERE ml.meal_type = ?
+      GROUP BY f.id
+      ORDER BY use_count DESC, f.name ASC
+      LIMIT ?
+      ''',
+      [mealType, limit],
+    );
+    return _hydrateResults(rows);
+  }
+
+  // ===================================================================
   // Meal logs
   // ===================================================================
 
@@ -464,6 +528,89 @@ class NutritionRepository extends BaseRepository {
     await db.insert('meal_log_items', item.toMap());
   }
 
+  /// Returns the items of the most recent meal of [mealType] logged
+  /// before [beforeDate] (exclusive). Used by the "repeat this meal"
+  /// flow. Returns an empty list when no previous instance exists.
+  Future<List<MealLogItem>> getLatestMealItems(
+    String mealType, {
+    String? beforeDate,
+  }) async {
+    _validateMealType(mealType);
+    final db = await this.db;
+    final where = <String>['meal_type = ?'];
+    final args = <Object?>[mealType];
+    if (beforeDate != null) {
+      where.add('date < ?');
+      args.add(beforeDate);
+    }
+    final logs = await db.query(
+      'meal_logs',
+      where: where.join(' AND '),
+      whereArgs: args,
+      orderBy: 'date DESC',
+      limit: 1,
+    );
+    if (logs.isEmpty) return const [];
+    final items = await db.query(
+      'meal_log_items',
+      where: 'meal_log_id = ?',
+      whereArgs: [logs.first['id']],
+      orderBy: 'created_at ASC',
+    );
+    return items.map(MealLogItem.fromMap).toList();
+  }
+
+  /// Clones [items] into the meal (date, mealType), preserving each
+  /// item's snapshot verbatim so past data stays editable and auditable.
+  /// New ids are assigned; `created_at` is set to now.
+  Future<int> copyItemsToMeal({
+    required String date,
+    required String mealType,
+    required List<MealLogItem> items,
+  }) async {
+    if (items.isEmpty) return 0;
+    final log = await ensureMealLog(date: date, mealType: mealType);
+    final db = await this.db;
+    final now = DateTime.now();
+    await db.transaction((txn) async {
+      final touchedFoods = <String>{};
+      for (final item in items) {
+        final clone = MealLogItem(
+          id: _uuid.v4(),
+          mealLogId: log.id,
+          foodId: item.foodId,
+          foodVariantId: item.foodVariantId,
+          foodNameSnapshot: item.foodNameSnapshot,
+          brandSnapshot: item.brandSnapshot,
+          quantity: item.quantity,
+          unit: item.unit,
+          calories: item.calories,
+          proteinG: item.proteinG,
+          carbsG: item.carbsG,
+          fatG: item.fatG,
+          fiberG: item.fiberG,
+          sugarsG: item.sugarsG,
+          sodiumMg: item.sodiumMg,
+          snapshotJson: item.snapshotJson,
+          createdAt: now,
+        );
+        await txn.insert('meal_log_items', clone.toMap());
+        if (item.foodId != null) touchedFoods.add(item.foodId!);
+      }
+      for (final foodId in touchedFoods) {
+        try {
+          await txn.update(
+            'foods',
+            {'last_used_at': now.toIso8601String()},
+            where: 'id = ?',
+            whereArgs: [foodId],
+          );
+        } catch (_) {}
+      }
+    });
+    return items.length;
+  }
+
   /// Returns all meal logs and their items for the given day.
   Future<List<MealLogWithItems>> getDayMeals(String date) async {
     _validateDate(date);
@@ -553,6 +700,37 @@ class NutritionRepository extends BaseRepository {
     );
   }
 
+  /// Daily consumed totals for the last [days] days (including today),
+  /// oldest first. Each row has `date` plus the seven nutrient sums;
+  /// days without any logged item are absent.
+  Future<List<Map<String, dynamic>>> getDailyNutritionHistory({
+    int days = 30,
+  }) async {
+    final db = await this.db;
+    final start = _dateString(
+      DateTime.now().subtract(Duration(days: days - 1)),
+    );
+    final rows = await db.rawQuery(
+      '''
+      SELECT ml.date as date,
+        SUM(mli.calories) as calories,
+        SUM(mli.protein_g) as protein_g,
+        SUM(mli.carbs_g) as carbs_g,
+        SUM(mli.fat_g) as fat_g,
+        SUM(mli.fiber_g) as fiber_g,
+        SUM(mli.sugars_g) as sugars_g,
+        SUM(mli.sodium_mg) as sodium_mg
+      FROM meal_log_items mli
+      JOIN meal_logs ml ON mli.meal_log_id = ml.id
+      WHERE ml.date >= ?
+      GROUP BY ml.date
+      ORDER BY ml.date ASC
+      ''',
+      [start],
+    );
+    return rows;
+  }
+
   // ===================================================================
   // Goals
   // ===================================================================
@@ -623,6 +801,188 @@ class NutritionRepository extends BaseRepository {
     await db.update('nutrition_goals', {
       'is_active': 0,
     }, where: 'is_active = 1');
+  }
+
+  // ===================================================================
+  // Saved meals (templates)
+  // ===================================================================
+
+  /// Creates a new saved meal or updates the one identified by [id]
+  /// (when provided). Items are replaced wholesale — they carry no
+  /// history links, mirroring the servings upsert pattern.
+  Future<SavedMeal> saveSavedMeal({
+    String? id,
+    required String name,
+    String? mealType,
+    double portions = 1,
+    List<SavedMealItemDraft> items = const [],
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw const NutritionValidationException('saved_meal_name_required');
+    }
+    if (portions <= 0 || portions.isNaN || portions.isInfinite) {
+      throw const NutritionValidationException('saved_meal_portions_invalid');
+    }
+    final now = DateTime.now();
+    final meal = id == null
+        ? SavedMeal(
+            id: _uuid.v4(),
+            name: trimmed,
+            mealType: mealType,
+            portions: portions,
+            createdAt: now,
+            updatedAt: now,
+          )
+        : SavedMeal(
+            id: id,
+            name: trimmed,
+            mealType: mealType,
+            portions: portions,
+            createdAt: now,
+            updatedAt: now,
+          );
+    final db = await this.db;
+    await db.transaction((txn) async {
+      final existing = id == null
+          ? null
+          : await txn.query(
+              'saved_meals',
+              where: 'id = ?',
+              whereArgs: [id],
+              limit: 1,
+            );
+      if (existing != null && existing.isEmpty) {
+        throw const NutritionValidationException('saved_meal_not_found');
+      }
+      if (id == null) {
+        await txn.insert('saved_meals', meal.toMap());
+      } else {
+        await txn.update(
+          'saved_meals',
+          meal.toMap(),
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        await txn.delete(
+          'saved_meal_items',
+          where: 'saved_meal_id = ?',
+          whereArgs: [id],
+        );
+      }
+      for (var i = 0; i < items.length; i++) {
+        final item = items[i];
+        await txn.insert('saved_meal_items', {
+          'id': _uuid.v4(),
+          'saved_meal_id': meal.id,
+          'food_id': item.foodId,
+          'food_variant_id': item.foodVariantId,
+          'food_name_snapshot': item.foodNameSnapshot,
+          'brand_snapshot': item.brandSnapshot,
+          'quantity': item.quantity,
+          'unit': item.unit,
+          'order_index': i,
+        });
+      }
+    });
+    return meal;
+  }
+
+  /// Returns a saved meal with its items and live-computed totals, or
+  /// null when it does not exist.
+  Future<SavedMealWithItems?> getSavedMeal(String id) async {
+    final db = await this.db;
+    final rows = await db.query(
+      'saved_meals',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return _savedMealWithItems(db, rows.first);
+  }
+
+  /// All saved meals, alphabetically, with items and live totals.
+  Future<List<SavedMealWithItems>> getSavedMeals() async {
+    final db = await this.db;
+    final rows = await db.query('saved_meals', orderBy: 'name ASC');
+    final result = <SavedMealWithItems>[];
+    for (final row in rows) {
+      result.add(await _savedMealWithItems(db, row));
+    }
+    return result;
+  }
+
+  /// Deletes a saved meal; its items cascade.
+  Future<void> deleteSavedMeal(String id) async {
+    final db = await this.db;
+    await db.delete('saved_meals', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Logs every ingredient of [savedMealId] into (date, mealType),
+  /// scaling quantities by the meal's portion count. Returns the number
+  /// of items added and the number skipped because their food was
+  /// deleted from the cache.
+  Future<({int added, int skipped})> addSavedMealToDate({
+    required String date,
+    required String mealType,
+    required String savedMealId,
+  }) async {
+    _validateDate(date);
+    _validateMealType(mealType);
+    final meal = await getSavedMeal(savedMealId);
+    if (meal == null) {
+      throw const NutritionValidationException('saved_meal_not_found');
+    }
+    var added = 0;
+    var skipped = 0;
+    for (final item in meal.items) {
+      if (item.foodId == null || item.foodVariantId == null) {
+        skipped++;
+        continue;
+      }
+      final details = await getFoodWithDetails(item.foodId!);
+      if (details == null) {
+        skipped++;
+        continue;
+      }
+      final variants = details.variants;
+      if (variants.isEmpty) {
+        skipped++;
+        continue;
+      }
+      final variant = variants.firstWhere(
+        (v) => v.id == item.foodVariantId,
+        orElse: () => variants.first,
+      );
+      final servings = details.servings[variant.id] ?? const <FoodServing>[];
+      final serving = servings.firstWhereOrNull(
+        (s) => s.label == item.unit || s.unit == item.unit,
+      );
+      final conversion = NutritionConversion(
+        quantity: item.quantity * meal.meal.portions,
+        unit: item.unit,
+        referenceAmount: variant.referenceAmount,
+        referenceUnit: variant.referenceUnit,
+        serving: serving,
+      );
+      try {
+        conversion.resolveMultiplier();
+      } catch (_) {
+        skipped++;
+        continue;
+      }
+      await addMealLogItem(
+        date: date,
+        mealType: mealType,
+        food: details.food,
+        variant: variant,
+        conversion: conversion,
+        availableServings: servings,
+      );
+      added++;
+    }
+    return (added: added, skipped: skipped);
   }
 
   // ===================================================================
@@ -707,6 +1067,122 @@ class NutritionRepository extends BaseRepository {
       orderBy: 'label ASC',
     );
     return rows.map(FoodServing.fromMap).toList();
+  }
+
+  /// Loads a saved meal with its items and recomputes the nutrition
+  /// totals live from the current food cache.
+  Future<SavedMealWithItems> _savedMealWithItems(
+    DatabaseExecutor db,
+    Map<String, dynamic> mealRow,
+  ) async {
+    final meal = SavedMeal.fromMap(mealRow);
+    final itemRows = await db.query(
+      'saved_meal_items',
+      where: 'saved_meal_id = ?',
+      whereArgs: [meal.id],
+      orderBy: 'order_index ASC',
+    );
+    final items = itemRows.map(SavedMealItem.fromMap).toList();
+    final computed = await _computeSavedMealTotals(db, items);
+    return SavedMealWithItems(
+      meal: meal,
+      items: items,
+      totals: computed.totals,
+      consumedByItem: computed.byItem,
+    );
+  }
+
+  /// Recomputes a saved meal's nutrition from the live food cache by
+  /// replaying each item's conversion (same rules as the quantity
+  /// sheet). Items whose food/variant was deleted or whose unit can no
+  /// longer be resolved contribute nothing.
+  Future<({NutritionValues? totals, Map<String, NutritionValues> byItem})>
+  _computeSavedMealTotals(
+    DatabaseExecutor db,
+    List<SavedMealItem> items,
+  ) async {
+    if (items.isEmpty) return (totals: null, byItem: <String, NutritionValues>{});
+    final variantIds = <String>[];
+    for (final item in items) {
+      if (item.foodVariantId != null) variantIds.add(item.foodVariantId!);
+    }
+    final variants = <String, FoodVariant>{};
+    final servingsByVariant = <String, List<FoodServing>>{};
+    if (variantIds.isNotEmpty) {
+      final ph = List.filled(variantIds.length, '?').join(',');
+      final variantRows = await db.rawQuery(
+        'SELECT * FROM food_variants WHERE id IN ($ph)',
+        variantIds,
+      );
+      for (final row in variantRows) {
+        final v = FoodVariant.fromMap(row);
+        variants[v.id] = v;
+      }
+      final servingRows = await db.rawQuery(
+        'SELECT * FROM food_servings WHERE food_variant_id IN ($ph) ORDER BY label ASC',
+        variantIds,
+      );
+      for (final row in servingRows) {
+        final s = FoodServing.fromMap(row);
+        servingsByVariant.putIfAbsent(s.foodVariantId, () => []).add(s);
+      }
+    }
+    var calories = 0.0;
+    var proteinG = 0.0;
+    var carbsG = 0.0;
+    var fatG = 0.0;
+    var fiberG = 0.0;
+    var sugarsG = 0.0;
+    var sodiumMg = 0.0;
+    var hasAny = false;
+    final byItem = <String, NutritionValues>{};
+    for (final item in items) {
+      final variant = item.foodVariantId == null
+          ? null
+          : variants[item.foodVariantId];
+      if (variant == null) continue;
+      final servings =
+          servingsByVariant[variant.id] ?? const <FoodServing>[];
+      final serving = servings.firstWhereOrNull(
+        (s) => s.label == item.unit || s.unit == item.unit,
+      );
+      final conversion = NutritionConversion(
+        quantity: item.quantity,
+        unit: item.unit,
+        referenceAmount: variant.referenceAmount,
+        referenceUnit: variant.referenceUnit,
+        serving: serving,
+      );
+      NutritionValues consumed;
+      try {
+        conversion.resolveMultiplier();
+        consumed = conversion.apply(variant.values);
+      } catch (_) {
+        continue;
+      }
+      byItem[item.id] = consumed;
+      calories += consumed.calories ?? 0;
+      proteinG += consumed.proteinG ?? 0;
+      carbsG += consumed.carbsG ?? 0;
+      fatG += consumed.fatG ?? 0;
+      fiberG += consumed.fiberG ?? 0;
+      sugarsG += consumed.sugarsG ?? 0;
+      sodiumMg += consumed.sodiumMg ?? 0;
+      hasAny = true;
+    }
+    if (!hasAny) return (totals: null, byItem: byItem);
+    return (
+      totals: NutritionValues(
+        calories: calories,
+        proteinG: proteinG,
+        carbsG: carbsG,
+        fatG: fatG,
+        fiberG: fiberG,
+        sugarsG: sugarsG,
+        sodiumMg: sodiumMg,
+      ),
+      byItem: byItem,
+    );
   }
 
   Future<List<FoodSearchResultLite>> _hydrateResults(
@@ -845,6 +1321,37 @@ class ManualServingInput {
     this.gramsEquivalent,
     this.mlEquivalent,
   });
+}
+
+/// Input for a saved meal ingredient. Built by the UI from either a
+/// meal log item or a food + quantity selection.
+class SavedMealItemDraft {
+  final String? foodId;
+  final String? foodVariantId;
+  final String foodNameSnapshot;
+  final String? brandSnapshot;
+  final double quantity;
+  final String unit;
+
+  const SavedMealItemDraft({
+    this.foodId,
+    this.foodVariantId,
+    required this.foodNameSnapshot,
+    this.brandSnapshot,
+    required this.quantity,
+    required this.unit,
+  });
+
+  factory SavedMealItemDraft.fromMealLogItem(MealLogItem item) {
+    return SavedMealItemDraft(
+      foodId: item.foodId,
+      foodVariantId: item.foodVariantId,
+      foodNameSnapshot: item.foodNameSnapshot,
+      brandSnapshot: item.brandSnapshot,
+      quantity: item.quantity,
+      unit: item.unit,
+    );
+  }
 }
 
 /// CSV export row.

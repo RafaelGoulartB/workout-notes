@@ -23,6 +23,7 @@ class Food {
   final String? sourceUrl;
   final DateTime fetchedAt;
   final DateTime? lastUsedAt;
+  final bool? isFavorite;
 
   const Food({
     required this.id,
@@ -35,6 +36,7 @@ class Food {
     this.sourceUrl,
     required this.fetchedAt,
     this.lastUsedAt,
+    this.isFavorite,
   });
 
   bool get isManual => source == FoodSource.manual;
@@ -54,6 +56,7 @@ class Food {
     Object? sourceUrl = _sentinel,
     DateTime? fetchedAt,
     Object? lastUsedAt = _sentinel,
+    Object? isFavorite = _sentinel,
   }) {
     return Food(
       id: id ?? this.id,
@@ -72,6 +75,9 @@ class Food {
       lastUsedAt: identical(lastUsedAt, _sentinel)
           ? this.lastUsedAt
           : lastUsedAt as DateTime?,
+      isFavorite: identical(isFavorite, _sentinel)
+          ? this.isFavorite
+          : isFavorite as bool?,
     );
   }
 
@@ -86,9 +92,11 @@ class Food {
     'source_url': sourceUrl,
     'fetched_at': fetchedAt.toIso8601String(),
     'last_used_at': lastUsedAt?.toIso8601String(),
+    'is_favorite': (isFavorite ?? false) ? 1 : 0,
   };
 
   factory Food.fromMap(Map<String, dynamic> map) {
+    final isFavoriteRaw = map['is_favorite'] as int?;
     return Food(
       id: map['id'] as String,
       source: map['source'] as String,
@@ -102,6 +110,7 @@ class Food {
       lastUsedAt: (map['last_used_at'] as String?) != null
           ? DateTime.parse(map['last_used_at'] as String)
           : null,
+      isFavorite: isFavoriteRaw == null ? null : isFavoriteRaw == 1,
     );
   }
 
