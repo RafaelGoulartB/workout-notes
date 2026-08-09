@@ -6,6 +6,7 @@ import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_search_result.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
+import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
@@ -61,7 +62,10 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   List<FoodSearchResult> _recents = const [];
   List<FoodSearchResult> _allFoods = const [];
   List<FoodSearchResult> _mealSuggestions = const [];
+  List<MealTypeDefinition> _mealTypes = const [];
   _FoodSearchFilter _activeFilter = _FoodSearchFilter.all;
+  String? _selectedMealType;
+  String? _selectedMealName;
   bool _suggestionsLoading = true;
   bool _isSearchingRemote = false;
   NutritionGatewayError? _remoteError;
@@ -70,6 +74,8 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedMealType = widget.mealType;
+    _selectedMealName = widget.mealName;
     _controller.addListener(_onChanged);
     _loadSuggestions();
   }
@@ -88,17 +94,19 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
         widget.repository.getFavoriteFoods(),
         widget.repository.getRecentFoods(),
         widget.repository.getAllFoods(),
-        if (widget.mealType != null)
-          widget.repository.getMealSuggestions(widget.mealType!),
+        widget.repository.getMealTypes(),
+        if (_selectedMealType != null)
+          widget.repository.getMealSuggestions(_selectedMealType!),
       ]);
       if (!mounted) return;
       setState(() {
         _favorites = _attachVariants(results[0]);
         _recents = _attachVariants(results[1]);
         _allFoods = _attachVariants(results[2]);
-        _mealSuggestions = widget.mealType == null
+        _mealTypes = results[3] as List<MealTypeDefinition>;
+        _mealSuggestions = _selectedMealType == null
             ? const []
-            : _attachVariants(results[3]);
+            : _attachVariants(results[4]);
         _suggestionsLoading = false;
       });
     } catch (_) {
@@ -287,7 +295,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     if (!mounted) return;
     if (details == null || details.variants.isEmpty) return;
     final variant = details.variants.first;
-    Navigator.of(context).pop(
+    _returnSelection(
       NutritionSelection(
         food: details.food,
         primaryVariant: variant,
@@ -319,7 +327,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       if (!mounted) return;
       final variant = local.variants.isEmpty ? null : local.variants.first;
       if (variant != null) {
-        Navigator.of(context).pop(
+        _returnSelection(
           NutritionSelection(
             food: local.food,
             primaryVariant: variant,
@@ -354,7 +362,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       );
     } catch (_) {}
     if (!mounted) return;
-    Navigator.of(context).pop(
+    _returnSelection(
       NutritionSelection(
         food: remote.food,
         primaryVariant: variant,
@@ -370,7 +378,50 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       ),
     );
     if (result == null || !mounted) return;
-    Navigator.of(context).pop(result);
+    _returnSelection(result);
+  }
+
+  Future<void> _selectMeal(String mealType) async {
+    final definition = _mealTypes.firstWhere((type) => type.key == mealType);
+    final loc = AppLocalizations.of(context)!;
+    setState(() {
+      _selectedMealType = definition.key;
+      _selectedMealName = definition.displayName(loc);
+      _mealSuggestions = const [];
+      _suggestionsLoading = true;
+    });
+    try {
+      final suggestions = await widget.repository.getMealSuggestions(mealType);
+      if (!mounted || _selectedMealType != mealType) return;
+      setState(() {
+        _mealSuggestions = _attachVariants(suggestions);
+        _suggestionsLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _suggestionsLoading = false);
+    }
+  }
+
+  void _returnSelection(NutritionSelection selection) {
+    Navigator.of(context).pop(
+      NutritionSelection(
+        food: selection.food,
+        primaryVariant: selection.primaryVariant,
+        servings: selection.servings,
+        mealType: _selectedMealType,
+        mealName: _selectedMealName,
+      ),
+    );
+  }
+
+  void _selectFood(FoodSearchResult result) {
+    _returnSelection(
+      NutritionSelection(
+        food: result.food,
+        primaryVariant: result.primaryVariant,
+        servings: result.servings,
+      ),
+    );
   }
 
   Future<void> _openSavedMeals() async {
@@ -413,10 +464,48 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     final mealLabel = _mealLabel(loc);
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          mealLabel.isEmpty ? loc.nutritionSearchTitle : mealLabel,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        title: PopupMenuButton<String>(
+          tooltip: loc.nutritionSearchChooseMeal,
+          initialValue: _selectedMealType,
+          onSelected: _selectMeal,
+          itemBuilder: (context) => [
+            for (final meal in _mealTypes)
+              PopupMenuItem(
+                value: meal.key,
+                child: Row(
+                  children: [
+                    if (meal.key == _selectedMealType) ...[
+                      Icon(
+                        Icons.check_rounded,
+                        size: 18,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Text(meal.displayName(loc)),
+                  ],
+                ),
+              ),
+          ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  mealLabel.isEmpty ? loc.nutritionSearchTitle : mealLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (_mealTypes.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.arrow_drop_down_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+              ],
+            ],
+          ),
         ),
         centerTitle: true,
       ),
@@ -498,7 +587,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
           _favorites.isNotEmpty;
       final showMeal =
           _activeFilter == _FoodSearchFilter.all &&
-          widget.mealType != null &&
+          _selectedMealType != null &&
           _mealSuggestions.isNotEmpty;
       final showRecents =
           _activeFilter == _FoodSearchFilter.all && _recents.isNotEmpty;
@@ -519,6 +608,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                 separatorBuilder: (_, _) => const SizedBox(height: 6),
                 itemBuilder: (_, index) => _FoodCard(
                   result: _favorites[index],
+                  onSelected: () => _selectFood(_favorites[index]),
                   onToggleFavorite: () => _toggleFavorite(_favorites[index]),
                 ),
               ),
@@ -537,6 +627,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                 separatorBuilder: (_, _) => const SizedBox(height: 6),
                 itemBuilder: (_, index) => _FoodCard(
                   result: _mealSuggestions[index],
+                  onSelected: () => _selectFood(_mealSuggestions[index]),
                   onToggleFavorite: () =>
                       _toggleFavorite(_mealSuggestions[index]),
                 ),
@@ -557,6 +648,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                 separatorBuilder: (_, _) => const SizedBox(height: 6),
                 itemBuilder: (_, index) => _FoodCard(
                   result: _recents[index],
+                  onSelected: () => _selectFood(_recents[index]),
                   onToggleFavorite: () => _toggleFavorite(_recents[index]),
                 ),
               ),
@@ -573,6 +665,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                 separatorBuilder: (_, _) => const SizedBox(height: 6),
                 itemBuilder: (_, index) => _FoodCard(
                   result: _allFoods[index],
+                  onSelected: () => _selectFood(_allFoods[index]),
                   onToggleFavorite: () => _toggleFavorite(_allFoods[index]),
                 ),
               ),
@@ -651,6 +744,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
               separatorBuilder: (_, _) => const SizedBox(height: 6),
               itemBuilder: (_, index) => _FoodCard(
                 result: _localResults[index],
+                onSelected: () => _selectFood(_localResults[index]),
                 onToggleFavorite: () => _toggleFavorite(_localResults[index]),
               ),
             ),
@@ -665,8 +759,10 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             sliver: SliverList.separated(
               itemCount: _remoteResults.length,
               separatorBuilder: (_, _) => const SizedBox(height: 6),
-              itemBuilder: (_, index) =>
-                  _FoodCard(result: _remoteResults[index]),
+              itemBuilder: (_, index) => _FoodCard(
+                result: _remoteResults[index],
+                onSelected: () => _selectFood(_remoteResults[index]),
+              ),
             ),
           ),
         ],
@@ -711,9 +807,9 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   }
 
   String _mealLabel(AppLocalizations loc) {
-    final name = widget.mealName;
+    final name = _selectedMealName;
     if (name != null && name.trim().isNotEmpty) return name;
-    switch (widget.mealType) {
+    switch (_selectedMealType) {
       case MealType.breakfast:
         return loc.nutritionMealBreakfast;
       case MealType.lunch:
@@ -723,7 +819,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       case MealType.snacks:
         return loc.nutritionMealSnacks;
     }
-    return widget.mealType ?? '';
+    return _selectedMealType ?? '';
   }
 }
 
@@ -867,9 +963,14 @@ class _SearchActionCard extends StatelessWidget {
 
 class _FoodCard extends StatelessWidget {
   final FoodSearchResult result;
+  final VoidCallback onSelected;
   final VoidCallback? onToggleFavorite;
 
-  const _FoodCard({required this.result, this.onToggleFavorite});
+  const _FoodCard({
+    required this.result,
+    required this.onSelected,
+    this.onToggleFavorite,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -894,15 +995,7 @@ class _FoodCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
-        onTap: () {
-          Navigator.of(context).pop(
-            NutritionSelection(
-              food: result.food,
-              primaryVariant: variant,
-              servings: result.servings,
-            ),
-          );
-        },
+        onTap: onSelected,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
           child: Row(

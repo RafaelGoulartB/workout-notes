@@ -27,10 +27,14 @@ class NutritionSelection {
   final Food food;
   final FoodVariant? primaryVariant;
   final List<FoodServing> servings;
+  final String? mealType;
+  final String? mealName;
 
   const NutritionSelection({
     required this.food,
     this.primaryVariant,
     this.servings = const [],
+    this.mealType,
+    this.mealName,
   });
 }

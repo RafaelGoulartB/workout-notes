@@ -346,6 +346,33 @@ void main() {
     expect(gateway.searchCalls, 1);
   });
 
+  testWidgets('Food search header changes the target meal', (tester) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        _app(
+          FoodSearchScreen(
+            gateway: _StubGateway(
+              NutritionGatewayResult.ok(const <FoodSearchResult>[]),
+            ),
+            repository: repository,
+            mealType: 'lunch',
+          ),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+    expect(find.text(loc.nutritionMealLunch), findsOneWidget);
+    await tester.tap(find.text(loc.nutritionMealLunch));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(loc.nutritionMealBreakfast));
+    await tester.pumpAndSettle();
+
+    expect(find.text(loc.nutritionMealBreakfast), findsOneWidget);
+  });
+
   testWidgets('A response is ignored when the typed query has changed', (
     tester,
   ) async {

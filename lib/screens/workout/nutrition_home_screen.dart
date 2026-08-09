@@ -647,7 +647,11 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       servings: result.servings,
     );
     if (quantity == null) return;
-    await _persistAdd(mealType, mealLabel, quantity);
+    await _persistAdd(
+      result.mealType ?? mealType,
+      result.mealName ?? mealLabel,
+      quantity,
+    );
   }
 
   Future<void> _persistAdd(
