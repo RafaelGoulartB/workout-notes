@@ -21,12 +21,7 @@ import 'nutrition_settings_screen.dart';
 import 'saved_meal_editor_screen.dart';
 import 'saved_meals_screen.dart';
 
-enum _NutritionMenuAction {
-  progress,
-  savedMeals,
-  copyPreviousDay,
-  manageMeals,
-}
+enum _NutritionMenuAction { progress, savedMeals, copyPreviousDay, manageMeals }
 
 /// Nutrition dashboard with a compact daily overview and tools section.
 class NutritionHomeScreen extends StatefulWidget {
@@ -555,7 +550,8 @@ class NutritionDayDetailScreen extends StatefulWidget {
       _NutritionDayDetailScreenState();
 }
 
-class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
+class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
+    with SingleTickerProviderStateMixin {
   final NutritionRepository _repository = NutritionRepository();
   final NutritionGateway _gateway = OpenFoodFactsGateway();
 
@@ -566,12 +562,20 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
   NutritionGoal? _goal;
   bool _isLoading = true;
   bool _isMutating = false;
+  late final TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _selectedDate = _dateOnly(widget.initialDate ?? DateTime.now());
     _load();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -943,13 +947,16 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.nutritionHomeDiary),
+        titleSpacing: 0,
+        title: _DateNavigator(
+          date: _selectedDate,
+          onPrevious: () => _changeDay(-1),
+          onNext: () => _changeDay(1),
+          onJumpToday: _jumpToToday,
+          onPickDate: _pickDate,
+          compact: true,
+        ),
         actions: [
-          IconButton(
-            tooltip: loc.nutritionSettingsTitle,
-            onPressed: _openSettings,
-            icon: const Icon(Icons.settings_outlined),
-          ),
           PopupMenuButton<_NutritionMenuAction>(
             tooltip: loc.nutritionMoreOptions,
             onSelected: (action) {
@@ -1010,34 +1017,63 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
           ? const Center(child: CircularProgressIndicator())
           : IgnorePointer(
               ignoring: _isMutating,
-              child: RefreshIndicator(
-                onRefresh: _load,
-                child: CustomScrollView(
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: _DateNavigator(
-                        date: _selectedDate,
-                        // Always navigable: disabling the arrow on empty
-                        // days made it fall back to "go to today", so the
-                        // user could never reach a previous day from an
-                        // empty one.
-                        onPrevious: () => _changeDay(-1),
-                        onNext: () => _changeDay(1),
-                        onJumpToday: _jumpToToday,
-                        onPickDate: _pickDate,
+              child: Column(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: theme.colorScheme.outlineVariant.withAlpha(90),
+                        ),
                       ),
                     ),
-                    SliverToBoxAdapter(
-                      child: _DailySummaryCard(
-                        summary: _summary,
-                        goal: _goal,
-                        onConfigureGoal: _openSettings,
-                      ).animate().fadeIn(duration: 250.ms),
+                    child: TabBar(
+                      controller: _tabController,
+                      tabs: [
+                        Tab(
+                          icon: const Icon(Icons.menu_book_outlined, size: 20),
+                          text: loc.nutritionDiaryTab,
+                        ),
+                        Tab(
+                          icon: const Icon(
+                            Icons.donut_large_outlined,
+                            size: 20,
+                          ),
+                          text: loc.nutritionDailyStatsTab,
+                        ),
+                      ],
                     ),
-                    ..._buildMealSlivers(loc, theme),
-                    const SliverToBoxAdapter(child: SizedBox(height: 32)),
-                  ],
-                ),
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        RefreshIndicator(
+                          onRefresh: _load,
+                          child: CustomScrollView(
+                            key: const PageStorageKey('nutrition-diary'),
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            slivers: [
+                              ..._buildMealSlivers(loc, theme),
+                              const SliverToBoxAdapter(
+                                child: SizedBox(height: 32),
+                              ),
+                            ],
+                          ),
+                        ),
+                        RefreshIndicator(
+                          onRefresh: _load,
+                          child: _DailyStatisticsView(
+                            key: const PageStorageKey('nutrition-statistics'),
+                            summary: _summary,
+                            goal: _goal,
+                            onConfigureGoal: _openSettings,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
     );
@@ -1061,27 +1097,36 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen> {
     return [
       for (final type in _mealTypes)
         SliverToBoxAdapter(
-          child: _MealSection(
-            title: type.displayName(loc),
-            meal: _mealFor(type.key),
-            onAdd: () => _addItem(type.key, type.displayName(loc)),
-            onEdit: _editItem,
-            onDelete: _deleteItem,
-            onRepeat: () => _repeatMeal(_mealFor(type.key)),
-            onSaveAsMeal: () => _saveMealFromDay(_mealFor(type.key)),
-          ).animate().fadeIn(duration: 250.ms, delay: 40.ms).slideY(begin: 0.02),
+          child:
+              _MealSection(
+                    title: type.displayName(loc),
+                    meal: _mealFor(type.key),
+                    onAdd: () => _addItem(type.key, type.displayName(loc)),
+                    onEdit: _editItem,
+                    onDelete: _deleteItem,
+                    onRepeat: () => _repeatMeal(_mealFor(type.key)),
+                    onSaveAsMeal: () => _saveMealFromDay(_mealFor(type.key)),
+                  )
+                  .animate()
+                  .fadeIn(duration: 250.ms, delay: 40.ms)
+                  .slideY(begin: 0.02),
         ),
       for (final meal in orphanMeals)
         SliverToBoxAdapter(
-          child: _MealSection(
-            title: meal.log.displayName(loc),
-            meal: meal,
-            onAdd: () => _addItem(meal.log.mealType, meal.log.displayName(loc)),
-            onEdit: _editItem,
-            onDelete: _deleteItem,
-            onRepeat: () => _repeatMeal(meal),
-            onSaveAsMeal: () => _saveMealFromDay(meal),
-          ).animate().fadeIn(duration: 250.ms, delay: 40.ms).slideY(begin: 0.02),
+          child:
+              _MealSection(
+                    title: meal.log.displayName(loc),
+                    meal: meal,
+                    onAdd: () =>
+                        _addItem(meal.log.mealType, meal.log.displayName(loc)),
+                    onEdit: _editItem,
+                    onDelete: _deleteItem,
+                    onRepeat: () => _repeatMeal(meal),
+                    onSaveAsMeal: () => _saveMealFromDay(meal),
+                  )
+                  .animate()
+                  .fadeIn(duration: 250.ms, delay: 40.ms)
+                  .slideY(begin: 0.02),
         ),
     ];
   }
@@ -1114,6 +1159,7 @@ class _DateNavigator extends StatelessWidget {
   final VoidCallback onNext;
   final VoidCallback onJumpToday;
   final VoidCallback onPickDate;
+  final bool compact;
 
   const _DateNavigator({
     required this.date,
@@ -1121,6 +1167,7 @@ class _DateNavigator extends StatelessWidget {
     required this.onNext,
     required this.onJumpToday,
     required this.onPickDate,
+    this.compact = false,
   });
 
   @override
@@ -1128,14 +1175,22 @@ class _DateNavigator extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final isToday = _dateOnly(date) == _dateOnly(DateTime.now());
+    final formattedDate = isToday
+        ? loc.nutritionJumpToday
+        : compact
+        ? DateFormat.MMMEd(Intl.defaultLocale).format(date)
+        : DateFormat.yMMMMEEEEd(Intl.defaultLocale).format(date);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+      padding: compact
+          ? EdgeInsets.zero
+          : const EdgeInsets.fromLTRB(4, 2, 4, 0),
       child: Row(
         children: [
           IconButton(
             tooltip: loc.nutritionPreviousDay,
             onPressed: onPrevious ?? onJumpToday,
             visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
             icon: const Icon(Icons.chevron_left_rounded),
           ),
           Expanded(
@@ -1149,7 +1204,7 @@ class _DateNavigator extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        DateFormat.yMMMMEEEEd(Intl.defaultLocale).format(date),
+                        formattedDate,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleSmall?.copyWith(
@@ -1157,7 +1212,7 @@ class _DateNavigator extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (!isToday) ...[
+                    if (!isToday && !compact) ...[
                       const SizedBox(width: 8),
                       FilledButton.tonal(
                         onPressed: onJumpToday,
@@ -1182,6 +1237,7 @@ class _DateNavigator extends StatelessWidget {
             tooltip: loc.nutritionNextDay,
             onPressed: onNext,
             visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
             icon: const Icon(Icons.chevron_right_rounded),
           ),
         ],
@@ -1195,6 +1251,8 @@ class _DateNavigator extends StatelessWidget {
 
 /// Compact MyFitnessPal-style summary: calorie count with a progress
 /// bar, macro mini-stats and a micronutrient footer row.
+// Kept temporarily as a compatibility building block for older diary layouts.
+// ignore: unused_element
 class _DailySummaryCard extends StatelessWidget {
   final DailyNutritionSummary summary;
   final NutritionGoal? goal;
@@ -1215,7 +1273,8 @@ class _DailySummaryCard extends StatelessWidget {
     final hasGoal = calorieGoal != null && calorieGoal > 0;
     final fraction = hasGoal ? (calories / calorieGoal).clamp(0.0, 1.0) : null;
     final percent = hasGoal ? (calories / calorieGoal * 100).round() : null;
-    final hasMicro = summary.consumed.fiberG != null ||
+    final hasMicro =
+        summary.consumed.fiberG != null ||
         summary.consumed.sugarsG != null ||
         summary.consumed.sodiumMg != null;
 
@@ -1420,6 +1479,472 @@ class _DailySummaryCard extends StatelessWidget {
   }
 }
 
+/// Statistics for the currently selected diary date. Keeping this inside the
+/// day screen makes date navigation update the diary and its analysis together.
+class _DailyStatisticsView extends StatelessWidget {
+  final DailyNutritionSummary summary;
+  final NutritionGoal? goal;
+  final VoidCallback onConfigureGoal;
+
+  const _DailyStatisticsView({
+    super.key,
+    required this.summary,
+    required this.goal,
+    required this.onConfigureGoal,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final values = summary.consumed;
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      children: [
+        _StatisticsSectionCard(
+          title: loc.nutritionCaloriesTitle,
+          icon: Icons.local_fire_department_rounded,
+          child: _CalorieEquation(
+            consumed: values.calories ?? 0,
+            goal: goal?.calories,
+            onConfigureGoal: onConfigureGoal,
+          ),
+        ).animate().fadeIn(duration: 220.ms).slideY(begin: 0.025),
+        const SizedBox(height: 12),
+        _StatisticsSectionCard(
+          title: loc.nutritionMacrosTitle,
+          icon: Icons.donut_large_rounded,
+          child: Row(
+            children: [
+              Expanded(
+                child: _MacroRing(
+                  label: loc.nutritionProgressCarbs,
+                  consumed: values.carbsG,
+                  goal: goal?.carbsG,
+                  color: const Color(0xFF20A39E),
+                ),
+              ),
+              Expanded(
+                child: _MacroRing(
+                  label: loc.nutritionProgressProtein,
+                  consumed: values.proteinG,
+                  goal: goal?.proteinG,
+                  color: const Color(0xFFF29E38),
+                ),
+              ),
+              Expanded(
+                child: _MacroRing(
+                  label: loc.nutritionProgressFat,
+                  consumed: values.fatG,
+                  goal: goal?.fatG,
+                  color: const Color(0xFF8E44AD),
+                ),
+              ),
+            ],
+          ),
+        ).animate().fadeIn(duration: 260.ms, delay: 40.ms),
+        const SizedBox(height: 12),
+        _StatisticsSectionCard(
+          title: loc.nutritionNutrientsTitle,
+          icon: Icons.monitor_heart_outlined,
+          child: Column(
+            children: [
+              _NutrientProgressRow(
+                label: loc.nutritionProgressProtein,
+                consumed: values.proteinG,
+                goal: goal?.proteinG,
+                unit: 'g',
+                color: const Color(0xFFF29E38),
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressCarbs,
+                consumed: values.carbsG,
+                goal: goal?.carbsG,
+                unit: 'g',
+                color: const Color(0xFF20A39E),
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressFiber,
+                consumed: values.fiberG,
+                unit: 'g',
+                color: const Color(0xFF5B9D63),
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressSugars,
+                consumed: values.sugarsG,
+                unit: 'g',
+                color: const Color(0xFFD4758F),
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressFat,
+                consumed: values.fatG,
+                goal: goal?.fatG,
+                unit: 'g',
+                color: const Color(0xFF8E44AD),
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressSodium,
+                consumed: values.sodiumMg,
+                unit: 'mg',
+                color: Theme.of(context).colorScheme.primary,
+                isLast: true,
+              ),
+            ],
+          ),
+        ).animate().fadeIn(duration: 300.ms, delay: 80.ms),
+      ],
+    );
+  }
+}
+
+class _StatisticsSectionCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Widget child;
+
+  const _StatisticsSectionCard({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 19, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CalorieEquation extends StatelessWidget {
+  final double consumed;
+  final double? goal;
+  final VoidCallback onConfigureGoal;
+
+  const _CalorieEquation({
+    required this.consumed,
+    required this.goal,
+    required this.onConfigureGoal,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final hasGoal = goal != null && goal! > 0;
+    final remaining = hasGoal ? goal! - consumed : null;
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _EquationValue(
+                value: hasGoal ? _formatNutritionNumber(goal!) : '—',
+                label: loc.nutritionCaloriesGoalLabel,
+              ),
+            ),
+            const _EquationSymbol(Icons.remove_rounded),
+            Expanded(
+              child: _EquationValue(
+                value: _formatNutritionNumber(consumed),
+                label: loc.nutritionCaloriesFoodLabel,
+              ),
+            ),
+            const _EquationSymbol(Icons.drag_handle_rounded),
+            Expanded(
+              child: _EquationValue(
+                value: remaining == null
+                    ? '—'
+                    : _formatNutritionNumber(remaining),
+                label: loc.nutritionCaloriesRemainingLabel,
+                color: remaining != null && remaining < 0
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+        if (hasGoal) ...[
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: (consumed / goal!).clamp(0.0, 1.0),
+              minHeight: 8,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+            ),
+          ),
+        ] else ...[
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: onConfigureGoal,
+            child: Text(loc.nutritionConfigureGoal),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _EquationValue extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color? color;
+
+  const _EquationValue({required this.value, required this.label, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        Text(
+          value,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EquationSymbol extends StatelessWidget {
+  final IconData icon;
+
+  const _EquationSymbol(this.icon);
+
+  @override
+  Widget build(BuildContext context) => Icon(
+    icon,
+    size: 17,
+    color: Theme.of(context).colorScheme.onSurfaceVariant,
+  );
+}
+
+class _MacroRing extends StatelessWidget {
+  final String label;
+  final double? consumed;
+  final double? goal;
+  final Color color;
+
+  const _MacroRing({
+    required this.label,
+    required this.consumed,
+    required this.goal,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final current = consumed ?? 0;
+    final hasGoal = goal != null && goal! > 0;
+    final progress = hasGoal ? (current / goal!).clamp(0.0, 1.0) : 0.0;
+    return Column(
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 9),
+        SizedBox.square(
+          dimension: 70,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox.expand(
+                child: CircularProgressIndicator(
+                  value: hasGoal ? progress : 0,
+                  strokeWidth: 7,
+                  strokeCap: StrokeCap.round,
+                  color: color,
+                  backgroundColor: color.withAlpha(35),
+                ),
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _formatNutritionNumber(current),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    hasGoal ? '/${_formatNutritionNumber(goal!)}g' : 'g',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 7),
+        Text(
+          hasGoal
+              ? '${_formatNutritionNumber((goal! - current).clamp(0, double.infinity).toDouble())} g ${AppLocalizations.of(context)!.nutritionRemainingLabel.toLowerCase()}'
+              : '—',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NutrientProgressRow extends StatelessWidget {
+  final String label;
+  final double? consumed;
+  final double? goal;
+  final String unit;
+  final Color color;
+  final bool isLast;
+
+  const _NutrientProgressRow({
+    required this.label,
+    required this.consumed,
+    this.goal,
+    required this.unit,
+    required this.color,
+    this.isLast = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final current = consumed ?? 0;
+    final hasGoal = goal != null && goal! > 0;
+    final remaining = hasGoal ? goal! - current : null;
+    return Padding(
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 15),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                '${_formatNutritionNumber(current)}$unit',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (hasGoal) ...[
+                Text(
+                  '  /  ${_formatNutritionNumber(goal!)}$unit',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                SizedBox(
+                  width: 62,
+                  child: Text(
+                    '${_formatNutritionNumber(remaining!)}$unit',
+                    textAlign: TextAlign.end,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: remaining < 0
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 7),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: hasGoal ? (current / goal!).clamp(0.0, 1.0) : 0,
+              minHeight: 4,
+              color: color,
+              backgroundColor: color.withAlpha(32),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Kept with the nutrition widgets in case incomplete-data messaging is
+// reintroduced in a less intrusive location.
+// ignore: unused_element
+class _IncompleteDataNotice extends StatelessWidget {
+  final String text;
+
+  const _IncompleteDataNotice({required this.text});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: _nutritionWarningColor.withAlpha(25),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.info_outline, color: _nutritionWarningColor, size: 18),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Text(text, style: Theme.of(context).textTheme.bodySmall),
+        ),
+      ],
+    ),
+  );
+}
+
+String _formatNutritionNumber(double value) {
+  if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+  return value.toStringAsFixed(1);
+}
+
 /// Compact per-macro stat: colored dot + label, "x / y g" value and a
 /// thin progress bar when a goal exists.
 class _MacroMiniStat extends StatelessWidget {
@@ -1571,6 +2096,18 @@ class _MealSection extends StatelessWidget {
       0,
       (sum, item) => sum + (item.calories ?? 0),
     );
+    final proteinTotal = meal.items.fold<double>(
+      0,
+      (sum, item) => sum + (item.proteinG ?? 0),
+    );
+    final carbsTotal = meal.items.fold<double>(
+      0,
+      (sum, item) => sum + (item.carbsG ?? 0),
+    );
+    final fatTotal = meal.items.fold<double>(
+      0,
+      (sum, item) => sum + (item.fatG ?? 0),
+    );
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
       child: Card(
@@ -1579,80 +2116,87 @@ class _MealSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 8, 6, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
+            ColoredBox(
+              color: theme.colorScheme.primaryContainer.withAlpha(65),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 9, 6, 7),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          Text(
+                            meal.items.isEmpty
+                                ? loc.nutritionItemCount(0)
+                                : 'C ${_format(carbsTotal)}g  ·  P ${_format(proteinTotal)}g  ·  G ${_format(fatTotal)}g',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (kcalTotal > 0) ...[
+                      Text(
+                        '${_format(kcalTotal)} kcal',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.primary,
                         ),
-                        Text(
-                          loc.nutritionItemCount(meal.items.length),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    IconButton(
+                      tooltip: loc.nutritionAddItem,
+                      onPressed: onAdd,
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.add_circle_outline),
+                    ),
+                    PopupMenuButton<String>(
+                      tooltip: loc.nutritionMealMenu,
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: (action) {
+                        switch (action) {
+                          case 'repeat':
+                            onRepeat();
+                          case 'save':
+                            onSaveAsMeal();
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        PopupMenuItem(
+                          value: 'repeat',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.replay_outlined),
+                            title: Text(loc.nutritionRepeatMeal),
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'save',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.bookmark_add_outlined),
+                            title: Text(loc.nutritionSaveMeal),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  if (kcalTotal > 0) ...[
-                    Text(
-                      '${_format(kcalTotal)} kcal',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
                   ],
-                  IconButton(
-                    tooltip: loc.nutritionAddItem,
-                    onPressed: onAdd,
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.add_circle_outline),
-                  ),
-                  PopupMenuButton<String>(
-                    tooltip: loc.nutritionMealMenu,
-                    icon: const Icon(Icons.more_vert),
-                    onSelected: (action) {
-                      switch (action) {
-                        case 'repeat':
-                          onRepeat();
-                        case 'save':
-                          onSaveAsMeal();
-                      }
-                    },
-                    itemBuilder: (ctx) => [
-                      PopupMenuItem(
-                        value: 'repeat',
-                        child: ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.replay_outlined),
-                          title: Text(loc.nutritionRepeatMeal),
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'save',
-                        child: ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.bookmark_add_outlined),
-                          title: Text(loc.nutritionSaveMeal),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ),
             if (meal.items.isEmpty)

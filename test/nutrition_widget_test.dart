@@ -277,9 +277,19 @@ void main() {
     });
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text(loc.nutritionHomeDiary), findsOneWidget);
+    expect(find.text(loc.nutritionJumpToday), findsOneWidget);
+    expect(find.text(loc.nutritionDiaryTab), findsOneWidget);
+    expect(find.text(loc.nutritionDailyStatsTab), findsOneWidget);
+    expect(find.byIcon(Icons.settings_outlined), findsNothing);
     expect(find.text(loc.nutritionAddManually), findsNothing);
     expect(find.byType(FloatingActionButton), findsNothing);
+
+    await tester.tap(find.text(loc.nutritionDailyStatsTab));
+    await tester.pumpAndSettle();
+
+    expect(find.text(loc.nutritionCaloriesTitle), findsOneWidget);
+    expect(find.text(loc.nutritionMacrosTitle), findsOneWidget);
+    expect(find.text(loc.nutritionNutrientsTitle), findsOneWidget);
   });
 
   testWidgets(
