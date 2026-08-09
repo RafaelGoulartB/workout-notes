@@ -6646,6 +6646,132 @@ abstract class AppLocalizations {
   /// **'Type at least 2 characters.'**
   String get nutritionSearchQueryTooShort;
 
+  /// No description provided for @nutritionRateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Food Facts is busy right now. Try again in a moment.'**
+  String get nutritionRateLimited;
+
+  /// No description provided for @nutritionScanBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan barcode'**
+  String get nutritionScanBarcode;
+
+  /// No description provided for @nutritionScanTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan barcode'**
+  String get nutritionScanTitle;
+
+  /// No description provided for @nutritionScanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Point the camera at the barcode…'**
+  String get nutritionScanning;
+
+  /// No description provided for @nutritionScanUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode scanning is only available on Android.'**
+  String get nutritionScanUnsupported;
+
+  /// No description provided for @nutritionScanInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid code.'**
+  String get nutritionScanInvalid;
+
+  /// No description provided for @nutritionScanNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Product not found on Open Food Facts.'**
+  String get nutritionScanNotFound;
+
+  /// No description provided for @nutritionScanNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Network error while querying Open Food Facts.'**
+  String get nutritionScanNetwork;
+
+  /// No description provided for @nutritionScanError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not look up the product.'**
+  String get nutritionScanError;
+
+  /// No description provided for @nutritionPhotoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition label photo'**
+  String get nutritionPhotoTitle;
+
+  /// No description provided for @nutritionPhotoTake.
+  ///
+  /// In en, this message translates to:
+  /// **'Take photo'**
+  String get nutritionPhotoTake;
+
+  /// No description provided for @nutritionPhotoGallery.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from gallery'**
+  String get nutritionPhotoGallery;
+
+  /// No description provided for @nutritionPhotoSelectHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo of the product\'s nutrition label. The AI Coach identifies the food and its values for you to review.'**
+  String get nutritionPhotoSelectHint;
+
+  /// No description provided for @nutritionPhotoAnalyze.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyze label'**
+  String get nutritionPhotoAnalyze;
+
+  /// No description provided for @nutritionPhotoAnalyzing.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyzing nutrition label…'**
+  String get nutritionPhotoAnalyzing;
+
+  /// No description provided for @nutritionPhotoNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Coach not configured'**
+  String get nutritionPhotoNotConfigured;
+
+  /// No description provided for @nutritionPhotoNotConfiguredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure an AI provider (with a vision-capable model) in the AI Coach settings to use this feature.'**
+  String get nutritionPhotoNotConfiguredBody;
+
+  /// No description provided for @nutritionPhotoOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure AI Coach'**
+  String get nutritionPhotoOpenSettings;
+
+  /// No description provided for @nutritionPhotoInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read the nutrition label. Try a sharper photo.'**
+  String get nutritionPhotoInvalid;
+
+  /// No description provided for @nutritionPhotoPickFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not get the photo.'**
+  String get nutritionPhotoPickFailed;
+
+  /// No description provided for @nutritionPhotoError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to analyze the nutrition label.'**
+  String get nutritionPhotoError;
+
   /// No description provided for @nutritionAddManually.
   ///
   /// In en, this message translates to:

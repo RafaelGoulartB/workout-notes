@@ -3,11 +3,13 @@ import 'dart:convert';
 /// Source of a food record.
 ///
 /// - `manual`: created by the user directly in the app.
-/// - Other values are gateway-defined (e.g. `tbca`, `open_food_facts`,
-///   `usda`). The MVP does not ship a default gateway, but new sources
-///   can be added without schema changes.
+/// - `ai_vision`: extracted from a nutrition label photo by the AI Coach.
+/// - Other values are gateway-defined (e.g. `open_food_facts`, `usda`).
+///   New sources can be added without schema changes.
 class FoodSource {
   static const String manual = 'manual';
+  static const String aiVision = 'ai_vision';
+  static const String openFoodFacts = 'open_food_facts';
 }
 
 class Food {

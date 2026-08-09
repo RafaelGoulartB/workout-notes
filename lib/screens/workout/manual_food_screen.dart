@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
+import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 
@@ -8,10 +10,21 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 /// food is persisted via [NutritionRepository.createManualFood] and
 /// popped to the caller so the search screen can hand it off to the
 /// quantity sheet.
+///
+/// When [initial] is provided (AI label extraction), the form is
+/// pre-filled so the user can review and correct the parsed values
+/// before saving. [source] is recorded as the food's origin.
 class ManualFoodScreen extends StatefulWidget {
   final NutritionRepository repository;
+  final String source;
+  final AiFoodLabelDraft? initial;
 
-  const ManualFoodScreen({super.key, required this.repository});
+  const ManualFoodScreen({
+    super.key,
+    required this.repository,
+    this.source = FoodSource.manual,
+    this.initial,
+  });
 
   @override
   State<ManualFoodScreen> createState() => _ManualFoodScreenState();
@@ -34,6 +47,29 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
   bool _isEstimated = false;
   final List<_ManualServingDraft> _servings = [];
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial == null) return;
+    _nameController.text = initial.name;
+    if (initial.brand != null) _brandController.text = initial.brand!;
+    if (initial.barcode != null) _barcodeController.text = initial.barcode!;
+    _referenceAmountController.text = _formatAmount(initial.referenceAmount);
+    _referenceUnitController.text = initial.referenceUnit;
+    _fillNumber(_caloriesController, initial.values.calories);
+    _fillNumber(_proteinController, initial.values.proteinG);
+    _fillNumber(_carbsController, initial.values.carbsG);
+    _fillNumber(_fatController, initial.values.fatG);
+    _fillNumber(_fiberController, initial.values.fiberG);
+    _fillNumber(_sugarsController, initial.values.sugarsG);
+    _fillNumber(_sodiumController, initial.values.sodiumMg);
+    _isEstimated = true;
+    for (final serving in initial.servings) {
+      _servings.add(_servingDraftFrom(serving));
+    }
+  }
 
   @override
   void dispose() {
@@ -67,6 +103,7 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
         name: _nameController.text.trim(),
         brand: _nullableText(_brandController.text),
         barcode: _nullableText(_barcodeController.text),
+        source: widget.source,
         referenceAmount: _parseDouble(_referenceAmountController.text, 100)!,
         referenceUnit: _referenceUnitController.text.trim().isEmpty
             ? 'g'
@@ -127,6 +164,29 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
     setState(() {
       _servings.add(_ManualServingDraft());
     });
+  }
+
+  static String _formatAmount(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(2);
+  }
+
+  static void _fillNumber(TextEditingController controller, double? value) {
+    if (value == null) return;
+    controller.text = _formatAmount(value);
+  }
+
+  static _ManualServingDraft _servingDraftFrom(
+    AiFoodLabelServingDraft serving,
+  ) {
+    final draft = _ManualServingDraft();
+    draft.labelController.text = serving.label;
+    draft.quantityController.text = _formatAmount(serving.quantity);
+    draft.unitController.text = serving.unit;
+    if (serving.gramsEquivalent != null) {
+      draft.gramsController.text = _formatAmount(serving.gramsEquivalent!);
+    }
+    return draft;
   }
 
   void _removeServing(int index) {

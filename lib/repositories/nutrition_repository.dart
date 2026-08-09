@@ -84,13 +84,22 @@ class NutritionRepository extends BaseRepository {
       limit: 1,
     );
     if (foodRows.isEmpty) return null;
-    final food = Food.fromMap(foodRows.first);
-    final variants = await _loadVariants(food.id);
-    final servings = <String, List<FoodServing>>{};
-    for (final v in variants) {
-      servings[v.id] = await _loadServings(v.id);
-    }
-    return FoodWithDetails(food: food, variants: variants, servings: servings);
+    return _detailsFor(Food.fromMap(foodRows.first));
+  }
+
+  /// Returns one food by its barcode, or null when missing. Used by
+  /// the barcode scan flow to surface cached items without a network
+  /// call.
+  Future<FoodWithDetails?> getFoodByBarcode(String barcode) async {
+    final db = await this.db;
+    final foodRows = await db.query(
+      'foods',
+      where: 'barcode = ?',
+      whereArgs: [barcode],
+      limit: 1,
+    );
+    if (foodRows.isEmpty) return null;
+    return _detailsFor(Food.fromMap(foodRows.first));
   }
 
   /// Returns one food by (source, externalId), or null when missing.
@@ -106,13 +115,7 @@ class NutritionRepository extends BaseRepository {
       limit: 1,
     );
     if (foodRows.isEmpty) return null;
-    final food = Food.fromMap(foodRows.first);
-    final variants = await _loadVariants(food.id);
-    final servings = <String, List<FoodServing>>{};
-    for (final v in variants) {
-      servings[v.id] = await _loadServings(v.id);
-    }
-    return FoodWithDetails(food: food, variants: variants, servings: servings);
+    return _detailsFor(Food.fromMap(foodRows.first));
   }
 
   /// Upserts a food plus its variants and servings in a single
@@ -171,6 +174,8 @@ class NutritionRepository extends BaseRepository {
   }
 
   /// Registers a manual food entry and returns the persisted [Food].
+  /// [source] defaults to [FoodSource.manual]; the AI label flow uses
+  /// [FoodSource.aiVision] so estimated foods stay distinguishable.
   Future<Food> createManualFood({
     required String name,
     String? brand,
@@ -179,13 +184,14 @@ class NutritionRepository extends BaseRepository {
     required String referenceUnit,
     required NutritionValues referenceValues,
     bool isEstimated = false,
+    String source = FoodSource.manual,
     List<ManualServingInput> servings = const [],
   }) async {
     final now = DateTime.now();
     final foodId = _uuid.v4();
     final food = Food(
       id: foodId,
-      source: FoodSource.manual,
+      source: source,
       externalId: foodId,
       name: name,
       searchName: Food.normalizeForSearch(name),
@@ -636,6 +642,16 @@ class NutritionRepository extends BaseRepository {
       orderBy: 'reference_amount ASC',
     );
     return rows.map(FoodVariant.fromMap).toList();
+  }
+
+  /// Loads a food's variants and their servings.
+  Future<FoodWithDetails> _detailsFor(Food food) async {
+    final variants = await _loadVariants(food.id);
+    final servings = <String, List<FoodServing>>{};
+    for (final v in variants) {
+      servings[v.id] = await _loadServings(v.id);
+    }
+    return FoodWithDetails(food: food, variants: variants, servings: servings);
   }
 
   Future<List<FoodServing>> _loadServings(String variantId) async {

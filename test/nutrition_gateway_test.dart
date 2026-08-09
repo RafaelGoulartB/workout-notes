@@ -85,7 +85,7 @@ void main() {
       expect(result.ok, isTrue);
       expect(result.data, isNotNull);
       expect(result.data!.length, 2);
-      expect(result.data!.first.name, 'Apple');
+      expect(result.data!.first.food.name, 'Apple');
     });
 
     test('classifies network failures', () async {
@@ -161,11 +161,9 @@ void main() {
       );
       final result = await gateway.search('apple');
       expect(result.ok, isTrue);
-      // The gateway itself returns Food; nulls are preserved in
-      // the variant values which the repository rehydrates from the
-      // database. So the relevant assertion is that the call
-      // succeeded.
-      expect(result.data!.first.name, 'Apple');
+      // The gateway itself returns FoodSearchResult rows with the
+      // variant values; nulls are preserved through the payload.
+      expect(result.data!.first.food.name, 'Apple');
     });
   });
 }

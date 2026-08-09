@@ -3641,6 +3641,77 @@ class AppLocalizationsPt extends AppLocalizations {
   String get nutritionSearchQueryTooShort => 'Digite pelo menos 2 caracteres.';
 
   @override
+  String get nutritionRateLimited =>
+      'O Open Food Facts está ocupado agora. Tente novamente em instantes.';
+
+  @override
+  String get nutritionScanBarcode => 'Escanear código';
+
+  @override
+  String get nutritionScanTitle => 'Escanear código de barras';
+
+  @override
+  String get nutritionScanning =>
+      'Posicione o código dentro da área de leitura…';
+
+  @override
+  String get nutritionScanUnsupported =>
+      'O escaneamento de código está disponível apenas no Android.';
+
+  @override
+  String get nutritionScanInvalid => 'Código inválido.';
+
+  @override
+  String get nutritionScanNotFound =>
+      'Produto não encontrado no Open Food Facts.';
+
+  @override
+  String get nutritionScanNetwork =>
+      'Falha de conexão ao consultar o Open Food Facts.';
+
+  @override
+  String get nutritionScanError => 'Não foi possível consultar o produto.';
+
+  @override
+  String get nutritionPhotoTitle => 'Foto da tabela nutricional';
+
+  @override
+  String get nutritionPhotoTake => 'Tirar foto';
+
+  @override
+  String get nutritionPhotoGallery => 'Escolher da galeria';
+
+  @override
+  String get nutritionPhotoSelectHint =>
+      'Tire uma foto da tabela nutricional do alimento. A IA do AI Coach identifica o alimento e os valores para você revisar.';
+
+  @override
+  String get nutritionPhotoAnalyze => 'Analisar tabela';
+
+  @override
+  String get nutritionPhotoAnalyzing => 'Analisando a tabela nutricional…';
+
+  @override
+  String get nutritionPhotoNotConfigured => 'AI Coach não configurado';
+
+  @override
+  String get nutritionPhotoNotConfiguredBody =>
+      'Configure um provedor de IA (com um modelo que aceite imagens) nos Ajustes do AI Coach para usar esta função.';
+
+  @override
+  String get nutritionPhotoOpenSettings => 'Configurar AI Coach';
+
+  @override
+  String get nutritionPhotoInvalid =>
+      'Não foi possível ler a tabela nutricional. Tente outra foto mais nítida.';
+
+  @override
+  String get nutritionPhotoPickFailed => 'Não foi possível obter a foto.';
+
+  @override
+  String get nutritionPhotoError => 'Falha ao analisar a tabela nutricional.';
+
+  @override
   String get nutritionAddManually => 'Cadastrar alimento manualmente';
 
   @override

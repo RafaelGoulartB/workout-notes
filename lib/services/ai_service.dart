@@ -196,7 +196,9 @@ class AiService {
   }
 
   Map<String, String> _headers({required String token}) => {
-    'Authorization': 'Bearer $token',
+    // Local providers (e.g. Ollama) have no token; sending an empty
+    // Bearer header can make some servers reject the request.
+    if (token.isNotEmpty) 'Authorization': 'Bearer $token',
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   };

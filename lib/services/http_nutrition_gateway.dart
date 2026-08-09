@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:uuid/uuid.dart';
 
-import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/food_search_result.dart';
 
 import 'nutrition_gateway.dart';
@@ -42,7 +40,7 @@ class HttpNutritionGateway implements NutritionGateway {
       (_baseUrl == null || _baseUrl.isEmpty) ? null : _baseUrl;
 
   @override
-  Future<NutritionGatewayResult<List<Food>>> search(
+  Future<NutritionGatewayResult<List<FoodSearchResult>>> search(
     String query, {
     int limit = 20,
   }) async {
@@ -76,11 +74,10 @@ class HttpNutritionGateway implements NutritionGateway {
         );
       }
       final payload = NutritionGatewaySearchPayload.fromJson(decoded);
-      final foods = <Food>[];
-      for (final item in payload.results) {
-        foods.add(_toFood(item));
-      }
-      return NutritionGatewayResult.ok(foods);
+      final results = payload.results
+          .map((item) => item.toSearchResult())
+          .toList();
+      return NutritionGatewayResult.ok(results);
     } on TimeoutException {
       return NutritionGatewayResult.error(
         const NutritionGatewayError('timeout', 'Gateway request timed out'),
@@ -101,7 +98,7 @@ class HttpNutritionGateway implements NutritionGateway {
   }
 
   @override
-  Future<NutritionGatewayResult<Food>> getFood(
+  Future<NutritionGatewayResult<FoodSearchResult>> getFood(
     String source,
     String externalId,
   ) async {
@@ -135,7 +132,7 @@ class HttpNutritionGateway implements NutritionGateway {
         );
       }
       final payload = NutritionGatewayFoodPayload.fromJson(decoded);
-      return NutritionGatewayResult.ok(_toFood(payload));
+      return NutritionGatewayResult.ok(payload.toSearchResult());
     } on TimeoutException {
       return NutritionGatewayResult.error(
         const NutritionGatewayError('timeout', 'Gateway request timed out'),
@@ -155,8 +152,8 @@ class HttpNutritionGateway implements NutritionGateway {
     }
   }
 
-  /// Convenience helper that returns the [Food] together with its
-  /// primary variant + servings when available.
+  /// Convenience helper that returns the [FoodSearchResult] for a food
+  /// (with its primary variant + servings when available).
   Future<NutritionGatewayResult<FoodSearchResult>> fetchFoodDetail(
     String source,
     String externalId,
@@ -165,15 +162,7 @@ class HttpNutritionGateway implements NutritionGateway {
     if (result.error != null) {
       return NutritionGatewayResult.error(result.error!);
     }
-    final food = result.data!;
-    return NutritionGatewayResult.ok(
-      FoodSearchResult(
-        food: food,
-        primaryVariant: null,
-        servings: const [],
-        isRemote: true,
-      ),
-    );
+    return NutritionGatewayResult.ok(result.data!);
   }
 
   bool get isConfigured => baseUrl != null;
@@ -207,19 +196,4 @@ class HttpNutritionGateway implements NutritionGateway {
     'Accept': 'application/json',
     'User-Agent': 'workout-notes/1.0',
   };
-
-  Food _toFood(NutritionGatewayFoodPayload payload) {
-    final now = DateTime.now();
-    return Food(
-      id: const Uuid().v4(),
-      source: payload.source,
-      externalId: payload.externalId,
-      name: payload.name,
-      searchName: Food.normalizeForSearch(payload.name),
-      brand: payload.brand,
-      barcode: payload.barcode,
-      sourceUrl: payload.sourceUrl,
-      fetchedAt: now,
-    );
-  }
 }

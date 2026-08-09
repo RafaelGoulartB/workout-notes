@@ -1,4 +1,7 @@
+import 'package:uuid/uuid.dart';
+
 import 'package:workout_notes/models/nutrition/food.dart';
+import 'package:workout_notes/models/nutrition/food_search_result.dart';
 import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
@@ -28,22 +31,20 @@ class NutritionGatewayError {
   String toString() => 'NutritionGatewayError($code): $message';
 }
 
-/// Abstract gateway contract used by the nutrition module.
+/// Abstract gateway contract used by the nutrition module. Each
+/// implementation talks to one external provider (Open Food Facts,
+/// USDA, FatSecret, …).
 ///
-/// Two endpoints are expected from a compliant gateway:
-///
-///   GET `${baseUrl}/foods/search?q=<query>&limit=<limit>`
-///   GET `${baseUrl}/foods/{source}/{externalId}`
-///
-/// The HTTP client must return JSON shaped like
-/// [NutritionGatewaySearchPayload] / [NutritionGatewayFoodPayload].
+/// Results are rich: each [FoodSearchResult] carries the food plus its
+/// primary variant (with the nutrition values) and any servings, so
+/// the UI can persist and display provider data without a second call.
 abstract class NutritionGateway {
-  Future<NutritionGatewayResult<List<Food>>> search(
+  Future<NutritionGatewayResult<List<FoodSearchResult>>> search(
     String query, {
     int limit = 20,
   });
 
-  Future<NutritionGatewayResult<Food>> getFood(
+  Future<NutritionGatewayResult<FoodSearchResult>> getFood(
     String source,
     String externalId,
   );
@@ -160,6 +161,31 @@ class NutritionGatewayFoodPayload {
       sourceUrl: json['source_url'] as String?,
       variants: variants,
       servings: servings,
+    );
+  }
+
+  /// Converts the parsed payload into a domain [FoodSearchResult],
+  /// assigning a fresh local id and the normalized search name.
+  FoodSearchResult toSearchResult() {
+    final food = Food(
+      id: const Uuid().v4(),
+      source: source,
+      externalId: externalId,
+      name: name,
+      searchName: Food.normalizeForSearch(name),
+      brand: brand,
+      barcode: barcode,
+      sourceUrl: sourceUrl,
+      fetchedAt: DateTime.now(),
+    );
+    final primary = variants.isEmpty ? null : variants.first;
+    return FoodSearchResult(
+      food: food,
+      primaryVariant: primary,
+      servings: primary == null
+          ? const []
+          : servings[primary.id] ?? const [],
+      isRemote: true,
     );
   }
 

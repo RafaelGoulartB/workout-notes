@@ -9,6 +9,7 @@ import com.workoutnotes.workout_notes.sleep.TraditionalAlarmBridge
 
 class MainActivity : FlutterActivity() {
     private var sleepMonitorBridge: SleepMonitorBridge? = null
+    private var barcodeScannerBridge: BarcodeScannerBridge? = null
     private lateinit var traditionalAlarmBridge: TraditionalAlarmBridge
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -23,6 +24,12 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             "workout_notes/sleep_monitor/events",
         ).setStreamHandler(bridge)
+        val barcodeBridge = BarcodeScannerBridge()
+        barcodeScannerBridge = barcodeBridge
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "workout_notes/barcode_scanner/methods",
+        ).setMethodCallHandler(barcodeBridge)
         traditionalAlarmBridge = TraditionalAlarmBridge(applicationContext)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -33,10 +40,12 @@ class MainActivity : FlutterActivity() {
     override fun onResume() {
         super.onResume()
         sleepMonitorBridge?.attachActivity(this)
+        barcodeScannerBridge?.attachActivity(this)
     }
 
     override fun onPause() {
         sleepMonitorBridge?.detachActivity()
+        barcodeScannerBridge?.detachActivity()
         super.onPause()
     }
 
@@ -52,7 +61,9 @@ class MainActivity : FlutterActivity() {
 
     @Deprecated("Deprecated in Android SDK")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
-        if (sleepMonitorBridge?.onActivityResult(requestCode, resultCode, data) != true) {
+        val handled = sleepMonitorBridge?.onActivityResult(requestCode, resultCode, data) == true ||
+            barcodeScannerBridge?.onActivityResult(requestCode, resultCode, data) == true
+        if (!handled) {
             super.onActivityResult(requestCode, resultCode, data)
         }
     }

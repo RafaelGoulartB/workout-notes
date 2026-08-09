@@ -8,10 +8,11 @@ import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_search_result.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
-import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 
+import 'barcode_scan_screen.dart';
+import 'food_label_photo_screen.dart';
 import 'manual_food_screen.dart';
 
 /// Food search screen. Combines local cache + remote gateway results
@@ -106,8 +107,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
         });
         return;
       }
-      final foods = result.data ?? const <Food>[];
-      final hydrated = await _hydrateRemote(foods);
+      final hydrated = await _hydrateRemote(result.data ?? const []);
       if (!mounted || _controller.text != _lastQuery) return;
       setState(() {
         _remoteResults = _mergeWithLocal(hydrated, _localResults);
@@ -117,37 +117,29 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     });
   }
 
-  Future<List<FoodSearchResult>> _hydrateRemote(List<Food> foods) async {
-    final result = <FoodSearchResult>[];
-    for (final food in foods) {
-      final persisted = await widget.repository.upsertFoodWithDetails(
-        food: food,
-        variants: [
-          FoodVariant(
-            id: 'remote_default',
-            foodId: food.id,
-            referenceAmount: 100,
-            referenceUnit: 'g',
-            values: NutritionValues.empty,
-            isEstimated: false,
-          ),
-        ],
-      );
-      final details = await widget.repository.getFoodWithDetails(persisted.id);
-      if (details == null) continue;
-      final primary = details.variants.isEmpty ? null : details.variants.first;
-      result.add(
-        FoodSearchResult(
-          food: details.food,
-          primaryVariant: primary,
-          servings: primary == null
-              ? const []
-              : details.servings[primary.id] ?? const [],
-          isRemote: true,
-        ),
-      );
+  /// Persists each remote result (food + variant + servings) into the
+  /// local cache so it shows up in future searches even offline, and
+  /// returns the hydrated rows for display.
+  Future<List<FoodSearchResult>> _hydrateRemote(
+    List<FoodSearchResult> results,
+  ) async {
+    final hydrated = <FoodSearchResult>[];
+    for (final result in results) {
+      final variant = result.primaryVariant;
+      if (variant == null) continue;
+      try {
+        await widget.repository.upsertFoodWithDetails(
+          food: result.food,
+          variants: [variant],
+          servings: {variant.id: result.servings},
+        );
+        hydrated.add(result);
+      } catch (_) {
+        // Skip foods that failed to persist rather than failing the
+        // whole search.
+      }
     }
-    return result;
+    return hydrated;
   }
 
   List<FoodSearchResult> _attachVariants(List<dynamic> results) {
@@ -180,20 +172,139 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       ),
     );
     if (created == null || !mounted) return;
+    final details = await widget.repository.getFoodWithDetails(created.id);
+    if (!mounted) return;
+    if (details == null || details.variants.isEmpty) return;
+    final variant = details.variants.first;
     Navigator.of(context).pop(
       NutritionSelection(
-        food: created,
-        primaryVariant: null,
-        servings: const [],
+        food: details.food,
+        primaryVariant: variant,
+        servings: details.servings[variant.id] ?? const [],
       ),
     );
+  }
+
+  Future<void> _scanBarcode() async {
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const BarcodeScanScreen()),
+    );
+    if (code == null || !mounted) return;
+    await _handleScannedCode(code);
+  }
+
+  Future<void> _handleScannedCode(String rawCode) async {
+    final loc = AppLocalizations.of(context)!;
+    final code = _extractProductCode(rawCode);
+    if (code == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.nutritionScanInvalid)));
+      return;
+    }
+    // 1. Local cache: no network call needed for known products.
+    final local = await widget.repository.getFoodByBarcode(code);
+    if (local != null) {
+      if (!mounted) return;
+      final variant = local.variants.isEmpty ? null : local.variants.first;
+      if (variant != null) {
+        Navigator.of(context).pop(
+          NutritionSelection(
+            food: local.food,
+            primaryVariant: variant,
+            servings: local.servings[variant.id] ?? const [],
+          ),
+        );
+      }
+      return;
+    }
+    // 2. Open Food Facts by barcode.
+    final result = await widget.gateway.getFood(FoodSource.openFoodFacts, code);
+    if (!mounted) return;
+    if (result.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_barcodeErrorText(loc, result.error!.code))),
+      );
+      return;
+    }
+    final remote = result.data;
+    final variant = remote?.primaryVariant;
+    if (remote == null || variant == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.nutritionScanNotFound)));
+      return;
+    }
+    try {
+      await widget.repository.upsertFoodWithDetails(
+        food: remote.food,
+        variants: [variant],
+        servings: {variant.id: remote.servings},
+      );
+    } catch (_) {}
+    if (!mounted) return;
+    Navigator.of(context).pop(
+      NutritionSelection(
+        food: remote.food,
+        primaryVariant: variant,
+        servings: remote.servings,
+      ),
+    );
+  }
+
+  Future<void> _photoLabel() async {
+    final result = await Navigator.of(context).push<NutritionSelection>(
+      MaterialPageRoute(
+        builder: (_) => FoodLabelPhotoScreen(repository: widget.repository),
+      ),
+    );
+    if (result == null || !mounted) return;
+    Navigator.of(context).pop(result);
+  }
+
+  /// Extracts a product code from a raw scan. Handles plain barcodes
+  /// and QR codes that encode an Open Food Facts product URL.
+  static String? _extractProductCode(String raw) {
+    final trimmed = raw.trim();
+    final urlMatch = RegExp(r'/product/(\d+)(?:[/?]|$)').firstMatch(trimmed);
+    if (urlMatch != null) return urlMatch.group(1);
+    final digits = trimmed.replaceAll(RegExp(r'\D'), '');
+    return digits.isEmpty ? null : digits;
+  }
+
+  static String _barcodeErrorText(AppLocalizations loc, String code) {
+    switch (code) {
+      case 'not_found':
+        return loc.nutritionScanNotFound;
+      case 'rate_limited':
+        return loc.nutritionRateLimited;
+      case 'network':
+        return loc.nutritionScanNetwork;
+      default:
+        return loc.nutritionScanError;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: Text(loc.nutritionSearchTitle), centerTitle: true),
+      appBar: AppBar(
+        title: Text(loc.nutritionSearchTitle),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: loc.nutritionScanBarcode,
+            onPressed: _scanBarcode,
+            icon: const Icon(Icons.qr_code_scanner),
+          ),
+          IconButton(
+            tooltip: loc.nutritionPhotoTitle,
+            onPressed: _photoLabel,
+            icon: const Icon(Icons.camera_alt_outlined),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -246,11 +357,11 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     final hasRemoteBanner = _remoteError != null || _isSearchingRemote;
     return CustomScrollView(
       slivers: [
-        if (_remoteError?.code == 'not_configured')
+        if (_remoteError?.code == 'rate_limited')
           SliverToBoxAdapter(
             child: _InfoBanner(
-              icon: Icons.cloud_off_outlined,
-              text: loc.nutritionSearchNotConfigured,
+              icon: Icons.hourglass_top,
+              text: loc.nutritionRateLimited,
             ),
           )
         else if (_remoteError != null)

@@ -12,8 +12,8 @@ import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/services/http_nutrition_gateway.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
+import 'package:workout_notes/services/open_food_facts_gateway.dart';
 
 import 'food_quantity_sheet.dart';
 import 'food_search_screen.dart';
@@ -31,7 +31,7 @@ class NutritionHomeScreen extends StatefulWidget {
 
 class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   final NutritionRepository _repository = NutritionRepository();
-  final NutritionGateway _gateway = HttpNutritionGateway();
+  final NutritionGateway _gateway = OpenFoodFactsGateway();
 
   DateTime _selectedDate = _dateOnly(DateTime.now());
   List<MealLogWithItems> _meals = const [];

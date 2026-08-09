@@ -3624,6 +3624,75 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nutritionSearchQueryTooShort => 'Type at least 2 characters.';
 
   @override
+  String get nutritionRateLimited =>
+      'Open Food Facts is busy right now. Try again in a moment.';
+
+  @override
+  String get nutritionScanBarcode => 'Scan barcode';
+
+  @override
+  String get nutritionScanTitle => 'Scan barcode';
+
+  @override
+  String get nutritionScanning => 'Point the camera at the barcode…';
+
+  @override
+  String get nutritionScanUnsupported =>
+      'Barcode scanning is only available on Android.';
+
+  @override
+  String get nutritionScanInvalid => 'Invalid code.';
+
+  @override
+  String get nutritionScanNotFound => 'Product not found on Open Food Facts.';
+
+  @override
+  String get nutritionScanNetwork =>
+      'Network error while querying Open Food Facts.';
+
+  @override
+  String get nutritionScanError => 'Could not look up the product.';
+
+  @override
+  String get nutritionPhotoTitle => 'Nutrition label photo';
+
+  @override
+  String get nutritionPhotoTake => 'Take photo';
+
+  @override
+  String get nutritionPhotoGallery => 'Choose from gallery';
+
+  @override
+  String get nutritionPhotoSelectHint =>
+      'Take a photo of the product\'s nutrition label. The AI Coach identifies the food and its values for you to review.';
+
+  @override
+  String get nutritionPhotoAnalyze => 'Analyze label';
+
+  @override
+  String get nutritionPhotoAnalyzing => 'Analyzing nutrition label…';
+
+  @override
+  String get nutritionPhotoNotConfigured => 'AI Coach not configured';
+
+  @override
+  String get nutritionPhotoNotConfiguredBody =>
+      'Configure an AI provider (with a vision-capable model) in the AI Coach settings to use this feature.';
+
+  @override
+  String get nutritionPhotoOpenSettings => 'Configure AI Coach';
+
+  @override
+  String get nutritionPhotoInvalid =>
+      'Could not read the nutrition label. Try a sharper photo.';
+
+  @override
+  String get nutritionPhotoPickFailed => 'Could not get the photo.';
+
+  @override
+  String get nutritionPhotoError => 'Failed to analyze the nutrition label.';
+
+  @override
   String get nutritionAddManually => 'Add food manually';
 
   @override

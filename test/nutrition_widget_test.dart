@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/models/nutrition/food.dart';
+import 'package:workout_notes/models/nutrition/food_search_result.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/screens/workout/food_search_screen.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
@@ -112,11 +112,11 @@ Future<void> _installSchema(Database db) async {
 }
 
 class _StubGateway implements NutritionGateway {
-  final NutritionGatewayResult<List<Food>> result;
+  final NutritionGatewayResult<List<FoodSearchResult>> result;
   _StubGateway(this.result);
 
   @override
-  Future<NutritionGatewayResult<List<Food>>> search(
+  Future<NutritionGatewayResult<List<FoodSearchResult>>> search(
     String query, {
     int limit = 20,
   }) async {
@@ -124,7 +124,7 @@ class _StubGateway implements NutritionGateway {
   }
 
   @override
-  Future<NutritionGatewayResult<Food>> getFood(
+  Future<NutritionGatewayResult<FoodSearchResult>> getFood(
     String source,
     String externalId,
   ) async {

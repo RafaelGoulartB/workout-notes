@@ -424,6 +424,70 @@ void main() {
     });
   });
 
+  group('barcode lookup', () {
+    setUp(() async {
+      final now = DateTime.now().toIso8601String();
+      await database.insert('foods', {
+        'id': 'bc1',
+        'source': FoodSource.openFoodFacts,
+        'external_id': '7891234567890',
+        'name': 'Arroz integral',
+        'search_name': Food.normalizeForSearch('Arroz integral'),
+        'barcode': '7891234567890',
+        'fetched_at': now,
+      });
+      await database.insert('food_variants', {
+        'id': 'bcv1',
+        'food_id': 'bc1',
+        'reference_amount': 100,
+        'reference_unit': 'g',
+        'calories': 350,
+        'protein_g': 7,
+        'carbs_g': 77,
+        'fat_g': 2,
+        'is_estimated': 0,
+      });
+    });
+
+    test('returns null when the barcode is unknown', () async {
+      final found = await repository.getFoodByBarcode('0000000000000');
+      expect(found, isNull);
+    });
+
+    test('returns the food with details for a known barcode', () async {
+      final found = await repository.getFoodByBarcode('7891234567890');
+      expect(found, isNotNull);
+      expect(found!.food.name, 'Arroz integral');
+      expect(found.food.source, FoodSource.openFoodFacts);
+      expect(found.variants, hasLength(1));
+      expect(found.variants.first.values.calories, 350);
+    });
+  });
+
+  group('AI vision source', () {
+    test('manual food created with ai_vision source keeps the source', () async {
+      final food = await repository.createManualFood(
+        name: 'Iogurte natural',
+        barcode: '7896000000000',
+        source: FoodSource.aiVision,
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(
+          calories: 64,
+          proteinG: 5.5,
+          carbsG: 7,
+          fatG: 3.5,
+        ),
+        isEstimated: true,
+      );
+      expect(food.isManual, isFalse);
+      final details = await repository.getFoodWithDetails(food.id);
+      expect(details!.food.source, FoodSource.aiVision);
+      expect(details.variants.first.isEstimated, isTrue);
+      expect(details.food.barcode, '7896000000000');
+    });
+  });
+
   group('CSV export', () {
     test('returns a row per meal_log_item with the food source', () async {
       final food = await repository.createManualFood(
