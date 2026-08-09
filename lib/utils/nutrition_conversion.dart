@@ -1,5 +1,4 @@
 import 'package:workout_notes/models/nutrition/food_serving.dart';
-import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 
 /// Validation/calculation helpers for nutrition conversions.
@@ -155,17 +154,6 @@ class NutritionConversion {
   }
 
   static bool _isInvalidNumber(double value) => value.isNaN || value.isInfinite;
-
-  /// Returns the available unit categories for a given variant, based
-  /// on the variant's reference unit and any serving equivalences.
-  static Set<String> availableUnitsFor(FoodVariant variant) {
-    final units = <String>{};
-    final normalizedRef = normalizeUnit(variant.referenceUnit);
-    if (normalizedRef == 'g' || normalizedRef == 'ml') {
-      units.add(normalizedRef);
-    }
-    return units;
-  }
 }
 
 class NutritionConversionException implements Exception {

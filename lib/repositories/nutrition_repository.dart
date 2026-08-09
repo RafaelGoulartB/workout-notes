@@ -272,18 +272,6 @@ class NutritionRepository extends BaseRepository {
     );
   }
 
-  /// Bumps [lastUsedAt] for a food so the cache can surface recently
-  /// used items in future iterations. Safe to call multiple times.
-  Future<void> markFoodUsed(String foodId) async {
-    final db = await this.db;
-    await db.update(
-      'foods',
-      {'last_used_at': DateTime.now().toIso8601String()},
-      where: 'id = ?',
-      whereArgs: [foodId],
-    );
-  }
-
   // ===================================================================
   // Favorites, recents and meal suggestions
   // ===================================================================
