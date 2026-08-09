@@ -3868,6 +3868,303 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nutritionSettingsFromMacros => 'estimated from macros';
 
   @override
+  String get nutritionSettingsSuggestSection => 'Automatic suggestion';
+
+  @override
+  String get nutritionSettingsSuggestBody =>
+      'Estimate daily calories and macros from your body profile using the Mifflin-St Jeor equation.';
+
+  @override
+  String get nutritionSettingsSuggestButton => 'Suggest goals';
+
+  @override
+  String get nutritionSuggestTitle => 'Suggest goals from your profile';
+
+  @override
+  String get nutritionSuggestSubtitle =>
+      'Mifflin-St Jeor estimate based on weight, height, age and activity level.';
+
+  @override
+  String get nutritionSuggestSex => 'Sex';
+
+  @override
+  String get nutritionSuggestSexMale => 'Male';
+
+  @override
+  String get nutritionSuggestSexFemale => 'Female';
+
+  @override
+  String get nutritionSuggestAge => 'Age (years)';
+
+  @override
+  String get nutritionSuggestHeight => 'Height (cm)';
+
+  @override
+  String get nutritionSuggestWeight => 'Weight (kg)';
+
+  @override
+  String get nutritionSuggestActivity => 'Activity level';
+
+  @override
+  String get nutritionSuggestActivitySedentary => 'Sedentary';
+
+  @override
+  String get nutritionSuggestActivityLight => 'Light';
+
+  @override
+  String get nutritionSuggestActivityModerate => 'Moderate';
+
+  @override
+  String get nutritionSuggestActivityActive => 'Active';
+
+  @override
+  String get nutritionSuggestActivityVeryActive => 'Very active';
+
+  @override
+  String get nutritionSuggestObjective => 'Objective';
+
+  @override
+  String get nutritionSuggestObjectiveCut => 'Cut';
+
+  @override
+  String get nutritionSuggestObjectiveMaintenance => 'Maintenance';
+
+  @override
+  String get nutritionSuggestObjectiveBulk => 'Bulk';
+
+  @override
+  String get nutritionSuggestBmr => 'BMR';
+
+  @override
+  String get nutritionSuggestTdee => 'TDEE';
+
+  @override
+  String get nutritionSuggestNoProfile =>
+      'Enter weight, height and age to calculate.';
+
+  @override
+  String get nutritionSuggestGoalPreview => 'Suggested goal';
+
+  @override
+  String get nutritionSuggestApply => 'Apply goals';
+
+  @override
+  String get nutritionSuggestApplied => 'Suggested goals applied';
+
+  @override
+  String get nutritionProgressFiber => 'Fiber';
+
+  @override
+  String get nutritionProgressSugars => 'Sugars';
+
+  @override
+  String get nutritionProgressSodium => 'Sodium';
+
+  @override
+  String get nutritionCopyPreviousDay => 'Copy previous day';
+
+  @override
+  String get nutritionCopyNothingToCopy =>
+      'Nothing to copy — no meals logged the previous day.';
+
+  @override
+  String get nutritionCopyTitle => 'Copy meals from the previous day';
+
+  @override
+  String get nutritionCopyConfirm => 'Copy';
+
+  @override
+  String nutritionCopiedItems(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items copied',
+      one: '1 item copied',
+      zero: 'No items copied',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get nutritionRepeatNoPrevious =>
+      'No previous occurrence of this meal found.';
+
+  @override
+  String get nutritionRepeatMeal => 'Repeat this meal';
+
+  @override
+  String get nutritionSaveMeal => 'Save as meal';
+
+  @override
+  String get nutritionSaveMealEmpty => 'Add items to this meal first.';
+
+  @override
+  String get nutritionMealMenu => 'Meal options';
+
+  @override
+  String get nutritionSavedMeals => 'Saved meals';
+
+  @override
+  String get nutritionSavedMealsEmptyTitle => 'No saved meals yet';
+
+  @override
+  String get nutritionSavedMealsEmptySubtitle =>
+      'Save a meal you eat often — like a post-workout shake — and log it with one tap.';
+
+  @override
+  String get nutritionSavedMealNew => 'New meal';
+
+  @override
+  String get nutritionSavedMealEdit => 'Edit meal';
+
+  @override
+  String get nutritionSavedMealDelete => 'Delete meal';
+
+  @override
+  String nutritionSavedMealDeleteConfirm(String name) {
+    return 'Delete \"$name\"?';
+  }
+
+  @override
+  String get nutritionSavedMealDeleted => 'Meal deleted';
+
+  @override
+  String get nutritionSavedMealPickMeal => 'Log into which meal?';
+
+  @override
+  String get nutritionSavedMealLogToday => 'Log today';
+
+  @override
+  String get nutritionSavedMealNothingLogged =>
+      'No items could be logged — some foods were deleted.';
+
+  @override
+  String nutritionSavedMealPartialLogged(int added, int skipped) {
+    return '$added items logged, $skipped skipped (food deleted)';
+  }
+
+  @override
+  String nutritionSavedMealLogged(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items logged',
+      one: '1 item logged',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String nutritionSavedMealPortionsLabel(String portions) {
+    return '$portions portions';
+  }
+
+  @override
+  String get nutritionSavedMealSaved => 'Meal saved';
+
+  @override
+  String get nutritionSavedMealName => 'Meal name';
+
+  @override
+  String get nutritionSavedMealMealType => 'Meal type';
+
+  @override
+  String get nutritionSavedMealNoType => 'No specific meal';
+
+  @override
+  String get nutritionSavedMealPortions => 'Portions';
+
+  @override
+  String get nutritionSavedMealIngredients => 'Ingredients';
+
+  @override
+  String get nutritionSavedMealEmptyIngredients =>
+      'No ingredients yet. Add the foods of this meal.';
+
+  @override
+  String get nutritionSearchFavorites => 'Favorites';
+
+  @override
+  String get nutritionSearchRecent => 'Recent';
+
+  @override
+  String nutritionSearchSuggestedFor(String meal) {
+    return 'Suggested for $meal';
+  }
+
+  @override
+  String get nutritionSearchFavorite => 'Add to favorites';
+
+  @override
+  String get nutritionSearchUnfavorite => 'Remove from favorites';
+
+  @override
+  String get nutritionProgressTitle => 'Nutrition progress';
+
+  @override
+  String get nutritionProgressDaily => 'Daily calories — last 30 days';
+
+  @override
+  String get nutritionProgressWeekly => 'Weekly averages';
+
+  @override
+  String get nutritionProgressWeeklyCalories => 'Average calories per week';
+
+  @override
+  String get nutritionProgressWeeklyMacros => 'Average macros per week';
+
+  @override
+  String get nutritionProgressMicronutrients => 'Micronutrient trends';
+
+  @override
+  String get nutritionProgressFiberAndSugars => 'Fiber and sugars';
+
+  @override
+  String get nutritionProgressAdherence => 'Goal adherence';
+
+  @override
+  String get nutritionProgressAvgCalories => 'Avg calories/day';
+
+  @override
+  String get nutritionProgressAvgProtein => 'Avg protein/day';
+
+  @override
+  String get nutritionProgressDaysLogged => 'Logged days';
+
+  @override
+  String get nutritionProgressAdherenceRate => 'Adherence';
+
+  @override
+  String get nutritionProgressNoGoal =>
+      'Configure a calorie goal in Settings to see adherence and the goal line on the charts.';
+
+  @override
+  String get nutritionProgressBelow => 'Below';
+
+  @override
+  String get nutritionProgressWithin => 'Within';
+
+  @override
+  String get nutritionProgressAbove => 'Above';
+
+  @override
+  String nutritionProgressDaysLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days logged',
+      one: '1 day logged',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get nutritionProgressWeekComparison => 'This week vs. last week';
+
+  @override
+  String get nutritionProgressCalories => 'Calories';
+
+  @override
   String get exportNutritionCsv => 'Nutrition CSV';
 
   @override

@@ -7108,6 +7108,516 @@ abstract class AppLocalizations {
   /// **'estimated from macros'**
   String get nutritionSettingsFromMacros;
 
+  /// No description provided for @nutritionSettingsSuggestSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic suggestion'**
+  String get nutritionSettingsSuggestSection;
+
+  /// No description provided for @nutritionSettingsSuggestBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimate daily calories and macros from your body profile using the Mifflin-St Jeor equation.'**
+  String get nutritionSettingsSuggestBody;
+
+  /// No description provided for @nutritionSettingsSuggestButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggest goals'**
+  String get nutritionSettingsSuggestButton;
+
+  /// No description provided for @nutritionSuggestTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggest goals from your profile'**
+  String get nutritionSuggestTitle;
+
+  /// No description provided for @nutritionSuggestSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mifflin-St Jeor estimate based on weight, height, age and activity level.'**
+  String get nutritionSuggestSubtitle;
+
+  /// No description provided for @nutritionSuggestSex.
+  ///
+  /// In en, this message translates to:
+  /// **'Sex'**
+  String get nutritionSuggestSex;
+
+  /// No description provided for @nutritionSuggestSexMale.
+  ///
+  /// In en, this message translates to:
+  /// **'Male'**
+  String get nutritionSuggestSexMale;
+
+  /// No description provided for @nutritionSuggestSexFemale.
+  ///
+  /// In en, this message translates to:
+  /// **'Female'**
+  String get nutritionSuggestSexFemale;
+
+  /// No description provided for @nutritionSuggestAge.
+  ///
+  /// In en, this message translates to:
+  /// **'Age (years)'**
+  String get nutritionSuggestAge;
+
+  /// No description provided for @nutritionSuggestHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Height (cm)'**
+  String get nutritionSuggestHeight;
+
+  /// No description provided for @nutritionSuggestWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Weight (kg)'**
+  String get nutritionSuggestWeight;
+
+  /// No description provided for @nutritionSuggestActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity level'**
+  String get nutritionSuggestActivity;
+
+  /// No description provided for @nutritionSuggestActivitySedentary.
+  ///
+  /// In en, this message translates to:
+  /// **'Sedentary'**
+  String get nutritionSuggestActivitySedentary;
+
+  /// No description provided for @nutritionSuggestActivityLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get nutritionSuggestActivityLight;
+
+  /// No description provided for @nutritionSuggestActivityModerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Moderate'**
+  String get nutritionSuggestActivityModerate;
+
+  /// No description provided for @nutritionSuggestActivityActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get nutritionSuggestActivityActive;
+
+  /// No description provided for @nutritionSuggestActivityVeryActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Very active'**
+  String get nutritionSuggestActivityVeryActive;
+
+  /// No description provided for @nutritionSuggestObjective.
+  ///
+  /// In en, this message translates to:
+  /// **'Objective'**
+  String get nutritionSuggestObjective;
+
+  /// No description provided for @nutritionSuggestObjectiveCut.
+  ///
+  /// In en, this message translates to:
+  /// **'Cut'**
+  String get nutritionSuggestObjectiveCut;
+
+  /// No description provided for @nutritionSuggestObjectiveMaintenance.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance'**
+  String get nutritionSuggestObjectiveMaintenance;
+
+  /// No description provided for @nutritionSuggestObjectiveBulk.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk'**
+  String get nutritionSuggestObjectiveBulk;
+
+  /// No description provided for @nutritionSuggestBmr.
+  ///
+  /// In en, this message translates to:
+  /// **'BMR'**
+  String get nutritionSuggestBmr;
+
+  /// No description provided for @nutritionSuggestTdee.
+  ///
+  /// In en, this message translates to:
+  /// **'TDEE'**
+  String get nutritionSuggestTdee;
+
+  /// No description provided for @nutritionSuggestNoProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter weight, height and age to calculate.'**
+  String get nutritionSuggestNoProfile;
+
+  /// No description provided for @nutritionSuggestGoalPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested goal'**
+  String get nutritionSuggestGoalPreview;
+
+  /// No description provided for @nutritionSuggestApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply goals'**
+  String get nutritionSuggestApply;
+
+  /// No description provided for @nutritionSuggestApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested goals applied'**
+  String get nutritionSuggestApplied;
+
+  /// No description provided for @nutritionProgressFiber.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiber'**
+  String get nutritionProgressFiber;
+
+  /// No description provided for @nutritionProgressSugars.
+  ///
+  /// In en, this message translates to:
+  /// **'Sugars'**
+  String get nutritionProgressSugars;
+
+  /// No description provided for @nutritionProgressSodium.
+  ///
+  /// In en, this message translates to:
+  /// **'Sodium'**
+  String get nutritionProgressSodium;
+
+  /// No description provided for @nutritionCopyPreviousDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy previous day'**
+  String get nutritionCopyPreviousDay;
+
+  /// No description provided for @nutritionCopyNothingToCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to copy — no meals logged the previous day.'**
+  String get nutritionCopyNothingToCopy;
+
+  /// No description provided for @nutritionCopyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy meals from the previous day'**
+  String get nutritionCopyTitle;
+
+  /// No description provided for @nutritionCopyConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get nutritionCopyConfirm;
+
+  /// No description provided for @nutritionCopiedItems.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No items copied} =1{1 item copied} other{{count} items copied}}'**
+  String nutritionCopiedItems(int count);
+
+  /// No description provided for @nutritionRepeatNoPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'No previous occurrence of this meal found.'**
+  String get nutritionRepeatNoPrevious;
+
+  /// No description provided for @nutritionRepeatMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat this meal'**
+  String get nutritionRepeatMeal;
+
+  /// No description provided for @nutritionSaveMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as meal'**
+  String get nutritionSaveMeal;
+
+  /// No description provided for @nutritionSaveMealEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Add items to this meal first.'**
+  String get nutritionSaveMealEmpty;
+
+  /// No description provided for @nutritionMealMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal options'**
+  String get nutritionMealMenu;
+
+  /// No description provided for @nutritionSavedMeals.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved meals'**
+  String get nutritionSavedMeals;
+
+  /// No description provided for @nutritionSavedMealsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No saved meals yet'**
+  String get nutritionSavedMealsEmptyTitle;
+
+  /// No description provided for @nutritionSavedMealsEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save a meal you eat often — like a post-workout shake — and log it with one tap.'**
+  String get nutritionSavedMealsEmptySubtitle;
+
+  /// No description provided for @nutritionSavedMealNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New meal'**
+  String get nutritionSavedMealNew;
+
+  /// No description provided for @nutritionSavedMealEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit meal'**
+  String get nutritionSavedMealEdit;
+
+  /// No description provided for @nutritionSavedMealDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete meal'**
+  String get nutritionSavedMealDelete;
+
+  /// No description provided for @nutritionSavedMealDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\"?'**
+  String nutritionSavedMealDeleteConfirm(String name);
+
+  /// No description provided for @nutritionSavedMealDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal deleted'**
+  String get nutritionSavedMealDeleted;
+
+  /// No description provided for @nutritionSavedMealPickMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Log into which meal?'**
+  String get nutritionSavedMealPickMeal;
+
+  /// No description provided for @nutritionSavedMealLogToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Log today'**
+  String get nutritionSavedMealLogToday;
+
+  /// No description provided for @nutritionSavedMealNothingLogged.
+  ///
+  /// In en, this message translates to:
+  /// **'No items could be logged — some foods were deleted.'**
+  String get nutritionSavedMealNothingLogged;
+
+  /// No description provided for @nutritionSavedMealPartialLogged.
+  ///
+  /// In en, this message translates to:
+  /// **'{added} items logged, {skipped} skipped (food deleted)'**
+  String nutritionSavedMealPartialLogged(int added, int skipped);
+
+  /// No description provided for @nutritionSavedMealLogged.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item logged} other{{count} items logged}}'**
+  String nutritionSavedMealLogged(int count);
+
+  /// No description provided for @nutritionSavedMealPortionsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{portions} portions'**
+  String nutritionSavedMealPortionsLabel(String portions);
+
+  /// No description provided for @nutritionSavedMealSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal saved'**
+  String get nutritionSavedMealSaved;
+
+  /// No description provided for @nutritionSavedMealName.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal name'**
+  String get nutritionSavedMealName;
+
+  /// No description provided for @nutritionSavedMealMealType.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal type'**
+  String get nutritionSavedMealMealType;
+
+  /// No description provided for @nutritionSavedMealNoType.
+  ///
+  /// In en, this message translates to:
+  /// **'No specific meal'**
+  String get nutritionSavedMealNoType;
+
+  /// No description provided for @nutritionSavedMealPortions.
+  ///
+  /// In en, this message translates to:
+  /// **'Portions'**
+  String get nutritionSavedMealPortions;
+
+  /// No description provided for @nutritionSavedMealIngredients.
+  ///
+  /// In en, this message translates to:
+  /// **'Ingredients'**
+  String get nutritionSavedMealIngredients;
+
+  /// No description provided for @nutritionSavedMealEmptyIngredients.
+  ///
+  /// In en, this message translates to:
+  /// **'No ingredients yet. Add the foods of this meal.'**
+  String get nutritionSavedMealEmptyIngredients;
+
+  /// No description provided for @nutritionSearchFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get nutritionSearchFavorites;
+
+  /// No description provided for @nutritionSearchRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get nutritionSearchRecent;
+
+  /// No description provided for @nutritionSearchSuggestedFor.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested for {meal}'**
+  String nutritionSearchSuggestedFor(String meal);
+
+  /// No description provided for @nutritionSearchFavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to favorites'**
+  String get nutritionSearchFavorite;
+
+  /// No description provided for @nutritionSearchUnfavorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from favorites'**
+  String get nutritionSearchUnfavorite;
+
+  /// No description provided for @nutritionProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition progress'**
+  String get nutritionProgressTitle;
+
+  /// No description provided for @nutritionProgressDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily calories — last 30 days'**
+  String get nutritionProgressDaily;
+
+  /// No description provided for @nutritionProgressWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly averages'**
+  String get nutritionProgressWeekly;
+
+  /// No description provided for @nutritionProgressWeeklyCalories.
+  ///
+  /// In en, this message translates to:
+  /// **'Average calories per week'**
+  String get nutritionProgressWeeklyCalories;
+
+  /// No description provided for @nutritionProgressWeeklyMacros.
+  ///
+  /// In en, this message translates to:
+  /// **'Average macros per week'**
+  String get nutritionProgressWeeklyMacros;
+
+  /// No description provided for @nutritionProgressMicronutrients.
+  ///
+  /// In en, this message translates to:
+  /// **'Micronutrient trends'**
+  String get nutritionProgressMicronutrients;
+
+  /// No description provided for @nutritionProgressFiberAndSugars.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiber and sugars'**
+  String get nutritionProgressFiberAndSugars;
+
+  /// No description provided for @nutritionProgressAdherence.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal adherence'**
+  String get nutritionProgressAdherence;
+
+  /// No description provided for @nutritionProgressAvgCalories.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg calories/day'**
+  String get nutritionProgressAvgCalories;
+
+  /// No description provided for @nutritionProgressAvgProtein.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg protein/day'**
+  String get nutritionProgressAvgProtein;
+
+  /// No description provided for @nutritionProgressDaysLogged.
+  ///
+  /// In en, this message translates to:
+  /// **'Logged days'**
+  String get nutritionProgressDaysLogged;
+
+  /// No description provided for @nutritionProgressAdherenceRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Adherence'**
+  String get nutritionProgressAdherenceRate;
+
+  /// No description provided for @nutritionProgressNoGoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure a calorie goal in Settings to see adherence and the goal line on the charts.'**
+  String get nutritionProgressNoGoal;
+
+  /// No description provided for @nutritionProgressBelow.
+  ///
+  /// In en, this message translates to:
+  /// **'Below'**
+  String get nutritionProgressBelow;
+
+  /// No description provided for @nutritionProgressWithin.
+  ///
+  /// In en, this message translates to:
+  /// **'Within'**
+  String get nutritionProgressWithin;
+
+  /// No description provided for @nutritionProgressAbove.
+  ///
+  /// In en, this message translates to:
+  /// **'Above'**
+  String get nutritionProgressAbove;
+
+  /// No description provided for @nutritionProgressDaysLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 day logged} other{{count} days logged}}'**
+  String nutritionProgressDaysLabel(int count);
+
+  /// No description provided for @nutritionProgressWeekComparison.
+  ///
+  /// In en, this message translates to:
+  /// **'This week vs. last week'**
+  String get nutritionProgressWeekComparison;
+
+  /// No description provided for @nutritionProgressCalories.
+  ///
+  /// In en, this message translates to:
+  /// **'Calories'**
+  String get nutritionProgressCalories;
+
   /// No description provided for @exportNutritionCsv.
   ///
   /// In en, this message translates to:
