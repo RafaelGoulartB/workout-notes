@@ -5,6 +5,7 @@ import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_search_result.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
+import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
@@ -14,17 +15,20 @@ import 'food_label_photo_screen.dart';
 import 'manual_food_screen.dart';
 
 /// Food search screen. Combines local cache + remote gateway results
-/// with a debounce and explicit fallback messaging.
+/// with a debounce and explicit fallback messaging. Before any query
+/// it surfaces favorites, recent foods and meal-specific suggestions.
 class FoodSearchScreen extends StatefulWidget {
   final NutritionGateway gateway;
   final NutritionRepository repository;
   final bool enableManualButton;
+  final String? mealType;
 
   const FoodSearchScreen({
     super.key,
     required this.gateway,
     required this.repository,
     this.enableManualButton = true,
+    this.mealType,
   });
 
   @override
@@ -44,6 +48,10 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   List<FoodSearchResult> _localResults = const [];
   List<FoodSearchResult> _remoteResults = const [];
+  List<FoodSearchResult> _favorites = const [];
+  List<FoodSearchResult> _recents = const [];
+  List<FoodSearchResult> _mealSuggestions = const [];
+  bool _suggestionsLoading = true;
   bool _isSearchingRemote = false;
   NutritionGatewayError? _remoteError;
   bool _showQueryTooShort = false;
@@ -52,6 +60,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   void initState() {
     super.initState();
     _controller.addListener(_onChanged);
+    _loadSuggestions();
   }
 
   @override
@@ -59,6 +68,60 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     _controller.removeListener(_onChanged);
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSuggestions() async {
+    if (!mounted) return;
+    try {
+      final results = await Future.wait([
+        widget.repository.getFavoriteFoods(),
+        widget.repository.getRecentFoods(),
+        if (widget.mealType != null)
+          widget.repository.getMealSuggestions(widget.mealType!),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _favorites = _attachVariants(results[0]);
+        _recents = _attachVariants(results[1]);
+        _mealSuggestions = widget.mealType == null
+            ? const []
+            : _attachVariants(results[2]);
+        _suggestionsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _suggestionsLoading = false);
+    }
+  }
+
+  Future<void> _toggleFavorite(FoodSearchResult result) async {
+    final currently = result.food.isFavorite ?? false;
+    setState(() {
+      // Optimistic update so the star reacts instantly.
+      _replaceInLists(result, !currently);
+    });
+    try {
+      await widget.repository.setFoodFavorite(result.food.id, !currently);
+      await _loadSuggestions();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _replaceInLists(result, currently));
+    }
+  }
+
+  void _replaceInLists(FoodSearchResult result, bool isFavorite) {
+    FoodSearchResult withFlag(FoodSearchResult r) => FoodSearchResult(
+      food: r.food.copyWith(isFavorite: isFavorite),
+      primaryVariant: r.primaryVariant,
+      servings: r.servings,
+      isRemote: r.isRemote,
+    );
+    if (result.food.isFavorite != isFavorite) {
+      _localResults = [
+        for (final r in _localResults)
+          if (r.food.id == result.food.id) withFlag(r) else r,
+      ];
+    }
   }
 
   void _onChanged() {
@@ -400,8 +463,109 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   Widget _buildResults(AppLocalizations loc) {
     final theme = Theme.of(context);
+    final query = _controller.text.trim();
     final hasAny = _localResults.isNotEmpty || _remoteResults.isNotEmpty;
     final hasRemoteBanner = _remoteError != null || _isSearchingRemote;
+
+    // Before the user types: favorites, meal-specific suggestions and
+    // recents take over the empty state.
+    if (query.isEmpty && !_showQueryTooShort) {
+      final showFavorites = _favorites.isNotEmpty;
+      final showMeal = widget.mealType != null && _mealSuggestions.isNotEmpty;
+      final showRecents = _recents.isNotEmpty;
+      final hasSuggestions = showFavorites || showMeal || showRecents;
+      return CustomScrollView(
+        slivers: [
+          if (showFavorites) ...[
+            SliverToBoxAdapter(
+              child: _SectionHeader(text: loc.nutritionSearchFavorites),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              sliver: SliverList.separated(
+                itemCount: _favorites.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
+                itemBuilder: (_, index) => _FoodCard(
+                  result: _favorites[index],
+                  onToggleFavorite: () => _toggleFavorite(_favorites[index]),
+                ),
+              ),
+            ),
+          ],
+          if (showMeal) ...[
+            SliverToBoxAdapter(
+              child: _SectionHeader(
+                text: loc.nutritionSearchSuggestedFor(_mealLabel(loc)),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              sliver: SliverList.separated(
+                itemCount: _mealSuggestions.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
+                itemBuilder: (_, index) => _FoodCard(
+                  result: _mealSuggestions[index],
+                  onToggleFavorite: () =>
+                      _toggleFavorite(_mealSuggestions[index]),
+                ),
+              ),
+            ),
+          ],
+          if (showRecents) ...[
+            SliverToBoxAdapter(
+              child: _SectionHeader(text: loc.nutritionSearchRecent),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+              sliver: SliverList.separated(
+                itemCount: _recents.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
+                itemBuilder: (_, index) => _FoodCard(
+                  result: _recents[index],
+                  onToggleFavorite: () => _toggleFavorite(_recents[index]),
+                ),
+              ),
+            ),
+          ],
+          if (!hasSuggestions && !_suggestionsLoading)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.restaurant_menu_rounded,
+                        size: 80,
+                        color: theme.colorScheme.primary.withAlpha(80),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        loc.nutritionSearchEmpty,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        loc.nutritionSearchEmptyHint,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+
     return CustomScrollView(
       slivers: [
         if (_remoteError?.code == 'rate_limited')
@@ -434,7 +598,10 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             sliver: SliverList.separated(
               itemCount: _localResults.length,
               separatorBuilder: (_, _) => const SizedBox(height: 6),
-              itemBuilder: (_, index) => _FoodCard(result: _localResults[index]),
+              itemBuilder: (_, index) => _FoodCard(
+                result: _localResults[index],
+                onToggleFavorite: () => _toggleFavorite(_localResults[index]),
+              ),
             ),
           ),
         ],
@@ -490,12 +657,27 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       ],
     );
   }
+
+  String _mealLabel(AppLocalizations loc) {
+    switch (widget.mealType) {
+      case MealType.breakfast:
+        return loc.nutritionMealBreakfast;
+      case MealType.lunch:
+        return loc.nutritionMealLunch;
+      case MealType.dinner:
+        return loc.nutritionMealDinner;
+      case MealType.snacks:
+        return loc.nutritionMealSnacks;
+    }
+    return widget.mealType ?? '';
+  }
 }
 
 class _FoodCard extends StatelessWidget {
   final FoodSearchResult result;
+  final VoidCallback? onToggleFavorite;
 
-  const _FoodCard({required this.result});
+  const _FoodCard({required this.result, this.onToggleFavorite});
 
   @override
   Widget build(BuildContext context) {
@@ -602,10 +784,27 @@ class _FoodCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: theme.colorScheme.onSurfaceVariant.withAlpha(140),
-              ),
+              if (result.food.isFavorite != null)
+                IconButton(
+                  tooltip: result.food.isFavorite!
+                      ? loc.nutritionSearchUnfavorite
+                      : loc.nutritionSearchFavorite,
+                  onPressed: onToggleFavorite,
+                  icon: Icon(
+                    result.food.isFavorite!
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    size: 20,
+                    color: result.food.isFavorite!
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                )
+              else
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: theme.colorScheme.onSurfaceVariant.withAlpha(140),
+                ),
             ],
           ),
         ),
