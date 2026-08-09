@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:workout_notes/database/database_helper.dart';
-import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
 
 void main() {
@@ -29,7 +28,7 @@ void main() {
               bedtime_minutes INTEGER,
               wake_time_minutes INTEGER,
               comment TEXT,
-              source TEXT NOT NULL DEFAULT 'manual',
+              source TEXT NOT NULL DEFAULT 'monitored',
               time_in_bed_minutes INTEGER,
               estimated_sleep_minutes INTEGER,
               created_at TEXT NOT NULL
@@ -47,103 +46,50 @@ void main() {
     await database.close();
   });
 
-  test('saves, reads, updates and deletes a record', () async {
-    final date = DateTime(2026, 7, 25);
-    await repository.add(
-      date: date,
+  test('reads records in date order and deletes by id', () async {
+    await _insertEntry(
+      database,
+      date: DateTime(2026, 7, 24),
+      sleepMinutes: 420,
+    );
+    await _insertEntry(
+      database,
+      date: DateTime(2026, 7, 25),
       sleepMinutes: 480,
       actualSleepMinutes: 420,
-      bedtimeMinutes: 22 * 60,
-      wakeTimeMinutes: 6 * 60,
-      comment: 'Good night',
     );
 
-    var entry = await repository.getByDate(date);
-    expect(entry, isNotNull);
-    expect(entry!.actualSleepMinutes, 420);
-    expect(entry.efficiency, closeTo(87.5, 0.001));
+    final entries = await repository.getEntries();
+    expect(entries, hasLength(2));
+    expect(entries.first.date, DateTime(2026, 7, 25));
+    expect(entries.first.efficiency, closeTo(87.5, 0.001));
 
-    await repository.save(
-      entry.copyWith(sleepMinutes: 450, actualSleepMinutes: null),
-    );
-    entry = await repository.getByDate(date);
-    expect(entry!.sleepMinutes, 450);
-    expect(entry.actualSleepMinutes, isNull);
+    final byDate = await repository.getByDate(DateTime(2026, 7, 24));
+    expect(byDate, isNotNull);
+    expect(await repository.getById(byDate!.id), isNotNull);
+    expect((await repository.getLatest())!.id, entries.first.id);
 
-    await repository.delete(entry.id);
-    expect(await repository.getLatest(), isNull);
-  });
-
-  test(
-    'updates the existing record for the same date without replacing its id',
-    () async {
-      await repository.add(date: DateTime(2026, 7, 25), sleepMinutes: 420);
-      final original = await repository.getByDate(DateTime(2026, 7, 25));
-      await repository.add(
-        date: DateTime(2026, 7, 25),
-        sleepMinutes: 500,
-        actualSleepMinutes: 480,
-      );
-
-      final entries = await repository.getEntries();
-      expect(entries, hasLength(1));
-      expect(entries.single.sleepMinutes, 500);
-      expect(entries.single.id, original!.id);
-    },
-  );
-
-  test(
-    'manual data merges into monitored entry without losing metrics',
-    () async {
-      final date = DateTime(2026, 7, 25);
-      await repository.add(
-        date: date,
-        sleepMinutes: 480,
-        source: 'monitored',
-        timeInBedMinutes: 480,
-        estimatedSleepMinutes: 430,
-      );
-      final monitored = await repository.getByDate(date);
-
-      await repository.add(
-        date: date,
-        sleepMinutes: 450,
-        actualSleepMinutes: 420,
-        comment: 'Acordei bem',
-      );
-
-      final merged = await repository.getByDate(date);
-      expect(merged!.id, monitored!.id);
-      expect(merged.source, 'hybrid');
-      expect(merged.sleepMinutes, 450);
-      expect(merged.actualSleepMinutes, 420);
-      expect(merged.comment, 'Acordei bem');
-      expect(merged.timeInBedMinutes, 480);
-      expect(merged.estimatedSleepMinutes, 430);
-    },
-  );
-
-  test('rejects changing an entry onto another entry date', () async {
-    await repository.add(date: DateTime(2026, 7, 24), sleepMinutes: 420);
-    await repository.add(date: DateTime(2026, 7, 25), sleepMinutes: 500);
-    final first = await repository.getByDate(DateTime(2026, 7, 24));
-    expect(
-      () => repository.save(first!.copyWith(date: DateTime(2026, 7, 25))),
-      throwsStateError,
-    );
+    await repository.delete(byDate.id);
+    expect(await repository.getByDate(DateTime(2026, 7, 24)), isNull);
   });
 
   test(
     'calculates dashboard values and ignores missing actual sleep',
     () async {
       final ref = DateTime(2026, 7, 26);
-      await repository.add(
+      await _insertEntry(
+        database,
         date: DateTime(2026, 7, 26),
         sleepMinutes: 480,
         actualSleepMinutes: 420,
       );
-      await repository.add(date: DateTime(2026, 7, 25), sleepMinutes: 450);
-      await repository.add(
+      await _insertEntry(
+        database,
+        date: DateTime(2026, 7, 25),
+        sleepMinutes: 450,
+      );
+      await _insertEntry(
+        database,
         date: DateTime(2026, 7, 1),
         sleepMinutes: 360,
         actualSleepMinutes: 300,
@@ -158,26 +104,101 @@ void main() {
       expect(stats.maximum30Days, 480);
       expect(stats.efficiency7Days, closeTo(87.5, 0.001));
       expect(stats.efficiency30Days, closeTo((87.5 + 83.333333) / 2, 0.001));
+      expect(stats.regularity7Days, isNull);
+      expect(stats.regularitySampleCount, 0);
     },
   );
+  test('regularity treats bedtime values around midnight as close', () async {
+    final reference = DateTime(2026, 7, 26);
+    await _insertEntry(
+      database,
+      date: DateTime(2026, 7, 26),
+      sleepMinutes: 450,
+      bedtimeMinutes: 10,
+      wakeTimeMinutes: 450,
+    );
+    await _insertEntry(
+      database,
+      date: DateTime(2026, 7, 25),
+      sleepMinutes: 450,
+      bedtimeMinutes: 1430,
+      wakeTimeMinutes: 430,
+    );
+
+    final stats = await repository.getDashboardStats(referenceDate: reference);
+
+    expect(stats.regularitySampleCount, 2);
+    expect(stats.regularity7Days, closeTo(94.44, 0.2));
+  });
+
+  test('regularity ignores incomplete times and requires two nights', () async {
+    final reference = DateTime(2026, 7, 26);
+    await _insertEntry(
+      database,
+      date: DateTime(2026, 7, 26),
+      sleepMinutes: 450,
+      bedtimeMinutes: 1380,
+      wakeTimeMinutes: 420,
+    );
+    await _insertEntry(
+      database,
+      date: DateTime(2026, 7, 25),
+      sleepMinutes: 430,
+      bedtimeMinutes: 1370,
+    );
+
+    final stats = await repository.getDashboardStats(referenceDate: reference);
+
+    expect(stats.regularitySampleCount, 1);
+    expect(stats.regularity7Days, isNull);
+  });
 
   test(
-    'rejects invalid durations and actual sleep greater than duration',
+    'regularity bottoms out after three hours of average variation',
     () async {
-      final base = SleepEntry(
-        id: 'invalid',
+      final reference = DateTime(2026, 7, 26);
+      await _insertEntry(
+        database,
         date: DateTime(2026, 7, 26),
-        sleepMinutes: 0,
-        createdAt: DateTime.now(),
+        sleepMinutes: 480,
+        bedtimeMinutes: 0,
+        wakeTimeMinutes: 660,
       );
-      expect(() => repository.save(base), throwsArgumentError);
+      await _insertEntry(
+        database,
+        date: DateTime(2026, 7, 25),
+        sleepMinutes: 480,
+        bedtimeMinutes: 1080,
+        wakeTimeMinutes: 300,
+      );
 
-      expect(
-        () => repository.save(
-          base.copyWith(sleepMinutes: 300, actualSleepMinutes: 301),
-        ),
-        throwsArgumentError,
+      final stats = await repository.getDashboardStats(
+        referenceDate: reference,
       );
+
+      expect(stats.regularitySampleCount, 2);
+      expect(stats.regularity7Days, 0);
     },
   );
+}
+
+Future<void> _insertEntry(
+  Database database, {
+  required DateTime date,
+  required int sleepMinutes,
+  int? actualSleepMinutes,
+  int? bedtimeMinutes,
+  int? wakeTimeMinutes,
+}) async {
+  final dateString = date.toIso8601String().substring(0, 10);
+  await database.insert('sleep_entries', {
+    'id': 'entry-$dateString',
+    'date': dateString,
+    'sleep_minutes': sleepMinutes,
+    'actual_sleep_minutes': actualSleepMinutes,
+    'bedtime_minutes': bedtimeMinutes,
+    'wake_time_minutes': wakeTimeMinutes,
+    'source': 'monitored',
+    'created_at': date.add(const Duration(hours: 7)).toIso8601String(),
+  });
 }

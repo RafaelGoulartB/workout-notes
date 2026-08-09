@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/widgets/exercise_picker_sheet.dart';
+import 'package:workout_notes/widgets/workout/set_editor_fields.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/routine_repository.dart';
 import '../../models/exercise_with_sets.dart';
@@ -51,6 +52,7 @@ class _FutureWorkoutPlannerScreenState
           name: entry['exercise_name'] as String? ?? '',
           localeKey: entry['exercise_locale_key'] as String?,
           exerciseType: entry['exercise_type'] as String? ?? 'weightReps',
+          weightIncrement: (entry['weight_increment'] as num?)?.toDouble() ?? 1,
           categoryId: entry['category_id'] as String?,
           categoryName: entry['category_name'] as String? ?? '',
           categoryColor: Color(entry['category_color'] as int? ?? 0xFF757575),
@@ -562,6 +564,8 @@ class _FutureWorkoutPlannerScreenState
             name: ExerciseLocaleHelper.exerciseName(loc, exercise),
             localeKey: exercise['locale_key'] as String?,
             exerciseType: exercise['type'] as String? ?? 'weightReps',
+            weightIncrement:
+                (exercise['weight_increment'] as num?)?.toDouble() ?? 1,
             categoryId: exercise['category_id'] as String?,
             categoryName: ExerciseLocaleHelper.categoryName(loc, exercise),
             categoryColor: Color(
@@ -639,77 +643,184 @@ class _FutureWorkoutPlannerScreenState
   Future<void> _editSetDialog(ExerciseWithSets exercise, int setIndex) async {
     final loc = AppLocalizations.of(context)!;
     final set = exercise.sets[setIndex];
-    final weightCtl = TextEditingController(
-      text: (set['weight'] as num?)?.toStringAsFixed(1) ?? '',
-    );
-    final repsCtl = TextEditingController(
-      text: (set['reps'] as int?)?.toString() ?? '',
-    );
-    final rpeCtl = TextEditingController(
-      text: (set['rpe'] as num?)?.toStringAsFixed(1) ?? '',
-    );
+    double weight = (set['weight'] as num?)?.toDouble() ?? 0;
+    int reps = (set['reps'] as num?)?.toInt() ?? 0;
+    double distance = (set['distance'] as num?)?.toDouble() ?? 0;
+    int timeSeconds = (set['time_seconds'] as num?)?.toInt() ?? 0;
+    double? rpe = (set['rpe'] as num?)?.toDouble();
+    bool isWarmup = (set['is_warmup'] as int?) == 1;
 
-    final result = await showDialog<bool>(
+    final result = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('${exercise.localizedName(loc)} — #${setIndex + 1}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: weightCtl,
-              decoration: InputDecoration(
-                labelText: loc.activeWorkoutWeight,
-                border: const OutlineInputBorder(),
-                isDense: true,
-              ),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            left: 16,
+            right: 16,
+            top: 8,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        ctx,
+                      ).colorScheme.onSurfaceVariant.withAlpha(80),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  ' — #',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.whatshot,
+                      size: 16,
+                      color: isWarmup
+                          ? Colors.orange
+                          : Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(loc.activeWorkoutWarmup),
+                    const Spacer(),
+                    Switch.adaptive(
+                      value: isWarmup,
+                      onChanged: (value) =>
+                          setSheetState(() => isWarmup = value),
+                    ),
+                  ],
+                ),
+                WorkoutSetFieldControls(
+                  exerciseType: exercise.exerciseType,
+                  weight: weight,
+                  reps: reps,
+                  distance: distance,
+                  timeSeconds: timeSeconds,
+                  weightIncrement: exercise.weightIncrement,
+                  showPace: true,
+                  onWeightChanged: (value) =>
+                      setSheetState(() => weight = value),
+                  onRepsChanged: (value) => setSheetState(() => reps = value),
+                  onDistanceChanged: (value) =>
+                      setSheetState(() => distance = value),
+                  onTimeChanged: (value) =>
+                      setSheetState(() => timeSeconds = value),
+                ),
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Text(
+                          'RPE',
+                          style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      ...List.generate(11, (i) {
+                        final value = i.toDouble();
+                        final selected = rpe != null && rpe!.round() == i;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: GestureDetector(
+                            onTap: () => setSheetState(() {
+                              rpe = rpe == value ? null : value;
+                            }),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 120),
+                              width: 30,
+                              height: 30,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: selected
+                                    ? Theme.of(ctx).colorScheme.primary
+                                    : Colors.transparent,
+                                border: Border.all(
+                                  color: selected
+                                      ? Theme.of(ctx).colorScheme.primary
+                                      : Theme.of(
+                                          ctx,
+                                        ).colorScheme.outlineVariant,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  i == 0 ? '-' : '',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: selected
+                                        ? Theme.of(ctx).colorScheme.onPrimary
+                                        : Theme.of(ctx).colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: Text(loc.commonCancel),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: Text(loc.commonSave),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: repsCtl,
-              decoration: InputDecoration(
-                labelText: loc.activeWorkoutReps,
-                border: const OutlineInputBorder(),
-                isDense: true,
-              ),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: rpeCtl,
-              decoration: InputDecoration(
-                labelText: loc.workoutDetailRpe,
-                border: const OutlineInputBorder(),
-                isDense: true,
-              ),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-            ),
-          ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonSave),
-          ),
-        ],
       ),
     );
 
     if (result == true) {
       await _workoutRepo.updateSet(
         set['id'] as String,
-        weight: double.tryParse(weightCtl.text),
-        reps: int.tryParse(repsCtl.text),
-        rpe: double.tryParse(rpeCtl.text),
+        weight: weight,
+        reps: reps,
+        distance: distance,
+        timeSeconds: timeSeconds,
+        rpe: rpe,
+        isWarmup: isWarmup,
       );
       await _load();
       if (mounted) setState(() {});

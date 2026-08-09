@@ -3,19 +3,30 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
+import 'package:workout_notes/models/sleep_night_summary.dart';
+import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
-import 'package:workout_notes/widgets/empty_state_placeholder.dart';
+import 'package:workout_notes/services/sleep_goal_service.dart';
 
-import 'sleep_entry_sheet.dart';
+import 'package:workout_notes/widgets/empty_state_placeholder.dart';
+import 'package:workout_notes/widgets/sleep/sleep_duration_chart.dart';
+import 'package:workout_notes/widgets/sleep/sleep_latest_card.dart';
+import 'package:workout_notes/widgets/sleep/sleep_goal_metrics_card.dart';
+
+import 'package:workout_notes/widgets/sleep/sleep_schedule_chart.dart';
+import 'package:workout_notes/widgets/sleep/sleep_weekly_summary_card.dart';
+import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
+
 import 'sleep_monitor_result_screen.dart';
 import 'sleep_monitor_screen.dart';
+import 'traditional_alarms_screen.dart';
+import 'sleep_settings_screen.dart';
 
 class SleepTrackerScreen extends StatefulWidget {
   const SleepTrackerScreen({super.key});
@@ -28,30 +39,42 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   final _repository = SleepRepository();
   final _monitorRepository = SleepMonitorRepository();
   final _monitorService = SleepMonitorService.instance;
+  final _sleepGoalService = SleepGoalService();
   List<SleepEntry> _entries = const [];
   SleepDashboardStats? _stats;
+  SleepNightSummary? _latestNight;
+  Map<String, SleepNightSummary> _nightSummaries = const {};
   bool _isLoading = true;
   int _historyDisplayCount = 5;
   int _lastRecoveryCount = 0;
+  late DateTime _weekEnd;
+  bool _isChangingWeek = false;
+  int _sleepGoalMinutes = SleepGoalService.defaultGoalMinutes;
 
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _weekEnd = DateTime(now.year, now.month, now.day);
     _monitorService.addListener(_onMonitorChanged);
     _lastRecoveryCount = _monitorService.recoveredCount;
-    _monitorService.initialize();
+    _bootstrap();
     if (_lastRecoveryCount > 0) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _showRecoveryMessage(_lastRecoveryCount);
       });
     }
-    _load();
   }
 
   @override
   void dispose() {
     _monitorService.removeListener(_onMonitorChanged);
     super.dispose();
+  }
+
+  Future<void> _bootstrap() async {
+    await _monitorService.initialize();
+    if (mounted) await _load();
   }
 
   void _onMonitorChanged() {
@@ -82,12 +105,29 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   Future<void> _load() async {
     if (mounted) setState(() => _isLoading = true);
     try {
+      await _monitorRepository.repairSleepEntriesFromSessions();
+      await _monitorRepository.restageSleepStageEpochs();
       final entries = await _repository.getEntries(limit: 500);
-      final stats = await _repository.getDashboardStats();
+      final stats = await _repository.getDashboardStats(
+        referenceDate: _weekEnd,
+      );
+      final sleepGoalMinutes = await _sleepGoalService.load();
+      final nightSummaries = await _monitorRepository.getNightSummaries(
+        limit: 500,
+      );
+      final summariesByEntry = {
+        for (final summary in nightSummaries) summary.entry.id: summary,
+      };
+      final latestNight = stats.latest == null
+          ? null
+          : summariesByEntry[stats.latest!.id];
       if (!mounted) return;
       setState(() {
         _entries = entries;
         _stats = stats;
+        _sleepGoalMinutes = sleepGoalMinutes;
+        _latestNight = latestNight;
+        _nightSummaries = summariesByEntry;
         _historyDisplayCount = 5;
         _isLoading = false;
       });
@@ -102,7 +142,31 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: Text(loc.sleepTitle), centerTitle: true),
+      appBar: AppBar(
+        title: Text(
+          _formatHeaderDate(),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        centerTitle: false,
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            tooltip: 'Alarmes',
+            icon: const Icon(Icons.alarm_rounded),
+            onPressed: _openTraditionalAlarms,
+          ),
+          IconButton(
+            tooltip: loc.sleepSettingsTitle,
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: _openSleepSettings,
+          ),
+        ],
+      ),
+      floatingActionButton: _buildMonitorFab(),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -111,33 +175,24 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                   ? _buildEmptyState(loc)
                   : _buildContent(theme, loc),
             ),
-      floatingActionButton: _isLoading
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: _openAdd,
-              icon: const Icon(Icons.add),
-              label: Text(loc.sleepAdd),
-            ),
     );
   }
+
+  String _formatHeaderDate() =>
+      DateFormat('EEEE, d MMMM', Intl.defaultLocale).format(DateTime.now());
 
   Widget _buildEmptyState(AppLocalizations loc) {
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       child: Column(
         children: [
-          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
-            _buildMonitorCta(loc),
-            const SizedBox(height: 16),
-          ],
           SizedBox(
-            height: MediaQuery.sizeOf(context).height * .58,
+            height: MediaQuery.sizeOf(context).height * .5,
             child: EmptyStatePlaceholder(
               icon: Icons.nightlight_round,
               title: loc.sleepEmptyTitle,
               subtitle: loc.sleepEmptySubtitle,
-              actionLabel: loc.sleepAdd,
-              onAction: _openAdd,
             ),
           ),
         ],
@@ -147,26 +202,46 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
 
   Widget _buildContent(ThemeData theme, AppLocalizations loc) {
     final stats = _stats!;
+    final weeklyDays = _weeklyDays();
+    final latest = stats.latest;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [
-        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
-          _buildMonitorCta(loc),
-          const SizedBox(height: 12),
+        if (latest != null) ...[
+          SleepGoalMetricsCard(
+            entry: latest,
+            stats: stats,
+            goalMinutes: _sleepGoalMinutes,
+          ),
+          const SizedBox(height: 16),
+          SleepLatestCard(entry: latest, onTap: () => _showDetails(latest)),
+          if (_latestNight?.session != null) ...[
+            const SizedBox(height: 16),
+            SleepStageCard(
+              session: _latestNight!.session!,
+              stages: _latestNight!.stages,
+              compact: true,
+            ),
+          ],
+          const SizedBox(height: 16),
         ],
-        _LatestSleepCard(
-          entry: stats.latest,
-          loc: loc,
-        ).animate().fadeIn(duration: 350.ms),
-        const SizedBox(height: 12),
-        _buildMetricGrid(theme, stats, loc),
-        const SizedBox(height: 16),
-        _SleepChartCard(
-          title: loc.sleepDailyChart,
-          icon: Icons.bar_chart_rounded,
-          child: _buildDailyChart(theme, loc),
+        SleepWeeklySummaryCard(
+          stats: stats,
+          start: weeklyDays.first,
+          end: weeklyDays.last,
         ),
+        const SizedBox(height: 12),
+        SleepScheduleChart(
+          entries: _entries,
+          days: weeklyDays,
+          onPreviousWeek: _isChangingWeek ? null : () => _changeWeek(-1),
+          onNextWeek: _isChangingWeek || !_canGoToNextWeek
+              ? null
+              : () => _changeWeek(1),
+        ),
+        const SizedBox(height: 12),
+        SleepDurationChart(entries: _entries, days: weeklyDays),
         const SizedBox(height: 12),
         _SleepChartCard(
           title: loc.sleepTrendChart,
@@ -186,193 +261,77 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                 )
               : _buildTrendChart(theme, loc),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         _buildHistory(theme, loc),
       ],
     );
   }
 
-  Widget _buildMonitorCta(AppLocalizations loc) {
-    final active = _monitorService.isMonitoring;
-    return Card(
-      color: Theme.of(context).colorScheme.primaryContainer,
-      child: ListTile(
-        leading: Icon(active ? Icons.graphic_eq : Icons.mic_none),
-        title: Text(
-          active ? loc.sleepMonitorRunning : loc.sleepMonitorCta,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
-        subtitle: Text(
-          active ? loc.sleepMonitorOpenActive : loc.sleepMonitorCtaSubtitle,
-        ),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: _openMonitor,
-      ),
-    );
-  }
-
-  Widget _buildMetricGrid(
-    ThemeData theme,
-    SleepDashboardStats stats,
-    AppLocalizations loc,
-  ) {
-    final cards = [
-      _MetricData(
-        loc.sleepAverage7Days,
-        _formatMinutes(stats.average7Days?.round(), loc),
-        Icons.calendar_view_week_outlined,
-        theme.colorScheme.primary,
-      ),
-      _MetricData(
-        loc.sleepAverage30Days,
-        _formatMinutes(stats.average30Days?.round(), loc),
-        Icons.calendar_month_outlined,
-        theme.colorScheme.secondary,
-      ),
-      _MetricData(
-        loc.sleepActualAverage,
-        _formatMinutes(stats.actualAverage30Days?.round(), loc),
-        Icons.bedtime_outlined,
-        Colors.indigo,
-      ),
-      _MetricData(
-        loc.sleepConsistency,
-        loc.sleepDaysRecorded(stats.recordedDays30Days, 30),
-        Icons.event_available_outlined,
-        Colors.green,
-      ),
-      _MetricData(
-        loc.sleepEfficiency,
-        stats.efficiency30Days == null
-            ? '--'
-            : '${stats.efficiency30Days!.toStringAsFixed(0)}%',
-        Icons.speed_outlined,
-        Colors.teal,
-      ),
-      _MetricData(
-        loc.sleepMinimum,
-        _formatMinutes(stats.minimum30Days, loc),
-        Icons.arrow_downward_rounded,
-        Colors.deepOrange,
-      ),
-      _MetricData(
-        loc.sleepMaximum,
-        _formatMinutes(stats.maximum30Days, loc),
-        Icons.arrow_upward_rounded,
-        Colors.purple,
-      ),
-    ];
-    return GridView.builder(
-      itemCount: cards.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 1.8,
-      ),
-      itemBuilder: (context, index) => _MetricCard(data: cards[index]),
-    );
-  }
-
-  Widget _buildDailyChart(ThemeData theme, AppLocalizations loc) {
-    final today = _dateOnly(DateTime.now());
-    final byDate = {
-      for (final entry in _entries) _dateString(entry.date): entry,
-    };
-    final days = List.generate(
-      7,
-      (index) => today.subtract(Duration(days: 6 - index)),
-    );
-    final groups = <BarChartGroupData>[];
-    var maxHours = 0.0;
-    for (var index = 0; index < days.length; index++) {
-      final entry = byDate[_dateString(days[index])];
-      final recorded = entry == null ? null : entry.sleepMinutes / 60;
-      final actual = entry?.actualSleepMinutes == null
-          ? null
-          : entry!.actualSleepMinutes! / 60;
-      maxHours = math.max(maxHours, math.max(recorded ?? 0, actual ?? 0));
-      final rods = <BarChartRodData>[];
-      if (recorded != null) {
-        rods.add(_barRod(recorded, theme.colorScheme.primary));
-      }
-      if (actual != null) {
-        rods.add(_barRod(actual, Colors.indigo));
-      }
-      groups.add(BarChartGroupData(x: index, barRods: rods));
+  Widget? _buildMonitorFab() {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return null;
     }
-
-    return Column(
-      children: [
-        _ChartLegend(
-          items: [
-            (theme.colorScheme.primary, loc.sleepChartRecorded),
-            (Colors.indigo, loc.sleepChartActual),
-          ],
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 210,
-          child: BarChart(
-            BarChartData(
-              maxY: math.max(8, maxHours + 1),
-              minY: 0,
-              alignment: BarChartAlignment.spaceAround,
-              barGroups: groups,
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                horizontalInterval: 2,
-              ),
-              borderData: FlBorderData(show: false),
-              titlesData: FlTitlesData(
-                topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 30,
-                    interval: 2,
-                    getTitlesWidget: (value, meta) => Text(
-                      '${value.toInt()}h',
-                      style: const TextStyle(fontSize: 10),
-                    ),
-                  ),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 28,
-                    getTitlesWidget: (value, meta) {
-                      final index = value.toInt();
-                      if (index < 0 || index >= days.length) {
-                        return const SizedBox();
-                      }
-                      return SideTitleWidget(
-                        meta: meta,
-                        child: Text(
-                          DateFormat(
-                            'E',
-                            Intl.defaultLocale,
-                          ).format(days[index]).substring(0, 1),
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+    final isActive = _monitorService.isMonitoring;
+    final loc = AppLocalizations.of(context)!;
+    final elapsed = _formatElapsed(_monitorService.state.elapsed);
+    return FloatingActionButton.extended(
+      heroTag: 'sleep-monitor-fab',
+      onPressed: _openMonitor,
+      icon: Icon(isActive ? Icons.open_in_new_rounded : Icons.nightlight_round),
+      label: Text(
+        isActive
+            ? '${loc.sleepMonitorOpenActive} - $elapsed'
+            : loc.sleepMonitorCta,
+      ),
     );
+  }
+
+  static String _formatElapsed(Duration duration) {
+    final hours = duration.inHours.toString().padLeft(2, '0');
+    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
+  }
+
+  Future<void> _openTraditionalAlarms() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TraditionalAlarmsScreen()),
+    );
+    if (mounted) await _load();
+  }
+
+  Future<void> _openSleepSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SleepSettingsScreen()),
+    );
+    if (mounted) await _load();
+  }
+
+  bool get _canGoToNextWeek {
+    return _weekEnd.isBefore(_dateOnly(DateTime.now()));
+  }
+
+  Future<void> _changeWeek(int direction) async {
+    if (_isChangingWeek) return;
+    final today = _dateOnly(DateTime.now());
+    final candidate = _weekEnd.add(Duration(days: direction * 7));
+    if (candidate.isAfter(today)) return;
+
+    setState(() => _isChangingWeek = true);
+    try {
+      final stats = await _repository.getDashboardStats(
+        referenceDate: candidate,
+      );
+      if (!mounted) return;
+      setState(() {
+        _weekEnd = candidate;
+        _stats = stats;
+      });
+    } finally {
+      if (mounted) setState(() => _isChangingWeek = false);
+    }
   }
 
   Widget _buildTrendChart(ThemeData theme, AppLocalizations loc) {
@@ -383,6 +342,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     };
     final recordedSpots = <FlSpot>[];
     final actualSpots = <FlSpot>[];
+    final deepSpots = <FlSpot>[];
     for (var index = 0; index < 30; index++) {
       final date = start.add(Duration(days: index));
       final entry = byDate[_dateString(date)];
@@ -391,6 +351,13 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       if (entry.actualSleepMinutes != null) {
         actualSpots.add(
           FlSpot(index.toDouble(), entry.actualSleepMinutes! / 60),
+        );
+      }
+      final stageSession = _nightSummaries[entry.id]?.session;
+      if (stageSession?.deepSleepMinutes != null &&
+          (stageSession?.stageConfidence ?? 0) >= 0.6) {
+        deepSpots.add(
+          FlSpot(index.toDouble(), stageSession!.deepSleepMinutes! / 60),
         );
       }
     }
@@ -404,11 +371,13 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
           items: [
             (theme.colorScheme.primary, loc.sleepChartRecorded),
             (Colors.indigo, loc.sleepChartActual),
+            if (deepSpots.isNotEmpty)
+              (Colors.deepPurple, loc.sleepStageDeepEstimated),
           ],
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 220,
+          height: 180,
           child: LineChart(
             LineChartData(
               minX: 0,
@@ -458,6 +427,8 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                 _lineData(recordedSpots, theme.colorScheme.primary),
                 if (actualSpots.isNotEmpty)
                   _lineData(actualSpots, Colors.indigo),
+                if (deepSpots.isNotEmpty)
+                  _lineData(deepSpots, Colors.deepPurple),
               ],
             ),
           ),
@@ -491,6 +462,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _SleepHistoryCard(
                   entry: entry,
+                  summary: _nightSummaries[entry.id],
                   loc: loc,
                   onTap: () => _showDetails(entry),
                 ),
@@ -510,10 +482,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
           ),
       ],
     );
-  }
-
-  Future<void> _openAdd() async {
-    await showSleepEntrySheet(context, repository: _repository, onSaved: _load);
   }
 
   Future<void> _openMonitor() async {
@@ -635,20 +603,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                           foregroundColor: Colors.red,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      FilledButton.icon(
-                        onPressed: () async {
-                          Navigator.pop(sheetContext);
-                          await showSleepEntrySheet(
-                            context,
-                            repository: _repository,
-                            existing: entry,
-                            onSaved: _load,
-                          );
-                        },
-                        icon: const Icon(Icons.edit_outlined),
-                        label: Text(loc.sleepEdit),
-                      ),
                     ],
                   ),
                 ],
@@ -690,13 +644,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     }
   }
 
-  static BarChartRodData _barRod(double value, Color color) => BarChartRodData(
-    toY: value,
-    width: 9,
-    color: color,
-    borderRadius: BorderRadius.circular(3),
-  );
-
   static LineChartBarData _lineData(List<FlSpot> spots, Color color) =>
       LineChartBarData(
         spots: spots,
@@ -718,147 +665,18 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     return '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
   }
 
+  List<DateTime> _weeklyDays() {
+    return List.generate(
+      7,
+      (index) => _weekEnd.subtract(Duration(days: 6 - index)),
+    );
+  }
+
   static DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
 
   static String _dateString(DateTime value) =>
       _dateOnly(value).toIso8601String().substring(0, 10);
-}
-
-class _LatestSleepCard extends StatelessWidget {
-  final SleepEntry? entry;
-  final AppLocalizations loc;
-
-  const _LatestSleepCard({required this.entry, required this.loc});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = theme.colorScheme.primary;
-    return Card(
-      color: color.withAlpha(18),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withAlpha(24),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(Icons.nightlight_round, color: color, size: 30),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(loc.sleepLatest, style: theme.textTheme.labelLarge),
-                  const SizedBox(height: 4),
-                  Text(
-                    entry == null
-                        ? '--'
-                        : loc.sleepDurationValue(
-                            entry!.sleepMinutes ~/ 60,
-                            entry!.sleepMinutes % 60,
-                          ),
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (entry != null)
-                    Text(
-                      DateFormat.yMMMd(Intl.defaultLocale).format(entry!.date),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (entry?.actualSleepMinutes != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    loc.sleepActualDuration,
-                    style: theme.textTheme.labelSmall,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    loc.sleepDurationValue(
-                      entry!.actualSleepMinutes! ~/ 60,
-                      entry!.actualSleepMinutes! % 60,
-                    ),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: Colors.indigo,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MetricData {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  const _MetricData(this.label, this.value, this.icon, this.color);
-}
-
-class _MetricCard extends StatelessWidget {
-  final _MetricData data;
-
-  const _MetricCard({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Icon(data.icon, color: data.color, size: 22),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    data.label,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    data.value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _SleepChartCard extends StatelessWidget {
@@ -937,11 +755,13 @@ class _ChartLegend extends StatelessWidget {
 
 class _SleepHistoryCard extends StatelessWidget {
   final SleepEntry entry;
+  final SleepNightSummary? summary;
   final AppLocalizations loc;
   final VoidCallback onTap;
 
   const _SleepHistoryCard({
     required this.entry,
+    required this.summary,
     required this.loc,
     required this.onTap,
   });
@@ -1009,6 +829,27 @@ class _SleepHistoryCard extends StatelessWidget {
                           color: theme.colorScheme.primary,
                         ),
                       ),
+                    if (summary?.hasStages ?? false) ...[
+                      const SizedBox(height: 7),
+                      _StageMiniComposition(session: summary!.session!),
+                      const SizedBox(height: 4),
+                      Text(
+                        _stageTotals(summary!.session!, loc),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ] else if (summary?.session != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        loc.sleepStageUnavailable,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1029,6 +870,61 @@ class _SleepHistoryCard extends StatelessWidget {
     );
   }
 }
+
+class _StageMiniComposition extends StatelessWidget {
+  final SleepMonitorSession session;
+
+  const _StageMiniComposition({required this.session});
+
+  @override
+  Widget build(BuildContext context) {
+    final awake = session.awakeMinutes ?? 0;
+    final sleeping = session.sleepingMinutes ?? 0;
+    final deep = session.deepSleepMinutes ?? 0;
+    final unknown = session.unknownMinutes ?? 0;
+    final total = awake + sleeping + deep + unknown;
+    if (total <= 0) return const SizedBox.shrink();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(99),
+      child: SizedBox(
+        height: 6,
+        child: Row(
+          children: [
+            if (awake > 0)
+              Expanded(
+                flex: awake,
+                child: Container(color: Colors.orange),
+              ),
+            if (sleeping > 0)
+              Expanded(
+                flex: sleeping,
+                child: Container(color: Colors.lightBlue),
+              ),
+            if (deep > 0)
+              Expanded(
+                flex: deep,
+                child: Container(color: Colors.indigo),
+              ),
+            if (unknown > 0)
+              Expanded(
+                flex: unknown,
+                child: Container(color: Colors.grey),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _stageTotals(SleepMonitorSession session, AppLocalizations loc) {
+  final sleeping = session.sleepingMinutes ?? 0;
+  final deep = session.deepSleepMinutes ?? 0;
+  return '${loc.sleepStageSleeping} ${_compactMinutes(sleeping)} \u00b7 ${loc.sleepStageDeepEstimated} ${_compactMinutes(deep)}';
+}
+
+String _compactMinutes(int minutes) =>
+    minutes >= 60 ? '${minutes ~/ 60}h ${minutes % 60}min' : '${minutes}min';
 
 class _DetailRow extends StatelessWidget {
   final IconData icon;

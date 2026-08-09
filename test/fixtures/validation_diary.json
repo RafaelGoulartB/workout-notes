@@ -1,0 +1,10 @@
+{
+  "session_start": "22:00",
+  "bedtime": "22:00",
+  "sleep_onset": "22:20",
+  "final_wake": "05:40",
+  "awakenings": ["05:00"],
+  "optional_epoch_labels": [
+    {"offset_seconds": 3600, "stage": "deep", "duration_seconds": 7200}
+  ]
+}

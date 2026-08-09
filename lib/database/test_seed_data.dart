@@ -1178,7 +1178,7 @@ class TestDataGenerator {
       await db.rawInsert(
         'INSERT OR REPLACE INTO sleep_entries '
         '(id, date, sleep_minutes, actual_sleep_minutes, bedtime_minutes, '
-        'wake_time_minutes, comment, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'wake_time_minutes, comment, source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           _uuid.v4(),
           dateStr,
@@ -1187,6 +1187,7 @@ class TestDataGenerator {
           bedtimeMinutes,
           wakeTimeMinutes,
           hasActual ? null : 'Sono real não informado',
+          'monitored',
           date.add(const Duration(hours: 7)).toIso8601String(),
         ],
       );

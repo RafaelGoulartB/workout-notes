@@ -143,7 +143,7 @@ void main() {
     await database.close();
   });
 
-  test('backup v5 includes all nutrition tables', () async {
+  test('backup includes all nutrition tables', () async {
     final now = DateTime.now().toIso8601String();
     await database.insert('foods', {
       'id': 'f1',
@@ -197,7 +197,7 @@ void main() {
     final export = await ExportImportRepository(
       databaseProvider: () async => database,
     ).exportAllData();
-    expect(export['version'], 5);
+    expect(export['version'], ExportImportRepository.currentBackupVersion);
     expect(export['foods'], hasLength(1));
     expect(export['food_variants'], hasLength(1));
     expect(export['food_servings'], hasLength(1));
@@ -417,7 +417,7 @@ void main() {
     );
     final bytes = await service.exportBackupBytes();
     final json = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
-    expect(json['version'], 5);
+    expect(json['version'], ExportImportRepository.currentBackupVersion);
     expect(json['meal_log_items'], isNotEmpty);
 
     // The nutrition CSV needs a localizations stub.

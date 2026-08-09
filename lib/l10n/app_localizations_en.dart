@@ -21,23 +21,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sleepTitle => 'Sleep';
 
   @override
-  String get sleepAdd => 'Log sleep';
-
-  @override
-  String get sleepAddTitle => 'Log sleep';
-
-  @override
-  String get sleepEditTitle => 'Edit sleep record';
-
-  @override
   String get sleepEmptyTitle => 'No sleep logged';
 
   @override
   String get sleepEmptySubtitle =>
-      'Log your nights to track duration, actual sleep, and consistency.';
-
-  @override
-  String get sleepDate => 'Wake-up date';
+      'Monitor your nights to track duration, actual sleep, and consistency.';
 
   @override
   String get sleepDuration => 'Sleep duration';
@@ -46,45 +34,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sleepActualDuration => 'Actual sleep';
 
   @override
-  String get sleepActualDurationHint => 'Time actually asleep';
-
-  @override
   String get sleepBedtime => 'Bedtime';
 
   @override
   String get sleepWakeTime => 'Wake-up time';
 
   @override
-  String get sleepComment => 'Note (optional)';
-
-  @override
-  String get sleepHours => 'hours';
-
-  @override
-  String get sleepMinutes => 'minutes';
-
-  @override
-  String get sleepSave => 'Save record';
-
-  @override
-  String get sleepSaved => 'Sleep record saved!';
-
-  @override
   String get sleepDeleted => 'Sleep record deleted';
 
   @override
   String get sleepDeleteConfirm => 'Delete this sleep record?';
-
-  @override
-  String get sleepInvalidDuration =>
-      'Enter a duration between 1 minute and 24 hours.';
-
-  @override
-  String get sleepInvalidActual =>
-      'Actual sleep must be greater than zero and cannot exceed the main duration.';
-
-  @override
-  String get sleepInvalidTime => 'Enter a valid time.';
 
   @override
   String get sleepSummary => 'Summary';
@@ -161,15 +120,115 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sleepDelete => 'Delete record';
 
   @override
-  String get sleepEdit => 'Edit record';
-
-  @override
-  String get sleepNotInformed => 'Not informed';
-
-  @override
   String sleepDurationValue(Object hours, Object minutes) {
     return '${hours}h ${minutes}min';
   }
+
+  @override
+  String get sleepGoalTitle => 'Sleep goal';
+
+  @override
+  String get sleepGoalTarget => 'Target';
+
+  @override
+  String get sleepGoalReached => 'Goal reached';
+
+  @override
+  String get sleepGoalMissed => 'Goal missed';
+
+  @override
+  String get sleepGoalInfo =>
+      'A personal target for comparing your nights. It is not a clinical recommendation.';
+
+  @override
+  String get sleepMetricSleep => 'Sleep';
+
+  @override
+  String get sleepMetricTimeInBed => 'Time in bed';
+
+  @override
+  String get sleepGoalDialogTitle => 'Set sleep goal';
+
+  @override
+  String get sleepGoalDialogDescription =>
+      'Choose how much sleep you want to aim for each night.';
+
+  @override
+  String get sleepGoalSaved => 'Sleep goal saved';
+
+  @override
+  String sleepGoalCurrent(String duration) {
+    return '$duration per night';
+  }
+
+  @override
+  String get sleepGoalBody =>
+      'This target is used to compare your latest night and highlight progress.';
+
+  @override
+  String get sleepMonitorOpen => 'Open monitoring';
+
+  @override
+  String sleepMonitorElapsed(String duration) {
+    return 'Active for $duration';
+  }
+
+  @override
+  String get sleepWeeklySummary => 'Weekly summary';
+
+  @override
+  String get sleepAverageSleep => 'Average sleep';
+
+  @override
+  String get sleepRegularity => 'Regularity';
+
+  @override
+  String get sleepRegularityInfo =>
+      'An app consistency score based on bedtime and wake-up variation. It is not a clinical measurement.';
+
+  @override
+  String sleepNightsRecorded(Object count, Object total) {
+    return '$count of $total nights recorded';
+  }
+
+  @override
+  String get sleepScheduleChart => 'Sleep schedule';
+
+  @override
+  String get sleepScheduleChartSubtitle =>
+      'Bedtime to wake-up time over the last 7 days';
+
+  @override
+  String get sleepScheduleNoTimes =>
+      'Add bedtime and wake-up times to see your weekly schedule.';
+
+  @override
+  String sleepScheduleSemantics(Object count) {
+    return 'Weekly sleep schedule with $count nights';
+  }
+
+  @override
+  String get sleepDurationChart => 'Sleep duration';
+
+  @override
+  String get sleepDurationChartSubtitle =>
+      'Recorded and actual or estimated sleep by night';
+
+  @override
+  String get sleepChartActualOrEstimated => 'Actual / estimated';
+
+  @override
+  String get sleepDurationChartSemantics =>
+      'Weekly chart comparing recorded and actual or estimated sleep duration';
+
+  @override
+  String get sleepPreviousWeek => 'Previous week';
+
+  @override
+  String get sleepNextWeek => 'Next week';
+
+  @override
+  String get sleepNoRecordForDay => 'No sleep record for this day';
 
   @override
   String get sleepMonitorCta => 'Monitor sleep';
@@ -204,6 +263,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sleepMonitorStart => 'Start monitoring';
+
+  @override
+  String sleepMonitorStartWithAlarm(String time) {
+    return 'Start and wake at $time';
+  }
 
   @override
   String get sleepMonitorFinish => 'Finish and view result';
@@ -257,6 +321,71 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sleepMonitorInvalidSignal => 'Signal temporarily unavailable';
 
   @override
+  String get sleepAlarmSectionTitle => 'Your wake-up time';
+
+  @override
+  String get sleepAlarmTapToChange => 'Tap the clock to change';
+
+  @override
+  String get sleepAlarmNext => 'Next alarm';
+
+  @override
+  String sleepAlarmIn(String duration) {
+    return 'in $duration';
+  }
+
+  @override
+  String get sleepAlarmSystemSound => 'System alarm sound + vibration';
+
+  @override
+  String get sleepAlarmSystemSoundBody =>
+      'Uses your device\'s alarm volume and Do Not Disturb settings.';
+
+  @override
+  String get sleepAlarmPreparation => 'Prepare your phone';
+
+  @override
+  String get sleepAlarmPreparationBody =>
+      'Leave it charging near the bed, with the microphone unobstructed.';
+
+  @override
+  String sleepAlarmScheduledFor(String time) {
+    return 'Alarm set for $time';
+  }
+
+  @override
+  String get sleepAlarmRemaining => 'Time until alarm';
+
+  @override
+  String get sleepAlarmChange => 'Change alarm';
+
+  @override
+  String get sleepAlarmInvalidWindow =>
+      'Choose a time between 1 minute and 16 hours from now.';
+
+  @override
+  String get sleepAlarmExactPermission =>
+      'Allow Alarms & reminders so the alarm can ring exactly on time.';
+
+  @override
+  String get sleepAlarmEnableExactPermission => 'Allow exact alarms';
+
+  @override
+  String get sleepAlarmNotificationRequired =>
+      'Notifications are required to show and dismiss the wake-up alarm.';
+
+  @override
+  String get sleepAlarmFullScreenLimited =>
+      'Full-screen alarms are disabled. Sound and vibration will still use a highlighted notification.';
+
+  @override
+  String get sleepAlarmEnableFullScreen => 'Allow full-screen alarm';
+
+  @override
+  String get sleepAlarmScheduleFailed =>
+      'The wake-up alarm could not be scheduled.';
+
+  @override
   String get sleepMonitorResultTitle => 'Monitoring result';
 
   @override
@@ -293,11 +422,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sleepMonitorInvalid => 'Invalid signal';
 
   @override
-  String get sleepMonitorDataQuality => 'MVP data quality';
+  String get sleepMonitorDataQuality => 'Capture quality';
 
   @override
-  String get sleepMonitorDataAcceptable =>
-      'Night suitable for the next MVP phase';
+  String get sleepMonitorDataAcceptable => 'Capture quality is good';
 
   @override
   String get sleepMonitorDataAcceptableBody =>
@@ -328,7 +456,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sleepMonitorNoSegmentsBody =>
-      'This session cannot evaluate the MVP. The monitor will now stop with an error if the microphone stops returning data, instead of completing an empty night.';
+      'This session has no usable audio segments. The monitor now stops with an error if the microphone stops returning data, instead of completing an empty night.';
 
   @override
   String get sleepMonitorAverageNoise => 'Average noise score';
@@ -368,7 +496,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sleepMonitorExportWithPersonalBody =>
-      'Also includes exact date and time, local IDs, manual durations and your personal sleep comment.';
+      'Also includes exact date and time, local IDs, recorded durations and your personal sleep comment.';
 
   @override
   String get sleepMonitorExportConfirm => 'Generate and share';
@@ -385,9 +513,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sleepMonitorTimeInBed => 'Time in bed';
 
   @override
-  String get sleepMonitorEditManual => 'Edit manual record';
-
-  @override
   String get sleepMonitorDeleteSession => 'Delete session';
 
   @override
@@ -400,6 +525,154 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get sleepMonitorDiscardBody =>
       'The active session and its metrics will be deleted.';
+
+  @override
+  String get sleepMonitorDigitalSilence => 'Digital silence';
+
+  @override
+  String get sleepInferenceTitle => 'Night analysis';
+
+  @override
+  String get sleepInferenceSleptAt => 'Fell asleep';
+
+  @override
+  String get sleepInferenceOnsetUnknown => 'Onset not identified';
+
+  @override
+  String get sleepInferencePreparation => 'Preparation';
+
+  @override
+  String get sleepInferenceSettling => 'Settling';
+
+  @override
+  String get sleepInferenceAwakenings => 'Woke up';
+
+  @override
+  String get sleepInferenceEstimatedSleep => 'Estimated sleep';
+
+  @override
+  String get sleepInferenceConfidence => 'Confidence';
+
+  @override
+  String get sleepInferenceConfidenceLow => 'low';
+
+  @override
+  String get sleepInferenceConfidenceMedium => 'medium';
+
+  @override
+  String get sleepInferenceInsufficient =>
+      'This night\'s data is not sufficient to calculate sleep onset and awakenings safely.';
+
+  @override
+  String get sleepInferenceEventsTitle => 'Night events';
+
+  @override
+  String get sleepInferencePeak => 'peak';
+
+  @override
+  String get sleepInferenceEventTransient => 'Transient activity';
+
+  @override
+  String get sleepInferenceEventProlonged => 'Prolonged activity';
+
+  @override
+  String get sleepInferenceEventAwakening => 'Awakening';
+
+  @override
+  String get sleepInferenceEventFinalActivity =>
+      'Activity before monitoring ended';
+
+  @override
+  String get sleepInferenceReasonShort =>
+      'Short peak without enough duration to indicate an awakening.';
+
+  @override
+  String get sleepInferenceReasonSustained =>
+      'Sustained sound activity without a quiet recovery that indicates an awakening.';
+
+  @override
+  String get sleepInferenceReasonAwakening =>
+      'Sustained activity followed by a return to quiet.';
+
+  @override
+  String get sleepInferenceReasonFinal =>
+      'Sustained activity during the final ten minutes.';
+
+  @override
+  String get sleepInferenceBlockerTooShort =>
+      'Record at least four hours in a completed session.';
+
+  @override
+  String get sleepInferenceBlockerLowTimelineCoverage =>
+      'Timeline coverage was below 90%.';
+
+  @override
+  String get sleepInferenceBlockerLowSignalCoverage =>
+      'Valid signal coverage was below 80%.';
+
+  @override
+  String get sleepInferenceBlockerInvalidSegments =>
+      'More than 20% of the period contains invalid signal.';
+
+  @override
+  String get sleepInferenceBlockerDigitalSilence =>
+      'More than 20% of the period contains digital microphone silence.';
+
+  @override
+  String get sleepStagesTitle => 'Sleep stages';
+
+  @override
+  String get sleepStageAwake => 'Awake';
+
+  @override
+  String get sleepStageSleeping => 'Sleeping';
+
+  @override
+  String get sleepStageDeepEstimated => 'Estimated deep sleep';
+
+  @override
+  String get sleepStageUnknown => 'Insufficient data';
+
+  @override
+  String get sleepStageUnavailable => 'Sleep stages unavailable';
+
+  @override
+  String get sleepStageUnavailableLegacyBody =>
+      'This recording predates acoustic staging. Duration and sleep onset were repaired, but deep sleep cannot be reconstructed without the original spectral signal.';
+
+  @override
+  String get sleepStageInsufficientBody =>
+      'This night didn\'t meet the quality criteria for estimating sleep stages. Total sleep and onset were still estimated from sound levels.';
+
+  @override
+  String get sleepStageModelUnavailableBody =>
+      'This recording is missing the spectral signal required to estimate sleep stages.';
+
+  @override
+  String get sleepStageTimelineSemantics =>
+      'Interactive timeline with awake, sleeping and estimated deep sleep stages';
+
+  @override
+  String get sleepOnsetTime => 'Fell asleep';
+
+  @override
+  String get sleepFinalWake => 'Final wake-up';
+
+  @override
+  String get sleepLatency => 'Sleep latency';
+
+  @override
+  String get sleepAwakenings => 'Awakenings';
+
+  @override
+  String get sleepAnalysisTechnicalDetails => 'Technical details';
+
+  @override
+  String get sleepMonitorPlacementTitle => 'For a reliable analysis';
+
+  @override
+  String get sleepMonitorPlacementBody =>
+      'Keep the phone charging 50–100 cm from your head, point the microphone toward you and never place it under the pillow. Other people, pets, TV or music can reduce confidence.';
 
   @override
   String get commonCancel => 'Cancel';
@@ -2924,6 +3197,264 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get aiSettingsAboutBody =>
       'The AI Coach sends a summary of your data each turn and has access to 13 read tools. It cannot edit your data. Conversations are stored locally.';
+
+  @override
+  String get sleepSettingsTitle => 'Sleep settings';
+
+  @override
+  String get sleepSettingsGoalSection => 'SLEEP GOAL';
+
+  @override
+  String get sleepSettingsMissionSection => 'ALARM MISSION';
+
+  @override
+  String get sleepMissionToggle => 'Barcode mission';
+
+  @override
+  String get sleepMissionToggleBody =>
+      'A protected alarm requires a mission when you choose that mode.';
+
+  @override
+  String get sleepMissionNotConfigured => 'No barcode registered';
+
+  @override
+  String sleepMissionConfigured(String format) {
+    return 'Registered code: $format';
+  }
+
+  @override
+  String get sleepMissionScan => 'Scan code';
+
+  @override
+  String get sleepMissionReplace => 'Replace code';
+
+  @override
+  String get sleepMissionRemove => 'Remove code';
+
+  @override
+  String get sleepMissionRemoveConfirm =>
+      'Remove the registered code? Protected alarms already started will not change.';
+
+  @override
+  String get sleepMissionScanError => 'The barcode could not be read.';
+
+  @override
+  String get sleepMissionCameraDenied =>
+      'Camera permission is required to read the mission.';
+
+  @override
+  String get sleepMonitorModeSection => 'HOW TO MONITOR';
+
+  @override
+  String get sleepMonitorModeAlarmNoMission =>
+      'Monitor + alarm without mission';
+
+  @override
+  String get sleepMonitorModeAlarmWithMission => 'Monitor + alarm with mission';
+
+  @override
+  String get sleepMonitorModeOnly => 'Monitor only, without alarm';
+
+  @override
+  String get sleepMonitorModeAlarmNoMissionBody =>
+      'The alarm rings at the selected time and can be dismissed normally.';
+
+  @override
+  String get sleepMonitorModeAlarmWithMissionBody =>
+      'To dismiss it, scan the registered code or complete the emergency action with 500 taps.';
+
+  @override
+  String get sleepMonitorModeOnlyBody =>
+      'Monitors the environment without scheduling an alarm.';
+
+  @override
+  String get sleepMonitorModeMissionUnavailable =>
+      'Configure a barcode mission to unlock this mode.';
+
+  @override
+  String get sleepMonitorStartOnly => 'Start monitoring only';
+
+  @override
+  String sleepMonitorStartWithMission(String time) {
+    return 'Start and wake at $time with mission';
+  }
+
+  @override
+  String get sleepMonitorProtectedStop => 'Stop monitoring only';
+
+  @override
+  String get sleepMonitorProtectedStopBody =>
+      'The alarm and mission will remain active for this time.';
+
+  @override
+  String get sleepMonitorMissionPending => 'Mission pending';
+
+  @override
+  String get sleepMonitorMissionReady => 'Mission configured';
+
+  @override
+  String get sleepMissionFormatUnknown => 'barcode';
+
+  @override
+  String get sleepMissionRemoved => 'Mission removed for new sessions.';
+
+  @override
+  String get sleepMissionSaved => 'Code registered successfully.';
+
+  @override
+  String get sleepMissionOpenSettings => 'Open camera settings';
+
+  @override
+  String get alarmTitle => 'Alarms';
+
+  @override
+  String get alarmNew => 'New alarm';
+
+  @override
+  String get alarmEdit => 'Edit alarm';
+
+  @override
+  String get alarmEmptyTitle => 'No alarms';
+
+  @override
+  String get alarmEmptyBody => 'Create an alarm to wake up at the right time.';
+
+  @override
+  String get alarmDeleteTitle => 'Delete alarm?';
+
+  @override
+  String get alarmDeleteBody => 'This alarm will stop ringing.';
+
+  @override
+  String get alarmDelete => 'Delete';
+
+  @override
+  String get alarmPermissionRequired =>
+      'Allow notifications and exact alarms to continue.';
+
+  @override
+  String get alarmUpdateError => 'Could not update the alarm.';
+
+  @override
+  String get alarmSaveError => 'Could not save the alarm.';
+
+  @override
+  String alarmNext(String time) {
+    return 'Next: $time';
+  }
+
+  @override
+  String get alarmMission => 'Mission';
+
+  @override
+  String alarmSnoozeChip(int minutes, int count) {
+    return '$minutes min • ${count}x';
+  }
+
+  @override
+  String get alarmOneShot => 'Once';
+
+  @override
+  String get alarmEveryDay => 'Every day';
+
+  @override
+  String get alarmRepeat => 'Repeat';
+
+  @override
+  String get alarmOneShotHelp => 'No days selected: this alarm will ring once.';
+
+  @override
+  String get alarmDaysHelp => 'Choose the days when this alarm should ring.';
+
+  @override
+  String get alarmSnoozeEnable => 'Allow snooze';
+
+  @override
+  String get alarmSnoozeEnableBody => 'Delay the alarm before dismissing it.';
+
+  @override
+  String get alarmSnoozeInterval => 'Snooze interval';
+
+  @override
+  String get alarmMaxSnoozes => 'Maximum snoozes';
+
+  @override
+  String get alarmNoSnoozes => 'Do not allow';
+
+  @override
+  String alarmSnoozeTimes(int count) {
+    return '$count time(s)';
+  }
+
+  @override
+  String get alarmRequireMission => 'Require a mission to dismiss';
+
+  @override
+  String get alarmRequireMissionBody =>
+      'Requires the barcode configured in sleep monitoring.';
+
+  @override
+  String get alarmMissionNotConfigured =>
+      'Set up a barcode mission in Sleep settings before using it.';
+
+  @override
+  String get alarmSaving => 'Saving…';
+
+  @override
+  String get alarmSave => 'Save alarm';
+
+  @override
+  String get alarmWeekMon => 'Mon';
+
+  @override
+  String get alarmWeekTue => 'Tue';
+
+  @override
+  String get alarmWeekWed => 'Wed';
+
+  @override
+  String get alarmWeekThu => 'Thu';
+
+  @override
+  String get alarmWeekFri => 'Fri';
+
+  @override
+  String get alarmWeekSat => 'Sat';
+
+  @override
+  String get alarmWeekSun => 'Sun';
+
+  @override
+  String get sleepSettingsAlarmsSection => 'ALARMS';
+
+  @override
+  String get sleepSettingsSnoozeToggle => 'Allow snoozes';
+
+  @override
+  String get sleepSettingsSnoozeToggleBody =>
+      'Controls snoozes in sleep monitoring and the default for new alarms.';
+
+  @override
+  String get sleepSettingsMaxSnoozesBody =>
+      'Sleep monitoring always uses this limit. Each traditional alarm can set its own limit.';
+
+  @override
+  String get sleepSettingsMaxSnoozesDialogBody =>
+      'This limit is used by sleep monitoring and as the default for new alarms.';
+
+  @override
+  String get sleepSettingsAllowedSnoozes => 'Allowed snoozes';
+
+  @override
+  String get sleepMonitorSnoozesTitle => 'Alarm snoozes';
+
+  @override
+  String get sleepMonitorSnoozesDisabled => 'Disabled in Sleep settings.';
+
+  @override
+  String sleepMonitorSnoozesConfigured(int count) {
+    return 'Up to $count snooze(s), according to Sleep settings.';
+  }
 
   @override
   String get aiEmptyTitle => 'Configure an AI provider';

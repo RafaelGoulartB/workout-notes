@@ -21,7 +21,12 @@ class SleepMonitoringService : Service() {
         @Volatile private var lastState: Map<String, Any?>? = null
         @Volatile var eventSink: ((Map<String, Any?>) -> Unit)? = null
 
-        fun startResponse(context: android.content.Context): Map<String, Any?> {
+        fun startResponse(
+            context: android.content.Context,
+            sessionId: String,
+            alarmAtMillis: Long,
+            monitorMode: String,
+        ): Map<String, Any?> {
             val granted = ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.RECORD_AUDIO,
@@ -30,6 +35,13 @@ class SleepMonitoringService : Service() {
                 context,
                 status = "starting",
                 microphoneGranted = granted,
+            ) + mapOf(
+                "session_id" to sessionId,
+                "monitor_mode" to monitorMode,
+                "alarm_at" to if (alarmAtMillis > 0L) {
+                    Instant.ofEpochMilli(alarmAtMillis).toString()
+                } else null,
+                "mission_status" to if (monitorMode == "alarm_with_mission") "pending" else "unconfigured",
             )
         }
 
@@ -51,6 +63,71 @@ class SleepMonitoringService : Service() {
             return lastState ?: mapOf("status" to "idle")
         }
 
+        fun updateAlarm(alarmAtMillis: Long): Map<String, Any?> {
+            val service = activeInstance ?: return lastState ?: mapOf("status" to "idle")
+            service.updateAlarmInternal(alarmAtMillis)
+            return service.stateMap()
+        }
+
+        fun alarmDismissed(context: android.content.Context, method: String) {
+            val service = activeInstance
+            service?.markAlarmDismissed(method)
+            val snapshot = SleepAlarmScheduler.read(context)
+            if (service == null && snapshot != null) {
+                try {
+                    val spool = SleepSessionSpool(context)
+                    val stored = spool.read(snapshot.sessionId)
+                    @Suppress("UNCHECKED_CAST")
+                    val session: MutableMap<String, Any?> =
+                        (stored["session"] as? Map<String, Any?>)?.toMutableMap()
+                            ?: mutableMapOf()
+                    session["alarm_dismiss_method"] = method
+                    session["alarm_dismissed_at"] = Instant.now().toString()
+                    session["mission_status"] = "completed"
+                    spool.updateSession(session)
+                } catch (_: Throwable) {
+                    // The spool will still be imported with the completed alarm
+                    // state on the next Flutter launch.
+                }
+            }
+            val updated = (lastState ?: mapOf(
+                "supported" to true,
+                "status" to "completed",
+            )) + mapOf(
+                "alarm_dismissed" to true,
+                "alarm_dismiss_method" to method,
+                "alarm_ringing" to false,
+                "mission_status" to "completed",
+                "session_id" to snapshot?.sessionId,
+                "end_reason" to "alarm",
+            )
+            lastState = updated
+            eventSink?.invoke(updated)
+        }
+
+        fun publishAlarmRinging(context: android.content.Context) {
+            val snapshot = SleepAlarmScheduler.read(context)
+            val updated = (lastState ?: currentState(context)) + mapOf(
+                "alarm_ringing" to true,
+                "emergency_taps" to SleepAlarmScheduler.emergencyTaps(context),
+                "monitor_mode" to (snapshot?.monitorMode ?: "alarm_without_mission"),
+                "mission_status" to if (snapshot?.requiresMission == true) {
+                    "pending"
+                } else {
+                    "unconfigured"
+                },
+                "alarm_at" to snapshot?.alarmAtMillis?.let {
+                    Instant.ofEpochMilli(it).toString()
+                },
+                "session_id" to snapshot?.sessionId,
+                "alarm_dismissed" to false,
+                "alarm_dismiss_method" to null,
+                "end_reason" to "alarm",
+            )
+            lastState = updated
+            eventSink?.invoke(updated)
+        }
+
         fun currentState(context: android.content.Context): Map<String, Any?> {
             val service = activeInstance
             if (service != null) return service.stateMap()
@@ -58,6 +135,17 @@ class SleepMonitoringService : Service() {
                 context,
                 Manifest.permission.RECORD_AUDIO,
             ) == PackageManager.PERMISSION_GRANTED
+            val snapshot = SleepAlarmScheduler.read(context)
+            if (lastState == null && snapshot?.state == SleepAlarmScheduler.STATE_RINGING) {
+                return state(context, "completed", granted) + mapOf(
+                    "session_id" to snapshot.sessionId,
+                    "alarm_at" to Instant.ofEpochMilli(snapshot.alarmAtMillis).toString(),
+                    "monitor_mode" to snapshot.monitorMode,
+                    "mission_status" to if (snapshot.requiresMission) "pending" else "unconfigured",
+                    "alarm_ringing" to true,
+                    "emergency_taps" to SleepAlarmScheduler.emergencyTaps(context),
+                )
+            }
             return lastState ?: state(context, "idle", granted)
         }
 
@@ -70,12 +158,16 @@ class SleepMonitoringService : Service() {
             "microphone_granted" to microphoneGranted,
             "status" to status,
             "updated_at" to Instant.now().toString(),
+            "exact_alarm_granted" to SleepAlarmScheduler.canScheduleExact(context),
+            "full_screen_intent_granted" to
+                SleepAlarmScheduler.canUseFullScreenIntent(context),
         )
     }
 
     private lateinit var spool: SleepSessionSpool
     private var session: MutableMap<String, Any?>? = null
     private var processor: AudioSignalProcessor? = null
+    private var motionAggregator: MotionAggregator? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var finished = false
     @Volatile private var finishing = false
@@ -87,6 +179,11 @@ class SleepMonitoringService : Service() {
     private var inNoiseEvent = false
     private var validFractionSum = 0.0
     private var segmentCount = 0
+    private var monitorMode = "alarm_without_mission"
+    private var missionType: String? = null
+    private var missionHash: String? = null
+    private var missionSalt: String? = null
+    private var missionFormat: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -103,9 +200,15 @@ class SleepMonitoringService : Service() {
 
         // Foreground first: Android requires this immediately for a microphone
         // service, even though AudioRecord is opened only below after permission.
+        monitorMode = intent?.getStringExtra(SleepAlarmScheduler.EXTRA_MONITOR_MODE)
+            ?: "alarm_without_mission"
+        missionType = intent?.getStringExtra(SleepAlarmScheduler.EXTRA_MISSION_TYPE)
+        missionHash = intent?.getStringExtra(SleepAlarmScheduler.EXTRA_MISSION_HASH)
+        missionSalt = intent?.getStringExtra(SleepAlarmScheduler.EXTRA_MISSION_SALT)
+        missionFormat = intent?.getStringExtra(SleepAlarmScheduler.EXTRA_MISSION_FORMAT)
         SleepMonitorNotification.ensureChannel(this)
         val startedAt = System.currentTimeMillis()
-        val notification = SleepMonitorNotification.build(this, startedAt)
+        val notification = SleepMonitorNotification.build(this, startedAt, monitorMode)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 SleepMonitorNotification.NOTIFICATION_ID,
@@ -116,7 +219,12 @@ class SleepMonitoringService : Service() {
             startForeground(SleepMonitorNotification.NOTIFICATION_ID, notification)
         }
 
-        val sessionId = UUID.randomUUID().toString()
+        val sessionId = intent?.getStringExtra(SleepAlarmScheduler.EXTRA_SESSION_ID)
+            ?: UUID.randomUUID().toString()
+        val alarmAtMillis = intent?.getLongExtra(
+            SleepAlarmScheduler.EXTRA_ALARM_AT,
+            0L,
+        ) ?: 0L
         val start = Instant.ofEpochMilli(startedAt)
         val offset = ZoneId.systemDefault().rules.getOffset(start).totalSeconds / 60
         session = mutableMapOf(
@@ -125,16 +233,30 @@ class SleepMonitoringService : Service() {
             "status" to "starting",
             "started_at" to start.toString(),
             "ended_at" to null,
+            "alarm_at" to if (alarmAtMillis > 0L) {
+                Instant.ofEpochMilli(alarmAtMillis).toString()
+            } else {
+                null
+            },
+            "monitor_mode" to monitorMode,
+            "mission_type" to missionType,
+            "mission_status" to if (monitorMode == "alarm_with_mission") "pending" else "unconfigured",
+            "alarm_dismiss_method" to null,
+            "alarm_dismissed_at" to null,
             "utc_offset_start_minutes" to offset,
             "utc_offset_end_minutes" to null,
             "sensor_mode" to "audio",
-            "algorithm_version" to "audio-noise-v1",
+            "algorithm_version" to "audio-features-v2",
             "time_in_bed_minutes" to null,
             "quiet_minutes" to null,
             "noisy_minutes" to null,
             "estimated_sleep_minutes" to null,
             "noise_event_count" to 0,
             "signal_quality_score" to null,
+            "analysis_status" to if (
+                SleepStageModelGate.capabilities(this)["sleep_staging_available"] == true
+            ) "pending" else "model_unavailable",
+            "stage_algorithm_version" to null,
             "end_reason" to null,
             "created_at" to start.toString(),
         )
@@ -148,10 +270,14 @@ class SleepMonitoringService : Service() {
 
         try {
             acquireWakeLock()
+            val motion = MotionAggregator.from(this)
+            motion.register()
+            motionAggregator = motion
             processor = AudioSignalProcessor(
                 sessionId,
                 onSegment = ::onSegment,
                 onError = { finish("audio_error", "failed") },
+                onMotionSnapshot = { motion.snapshotAndReset() },
             )
             processor?.start()
             session!!["status"] = "running"
@@ -239,6 +365,14 @@ class SleepMonitoringService : Service() {
         }
         finished = true
         finishing = false
+        if (
+            (reason == "user" ||
+                reason == "notification_action" ||
+                finalStatus == "discarded") &&
+                monitorMode != "alarm_with_mission"
+        ) {
+            SleepAlarmScheduler.cancel(this)
+        }
         releaseResources()
         publish()
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -247,6 +381,8 @@ class SleepMonitoringService : Service() {
 
     private fun releaseResources() {
         processor = null
+        motionAggregator?.unregister()
+        motionAggregator = null
         wakeLock?.let { lock ->
             if (lock.isHeld) lock.release()
         }
@@ -274,6 +410,15 @@ class SleepMonitoringService : Service() {
         "session_id" to session?.get("id"),
         "started_at" to session?.get("started_at"),
         "updated_at" to Instant.now().toString(),
+        "alarm_at" to session?.get("alarm_at"),
+        "monitor_mode" to (session?.get("monitor_mode") ?: monitorMode),
+        "mission_status" to (session?.get("mission_status") ?: "unconfigured"),
+        "alarm_ringing" to false,
+        "emergency_taps" to 0,
+        "alarm_dismiss_method" to session?.get("alarm_dismiss_method"),
+        "exact_alarm_granted" to SleepAlarmScheduler.canScheduleExact(this),
+        "full_screen_intent_granted" to SleepAlarmScheduler.canUseFullScreenIntent(this),
+        "alarm_dismissed" to false,
         "latest_segment" to latestSegment,
         "current_noise_score" to noiseScore,
         "end_reason" to session?.get("end_reason"),
@@ -284,10 +429,27 @@ class SleepMonitoringService : Service() {
         },
     )
 
+    @Synchronized
+    private fun updateAlarmInternal(alarmAtMillis: Long) {
+        val current = session ?: return
+        if (finished || finishing) return
+        current["alarm_at"] = Instant.ofEpochMilli(alarmAtMillis).toString()
+        spool.updateSession(current)
+        publish()
+    }
+
     private fun publish() {
         val map = stateMap()
         lastState = map
         eventSink?.invoke(map)
+    }
+
+    private fun markAlarmDismissed(method: String) {
+        val current = session ?: return
+        current["alarm_dismiss_method"] = method
+        current["alarm_dismissed_at"] = Instant.now().toString()
+        current["mission_status"] = "completed"
+        spool.updateSession(current)
     }
 
     override fun onDestroy() {

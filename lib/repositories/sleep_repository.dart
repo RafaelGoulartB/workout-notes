@@ -1,4 +1,4 @@
-import 'package:uuid/uuid.dart';
+import 'dart:math' as math;
 
 import '../models/sleep_entry.dart';
 import 'base_repository.dart';
@@ -38,81 +38,6 @@ class SleepRepository extends BaseRepository {
     return rows.isEmpty ? null : SleepEntry.fromMap(rows.first);
   }
 
-  /// Inserts or updates the single record associated with [entry.date].
-  ///
-  /// This deliberately avoids SQLite REPLACE. REPLACE deletes the conflicting
-  /// parent row first, which can cascade into monitor sessions.
-  Future<void> save(SleepEntry entry) async {
-    _validate(entry);
-    final database = await db;
-    final existingForDate = await getByDate(entry.date);
-    final existingById = await getById(entry.id);
-    if (existingForDate != null) {
-      // A new entry for an already recorded date is an upsert-by-date. An
-      // existing entry being moved onto another occupied date is a real edit
-      // conflict and must be explicit.
-      if (existingForDate.id != entry.id && existingById != null) {
-        throw StateError('sleep_entry_date_conflict');
-      }
-      final mergesManualDataIntoMonitoring =
-          existingForDate.source != 'manual' && entry.source == 'manual';
-      final savedEntry = entry.copyWith(
-        id: existingForDate.id,
-        source: mergesManualDataIntoMonitoring ? 'hybrid' : entry.source,
-        timeInBedMinutes: mergesManualDataIntoMonitoring
-            ? existingForDate.timeInBedMinutes
-            : entry.timeInBedMinutes,
-        estimatedSleepMinutes: mergesManualDataIntoMonitoring
-            ? existingForDate.estimatedSleepMinutes
-            : entry.estimatedSleepMinutes,
-        createdAt: existingForDate.createdAt,
-      );
-      await database.update(
-        'sleep_entries',
-        savedEntry.toMap(),
-        where: 'id = ?',
-        whereArgs: [existingForDate.id],
-      );
-    } else if (existingById != null) {
-      await database.update(
-        'sleep_entries',
-        entry.toMap(),
-        where: 'id = ?',
-        whereArgs: [entry.id],
-      );
-    } else {
-      await database.insert('sleep_entries', entry.toMap());
-    }
-  }
-
-  Future<void> add({
-    required DateTime date,
-    required int sleepMinutes,
-    int? actualSleepMinutes,
-    int? bedtimeMinutes,
-    int? wakeTimeMinutes,
-    String? comment,
-    String source = 'manual',
-    int? timeInBedMinutes,
-    int? estimatedSleepMinutes,
-  }) async {
-    await save(
-      SleepEntry(
-        id: const Uuid().v4(),
-        date: _dateOnly(date),
-        sleepMinutes: sleepMinutes,
-        actualSleepMinutes: actualSleepMinutes,
-        bedtimeMinutes: bedtimeMinutes,
-        wakeTimeMinutes: wakeTimeMinutes,
-        comment: _cleanComment(comment),
-        source: source,
-        timeInBedMinutes: timeInBedMinutes,
-        estimatedSleepMinutes: estimatedSleepMinutes,
-        createdAt: DateTime.now(),
-      ),
-    );
-  }
-
   Future<void> delete(String id) async {
     await (await db).delete('sleep_entries', where: 'id = ?', whereArgs: [id]);
   }
@@ -129,6 +54,12 @@ class SleepRepository extends BaseRepository {
       from: end.subtract(const Duration(days: 29)),
       to: end,
     );
+    final regularityEntries = entries7
+        .where(
+          (entry) =>
+              entry.bedtimeMinutes != null && entry.wakeTimeMinutes != null,
+        )
+        .toList();
 
     return SleepDashboardStats(
       latest: await getLatest(),
@@ -154,6 +85,8 @@ class SleepRepository extends BaseRepository {
       efficiency30Days: _average(
         entries30.where((e) => e.efficiency != null).map((e) => e.efficiency!),
       ),
+      regularity7Days: _regularityScore(regularityEntries),
+      regularitySampleCount: regularityEntries.length,
     );
   }
 
@@ -182,24 +115,6 @@ class SleepRepository extends BaseRepository {
     );
   }
 
-  static void _validate(SleepEntry entry) {
-    if (!const {'manual', 'monitored', 'hybrid'}.contains(entry.source)) {
-      throw ArgumentError.value(entry.source, 'source');
-    }
-    if (entry.sleepMinutes <= 0 || entry.sleepMinutes > 24 * 60) {
-      throw ArgumentError.value(entry.sleepMinutes, 'sleepMinutes');
-    }
-    final actual = entry.actualSleepMinutes;
-    if (actual != null && (actual <= 0 || actual > entry.sleepMinutes)) {
-      throw ArgumentError.value(actual, 'actualSleepMinutes');
-    }
-    for (final value in [entry.bedtimeMinutes, entry.wakeTimeMinutes]) {
-      if (value != null && (value < 0 || value >= 24 * 60)) {
-        throw ArgumentError.value(value, 'timeMinutes');
-      }
-    }
-  }
-
   static double? _average(Iterable<num> values) {
     final list = values.toList();
     if (list.isEmpty) return null;
@@ -218,14 +133,48 @@ class SleepRepository extends BaseRepository {
     return list.reduce((a, b) => a > b ? a : b);
   }
 
+  /// Returns a non-clinical schedule consistency score for the last seven days.
+  ///
+  /// Bedtime and wake-up values are circular clock values, so 23:50 and 00:10
+  /// remain close. The average deviation of both clock times is mapped to a
+  /// 0-100 score, with deviations of three hours or more scoring zero.
+  static double? _regularityScore(List<SleepEntry> entries) {
+    if (entries.length < 2) return null;
+    final bedtimes = entries.map((entry) => entry.bedtimeMinutes!).toList();
+    final wakeTimes = entries.map((entry) => entry.wakeTimeMinutes!).toList();
+    final bedtimeCenter = _circularCenter(bedtimes);
+    final wakeTimeCenter = _circularCenter(wakeTimes);
+    final bedtimeDeviation = _average(
+      bedtimes.map((value) => _circularDistance(value, bedtimeCenter)),
+    )!;
+    final wakeTimeDeviation = _average(
+      wakeTimes.map((value) => _circularDistance(value, wakeTimeCenter)),
+    )!;
+    final combinedDeviation = (bedtimeDeviation + wakeTimeDeviation) / 2;
+    return (100 * (1 - math.min(combinedDeviation, 180) / 180)).clamp(0, 100);
+  }
+
+  static int _circularCenter(List<int> values) {
+    var sinSum = 0.0;
+    var cosSum = 0.0;
+    for (final value in values) {
+      final angle = value / 1440 * 2 * math.pi;
+      sinSum += math.sin(angle);
+      cosSum += math.cos(angle);
+    }
+    var angle = math.atan2(sinSum, cosSum);
+    if (angle < 0) angle += 2 * math.pi;
+    return (angle / (2 * math.pi) * 1440).round() % 1440;
+  }
+
+  static int _circularDistance(int first, int second) {
+    final direct = (first - second).abs();
+    return math.min(direct, 1440 - direct);
+  }
+
   static DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
 
   static String _dateString(DateTime value) =>
       _dateOnly(value).toIso8601String().substring(0, 10);
-
-  static String? _cleanComment(String? comment) {
-    final value = comment?.trim();
-    return value == null || value.isEmpty ? null : value;
-  }
 }

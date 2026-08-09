@@ -51,6 +51,7 @@ android {
                 // upload keystore before it reaches the build step.
                 signingConfigs.getByName("debug")
             }
+            proguardFiles("proguard-rules.pro")
         }
     }
 }
@@ -63,6 +64,12 @@ kotlin {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    implementation("androidx.activity:activity:1.10.1")
+    implementation("androidx.camera:camera-camera2:1.6.1")
+    implementation("androidx.camera:camera-core:1.6.1")
+    implementation("androidx.camera:camera-lifecycle:1.6.1")
+    implementation("androidx.camera:camera-view:1.6.1")
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
     testImplementation("junit:junit:4.13.2")
 }
 

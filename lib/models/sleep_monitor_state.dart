@@ -1,4 +1,5 @@
 import 'sleep_monitor_segment.dart';
+import 'sleep_monitor_mode.dart';
 
 class SleepMonitorState {
   static const idle = 'idle';
@@ -15,6 +16,16 @@ class SleepMonitorState {
   final String? sessionId;
   final DateTime? startedAt;
   final DateTime? updatedAt;
+  final DateTime? alarmAt;
+  final SleepMonitoringMode mode;
+  final SleepMissionStatus missionStatus;
+  final bool alarmRinging;
+  final int emergencyTaps;
+  final String? alarmDismissMethod;
+  final String? endReason;
+  final bool exactAlarmGranted;
+  final bool fullScreenIntentGranted;
+  final bool alarmDismissed;
   final SleepMonitorSegment? latestSegment;
   final double? currentNoiseScore;
   final String? errorCode;
@@ -27,6 +38,16 @@ class SleepMonitorState {
     required this.sessionId,
     required this.startedAt,
     required this.updatedAt,
+    this.alarmAt,
+    this.mode = SleepMonitoringMode.alarmWithoutMission,
+    this.missionStatus = SleepMissionStatus.unconfigured,
+    this.alarmRinging = false,
+    this.emergencyTaps = 0,
+    this.alarmDismissMethod,
+    this.endReason,
+    this.exactAlarmGranted = false,
+    this.fullScreenIntentGranted = false,
+    this.alarmDismissed = false,
     required this.latestSegment,
     required this.currentNoiseScore,
     required this.errorCode,
@@ -41,6 +62,16 @@ class SleepMonitorState {
         sessionId: null,
         startedAt: null,
         updatedAt: null,
+        alarmAt: null,
+        mode: SleepMonitoringMode.alarmWithoutMission,
+        missionStatus: SleepMissionStatus.unconfigured,
+        alarmRinging: false,
+        emergencyTaps: 0,
+        alarmDismissMethod: null,
+        endReason: null,
+        exactAlarmGranted: false,
+        fullScreenIntentGranted: false,
+        alarmDismissed: false,
         latestSegment: null,
         currentNoiseScore: null,
         errorCode: null,
@@ -64,6 +95,16 @@ class SleepMonitorState {
     String? sessionId,
     DateTime? startedAt,
     DateTime? updatedAt,
+    DateTime? alarmAt,
+    SleepMonitoringMode? mode,
+    SleepMissionStatus? missionStatus,
+    bool? alarmRinging,
+    int? emergencyTaps,
+    String? alarmDismissMethod,
+    String? endReason,
+    bool? exactAlarmGranted,
+    bool? fullScreenIntentGranted,
+    bool? alarmDismissed,
     SleepMonitorSegment? latestSegment,
     double? currentNoiseScore,
     String? errorCode,
@@ -76,6 +117,17 @@ class SleepMonitorState {
       sessionId: sessionId ?? this.sessionId,
       startedAt: startedAt ?? this.startedAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      alarmAt: alarmAt ?? this.alarmAt,
+      mode: mode ?? this.mode,
+      missionStatus: missionStatus ?? this.missionStatus,
+      alarmRinging: alarmRinging ?? this.alarmRinging,
+      emergencyTaps: emergencyTaps ?? this.emergencyTaps,
+      alarmDismissMethod: alarmDismissMethod ?? this.alarmDismissMethod,
+      endReason: endReason ?? this.endReason,
+      exactAlarmGranted: exactAlarmGranted ?? this.exactAlarmGranted,
+      fullScreenIntentGranted:
+          fullScreenIntentGranted ?? this.fullScreenIntentGranted,
+      alarmDismissed: alarmDismissed ?? this.alarmDismissed,
       latestSegment: latestSegment ?? this.latestSegment,
       currentNoiseScore: currentNoiseScore ?? this.currentNoiseScore,
       errorCode: errorCode,
@@ -86,6 +138,7 @@ class SleepMonitorState {
   factory SleepMonitorState.fromMap(Map<String, dynamic> map) {
     final startedText = map['started_at'] as String?;
     final updatedText = map['updated_at'] as String?;
+    final alarmText = map['alarm_at'] as String?;
     final segment = map['latest_segment'];
     return SleepMonitorState(
       supported: map['supported'] as bool? ?? true,
@@ -94,6 +147,17 @@ class SleepMonitorState {
       sessionId: map['session_id'] as String?,
       startedAt: startedText == null ? null : DateTime.parse(startedText),
       updatedAt: updatedText == null ? null : DateTime.parse(updatedText),
+      alarmAt: alarmText == null ? null : DateTime.parse(alarmText),
+      mode: SleepMonitoringMode.fromWire(map['monitor_mode']),
+      missionStatus: SleepMissionStatus.fromWire(map['mission_status']),
+      alarmRinging: map['alarm_ringing'] as bool? ?? false,
+      emergencyTaps: (map['emergency_taps'] as num?)?.toInt() ?? 0,
+      alarmDismissMethod: map['alarm_dismiss_method'] as String?,
+      endReason: map['end_reason'] as String?,
+      exactAlarmGranted: map['exact_alarm_granted'] as bool? ?? false,
+      fullScreenIntentGranted:
+          map['full_screen_intent_granted'] as bool? ?? false,
+      alarmDismissed: map['alarm_dismissed'] as bool? ?? false,
       latestSegment: segment is Map
           ? SleepMonitorSegment.fromMap(Map<String, dynamic>.from(segment))
           : null,
