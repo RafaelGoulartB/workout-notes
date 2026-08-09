@@ -1227,6 +1227,12 @@
 
   "nutritionSearchTitle": "Search food",
   "nutritionSearchHint": "Search for a food",
+  "nutritionSearchAll": "All",
+  "nutritionSearchMyMeals": "My meals",
+  "nutritionSearchMyFoods": "My foods",
+  "nutritionSearchHistory": "History",
+  "nutritionSearchMostRecent": "Most recent",
+  "nutritionScanMeal": "Scan food",
   "nutritionSearchEmpty": "No matches yet",
   "nutritionSearchEmptyHint": "Try a different word or register the food manually.",
   "nutritionSearchLocalResults": "Saved on this device",

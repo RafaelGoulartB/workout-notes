@@ -13,6 +13,9 @@ import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'barcode_scan_screen.dart';
 import 'food_label_photo_screen.dart';
 import 'manual_food_screen.dart';
+import 'saved_meals_screen.dart';
+
+enum _FoodSearchFilter { all, meals, favorites, myFoods }
 
 /// Food search screen. Combines local cache + remote gateway results
 /// with a debounce and explicit fallback messaging. Before any query
@@ -56,7 +59,9 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   List<FoodSearchResult> _remoteResults = const [];
   List<FoodSearchResult> _favorites = const [];
   List<FoodSearchResult> _recents = const [];
+  List<FoodSearchResult> _allFoods = const [];
   List<FoodSearchResult> _mealSuggestions = const [];
+  _FoodSearchFilter _activeFilter = _FoodSearchFilter.all;
   bool _suggestionsLoading = true;
   bool _isSearchingRemote = false;
   NutritionGatewayError? _remoteError;
@@ -82,6 +87,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       final results = await Future.wait([
         widget.repository.getFavoriteFoods(),
         widget.repository.getRecentFoods(),
+        widget.repository.getAllFoods(),
         if (widget.mealType != null)
           widget.repository.getMealSuggestions(widget.mealType!),
       ]);
@@ -89,9 +95,10 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       setState(() {
         _favorites = _attachVariants(results[0]);
         _recents = _attachVariants(results[1]);
+        _allFoods = _attachVariants(results[2]);
         _mealSuggestions = widget.mealType == null
             ? const []
-            : _attachVariants(results[2]);
+            : _attachVariants(results[3]);
         _suggestionsLoading = false;
       });
     } catch (_) {
@@ -123,10 +130,15 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       isRemote: r.isRemote,
     );
     if (result.food.isFavorite != isFavorite) {
-      _localResults = [
-        for (final r in _localResults)
+      List<FoodSearchResult> replace(List<FoodSearchResult> items) => [
+        for (final r in items)
           if (r.food.id == result.food.id) withFlag(r) else r,
       ];
+      _localResults = replace(_localResults);
+      _favorites = replace(_favorites);
+      _recents = replace(_recents);
+      _allFoods = replace(_allFoods);
+      _mealSuggestions = replace(_mealSuggestions);
     }
   }
 
@@ -135,6 +147,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     // never be rendered under the newly typed query.
     _remoteRequestGeneration++;
     final value = _controller.text;
+    if (value.trim().isNotEmpty) _activeFilter = _FoodSearchFilter.all;
     if (value.trim().length < 2) {
       setState(() {
         _localResults = const [];
@@ -360,6 +373,16 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     Navigator.of(context).pop(result);
   }
 
+  Future<void> _openSavedMeals() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SavedMealsScreen(repository: widget.repository),
+      ),
+    );
+    if (mounted) setState(() => _activeFilter = _FoodSearchFilter.all);
+    await _loadSuggestions();
+  }
+
   /// Extracts a product code from a raw scan. Handles plain barcodes
   /// and QR codes that encode an Open Food Facts product URL.
   static String? _extractProductCode(String raw) {
@@ -387,32 +410,25 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final mealLabel = _mealLabel(loc);
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.nutritionSearchTitle),
+        title: Text(
+          mealLabel.isEmpty ? loc.nutritionSearchTitle : mealLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            tooltip: loc.nutritionScanBarcode,
-            onPressed: _scanBarcode,
-            icon: const Icon(Icons.qr_code_scanner),
-          ),
-          IconButton(
-            tooltip: loc.nutritionPhotoTitle,
-            onPressed: _photoLabel,
-            icon: const Icon(Icons.camera_alt_outlined),
-          ),
-        ],
       ),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
               child: TextField(
                 controller: _controller,
-                autofocus: true,
+                autofocus: false,
                 decoration: InputDecoration(
                   hintText: loc.nutritionSearchHint,
                   prefixIcon: const Icon(Icons.search_rounded),
@@ -424,43 +440,43 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                     icon: const Icon(Icons.arrow_forward_rounded),
                   ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(999),
                   ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(999),
+                    borderSide: BorderSide(color: theme.colorScheme.outline),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   filled: true,
-                  fillColor: theme.colorScheme.surfaceContainerHighest
-                      .withAlpha(80),
+                  fillColor: theme.colorScheme.surfaceContainerLow,
                 ),
                 textInputAction: TextInputAction.search,
                 onSubmitted: _searchRemote,
               ),
+            ),
+            _FoodSearchFilters(
+              active: _activeFilter,
+              onSelected: (filter) {
+                if (_controller.text.isNotEmpty) _controller.clear();
+                setState(() => _activeFilter = filter);
+                if (filter == _FoodSearchFilter.meals) _openSavedMeals();
+              },
+            ),
+            _FoodSearchActions(
+              onPhoto: _photoLabel,
+              onBarcode: _scanBarcode,
+              onManual: widget.enableManualButton ? _manualEntry : null,
             ),
             if (_showQueryTooShort)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                 child: Text(
                   loc.nutritionSearchQueryTooShort,
-                  style: TextStyle(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                 ),
               ),
             if (_isSearchingRemote) const LinearProgressIndicator(),
             Expanded(child: _buildResults(loc)),
-            if (widget.enableManualButton)
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  child: FilledButton.tonalIcon(
-                    onPressed: _manualEntry,
-                    icon: const Icon(Icons.edit_outlined),
-                    label: Text(loc.nutritionAddManually),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -476,10 +492,20 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     // Before the user types: favorites, meal-specific suggestions and
     // recents take over the empty state.
     if (query.isEmpty && !_showQueryTooShort) {
-      final showFavorites = _favorites.isNotEmpty;
-      final showMeal = widget.mealType != null && _mealSuggestions.isNotEmpty;
-      final showRecents = _recents.isNotEmpty;
-      final hasSuggestions = showFavorites || showMeal || showRecents;
+      final showFavorites =
+          (_activeFilter == _FoodSearchFilter.all ||
+              _activeFilter == _FoodSearchFilter.favorites) &&
+          _favorites.isNotEmpty;
+      final showMeal =
+          _activeFilter == _FoodSearchFilter.all &&
+          widget.mealType != null &&
+          _mealSuggestions.isNotEmpty;
+      final showRecents =
+          _activeFilter == _FoodSearchFilter.all && _recents.isNotEmpty;
+      final showAllFoods =
+          _activeFilter == _FoodSearchFilter.myFoods && _allFoods.isNotEmpty;
+      final hasSuggestions =
+          showFavorites || showMeal || showRecents || showAllFoods;
       return CustomScrollView(
         slivers: [
           if (showFavorites) ...[
@@ -519,7 +545,10 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
           ],
           if (showRecents) ...[
             SliverToBoxAdapter(
-              child: _SectionHeader(text: loc.nutritionSearchRecent),
+              child: _HistoryHeader(
+                title: loc.nutritionSearchHistory,
+                sortLabel: loc.nutritionSearchMostRecent,
+              ),
             ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
@@ -529,6 +558,22 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                 itemBuilder: (_, index) => _FoodCard(
                   result: _recents[index],
                   onToggleFavorite: () => _toggleFavorite(_recents[index]),
+                ),
+              ),
+            ),
+          ],
+          if (showAllFoods) ...[
+            SliverToBoxAdapter(
+              child: _SectionHeader(text: loc.nutritionSearchMyFoods),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+              sliver: SliverList.separated(
+                itemCount: _allFoods.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
+                itemBuilder: (_, index) => _FoodCard(
+                  result: _allFoods[index],
+                  onToggleFavorite: () => _toggleFavorite(_allFoods[index]),
                 ),
               ),
             ),
@@ -620,7 +665,8 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             sliver: SliverList.separated(
               itemCount: _remoteResults.length,
               separatorBuilder: (_, _) => const SizedBox(height: 6),
-              itemBuilder: (_, index) => _FoodCard(result: _remoteResults[index]),
+              itemBuilder: (_, index) =>
+                  _FoodCard(result: _remoteResults[index]),
             ),
           ),
         ],
@@ -681,6 +727,144 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   }
 }
 
+class _FoodSearchFilters extends StatelessWidget {
+  final _FoodSearchFilter active;
+  final ValueChanged<_FoodSearchFilter> onSelected;
+
+  const _FoodSearchFilters({required this.active, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final labels = <_FoodSearchFilter, String>{
+      _FoodSearchFilter.all: loc.nutritionSearchAll,
+      _FoodSearchFilter.meals: loc.nutritionSearchMyMeals,
+      _FoodSearchFilter.favorites: loc.nutritionSearchFavorites,
+      _FoodSearchFilter.myFoods: loc.nutritionSearchMyFoods,
+    };
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          for (final entry in labels.entries)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: ChoiceChip(
+                label: Text(entry.value),
+                selected: active == entry.key,
+                showCheckmark: false,
+                visualDensity: VisualDensity.compact,
+                onSelected: (_) => onSelected(entry.key),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FoodSearchActions extends StatelessWidget {
+  final VoidCallback onPhoto;
+  final VoidCallback onBarcode;
+  final VoidCallback? onManual;
+
+  const _FoodSearchActions({
+    required this.onPhoto,
+    required this.onBarcode,
+    required this.onManual,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return Container(
+      height: 92,
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      color: theme.colorScheme.primaryContainer.withAlpha(42),
+      child: Row(
+        children: [
+          Expanded(
+            child: _SearchActionCard(
+              icon: Icons.center_focus_strong_rounded,
+              label: loc.nutritionScanMeal,
+              onTap: onPhoto,
+            ),
+          ),
+          Expanded(
+            child: _SearchActionCard(
+              icon: Icons.qr_code_scanner_rounded,
+              label: loc.nutritionScanBarcode,
+              onTap: onBarcode,
+            ),
+          ),
+          if (onManual != null)
+            Expanded(
+              child: _SearchActionCard(
+                icon: Icons.edit_note_rounded,
+                label: loc.nutritionAddManually,
+                onTap: onManual!,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchActionCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _SearchActionCard({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: Material(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 25, color: theme.colorScheme.primary),
+              const SizedBox(height: 5),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _FoodCard extends StatelessWidget {
   final FoodSearchResult result;
   final VoidCallback? onToggleFavorite;
@@ -692,22 +876,24 @@ class _FoodCard extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final variant = result.primaryVariant;
-    final isManual = result.food.isManual;
-    final sourceColor = isManual
-        ? theme.colorScheme.tertiaryContainer
-        : theme.colorScheme.secondaryContainer;
+    final details = <String>[
+      if (variant?.values.calories != null)
+        '${variant!.values.calories!.toStringAsFixed(0)} kcal',
+      if (result.food.brand != null && result.food.brand!.isNotEmpty)
+        result.food.brand!,
+      if (variant != null)
+        loc.nutritionPer100g(
+          variant.referenceAmount.toStringAsFixed(0),
+          variant.referenceUnit,
+        ),
+    ].join(' · ');
 
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withAlpha(80),
-        ),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         onTap: () {
           Navigator.of(context).pop(
             NutritionSelection(
@@ -718,22 +904,9 @@ class _FoodCard extends StatelessWidget {
           );
         },
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
           child: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withAlpha(80),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.restaurant_outlined,
-                  color: theme.colorScheme.onPrimaryContainer,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -746,49 +919,18 @@ class _FoodCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      [
-                        if (result.food.brand != null &&
-                            result.food.brand!.isNotEmpty)
-                          result.food.brand!,
-                        if (variant != null)
-                          loc.nutritionPer100g(
-                            variant.referenceAmount.toStringAsFixed(0),
-                            variant.referenceUnit,
-                          ),
-                        if (variant?.values.calories != null)
-                          '${variant!.values.calories!.toStringAsFixed(0)} kcal',
-                      ].join(' · '),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                    if (details.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        details,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    ],
                   ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: sourceColor.withAlpha(90),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  isManual
-                      ? loc.nutritionSourceManual
-                      : loc.nutritionSourceGateway,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: isManual
-                        ? theme.colorScheme.onTertiaryContainer
-                        : theme.colorScheme.onSecondaryContainer,
-                    fontWeight: FontWeight.w600,
-                  ),
                 ),
               ),
               const SizedBox(width: 4),
@@ -798,21 +940,29 @@ class _FoodCard extends StatelessWidget {
                       ? loc.nutritionSearchUnfavorite
                       : loc.nutritionSearchFavorite,
                   onPressed: onToggleFavorite,
+                  visualDensity: VisualDensity.compact,
                   icon: Icon(
                     result.food.isFavorite!
                         ? Icons.star_rounded
                         : Icons.star_border_rounded,
-                    size: 20,
+                    size: 18,
                     color: result.food.isFavorite!
                         ? theme.colorScheme.primary
                         : theme.colorScheme.onSurfaceVariant,
                   ),
-                )
-              else
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: theme.colorScheme.onSurfaceVariant.withAlpha(140),
                 ),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withAlpha(65),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.add_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
             ],
           ),
         ),
@@ -835,6 +985,57 @@ class _SectionHeader extends StatelessWidget {
           color: theme.colorScheme.onSurfaceVariant,
           fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+  }
+}
+
+class _HistoryHeader extends StatelessWidget {
+  final String title;
+  final String sortLabel;
+
+  const _HistoryHeader({required this.title, required this.sortLabel});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.sort_rounded,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  sortLabel,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

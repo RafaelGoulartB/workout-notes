@@ -312,6 +312,11 @@ void main() {
       });
       final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
       expect(find.text(loc.nutritionSearchTitle), findsOneWidget);
+      expect(find.text(loc.nutritionSearchAll), findsOneWidget);
+      expect(find.text(loc.nutritionSearchMyMeals), findsOneWidget);
+      expect(find.text(loc.nutritionSearchFavorites), findsOneWidget);
+      expect(find.text(loc.nutritionScanMeal), findsOneWidget);
+      expect(find.text(loc.nutritionScanBarcode), findsOneWidget);
       expect(find.text(loc.nutritionAddManually), findsOneWidget);
     },
   );

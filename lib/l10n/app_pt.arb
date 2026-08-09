@@ -1207,6 +1207,12 @@
 
   "nutritionSearchTitle": "Buscar alimento",
   "nutritionSearchHint": "Buscar um alimento",
+  "nutritionSearchAll": "Todos",
+  "nutritionSearchMyMeals": "Refeições",
+  "nutritionSearchMyFoods": "Meus alimentos",
+  "nutritionSearchHistory": "Histórico",
+  "nutritionSearchMostRecent": "Mais recentes",
+  "nutritionScanMeal": "Escanear alimento",
   "nutritionSearchEmpty": "Nenhum resultado ainda",
   "nutritionSearchEmptyHint": "Tente outra palavra ou cadastre o alimento manualmente.",
   "nutritionSearchLocalResults": "Salvos neste dispositivo",
