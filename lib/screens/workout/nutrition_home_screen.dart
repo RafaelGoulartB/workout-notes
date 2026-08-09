@@ -693,7 +693,17 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
 
   Future<void> _editItem(MealLogItem item) async {
     final result = await _repository.getFoodWithDetails(item.foodId ?? '');
-    if (result == null) return;
+    if (result == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)!.nutritionItemFoodUnavailable,
+          ),
+        ),
+      );
+      return;
+    }
     final variant = result.variants.isEmpty
         ? null
         : result.variants.firstWhere(

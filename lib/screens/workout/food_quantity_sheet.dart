@@ -102,6 +102,7 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
   }
 
   void _recomputeUnitAvailability() {
+    final previous = _unit;
     final available = _computeAvailableUnits();
     if (_unit == null || !available.contains(_unit)) {
       if (available.contains('g')) {
@@ -119,6 +120,14 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
       } else {
         _unit = available.isEmpty ? null : available.first;
       }
+    }
+    if (_unit != null && _unit != previous) {
+      // The stored unit is no longer available for this variant (e.g.
+      // the food was re-fetched without servings). A number entered
+      // under the old unit cannot be reinterpreted: reset it to the
+      // new unit's natural default so the preview never shows a
+      // silently wrong conversion.
+      _quantityController.text = _defaultQuantityForUnit(_unit);
     }
   }
 

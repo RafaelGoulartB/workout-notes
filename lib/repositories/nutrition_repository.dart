@@ -148,7 +148,12 @@ class NutritionRepository extends BaseRepository {
           : food.copyWith(
               id: existing.first['id'] as String,
               fetchedAt: food.fetchedAt,
-              lastUsedAt: food.lastUsedAt,
+              // Fresh remote/manual results carry no `lastUsedAt`; keep
+              // the existing recency instead of wiping it (a re-fetch
+              // must not make a recently logged food disappear from
+              // the "recently used" list).
+              lastUsedAt: food.lastUsedAt ??
+                  _parseIsoDate(existing.first['last_used_at'] as String?),
             );
       // UPDATE in place (never REPLACE): REPLACE deletes the row
       // before inserting, which fires `ON DELETE SET NULL` on
@@ -959,36 +964,33 @@ class NutritionRepository extends BaseRepository {
       throw const NutritionValidationException('saved_meal_portions_invalid');
     }
     final now = DateTime.now();
-    final meal = id == null
-        ? SavedMeal(
-            id: _uuid.v4(),
-            name: trimmed,
-            mealType: mealType,
-            portions: portions,
-            createdAt: now,
-            updatedAt: now,
-          )
-        : SavedMeal(
-            id: id,
-            name: trimmed,
-            mealType: mealType,
-            portions: portions,
-            createdAt: now,
-            updatedAt: now,
-          );
     final db = await this.db;
-    await db.transaction((txn) async {
-      final existing = id == null
-          ? null
-          : await txn.query(
-              'saved_meals',
-              where: 'id = ?',
-              whereArgs: [id],
-              limit: 1,
-            );
-      if (existing != null && existing.isEmpty) {
-        throw const NutritionValidationException('saved_meal_not_found');
+    return db.transaction((txn) async {
+      Map<String, dynamic>? existingRow;
+      if (id != null) {
+        final rows = await txn.query(
+          'saved_meals',
+          where: 'id = ?',
+          whereArgs: [id],
+          limit: 1,
+        );
+        if (rows.isEmpty) {
+          throw const NutritionValidationException('saved_meal_not_found');
+        }
+        existingRow = rows.first;
       }
+      final meal = SavedMeal(
+        id: id ?? _uuid.v4(),
+        name: trimmed,
+        mealType: mealType,
+        portions: portions,
+        // Preserve the original creation date when editing; only the
+        // `updated_at` moves forward.
+        createdAt: existingRow == null
+            ? now
+            : SavedMeal.fromMap(existingRow).createdAt,
+        updatedAt: now,
+      );
       if (id == null) {
         await txn.insert('saved_meals', meal.toMap());
       } else {
@@ -1018,8 +1020,8 @@ class NutritionRepository extends BaseRepository {
           'order_index': i,
         });
       }
+      return meal;
     });
-    return meal;
   }
 
   /// Returns a saved meal with its items and live-computed totals, or
@@ -1224,7 +1226,7 @@ class NutritionRepository extends BaseRepository {
       orderBy: 'order_index ASC',
     );
     final items = itemRows.map(SavedMealItem.fromMap).toList();
-    final computed = await _computeSavedMealTotals(db, items);
+    final computed = await _computeSavedMealTotals(db, items, meal.portions);
     return SavedMealWithItems(
       meal: meal,
       items: items,
@@ -1235,12 +1237,16 @@ class NutritionRepository extends BaseRepository {
 
   /// Recomputes a saved meal's nutrition from the live food cache by
   /// replaying each item's conversion (same rules as the quantity
-  /// sheet). Items whose food/variant was deleted or whose unit can no
-  /// longer be resolved contribute nothing.
+  /// sheet). [portions] scales every ingredient, mirroring
+  /// [addSavedMealToDate], so the displayed totals always match what
+  /// logging the template would add. Items whose food/variant was
+  /// deleted or whose unit can no longer be resolved contribute
+  /// nothing.
   Future<({NutritionValues? totals, Map<String, NutritionValues> byItem})>
   _computeSavedMealTotals(
     DatabaseExecutor db,
     List<SavedMealItem> items,
+    double portions,
   ) async {
     if (items.isEmpty) {
       return (totals: null, byItem: <String, NutritionValues>{});
@@ -1289,7 +1295,7 @@ class NutritionRepository extends BaseRepository {
         (s) => s.label == item.unit || s.unit == item.unit,
       );
       final conversion = NutritionConversion(
-        quantity: item.quantity,
+        quantity: item.quantity * portions,
         unit: item.unit,
         referenceAmount: variant.referenceAmount,
         referenceUnit: variant.referenceUnit,
@@ -1393,6 +1399,12 @@ class NutritionRepository extends BaseRepository {
     return null;
   }
 
+  static DateTime? _parseIsoDate(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    final parsed = DateTime.tryParse(raw);
+    if (parsed != null && parsed.isUtc) return parsed.toLocal();
+    return parsed;
+  }
   static void _validateDate(String date) {
     if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(date)) {
       throw const NutritionValidationException('invalid_date_format');

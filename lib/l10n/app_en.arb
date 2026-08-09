@@ -1223,6 +1223,8 @@
   "nutritionItemDeleted": "Item removed",
   "nutritionItemSaved": "Item added",
   "nutritionItemUpdated": "Item updated",
+  "nutritionItemFoodUnavailable": "This item's food is no longer in the library and cannot be edited.",
+  "nutritionFoodNoVariant": "This food has no nutritional data to log.",
   "nutritionUndo": "Undo",
 
   "nutritionSearchTitle": "Search food",

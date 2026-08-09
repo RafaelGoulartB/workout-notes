@@ -228,6 +228,9 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       _isSearchingRemote = false;
       _remoteError = null;
     });
+    // The upsert refreshed the cached rows; reload the local section so
+    // it never displays stale values for foods that were just updated.
+    _scheduleLocal(query);
   }
 
   bool _isCurrentRemoteRequest(int generation, String query) {
@@ -415,6 +418,17 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   }
 
   void _selectFood(FoodSearchResult result) {
+    if (result.primaryVariant == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)!.nutritionFoodNoVariant,
+          ),
+        ),
+      );
+      return;
+    }
     _returnSelection(
       NutritionSelection(
         food: result.food,

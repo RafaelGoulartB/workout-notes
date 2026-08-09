@@ -1203,6 +1203,8 @@
   "nutritionItemDeleted": "Item removido",
   "nutritionItemSaved": "Item adicionado",
   "nutritionItemUpdated": "Item atualizado",
+  "nutritionItemFoodUnavailable": "O alimento deste item não está mais na biblioteca e não pode ser editado.",
+  "nutritionFoodNoVariant": "Este alimento não possui dados nutricionais para registrar.",
   "nutritionUndo": "Desfazer",
 
   "nutritionSearchTitle": "Buscar alimento",

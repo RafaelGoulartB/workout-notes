@@ -210,7 +210,8 @@ void main() {
       expect(loaded.meal.portions, 2);
       expect(loaded.items, hasLength(1));
       expect(loaded.items.first.foodNameSnapshot, 'B');
-      expect(loaded.totals!.calories, 30);
+      // Totals mirror the logging flow: 50 g × 2 portions × 0.6 kcal/g.
+      expect(loaded.totals!.calories, 60);
     });
 
     test('validates name and portions', () async {
