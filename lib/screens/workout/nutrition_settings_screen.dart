@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
+import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/widgets/form_section_card.dart';
+
+import 'nutrition_goal_suggest_sheet.dart';
 
 /// Screen for managing the user-defined daily nutrition goal.
 class NutritionSettingsScreen extends StatefulWidget {
@@ -22,6 +26,8 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
   final _proteinController = TextEditingController();
   final _carbsController = TextEditingController();
   final _fatController = TextEditingController();
+  final _bodyRepo = BodyMeasurementRepository();
+  final _settingsRepo = SettingsRepository();
   bool _isLoading = true;
   bool _isSaving = false;
   NutritionGoal? _current;
@@ -104,8 +110,26 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     }
   }
 
-  Future<void> _clear() async {
-    final loc = AppLocalizations.of(context)!;
+  /// Opens the Mifflin-St Jeor suggestion sheet and fills the goal
+  /// fields with its result when the user applies it.
+  Future<void> _openSuggestion() async {
+    await NutritionGoalSuggestSheet.show(
+      context,
+      bodyRepo: _bodyRepo,
+      settingsRepo: _settingsRepo,
+      onApply: (calories, protein, carbs, fat) {
+        if (!mounted) return;
+        setState(() {
+          _caloriesController.text = _format(calories);
+          _proteinController.text = _format(protein);
+          _carbsController.text = _format(carbs);
+          _fatController.text = _format(fat);
+        });
+      },
+    );
+  }
+
+  Future<void> _clear() async {    final loc = AppLocalizations.of(context)!;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -232,6 +256,28 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                           validator: _validateNumber,
                           prefix: 'g',
                           onChanged: (_) => setState(() {}),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    FormSectionCard(
+                      icon: Icons.calculate_outlined,
+                      title: loc.nutritionSettingsSuggestSection,
+                      children: [
+                        Text(
+                          loc.nutritionSettingsSuggestBody,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: _isSaving ? null : _openSuggestion,
+                          icon: const Icon(Icons.trending_up_rounded),
+                          label: Text(loc.nutritionSettingsSuggestButton),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                          ),
                         ),
                       ],
                     ),
