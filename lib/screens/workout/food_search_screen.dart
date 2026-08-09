@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -53,6 +55,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   static const Duration _remoteMinInterval = Duration(seconds: 6);
 
   final TextEditingController _controller = TextEditingController();
+  Timer? _localSearchDebounce;
   DateTime _lastRemoteSearchAt = DateTime.fromMillisecondsSinceEpoch(0);
   int _remoteRequestGeneration = 0;
 
@@ -82,6 +85,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   @override
   void dispose() {
+    _localSearchDebounce?.cancel();
     _controller.removeListener(_onChanged);
     _controller.dispose();
     super.dispose();
@@ -176,7 +180,10 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   void _scheduleLocal(String query) {
     setState(() => _showQueryTooShort = false);
-    Future<void>(() async {
+    _localSearchDebounce?.cancel();
+    // Debounce: one DB search + hydration per pause in typing instead
+    // of one per keystroke.
+    _localSearchDebounce = Timer(const Duration(milliseconds: 250), () async {
       try {
         final results = await widget.repository.searchLocalFoods(query);
         if (!mounted || _controller.text != query) return;

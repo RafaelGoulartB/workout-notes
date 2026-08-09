@@ -63,7 +63,7 @@ class NutritionRepository extends BaseRepository {
               WHEN f.brand IS NOT NULL AND LOWER(f.brand) LIKE ? THEN 2
               ELSE 3 END) as match_rank
       FROM foods f
-      WHERE f.search_name LIKE ? OR (f.brand IS NOT NULL AND LOWER(f.brand) LIKE ?)
+      WHERE f.search_name LIKE ? ESCAPE '\\' OR (f.brand IS NOT NULL AND LOWER(f.brand) LIKE ? ESCAPE '\\')
       ORDER BY match_rank ASC, f.name ASC
       LIMIT ?
       ''',
@@ -437,7 +437,20 @@ class NutritionRepository extends BaseRepository {
   }) async {
     _validateDate(date);
     final db = await this.db;
-    final existing = await db.query(
+    return _ensureMealLogIn(db, date: date, mealType: mealType, name: name);
+  }
+
+  /// Same as [ensureMealLog] but runs on an explicit executor so callers
+  /// can fold the lookup/insert into their own transaction — a check +
+  /// insert outside a transaction can race and violate
+  /// `UNIQUE(date, meal_type)`.
+  Future<MealLog> _ensureMealLogIn(
+    DatabaseExecutor executor, {
+    required String date,
+    required String mealType,
+    String? name,
+  }) async {
+    final existing = await executor.query(
       'meal_logs',
       where: 'date = ? AND meal_type = ?',
       whereArgs: [date, mealType],
@@ -451,7 +464,7 @@ class NutritionRepository extends BaseRepository {
       name: name,
       createdAt: DateTime.now(),
     );
-    await db.insert('meal_logs', log.toMap());
+    await executor.insert('meal_logs', log.toMap());
     return log;
   }
 
@@ -468,53 +481,55 @@ class NutritionRepository extends BaseRepository {
     List<FoodServing> availableServings = const [],
     String? name,
   }) async {
-    final log = await ensureMealLog(
-      date: date,
-      mealType: mealType,
-      name: name,
-    );
+    _validateDate(date);
     final db = await this.db;
-    final consumed = conversion.apply(variant.values);
-    final serving = availableServings.firstWhereOrNull(
-      (s) => s.label == conversion.unit || s.unit == conversion.unit,
-    );
-    final snapshot = NutritionSnapshot(
-      version: NutritionSnapshot.currentVersion,
-      source: food.source,
-      externalId: food.externalId,
-      foodName: food.name,
-      foodBrand: food.brand,
-      variantLabel: variant.label,
-      referenceAmount: variant.referenceAmount,
-      referenceUnit: variant.referenceUnit,
-      quantity: conversion.quantity,
-      unit: conversion.unit,
-      gramsEquivalent: serving?.gramsEquivalent,
-      mlEquivalent: serving?.mlEquivalent,
-      consumed: consumed,
-      isEstimated: variant.isEstimated,
-      hasMissingValues: consumed.hasMissingFields,
-    );
-    final item = MealLogItem(
-      id: _uuid.v4(),
-      mealLogId: log.id,
-      foodId: food.id,
-      foodVariantId: variant.id,
-      foodNameSnapshot: food.name,
-      brandSnapshot: food.brand,
-      quantity: conversion.quantity,
-      unit: conversion.unit,
-      calories: consumed.calories,
-      proteinG: consumed.proteinG,
-      carbsG: consumed.carbsG,
-      fatG: consumed.fatG,
-      fiberG: consumed.fiberG,
-      sugarsG: consumed.sugarsG,
-      sodiumMg: consumed.sodiumMg,
-      snapshotJson: snapshot.encode(),
-      createdAt: DateTime.now(),
-    );
-    await db.transaction((txn) async {
+    return db.transaction((txn) async {
+      final log = await _ensureMealLogIn(
+        txn,
+        date: date,
+        mealType: mealType,
+        name: name,
+      );
+      final consumed = conversion.apply(variant.values);
+      final serving = availableServings.firstWhereOrNull(
+        (s) => s.label == conversion.unit || s.unit == conversion.unit,
+      );
+      final snapshot = NutritionSnapshot(
+        version: NutritionSnapshot.currentVersion,
+        source: food.source,
+        externalId: food.externalId,
+        foodName: food.name,
+        foodBrand: food.brand,
+        variantLabel: variant.label,
+        referenceAmount: variant.referenceAmount,
+        referenceUnit: variant.referenceUnit,
+        quantity: conversion.quantity,
+        unit: conversion.unit,
+        gramsEquivalent: serving?.gramsEquivalent,
+        mlEquivalent: serving?.mlEquivalent,
+        consumed: consumed,
+        isEstimated: variant.isEstimated,
+        hasMissingValues: consumed.hasMissingFields,
+      );
+      final item = MealLogItem(
+        id: _uuid.v4(),
+        mealLogId: log.id,
+        foodId: food.id,
+        foodVariantId: variant.id,
+        foodNameSnapshot: food.name,
+        brandSnapshot: food.brand,
+        quantity: conversion.quantity,
+        unit: conversion.unit,
+        calories: consumed.calories,
+        proteinG: consumed.proteinG,
+        carbsG: consumed.carbsG,
+        fatG: consumed.fatG,
+        fiberG: consumed.fiberG,
+        sugarsG: consumed.sugarsG,
+        sodiumMg: consumed.sodiumMg,
+        snapshotJson: snapshot.encode(),
+        createdAt: DateTime.now(),
+      );
       await txn.insert('meal_log_items', item.toMap());
       if (food.id.isNotEmpty) {
         try {
@@ -526,8 +541,8 @@ class NutritionRepository extends BaseRepository {
           );
         } catch (_) {}
       }
+      return item;
     });
-    return item;
   }
 
   /// Updates the quantity/unit of an existing item, regenerating its
@@ -689,14 +704,16 @@ class NutritionRepository extends BaseRepository {
     String? name,
   }) async {
     if (items.isEmpty) return 0;
-    final log = await ensureMealLog(
-      date: date,
-      mealType: mealType,
-      name: name,
-    );
+    _validateDate(date);
     final db = await this.db;
     final now = DateTime.now();
     await db.transaction((txn) async {
+      final log = await _ensureMealLogIn(
+        txn,
+        date: date,
+        mealType: mealType,
+        name: name,
+      );
       final touchedFoods = <String>{};
       for (final item in items) {
         final clone = MealLogItem(

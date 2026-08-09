@@ -51,23 +51,28 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
   }
 
   Future<void> _load() async {
-    final results = await Future.wait([
-      widget.repository.getActiveGoal(),
-      widget.repository.getMealTypes(),
-    ]);
-    final goal = results[0] as NutritionGoal?;
-    if (!mounted) return;
-    setState(() {
-      _current = goal;
-      _mealTypes = results[1] as List<MealTypeDefinition>;
-      _isLoading = false;
-      if (goal != null) {
-        _caloriesController.text = _format(goal.calories);
-        _proteinController.text = _format(goal.proteinG);
-        _carbsController.text = _format(goal.carbsG);
-        _fatController.text = _format(goal.fatG);
-      }
-    });
+    try {
+      final results = await Future.wait([
+        widget.repository.getActiveGoal(),
+        widget.repository.getMealTypes(),
+      ]);
+      final goal = results[0] as NutritionGoal?;
+      if (!mounted) return;
+      setState(() {
+        _current = goal;
+        _mealTypes = results[1] as List<MealTypeDefinition>;
+        _isLoading = false;
+        if (goal != null) {
+          _caloriesController.text = _format(goal.calories);
+          _proteinController.text = _format(goal.proteinG);
+          _carbsController.text = _format(goal.carbsG);
+          _fatController.text = _format(goal.fatG);
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
   }
 
   String _format(double? value) {

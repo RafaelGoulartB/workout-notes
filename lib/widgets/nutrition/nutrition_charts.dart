@@ -46,7 +46,7 @@ class NutritionBarChart extends StatelessWidget {
       (acc, p) => p.value > acc ? p.value : acc,
     );
     final goal = goalValue ?? 0;
-    final chartMax = (maxValue > goal ? maxValue : goal) * 1.25;
+    final chartMax = _positiveMax((maxValue > goal ? maxValue : goal) * 1.25);
     final labelStep = (points.length / maxLabels).ceil().clamp(1, 99);
     return SizedBox(
       height: 150,
@@ -226,7 +226,7 @@ class WeeklyMacroBarChart extends StatelessWidget {
         acc,
       ].reduce((a, b) => a > b ? a : b),
     );
-    final chartMax = maxValue * 1.25;
+    final chartMax = _positiveMax(maxValue * 1.25);
     final labelStep = (points.length / 12).ceil().clamp(1, 99);
     return SizedBox(
       height: 150,
@@ -423,7 +423,7 @@ class NutrientTrendChart extends StatelessWidget {
       0,
       (acc, p) => p.value > acc ? p.value : acc,
     );
-    final chartMax = maxValue * 1.2;
+    final chartMax = _positiveMax(maxValue * 1.2);
     final pointCount = series.fold<int>(
       0,
       (acc, s) => s.points.length > acc ? s.points.length : acc,
@@ -559,3 +559,8 @@ class NutrientTrendChart extends StatelessWidget {
     );
   }
 }
+
+/// Guards the chart max against zero/negative data so an all-zero
+/// dataset still yields a valid axis (grid intervals never divide by
+/// zero).
+double _positiveMax(double value) => value <= 0 ? 1 : value;
