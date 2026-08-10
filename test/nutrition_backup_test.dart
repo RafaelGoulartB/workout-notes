@@ -32,9 +32,12 @@ void main() {
             'routine_exercises',
             'predefined_sets',
             'body_measurements',
+            'user_goals',
             'sleep_entries',
             'sleep_monitor_sessions',
             'sleep_monitor_segments',
+            'sleep_stage_epochs',
+            'traditional_alarms',
           ]) {
             await db.execute('CREATE TABLE $table (id TEXT PRIMARY KEY)');
           }
@@ -169,6 +172,46 @@ void main() {
   tearDown(() async {
     await database.close();
   });
+
+  test(
+    'round-trip preserves workout goals and all persisted sleep data',
+    () async {
+      const tableIds = <String, String>{
+        'user_goals': 'goal-1',
+        'sleep_entries': 'sleep-1',
+        'sleep_monitor_sessions': 'session-1',
+        'sleep_monitor_segments': 'segment-1',
+        'sleep_stage_epochs': 'epoch-1',
+        'traditional_alarms': 'alarm-1',
+      };
+
+      for (final entry in tableIds.entries) {
+        await database.insert(entry.key, {'id': entry.value});
+      }
+
+      final repository = ExportImportRepository(
+        databaseProvider: () async => database,
+      );
+      final backup = await repository.exportAllData();
+
+      expect(backup['version'], 11);
+      for (final entry in tableIds.entries) {
+        expect(backup[entry.key], [
+          {'id': entry.value},
+        ]);
+        await database.delete(entry.key);
+      }
+
+      final restoredRows = await repository.restoreFromBackup(backup);
+
+      expect(restoredRows, greaterThanOrEqualTo(tableIds.length));
+      for (final entry in tableIds.entries) {
+        expect(await database.query(entry.key), [
+          {'id': entry.value},
+        ]);
+      }
+    },
+  );
 
   test('backup includes all nutrition tables', () async {
     final now = DateTime.now().toIso8601String();
