@@ -41,6 +41,10 @@ class Food {
 
   bool get isManual => source == FoodSource.manual;
 
+  /// Foods entered by the user, either directly or from a label photo.
+  bool get isUserCreated =>
+      source == FoodSource.manual || source == FoodSource.aiVision;
+
   /// (source, externalId) pair used as the deduplication key for
   /// upserts and search-result merging.
   String get dedupKey => '$source::$externalId';

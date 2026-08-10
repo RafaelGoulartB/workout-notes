@@ -229,6 +229,54 @@ void main() {
       expect(details.variants.first.values.calories, 52);
     });
 
+    test(
+      'user-created food can be edited while preserving its variant link',
+      () async {
+        final food = await repository.createManualFood(
+          name: 'Iogurte natural',
+          brand: 'Minha marca',
+          referenceAmount: 100,
+          referenceUnit: 'g',
+          referenceValues: const NutritionValues(calories: 60, proteinG: 5),
+          servings: const [
+            ManualServingInput(
+              label: 'Pote',
+              quantity: 1,
+              unit: 'unidade',
+              gramsEquivalent: 170,
+            ),
+          ],
+        );
+        final before = await repository.getFoodWithDetails(food.id);
+        final variantId = before!.variants.first.id;
+
+        final updated = await repository.updateManualFood(
+          foodId: food.id,
+          name: 'Iogurte grego',
+          brand: 'Nova marca',
+          referenceAmount: 100,
+          referenceUnit: 'g',
+          referenceValues: const NutritionValues(calories: 90, proteinG: 8),
+          servings: const [
+            ManualServingInput(
+              label: 'Pote grande',
+              quantity: 1,
+              unit: 'unidade',
+              gramsEquivalent: 200,
+            ),
+          ],
+        );
+        final after = await repository.getFoodWithDetails(updated.id);
+
+        expect(updated.id, food.id);
+        expect(updated.name, 'Iogurte grego');
+        expect(updated.searchName, 'iogurte grego');
+        expect(after!.variants.first.id, variantId);
+        expect(after.variants.first.values.calories, 90);
+        expect(after.servings[variantId]!.single.label, 'Pote grande');
+      },
+    );
+
     test('upserting the same gateway food is idempotent', () async {
       final now = DateTime.now();
       final first = await repository.upsertFoodWithDetails(
@@ -364,7 +412,7 @@ void main() {
           referenceUnit: 'g',
         ),
       );
-      await database.delete('foods', where: 'id = ?', whereArgs: [food.id]);
+      await repository.deleteManualFood(food.id);
       final meals = await repository.getDayMeals('2026-07-26');
       final snacks = meals.firstWhere((m) => m.log.mealType == 'snacks');
       expect(snacks.items, hasLength(1));

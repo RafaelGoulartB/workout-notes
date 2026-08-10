@@ -1083,6 +1083,16 @@
   "nutritionAddManually": "Cadastrar alimento manualmente",
   "nutritionSourceManual": "Manual",
   "nutritionSourceGateway": "Gateway",
+  "nutritionFoodActions": "Ações do alimento",
+  "nutritionFoodEdit": "Editar alimento",
+  "nutritionFoodDelete": "Excluir alimento",
+  "nutritionFoodDeleteConfirm": "Excluir \"{name}\" da biblioteca? Os registros já feitos continuarão visíveis.",
+  "@nutritionFoodDeleteConfirm": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "nutritionFoodDeleted": "Alimento excluído",
   "nutritionPer100g": "por {amount} {unit}",
   "nutritionUnit": "Unidade",
   "nutritionUnitGrams": "Gramas (g)",
@@ -1101,6 +1111,7 @@
   "nutritionInvalidQuantity": "Informe uma quantidade maior que zero",
 
   "nutritionManualTitle": "Cadastrar alimento manualmente",
+  "nutritionManualEditTitle": "Editar alimento",
   "nutritionManualName": "Nome do alimento",
   "nutritionManualNameHint": "Ex: Pão integral",
   "nutritionManualBrand": "Marca (opcional)",

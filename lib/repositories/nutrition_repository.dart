@@ -272,6 +272,92 @@ class NutritionRepository extends BaseRepository {
     );
   }
 
+  /// Updates a food created by the user, preserving its local id and the
+  /// variant id referenced by existing meal entries.
+  Future<Food> updateManualFood({
+    required String foodId,
+    required String name,
+    String? brand,
+    String? barcode,
+    required double referenceAmount,
+    required String referenceUnit,
+    required NutritionValues referenceValues,
+    bool isEstimated = false,
+    List<ManualServingInput> servings = const [],
+  }) async {
+    final details = await getFoodWithDetails(foodId);
+    if (details == null) {
+      throw const NutritionValidationException('food_not_found');
+    }
+    if (!details.food.isUserCreated) {
+      throw const NutritionValidationException('manual_food_only');
+    }
+
+    final food = details.food.copyWith(
+      name: name,
+      searchName: Food.normalizeForSearch(name),
+      brand: brand,
+      barcode: barcode,
+      fetchedAt: DateTime.now(),
+    );
+    final currentVariant = details.variants.isEmpty
+        ? null
+        : details.variants.first;
+    final variant = currentVariant?.copyWith(
+          referenceAmount: referenceAmount,
+          referenceUnit: referenceUnit,
+          values: referenceValues,
+          isEstimated: isEstimated,
+        ) ??
+        FoodVariant(
+          id: _uuid.v4(),
+          foodId: food.id,
+          referenceAmount: referenceAmount,
+          referenceUnit: referenceUnit,
+          values: referenceValues,
+          isEstimated: isEstimated,
+        );
+    final servingModels = [
+      for (final serving in servings)
+        FoodServing(
+          id: _uuid.v4(),
+          foodVariantId: variant.id,
+          label: serving.label,
+          quantity: serving.quantity,
+          unit: serving.unit,
+          gramsEquivalent: serving.gramsEquivalent,
+          mlEquivalent: serving.mlEquivalent,
+        ),
+    ];
+
+    return upsertFoodWithDetails(
+      food: food,
+      variants: [variant],
+      servings: {variant.id: servingModels},
+    );
+  }
+
+  /// Deletes a food created by the user. Existing meal records keep their
+  /// snapshots; their live food links are nulled by the database FK.
+  Future<void> deleteManualFood(String foodId) async {
+    final db = await this.db;
+    await db.transaction((txn) async {
+      final rows = await txn.query(
+        'foods',
+        columns: ['source'],
+        where: 'id = ?',
+        whereArgs: [foodId],
+        limit: 1,
+      );
+      if (rows.isEmpty) return;
+      final source = rows.first['source'] as String?;
+      if (source != FoodSource.manual && source != FoodSource.aiVision) {
+        throw const NutritionValidationException('manual_food_only');
+      }
+      await txn.delete('foods', where: 'id = ?', whereArgs: [foodId]);
+    });
+  }
+
   // ===================================================================
   // Favorites, recents and meal suggestions
   // ===================================================================

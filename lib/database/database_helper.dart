@@ -2781,6 +2781,29 @@ class DatabaseHelper {
     isEstimated: isEstimated,
     servings: servings,
   );
+  Future<Food> updateManualFood({
+    required String foodId,
+    required String name,
+    String? brand,
+    String? barcode,
+    required double referenceAmount,
+    required String referenceUnit,
+    required NutritionValues referenceValues,
+    bool isEstimated = false,
+    List<ManualServingInput> servings = const [],
+  }) => nutritionRepo.updateManualFood(
+    foodId: foodId,
+    name: name,
+    brand: brand,
+    barcode: barcode,
+    referenceAmount: referenceAmount,
+    referenceUnit: referenceUnit,
+    referenceValues: referenceValues,
+    isEstimated: isEstimated,
+    servings: servings,
+  );
+  Future<void> deleteManualFood(String foodId) =>
+      nutritionRepo.deleteManualFood(foodId);
   Future<MealLog> ensureMealLog({
     required String date,
     required String mealType,

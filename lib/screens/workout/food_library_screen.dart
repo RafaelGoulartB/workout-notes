@@ -7,6 +7,8 @@ import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 
 import 'manual_food_screen.dart';
 
+enum _FoodLibraryAction { edit, delete }
+
 /// Browsable list of every food stored on the device.
 class FoodLibraryScreen extends StatefulWidget {
   final NutritionRepository repository;
@@ -62,6 +64,60 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
       !(entry.food.isFavorite ?? false),
     );
     await _load();
+  }
+
+  Future<void> _editFood(FoodSearchResultLite entry) async {
+    if (!entry.food.isUserCreated) return;
+    final updated = await Navigator.of(context).push<Food>(
+      MaterialPageRoute(
+        builder: (_) => ManualFoodScreen(
+          repository: widget.repository,
+          existingFood: FoodWithDetails(
+            food: entry.food,
+            variants: entry.variants,
+            servings: entry.servings,
+          ),
+        ),
+      ),
+    );
+    if (updated != null) await _load();
+  }
+
+  Future<void> _deleteFood(FoodSearchResultLite entry) async {
+    if (!entry.food.isUserCreated) return;
+    final loc = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(loc.nutritionFoodDelete),
+        content: Text(loc.nutritionFoodDeleteConfirm(entry.food.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(loc.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(loc.commonDelete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.repository.deleteManualFood(entry.food.id);
+      if (!mounted) return;
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.nutritionFoodDeleted)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+    }
   }
 
   List<FoodSearchResultLite> get _visibleFoods {
@@ -139,6 +195,12 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
         itemBuilder: (context, index) => _FoodLibraryTile(
           entry: foods[index],
           onFavorite: () => _toggleFavorite(foods[index]),
+          onEdit: foods[index].food.isUserCreated
+              ? () => _editFood(foods[index])
+              : null,
+          onDelete: foods[index].food.isUserCreated
+              ? () => _deleteFood(foods[index])
+              : null,
         ),
       ),
     );
@@ -148,8 +210,15 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
 class _FoodLibraryTile extends StatelessWidget {
   final FoodSearchResultLite entry;
   final VoidCallback onFavorite;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
-  const _FoodLibraryTile({required this.entry, required this.onFavorite});
+  const _FoodLibraryTile({
+    required this.entry,
+    required this.onFavorite,
+    this.onEdit,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +232,9 @@ class _FoodLibraryTile extends StatelessWidget {
       if (variant != null)
         '${_format(variant.referenceAmount)} ${variant.referenceUnit}'
             '${calories == null ? '' : ' · ${_format(calories)} kcal'}',
-      food.isManual ? loc.nutritionSourceManual : loc.nutritionSourceGateway,
+      food.isUserCreated
+          ? loc.nutritionSourceManual
+          : loc.nutritionSourceGateway,
     ];
 
     return Card(
@@ -186,19 +257,54 @@ class _FoodLibraryTile extends StatelessWidget {
           maxLines: 3,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: IconButton(
-          tooltip: (food.isFavorite ?? false)
-              ? loc.nutritionSearchUnfavorite
-              : loc.nutritionSearchFavorite,
-          onPressed: onFavorite,
-          icon: Icon(
-            (food.isFavorite ?? false)
-                ? Icons.star_rounded
-                : Icons.star_border_rounded,
-            color: (food.isFavorite ?? false)
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurfaceVariant,
-          ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: (food.isFavorite ?? false)
+                  ? loc.nutritionSearchUnfavorite
+                  : loc.nutritionSearchFavorite,
+              onPressed: onFavorite,
+              icon: Icon(
+                (food.isFavorite ?? false)
+                    ? Icons.star_rounded
+                    : Icons.star_border_rounded,
+                color: (food.isFavorite ?? false)
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (onEdit != null && onDelete != null)
+              PopupMenuButton<_FoodLibraryAction>(
+                tooltip: loc.nutritionFoodActions,
+                onSelected: (action) {
+                  switch (action) {
+                    case _FoodLibraryAction.edit:
+                      onEdit!();
+                    case _FoodLibraryAction.delete:
+                      onDelete!();
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: _FoodLibraryAction.edit,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.edit_outlined),
+                      title: Text(loc.nutritionFoodEdit),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _FoodLibraryAction.delete,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.delete_outline),
+                      title: Text(loc.nutritionFoodDelete),
+                    ),
+                  ),
+                ],
+              ),
+          ],
         ),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
+import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/widgets/form_section_card.dart';
@@ -19,12 +20,14 @@ class ManualFoodScreen extends StatefulWidget {
   final NutritionRepository repository;
   final String source;
   final AiFoodLabelDraft? initial;
+  final FoodWithDetails? existingFood;
 
   const ManualFoodScreen({
     super.key,
     required this.repository,
     this.source = FoodSource.manual,
     this.initial,
+    this.existingFood,
   });
 
   @override
@@ -52,6 +55,38 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
   @override
   void initState() {
     super.initState();
+    final existing = widget.existingFood;
+    if (existing != null) {
+      _nameController.text = existing.food.name;
+      if (existing.food.brand != null) {
+        _brandController.text = existing.food.brand!;
+      }
+      if (existing.food.barcode != null) {
+        _barcodeController.text = existing.food.barcode!;
+      }
+      final variant = existing.variants.isEmpty
+          ? null
+          : existing.variants.first;
+      if (variant != null) {
+        _referenceAmountController.text = _formatAmount(
+          variant.referenceAmount,
+        );
+        _referenceUnitController.text = variant.referenceUnit;
+        _fillNumber(_caloriesController, variant.values.calories);
+        _fillNumber(_proteinController, variant.values.proteinG);
+        _fillNumber(_carbsController, variant.values.carbsG);
+        _fillNumber(_fatController, variant.values.fatG);
+        _fillNumber(_fiberController, variant.values.fiberG);
+        _fillNumber(_sugarsController, variant.values.sugarsG);
+        _fillNumber(_sodiumController, variant.values.sodiumMg);
+        _isEstimated = variant.isEstimated;
+        for (final serving in existing.servings[variant.id] ??
+            const <FoodServing>[]) {
+          _servings.add(_servingDraftFromFoodServing(serving));
+        }
+      }
+      return;
+    }
     final initial = widget.initial;
     if (initial == null) return;
     _nameController.text = initial.name;
@@ -100,43 +135,66 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isSaving = true);
     try {
-      final food = await widget.repository.createManualFood(
-        name: _nameController.text.trim(),
-        brand: _nullableText(_brandController.text),
-        barcode: _nullableText(_barcodeController.text),
-        source: widget.source,
-        referenceAmount: _parseDouble(_referenceAmountController.text, 100)!,
-        referenceUnit: _referenceUnitController.text.trim().isEmpty
-            ? 'g'
-            : _referenceUnitController.text.trim(),
-        referenceValues: NutritionValues(
-          // Empty fields stay null ("unknown"), never 0: a blank
-          // macro is different from a measured zero and must keep
-          // flagging the food as incomplete in the UI.
-          calories: _parseDouble(_caloriesController.text, null),
-          proteinG: _parseDouble(_proteinController.text, null),
-          carbsG: _parseDouble(_carbsController.text, null),
-          fatG: _parseDouble(_fatController.text, null),
-          fiberG: _parseDouble(_fiberController.text, null),
-          sugarsG: _parseDouble(_sugarsController.text, null),
-          sodiumMg: _parseDouble(_sodiumController.text, null),
-        ),
-        isEstimated: _isEstimated,
-        servings: _servings
-            .where((s) => s.labelController.text.trim().isNotEmpty)
-            .map(
-              (s) => ManualServingInput(
-                label: s.labelController.text.trim(),
-                quantity: _parseDouble(s.quantityController.text, 1) ?? 1,
-                unit: s.unitController.text.trim().isEmpty
-                    ? 'g'
-                    : s.unitController.text.trim(),
-                gramsEquivalent: _parseDouble(s.gramsController.text, null),
-                mlEquivalent: _parseDouble(s.mlController.text, null),
-              ),
-            )
-            .toList(),
+      final servingInputs = _servings
+          .where((s) => s.labelController.text.trim().isNotEmpty)
+          .map(
+            (s) => ManualServingInput(
+              label: s.labelController.text.trim(),
+              quantity: _parseDouble(s.quantityController.text, 1) ?? 1,
+              unit: s.unitController.text.trim().isEmpty
+                  ? 'g'
+                  : s.unitController.text.trim(),
+              gramsEquivalent: _parseDouble(s.gramsController.text, null),
+              mlEquivalent: _parseDouble(s.mlController.text, null),
+            ),
+          )
+          .toList();
+      final name = _nameController.text.trim();
+      final brand = _nullableText(_brandController.text);
+      final barcode = _nullableText(_barcodeController.text);
+      final referenceAmount = _parseDouble(
+        _referenceAmountController.text,
+        100,
+      )!;
+      final referenceUnit = _referenceUnitController.text.trim().isEmpty
+          ? 'g'
+          : _referenceUnitController.text.trim();
+      final referenceValues = NutritionValues(
+        // Empty fields stay null ("unknown"), never 0: a blank
+        // macro is different from a measured zero and must keep
+        // flagging the food as incomplete in the UI.
+        calories: _parseDouble(_caloriesController.text, null),
+        proteinG: _parseDouble(_proteinController.text, null),
+        carbsG: _parseDouble(_carbsController.text, null),
+        fatG: _parseDouble(_fatController.text, null),
+        fiberG: _parseDouble(_fiberController.text, null),
+        sugarsG: _parseDouble(_sugarsController.text, null),
+        sodiumMg: _parseDouble(_sodiumController.text, null),
       );
+      final existing = widget.existingFood;
+      final food = existing == null
+          ? await widget.repository.createManualFood(
+              name: name,
+              brand: brand,
+              barcode: barcode,
+              source: widget.source,
+              referenceAmount: referenceAmount,
+              referenceUnit: referenceUnit,
+              referenceValues: referenceValues,
+              isEstimated: _isEstimated,
+              servings: servingInputs,
+            )
+          : await widget.repository.updateManualFood(
+              foodId: existing.food.id,
+              name: name,
+              brand: brand,
+              barcode: barcode,
+              referenceAmount: referenceAmount,
+              referenceUnit: referenceUnit,
+              referenceValues: referenceValues,
+              isEstimated: _isEstimated,
+              servings: servingInputs,
+            );
       if (!mounted) return;
       Navigator.of(context).pop(food);
     } catch (e) {
@@ -193,6 +251,22 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
     return draft;
   }
 
+  static _ManualServingDraft _servingDraftFromFoodServing(
+    FoodServing serving,
+  ) {
+    final draft = _ManualServingDraft();
+    draft.labelController.text = serving.label;
+    draft.quantityController.text = _formatAmount(serving.quantity);
+    draft.unitController.text = serving.unit;
+    if (serving.gramsEquivalent != null) {
+      draft.gramsController.text = _formatAmount(serving.gramsEquivalent!);
+    }
+    if (serving.mlEquivalent != null) {
+      draft.mlController.text = _formatAmount(serving.mlEquivalent!);
+    }
+    return draft;
+  }
+
   void _removeServing(int index) {
     setState(() {
       _servings.removeAt(index).dispose();
@@ -229,7 +303,11 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.nutritionManualTitle),
+        title: Text(
+          widget.existingFood == null
+              ? loc.nutritionManualTitle
+              : loc.nutritionManualEditTitle,
+        ),
         centerTitle: true,
         actions: [
           TextButton(

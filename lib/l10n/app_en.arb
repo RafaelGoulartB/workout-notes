@@ -1094,6 +1094,16 @@
   "nutritionAddManually": "Add food manually",
   "nutritionSourceManual": "Manual",
   "nutritionSourceGateway": "Gateway",
+  "nutritionFoodActions": "Food actions",
+  "nutritionFoodEdit": "Edit food",
+  "nutritionFoodDelete": "Delete food",
+  "nutritionFoodDeleteConfirm": "Delete \"{name}\" from the library? Existing records will remain visible.",
+  "@nutritionFoodDeleteConfirm": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "nutritionFoodDeleted": "Food deleted",
   "nutritionPer100g": "per {amount} {unit}",
   "@nutritionPer100g": {
     "placeholders": {
@@ -1118,6 +1128,7 @@
   "nutritionInvalidQuantity": "Enter a quantity greater than zero",
 
   "nutritionManualTitle": "Add food manually",
+  "nutritionManualEditTitle": "Edit food",
   "nutritionManualName": "Food name",
   "nutritionManualNameHint": "Ex: Whole-wheat bread",
   "nutritionManualBrand": "Brand (optional)",
