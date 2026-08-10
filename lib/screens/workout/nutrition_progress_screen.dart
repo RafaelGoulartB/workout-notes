@@ -30,8 +30,10 @@ const int _kRollingWindow = 7;
 /// informational "equivalent in fat" label on the hero card.
 const double _kKcalPerKgFat = 7700;
 
-class _NutritionProgressScreenState extends State<NutritionProgressScreen> {
+class _NutritionProgressScreenState extends State<NutritionProgressScreen>
+    with SingleTickerProviderStateMixin {
   final NutritionRepository _repository = NutritionRepository();
+  late final TabController _tabController;
 
   int _windowDays = _kWindow7;
 
@@ -47,7 +49,28 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: 0,
+    );
+    _tabController.addListener(_onTabChanged);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging) return;
+    final days = _tabController.index == 0 ? _kWindow7 : _kWindow30;
+    if (days != _windowDays) {
+      setState(() => _windowDays = days);
+    }
   }
 
   Future<void> _load() async {
@@ -106,11 +129,6 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen> {
       fatG: f,
       totalKcal: k,
     );
-  }
-
-  void _setWindow(int days) {
-    if (days == _windowDays) return;
-    setState(() => _windowDays = days);
   }
 
   // ------------------------------------------------------------------
@@ -208,11 +226,17 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(loc.nutritionBalanceTitle),
         centerTitle: true,
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: [
+            Tab(text: loc.nutritionBalanceLast7Days),
+            Tab(text: loc.nutritionBalanceLast30Days),
+          ],
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -222,8 +246,6 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
                 children: [
-                  _buildPeriodSelector(loc, theme),
-                  const SizedBox(height: 12),
                   _BalanceHeroCard(
                     balance: _windowBalance,
                     goal: _goal,
@@ -260,38 +282,6 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen> {
                 ],
               ),
             ),
-    );
-  }
-
-  Widget _buildPeriodSelector(AppLocalizations loc, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      child: SegmentedButton<int>(
-        segments: [
-          ButtonSegment(
-            value: _kWindow7,
-            label: Text(loc.nutritionBalanceLast7Days),
-            icon: const Icon(Icons.view_week_outlined, size: 18),
-          ),
-          ButtonSegment(
-            value: _kWindow30,
-            label: Text(loc.nutritionBalanceLast30Days),
-            icon: const Icon(Icons.calendar_view_month_outlined, size: 18),
-          ),
-        ],
-        selected: {_windowDays},
-        onSelectionChanged: (set) => _setWindow(set.first),
-        showSelectedIcon: false,
-        style: SegmentedButton.styleFrom(
-          backgroundColor: theme.colorScheme.surfaceContainerLow,
-          foregroundColor: theme.colorScheme.onSurface,
-          selectedBackgroundColor: theme.colorScheme.primary,
-          selectedForegroundColor: theme.colorScheme.onPrimary,
-          textStyle: theme.textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
     );
   }
 }
