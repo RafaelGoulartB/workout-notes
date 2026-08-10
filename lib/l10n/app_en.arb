@@ -1326,6 +1326,10 @@
   "nutritionSavedMealPortions": "Portions",
   "nutritionSavedMealIngredients": "Ingredients",
   "nutritionSavedMealEmptyIngredients": "No ingredients yet. Add the foods of this meal.",
+  "nutritionSavedMealTotalsTitle": "Total values",
+  "nutritionSavedMealTotalsPerPortion": "Per portion",
+  "nutritionSavedMealTotalsEmpty": "Add ingredients to see the values.",
+  "nutritionSavedMealTotalsPartial": "Partial values — some information is incomplete.",
 
   "nutritionSearchFavorites": "Favorites",
   "nutritionSearchSuggestedFor": "Suggested for {meal}",
