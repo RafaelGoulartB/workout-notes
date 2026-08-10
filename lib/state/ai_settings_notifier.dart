@@ -13,6 +13,9 @@ const _kPrefsActiveId = 'ai_active_provider_id_v1';
 const _kPrefsSystemPrompt = 'ai_system_prompt_v1';
 const _kPrefsContextMode = 'ai_context_mode_v1';
 const _kPrefsFabEnabled = 'ai_fab_enabled_v1';
+const _kPrefsResponseStyle = 'ai_response_style_v1';
+const _kPrefsShowMessageTimestamps = 'ai_show_message_timestamps_v1';
+const _kPrefsAutoExpandToolDetails = 'ai_auto_expand_tool_details_v1';
 const _kTokenPrefix = 'ai_token:';
 const _kLegacyTokenKey = 'ai_token';
 
@@ -124,6 +127,8 @@ class AiSettingsNotifier extends ChangeNotifier {
   String get systemPrompt => _settings.systemPrompt.isEmpty
       ? kDefaultAiCoachSystemPrompt
       : _settings.systemPrompt;
+  String get effectiveSystemPrompt =>
+      '$systemPrompt\n\n${_settings.responseStyle.systemInstruction}';
 
   static AiSettings _loadInitial() {
     return AiSettings(
@@ -153,6 +158,13 @@ class AiSettingsNotifier extends ChangeNotifier {
     final mode = AiContextModeX.fromStorageKey(
       prefs.getString(_kPrefsContextMode),
     );
+    final responseStyle = AiResponseStyleX.fromStorageKey(
+      prefs.getString(_kPrefsResponseStyle),
+    );
+    final showMessageTimestamps =
+        prefs.getBool(_kPrefsShowMessageTimestamps) ?? true;
+    final autoExpandToolDetails =
+        prefs.getBool(_kPrefsAutoExpandToolDetails) ?? false;
     _fabEnabled = prefs.getBool(_kPrefsFabEnabled) ?? true;
 
     // Replace the prompts shipped by the previous AI implementation. They
@@ -176,6 +188,9 @@ class AiSettingsNotifier extends ChangeNotifier {
       activeProviderId: activeId,
       systemPrompt: prompt,
       contextMode: mode,
+      responseStyle: responseStyle,
+      showMessageTimestamps: showMessageTimestamps,
+      autoExpandToolDetails: autoExpandToolDetails,
     );
 
     // Migrate legacy single token.
@@ -328,6 +343,24 @@ class AiSettingsNotifier extends ChangeNotifier {
   Future<void> setContextMode(AiContextMode mode) async {
     _settings = _settings.copyWith(contextMode: mode);
     await prefs.setString(_kPrefsContextMode, mode.storageKey);
+    notifyListeners();
+  }
+
+  Future<void> setResponseStyle(AiResponseStyle style) async {
+    _settings = _settings.copyWith(responseStyle: style);
+    await prefs.setString(_kPrefsResponseStyle, style.storageKey);
+    notifyListeners();
+  }
+
+  Future<void> setShowMessageTimestamps(bool enabled) async {
+    _settings = _settings.copyWith(showMessageTimestamps: enabled);
+    await prefs.setBool(_kPrefsShowMessageTimestamps, enabled);
+    notifyListeners();
+  }
+
+  Future<void> setAutoExpandToolDetails(bool enabled) async {
+    _settings = _settings.copyWith(autoExpandToolDetails: enabled);
+    await prefs.setBool(_kPrefsAutoExpandToolDetails, enabled);
     notifyListeners();
   }
 

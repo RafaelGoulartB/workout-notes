@@ -8,11 +8,13 @@ import '../../models/ai_chat_message.dart';
 class AiToolResultBubble extends StatefulWidget {
   final AiChatMessage message;
   final String toolLabel;
+  final bool initiallyExpanded;
 
   const AiToolResultBubble({
     super.key,
     required this.message,
     required this.toolLabel,
+    this.initiallyExpanded = false,
   });
 
   @override
@@ -20,7 +22,13 @@ class AiToolResultBubble extends StatefulWidget {
 }
 
 class _AiToolResultBubbleState extends State<AiToolResultBubble> {
-  bool _expanded = false;
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.initiallyExpanded;
+  }
 
   @override
   Widget build(BuildContext context) {

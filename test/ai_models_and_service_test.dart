@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/models/ai_provider.dart';
 import 'package:workout_notes/models/ai_settings.dart';
 import 'package:workout_notes/models/ai_tool_call.dart';
@@ -111,6 +112,56 @@ void main() {
     });
   });
 
+  group('AiResponseStyle', () {
+    test('round-trips through storageKey and has safe fallback', () {
+      for (final style in AiResponseStyle.values) {
+        expect(AiResponseStyleX.fromStorageKey(style.storageKey), style);
+      }
+      expect(
+        AiResponseStyleX.fromStorageKey('unknown'),
+        AiResponseStyle.balanced,
+      );
+    });
+
+    test(
+      'effective prompt applies style without changing editable prompt',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final notifier = AiSettingsNotifier(prefs: prefs);
+        await notifier.load();
+        await notifier.setSystemPrompt('Meu prompt personalizado');
+        await notifier.setResponseStyle(AiResponseStyle.concise);
+
+        expect(notifier.systemPrompt, 'Meu prompt personalizado');
+        expect(notifier.effectiveSystemPrompt, contains('seja conciso'));
+        expect(
+          notifier.effectiveSystemPrompt,
+          startsWith(notifier.systemPrompt),
+        );
+      },
+    );
+
+    test(
+      'chat appearance preferences persist across notifier reloads',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final notifier = AiSettingsNotifier(prefs: prefs);
+        await notifier.load();
+        await notifier.setShowMessageTimestamps(false);
+        await notifier.setAutoExpandToolDetails(true);
+        await notifier.setResponseStyle(AiResponseStyle.detailed);
+
+        final reloaded = AiSettingsNotifier(prefs: prefs);
+        await reloaded.load();
+        expect(reloaded.settings.showMessageTimestamps, isFalse);
+        expect(reloaded.settings.autoExpandToolDetails, isTrue);
+        expect(reloaded.settings.responseStyle, AiResponseStyle.detailed);
+      },
+    );
+  });
+
   group('AiProvider', () {
     test('toMap / fromMap round-trip', () {
       final p = AiProvider(
@@ -190,6 +241,17 @@ void main() {
       final s = AiSettings(providers: [p], activeProviderId: 'p1');
       final cleared = s.copyWith(clearActiveProvider: true);
       expect(cleared.activeProviderId, isNull);
+    });
+
+    test('copyWith preserves and updates chat preferences', () {
+      const settings = AiSettings(
+        responseStyle: AiResponseStyle.concise,
+        showMessageTimestamps: false,
+      );
+      final updated = settings.copyWith(autoExpandToolDetails: true);
+      expect(updated.responseStyle, AiResponseStyle.concise);
+      expect(updated.showMessageTimestamps, isFalse);
+      expect(updated.autoExpandToolDetails, isTrue);
     });
   });
 

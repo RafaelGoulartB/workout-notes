@@ -92,6 +92,38 @@ void main() {
     expect(find.textContaining('recordedNights'), findsOneWidget);
   });
 
+  testWidgets('tool call card can start expanded from chat preference', (
+    tester,
+  ) async {
+    final message = AiChatMessage(
+      id: 'tool-expanded',
+      threadId: 'thread-1',
+      role: AiMessageRole.tool,
+      content: '{"ok":true,"data":{"days":7}}',
+      toolCallId: 'call-expanded',
+      toolName: 'get_weekly_recovery_trend',
+      createdAt: DateTime(2026, 8, 10, 20),
+    );
+
+    await tester.pumpWidget(
+      _testApp(
+        AiToolResultBubble(
+          message: message,
+          toolLabel: 'Recuperação semanal',
+          initiallyExpanded: true,
+        ),
+      ),
+    );
+
+    expect(
+      tester
+          .widget<AnimatedCrossFade>(find.byType(AnimatedCrossFade))
+          .crossFadeState,
+      CrossFadeState.showSecond,
+    );
+    expect(find.textContaining('days'), findsOneWidget);
+  });
+
   testWidgets('composer enables send only after meaningful input', (
     tester,
   ) async {

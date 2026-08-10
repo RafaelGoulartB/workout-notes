@@ -230,7 +230,7 @@ class AiChatService extends ChangeNotifier {
         baseUrl: provider.baseUrl,
         token: token,
         model: provider.selectedModel,
-        systemPrompt: _settings!.systemPrompt,
+        systemPrompt: _settings!.effectiveSystemPrompt,
         contextMode: _settings!.contextMode,
       );
     } catch (e) {
@@ -864,7 +864,7 @@ class AiChatService extends ChangeNotifier {
       final context = await _context.build(mode: _settings!.contextMode);
       final wire = _buildWireMessages(
         _state.messages,
-        systemPrompt: _settings!.systemPrompt,
+        systemPrompt: _settings!.effectiveSystemPrompt,
         contextJson: context,
       );
       wire.add({

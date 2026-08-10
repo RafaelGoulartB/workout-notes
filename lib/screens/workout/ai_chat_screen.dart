@@ -524,6 +524,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     if (m.isUser) {
       return AiMessageBubble(
         message: m,
+        showTimestamp: _settings.settings.showMessageTimestamps,
         onCopy: () => MessageCopyAction.copy(context, m.content ?? ''),
       );
     }
@@ -535,6 +536,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
         children.add(
           AiMessageBubble(
             message: m,
+            showTimestamp: _settings.settings.showMessageTimestamps,
             onCopy: () => MessageCopyAction.copy(context, m.content ?? ''),
             onRetry: hasVisibleText
                 ? () => AiChatService.instance.retryFromMessage(index - 1)
@@ -582,6 +584,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               AiToolResultBubble(
                 message: n,
                 toolLabel: _toolLabels.humanLabel(n.toolName ?? '', l10n),
+                initiallyExpanded: _settings.settings.autoExpandToolDetails,
               ),
             );
           }
