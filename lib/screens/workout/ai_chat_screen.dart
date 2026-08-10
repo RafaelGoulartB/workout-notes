@@ -292,13 +292,13 @@ class _AiChatScreenState extends State<AiChatScreen> {
       liveRegion: true,
       label: _phaseText(state, l10n),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+        padding: const EdgeInsets.fromLTRB(8, 10, 12, 14),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 30,
-              height: 30,
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: theme.colorScheme.primaryContainer,
@@ -309,7 +309,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 color: theme.colorScheme.onPrimaryContainer,
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Container(
               margin: const EdgeInsets.only(top: 1),
               padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),

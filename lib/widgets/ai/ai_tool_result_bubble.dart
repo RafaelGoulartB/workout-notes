@@ -31,7 +31,7 @@ class _AiToolResultBubbleState extends State<AiToolResultBubble> {
     final statusColor = isOk ? colors.primary : colors.error;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(56, 3, 16, 7),
+      padding: const EdgeInsets.fromLTRB(44, 3, 12, 7),
       child: Material(
         color: colors.surfaceContainerLow,
         shape: RoundedRectangleBorder(

@@ -62,6 +62,7 @@ class AiMessageBubble extends StatelessWidget {
                 onCopy: onCopy,
                 onRetry: null,
                 alignEnd: true,
+                compact: true,
               ),
           ],
         ),
@@ -74,12 +75,12 @@ class AiMessageBubble extends StatelessWidget {
     final colors = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      padding: const EdgeInsets.fromLTRB(8, 12, 12, 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _CoachAvatar(colors: colors),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,8 +125,8 @@ class _CoachAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 30,
-      height: 30,
+      width: 28,
+      height: 28,
       decoration: BoxDecoration(
         color: colors.primaryContainer,
         shape: BoxShape.circle,
@@ -144,12 +145,14 @@ class _MessageMeta extends StatelessWidget {
   final VoidCallback? onCopy;
   final VoidCallback? onRetry;
   final bool alignEnd;
+  final bool compact;
 
   const _MessageMeta({
     required this.timestamp,
     required this.onCopy,
     required this.onRetry,
     required this.alignEnd,
+    this.compact = false,
   });
 
   @override
@@ -157,38 +160,42 @@ class _MessageMeta extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    return Padding(
-      padding: const EdgeInsets.only(top: 3),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: alignEnd
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
-        children: [
-          if (timestamp != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: Text(
-                timestamp!,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                  fontSize: 10,
+    return Transform.translate(
+      offset: Offset(0, compact ? -4 : 0),
+      child: Padding(
+        padding: EdgeInsets.only(top: compact ? 0 : 3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: alignEnd
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
+          children: [
+            if (timestamp != null)
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: compact ? 5 : 6),
+                child: Text(
+                  timestamp!,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
                 ),
               ),
-            ),
-          if (onCopy != null)
-            _ActionButton(
-              tooltip: l10n.aiChatCopy,
-              icon: Icons.content_copy_rounded,
-              onPressed: onCopy!,
-            ),
-          if (onRetry != null)
-            _ActionButton(
-              tooltip: l10n.aiChatRetry,
-              icon: Icons.refresh_rounded,
-              onPressed: onRetry!,
-            ),
-        ],
+            if (onCopy != null)
+              _ActionButton(
+                tooltip: l10n.aiChatCopy,
+                icon: Icons.content_copy_rounded,
+                onPressed: onCopy!,
+                compact: compact,
+              ),
+            if (onRetry != null)
+              _ActionButton(
+                tooltip: l10n.aiChatRetry,
+                icon: Icons.refresh_rounded,
+                onPressed: onRetry!,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -198,11 +205,13 @@ class _ActionButton extends StatelessWidget {
   final String tooltip;
   final IconData icon;
   final VoidCallback onPressed;
+  final bool compact;
 
   const _ActionButton({
     required this.tooltip,
     required this.icon,
     required this.onPressed,
+    this.compact = false,
   });
 
   @override
@@ -211,11 +220,14 @@ class _ActionButton extends StatelessWidget {
       tooltip: tooltip,
       onPressed: onPressed,
       visualDensity: VisualDensity.compact,
-      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+      constraints: BoxConstraints.tightFor(
+        width: compact ? 30 : 36,
+        height: compact ? 30 : 36,
+      ),
       padding: EdgeInsets.zero,
       icon: Icon(
         icon,
-        size: 17,
+        size: compact ? 15 : 17,
         color: Theme.of(context).colorScheme.onSurfaceVariant,
       ),
     );
