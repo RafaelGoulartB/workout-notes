@@ -2577,100 +2577,106 @@ class _MealSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 6, 10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          title,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
+            // The header sits on a subtly tinted surface (one step
+            // darker/lighter than the card body, depending on the
+            // brightness) so the eye can read the title row as a
+            // distinct "section" above the items without the saturated
+            // primaryContainer band the previous design used.
+            ColoredBox(
+              color: theme.colorScheme.surfaceContainerHigh,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 6, 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          const SizedBox(height: 2),
+                          Text(
+                            _subtitleText(
+                              loc: loc,
+                              itemCount: meal.items.length,
+                              carbsG: carbsTotal,
+                              proteinG: proteinTotal,
+                              fatG: fatTotal,
+                            ),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (hasItems) ...[
+                      Text(
+                        '${_format(kcalTotal)} kcal',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: theme.colorScheme.primary,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          _subtitleText(
-                            loc: loc,
-                            itemCount: meal.items.length,
-                            carbsG: carbsTotal,
-                            proteinG: proteinTotal,
-                            fatG: fatTotal,
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    IconButton(
+                      tooltip: loc.nutritionAddItem,
+                      onPressed: onAdd,
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.add_circle_outline),
+                    ),
+                    PopupMenuButton<String>(
+                      tooltip: loc.nutritionMealMenu,
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: (action) {
+                        switch (action) {
+                          case 'repeat':
+                            onRepeat();
+                          case 'save':
+                            onSaveAsMeal();
+                        }
+                      },
+                      itemBuilder: (ctx) => [
+                        PopupMenuItem(
+                          value: 'repeat',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.replay_outlined),
+                            title: Text(loc.nutritionRepeatMeal),
                           ),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        PopupMenuItem(
+                          value: 'save',
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.bookmark_add_outlined),
+                            title: Text(loc.nutritionSaveMeal),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
-                  ),
-                  if (hasItems) ...[
-                    Text(
-                      '${_format(kcalTotal)} kcal',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
                   ],
-                  IconButton(
-                    tooltip: loc.nutritionAddItem,
-                    onPressed: onAdd,
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.add_circle_outline),
-                  ),
-                  PopupMenuButton<String>(
-                    tooltip: loc.nutritionMealMenu,
-                    icon: const Icon(Icons.more_vert),
-                    onSelected: (action) {
-                      switch (action) {
-                        case 'repeat':
-                          onRepeat();
-                        case 'save':
-                          onSaveAsMeal();
-                      }
-                    },
-                    itemBuilder: (ctx) => [
-                      PopupMenuItem(
-                        value: 'repeat',
-                        child: ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.replay_outlined),
-                          title: Text(loc.nutritionRepeatMeal),
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'save',
-                        child: ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.bookmark_add_outlined),
-                          title: Text(loc.nutritionSaveMeal),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
             ),
             if (hasItems)
               Divider(
                 height: 1,
                 thickness: 1,
-                indent: 16,
-                endIndent: 16,
-                color: theme.colorScheme.outlineVariant.withAlpha(60),
+                color: theme.colorScheme.outlineVariant,
               ),
             if (!hasItems)
               _MealEmptyState(onAdd: onAdd)
