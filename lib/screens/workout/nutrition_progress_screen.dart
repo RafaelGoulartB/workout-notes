@@ -244,7 +244,7 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
               onRefresh: _load,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
                 children: [
                   _BalanceHeroCard(
                     balance: _windowBalance,
