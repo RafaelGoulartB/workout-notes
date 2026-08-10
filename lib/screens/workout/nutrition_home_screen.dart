@@ -4,20 +4,15 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
-import 'package:workout_notes/models/nutrition/food.dart';
-import 'package:workout_notes/models/nutrition/food_serving.dart';
-import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/services/barcode_scanner_service.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
 
-import 'barcode_scan_screen.dart';
 import 'food_quantity_sheet.dart';
 import 'food_library_screen.dart';
 import 'food_search_screen.dart';
@@ -28,11 +23,12 @@ import 'saved_meals_screen.dart';
 
 enum _NutritionMenuAction { progress, savedMeals, copyPreviousDay, manageMeals }
 
-/// Nutrition dashboard. Shows the day's totals at a glance, a quick
-/// "today" panel with one row per configured meal (so the most common
-/// action — adding a food to the next meal — is a single tap away)
-/// and a tools grid for progress, saved meals, the food library and
-/// settings. Tapping the summary card opens the detailed diary.
+/// Nutrition dashboard. Shows the day's totals at a glance, a tools
+/// grid (progress, saved meals, food library, settings) and a
+/// collapsible "today" panel with one row per configured meal. The
+/// per-meal rows open the food search pre-bound to that meal so the
+/// most common action — adding a food — is a single tap away. Tapping
+/// the summary card opens the detailed diary.
 class NutritionHomeScreen extends StatefulWidget {
   const NutritionHomeScreen({super.key});
 
@@ -43,14 +39,12 @@ class NutritionHomeScreen extends StatefulWidget {
 class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   final NutritionRepository _repository = NutritionRepository();
   final NutritionGateway _gateway = OpenFoodFactsGateway();
-  final BarcodeScannerService _barcodeScanner = const BarcodeScannerService();
 
   DailyNutritionSummary _summary = DailyNutritionSummary.empty;
   NutritionGoal? _goal;
   List<MealTypeDefinition> _mealTypes = const [];
   List<MealLogWithItems> _meals = const [];
   bool _isLoading = true;
-  bool _isMutating = false;
   bool _showMeals = true;
 
   @override
@@ -142,101 +136,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   int get _totalItemsToday =>
       _meals.fold<int>(0, (sum, meal) => sum + meal.items.length);
 
-  /// Picks the meal type the user is most likely to want to add to right
-  /// now: the first configured type that has no items yet, otherwise
-  /// the first configured type. Falls back to null when the catalog is
-  /// empty so callers can decide what to do.
-  MealTypeDefinition? _suggestedMealType() {
-    if (_mealTypes.isEmpty) return null;
-    for (final type in _mealTypes) {
-      final has = _meals.any(
-        (m) => m.log.mealType == type.key && m.items.isNotEmpty,
-      );
-      if (!has) return type;
-    }
-    return _mealTypes.first;
-  }
-
-  Future<MealTypeDefinition?> _pickMealTypeSheet(AppLocalizations loc) {
-    return showModalBottomSheet<MealTypeDefinition>(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    loc.nutritionHomePickMeal,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                for (final type in _mealTypes) ...[
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer.withAlpha(120),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        Icons.restaurant_outlined,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                    title: Text(type.displayName(loc)),
-                    trailing: Icon(
-                      Icons.chevron_right_rounded,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    onTap: () => Navigator.of(ctx).pop(type),
-                  ),
-                ],
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  icon: const Icon(Icons.close_rounded),
-                  label: Text(loc.nutritionCancel),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// Primary "add a food" flow. Asks the user which meal to add to
-  /// when more than one is configured, then opens the food search
-  /// pre-bound to that meal.
-  Future<void> _addQuickFood() async {
-    if (_mealTypes.isEmpty) {
-      // No meal catalog yet: jump straight to the search screen so the
-      // user can still log a food; the diary edit will pick the meal
-      // type at the quantity-sheet step.
-      await _openFoodSearchForMeal(null, null);
-      return;
-    }
-    final selected = _mealTypes.length == 1
-        ? _mealTypes.first
-        : await _pickMealTypeSheet(AppLocalizations.of(context)!);
-    if (selected == null || !mounted) return;
-    await _openFoodSearchForMeal(
-      selected.key,
-      selected.displayName(AppLocalizations.of(context)!),
-    );
-  }
-
   Future<void> _openFoodSearchForMeal(String? mealType, String? mealLabel) async {
     final result = await Navigator.of(context).push<NutritionSelection>(
       MaterialPageRoute(
@@ -270,163 +169,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     await _openFoodSearchForMeal(type.key, type.displayName(loc));
   }
 
-  /// Scans a barcode and routes the resulting product into the diary.
-  /// Mirrors the food search screen's scan flow but skips the search
-  /// page so the "scan" quick action is a single tap. Falls back to
-  /// opening the food search screen if the catalog is empty (so the
-  /// user can still log the food once they configure a meal type).
-  Future<void> _scanBarcode() async {
-    final loc = AppLocalizations.of(context)!;
-    if (!_barcodeScanner.isSupported) {
-      _showSnack(loc.nutritionScanUnsupported);
-      return;
-    }
-    final raw = await Navigator.of(context).push<String?>(
-      MaterialPageRoute(
-        builder: (_) => BarcodeScanScreen(scanner: _barcodeScanner),
-      ),
-    );
-    if (raw == null || raw.isEmpty || !mounted) return;
-    final productCode = _extractProductCode(raw);
-    if (productCode == null) {
-      _showSnack(loc.nutritionScanInvalid);
-      return;
-    }
-    final target = _suggestedMealType();
-    if (target == null) {
-      _showSnack(loc.nutritionSavedMealNoMealTypes);
-      return;
-    }
-    setState(() => _isMutating = true);
-    try {
-      // 1. Local cache: a known barcode is resolved without a network
-      //    hop.
-      final local = await _repository.getFoodByBarcode(productCode);
-      if (local != null) {
-        if (!mounted) return;
-        await _openQuantityForScanResult(
-          local.food,
-          local.variants,
-          local.servings,
-          target,
-        );
-        return;
-      }
-      // 2. Fall back to the Open Food Facts gateway for unknown codes.
-      final result = await _gateway.getFood(
-        FoodSource.openFoodFacts,
-        productCode,
-      );
-      if (!mounted) return;
-      if (result.error != null) {
-        _showSnack(_barcodeErrorText(result.error!.code));
-        return;
-      }
-      final remote = result.data;
-      final variant = remote?.primaryVariant;
-      if (remote == null || variant == null) {
-        _showSnack(loc.nutritionScanNotFound);
-        return;
-      }
-      final upserted = await _repository.upsertFoodWithDetails(
-        food: remote.food,
-        variants: [variant],
-        servings: {variant.id: remote.servings},
-      );
-      if (!mounted) return;
-      final rehydrated = await _repository.getFoodWithDetails(upserted.id);
-      if (rehydrated == null) {
-        _showSnack(loc.nutritionScanNotFound);
-        return;
-      }
-      await _openQuantityForScanResult(
-        rehydrated.food,
-        rehydrated.variants,
-        rehydrated.servings,
-        target,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
-    } finally {
-      if (mounted) setState(() => _isMutating = false);
-    }
-  }
-
-  /// Opens the quantity sheet for a scan-resolved food, then persists
-  /// it to the supplied meal type.
-  Future<void> _openQuantityForScanResult(
-    Food food,
-    List<FoodVariant> variants,
-    Map<String, List<FoodServing>> servings,
-    MealTypeDefinition target,
-  ) async {
-    if (variants.isEmpty) {
-      _showSnack(AppLocalizations.of(context)!.nutritionFoodNoVariant);
-      return;
-    }
-    final variant = variants.first;
-    if (!mounted) return;
-    final loc = AppLocalizations.of(context)!;
-    final selection = await showFoodQuantitySheet(
-      context: context,
-      food: food,
-      primaryVariant: variant,
-      servings: servings[variant.id] ?? const [],
-    );
-    if (selection == null) return;
-    setState(() => _isMutating = true);
-    try {
-      final upserted = await _repository.upsertFoodWithDetails(
-        food: selection.food,
-        variants: [selection.variant],
-        servings: {selection.variant.id: selection.availableServings},
-      );
-      await _repository.addMealLogItem(
-        date: _dateString(DateTime.now()),
-        mealType: target.key,
-        name: target.displayName(loc),
-        food: upserted,
-        variant: selection.variant,
-        conversion: selection.conversion,
-        availableServings: selection.availableServings,
-      );
-      if (!mounted) return;
-      _showSnack(loc.nutritionItemSaved);
-    } catch (e) {
-      if (!mounted) return;
-      _showSnack(loc.commonError(e.toString()));
-    } finally {
-      if (mounted) setState(() => _isMutating = false);
-      await _load();
-    }
-  }
-
-  /// Pulls the product code out of a raw scan. The scanner may return
-  /// either a plain barcode or an Open Food Facts URL — both are
-  /// accepted by the gateway.
-  static String? _extractProductCode(String raw) {
-    final trimmed = raw.trim();
-    final urlMatch = RegExp(r'/product/(\d+)(?:[/?]|$)').firstMatch(trimmed);
-    if (urlMatch != null) return urlMatch.group(1);
-    final digits = trimmed.replaceAll(RegExp(r'\D'), '');
-    return digits.isEmpty ? null : digits;
-  }
-
-  String _barcodeErrorText(String code) {
-    final loc = AppLocalizations.of(context)!;
-    switch (code) {
-      case 'not_found':
-        return loc.nutritionScanNotFound;
-      case 'rate_limited':
-        return loc.nutritionRateLimited;
-      case 'network':
-        return loc.nutritionScanNetwork;
-      default:
-        return loc.nutritionScanError;
-    }
-  }
-
   void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
@@ -438,9 +180,9 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   ) async {
     final loc = AppLocalizations.of(context)!;
     final date = _dateString(DateTime.now());
-    // If the user came from the quick-add path and the search screen
-    // didn't bind a meal, fall back to the first configured type so we
-    // always persist to a real section.
+    // If the user came from a per-meal tap and the search screen
+    // didn't bind a meal, fall back to the first configured type so
+    // we always persist to a real section.
     final resolvedType = mealType ?? _mealTypes.firstOrNull?.key;
     final resolvedLabel = mealLabel ?? (resolvedType == null
         ? null
@@ -454,7 +196,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
       _showSnack(loc.nutritionSavedMealNoMealTypes);
       return;
     }
-    setState(() => _isMutating = true);
     try {
       final upserted = await _repository.upsertFoodWithDetails(
         food: selection.food,
@@ -476,7 +217,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
       if (!mounted) return;
       _showSnack(loc.commonError(e.toString()));
     } finally {
-      if (mounted) setState(() => _isMutating = false);
       await _load();
     }
   }
@@ -493,11 +233,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     final empty =
         _mealTypes.isEmpty && orphanMeals.isEmpty && _meals.isEmpty;
     if (empty) {
-      return [
-        SliverToBoxAdapter(
-          child: _NutritionHomeEmptyMeals(onAdd: _addQuickFood),
-        ),
-      ];
+      return [SliverToBoxAdapter(child: _NutritionHomeEmptyMeals())];
     }
     return [
       for (final type in _mealTypes)
@@ -590,17 +326,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                   ),
                   SliverToBoxAdapter(
                     child: _NutritionSectionHeader(
-                      text: loc.nutritionHomeSectionQuickActions,
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _NutritionQuickActionsRow(
-                      onAddFood: _isMutating ? null : _addQuickFood,
-                      onScan: _isMutating ? null : _scanBarcode,
-                    ).animate().fadeIn(duration: 350.ms, delay: 120.ms),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _NutritionSectionHeader(
                       text: loc.nutritionHomeSectionTools,
                     ),
                   ),
@@ -610,7 +335,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                       onSavedMeals: _openSavedMeals,
                       onFoods: _openFoodLibrary,
                       onSettings: _openSettings,
-                    ).animate().fadeIn(duration: 350.ms, delay: 180.ms),
+                    ).animate().fadeIn(duration: 350.ms, delay: 120.ms),
                   ),
                   SliverToBoxAdapter(
                     child: _CollapsibleSectionHeader(
@@ -982,113 +707,6 @@ class _NutritionSectionHeader extends StatelessWidget {
   }
 }
 
-/// Two large action cards for the "Quick actions" section. Mirrors
-/// the workout home's _ActionCard so the two tabs feel like one app.
-class _NutritionQuickActionsRow extends StatelessWidget {
-  final VoidCallback? onAddFood;
-  final VoidCallback? onScan;
-
-  const _NutritionQuickActionsRow({required this.onAddFood, required this.onScan});
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: _NutritionActionCard(
-              icon: Icons.add_circle_outline_rounded,
-              label: loc.nutritionHomeAddFood,
-              subtitle: loc.nutritionHomeAddFoodSubtitle,
-              color: Theme.of(context).colorScheme.primary,
-              onTap: onAddFood,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _NutritionActionCard(
-              icon: Icons.qr_code_scanner_rounded,
-              label: loc.nutritionHomeScanBarcode,
-              subtitle: loc.nutritionHomeScanBarcodeSubtitle,
-              color: Theme.of(context).colorScheme.secondary,
-              onTap: onScan,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NutritionActionCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final Color color;
-  final VoidCallback? onTap;
-
-  const _NutritionActionCard({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final disabled = onTap == null;
-    return Opacity(
-      opacity: disabled ? 0.5 : 1,
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: color.withAlpha(25),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: color, size: 24),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  label,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// 2x2 tools grid (4 cells), matching the workout home's
 /// _buildNavGrid so the bottom of both tabs feels identical.
 class _NutritionToolsGrid extends StatelessWidget {
@@ -1440,8 +1058,7 @@ class _NutritionHomeMealRow extends StatelessWidget {
 /// First-time / empty state for the "today" meals list. Shown when
 /// the meal catalog is empty AND no meals have been logged yet.
 class _NutritionHomeEmptyMeals extends StatelessWidget {
-  final VoidCallback onAdd;
-  const _NutritionHomeEmptyMeals({required this.onAdd});
+  const _NutritionHomeEmptyMeals();
 
   @override
   Widget build(BuildContext context) {
@@ -1514,16 +1131,6 @@ class _NutritionHomeSkeleton extends StatelessWidget {
         line(h: 22, w: 160),
         const SizedBox(height: 14),
         line(h: 130, r: 20),
-        const SizedBox(height: 22),
-        line(h: 12, w: 100),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(child: line(h: 100, r: 16)),
-            const SizedBox(width: 12),
-            Expanded(child: line(h: 100, r: 16)),
-          ],
-        ),
         const SizedBox(height: 22),
         line(h: 12, w: 80),
         const SizedBox(height: 12),
