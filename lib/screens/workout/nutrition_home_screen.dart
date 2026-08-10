@@ -745,9 +745,9 @@ class _NutritionToolsGrid extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final items = [
       _NutritionToolItemData(
-        Icons.insights_rounded,
-        loc.nutritionHomeToolHistory,
-        onProgress,
+        Icons.fastfood_rounded,
+        loc.nutritionFoodLibraryTitle,
+        onFoods,
       ),
       _NutritionToolItemData(
         Icons.bookmark_outline_rounded,
@@ -755,9 +755,9 @@ class _NutritionToolsGrid extends StatelessWidget {
         onSavedMeals,
       ),
       _NutritionToolItemData(
-        Icons.fastfood_rounded,
-        loc.nutritionFoodLibraryTitle,
-        onFoods,
+        Icons.insights_rounded,
+        loc.nutritionHomeToolBalance,
+        onProgress,
       ),
       _NutritionToolItemData(
         Icons.tune_rounded,
