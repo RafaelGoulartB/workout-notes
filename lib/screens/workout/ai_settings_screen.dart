@@ -7,6 +7,7 @@ import '../../models/ai_settings.dart';
 import '../../services/ai_service.dart';
 import '../../state/ai_settings_notifier.dart';
 import '../../utils/ai_error_localizer.dart';
+import '../../widgets/ai/ai_provider_picker_sheet.dart';
 import '../../widgets/empty_state_placeholder.dart';
 import '../../widgets/settings/settings.dart';
 
@@ -105,90 +106,125 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     final l10n = AppLocalizations.of(context)!;
     final isActive = p.id == settings.activeProviderId;
     return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? theme.colorScheme.primary.withAlpha(25)
-                        : theme.colorScheme.surfaceContainerHighest.withAlpha(120),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    isActive
-                        ? Icons.check_circle_rounded
-                        : Icons.cloud_outlined,
-                    size: 18,
-                    color: isActive
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurfaceVariant,
-                  ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? theme.colorScheme.primary.withAlpha(25)
+                      : theme.colorScheme.surfaceContainerHighest.withAlpha(
+                          120,
+                        ),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    p.name,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                child: Icon(
+                  isActive ? Icons.check_circle_rounded : Icons.cloud_outlined,
+                  size: 18,
+                  color: isActive
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
-                if (!isActive)
-                  TextButton(
-                    onPressed: () => _notifier.setActiveProvider(p.id),
-                    child: Text(l10n.aiSettingsActivate),
-                  ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.only(left: 48),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 4),
-                  Text(
-                    p.baseUrl,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  if (p.selectedModel.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        l10n.aiSettingsModelValue(p.selectedModel),
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                ],
               ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed: () => _showEditProviderSheet(p),
-                  icon: const Icon(Icons.edit_rounded, size: 16),
-                  label: Text(l10n.aiSettingsEdit),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  p.name,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                TextButton.icon(
-                  onPressed: () => _confirmRemove(p),
-                  icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                  label: Text(l10n.aiSettingsRemove),
+              ),
+              if (!isActive)
+                TextButton(
+                  onPressed: () => _notifier.setActiveProvider(p.id),
+                  child: Text(l10n.aiSettingsActivate),
+                ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 48),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
+                Text(
+                  p.baseUrl,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => _showModelPicker(p),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.smart_toy_outlined,
+                          size: 18,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.aiSettingsDefaultModel,
+                                style: theme.textTheme.labelLarge,
+                              ),
+                              Text(
+                                p.selectedModel.isEmpty
+                                    ? l10n.aiSettingsNoModelSelected
+                                    : p.selectedModel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right_rounded),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
-          ],
-        ),
-      );
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: () => _showEditProviderSheet(p),
+                icon: const Icon(Icons.edit_rounded, size: 16),
+                label: Text(l10n.aiSettingsEdit),
+              ),
+              TextButton.icon(
+                onPressed: () => _confirmRemove(p),
+                icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                label: Text(l10n.aiSettingsRemove),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _confirmRemove(AiProvider p) async {
@@ -312,6 +348,17 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
 
   void _showEditProviderSheet(AiProvider provider) {
     _showProviderEditor(provider);
+  }
+
+  void _showModelPicker(AiProvider provider) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => AiProviderPickerSheet(
+        notifier: _notifier,
+        initialProviderId: provider.id,
+      ),
+    );
   }
 
   void _showProviderEditor(AiProvider? existing) {

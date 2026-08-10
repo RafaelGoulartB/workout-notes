@@ -886,6 +886,8 @@
   "aiSettingsRemoveConfirmBody": "The token will also be deleted.",
   "aiSettingsBaseUrl": "Base URL",
   "aiSettingsModelValue": "Model: {model}",
+  "aiSettingsDefaultModel": "Default model",
+  "aiSettingsNoModelSelected": "No model selected",
   "aiSettingsProviderName": "Name",
   "aiSettingsNameRequired": "Enter a name.",
   "aiSettingsBaseUrlRequired": "Enter a base URL.",

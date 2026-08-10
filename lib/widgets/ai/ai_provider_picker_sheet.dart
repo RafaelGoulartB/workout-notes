@@ -7,7 +7,13 @@ import '../../utils/ai_error_localizer.dart';
 
 class AiProviderPickerSheet extends StatefulWidget {
   final AiSettingsNotifier notifier;
-  const AiProviderPickerSheet({super.key, required this.notifier});
+  final String? initialProviderId;
+
+  const AiProviderPickerSheet({
+    super.key,
+    required this.notifier,
+    this.initialProviderId,
+  });
 
   @override
   State<AiProviderPickerSheet> createState() => _AiProviderPickerSheetState();
@@ -23,7 +29,8 @@ class _AiProviderPickerSheetState extends State<AiProviderPickerSheet> {
   @override
   void initState() {
     super.initState();
-    _selectedId = widget.notifier.settings.activeProvider?.id;
+    _selectedId =
+        widget.initialProviderId ?? widget.notifier.settings.activeProvider?.id;
     _search.addListener(
       () => setState(() => _query = _search.text.trim().toLowerCase()),
     );
