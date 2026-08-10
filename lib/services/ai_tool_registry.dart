@@ -2,24 +2,139 @@ import '../database/database_helper.dart';
 import '../l10n/app_localizations.dart';
 import '../models/ai_message_role.dart';
 import '../repositories/goal_repository.dart';
+import 'ai_wellness_analytics_service.dart';
 
 class AiToolRegistry {
   final DatabaseHelper db;
   final GoalRepository goalRepo;
-  AiToolRegistry({DatabaseHelper? db, GoalRepository? goalRepo})
-    : db = db ?? DatabaseHelper.instance,
-      goalRepo = goalRepo ?? GoalRepository();
+  final AiWellnessAnalyticsService wellness;
+  AiToolRegistry({
+    DatabaseHelper? db,
+    GoalRepository? goalRepo,
+    AiWellnessAnalyticsService? wellness,
+  }) : db = db ?? DatabaseHelper.instance,
+       goalRepo = goalRepo ?? GoalRepository(),
+       wellness = wellness ?? AiWellnessAnalyticsService(db: db);
 
   /// OpenAI function-calling JSON schemas for all read tools.
-  List<Map<String, dynamic>> openAiReadToolsSchema() {
-    return _tools.map((t) => _schemaFor(t['name'] as String)).toList();
+  List<Map<String, dynamic>> openAiReadToolsSchema({Iterable<String>? names}) {
+    final selected = names?.toSet();
+    return _tools
+        .where((tool) => selected == null || selected.contains(tool['name']))
+        .map((tool) => _schemaFor(tool['name'] as String))
+        .toList();
   }
 
   /// All tools available during a chat turn, including guarded proposals.
-  List<Map<String, dynamic>> openAiChatToolsSchema() => [
-    ...openAiReadToolsSchema(),
-    _schemaFor('propose_routine_change'),
+  List<Map<String, dynamic>> openAiChatToolsSchema({
+    Iterable<String>? names,
+    bool includeRoutineProposal = true,
+  }) => [
+    ...openAiReadToolsSchema(names: names),
+    if (includeRoutineProposal) _schemaFor('propose_routine_change'),
   ];
+
+  /// Selects a compact tool catalog for the current user request.
+  Set<String> toolNamesForQuery(String query) {
+    final text = query.toLowerCase();
+    final selected = <String>{};
+    bool hasAny(Iterable<String> terms) => terms.any(text.contains);
+
+    if (hasAny(['sono', 'sleep', 'dormi', 'insonia', 'insônia'])) {
+      selected.addAll({
+        'get_sleep_summary',
+        'analyze_sleep_performance',
+        'get_weekly_recovery_trend',
+        'list_recent_workouts',
+      });
+    }
+    if (hasAny([
+      'nutri',
+      'caloria',
+      'macro',
+      'proteina',
+      'proteína',
+      'carbo',
+      'gordura',
+      'comida',
+      'dieta',
+      'ingestao',
+      'ingestão',
+      'refeicao',
+      'refeição',
+    ])) {
+      selected.addAll({
+        'get_nutrition_summary',
+        'analyze_nutrition_body_trend',
+        'list_body_measurements',
+      });
+    }
+    if (hasAny(['recuper', 'fadiga', 'cansa', 'readiness', 'descanso'])) {
+      selected.addAll({
+        'get_weekly_recovery_trend',
+        'get_sleep_summary',
+        'get_nutrition_summary',
+        'list_recent_workouts',
+      });
+    }
+    if (hasAny([
+      'peso',
+      'weight',
+      'medida',
+      'corpo',
+      'composicao',
+      'composição',
+    ])) {
+      selected.addAll({
+        'list_body_measurements',
+        'analyze_nutrition_body_trend',
+      });
+    }
+    if (hasAny(['rotina', 'routine', 'ficha', 'divisao', 'divisão'])) {
+      selected.addAll({
+        'list_routines',
+        'get_routine_detail',
+        'list_exercises',
+      });
+    }
+    if (hasAny([
+      'treino',
+      'workout',
+      'exercicio',
+      'exercício',
+      'serie',
+      'série',
+      'carga',
+      'volume',
+      'recorde',
+      'cardio',
+      'corrida',
+    ])) {
+      selected.addAll({
+        'list_recent_workouts',
+        'get_workout_detail',
+        'list_exercises',
+        'get_exercise_history',
+        'get_exercise_personal_records',
+        'get_weekly_volume_breakdown',
+        'get_progress_trend',
+        'get_cardio_summary',
+      });
+    }
+    if (hasAny(['meta', 'goal', 'objetivo'])) {
+      selected.addAll({'list_goals', 'get_goal_progress_history'});
+    }
+    if (selected.isEmpty) {
+      selected.addAll({
+        'list_recent_workouts',
+        'get_sleep_summary',
+        'get_nutrition_summary',
+        'get_weekly_recovery_trend',
+        'list_goals',
+      });
+    }
+    return selected;
+  }
 
   /// Human-friendly label for a tool name (used in chat bubbles).
   String humanLabel(String toolName, [AppLocalizations? l10n]) {
@@ -51,6 +166,16 @@ class AiToolRegistry {
           return l10n.aiToolListGoals;
         case 'get_goal_progress_history':
           return l10n.aiToolGoalHistory;
+        case 'get_sleep_summary':
+          return l10n.aiToolSleepSummary;
+        case 'get_nutrition_summary':
+          return l10n.aiToolNutritionSummary;
+        case 'analyze_sleep_performance':
+          return l10n.aiToolSleepPerformance;
+        case 'analyze_nutrition_body_trend':
+          return l10n.aiToolNutritionBodyTrend;
+        case 'get_weekly_recovery_trend':
+          return l10n.aiToolRecoveryTrend;
         case 'propose_routine_change':
           return l10n.aiToolProposeRoutineChange;
       }
@@ -82,6 +207,16 @@ class AiToolRegistry {
         return 'Metas ativas';
       case 'get_goal_progress_history':
         return 'Histórico da meta';
+      case 'get_sleep_summary':
+        return 'Analisando sono recente';
+      case 'get_nutrition_summary':
+        return 'Analisando nutrição';
+      case 'analyze_sleep_performance':
+        return 'Relacionando sono e desempenho';
+      case 'analyze_nutrition_body_trend':
+        return 'Relacionando ingestão e peso';
+      case 'get_weekly_recovery_trend':
+        return 'Calculando recuperação semanal';
       case 'propose_routine_change':
         return 'Preparando proposta de rotina';
       default:
@@ -122,6 +257,36 @@ class AiToolRegistry {
           return _ok(await _listGoals(args));
         case 'get_goal_progress_history':
           return _ok(await _getGoalProgressHistory(args));
+        case 'get_sleep_summary':
+          return _ok(
+            await wellness.sleepSummary(
+              days: _boundedInt(args, 'days', 14, 3, 90),
+            ),
+          );
+        case 'get_nutrition_summary':
+          return _ok(
+            await wellness.nutritionSummary(
+              days: _boundedInt(args, 'days', 14, 3, 90),
+            ),
+          );
+        case 'analyze_sleep_performance':
+          return _ok(
+            await wellness.sleepPerformance(
+              days: _boundedInt(args, 'days', 42, 7, 90),
+            ),
+          );
+        case 'analyze_nutrition_body_trend':
+          return _ok(
+            await wellness.nutritionBodyTrend(
+              days: _boundedInt(args, 'days', 84, 14, 180),
+            ),
+          );
+        case 'get_weekly_recovery_trend':
+          return _ok(
+            await wellness.weeklyRecoveryTrend(
+              weeks: _boundedInt(args, 'weeks', 8, 2, 12),
+            ),
+          );
         default:
           return AiToolResult(
             ok: false,
@@ -141,7 +306,7 @@ class AiToolRegistry {
   Future<Map<String, dynamic>> _listRecentWorkouts(
     Map<String, dynamic> args,
   ) async {
-    final limit = (args['limit'] as int?) ?? 10;
+    final limit = _boundedInt(args, 'limit', 10, 1, 20);
     final rows = await db.getWorkouts(limit: limit);
     final out = <Map<String, dynamic>>[];
     for (final w in rows) {
@@ -220,7 +385,9 @@ class AiToolRegistry {
       search: args['name_contains'] as String?,
       favorites: args['is_favorite'] as bool?,
     );
+    final limit = _boundedInt(args, 'limit', 30, 1, 50);
     final compact = rows
+        .take(limit)
         .map(
           (e) => {
             'id': e['id'],
@@ -240,7 +407,7 @@ class AiToolRegistry {
     final id =
         (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
     if (id == null) return {'error': 'exercise_id é obrigatório'};
-    final limit = (args['limit'] as int?) ?? 20;
+    final limit = _boundedInt(args, 'limit', 20, 1, 40);
     final history = await db.getExerciseHistory(id, limit: limit);
     return {
       'exerciseId': id,
@@ -266,8 +433,7 @@ class AiToolRegistry {
   Future<Map<String, dynamic>> _getWeeklyVolumeBreakdown(
     Map<String, dynamic> args,
   ) async {
-    final weeks =
-        (args['weeks_back'] as int?) ?? (args['weeksBack'] as int?) ?? 8;
+    final weeks = _boundedInt(args, 'weeks', 8, 2, 16);
     final byCategory = await db.getWeeklyVolumeByCategory(weeks: weeks);
     return {'weeksBack': weeks, 'byCategory': byCategory};
   }
@@ -278,8 +444,7 @@ class AiToolRegistry {
     final id =
         (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
     if (id == null) return {'error': 'exercise_id é obrigatório'};
-    final weeks =
-        (args['weeks_back'] as int?) ?? (args['weeksBack'] as int?) ?? 8;
+    final weeks = _boundedInt(args, 'weeks', 8, 2, 16);
     final history = await db.getExerciseHistory(id, limit: weeks * 5);
     return {
       'exerciseId': id,
@@ -367,7 +532,7 @@ class AiToolRegistry {
     Map<String, dynamic> args,
   ) async {
     final type = args['type'] as String?;
-    final limit = (args['limit'] as int?) ?? 30;
+    final limit = _boundedInt(args, 'limit', 30, 1, 50);
     final rows = await db.getBodyMeasurements(type: type, limit: limit);
     return {
       'type': type,
@@ -390,8 +555,7 @@ class AiToolRegistry {
   Future<Map<String, dynamic>> _getCardioSummary(
     Map<String, dynamic> args,
   ) async {
-    final weeks =
-        (args['weeks_back'] as int?) ?? (args['weeksBack'] as int?) ?? 4;
+    final weeks = _boundedInt(args, 'weeks', 4, 2, 16);
     final weekly = await db.getCardioWeeklyDistance(weeks: weeks);
     final byModality = await db.getCardioDistanceByModality();
     return {
@@ -443,7 +607,7 @@ class AiToolRegistry {
   ) async {
     final id = (args['goal_id'] as String?) ?? (args['goalId'] as String?);
     if (id == null) return {'error': 'goal_id é obrigatório'};
-    final periods = (args['periods_back'] as int?) ?? 6;
+    final periods = _boundedInt(args, 'periods', 6, 1, 12);
     final goal = await goalRepo.getById(id);
     if (goal == null) return {'error': 'meta não encontrada'};
     final (current, history) = await goalRepo.getProgressWithHistory(
@@ -709,6 +873,60 @@ class AiToolRegistry {
             },
           },
         };
+      case 'get_sleep_summary':
+        return _windowToolSchema(
+          name,
+          'Resumo agregado do sono recente: duração, eficiência, cobertura e regularidade de horários. Use antes de opinar sobre sono.',
+          defaultValue: 14,
+          minimum: 3,
+          maximum: 90,
+        );
+      case 'get_nutrition_summary':
+        return _windowToolSchema(
+          name,
+          'Resumo agregado de calorias e macronutrientes, meta ativa, cobertura e qualidade dos registros.',
+          defaultValue: 14,
+          minimum: 3,
+          maximum: 90,
+        );
+      case 'analyze_sleep_performance':
+        return _windowToolSchema(
+          name,
+          'Calcula associações observacionais entre sono e volume/sensação dos treinos em datas pareadas. Não implica causalidade.',
+          defaultValue: 42,
+          minimum: 7,
+          maximum: 90,
+        );
+      case 'analyze_nutrition_body_trend':
+        return _windowToolSchema(
+          name,
+          'Relaciona ingestão semanal de calorias/macros com medidas de peso corporal e informa cobertura dos dados.',
+          defaultValue: 84,
+          minimum: 14,
+          maximum: 180,
+        );
+      case 'get_weekly_recovery_trend':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Tendência semanal não clínica de recuperação, combinando apenas componentes disponíveis de sono, regularidade e sensação dos treinos.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'weeks': {
+                  'type': 'integer',
+                  'description': 'Semanas (2 a 12; padrão 8).',
+                  'default': 8,
+                  'minimum': 2,
+                  'maximum': 12,
+                },
+              },
+              'required': const [],
+            },
+          },
+        };
       case 'propose_routine_change':
         return {
           'type': 'function',
@@ -795,6 +1013,45 @@ class AiToolRegistry {
     }
   }
 
+  Map<String, dynamic> _windowToolSchema(
+    String name,
+    String description, {
+    required int defaultValue,
+    required int minimum,
+    required int maximum,
+  }) => {
+    'type': 'function',
+    'function': {
+      'name': name,
+      'description': description,
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'days': {
+            'type': 'integer',
+            'description': 'Janela em dias ($minimum a $maximum).',
+            'default': defaultValue,
+            'minimum': minimum,
+            'maximum': maximum,
+          },
+        },
+        'required': const [],
+      },
+    },
+  };
+
+  int _boundedInt(
+    Map<String, dynamic> args,
+    String key,
+    int fallback,
+    int minimum,
+    int maximum,
+  ) {
+    final raw = args[key] ?? args['${key}_back'];
+    final value = raw is num ? raw.toInt() : int.tryParse('$raw');
+    return (value ?? fallback).clamp(minimum, maximum);
+  }
+
   AiToolResult _ok(Map<String, dynamic> data) =>
       AiToolResult(ok: true, data: data);
 
@@ -821,6 +1078,23 @@ class AiToolRegistry {
     {
       'name': 'get_goal_progress_history',
       'description': 'Goal progress history',
+    },
+    {'name': 'get_sleep_summary', 'description': 'Recent sleep summary'},
+    {
+      'name': 'get_nutrition_summary',
+      'description': 'Calories and macros summary',
+    },
+    {
+      'name': 'analyze_sleep_performance',
+      'description': 'Sleep and workout performance association',
+    },
+    {
+      'name': 'analyze_nutrition_body_trend',
+      'description': 'Nutrition and body-weight trend',
+    },
+    {
+      'name': 'get_weekly_recovery_trend',
+      'description': 'Weekly recovery trend',
     },
   ];
 }

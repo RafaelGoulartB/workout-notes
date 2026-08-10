@@ -17,9 +17,9 @@ void main() {
     await uninstallAiTestDb();
   });
 
-  test('openAiReadToolsSchema returns 13 tools with valid shape', () {
+  test('openAiReadToolsSchema returns 18 tools with valid shape', () {
     final tools = registry.openAiReadToolsSchema();
-    expect(tools.length, 13);
+    expect(tools.length, 18);
     for (final t in tools) {
       expect(t['type'], 'function');
       expect(t['function'], isA<Map>());
@@ -31,7 +31,7 @@ void main() {
 
   test('openAiChatToolsSchema includes the guarded routine proposal tool', () {
     final tools = registry.openAiChatToolsSchema();
-    expect(tools, hasLength(14));
+    expect(tools, hasLength(19));
     final proposal = tools.firstWhere(
       (tool) => (tool['function'] as Map)['name'] == 'propose_routine_change',
     );
@@ -67,6 +67,47 @@ void main() {
       final name = (t['function'] as Map)['name'] as String;
       expect(registry.humanLabel(name), isNotEmpty);
     }
+  });
+
+  test('tool routing exposes a compact domain-specific catalog', () {
+    final names = registry.toolNamesForQuery(
+      'Meu sono está afetando meu desempenho no treino?',
+    );
+    expect(names, contains('get_sleep_summary'));
+    expect(names, contains('analyze_sleep_performance'));
+    expect(names, isNot(contains('get_routine_detail')));
+    expect(
+      registry.openAiReadToolsSchema(names: names).length,
+      lessThan(registry.openAiReadToolsSchema().length),
+    );
+  });
+
+  test('tool results preserve all rows requested by the query', () async {
+    await db.insert('exercise_categories', {
+      'id': 'large',
+      'name': 'Categoria',
+      'color': 0,
+      'order_index': 0,
+      'energy_system': 'anaerobic',
+    });
+    for (var i = 0; i < 50; i++) {
+      await db.insert('exercises', {
+        'id': 'large-$i',
+        'name': 'Exercício $i ${List.filled(500, 'x').join()}',
+        'category_id': 'large',
+        'type': 'weightReps',
+        'is_favorite': 0,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    }
+    final result = await registry.executeRead(
+      toolName: 'list_exercises',
+      args: const {'limit': 50},
+    );
+    expect(result.ok, isTrue);
+    final exercises = (result.data as Map)['exercises'] as List;
+    expect(exercises, hasLength(50));
+    expect((result.data as Map).containsKey('_truncated'), isFalse);
   });
 
   test('executeRead on unknown tool returns unknown_tool', () async {

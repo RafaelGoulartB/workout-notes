@@ -22,7 +22,7 @@ import 'ai_settings_notifier.dart';
 const _uuid = Uuid();
 
 const int kMaxToolRounds = 3;
-const int kHistoryTokenBudget = 8000;
+const int kHistoryTokenBudget = 6000;
 const int kMaxInvalidAnswerRegenerations = 2;
 const String _routineMutationPolicy = r'''# Propostas de rotina (política fixa)
 Você pode preparar uma proposta de rotina somente quando o usuário pedir explicitamente para criar, montar, editar, alterar, adicionar ou remover conteúdo de uma rotina. Nunca proponha alterações apenas por sugestão, análise ou pergunta hipotética.
@@ -328,8 +328,13 @@ class AiChatService extends ChangeNotifier {
     required AiContextMode contextMode,
   }) async {
     var current = [...messages];
-    final toolsSchema = _tools.openAiChatToolsSchema();
     final explicitRoutineTurn = _hasExplicitRoutineIntent(current);
+    final latestUserText =
+        current.lastWhere((message) => message.isUser).content ?? '';
+    final toolsSchema = _tools.openAiChatToolsSchema(
+      names: _tools.toolNamesForQuery(latestUserText),
+      includeRoutineProposal: explicitRoutineTurn,
+    );
 
     for (var round = 0; round < kMaxToolRounds + 1; round++) {
       // Refresh context cache at the start of a turn.
@@ -622,22 +627,46 @@ class AiChatService extends ChangeNotifier {
 
   /// Drops oldest user/assistant blocks until total estimated tokens <= budget.
   List<AiChatMessage> _compactHistory(List<AiChatMessage> messages) {
-    final total = _estimateTokens(messages);
-    if (total <= kHistoryTokenBudget) return messages;
+    if (messages.isEmpty) return messages;
+
+    // Tool transcripts are useful only while the current user turn is still
+    // running. Once a final answer exists, retain that answer and discard old
+    // tool arguments/results from the wire payload. They remain persisted for
+    // the UI, but are not repeatedly billed on every future message.
+    var lastUserIndex = -1;
+    for (var i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].isUser) {
+        lastUserIndex = i;
+        break;
+      }
+    }
+    final normalized = <AiChatMessage>[];
+    for (var i = 0; i < messages.length; i++) {
+      final message = messages[i];
+      if (i < lastUserIndex &&
+          (message.isTool ||
+              (message.isAssistant && message.toolCalls.isNotEmpty))) {
+        continue;
+      }
+      normalized.add(message);
+    }
+
+    final total = _estimateTokens(normalized);
+    if (total <= kHistoryTokenBudget) return normalized;
 
     // Compact whole user turns. A tool result without its preceding assistant
     // tool_call is an invalid transcript and prevents the model from reliably
     // grounding its answer in that result.
     final turns = <List<AiChatMessage>>[];
     List<AiChatMessage>? turn;
-    for (final message in messages) {
+    for (final message in normalized) {
       if (message.isUser) {
         turn = <AiChatMessage>[];
         turns.add(turn);
       }
       turn?.add(message);
     }
-    if (turns.isEmpty) return messages;
+    if (turns.isEmpty) return normalized;
 
     final keep = <AiChatMessage>[];
     var running = 0;
@@ -650,6 +679,10 @@ class AiChatService extends ChangeNotifier {
     }
     return keep;
   }
+
+  @visibleForTesting
+  List<AiChatMessage> compactHistoryForTest(List<AiChatMessage> messages) =>
+      _compactHistory(messages);
 
   int _estimateTokens(List<AiChatMessage> messages) {
     var total = 0;

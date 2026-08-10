@@ -77,6 +77,9 @@ Future<Database> installAiTestDb() async {
           'CREATE TABLE nutrition_goals (id TEXT PRIMARY KEY, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1)',
         );
         await db.execute(
+          "CREATE TABLE sleep_entries (id TEXT PRIMARY KEY, date TEXT NOT NULL UNIQUE, sleep_minutes INTEGER NOT NULL, actual_sleep_minutes INTEGER, bedtime_minutes INTEGER, wake_time_minutes INTEGER, comment TEXT, source TEXT NOT NULL DEFAULT 'manual', time_in_bed_minutes INTEGER, estimated_sleep_minutes INTEGER, created_at TEXT NOT NULL)",
+        );
+        await db.execute(
           'CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)',
         );
       },
