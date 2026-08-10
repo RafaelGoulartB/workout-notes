@@ -229,17 +229,12 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen> {
                     goal: _goal,
                     windowDays: _windowDays,
                   ).animate().fadeIn(duration: 250.ms),
-                  const SizedBox(height: 12),
-                  _DayDistributionCard(
-                    balance: _windowBalance,
-                    windowDays: _windowDays,
-                  ).animate().fadeIn(duration: 250.ms, delay: 60.ms),
                   if (_windowDays == _kWindow7) ...[
                     const SizedBox(height: 12),
                     _WeekSequenceCard(
                       dailies: _windowDailies,
                       goal: _goal?.calories,
-                    ).animate().fadeIn(duration: 250.ms, delay: 100.ms),
+                    ).animate().fadeIn(duration: 250.ms, delay: 60.ms),
                   ],
                   const SizedBox(height: 12),
                   _RollingAverageCard(
@@ -596,235 +591,6 @@ class _BalanceMetric extends StatelessWidget {
   }
 }
 
-// =====================================================================
-// Day distribution
-// =====================================================================
-
-class _DayDistributionCard extends StatelessWidget {
-  final CalorieBalance? balance;
-  final int windowDays;
-
-  const _DayDistributionCard({
-    required this.balance,
-    required this.windowDays,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final balance = this.balance;
-    final hasGoal = (balance?.totalGoal ?? 0) > 0;
-    final logged = balance?.daysLogged ?? 0;
-    final deficit = balance?.daysInDeficit ?? 0;
-    final onTarget = balance?.daysOnTarget ?? 0;
-    final surplus = balance?.daysInSurplus ?? 0;
-
-    return _SectionCard(
-      icon: Icons.donut_small_outlined,
-      iconColor: theme.colorScheme.primary,
-      title: loc.nutritionBalanceDistributionTitle,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _DistributionStat(
-                  label: loc.nutritionBalanceStatusDeficit,
-                  count: deficit,
-                  logged: logged,
-                  color: const Color(0xFF2BB673),
-                  icon: Icons.south_east_rounded,
-                ),
-              ),
-              _StatDivider(theme: theme),
-              Expanded(
-                child: _DistributionStat(
-                  label: loc.nutritionBalanceStatusMaintaining,
-                  count: onTarget,
-                  logged: logged,
-                  color: theme.colorScheme.primary,
-                  icon: Icons.check_rounded,
-                ),
-              ),
-              _StatDivider(theme: theme),
-              Expanded(
-                child: _DistributionStat(
-                  label: loc.nutritionBalanceStatusSurplus,
-                  count: surplus,
-                  logged: logged,
-                  color: theme.colorScheme.error,
-                  icon: Icons.north_east_rounded,
-                ),
-              ),
-            ],
-          ),
-          if (logged == 0) ...[
-            const SizedBox(height: 12),
-            Text(
-              loc.nutritionBalanceNoDaysLogged,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ] else if (!hasGoal) ...[
-            const SizedBox(height: 12),
-            _EmptyNote(text: loc.nutritionBalanceDistributionNoGoal),
-          ] else ...[
-            const SizedBox(height: 12),
-            _DistributionInsight(
-              deficit: deficit,
-              onTarget: onTarget,
-              surplus: surplus,
-              logged: logged,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _DistributionStat extends StatelessWidget {
-  final String label;
-  final int count;
-  final int logged;
-  final Color color;
-  final IconData icon;
-
-  const _DistributionStat({
-    required this.label,
-    required this.count,
-    required this.logged,
-    required this.color,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final percent =
-        logged == 0 ? 0 : ((count / logged) * 100).round();
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: color.withAlpha(35),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, color: color, size: 18),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '$count',
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: color,
-            height: 1.0,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          '$percent%',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
-}
-
-class _StatDivider extends StatelessWidget {
-  final ThemeData theme;
-  const _StatDivider({required this.theme});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 48,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      color: theme.colorScheme.outlineVariant.withAlpha(70),
-    );
-  }
-}
-
-class _DistributionInsight extends StatelessWidget {
-  final int deficit;
-  final int onTarget;
-  final int surplus;
-  final int logged;
-
-  const _DistributionInsight({
-    required this.deficit,
-    required this.onTarget,
-    required this.surplus,
-    required this.logged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final String text;
-    if (logged == 0) {
-      text = '';
-    } else if (onTarget >= logged * 0.6) {
-      text = loc.nutritionBalanceInsightConsistent;
-    } else if (deficit > surplus * 1.5) {
-      text = loc.nutritionBalanceInsightMostlyDeficit;
-    } else if (surplus > deficit * 1.5) {
-      text = loc.nutritionBalanceInsightMostlySurplus;
-    } else if (deficit + surplus > onTarget * 2) {
-      text = loc.nutritionBalanceInsightSwinging;
-    } else {
-      text = loc.nutritionBalanceInsightBalanced;
-    }
-    if (text.isEmpty) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.tips_and_updates_outlined,
-            size: 16,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// =====================================================================
 // 7-day sequence (compact 7-cell strip)
 // =====================================================================
 
@@ -839,6 +605,22 @@ class _WeekSequenceCard extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final hasGoal = goal != null && goal! > 0;
+    var deficit = 0, onTarget = 0, surplus = 0, logged = 0;
+    for (final d in dailies) {
+      if (d.calories == null) continue;
+      logged++;
+      if (hasGoal) {
+        final delta = d.calories! - goal!;
+        final ratio = delta.abs() / goal!;
+        if (ratio <= 0.10) {
+          onTarget++;
+        } else if (delta < 0) {
+          deficit++;
+        } else {
+          surplus++;
+        }
+      }
+    }
     return _SectionCard(
       icon: Icons.view_week_outlined,
       iconColor: theme.colorScheme.secondary,
@@ -859,11 +641,117 @@ class _WeekSequenceCard extends StatelessWidget {
                 ),
             ],
           ),
-          if (!hasGoal) ...[
-            const SizedBox(height: 10),
-            _EmptyNote(text: loc.nutritionProgressNoGoal),
-          ],
+          const SizedBox(height: 10),
+          if (!hasGoal)
+            _EmptyNote(text: loc.nutritionProgressNoGoal)
+          else if (logged == 0)
+            Text(
+              loc.nutritionBalanceNoDaysLogged,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            )
+          else
+            _WeekSequenceSummary(
+              deficit: deficit,
+              onTarget: onTarget,
+              surplus: surplus,
+              logged: logged,
+            ),
         ],
+      ),
+    );
+  }
+}
+
+/// Compact summary row for the week sequence. Renders a single line
+/// with the deficit / on-target / surplus counts plus the contextual
+/// insight. Replaces the former standalone "Day distribution" card,
+/// which duplicated the per-cell status the sequence already shows.
+class _WeekSequenceSummary extends StatelessWidget {
+  final int deficit;
+  final int onTarget;
+  final int surplus;
+  final int logged;
+
+  const _WeekSequenceSummary({
+    required this.deficit,
+    required this.onTarget,
+    required this.surplus,
+    required this.logged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    return Row(
+      children: [
+        _CountChip(
+          label: loc.nutritionBalanceStatusDeficit,
+          count: deficit,
+          color: _deficitColor,
+        ),
+        const SizedBox(width: 6),
+        _CountChip(
+          label: loc.nutritionBalanceStatusMaintaining,
+          count: onTarget,
+          color: _onTargetColor,
+        ),
+        const SizedBox(width: 6),
+        _CountChip(
+          label: loc.nutritionBalanceStatusSurplus,
+          count: surplus,
+          color: _surplusColor,
+        ),
+      ],
+    );
+  }
+}
+
+class _CountChip extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color color;
+
+  const _CountChip({
+    required this.label,
+    required this.count,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withAlpha(28),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          children: [
+            Text(
+              '$count',
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+                height: 1.0,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 10,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
