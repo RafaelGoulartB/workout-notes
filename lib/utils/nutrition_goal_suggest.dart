@@ -1,6 +1,35 @@
 /// User body-weight objective used by [suggestNutritionGoal].
 enum NutritionObjective { cut, maintenance, bulk }
 
+/// Protein and fat targets used to derive the daily macro split.
+/// Carbohydrates always absorb the remaining target calories.
+class NutritionMacroRatios {
+  final double proteinPerKg;
+  final double fatPerKg;
+
+  const NutritionMacroRatios({
+    required this.proteinPerKg,
+    required this.fatPerKg,
+  });
+
+  factory NutritionMacroRatios.defaultsFor(NutritionObjective objective) {
+    return switch (objective) {
+      NutritionObjective.cut => const NutritionMacroRatios(
+        proteinPerKg: 2.2,
+        fatPerKg: 0.8,
+      ),
+      NutritionObjective.maintenance => const NutritionMacroRatios(
+        proteinPerKg: 1.8,
+        fatPerKg: 1.0,
+      ),
+      NutritionObjective.bulk => const NutritionMacroRatios(
+        proteinPerKg: 2.0,
+        fatPerKg: 1.2,
+      ),
+    };
+  }
+}
+
 /// Physical activity level used to scale the BMR into TDEE.
 enum ActivityLevel {
   sedentary(1.2),
@@ -42,8 +71,8 @@ class NutritionGoalSuggestion {
 /// - Target calories = TDEE adjusted by the objective: −20% (cut),
 ///   unchanged (maintenance), +10% (bulk).
 /// - Macros: protein 2.2/1.8/2.0 g/kg, fat 0.8/1.0/1.2 g/kg depending
-///   on the objective; carbohydrates absorb the remaining energy
-///   (clamped at ≥ 0).
+///   on the objective by default. Custom [macroRatios] can override those
+///   values; carbohydrates absorb the remaining energy (clamped at ≥ 0).
 ///
 /// Values are rounded to integers. Throws [ArgumentError] for
 /// non-positive inputs.
@@ -54,11 +83,13 @@ NutritionGoalSuggestion suggestNutritionGoal({
   required bool isMale,
   required ActivityLevel activity,
   required NutritionObjective objective,
+  NutritionMacroRatios? macroRatios,
 }) {
   if (weightKg <= 0 || heightCm <= 0 || ageYears <= 0) {
     throw ArgumentError('weight, height and age must be positive');
   }
-  final bmr = 10 * weightKg + 6.25 * heightCm - 5 * ageYears + (isMale ? 5 : -161);
+  final bmr =
+      10 * weightKg + 6.25 * heightCm - 5 * ageYears + (isMale ? 5 : -161);
   final tdee = bmr * activity.factor;
   final adjustment = switch (objective) {
     NutritionObjective.cut => 0.80,
@@ -67,18 +98,12 @@ NutritionGoalSuggestion suggestNutritionGoal({
   };
   final calories = tdee * adjustment;
 
-  final proteinPerKg = switch (objective) {
-    NutritionObjective.cut => 2.2,
-    NutritionObjective.maintenance => 1.8,
-    NutritionObjective.bulk => 2.0,
-  };
-  final fatPerKg = switch (objective) {
-    NutritionObjective.cut => 0.8,
-    NutritionObjective.maintenance => 1.0,
-    NutritionObjective.bulk => 1.2,
-  };
-  final protein = proteinPerKg * weightKg;
-  final fat = fatPerKg * weightKg;
+  final ratios = macroRatios ?? NutritionMacroRatios.defaultsFor(objective);
+  if (ratios.proteinPerKg <= 0 || ratios.fatPerKg <= 0) {
+    throw ArgumentError('macro ratios must be positive');
+  }
+  final protein = ratios.proteinPerKg * weightKg;
+  final fat = ratios.fatPerKg * weightKg;
   final carbs = (calories - protein * 4 - fat * 9) / 4;
   return NutritionGoalSuggestion(
     bmr: bmr.roundToDouble(),

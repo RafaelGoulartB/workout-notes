@@ -6,6 +6,9 @@ import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
 
+typedef NutritionGoalApplyCallback =
+    void Function(double calories, double proteinG, double carbsG, double fatG);
+
 /// Bottom sheet that estimates daily calories and macros from the body
 /// profile using the Mifflin-St Jeor equation. The profile is persisted
 /// in `app_settings` under the `nutrition_profile_*` keys and the final
@@ -13,12 +16,7 @@ import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
 class NutritionGoalSuggestSheet extends StatefulWidget {
   final BodyMeasurementRepository bodyRepo;
   final SettingsRepository settingsRepo;
-  final void Function(
-    double calories,
-    double proteinG,
-    double carbsG,
-    double fatG,
-  ) onApply;
+  final NutritionGoalApplyCallback onApply;
 
   const NutritionGoalSuggestSheet({
     super.key,
@@ -31,7 +29,7 @@ class NutritionGoalSuggestSheet extends StatefulWidget {
     BuildContext context, {
     required BodyMeasurementRepository bodyRepo,
     required SettingsRepository settingsRepo,
-    required void Function(double, double, double, double) onApply,
+    required NutritionGoalApplyCallback onApply,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -57,9 +55,17 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
   static const _kWeight = 'nutrition_profile_weight_kg';
   static const _kActivity = 'nutrition_profile_activity';
 
+  static String _macroSettingKey(NutritionObjective objective, String macro) =>
+      'nutrition_profile_macro_${objective.name}_${macro}_g_kg';
+
   final _ageController = TextEditingController();
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
+  late final Map<NutritionObjective, _MacroRatioControllers> _macroControllers =
+      {
+        for (final objective in NutritionObjective.values)
+          objective: _MacroRatioControllers.defaultsFor(objective),
+      };
 
   bool _isLoading = true;
   bool _isMale = true;
@@ -78,6 +84,9 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
     _ageController.dispose();
     _heightController.dispose();
     _weightController.dispose();
+    for (final controllers in _macroControllers.values) {
+      controllers.dispose();
+    }
     super.dispose();
   }
 
@@ -90,6 +99,12 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
         widget.settingsRepo.getSetting(_kHeight),
         widget.settingsRepo.getSetting(_kWeight),
         widget.settingsRepo.getSetting(_kActivity),
+        for (final objective in NutritionObjective.values) ...[
+          widget.settingsRepo.getSetting(
+            _macroSettingKey(objective, 'protein'),
+          ),
+          widget.settingsRepo.getSetting(_macroSettingKey(objective, 'fat')),
+        ],
       ]);
       final latestWeight = results[0] as double?;
       final sex = results[1] as String?;
@@ -110,6 +125,18 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
           (a) => a.name == activity,
           orElse: () => ActivityLevel.moderate,
         );
+        for (var index = 0; index < NutritionObjective.values.length; index++) {
+          final objective = NutritionObjective.values[index];
+          final controllers = _macroControllers[objective]!;
+          final protein = results[6 + index * 2] as String?;
+          final fat = results[7 + index * 2] as String?;
+          if (_parseNum(protein ?? '') != null) {
+            controllers.protein.text = protein!;
+          }
+          if (_parseNum(fat ?? '') != null) {
+            controllers.fat.text = fat!;
+          }
+        }
         _isLoading = false;
       });
     } catch (_) {
@@ -123,12 +150,52 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
   double? get _height => _parseNum(_heightController.text);
   double? get _weight => _parseNum(_weightController.text);
 
+  NutritionMacroRatios? _ratiosFor(NutritionObjective objective) {
+    final controllers = _macroControllers[objective]!;
+    final protein = _parseNum(controllers.protein.text);
+    final fat = _parseNum(controllers.fat.text);
+    if (protein == null || fat == null) return null;
+    return NutritionMacroRatios(proteinPerKg: protein, fatPerKg: fat);
+  }
+
+  bool get _hasCompleteProfile =>
+      _age != null && _height != null && _weight != null;
+
+  bool get _allRatiosValid => NutritionObjective.values.every(
+    (objective) => _ratiosFor(objective) != null,
+  );
+
+  bool get _hasMacroEnergyConflict {
+    final age = _age;
+    final height = _height;
+    final weight = _weight;
+    if (age == null || height == null || weight == null) return false;
+    for (final objective in NutritionObjective.values) {
+      final ratios = _ratiosFor(objective);
+      if (ratios == null) continue;
+      final suggestion = suggestNutritionGoal(
+        weightKg: weight,
+        heightCm: height,
+        ageYears: age.toInt(),
+        isMale: _isMale,
+        activity: _activity,
+        objective: objective,
+        macroRatios: ratios,
+      );
+      if (suggestion.proteinG * 4 + suggestion.fatG * 9 > suggestion.calories) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   void _recompute() {
     final age = _age;
     final height = _height;
     final weight = _weight;
-    if (age == null || height == null || weight == null) {
-      if (_suggestion != null) setState(() => _suggestion = null);
+    final ratios = _ratiosFor(_objective);
+    if (age == null || height == null || weight == null || ratios == null) {
+      setState(() => _suggestion = null);
       return;
     }
     setState(() {
@@ -139,13 +206,26 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
         isMale: _isMale,
         activity: _activity,
         objective: _objective,
+        macroRatios: ratios,
       );
     });
   }
 
+  void _restoreMacroDefaults() {
+    for (final objective in NutritionObjective.values) {
+      final defaults = NutritionMacroRatios.defaultsFor(objective);
+      final controllers = _macroControllers[objective]!;
+      controllers.protein.text = _formatRatio(defaults.proteinPerKg);
+      controllers.fat.text = _formatRatio(defaults.fatPerKg);
+    }
+    _recompute();
+  }
+
   Future<void> _apply() async {
     final suggestion = _suggestion;
-    if (suggestion == null) return;
+    if (suggestion == null || !_allRatiosValid || _hasMacroEnergyConflict) {
+      return;
+    }
     final loc = AppLocalizations.of(context)!;
     final settings = widget.settingsRepo;
     await settings.setSetting(_kSex, _isMale ? 'male' : 'female');
@@ -153,6 +233,17 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
     await settings.setSetting(_kHeight, _heightController.text.trim());
     await settings.setSetting(_kWeight, _weightController.text.trim());
     await settings.setSetting(_kActivity, _activity.name);
+    for (final objective in NutritionObjective.values) {
+      final ratios = _ratiosFor(objective)!;
+      await settings.setSetting(
+        _macroSettingKey(objective, 'protein'),
+        ratios.proteinPerKg.toString(),
+      );
+      await settings.setSetting(
+        _macroSettingKey(objective, 'fat'),
+        ratios.fatPerKg.toString(),
+      );
+    }
     if (!mounted) return;
     widget.onApply(
       suggestion.calories,
@@ -161,9 +252,9 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
       suggestion.fatG,
     );
     Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.nutritionSuggestApplied)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.nutritionSuggestApplied)));
   }
 
   static double? _parseNum(String raw) {
@@ -180,6 +271,8 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
     if (value == null) return null;
     return value >= 1 ? value : null;
   }
+
+  static String _formatRatio(double value) => value.toStringAsFixed(1);
 
   static String _activityLabel(AppLocalizations loc, ActivityLevel level) {
     switch (level) {
@@ -245,8 +338,10 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text(loc.nutritionSuggestSex,
-                      style: theme.textTheme.labelLarge),
+                  Text(
+                    loc.nutritionSuggestSex,
+                    style: theme.textTheme.labelLarge,
+                  ),
                   const SizedBox(height: 8),
                   SegmentedButton<bool>(
                     segments: [
@@ -296,8 +391,10 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  Text(loc.nutritionSuggestActivity,
-                      style: theme.textTheme.labelLarge),
+                  Text(
+                    loc.nutritionSuggestActivity,
+                    style: theme.textTheme.labelLarge,
+                  ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<ActivityLevel>(
                     initialValue: _activity,
@@ -327,8 +424,10 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
                     },
                   ),
                   const SizedBox(height: 14),
-                  Text(loc.nutritionSuggestObjective,
-                      style: theme.textTheme.labelLarge),
+                  Text(
+                    loc.nutritionSuggestObjective,
+                    style: theme.textTheme.labelLarge,
+                  ),
                   const SizedBox(height: 8),
                   SegmentedButton<NutritionObjective>(
                     segments: [
@@ -344,8 +443,24 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
                       _recompute();
                     },
                   ),
+                  const SizedBox(height: 12),
+                  _MacroConfigurationCard(
+                    controllers: _macroControllers,
+                    objectiveLabel: (objective) =>
+                        _objectiveLabel(loc, objective),
+                    onChanged: _recompute,
+                    onRestore: _restoreMacroDefaults,
+                  ),
+                  if (!_allRatiosValid || _hasMacroEnergyConflict) ...[
+                    const SizedBox(height: 8),
+                    _InlineWarning(
+                      message: !_allRatiosValid
+                          ? loc.nutritionSuggestInvalidMacros
+                          : loc.nutritionSuggestMacroEnergyError,
+                    ),
+                  ],
                   const SizedBox(height: 16),
-                  if (_suggestion == null)
+                  if (_suggestion == null && !_hasCompleteProfile)
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -372,15 +487,17 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
                         ],
                       ),
                     )
-                  else
-                    _SuggestionPreviewCard(
-                      suggestion: _suggestion!,
-                      isMale: _isMale,
-                      weightKg: _weight!,
-                    ),
+                  else if (_suggestion != null) ...[
+                    _SuggestionPreviewCard(suggestion: _suggestion!),
+                  ],
                   const SizedBox(height: 16),
                   FilledButton.icon(
-                    onPressed: _suggestion == null ? null : _apply,
+                    onPressed:
+                        _suggestion == null ||
+                            !_allRatiosValid ||
+                            _hasMacroEnergyConflict
+                        ? null
+                        : _apply,
                     icon: const Icon(Icons.check_rounded),
                     label: Text(loc.nutritionSuggestApply),
                     style: FilledButton.styleFrom(
@@ -394,16 +511,232 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
   }
 }
 
+class _MacroRatioControllers {
+  final TextEditingController protein;
+  final TextEditingController fat;
+
+  _MacroRatioControllers({required this.protein, required this.fat});
+
+  factory _MacroRatioControllers.defaultsFor(NutritionObjective objective) {
+    final defaults = NutritionMacroRatios.defaultsFor(objective);
+    return _MacroRatioControllers(
+      protein: TextEditingController(
+        text: defaults.proteinPerKg.toStringAsFixed(1),
+      ),
+      fat: TextEditingController(text: defaults.fatPerKg.toStringAsFixed(1)),
+    );
+  }
+
+  void dispose() {
+    protein.dispose();
+    fat.dispose();
+  }
+}
+
+class _MacroConfigurationCard extends StatelessWidget {
+  final Map<NutritionObjective, _MacroRatioControllers> controllers;
+  final String Function(NutritionObjective) objectiveLabel;
+  final VoidCallback onChanged;
+  final VoidCallback onRestore;
+
+  const _MacroConfigurationCard({
+    required this.controllers,
+    required this.objectiveLabel,
+    required this.onChanged,
+    required this.onRestore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+        leading: const Icon(Icons.tune_rounded, size: 20),
+        title: Text(
+          loc.nutritionSuggestMacroSettings,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          loc.nutritionSuggestMacroSettingsSubtitle,
+          style: theme.textTheme.bodySmall,
+        ),
+        children: [
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                flex: 5,
+                child: Text(
+                  loc.nutritionSuggestObjective,
+                  style: theme.textTheme.labelSmall,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 4,
+                child: Text(
+                  loc.nutritionSuggestProteinPerKg,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelSmall,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 4,
+                child: Text(
+                  loc.nutritionSuggestFatPerKg,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelSmall,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          for (final objective in NutritionObjective.values) ...[
+            _MacroConfigurationRow(
+              label: objectiveLabel(objective),
+              controllers: controllers[objective]!,
+              onChanged: onChanged,
+            ),
+            if (objective != NutritionObjective.values.last)
+              const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  loc.nutritionSuggestCarbsRemainder,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onRestore,
+                icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                label: Text(loc.nutritionSuggestRestoreDefaults),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MacroConfigurationRow extends StatelessWidget {
+  final String label;
+  final _MacroRatioControllers controllers;
+  final VoidCallback onChanged;
+
+  const _MacroConfigurationRow({
+    required this.label,
+    required this.controllers,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(flex: 5, child: Text(label)),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 4,
+          child: _MacroRatioField(
+            controller: controllers.protein,
+            onChanged: onChanged,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 4,
+          child: _MacroRatioField(
+            controller: controllers.fat,
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MacroRatioField extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback onChanged;
+
+  const _MacroRatioField({required this.controller, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
+      textAlign: TextAlign.center,
+      onChanged: (_) => onChanged(),
+      decoration: const InputDecoration(
+        suffixText: 'g/kg',
+        isDense: true,
+        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        border: OutlineInputBorder(),
+      ),
+    );
+  }
+}
+
+class _InlineWarning extends StatelessWidget {
+  final String message;
+
+  const _InlineWarning({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            color: theme.colorScheme.onErrorContainer,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onErrorContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SuggestionPreviewCard extends StatelessWidget {
   final NutritionGoalSuggestion suggestion;
-  final bool isMale;
-  final double weightKg;
 
-  const _SuggestionPreviewCard({
-    required this.suggestion,
-    required this.isMale,
-    required this.weightKg,
-  });
+  const _SuggestionPreviewCard({required this.suggestion});
 
   @override
   Widget build(BuildContext context) {
@@ -413,9 +746,7 @@ class _SuggestionPreviewCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withAlpha(80),
-        ),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
@@ -543,9 +874,7 @@ class _SheetNumberField extends StatelessWidget {
     return TextField(
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
-      ],
+      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
       onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
@@ -553,7 +882,10 @@ class _SheetNumberField extends StatelessWidget {
         filled: true,
         fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 12,
+        ),
       ),
     );
   }
