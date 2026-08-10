@@ -13,6 +13,7 @@ import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/screens/workout/food_library_screen.dart';
 import 'package:workout_notes/screens/workout/food_quantity_sheet.dart';
 import 'package:workout_notes/screens/workout/food_search_screen.dart';
 import 'package:workout_notes/screens/workout/nutrition_home_screen.dart';
@@ -320,6 +321,23 @@ void main() {
       expect(find.text(loc.nutritionAddManually), findsOneWidget);
     },
   );
+
+  testWidgets('Food library add menu offers AI scan and manual entry', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(FoodLibraryScreen(repository: repository)));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text(loc.nutritionScanMeal), findsOneWidget);
+    expect(find.text(loc.nutritionAddManually), findsOneWidget);
+  });
 
   testWidgets('Remote search only runs after an explicit submit', (
     tester,
