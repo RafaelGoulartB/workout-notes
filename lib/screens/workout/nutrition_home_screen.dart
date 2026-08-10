@@ -136,6 +136,20 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   int get _totalItemsToday =>
       _meals.fold<int>(0, (sum, meal) => sum + meal.items.length);
 
+  /// Formats a calorie value as a compact label for the section header
+  /// (e.g. "584 kcal"). Returns null when there is nothing to show so
+  /// the header hides the value cleanly on an empty day.
+  String? _formatKcalLabel(AppLocalizations loc, double? calories) {
+    final value = calories ?? 0;
+    if (value <= 0) return null;
+    return loc.nutritionConsumedKcal(_formatNum(value));
+  }
+
+  static String _formatNum(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(1);
+  }
+
   Future<void> _openFoodSearchForMeal(String? mealType, String? mealLabel) async {
     final result = await Navigator.of(context).push<NutritionSelection>(
       MaterialPageRoute(
@@ -343,6 +357,10 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                       iconBg: theme.colorScheme.primaryContainer,
                       iconFg: theme.colorScheme.onPrimaryContainer,
                       title: loc.nutritionHomeSectionToday,
+                      value: _formatKcalLabel(
+                        loc,
+                        _summary.consumed.calories,
+                      ),
                       count: _totalItemsToday,
                       expanded: _showMeals,
                       onTap: () => setState(() => _showMeals = !_showMeals),
@@ -865,9 +883,9 @@ class _NutritionToolTile extends StatelessWidget {
 }
 
 /// Collapsible header used by the "Today" section. Renders a
-/// small icon chip, a section title, a count pill and an
-/// expand/collapse caret. Matches the workout home's
-/// _CollapsibleSectionHeader visually.
+/// small icon chip, a section title, an optional value (e.g. the
+/// day's total calories), a count pill and an expand/collapse caret.
+/// Matches the workout home's _CollapsibleSectionHeader visually.
 class _CollapsibleSectionHeader extends StatelessWidget {
   final IconData icon;
   final Color iconBg;
@@ -875,6 +893,7 @@ class _CollapsibleSectionHeader extends StatelessWidget {
   final String title;
   final int count;
   final bool expanded;
+  final String? value;
   final VoidCallback onTap;
 
   const _CollapsibleSectionHeader({
@@ -885,6 +904,7 @@ class _CollapsibleSectionHeader extends StatelessWidget {
     required this.count,
     required this.expanded,
     required this.onTap,
+    this.value,
   });
 
   @override
@@ -915,6 +935,16 @@ class _CollapsibleSectionHeader extends StatelessWidget {
               ),
             ),
             const Spacer(),
+            if (value != null) ...[
+              Text(
+                value!,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(width: 10),
+            ],
             if (count > 0) ...[
               Container(
                 padding:
