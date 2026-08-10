@@ -338,6 +338,14 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
                   onTap: _onServingChanged,
                 ),
               ],
+              const SizedBox(height: 16),
+              _PreviewSection(
+                preview: _preview,
+                isEstimated: _isEstimated,
+                hasMissing: _hasMissing,
+                loc: loc,
+                theme: theme,
+              ),
               const SizedBox(height: 14),
               _QuantityField(
                 controller: _quantityController,
@@ -346,14 +354,6 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
                 onIncrement: () => _adjustQuantity(1),
                 onDecrement: () => _adjustQuantity(-1),
                 canDecrement: (_parseQuantity(_quantityController.text) ?? 0) > 0,
-              ),
-              const SizedBox(height: 18),
-              _PreviewSection(
-                preview: _preview,
-                isEstimated: _isEstimated,
-                hasMissing: _hasMissing,
-                loc: loc,
-                theme: theme,
               ),
               const SizedBox(height: 18),
               FilledButton(
