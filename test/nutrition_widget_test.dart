@@ -548,6 +548,57 @@ void main() {
     expect(save.onPressed, isNotNull);
   });
 
+  testWidgets(
+    'Falls back to the labelled value when the equivalence is the wrong unit',
+    (tester) async {
+      final now = DateTime.now();
+      final food = Food(
+        id: 'food',
+        source: FoodSource.manual,
+        externalId: 'food',
+        name: 'Coca-Cola Sabor Original',
+        searchName: 'coca cola',
+        brand: 'Coca-Cola',
+        fetchedAt: now,
+      );
+      const variant = FoodVariant(
+        id: 'variant',
+        foodId: 'food',
+        referenceAmount: 100,
+        referenceUnit: 'ml',
+        values: NutritionValues(calories: 42),
+      );
+      // Real-world bad data: the source lists only the gram weight of
+      // the can, but the label clearly says "250 ml". The sheet must
+      // treat the labelled value as a volume equivalence.
+      const serving = FoodServing(
+        id: 'serving',
+        foodVariantId: 'variant',
+        label: '250 ml',
+        unit: 'serving',
+        gramsEquivalent: 250,
+      );
+      await tester.pumpWidget(
+        _app(
+          Scaffold(
+            body: FoodQuantitySheet(
+              food: food,
+              primaryVariant: variant,
+              servings: const [serving],
+            ),
+          ),
+        ),
+      );
+      // Default unit is ml (per 100 ml), so the save button must be
+      // enabled without the user touching anything.
+      final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+      final save = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, loc.nutritionSave),
+      );
+      expect(save.onPressed, isNotNull);
+    },
+  );
+
   testWidgets('MainShell renders three tabs (Workout, Sleep, Nutrition)', (
     tester,
   ) async {

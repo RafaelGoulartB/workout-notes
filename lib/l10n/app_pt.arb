@@ -1126,6 +1126,7 @@
   "nutritionFieldRequired": "Campo obrigatório",
   "nutritionInvalidNumber": "Informe um número válido",
   "nutritionInvalidQuantity": "Informe uma quantidade maior que zero",
+  "nutritionServingEquivalenceMissing": "Esta porção não tem equivalência em peso ou volume — escolha outra porção ou troque para uma unidade de peso.",
 
   "nutritionManualTitle": "Cadastrar alimento manualmente",
   "nutritionManualEditTitle": "Editar alimento",

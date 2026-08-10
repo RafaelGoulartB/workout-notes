@@ -1143,6 +1143,7 @@
   "nutritionFieldRequired": "Required field",
   "nutritionInvalidNumber": "Enter a valid number",
   "nutritionInvalidQuantity": "Enter a quantity greater than zero",
+  "nutritionServingEquivalenceMissing": "This portion has no weight or volume equivalence — pick another one or switch to a weight unit.",
 
   "nutritionManualTitle": "Add food manually",
   "nutritionManualEditTitle": "Edit food",
