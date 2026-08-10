@@ -18,6 +18,7 @@ import 'food_library_screen.dart';
 import 'food_search_screen.dart';
 import 'nutrition_progress_screen.dart';
 import 'nutrition_settings_screen.dart';
+import 'settings_screen.dart';
 import 'saved_meal_editor_screen.dart';
 import 'saved_meals_screen.dart';
 
@@ -104,6 +105,13 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
       MaterialPageRoute(
         builder: (_) => NutritionSettingsScreen(repository: _repository),
       ),
+    );
+    await _load();
+  }
+
+  Future<void> _openAppSettings() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
     );
     await _load();
   }
@@ -315,8 +323,8 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
             icon: const Icon(Icons.calendar_month_outlined),
           ),
           IconButton(
-            tooltip: loc.nutritionSettingsTitle,
-            onPressed: _openSettings,
+            tooltip: loc.settingsTitle,
+            onPressed: _openAppSettings,
             icon: const Icon(Icons.settings_outlined),
           ),
         ],

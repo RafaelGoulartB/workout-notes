@@ -17,15 +17,142 @@ import '../../navigation/ai_coach_navigation.dart';
 import 'ai_chat_screen.dart';
 import 'ai_settings_screen.dart';
 import 'nutrition_settings_screen.dart';
+import 'sleep_settings_screen.dart';
 
-class WorkoutSettingsScreen extends StatefulWidget {
+enum _SettingsCategory { general, workout, ai, data }
+
+/// Application-wide settings entry point. The same screen is opened from the
+/// workout, sleep and nutrition tabs so global preferences never appear to
+/// belong to one tracking area.
+class AppSettingsScreen extends StatelessWidget {
+  const AppSettingsScreen({super.key});
+
+  void _open(BuildContext context, Widget screen) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          loc.settingsTitle,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        centerTitle: false,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        children: [
+          _SectionHeader(text: loc.settingsAppPreferencesSection),
+          _SettingsCard(
+            children: [
+              _LinkTile(
+                icon: Icons.tune_rounded,
+                iconColor: theme.colorScheme.primary,
+                title: loc.settingsGeneralTitle,
+                subtitle: loc.settingsGeneralSubtitle,
+                onTap: () => _open(
+                  context,
+                  const _SettingsDetailScreen(
+                    category: _SettingsCategory.general,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          _SectionHeader(text: loc.settingsBySectionTitle),
+          _SettingsCard(
+            children: [
+              _LinkTile(
+                icon: Icons.fitness_center_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: loc.tabWorkout,
+                subtitle: loc.settingsWorkoutSubtitle,
+                onTap: () => _open(
+                  context,
+                  const _SettingsDetailScreen(
+                    category: _SettingsCategory.workout,
+                  ),
+                ),
+              ),
+              const _CardDivider(),
+              _LinkTile(
+                icon: Icons.nightlight_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: loc.tabSleep,
+                subtitle: loc.settingsSleepSubtitle,
+                onTap: () => _open(context, const SleepSettingsScreen()),
+              ),
+              const _CardDivider(),
+              _LinkTile(
+                icon: Icons.restaurant_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: loc.tabNutrition,
+                subtitle: loc.settingsNutritionSubtitle,
+                onTap: () => _open(
+                  context,
+                  NutritionSettingsScreen(repository: NutritionRepository()),
+                ),
+              ),
+            ],
+          ),
+          _SectionHeader(text: loc.settingsResourcesSection),
+          _SettingsCard(
+            children: [
+              _LinkTile(
+                icon: Icons.smart_toy_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: loc.settingsAiTitle,
+                subtitle: loc.settingsAiSubtitle,
+                onTap: () => _open(
+                  context,
+                  const _SettingsDetailScreen(category: _SettingsCategory.ai),
+                ),
+              ),
+              const _CardDivider(),
+              _LinkTile(
+                icon: Icons.shield_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: loc.settingsDataPrivacyTitle,
+                subtitle: loc.settingsDataPrivacySubtitle,
+                onTap: () => _open(
+                  context,
+                  const _SettingsDetailScreen(category: _SettingsCategory.data),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Direct route kept for callers that specifically need workout preferences.
+class WorkoutSettingsScreen extends StatelessWidget {
   const WorkoutSettingsScreen({super.key});
 
   @override
-  State<WorkoutSettingsScreen> createState() => _WorkoutSettingsScreenState();
+  Widget build(BuildContext context) =>
+      const _SettingsDetailScreen(category: _SettingsCategory.workout);
 }
 
-class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
+class _SettingsDetailScreen extends StatefulWidget {
+  final _SettingsCategory category;
+
+  const _SettingsDetailScreen({required this.category});
+
+  @override
+  State<_SettingsDetailScreen> createState() => _SettingsDetailScreenState();
+}
+
+class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
   final _settingsRepo = SettingsRepository();
   Map<String, String> _settings = {};
   bool _isLoading = true;
@@ -982,11 +1109,17 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
+    final pageTitle = switch (widget.category) {
+      _SettingsCategory.general => loc.settingsGeneralTitle,
+      _SettingsCategory.workout => loc.settingsWorkoutTitle,
+      _SettingsCategory.ai => loc.settingsAiTitle,
+      _SettingsCategory.data => loc.settingsDataPrivacyTitle,
+    };
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          loc.settingsTitle,
+          pageTitle,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w600,
           ),
@@ -998,410 +1131,408 @@ class _WorkoutSettingsScreenState extends State<WorkoutSettingsScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                // ===== APARÊNCIA =====
-                _SectionHeader(text: loc.settingsSectionAppearance),
-                _SettingsCard(
-                  title: loc.settingsThemeMode,
-                  icon: Icons.dark_mode_outlined,
-                  children: [
-                    _RadioOption(
-                      icon: Icons.brightness_auto,
-                      label: loc.settingsSystem,
-                      subtitle: loc.settingsSystemSubtitle,
-                      selected: _selectedThemeMode == ThemeMode.system,
-                      onTap: () => _changeThemeMode(ThemeMode.system),
-                    ),
-                    const _CardDivider(),
-                    _RadioOption(
-                      icon: Icons.light_mode,
-                      label: loc.settingsLight,
-                      subtitle: loc.settingsLightSubtitle,
-                      selected: _selectedThemeMode == ThemeMode.light,
-                      onTap: () => _changeThemeMode(ThemeMode.light),
-                    ),
-                    const _CardDivider(),
-                    _RadioOption(
-                      icon: Icons.dark_mode,
-                      label: loc.settingsDark,
-                      subtitle: loc.settingsDarkSubtitle,
-                      selected: _selectedThemeMode == ThemeMode.dark,
-                      onTap: () => _changeThemeMode(ThemeMode.dark),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _SettingsCard(
-                  title: loc.settingsThemeColor,
-                  icon: Icons.palette_outlined,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-                      child: Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: List.generate(AccentColors.options.length, (
-                          i,
-                        ) {
-                          final isSelected = _selectedAccentIndex == i;
-                          final color = AccentColors.options[i];
-                          return _ColorSwatch(
-                            color: color,
-                            isSelected: isSelected,
-                            onTap: () => _changeAccentColor(i),
-                          );
-                        }),
+                if (widget.category == _SettingsCategory.general) ...[
+                  // ===== APARÊNCIA =====
+                  _SectionHeader(text: loc.settingsSectionAppearance),
+                  _SettingsCard(
+                    title: loc.settingsThemeMode,
+                    icon: Icons.dark_mode_outlined,
+                    children: [
+                      _RadioOption(
+                        icon: Icons.brightness_auto,
+                        label: loc.settingsSystem,
+                        subtitle: loc.settingsSystemSubtitle,
+                        selected: _selectedThemeMode == ThemeMode.system,
+                        onTap: () => _changeThemeMode(ThemeMode.system),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: AccentColors.options[_selectedAccentIndex],
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            _accentColorLabel(_selectedAccentIndex, loc),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                      const _CardDivider(),
+                      _RadioOption(
+                        icon: Icons.light_mode,
+                        label: loc.settingsLight,
+                        subtitle: loc.settingsLightSubtitle,
+                        selected: _selectedThemeMode == ThemeMode.light,
+                        onTap: () => _changeThemeMode(ThemeMode.light),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _SettingsCard(
-                  title: loc.settingsLanguage,
-                  icon: Icons.language_outlined,
-                  children: [
-                    _RadioOption(
-                      icon: Icons.translate,
-                      label: loc.settingsPortuguese,
-                      subtitle: loc.settingsLanguageSubtitle,
-                      selected:
-                          Localizations.localeOf(context).languageCode == 'pt',
-                      onTap: () => _changeLocale(const Locale('pt', 'BR')),
-                    ),
-                    const _CardDivider(),
-                    _RadioOption(
-                      icon: Icons.translate,
-                      label: loc.settingsEnglish,
-                      subtitle: loc.settingsLanguageSubtitle,
-                      selected:
-                          Localizations.localeOf(context).languageCode == 'en',
-                      onTap: () => _changeLocale(const Locale('en')),
-                    ),
-                  ],
-                ),
+                      const _CardDivider(),
+                      _RadioOption(
+                        icon: Icons.dark_mode,
+                        label: loc.settingsDark,
+                        subtitle: loc.settingsDarkSubtitle,
+                        selected: _selectedThemeMode == ThemeMode.dark,
+                        onTap: () => _changeThemeMode(ThemeMode.dark),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _SettingsCard(
+                    title: loc.settingsThemeColor,
+                    icon: Icons.palette_outlined,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                        child: Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: List.generate(AccentColors.options.length, (
+                            i,
+                          ) {
+                            final isSelected = _selectedAccentIndex == i;
+                            final color = AccentColors.options[i];
+                            return _ColorSwatch(
+                              color: color,
+                              isSelected: isSelected,
+                              onTap: () => _changeAccentColor(i),
+                            );
+                          }),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color:
+                                    AccentColors.options[_selectedAccentIndex],
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _accentColorLabel(_selectedAccentIndex, loc),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _SettingsCard(
+                    title: loc.settingsLanguage,
+                    icon: Icons.language_outlined,
+                    children: [
+                      _RadioOption(
+                        icon: Icons.translate,
+                        label: loc.settingsPortuguese,
+                        subtitle: loc.settingsLanguageSubtitle,
+                        selected:
+                            Localizations.localeOf(context).languageCode ==
+                            'pt',
+                        onTap: () => _changeLocale(const Locale('pt', 'BR')),
+                      ),
+                      const _CardDivider(),
+                      _RadioOption(
+                        icon: Icons.translate,
+                        label: loc.settingsEnglish,
+                        subtitle: loc.settingsLanguageSubtitle,
+                        selected:
+                            Localizations.localeOf(context).languageCode ==
+                            'en',
+                        onTap: () => _changeLocale(const Locale('en')),
+                      ),
+                    ],
+                  ),
+                ],
 
-                // ===== TREINO =====
-                _SectionHeader(text: loc.settingsSectionWorkout),
-                _SettingsCard(
-                  children: [
-                    _SwitchTile(
-                      icon: Icons.straighten,
-                      title: loc.settingsUnitSystem,
-                      subtitle: _settings['unit_system'] == 'kg'
-                          ? loc.settingsUnitKgCm
-                          : loc.settingsUnitLbsIn,
-                      value: _settings['unit_system'] == 'kg',
-                      onChanged: (v) =>
-                          _update('unit_system', v ? 'kg' : 'lbs'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _SettingsCard(
-                  title: loc.settingsTimer,
-                  icon: Icons.timer_outlined,
-                  children: [
-                    _ValuePickerTile(
-                      icon: Icons.timer,
-                      title: loc.settingsDefaultRest,
-                      currentValue:
-                          int.tryParse(
-                            _settings['default_rest_time'] ?? '90',
-                          ) ??
-                          90,
-                      displayValue: _formatRestTime(
-                        int.tryParse(_settings['default_rest_time'] ?? '90') ??
+                if (widget.category == _SettingsCategory.workout) ...[
+                  // ===== TREINO =====
+                  _SectionHeader(text: loc.settingsSectionWorkout),
+                  _SettingsCard(
+                    children: [
+                      _SwitchTile(
+                        icon: Icons.straighten,
+                        title: loc.settingsUnitSystem,
+                        subtitle: _settings['unit_system'] == 'kg'
+                            ? loc.settingsUnitKgCm
+                            : loc.settingsUnitLbsIn,
+                        value: _settings['unit_system'] == 'kg',
+                        onChanged: (v) =>
+                            _update('unit_system', v ? 'kg' : 'lbs'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _SettingsCard(
+                    title: loc.settingsTimer,
+                    icon: Icons.timer_outlined,
+                    children: [
+                      _ValuePickerTile(
+                        icon: Icons.timer,
+                        title: loc.settingsDefaultRest,
+                        currentValue:
+                            int.tryParse(
+                              _settings['default_rest_time'] ?? '90',
+                            ) ??
                             90,
-                      ),
-                      choices: _restChoices,
-                      formatChoice: _formatRestTime,
-                      sheetTitle: loc.settingsDefaultRest,
-                      onChanged: (v) =>
-                          _update('default_rest_time', v.toString()),
-                    ),
-                    const _CardDivider(),
-                    _SwitchTile(
-                      icon: Icons.play_circle_outline,
-                      title: loc.settingsAutoStartRest,
-                      subtitle: loc.settingsAutoStartRestSubtitle,
-                      value: _settings['auto_start_rest_timer'] == 'true',
-                      onChanged: (v) =>
-                          _update('auto_start_rest_timer', v.toString()),
-                    ),
-                    const _CardDivider(),
-                    _SwitchTile(
-                      icon: Icons.av_timer,
-                      title: loc.settingsAutoStartWorkoutTimer,
-                      subtitle: loc.settingsAutoStartWorkoutTimerSubtitle,
-                      value: _settings['auto_start_workout_timer'] == 'true',
-                      onChanged: (v) =>
-                          _update('auto_start_workout_timer', v.toString()),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _SettingsCard(
-                  children: [
-                    _SwitchTile(
-                      icon: Icons.lightbulb_outline,
-                      title: loc.settingsKeepScreenOn,
-                      subtitle: loc.settingsKeepScreenOnSubtitle,
-                      value: _settings['keep_screen_on'] == 'true',
-                      onChanged: (v) => _update('keep_screen_on', v.toString()),
-                    ),
-                  ],
-                ),
-
-                // ===== NOTIFICAÇÕES =====
-                _SectionHeader(text: loc.settingsSectionNotifications),
-                _SettingsCard(
-                  children: [
-                    _SwitchTile(
-                      icon: Icons.notifications_outlined,
-                      title: loc.settingsRestTimerNotif,
-                      subtitle: loc.settingsRestTimerNotifSubtitle,
-                      value:
-                          _settings['notification_rest_timer_enabled'] !=
-                          'false',
-                      onChanged: (v) => _updateNotificationPreference(
-                        'notification_rest_timer_enabled',
-                        v,
-                      ),
-                    ),
-                    if (_settings['notification_rest_timer_enabled'] !=
-                        'false') ...[
-                      const _CardDivider(),
-                      _SwitchTile(
-                        icon: Icons.volume_up_outlined,
-                        title: loc.settingsSound,
-                        subtitle: loc.settingsRestSoundSubtitle,
-                        indent: true,
-                        value:
-                            _settings['notification_rest_timer_sound'] !=
-                            'false',
-                        onChanged: (v) {
-                          _update(
-                            'notification_rest_timer_sound',
-                            v.toString(),
-                          );
-                          NotificationService.instance.loadSettings();
-                        },
+                        displayValue: _formatRestTime(
+                          int.tryParse(
+                                _settings['default_rest_time'] ?? '90',
+                              ) ??
+                              90,
+                        ),
+                        choices: _restChoices,
+                        formatChoice: _formatRestTime,
+                        sheetTitle: loc.settingsDefaultRest,
+                        onChanged: (v) =>
+                            _update('default_rest_time', v.toString()),
                       ),
                       const _CardDivider(),
                       _SwitchTile(
-                        icon: Icons.vibration,
-                        title: loc.settingsVibration,
-                        subtitle: loc.settingsRestVibrationSubtitle,
-                        indent: true,
-                        value:
-                            _settings['notification_rest_timer_vibration'] !=
-                            'false',
-                        onChanged: (v) {
-                          _update(
-                            'notification_rest_timer_vibration',
-                            v.toString(),
-                          );
-                          NotificationService.instance.loadSettings();
-                        },
+                        icon: Icons.play_circle_outline,
+                        title: loc.settingsAutoStartRest,
+                        subtitle: loc.settingsAutoStartRestSubtitle,
+                        value: _settings['auto_start_rest_timer'] == 'true',
+                        onChanged: (v) =>
+                            _update('auto_start_rest_timer', v.toString()),
+                      ),
+                      const _CardDivider(),
+                      _SwitchTile(
+                        icon: Icons.av_timer,
+                        title: loc.settingsAutoStartWorkoutTimer,
+                        subtitle: loc.settingsAutoStartWorkoutTimerSubtitle,
+                        value: _settings['auto_start_workout_timer'] == 'true',
+                        onChanged: (v) =>
+                            _update('auto_start_workout_timer', v.toString()),
                       ),
                     ],
-                  ],
-                ),
-                const SizedBox(height: 12),
-                _SettingsCard(
-                  children: [
-                    _SwitchTile(
-                      icon: Icons.notifications_active_outlined,
-                      title: loc.settingsWorkoutTimerNotif,
-                      subtitle: loc.settingsWorkoutTimerNotifSubtitle,
-                      value:
-                          _settings['notification_workout_timer_enabled'] !=
-                          'false',
-                      onChanged: (v) => _updateNotificationPreference(
-                        'notification_workout_timer_enabled',
-                        v,
-                      ),
-                    ),
-                    if (_settings['notification_workout_timer_enabled'] !=
-                        'false') ...[
-                      const _CardDivider(),
+                  ),
+                  const SizedBox(height: 12),
+                  _SettingsCard(
+                    children: [
                       _SwitchTile(
-                        icon: Icons.volume_up_outlined,
-                        title: loc.settingsSound,
-                        subtitle: loc.settingsWorkoutSoundSubtitle,
-                        indent: true,
-                        value:
-                            _settings['notification_workout_timer_sound'] ==
-                            'true',
-                        onChanged: (v) {
-                          _update(
-                            'notification_workout_timer_sound',
-                            v.toString(),
-                          );
-                          NotificationService.instance.loadSettings();
-                        },
-                      ),
-                      const _CardDivider(),
-                      _SwitchTile(
-                        icon: Icons.vibration,
-                        title: loc.settingsVibration,
-                        subtitle: loc.settingsWorkoutVibrationSubtitle,
-                        indent: true,
-                        value:
-                            _settings['notification_workout_timer_vibration'] ==
-                            'true',
-                        onChanged: (v) {
-                          _update(
-                            'notification_workout_timer_vibration',
-                            v.toString(),
-                          );
-                          NotificationService.instance.loadSettings();
-                        },
+                        icon: Icons.lightbulb_outline,
+                        title: loc.settingsKeepScreenOn,
+                        subtitle: loc.settingsKeepScreenOnSubtitle,
+                        value: _settings['keep_screen_on'] == 'true',
+                        onChanged: (v) =>
+                            _update('keep_screen_on', v.toString()),
                       ),
                     ],
-                  ],
-                ),
+                  ),
 
-                // ===== DADOS =====
-                _SectionHeader(text: loc.aiCoachSection),
-                _SettingsCard(
-                  children: [
-                    _LinkTile(
-                      icon: Icons.smart_toy_rounded,
-                      iconColor: theme.colorScheme.primary,
-                      title: loc.aiCoachEntry,
-                      subtitle: loc.aiCoachEntrySubtitle,
-                      onTap: _openAiCoach,
-                    ),
-                    const _CardDivider(),
-                    _LinkTile(
-                      icon: Icons.tune_rounded,
-                      iconColor: theme.colorScheme.onSurfaceVariant,
-                      title: loc.aiCoachConfigureEntry,
-                      subtitle: loc.aiCoachConfigureEntrySubtitle,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          AiCoachNavigation.route(
-                            kind: AiCoachRouteKind.aiFlow,
-                            builder: (_) => const AiSettingsScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                    const _CardDivider(),
-                    _SwitchTile(
-                      icon: Icons.smart_toy_outlined,
-                      title: loc.aiSettingsFabTitle,
-                      subtitle: loc.aiSettingsFabSubtitle,
-                      value: WorkoutNotesApp.aiSettings.fabEnabled,
-                      onChanged: (value) {
-                        WorkoutNotesApp.aiSettings.setFabEnabled(value);
-                      },
-                    ),
-                  ],
-                ),
+                  // ===== NOTIFICAÇÕES =====
+                  _SectionHeader(text: loc.settingsSectionNotifications),
+                  _SettingsCard(
+                    children: [
+                      _SwitchTile(
+                        icon: Icons.notifications_outlined,
+                        title: loc.settingsRestTimerNotif,
+                        subtitle: loc.settingsRestTimerNotifSubtitle,
+                        value:
+                            _settings['notification_rest_timer_enabled'] !=
+                            'false',
+                        onChanged: (v) => _updateNotificationPreference(
+                          'notification_rest_timer_enabled',
+                          v,
+                        ),
+                      ),
+                      if (_settings['notification_rest_timer_enabled'] !=
+                          'false') ...[
+                        const _CardDivider(),
+                        _SwitchTile(
+                          icon: Icons.volume_up_outlined,
+                          title: loc.settingsSound,
+                          subtitle: loc.settingsRestSoundSubtitle,
+                          indent: true,
+                          value:
+                              _settings['notification_rest_timer_sound'] !=
+                              'false',
+                          onChanged: (v) {
+                            _update(
+                              'notification_rest_timer_sound',
+                              v.toString(),
+                            );
+                            NotificationService.instance.loadSettings();
+                          },
+                        ),
+                        const _CardDivider(),
+                        _SwitchTile(
+                          icon: Icons.vibration,
+                          title: loc.settingsVibration,
+                          subtitle: loc.settingsRestVibrationSubtitle,
+                          indent: true,
+                          value:
+                              _settings['notification_rest_timer_vibration'] !=
+                              'false',
+                          onChanged: (v) {
+                            _update(
+                              'notification_rest_timer_vibration',
+                              v.toString(),
+                            );
+                            NotificationService.instance.loadSettings();
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _SettingsCard(
+                    children: [
+                      _SwitchTile(
+                        icon: Icons.notifications_active_outlined,
+                        title: loc.settingsWorkoutTimerNotif,
+                        subtitle: loc.settingsWorkoutTimerNotifSubtitle,
+                        value:
+                            _settings['notification_workout_timer_enabled'] !=
+                            'false',
+                        onChanged: (v) => _updateNotificationPreference(
+                          'notification_workout_timer_enabled',
+                          v,
+                        ),
+                      ),
+                      if (_settings['notification_workout_timer_enabled'] !=
+                          'false') ...[
+                        const _CardDivider(),
+                        _SwitchTile(
+                          icon: Icons.volume_up_outlined,
+                          title: loc.settingsSound,
+                          subtitle: loc.settingsWorkoutSoundSubtitle,
+                          indent: true,
+                          value:
+                              _settings['notification_workout_timer_sound'] ==
+                              'true',
+                          onChanged: (v) {
+                            _update(
+                              'notification_workout_timer_sound',
+                              v.toString(),
+                            );
+                            NotificationService.instance.loadSettings();
+                          },
+                        ),
+                        const _CardDivider(),
+                        _SwitchTile(
+                          icon: Icons.vibration,
+                          title: loc.settingsVibration,
+                          subtitle: loc.settingsWorkoutVibrationSubtitle,
+                          indent: true,
+                          value:
+                              _settings['notification_workout_timer_vibration'] ==
+                              'true',
+                          onChanged: (v) {
+                            _update(
+                              'notification_workout_timer_vibration',
+                              v.toString(),
+                            );
+                            NotificationService.instance.loadSettings();
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
 
-                // ===== NUTRIÇÃO =====
-                _SectionHeader(text: loc.nutritionTitle.toUpperCase()),
-                _SettingsCard(
-                  children: [
-                    _LinkTile(
-                      icon: Icons.flag_outlined,
-                      iconColor: theme.colorScheme.primary,
-                      title: loc.nutritionSettingsTitle,
-                      subtitle: loc.nutritionSettingsSubtitle,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => NutritionSettingsScreen(
-                              repository: NutritionRepository(),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const _CardDivider(),
-                    _LinkTile(
-                      icon: Icons.table_view_outlined,
-                      iconColor: theme.colorScheme.primary,
-                      title: loc.exportNutritionCsv,
-                      subtitle: loc.exportNutritionCsvSubtitle,
-                      onTap: _exportNutritionCsv,
-                    ),
-                  ],
-                ),
-
-                // ===== DADOS =====
-                _SectionHeader(text: loc.settingsSectionData),
-                _SettingsCard(
-                  children: [
-                    _LinkTile(
-                      icon: Icons.download_outlined,
-                      iconColor: theme.colorScheme.primary,
-                      title: loc.settingsExportBackup,
-                      subtitle: loc.settingsExportIncludesNutrition,
-                      onTap: _exportBackup,
-                    ),
-                    const _CardDivider(),
-                    _LinkTile(
-                      icon: Icons.upload_outlined,
-                      iconColor: theme.colorScheme.primary,
-                      title: loc.settingsImportBackup,
-                      subtitle: loc.settingsImportBackupSubtitle,
-                      onTap: _importBackup,
-                    ),
-                    if (_showTestData) ...[
+                if (widget.category == _SettingsCategory.ai) ...[
+                  // ===== INTELIGÊNCIA ARTIFICIAL =====
+                  _SectionHeader(text: loc.aiCoachSection),
+                  _SettingsCard(
+                    children: [
+                      _LinkTile(
+                        icon: Icons.smart_toy_rounded,
+                        iconColor: theme.colorScheme.primary,
+                        title: loc.aiCoachEntry,
+                        subtitle: loc.aiCoachEntrySubtitle,
+                        onTap: _openAiCoach,
+                      ),
                       const _CardDivider(),
                       _LinkTile(
-                        icon: Icons.bug_report_outlined,
-                        iconColor: theme.colorScheme.secondary,
-                        title: loc.settingsGenerateTestData,
-                        subtitle: loc.settingsGenerateTestDataSubtitle,
-                        onTap: _generateTestData,
+                        icon: Icons.tune_rounded,
+                        iconColor: theme.colorScheme.onSurfaceVariant,
+                        title: loc.aiCoachConfigureEntry,
+                        subtitle: loc.aiCoachConfigureEntrySubtitle,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            AiCoachNavigation.route(
+                              kind: AiCoachRouteKind.aiFlow,
+                              builder: (_) => const AiSettingsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      const _CardDivider(),
+                      _SwitchTile(
+                        icon: Icons.smart_toy_outlined,
+                        title: loc.aiSettingsFabTitle,
+                        subtitle: loc.aiSettingsFabSubtitle,
+                        value: WorkoutNotesApp.aiSettings.fabEnabled,
+                        onChanged: (value) {
+                          WorkoutNotesApp.aiSettings.setFabEnabled(value);
+                        },
                       ),
                     ],
-                    const _CardDivider(),
-                    _LinkTile(
-                      icon: Icons.info_outline,
-                      iconColor: theme.colorScheme.onSurfaceVariant,
-                      title: loc.settingsAbout,
-                      subtitle: loc.settingsAboutSubtitle,
-                      onTap: _showAbout,
-                    ),
-                    const _CardDivider(),
-                    _LinkTile(
-                      icon: Icons.delete_outline,
-                      iconColor: Colors.red,
-                      title: loc.settingsDeleteAllHistory,
-                      subtitle: loc.settingsDeleteHistoryContent
-                          .split('\n')
-                          .first,
-                      titleColor: Colors.red,
-                      onTap: _deleteAllHistory,
-                    ),
-                  ],
-                ),
+                  ),
+                ],
+
+                if (widget.category == _SettingsCategory.data) ...[
+                  // ===== EXPORTAÇÕES =====
+                  _SectionHeader(text: loc.settingsSectionExports),
+                  _SettingsCard(
+                    children: [
+                      _LinkTile(
+                        icon: Icons.table_view_outlined,
+                        iconColor: theme.colorScheme.primary,
+                        title: loc.exportNutritionCsv,
+                        subtitle: loc.exportNutritionCsvSubtitle,
+                        onTap: _exportNutritionCsv,
+                      ),
+                    ],
+                  ),
+
+                  // ===== DADOS =====
+                  _SectionHeader(text: loc.settingsSectionData),
+                  _SettingsCard(
+                    children: [
+                      _LinkTile(
+                        icon: Icons.download_outlined,
+                        iconColor: theme.colorScheme.primary,
+                        title: loc.settingsExportBackup,
+                        subtitle: loc.settingsExportIncludesNutrition,
+                        onTap: _exportBackup,
+                      ),
+                      const _CardDivider(),
+                      _LinkTile(
+                        icon: Icons.upload_outlined,
+                        iconColor: theme.colorScheme.primary,
+                        title: loc.settingsImportBackup,
+                        subtitle: loc.settingsImportBackupSubtitle,
+                        onTap: _importBackup,
+                      ),
+                      if (_showTestData) ...[
+                        const _CardDivider(),
+                        _LinkTile(
+                          icon: Icons.bug_report_outlined,
+                          iconColor: theme.colorScheme.secondary,
+                          title: loc.settingsGenerateTestData,
+                          subtitle: loc.settingsGenerateTestDataSubtitle,
+                          onTap: _generateTestData,
+                        ),
+                      ],
+                      const _CardDivider(),
+                      _LinkTile(
+                        icon: Icons.info_outline,
+                        iconColor: theme.colorScheme.onSurfaceVariant,
+                        title: loc.settingsAbout,
+                        subtitle: loc.settingsAboutSubtitle,
+                        onTap: _showAbout,
+                      ),
+                      const _CardDivider(),
+                      _LinkTile(
+                        icon: Icons.delete_outline,
+                        iconColor: Colors.red,
+                        title: loc.settingsDeleteAllHistory,
+                        subtitle: loc.settingsDeleteHistoryContent
+                            .split('\n')
+                            .first,
+                        titleColor: Colors.red,
+                        onTap: _deleteAllHistory,
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
     );
