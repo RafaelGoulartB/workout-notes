@@ -110,7 +110,7 @@ Regras:
 
     late final AiChatCompletion completion;
     try {
-      completion = await service.sendChat(
+      completion = await service.sendVision(
         baseUrl: provider.baseUrl,
         token: token,
         model: model,

@@ -195,6 +195,158 @@ class AiService {
     );
   }
 
+  /// Sends a multimodal request using the protocol expected by the provider.
+  ///
+  /// OpenCode exposes its GPT models through the OpenAI Responses API. Its
+  /// Chat Completions compatibility endpoint accepts text but rejects image
+  /// parts with HTTP 400, so vision requests must use `/responses` there.
+  Future<AiChatCompletion> sendVision({
+    required String baseUrl,
+    required String token,
+    required String model,
+    required List<Map<String, dynamic>> messages,
+  }) {
+    if (_usesResponsesApiForVision(baseUrl: baseUrl, model: model)) {
+      return _sendResponsesVision(
+        baseUrl: baseUrl,
+        token: token,
+        model: model,
+        messages: messages,
+      );
+    }
+    return sendChat(
+      baseUrl: baseUrl,
+      token: token,
+      model: model,
+      messages: messages,
+    );
+  }
+
+  bool _usesResponsesApiForVision({
+    required String baseUrl,
+    required String model,
+  }) {
+    final host = Uri.tryParse(baseUrl)?.host.toLowerCase() ?? '';
+    final isOpenCode = host == 'opencode.ai' || host.endsWith('.opencode.ai');
+    return isOpenCode && model.toLowerCase().startsWith('gpt-');
+  }
+
+  Future<AiChatCompletion> _sendResponsesVision({
+    required String baseUrl,
+    required String token,
+    required String model,
+    required List<Map<String, dynamic>> messages,
+  }) async {
+    final instructions = messages
+        .where((message) => message['role'] == 'system')
+        .map((message) => message['content'])
+        .whereType<String>()
+        .join('\n\n');
+    final input = <Map<String, dynamic>>[];
+    for (final message in messages.where(
+      (message) => message['role'] != 'system',
+    )) {
+      final content = message['content'];
+      final parts = <Map<String, dynamic>>[];
+      if (content is String) {
+        parts.add({'type': 'input_text', 'text': content});
+      } else if (content is List) {
+        for (final rawPart in content) {
+          if (rawPart is! Map) continue;
+          if (rawPart['type'] == 'text' && rawPart['text'] is String) {
+            parts.add({'type': 'input_text', 'text': rawPart['text']});
+          } else if (rawPart['type'] == 'image_url') {
+            final image = rawPart['image_url'];
+            final url = image is Map ? image['url'] : image;
+            if (url is String && url.isNotEmpty) {
+              parts.add({'type': 'input_image', 'image_url': url});
+            }
+          }
+        }
+      }
+      if (parts.isNotEmpty) {
+        input.add({'role': message['role'], 'content': parts});
+      }
+    }
+
+    final uri = Uri.parse('$baseUrl/responses');
+    final payload = <String, dynamic>{
+      'model': model,
+      if (instructions.isNotEmpty) 'instructions': instructions,
+      'input': input,
+    };
+    final res = await _client
+        .post(
+          uri,
+          headers: _headers(token: token),
+          body: jsonEncode(payload),
+        )
+        .timeout(timeout);
+
+    if (res.statusCode == 401) {
+      throw const AiServiceException(
+        'Invalid or missing API token.',
+        code: 'invalid_token',
+      );
+    }
+    if (res.statusCode == 404) {
+      throw const AiServiceException(
+        'Model or endpoint not found (404).',
+        code: 'not_found',
+      );
+    }
+    if (res.statusCode >= 400) {
+      throw AiServiceException(
+        'Request failed (${res.statusCode}): ${_truncate(res.body)}',
+        code: 'http_error',
+      );
+    }
+
+    final body = jsonDecode(res.body);
+    if (body is! Map) {
+      throw const AiServiceException(
+        'Invalid response body',
+        code: 'invalid_response',
+      );
+    }
+    final rawText = _extractResponsesText(body);
+    final text = rawText == null ? null : _sanitizeReasoning(rawText);
+    final usage = body['usage'];
+    return AiChatCompletion(
+      text: text,
+      hadReferencePlaceholders:
+          rawText != null &&
+          TextSanitizer.containsReferencePlaceholder(rawText),
+      promptTokens: usage is Map
+          ? (usage['input_tokens'] as num?)?.toInt()
+          : null,
+      completionTokens: usage is Map
+          ? (usage['output_tokens'] as num?)?.toInt()
+          : null,
+    );
+  }
+
+  String? _extractResponsesText(Map<dynamic, dynamic> body) {
+    final direct = body['output_text'];
+    if (direct is String && direct.isNotEmpty) return direct;
+    final output = body['output'];
+    if (output is! List) return null;
+    final buffer = StringBuffer();
+    for (final item in output) {
+      if (item is! Map || item['type'] != 'message') continue;
+      final content = item['content'];
+      if (content is! List) continue;
+      for (final part in content) {
+        if (part is Map && part['type'] == 'output_text') {
+          final text = part['text'];
+          if (text is String) buffer.write(text);
+        }
+      }
+    }
+    final text = buffer.toString();
+    return text.isEmpty ? null : text;
+  }
+
   Map<String, String> _headers({required String token}) => {
     // Local providers (e.g. Ollama) have no token; sending an empty
     // Bearer header can make some servers reject the request.

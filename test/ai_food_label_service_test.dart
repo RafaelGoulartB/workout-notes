@@ -246,14 +246,11 @@ void main() {
 
 class _FailingAiService extends AiService {
   @override
-  Future<AiChatCompletion> sendChat({
+  Future<AiChatCompletion> sendVision({
     required String baseUrl,
     required String token,
     required String model,
     required List<Map<String, dynamic>> messages,
-    List<Map<String, dynamic>>? tools,
-    Object? toolChoice,
-    double temperature = 0.3,
   }) {
     throw const AiServiceException(
       'Invalid or missing API token.',
