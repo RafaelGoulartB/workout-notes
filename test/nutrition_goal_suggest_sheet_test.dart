@@ -76,17 +76,15 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('2487 kcal'), findsOneWidget);
 
-    await tester.tap(find.text('Distribuição de macros'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Déficit'), findsNWidgets(2));
+    expect(find.text('Déficit'), findsOneWidget);
+    expect(find.text('Distribuição de macros · Manutenção'), findsOneWidget);
     expect(
       find.text('Carboidratos usam as calorias restantes.'),
       findsOneWidget,
     );
 
-    // Profile fields are first; maintenance protein is the sixth text field.
-    final maintenanceProtein = find.byType(TextField).at(5);
+    // Profile fields are first; selected-objective protein is the fourth.
+    final maintenanceProtein = find.byType(TextField).at(3);
     await tester.enterText(maintenanceProtein, '2,0');
     await tester.pump();
     expect(find.text('160 g'), findsOneWidget);

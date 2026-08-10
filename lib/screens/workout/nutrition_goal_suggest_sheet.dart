@@ -35,10 +35,14 @@ class NutritionGoalSuggestSheet extends StatefulWidget {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (_) => NutritionGoalSuggestSheet(
-        bodyRepo: bodyRepo,
-        settingsRepo: settingsRepo,
-        onApply: onApply,
+      useSafeArea: true,
+      builder: (_) => SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.9,
+        child: NutritionGoalSuggestSheet(
+          bodyRepo: bodyRepo,
+          settingsRepo: settingsRepo,
+          onApply: onApply,
+        ),
       ),
     );
   }
@@ -211,13 +215,11 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
     });
   }
 
-  void _restoreMacroDefaults() {
-    for (final objective in NutritionObjective.values) {
-      final defaults = NutritionMacroRatios.defaultsFor(objective);
-      final controllers = _macroControllers[objective]!;
-      controllers.protein.text = _formatRatio(defaults.proteinPerKg);
-      controllers.fat.text = _formatRatio(defaults.fatPerKg);
-    }
+  void _restoreCurrentMacroDefaults() {
+    final defaults = NutritionMacroRatios.defaultsFor(_objective);
+    final controllers = _macroControllers[_objective]!;
+    controllers.protein.text = _formatRatio(defaults.proteinPerKg);
+    controllers.fat.text = _formatRatio(defaults.fatPerKg);
     _recompute();
   }
 
@@ -307,206 +309,427 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 0,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: _isLoading
-          ? const Padding(
-              padding: EdgeInsets.symmetric(vertical: 48),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          : SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    loc.nutritionSuggestTitle,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    loc.nutritionSuggestSubtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    loc.nutritionSuggestSex,
-                    style: theme.textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  SegmentedButton<bool>(
-                    segments: [
-                      ButtonSegment(
-                        value: true,
-                        label: Text(loc.nutritionSuggestSexMale),
-                        icon: const Icon(Icons.male),
-                      ),
-                      ButtonSegment(
-                        value: false,
-                        label: Text(loc.nutritionSuggestSexFemale),
-                        icon: const Icon(Icons.female),
-                      ),
-                    ],
-                    selected: {_isMale},
-                    onSelectionChanged: (selection) {
-                      setState(() => _isMale = selection.first);
-                      _recompute();
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _SheetNumberField(
-                          controller: _ageController,
-                          label: loc.nutritionSuggestAge,
-                          onChanged: (_) => _recompute(),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _SheetNumberField(
-                          controller: _heightController,
-                          label: loc.nutritionSuggestHeight,
-                          onChanged: (_) => _recompute(),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _SheetNumberField(
-                          controller: _weightController,
-                          label: loc.nutritionSuggestWeight,
-                          onChanged: (_) => _recompute(),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    loc.nutritionSuggestActivity,
-                    style: theme.textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<ActivityLevel>(
-                    initialValue: _activity,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: theme.colorScheme.surfaceContainerHighest
-                          .withAlpha(60),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
+    final canApply =
+        _suggestion != null && _allRatiosValid && !_hasMacroEnergyConflict;
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 4, 12, 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loc.nutritionSuggestTitle,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                    items: [
-                      for (final level in ActivityLevel.values)
-                        DropdownMenuItem(
-                          value: level,
-                          child: Text(_activityLabel(loc, level)),
-                        ),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() => _activity = value);
-                      _recompute();
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    loc.nutritionSuggestObjective,
-                    style: theme.textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  SegmentedButton<NutritionObjective>(
-                    segments: [
-                      for (final objective in NutritionObjective.values)
-                        ButtonSegment(
-                          value: objective,
-                          label: Text(_objectiveLabel(loc, objective)),
-                        ),
-                    ],
-                    selected: {_objective},
-                    onSelectionChanged: (selection) {
-                      setState(() => _objective = selection.first);
-                      _recompute();
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _MacroConfigurationCard(
-                    controllers: _macroControllers,
-                    objectiveLabel: (objective) =>
-                        _objectiveLabel(loc, objective),
-                    onChanged: _recompute,
-                    onRestore: _restoreMacroDefaults,
-                  ),
-                  if (!_allRatiosValid || _hasMacroEnergyConflict) ...[
-                    const SizedBox(height: 8),
-                    _InlineWarning(
-                      message: !_allRatiosValid
-                          ? loc.nutritionSuggestInvalidMacros
-                          : loc.nutritionSuggestMacroEnergyError,
+                    const SizedBox(height: 3),
+                    Text(
+                      loc.nutritionSuggestSubtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
-                  const SizedBox(height: 16),
-                  if (_suggestion == null && !_hasCompleteProfile)
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest
-                            .withAlpha(60),
-                        borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              IconButton(
+                tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+        ),
+        Divider(height: 1, color: theme.colorScheme.outlineVariant),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              18,
+              16,
+              MediaQuery.viewInsetsOf(context).bottom + 24,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SectionLabel(
+                  icon: Icons.person_outline_rounded,
+                  label: loc.nutritionSuggestProfileSection,
+                ),
+                const SizedBox(height: 8),
+                _SurfaceCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        loc.nutritionSuggestSex,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            size: 18,
-                            color: theme.colorScheme.onSurfaceVariant,
+                      const SizedBox(height: 8),
+                      SegmentedButton<bool>(
+                        segments: [
+                          ButtonSegment(
+                            value: true,
+                            label: Text(loc.nutritionSuggestSexMale),
+                            icon: const Icon(Icons.male_rounded),
                           ),
-                          const SizedBox(width: 8),
+                          ButtonSegment(
+                            value: false,
+                            label: Text(loc.nutritionSuggestSexFemale),
+                            icon: const Icon(Icons.female_rounded),
+                          ),
+                        ],
+                        selected: {_isMale},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (selection) {
+                          setState(() => _isMale = selection.first);
+                          _recompute();
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
                           Expanded(
-                            child: Text(
-                              loc.nutritionSuggestNoProfile,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
+                            child: _SheetNumberField(
+                              controller: _ageController,
+                              label: loc.nutritionSuggestAgeShort,
+                              suffix: loc.nutritionSuggestYearsUnit,
+                              onChanged: (_) => _recompute(),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _SheetNumberField(
+                              controller: _heightController,
+                              label: loc.nutritionSuggestHeightShort,
+                              suffix: 'cm',
+                              onChanged: (_) => _recompute(),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _SheetNumberField(
+                              controller: _weightController,
+                              label: loc.nutritionSuggestWeightShort,
+                              suffix: 'kg',
+                              onChanged: (_) => _recompute(),
                             ),
                           ),
                         ],
                       ),
-                    )
-                  else if (_suggestion != null) ...[
-                    _SuggestionPreviewCard(suggestion: _suggestion!),
-                  ],
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed:
-                        _suggestion == null ||
-                            !_allRatiosValid ||
-                            _hasMacroEnergyConflict
-                        ? null
-                        : _apply,
-                    icon: const Icon(Icons.check_rounded),
-                    label: Text(loc.nutritionSuggestApply),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                    ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _SectionLabel(
+                  icon: Icons.flag_outlined,
+                  label: loc.nutritionSuggestPlanSection,
+                ),
+                const SizedBox(height: 8),
+                _SurfaceCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        loc.nutritionSuggestActivity,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      DropdownButtonFormField<ActivityLevel>(
+                        initialValue: _activity,
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.directions_run_rounded),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest
+                              .withAlpha(75),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                        items: [
+                          for (final level in ActivityLevel.values)
+                            DropdownMenuItem(
+                              value: level,
+                              child: Text(_activityLabel(loc, level)),
+                            ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() => _activity = value);
+                          _recompute();
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        loc.nutritionSuggestObjective,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _ObjectiveSelector(
+                        selected: _objective,
+                        labelFor: (objective) =>
+                            _objectiveLabel(loc, objective),
+                        onSelected: (objective) {
+                          setState(() => _objective = objective);
+                          _recompute();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _MacroConfigurationCard(
+                  objectiveLabel: _objectiveLabel(loc, _objective),
+                  controllers: _macroControllers[_objective]!,
+                  onChanged: _recompute,
+                  onRestore: _restoreCurrentMacroDefaults,
+                ),
+                if (!_allRatiosValid || _hasMacroEnergyConflict) ...[
+                  const SizedBox(height: 8),
+                  _InlineWarning(
+                    message: !_allRatiosValid
+                        ? loc.nutritionSuggestInvalidMacros
+                        : loc.nutritionSuggestMacroEnergyError,
                   ),
                 ],
+                const SizedBox(height: 20),
+                if (_suggestion == null && !_hasCompleteProfile)
+                  _InlineInfo(message: loc.nutritionSuggestNoProfile)
+                else if (_suggestion != null)
+                  _SuggestionPreviewCard(suggestion: _suggestion!),
+              ],
+            ),
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            12,
+            16,
+            12 + MediaQuery.paddingOf(context).bottom,
+          ),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            border: Border(
+              top: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: theme.colorScheme.shadow.withAlpha(20),
+                blurRadius: 12,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: FilledButton.icon(
+            onPressed: canApply ? _apply : null,
+            icon: const Icon(Icons.check_rounded),
+            label: Text(loc.nutritionSuggestApply),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _SectionLabel({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: theme.colorScheme.primary),
+        const SizedBox(width: 7),
+        Text(
+          label,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SurfaceCard extends StatelessWidget {
+  final Widget child;
+
+  const _SurfaceCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _ObjectiveSelector extends StatelessWidget {
+  final NutritionObjective selected;
+  final String Function(NutritionObjective) labelFor;
+  final ValueChanged<NutritionObjective> onSelected;
+
+  const _ObjectiveSelector({
+    required this.selected,
+    required this.labelFor,
+    required this.onSelected,
+  });
+
+  static IconData _iconFor(NutritionObjective objective) {
+    return switch (objective) {
+      NutritionObjective.cut => Icons.trending_down_rounded,
+      NutritionObjective.maintenance => Icons.balance_rounded,
+      NutritionObjective.bulk => Icons.trending_up_rounded,
+    };
+  }
+
+  static String _adjustmentFor(NutritionObjective objective) {
+    return switch (objective) {
+      NutritionObjective.cut => '-20%',
+      NutritionObjective.maintenance => '0%',
+      NutritionObjective.bulk => '+10%',
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (final objective in NutritionObjective.values) ...[
+          Expanded(
+            child: _ObjectiveOption(
+              icon: _iconFor(objective),
+              label: labelFor(objective),
+              adjustment: _adjustmentFor(objective),
+              selected: selected == objective,
+              onTap: () => onSelected(objective),
+            ),
+          ),
+          if (objective != NutritionObjective.values.last)
+            const SizedBox(width: 8),
+        ],
+      ],
+    );
+  }
+}
+
+class _ObjectiveOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String adjustment;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ObjectiveOption({
+    required this.icon,
+    required this.label,
+    required this.adjustment,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final foreground = selected
+        ? theme.colorScheme.onPrimaryContainer
+        : theme.colorScheme.onSurfaceVariant;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: selected
+            ? theme.colorScheme.primaryContainer
+            : theme.colorScheme.surfaceContainerHighest.withAlpha(70),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: selected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outlineVariant,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+            child: Column(
+              children: [
+                Icon(icon, size: 20, color: foreground),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: foreground,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  adjustment,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: foreground.withAlpha(190),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -534,14 +757,14 @@ class _MacroRatioControllers {
 }
 
 class _MacroConfigurationCard extends StatelessWidget {
-  final Map<NutritionObjective, _MacroRatioControllers> controllers;
-  final String Function(NutritionObjective) objectiveLabel;
+  final String objectiveLabel;
+  final _MacroRatioControllers controllers;
   final VoidCallback onChanged;
   final VoidCallback onRestore;
 
   const _MacroConfigurationCard({
-    required this.controllers,
     required this.objectiveLabel,
+    required this.controllers,
     required this.onChanged,
     required this.onRestore,
   });
@@ -550,86 +773,99 @@ class _MacroConfigurationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: 14),
-        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-        leading: const Icon(Icons.tune_rounded, size: 20),
-        title: Text(
-          loc.nutritionSuggestMacroSettings,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        subtitle: Text(
-          loc.nutritionSuggestMacroSettingsSubtitle,
-          style: theme.textTheme.bodySmall,
-        ),
+    return _SurfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 4),
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.tune_rounded,
+                  size: 19,
+                  color: theme.colorScheme.onSecondaryContainer,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${loc.nutritionSuggestMacroSettings} · $objectiveLabel',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      loc.nutritionSuggestSelectedObjectiveHint,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: loc.nutritionSuggestRestoreDefaults,
+                onPressed: onRestore,
+                icon: const Icon(Icons.restart_alt_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
-                flex: 5,
-                child: Text(
-                  loc.nutritionSuggestObjective,
-                  style: theme.textTheme.labelSmall,
+                child: _MacroRatioField(
+                  controller: controllers.protein,
+                  label: loc.nutritionSuggestProteinPerKg,
+                  icon: Icons.fitness_center_rounded,
+                  onChanged: onChanged,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Expanded(
-                flex: 4,
-                child: Text(
-                  loc.nutritionSuggestProteinPerKg,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.labelSmall,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 4,
-                child: Text(
-                  loc.nutritionSuggestFatPerKg,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.labelSmall,
+                child: _MacroRatioField(
+                  controller: controllers.fat,
+                  label: loc.nutritionSuggestFatPerKg,
+                  icon: Icons.water_drop_outlined,
+                  onChanged: onChanged,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          for (final objective in NutritionObjective.values) ...[
-            _MacroConfigurationRow(
-              label: objectiveLabel(objective),
-              controllers: controllers[objective]!,
-              onChanged: onChanged,
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withAlpha(70),
+              borderRadius: BorderRadius.circular(10),
             ),
-            if (objective != NutritionObjective.values.last)
-              const SizedBox(height: 8),
-          ],
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  loc.nutritionSuggestCarbsRemainder,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 17,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    loc.nutritionSuggestCarbsRemainder,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
-              ),
-              TextButton.icon(
-                onPressed: onRestore,
-                icon: const Icon(Icons.restart_alt_rounded, size: 18),
-                label: Text(loc.nutritionSuggestRestoreDefaults),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -637,48 +873,18 @@ class _MacroConfigurationCard extends StatelessWidget {
   }
 }
 
-class _MacroConfigurationRow extends StatelessWidget {
-  final String label;
-  final _MacroRatioControllers controllers;
-  final VoidCallback onChanged;
-
-  const _MacroConfigurationRow({
-    required this.label,
-    required this.controllers,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(flex: 5, child: Text(label)),
-        const SizedBox(width: 8),
-        Expanded(
-          flex: 4,
-          child: _MacroRatioField(
-            controller: controllers.protein,
-            onChanged: onChanged,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          flex: 4,
-          child: _MacroRatioField(
-            controller: controllers.fat,
-            onChanged: onChanged,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _MacroRatioField extends StatelessWidget {
   final TextEditingController controller;
+  final String label;
+  final IconData icon;
   final VoidCallback onChanged;
 
-  const _MacroRatioField({required this.controller, required this.onChanged});
+  const _MacroRatioField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -686,13 +892,17 @@ class _MacroRatioField extends StatelessWidget {
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
-      textAlign: TextAlign.center,
       onChanged: (_) => onChanged(),
-      decoration: const InputDecoration(
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, size: 18),
         suffixText: 'g/kg',
         isDense: true,
-        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        border: OutlineInputBorder(),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 14,
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -733,6 +943,35 @@ class _InlineWarning extends StatelessWidget {
   }
 }
 
+class _InlineInfo extends StatelessWidget {
+  final String message;
+
+  const _InlineInfo({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer.withAlpha(100),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 19,
+            color: theme.colorScheme.onSecondaryContainer,
+          ),
+          const SizedBox(width: 9),
+          Expanded(child: Text(message, style: theme.textTheme.bodySmall)),
+        ],
+      ),
+    );
+  }
+}
+
 class _SuggestionPreviewCard extends StatelessWidget {
   final NutritionGoalSuggestion suggestion;
 
@@ -742,68 +981,84 @@ class _SuggestionPreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primaryContainer.withAlpha(170),
+            theme.colorScheme.surfaceContainerLow,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.colorScheme.primary.withAlpha(70)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.calculate_outlined,
-                  size: 18,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.auto_graph_rounded,
+                size: 19,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                loc.nutritionSuggestGoalPreview,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            loc.nutritionConsumedKcal(_format(suggestion.calories)),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.7,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '${loc.nutritionSuggestBmr}: ${_format(suggestion.bmr)} kcal  ·  '
+            '${loc.nutritionSuggestTdee}: ${_format(suggestion.tdee)} kcal',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _MacroStat(
+                  label: loc.nutritionProgressProtein,
+                  value: suggestion.proteinG,
+                  color: theme.colorScheme.tertiary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MacroStat(
+                  label: loc.nutritionProgressCarbs,
+                  value: suggestion.carbsG,
+                  color: theme.colorScheme.secondary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _MacroStat(
+                  label: loc.nutritionProgressFat,
+                  value: suggestion.fatG,
                   color: theme.colorScheme.primary,
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  loc.nutritionSuggestGoalPreview,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              loc.nutritionConsumedKcal(_format(suggestion.calories)),
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${loc.nutritionSuggestBmr}: ${_format(suggestion.bmr)} kcal · '
-              '${loc.nutritionSuggestTdee}: ${_format(suggestion.tdee)} kcal',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 10),
-            _MacroRow(
-              label: loc.nutritionProgressProtein,
-              value: suggestion.proteinG,
-              color: theme.colorScheme.tertiary,
-            ),
-            const SizedBox(height: 6),
-            _MacroRow(
-              label: loc.nutritionProgressCarbs,
-              value: suggestion.carbsG,
-              color: theme.colorScheme.secondary,
-            ),
-            const SizedBox(height: 6),
-            _MacroRow(
-              label: loc.nutritionProgressFat,
-              value: suggestion.fatG,
-              color: theme.colorScheme.primary,
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -816,12 +1071,12 @@ class _SuggestionPreviewCard extends StatelessWidget {
   }
 }
 
-class _MacroRow extends StatelessWidget {
+class _MacroStat extends StatelessWidget {
   final String label;
   final double value;
   final Color color;
 
-  const _MacroRow({
+  const _MacroStat({
     required this.label,
     required this.value,
     required this.color,
@@ -830,22 +1085,44 @@ class _MacroRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Expanded(child: Text(label)),
-        Text(
-          '${_format(value)} g',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withAlpha(180),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          Text(
+            '${_format(value)} g',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -860,11 +1137,13 @@ class _MacroRow extends StatelessWidget {
 class _SheetNumberField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
+  final String suffix;
   final ValueChanged<String> onChanged;
 
   const _SheetNumberField({
     required this.controller,
     required this.label,
+    required this.suffix,
     required this.onChanged,
   });
 
@@ -878,6 +1157,7 @@ class _SheetNumberField extends StatelessWidget {
       onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
+        suffixText: suffix,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
         fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
