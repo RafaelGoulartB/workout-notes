@@ -1133,6 +1133,204 @@ class NutritionRepository extends BaseRepository {
   }
 
   // ===================================================================
+  // Calorie balance analytics
+  // ===================================================================
+
+  /// Per-day totals for the [days] window, oldest first. Days with no
+  /// logged items are emitted with `calories` (and the macros) null so
+  /// the screen can render continuous timelines and detect missed days.
+  Future<List<DailyCalorieTotal>> getDailyCalorieTotals({required int days}) async {
+    final db = await this.db;
+    final start = _dateString(
+      DateTime.now().subtract(Duration(days: days - 1)),
+    );
+    final rows = await db.rawQuery(
+      '''
+      SELECT ml.date as date,
+        SUM(mli.calories) as calories
+      FROM meal_log_items mli
+      JOIN meal_logs ml ON mli.meal_log_id = ml.id
+      WHERE ml.date >= ?
+      GROUP BY ml.date
+      ORDER BY ml.date ASC
+      ''',
+      [start],
+    );
+    final totalsByDate = <String, double>{};
+    for (final row in rows) {
+      final v = _sum(row['calories']) ?? 0;
+      if (v > 0) totalsByDate[row['date'] as String] = v;
+    }
+    final result = <DailyCalorieTotal>[];
+    final startDate = DateTime.parse(start);
+    for (var i = 0; i < days; i++) {
+      final d = DateTime(startDate.year, startDate.month, startDate.day + i);
+      final key = _dateString(d);
+      result.add(
+        DailyCalorieTotal(
+          date: d,
+          calories: totalsByDate[key],
+        ),
+      );
+    }
+    return result;
+  }
+
+  /// Aggregated totals for the [days] window. [goal] is the active
+  /// calorie target, or null when no goal is configured.
+  Future<CalorieBalance> getCalorieBalance({
+    required int days,
+    required double? goal,
+  }) async {
+    final dailies = await getDailyCalorieTotals(days: days);
+    var consumed = 0.0;
+    var loggedDays = 0;
+    var inDeficit = 0;
+    var onTarget = 0;
+    var inSurplus = 0;
+    final logged = <DailyCalorieTotal>[];
+    for (final d in dailies) {
+      if (d.calories == null) continue;
+      consumed += d.calories!;
+      loggedDays++;
+      logged.add(d);
+      if (goal != null && goal > 0) {
+        final delta = d.calories! - goal;
+        final ratio = (delta).abs() / goal;
+        if (ratio <= 0.10) {
+          onTarget++;
+        } else if (delta < 0) {
+          inDeficit++;
+        } else {
+          inSurplus++;
+        }
+      }
+    }
+    // Current streak: consecutive logged days (newest first) inside
+    // the ±10% goal band. If the user has no goal configured the
+    // streak is the number of consecutive days with any log.
+    var streak = 0;
+    if (goal != null && goal > 0) {
+      for (var i = logged.length - 1; i >= 0; i--) {
+        final d = logged[i];
+        final delta = (d.calories! - goal).abs() / goal;
+        if (delta <= 0.10) {
+          streak++;
+        } else {
+          break;
+        }
+      }
+    } else {
+      for (var i = logged.length - 1; i >= 0; i--) {
+        if (logged[i].calories != null) {
+          streak++;
+        } else {
+          break;
+        }
+      }
+    }
+    final avg = loggedDays == 0 ? 0.0 : consumed / loggedDays;
+    final totalGoal = goal == null ? null : goal * days;
+    return CalorieBalance(
+      days: days,
+      totalConsumed: consumed,
+      totalGoal: totalGoal,
+      balance: totalGoal == null ? null : consumed - totalGoal,
+      daysLogged: loggedDays,
+      daysInDeficit: inDeficit,
+      daysOnTarget: onTarget,
+      daysInSurplus: inSurplus,
+      currentStreak: streak,
+      averageDailyIntake: avg,
+    );
+  }
+
+  /// Top calorie-contributing foods in the [days] window, ordered by
+  /// summed calories. Items whose food was deleted contribute nothing.
+  Future<List<CalorieContributor>> getTopCalorieContributors({
+    required int days,
+    int limit = 10,
+  }) async {
+    final db = await this.db;
+    final start = _dateString(
+      DateTime.now().subtract(Duration(days: days - 1)),
+    );
+    final rows = await db.rawQuery(
+      '''
+      SELECT mli.food_name_snapshot as food_name,
+        mli.brand_snapshot as brand,
+        SUM(mli.calories) as total_calories,
+        COUNT(*) as occurrences
+      FROM meal_log_items mli
+      JOIN meal_logs ml ON mli.meal_log_id = ml.id
+      WHERE ml.date >= ?
+        AND mli.food_name_snapshot IS NOT NULL
+        AND mli.calories IS NOT NULL
+      GROUP BY mli.food_name_snapshot, mli.brand_snapshot
+      ORDER BY total_calories DESC
+      LIMIT ?
+      ''',
+      [start, limit],
+    );
+    return rows
+        .map(
+          (r) => CalorieContributor(
+            name: (r['food_name'] as String?) ?? '',
+            brand: r['brand'] as String?,
+            totalCalories: ((r['total_calories'] as num?) ?? 0).toDouble(),
+            occurrences: ((r['occurrences'] as num?) ?? 0).toInt(),
+          ),
+        )
+        .toList();
+  }
+
+  /// Calorie distribution across meal types in the [days] window.
+  /// Excludes days with no logged items and meal types that never
+  /// appear so the chart only renders what the user actually uses.
+  Future<List<MealTypeCalories>> getCaloriesByMealType({
+    required int days,
+  }) async {
+    final db = await this.db;
+    final start = _dateString(
+      DateTime.now().subtract(Duration(days: days - 1)),
+    );
+    final rows = await db.rawQuery(
+      '''
+      SELECT ml.meal_type as meal_type,
+        COALESCE(ml.name, ml.meal_type) as display_name,
+        SUM(mli.calories) as total_calories,
+        COUNT(*) as item_count
+      FROM meal_log_items mli
+      JOIN meal_logs ml ON mli.meal_log_id = ml.id
+      WHERE ml.date >= ?
+        AND mli.calories IS NOT NULL
+      GROUP BY ml.meal_type, display_name
+      ORDER BY total_calories DESC
+      ''',
+      [start],
+    );
+    return rows
+        .map(
+          (r) => MealTypeCalories(
+            mealType: (r['meal_type'] as String?) ?? '',
+            displayName: (r['display_name'] as String?) ?? '',
+            totalCalories: ((r['total_calories'] as num?) ?? 0).toDouble(),
+            itemCount: ((r['item_count'] as num?) ?? 0).toInt(),
+          ),
+        )
+        .toList();
+  }
+
+  /// Daily consumed totals for the [days] window — same shape as
+  /// [getDailyNutritionHistory] but only the calories column, for the
+  /// rolling-average chart.
+  Future<List<DailyCalorieTotal>> getDailyCaloriesForRolling({
+    required int days,
+  }) async {
+    return getDailyCalorieTotals(days: days);
+  }
+
+  // ===================================================================
   // CSV export
   // ===================================================================
 
@@ -1591,4 +1789,82 @@ extension _FirstWhereOrNull<T> on Iterable<T> {
     }
     return null;
   }
+}
+
+/// One day of total calories consumed, or null when the day has no
+/// logged items. Powers the calorie-tracking analytics screen.
+class DailyCalorieTotal {
+  final DateTime date;
+  final double? calories;
+
+  const DailyCalorieTotal({required this.date, required this.calories});
+}
+
+/// Aggregated calorie balance for a window of [days]. All counters
+/// consider only days with at least one logged item; days without
+/// any log are not counted in any bucket (deficit / on target /
+/// surplus / streak) so the user's behavior on a rest day never
+/// skews the totals.
+class CalorieBalance {
+  final int days;
+  final double totalConsumed;
+
+  /// Sum of the active goal over the whole window (or null when no
+  /// goal is configured). Combined with [totalConsumed] to produce
+  /// the net surplus / deficit.
+  final double? totalGoal;
+
+  /// `consumed - totalGoal`. Null when no goal is set.
+  final double? balance;
+  final int daysLogged;
+  final int daysInDeficit;
+  final int daysOnTarget;
+  final int daysInSurplus;
+  final int currentStreak;
+  final double averageDailyIntake;
+
+  const CalorieBalance({
+    required this.days,
+    required this.totalConsumed,
+    required this.totalGoal,
+    required this.balance,
+    required this.daysLogged,
+    required this.daysInDeficit,
+    required this.daysOnTarget,
+    required this.daysInSurplus,
+    required this.currentStreak,
+    required this.averageDailyIntake,
+  });
+}
+
+/// A food (or food + brand pair) that contributed calories in a
+/// window, used by the "top contributors" panel.
+class CalorieContributor {
+  final String name;
+  final String? brand;
+  final double totalCalories;
+  final int occurrences;
+
+  const CalorieContributor({
+    required this.name,
+    this.brand,
+    required this.totalCalories,
+    required this.occurrences,
+  });
+}
+
+/// Per-meal-type calorie subtotal, used by the "where the calories
+/// come from" panel.
+class MealTypeCalories {
+  final String mealType;
+  final String displayName;
+  final double totalCalories;
+  final int itemCount;
+
+  const MealTypeCalories({
+    required this.mealType,
+    required this.displayName,
+    required this.totalCalories,
+    required this.itemCount,
+  });
 }

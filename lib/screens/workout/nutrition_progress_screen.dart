@@ -1,17 +1,19 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
-import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
-import 'package:workout_notes/widgets/collapsible_section.dart';
-import 'package:workout_notes/widgets/nutrition/nutrition_charts.dart';
 
-/// Nutrition progress and history: daily/weekly calorie charts, macro
-/// breakdown, micronutrient trends, goal adherence and week-over-week
-/// comparison.
+/// Calorie-tracking analytics. The whole screen is purpose-built for
+/// the "am I in a surplus or a deficit?" question that drives weight
+/// change: it surfaces the net balance for the selected window, the
+/// distribution of days across the three bands, the rolling 7-day
+/// average against the goal, where the calories are coming from
+/// (per meal and per food), and how the macros stack up against the
+/// target.
 class NutritionProgressScreen extends StatefulWidget {
   const NutritionProgressScreen({super.key});
 
@@ -20,55 +22,26 @@ class NutritionProgressScreen extends StatefulWidget {
       _NutritionProgressScreenState();
 }
 
-/// One logged day from [NutritionRepository.getDailyNutritionHistory].
-class _DayPoint {
-  final DateTime date;
-  final NutritionValues values;
+const int _kWindow7 = 7;
+const int _kWindow30 = 30;
+const int _kRollingWindow = 7;
 
-  const _DayPoint({required this.date, required this.values});
-}
-
-/// Aggregated ISO week (Monday-anchored) with per-day averages.
-class _WeekPoint {
-  final DateTime start;
-  final int daysLogged;
-  final double totalCalories;
-  final double totalProtein;
-  final double totalCarbs;
-  final double totalFat;
-  final double totalFiber;
-  final double totalSugars;
-  final double totalSodium;
-
-  const _WeekPoint({
-    required this.start,
-    required this.daysLogged,
-    required this.totalCalories,
-    required this.totalProtein,
-    required this.totalCarbs,
-    required this.totalFat,
-    required this.totalFiber,
-    required this.totalSugars,
-    required this.totalSodium,
-  });
-
-  double get avgCalories => daysLogged == 0 ? 0 : totalCalories / daysLogged;
-  double get avgProtein => daysLogged == 0 ? 0 : totalProtein / daysLogged;
-  double get avgCarbs => daysLogged == 0 ? 0 : totalCarbs / daysLogged;
-  double get avgFat => daysLogged == 0 ? 0 : totalFat / daysLogged;
-  double get avgFiber => daysLogged == 0 ? 0 : totalFiber / daysLogged;
-  double get avgSugars => daysLogged == 0 ? 0 : totalSugars / daysLogged;
-  double get avgSodium => daysLogged == 0 ? 0 : totalSodium / daysLogged;
-}
+/// Roughly 7,700 kcal ≈ 1 kg of body fat. Used only for the
+/// informational "equivalent in fat" label on the hero card.
+const double _kKcalPerKgFat = 7700;
 
 class _NutritionProgressScreenState extends State<NutritionProgressScreen> {
-  static const _historyDays = 84;
+  final NutritionRepository _repository = NutritionRepository();
 
-  final _repository = NutritionRepository();
+  int _windowDays = _kWindow7;
 
-  List<_DayPoint> _days = const [];
-  List<_WeekPoint> _weeks = const [];
+  CalorieBalance? _balance;
+  List<DailyCalorieTotal> _dailies30 = const [];
+  List<DailyCalorieTotal> _dailies7 = const [];
+  List<CalorieContributor> _contributors = const [];
+  List<MealTypeCalories> _mealDistribution = const [];
   NutritionGoal? _goal;
+  _MacroSummary? _macros;
   bool _isLoading = true;
 
   @override
@@ -82,16 +55,35 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen> {
     setState(() => _isLoading = true);
     try {
       final results = await Future.wait([
-        _repository.getDailyNutritionHistory(days: _historyDays),
         _repository.getActiveGoal(),
+        _repository.getDailyCalorieTotals(days: _kWindow30),
+        _repository.getTopCalorieContributors(
+          days: _kWindow30,
+          limit: 8,
+        ),
+        _repository.getCaloriesByMealType(days: _kWindow30),
+        _repository.getDailyNutritionHistory(days: _kWindow30),
       ]);
       if (!mounted) return;
+      final goal = results[0] as NutritionGoal?;
+      final dailies = results[1] as List<DailyCalorieTotal>;
+      final balance = await _repository.getCalorieBalance(
+        days: _kWindow30,
+        goal: goal?.calories,
+      );
+      if (!mounted) return;
       setState(() {
-        _days = (results[0] as List<Map<String, dynamic>>)
-            .map(_dayFromRow)
-            .toList();
-        _weeks = _buildWeeks(_days);
-        _goal = results[1] as NutritionGoal?;
+        _goal = goal;
+        _dailies30 = dailies;
+        _dailies7 = dailies.length <= _kWindow7
+            ? dailies
+            : dailies.sublist(dailies.length - _kWindow7);
+        _balance = balance;
+        _contributors = results[2] as List<CalorieContributor>;
+        _mealDistribution = results[3] as List<MealTypeCalories>;
+        _macros = _summarizeMacros(
+          results[4] as List<Map<String, dynamic>>,
+        );
         _isLoading = false;
       });
     } catch (_) {
@@ -100,102 +92,118 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen> {
     }
   }
 
-  static _DayPoint _dayFromRow(Map<String, dynamic> row) {
-    return _DayPoint(
-      date: DateTime.parse(row['date'] as String),
-      values: NutritionValues(
-        calories: (row['calories'] as num?)?.toDouble(),
-        proteinG: (row['protein_g'] as num?)?.toDouble(),
-        carbsG: (row['carbs_g'] as num?)?.toDouble(),
-        fatG: (row['fat_g'] as num?)?.toDouble(),
-        fiberG: (row['fiber_g'] as num?)?.toDouble(),
-        sugarsG: (row['sugars_g'] as num?)?.toDouble(),
-        sodiumMg: (row['sodium_mg'] as num?)?.toDouble(),
-      ),
+  static _MacroSummary _summarizeMacros(List<Map<String, dynamic>> rows) {
+    double p = 0, c = 0, f = 0, k = 0;
+    for (final row in rows) {
+      p += (row['protein_g'] as num?)?.toDouble() ?? 0;
+      c += (row['carbs_g'] as num?)?.toDouble() ?? 0;
+      f += (row['fat_g'] as num?)?.toDouble() ?? 0;
+      k += (row['calories'] as num?)?.toDouble() ?? 0;
+    }
+    return _MacroSummary(
+      proteinG: p,
+      carbsG: c,
+      fatG: f,
+      totalKcal: k,
     );
   }
 
-  /// Buckets the last [days] into the last 12 ISO weeks (Monday start),
-  /// oldest first. Weeks without logged days keep zero totals so the
-  /// charts render a continuous timeline (same as the workout module).
-  static List<_WeekPoint> _buildWeeks(List<_DayPoint> days) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final firstMonday = _weekStart(today);
-    final weeks = <_WeekPoint>[];
-    for (var w = 11; w >= 0; w--) {
-      final start = firstMonday.subtract(Duration(days: w * 7));
-      final end = start.add(const Duration(days: 6));
-      var count = 0;
-      var kcal = 0.0;
-      var protein = 0.0;
-      var carbs = 0.0;
-      var fat = 0.0;
-      var fiber = 0.0;
-      var sugars = 0.0;
-      var sodium = 0.0;
-      for (final day in days) {
-        if (day.date.isBefore(start) || day.date.isAfter(end)) continue;
-        count++;
-        kcal += day.values.calories ?? 0;
-        protein += day.values.proteinG ?? 0;
-        carbs += day.values.carbsG ?? 0;
-        fat += day.values.fatG ?? 0;
-        fiber += day.values.fiberG ?? 0;
-        sugars += day.values.sugarsG ?? 0;
-        sodium += day.values.sodiumMg ?? 0;
+  void _setWindow(int days) {
+    if (days == _windowDays) return;
+    setState(() => _windowDays = days);
+  }
+
+  // ------------------------------------------------------------------
+  // Derived
+  // ------------------------------------------------------------------
+
+  CalorieBalance? get _windowBalance {
+    final balance = _balance;
+    if (balance == null) return null;
+    if (_windowDays == _kWindow7) {
+      final goal = _goal?.calories;
+      final consumed = _dailies7.fold<double>(
+        0,
+        (sum, d) => sum + (d.calories ?? 0),
+      );
+      final logged = _dailies7.where((d) => d.calories != null).length;
+      var deficit = 0, onTarget = 0, surplus = 0;
+      var streak = 0;
+      final loggedList = <DailyCalorieTotal>[];
+      for (final d in _dailies7) {
+        if (d.calories == null) continue;
+        loggedList.add(d);
+        if (goal != null && goal > 0) {
+          final delta = d.calories! - goal;
+          final ratio = delta.abs() / goal;
+          if (ratio <= 0.10) {
+            onTarget++;
+          } else if (delta < 0) {
+            deficit++;
+          } else {
+            surplus++;
+          }
+        }
       }
-      weeks.add(
-        _WeekPoint(
-          start: start,
-          daysLogged: count,
-          totalCalories: kcal,
-          totalProtein: protein,
-          totalCarbs: carbs,
-          totalFat: fat,
-          totalFiber: fiber,
-          totalSugars: sugars,
-          totalSodium: sodium,
-        ),
+      if (goal != null && goal > 0) {
+        for (var i = loggedList.length - 1; i >= 0; i--) {
+          final delta = (loggedList[i].calories! - goal).abs() / goal;
+          if (delta <= 0.10) {
+            streak++;
+          } else {
+            break;
+          }
+        }
+      }
+      return CalorieBalance(
+        days: _kWindow7,
+        totalConsumed: consumed,
+        totalGoal: goal == null ? null : goal * _kWindow7,
+        balance: goal == null ? null : consumed - (goal * _kWindow7),
+        daysLogged: logged,
+        daysInDeficit: deficit,
+        daysOnTarget: onTarget,
+        daysInSurplus: surplus,
+        currentStreak: streak,
+        averageDailyIntake: logged == 0 ? 0 : consumed / logged,
       );
     }
-    return weeks;
+    return balance;
   }
 
-  static DateTime _weekStart(DateTime date) {
-    final d = DateTime(date.year, date.month, date.day);
-    return d.subtract(Duration(days: d.weekday - 1));
-  }
+  List<DailyCalorieTotal> get _windowDailies =>
+      _windowDays == _kWindow7 ? _dailies7 : _dailies30;
 
-  // ------------------------------------------------------------------
-  // Overview stats
-  // ------------------------------------------------------------------
-
-  static double _avg(List<_DayPoint> days, double? Function(_DayPoint) pick) {
-    final logged = days.where((d) => pick(d) != null).toList();
-    if (logged.isEmpty) return 0;
-    return logged.map(pick).whereType<double>().reduce((a, b) => a + b) /
-        logged.length;
-  }
-
-  double? get _adherencePercent {
+  /// 7-day rolling average series over the 30-day window. Each point
+  /// is the mean of the last [window] days ending at that date. Days
+  /// without any log pull the mean down; we use a trailing mean of
+  /// non-null days within the window so a quiet day doesn't tank the
+  /// line (which would suggest a fictitious calorie crash).
+  List<FlSpot> _rollingSpots() {
     final goal = _goal?.calories;
-    if (goal == null) return null;
-    final logged = _days
-        .where((d) => d.values.calories != null)
-        .toList();
-    if (logged.isEmpty) return 0;
-    var within = 0;
-    for (final day in logged) {
-      final consumed = day.values.calories!;
-      final delta = (consumed - goal).abs() / goal;
-      if (delta <= 0.10) within++;
+    final spots = <FlSpot>[];
+    for (var i = 0; i < _dailies30.length; i++) {
+      final start = (i - _kRollingWindow + 1).clamp(0, _dailies30.length);
+      final window = _dailies30.sublist(start, i + 1);
+      final logged = window.where((d) => d.calories != null).toList();
+      if (logged.length < 3) continue;
+      final sum = logged.fold<double>(0, (s, d) => s + d.calories!);
+      final avg = sum / logged.length;
+      spots.add(FlSpot(i.toDouble(), avg));
     }
-    return within / logged.length * 100;
+    // Avoid forcing a chart recompute when the goal is null — the
+    // horizontal reference line just gets hidden in that case.
+    if (goal != null && spots.isNotEmpty) {
+      // ensure consumer can read goal via a side-channel
+    }
+    return spots;
   }
 
-  List<_DayPoint> get _last30Days =>
-      _days.length <= 30 ? _days : _days.sublist(_days.length - 30);
+  double? get _rollingGoal => _goal?.calories;
+
+  // ------------------------------------------------------------------
+  // Build
+  // ------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -203,7 +211,7 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.nutritionProgressTitle),
+        title: Text(loc.nutritionBalanceTitle),
         centerTitle: true,
       ),
       body: _isLoading
@@ -211,660 +219,1720 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 40),
                 children: [
-                  _buildOverviewStats(loc, theme),
+                  _buildPeriodSelector(loc, theme),
+                  const SizedBox(height: 12),
+                  _BalanceHeroCard(
+                    balance: _windowBalance,
+                    goal: _goal,
+                    windowDays: _windowDays,
+                  ).animate().fadeIn(duration: 250.ms),
+                  const SizedBox(height: 12),
+                  _DayDistributionCard(
+                    balance: _windowBalance,
+                    windowDays: _windowDays,
+                  ).animate().fadeIn(duration: 250.ms, delay: 60.ms),
+                  if (_windowDays == _kWindow7) ...[
+                    const SizedBox(height: 12),
+                    _WeekSequenceCard(
+                      dailies: _windowDailies,
+                      goal: _goal?.calories,
+                    ).animate().fadeIn(duration: 250.ms, delay: 100.ms),
+                  ],
+                  const SizedBox(height: 12),
+                  _RollingAverageCard(
+                    spots: _rollingSpots(),
+                    goal: _rollingGoal,
+                    windowDays: _kWindow30,
+                  ).animate().fadeIn(duration: 250.ms, delay: 140.ms),
+                  const SizedBox(height: 12),
+                  _MealDistributionCard(
+                    distribution: _mealDistribution,
+                  ).animate().fadeIn(duration: 250.ms, delay: 180.ms),
+                  const SizedBox(height: 12),
+                  _TopContributorsCard(
+                    contributors: _contributors,
+                    totalConsumed: _balance?.totalConsumed ?? 0,
+                  ).animate().fadeIn(duration: 250.ms, delay: 220.ms),
+                  const SizedBox(height: 12),
+                  _MacroBalanceCard(
+                    summary: _macros,
+                    goal: _goal,
+                  ).animate().fadeIn(duration: 250.ms, delay: 260.ms),
                   const SizedBox(height: 8),
-                  CollapsibleSection(
-                    title: loc.nutritionProgressDaily,
-                    icon: Icons.calendar_view_day_outlined,
-                    iconColor: theme.colorScheme.primary,
-                    initiallyExpanded: true,
-                    child: Card(
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        side: BorderSide(
-                          color: theme.colorScheme.outlineVariant
-                              .withAlpha(80),
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
-                        child: NutritionBarChart(
-                          points: _dailyBarPoints(loc),
-                          goalValue: _goal?.calories,
-                          color: theme.colorScheme.primary,
-                          formatValue: (v) => v >= 1000
-                              ? '${(v / 1000).toStringAsFixed(1)}k'
-                              : v.round().toString(),
-                          maxLabels: 10,
-                        ),
-                      ),
-                    ),
-                  ).animate().fadeIn(duration: 250.ms),
-                  CollapsibleSection(
-                    title: loc.nutritionProgressWeekly,
-                    icon: Icons.calendar_view_week_outlined,
-                    iconColor: theme.colorScheme.secondary,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Card(
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: BorderSide(
-                              color: theme.colorScheme.outlineVariant
-                                  .withAlpha(80),
-                            ),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  loc.nutritionProgressWeeklyCalories,
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                NutritionBarChart(
-                                  points: _weeklyCaloriePoints(loc),
-                                  goalValue: _goal?.calories,
-                                  color: theme.colorScheme.secondary,
-                                  formatValue: (v) => v >= 1000
-                                      ? '${(v / 1000).toStringAsFixed(1)}k'
-                                      : v.round().toString(),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Card(
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            side: BorderSide(
-                              color: theme.colorScheme.outlineVariant
-                                  .withAlpha(80),
-                            ),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  loc.nutritionProgressWeeklyMacros,
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                WeeklyMacroBarChart(
-                                  points: _weeklyMacroPoints(),
-                                  proteinColor: theme.colorScheme.tertiary,
-                                  carbsColor: theme.colorScheme.secondary,
-                                  fatColor: theme.colorScheme.primary,
-                                ),
-                                const SizedBox(height: 6),
-                                _Legend(
-                                  items: [
-                                    (
-                                      loc.nutritionProgressProtein,
-                                      theme.colorScheme.tertiary,
-                                    ),
-                                    (
-                                      loc.nutritionProgressCarbs,
-                                      theme.colorScheme.secondary,
-                                    ),
-                                    (
-                                      loc.nutritionProgressFat,
-                                      theme.colorScheme.primary,
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ).animate().fadeIn(duration: 250.ms),
-                  CollapsibleSection(
-                    title: loc.nutritionProgressMicronutrients,
-                    icon: Icons.spa_outlined,
-                    iconColor: Colors.teal,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _NutrientCard(
-                          title: loc.nutritionProgressFiberAndSugars,
-                          chart: NutrientTrendChart(
-                            series: _micronutrientSeries(loc, 'g'),
-                            formatValue: (v) => v.round().toString(),
-                          ),
-                          legend: _Legend(
-                            items: [
-                              (
-                                loc.nutritionProgressFiber,
-                                Colors.teal,
-                              ),
-                              (
-                                loc.nutritionProgressSugars,
-                                Colors.amber.shade700,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        _NutrientCard(
-                          title: loc.nutritionProgressSodium,
-                          chart: NutrientTrendChart(
-                            series: [
-                              NutrientTrendSeries(
-                                label: loc.nutritionProgressSodium,
-                                color: Colors.indigo,
-                                points: _sodiumPoints(loc),
-                              ),
-                            ],
-                            formatValue: (v) => v >= 1000
-                                ? '${(v / 1000).toStringAsFixed(1)}k'
-                                : v.round().toString(),
-                          ),
-                          legend: null,
-                        ),
-                      ],
-                    ),
-                  ).animate().fadeIn(duration: 250.ms),
-                  CollapsibleSection(
-                    title: loc.nutritionProgressAdherence,
-                    icon: Icons.flag_outlined,
-                    iconColor: theme.colorScheme.error,
-                    child: _buildAdherenceSection(loc, theme),
-                  ).animate().fadeIn(duration: 250.ms),
                 ],
               ),
             ),
     );
   }
 
-  Widget _buildOverviewStats(AppLocalizations loc, ThemeData theme) {
-    final loggedDays = _days.where(
-      (d) => d.values.calories != null,
-    ).length;
-    final adherence = _adherencePercent;
-    final stats = <(IconData, String, String)>[
-      (
-        Icons.local_fire_department_outlined,
-        loc.nutritionProgressAvgCalories,
-        '${_format(_avg(_last30Days, (d) => d.values.calories))} kcal',
-      ),
-      (
-        Icons.fitness_center_outlined,
-        loc.nutritionProgressAvgProtein,
-        '${_format(_avg(_last30Days, (d) => d.values.proteinG))} g',
-      ),
-      (
-        Icons.event_available_outlined,
-        loc.nutritionProgressDaysLogged,
-        _format2(loggedDays.toDouble()),
-      ),
-      (
-        Icons.flag_outlined,
-        loc.nutritionProgressAdherenceRate,
-        adherence == null
-            ? '—'
-            : '${adherence.round()}%',
-      ),
-    ];
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 14, 8, 14),
-        child: Row(
-          children: [
-            for (final stat in stats)
-              Expanded(
-                child: Column(
-                  children: [
-                    Icon(stat.$1, size: 20, color: theme.colorScheme.primary),
-                    const SizedBox(height: 6),
-                    Text(
-                      stat.$3,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      stat.$2,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              ),
-          ],
+  Widget _buildPeriodSelector(AppLocalizations loc, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: SegmentedButton<int>(
+        segments: [
+          ButtonSegment(
+            value: _kWindow7,
+            label: Text(loc.nutritionBalanceLast7Days),
+            icon: const Icon(Icons.view_week_outlined, size: 18),
+          ),
+          ButtonSegment(
+            value: _kWindow30,
+            label: Text(loc.nutritionBalanceLast30Days),
+            icon: const Icon(Icons.calendar_view_month_outlined, size: 18),
+          ),
+        ],
+        selected: {_windowDays},
+        onSelectionChanged: (set) => _setWindow(set.first),
+        showSelectedIcon: false,
+        style: SegmentedButton.styleFrom(
+          backgroundColor: theme.colorScheme.surfaceContainerLow,
+          foregroundColor: theme.colorScheme.onSurface,
+          selectedBackgroundColor: theme.colorScheme.primary,
+          selectedForegroundColor: theme.colorScheme.onPrimary,
+          textStyle: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
     );
   }
-
-  Widget _buildAdherenceSection(AppLocalizations loc, ThemeData theme) {
-    final goal = _goal?.calories;
-    if (goal == null) {
-      return _EmptyNote(text: loc.nutritionProgressNoGoal);
-    }
-    var below = 0;
-    var within = 0;
-    var above = 0;
-    for (final day in _days) {
-      final consumed = day.values.calories;
-      if (consumed == null) continue;
-      final delta = (consumed - goal).abs() / goal;
-      if (delta <= 0.10) {
-        within++;
-      } else if (consumed < goal) {
-        below++;
-      } else {
-        above++;
-      }
-    }
-    final chips = <(String, int, Color)>[
-      (loc.nutritionProgressBelow, below, theme.colorScheme.secondary),
-      (loc.nutritionProgressWithin, within, theme.colorScheme.primary),
-      (loc.nutritionProgressAbove, above, theme.colorScheme.error),
-    ];
-    final current = _weeks.isNotEmpty ? _weeks.last : null;
-    final previous = _weeks.length >= 2 ? _weeks[_weeks.length - 2] : null;
-    final comparison = current != null && previous != null
-        ? _WeekComparisonCard(loc: loc, current: current, previous: previous)
-        : null;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(
-              color: theme.colorScheme.outlineVariant.withAlpha(80),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                for (final chip in chips)
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          '${chip.$2}',
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: chip.$3,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          chip.$1,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        ?comparison,
-      ],
-    );
-  }
-
-  // ------------------------------------------------------------------
-  // Chart data
-  // ------------------------------------------------------------------
-
-  List<NutritionBarPoint> _dailyBarPoints(AppLocalizations loc) {
-    final fmt = DateFormat('dd/MM', Intl.defaultLocale);
-    return [
-      for (final day in _last30Days)
-        NutritionBarPoint(
-          label: fmt.format(day.date),
-          value: day.values.calories ?? 0,
-          tooltip: DateFormat.yMMMMEEEEd(Intl.defaultLocale).format(day.date),
-        ),
-    ];
-  }
-
-  List<NutritionBarPoint> _weeklyCaloriePoints(AppLocalizations loc) {
-    final fmt = DateFormat('dd/MM', Intl.defaultLocale);
-    return [
-      for (final week in _weeks)
-        NutritionBarPoint(
-          label: fmt.format(week.start),
-          value: week.avgCalories,
-          tooltip: '${fmt.format(week.start)} · '
-              '${loc.nutritionProgressDaysLabel(week.daysLogged)}',
-        ),
-    ];
-  }
-
-  List<WeeklyMacroPoint> _weeklyMacroPoints() {
-    final fmt = DateFormat('dd/MM', Intl.defaultLocale);
-    return [
-      for (final week in _weeks)
-        WeeklyMacroPoint(
-          label: fmt.format(week.start),
-          protein: week.avgProtein,
-          carbs: week.avgCarbs,
-          fat: week.avgFat,
-        ),
-    ];
-  }
-
-  /// Fiber + sugars weekly averages as two series.
-  List<NutrientTrendSeries> _micronutrientSeries(
-    AppLocalizations loc,
-    String unit,
-  ) {
-    final fmt = DateFormat('dd/MM', Intl.defaultLocale);
-    return [
-      NutrientTrendSeries(
-        label: loc.nutritionProgressFiber,
-        color: Colors.teal,
-        points: [
-          for (final week in _weeks)
-            NutrientTrendPoint(
-              label: fmt.format(week.start),
-              value: week.avgFiber,
-              tooltip: '${fmt.format(week.start)}\n'
-                  '${loc.nutritionProgressFiber}: ${_format(week.avgFiber)} $unit',
-            ),
-        ],
-      ),
-      NutrientTrendSeries(
-        label: loc.nutritionProgressSugars,
-        color: Colors.amber.shade700,
-        points: [
-          for (final week in _weeks)
-            NutrientTrendPoint(
-              label: fmt.format(week.start),
-              value: week.avgSugars,
-              tooltip: '${fmt.format(week.start)}\n'
-                  '${loc.nutritionProgressSugars}: ${_format(week.avgSugars)} $unit',
-            ),
-        ],
-      ),
-    ];
-  }
-
-  /// Sodium weekly averages (mg) as a single series.
-  List<NutrientTrendPoint> _sodiumPoints(AppLocalizations loc) {
-    final fmt = DateFormat('dd/MM', Intl.defaultLocale);
-    return [
-      for (final week in _weeks)
-        NutrientTrendPoint(
-          label: fmt.format(week.start),
-          value: week.avgSodium,
-          tooltip: '${fmt.format(week.start)}\n'
-              '${loc.nutritionProgressSodium}: ${_format(week.avgSodium)} mg',
-        ),
-    ];
-  }
-
-  static String _format(double value) {
-    if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
-    }
-    return value.toStringAsFixed(1);
-  }
-
-  static String _format2(double value) => value.round().toString();
 }
 
-/// Card wrapper for the micronutrient charts.
-class _NutrientCard extends StatelessWidget {
-  final String title;
-  final Widget chart;
-  final Widget? legend;
+// =====================================================================
+// Hero card — net balance
+// =====================================================================
 
-  const _NutrientCard({
-    required this.title,
-    required this.chart,
-    this.legend,
+class _BalanceHeroCard extends StatelessWidget {
+  final CalorieBalance? balance;
+  final NutritionGoal? goal;
+  final int windowDays;
+
+  const _BalanceHeroCard({
+    required this.balance,
+    required this.goal,
+    required this.windowDays,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final balance = this.balance;
+    final hasGoal = goal?.calories != null && goal!.calories! > 0;
+    final caloriesValue = balance?.balance;
+
+    final status = _statusFor(balance, hasGoal);
+    final statusColor = _colorForStatus(status, theme);
+    final statusLabel = _labelForStatus(status, loc, windowDays);
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              statusColor.withAlpha(45),
+              theme.colorScheme.surfaceContainerLow,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: statusColor.withAlpha(80),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    _iconForStatus(status),
+                    color: statusColor,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    windowDays == _kWindow7
+                        ? loc.nutritionBalanceThisWeek
+                        : loc.nutritionBalanceHeroTitle(windowDays),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      statusLabel.toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (caloriesValue == null)
+                Text(
+                  loc.nutritionBalanceNoGoal,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                )
+              else
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _signedKcal(caloriesValue),
+                      style: theme.textTheme.displaySmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: statusColor,
+                        height: 1.0,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        'kcal',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    if (caloriesValue.abs() >= 1)
+                      Text(
+                        loc.nutritionBalanceFatEquivalent(
+                          _formatFatKg(caloriesValue.abs()),
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                  ],
+                ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _BalanceMetric(
+                      label: loc.nutritionBalanceDaysLogged,
+                      value: '${balance?.daysLogged ?? 0}/$windowDays',
+                    ),
+                  ),
+                  Expanded(
+                    child: _BalanceMetric(
+                      label: loc.nutritionBalanceAverageIntake,
+                      value:
+                          '${_formatKcal(balance?.averageDailyIntake ?? 0)} kcal',
+                      sub: hasGoal
+                          ? loc.nutritionBalanceGoalKcal(
+                              _formatKcal(goal!.calories!),
+                            )
+                          : null,
+                    ),
+                  ),
+                  Expanded(
+                    child: _BalanceMetric(
+                      label: loc.nutritionBalanceCurrentStreak,
+                      value: balance == null
+                          ? '—'
+                          : loc.nutritionBalanceStreakDays(
+                              balance.currentStreak,
+                            ),
+                      sub: (balance?.currentStreak ?? 0) > 0
+                          ? loc.nutritionBalanceStreakHint
+                          : null,
+                      valueColor: (balance?.currentStreak ?? 0) > 0
+                          ? statusColor
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _formatKcal(double v) {
+    if (v == v.roundToDouble()) return v.toStringAsFixed(0);
+    return v.toStringAsFixed(0);
+  }
+
+  static String _formatFatKg(double absKcal) {
+    final kg = absKcal / _kKcalPerKgFat;
+    if (kg < 0.1) return '< 0,1';
+    if (kg >= 10) return kg.toStringAsFixed(0);
+    return kg.toStringAsFixed(1);
+  }
+
+  static String _signedKcal(double value) {
+    final sign = value > 0 ? '+' : '';
+    final abs = value.abs();
+    if (abs == abs.roundToDouble()) {
+      return '$sign${abs.toStringAsFixed(0)}';
+    }
+    return '$sign${abs.toStringAsFixed(0)}';
+  }
+
+  static _BalanceStatus _statusFor(CalorieBalance? b, bool hasGoal) {
+    if (!hasGoal) return _BalanceStatus.noGoal;
+    final v = b?.balance;
+    if (v == null) return _BalanceStatus.noGoal;
+    if (v.abs() < 1) return _BalanceStatus.maintaining;
+    return v < 0 ? _BalanceStatus.deficit : _BalanceStatus.surplus;
+  }
+
+  static IconData _iconForStatus(_BalanceStatus s) {
+    return switch (s) {
+      _BalanceStatus.deficit => Icons.south_east_rounded,
+      _BalanceStatus.surplus => Icons.north_east_rounded,
+      _BalanceStatus.maintaining => Icons.horizontal_rule_rounded,
+      _BalanceStatus.noGoal => Icons.flag_outlined,
+    };
+  }
+
+  static Color _colorForStatus(_BalanceStatus s, ThemeData theme) {
+    return switch (s) {
+      _BalanceStatus.deficit => const Color(0xFF2BB673),
+      _BalanceStatus.surplus => theme.colorScheme.error,
+      _BalanceStatus.maintaining => theme.colorScheme.primary,
+      _BalanceStatus.noGoal => theme.colorScheme.onSurfaceVariant,
+    };
+  }
+
+  static String _labelForStatus(
+    _BalanceStatus s,
+    AppLocalizations loc,
+    int windowDays,
+  ) {
+    return switch (s) {
+      _BalanceStatus.deficit => loc.nutritionBalanceStatusDeficit,
+      _BalanceStatus.surplus => loc.nutritionBalanceStatusSurplus,
+      _BalanceStatus.maintaining => loc.nutritionBalanceStatusMaintaining,
+      _BalanceStatus.noGoal => loc.nutritionBalanceStatusNoGoal,
+    };
+  }
+}
+
+enum _BalanceStatus { deficit, surplus, maintaining, noGoal }
+
+class _BalanceMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final String? sub;
+  final Color? valueColor;
+
+  const _BalanceMetric({
+    required this.label,
+    required this.value,
+    this.sub,
+    this.valueColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: valueColor ?? theme.colorScheme.onSurface,
+            height: 1.0,
+          ),
+        ),
+        if (sub != null) ...[
+          const SizedBox(height: 3),
+          Text(
+            sub!,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontSize: 10,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// =====================================================================
+// Day distribution
+// =====================================================================
+
+class _DayDistributionCard extends StatelessWidget {
+  final CalorieBalance? balance;
+  final int windowDays;
+
+  const _DayDistributionCard({
+    required this.balance,
+    required this.windowDays,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final balance = this.balance;
+    final hasGoal = (balance?.totalGoal ?? 0) > 0;
+    final logged = balance?.daysLogged ?? 0;
+    final deficit = balance?.daysInDeficit ?? 0;
+    final onTarget = balance?.daysOnTarget ?? 0;
+    final surplus = balance?.daysInSurplus ?? 0;
+
+    return _SectionCard(
+      icon: Icons.donut_small_outlined,
+      iconColor: theme.colorScheme.primary,
+      title: loc.nutritionBalanceDistributionTitle,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _DistributionStat(
+                  label: loc.nutritionBalanceStatusDeficit,
+                  count: deficit,
+                  logged: logged,
+                  color: const Color(0xFF2BB673),
+                  icon: Icons.south_east_rounded,
+                ),
+              ),
+              _StatDivider(theme: theme),
+              Expanded(
+                child: _DistributionStat(
+                  label: loc.nutritionBalanceStatusMaintaining,
+                  count: onTarget,
+                  logged: logged,
+                  color: theme.colorScheme.primary,
+                  icon: Icons.check_rounded,
+                ),
+              ),
+              _StatDivider(theme: theme),
+              Expanded(
+                child: _DistributionStat(
+                  label: loc.nutritionBalanceStatusSurplus,
+                  count: surplus,
+                  logged: logged,
+                  color: theme.colorScheme.error,
+                  icon: Icons.north_east_rounded,
+                ),
+              ),
+            ],
+          ),
+          if (logged == 0) ...[
+            const SizedBox(height: 12),
             Text(
-              title,
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w600,
+              loc.nutritionBalanceNoDaysLogged,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 10),
-            chart,
-            if (legend != null) const SizedBox(height: 6),
-            ?legend,
+          ] else if (!hasGoal) ...[
+            const SizedBox(height: 12),
+            _EmptyNote(text: loc.nutritionBalanceDistributionNoGoal),
+          ] else ...[
+            const SizedBox(height: 12),
+            _DistributionInsight(
+              deficit: deficit,
+              onTarget: onTarget,
+              surplus: surplus,
+              logged: logged,
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
 }
 
-class _Legend extends StatelessWidget {
-  final List<(String, Color)> items;
+class _DistributionStat extends StatelessWidget {
+  final String label;
+  final int count;
+  final int logged;
+  final Color color;
+  final IconData icon;
 
-  const _Legend({required this.items});
+  const _DistributionStat({
+    required this.label,
+    required this.count,
+    required this.logged,
+    required this.color,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Wrap(
-      spacing: 14,
-      runSpacing: 4,
+    final percent =
+        logged == 0 ? 0 : ((count / logged) * 100).round();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        for (final item in items)
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: color.withAlpha(35),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '$count',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: color,
+            height: 1.0,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '$percent%',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+}
+
+class _StatDivider extends StatelessWidget {
+  final ThemeData theme;
+  const _StatDivider({required this.theme});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 48,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      color: theme.colorScheme.outlineVariant.withAlpha(70),
+    );
+  }
+}
+
+class _DistributionInsight extends StatelessWidget {
+  final int deficit;
+  final int onTarget;
+  final int surplus;
+  final int logged;
+
+  const _DistributionInsight({
+    required this.deficit,
+    required this.onTarget,
+    required this.surplus,
+    required this.logged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final String text;
+    if (logged == 0) {
+      text = '';
+    } else if (onTarget >= logged * 0.6) {
+      text = loc.nutritionBalanceInsightConsistent;
+    } else if (deficit > surplus * 1.5) {
+      text = loc.nutritionBalanceInsightMostlyDeficit;
+    } else if (surplus > deficit * 1.5) {
+      text = loc.nutritionBalanceInsightMostlySurplus;
+    } else if (deficit + surplus > onTarget * 2) {
+      text = loc.nutritionBalanceInsightSwinging;
+    } else {
+      text = loc.nutritionBalanceInsightBalanced;
+    }
+    if (text.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.tips_and_updates_outlined,
+            size: 16,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// 7-day sequence (compact 7-cell strip)
+// =====================================================================
+
+class _WeekSequenceCard extends StatelessWidget {
+  final List<DailyCalorieTotal> dailies;
+  final double? goal;
+
+  const _WeekSequenceCard({required this.dailies, required this.goal});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final hasGoal = goal != null && goal! > 0;
+    return _SectionCard(
+      icon: Icons.view_week_outlined,
+      iconColor: theme.colorScheme.secondary,
+      title: loc.nutritionBalanceWeekSequence,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: item.$2,
-                  shape: BoxShape.circle,
+              for (final day in dailies)
+                Expanded(
+                  child: _WeekDayCell(
+                    date: day.date,
+                    calories: day.calories,
+                    goal: goal,
+                    hasGoal: hasGoal,
+                  ),
+                ),
+            ],
+          ),
+          if (!hasGoal) ...[
+            const SizedBox(height: 10),
+            _EmptyNote(text: loc.nutritionProgressNoGoal),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _WeekDayCell extends StatelessWidget {
+  final DateTime date;
+  final double? calories;
+  final double? goal;
+  final bool hasGoal;
+
+  const _WeekDayCell({
+    required this.date,
+    required this.calories,
+    required this.goal,
+    required this.hasGoal,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final dow = DateFormat.E(Intl.defaultLocale).format(date).substring(0, 1);
+    final isToday = _isSameDay(date, DateTime.now());
+    final (status, color) = _resolveStatus();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: Column(
+        children: [
+          Text(
+            dow.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: isToday
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 6),
+          AspectRatio(
+            aspectRatio: 0.72,
+            child: Container(
+              decoration: BoxDecoration(
+                color: _bgColor(color, theme),
+                borderRadius: BorderRadius.circular(10),
+                border: isToday
+                    ? Border.all(
+                        color: theme.colorScheme.primary,
+                        width: 1.5,
+                      )
+                    : null,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 2,
+                vertical: 6,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (calories == null)
+                    Text(
+                      '—',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )
+                  else ...[
+                    Text(
+                      _formatShort(calories!),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                        height: 1.0,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'kcal',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: color.withAlpha(180),
+                        fontSize: 9,
+                        height: 1.0,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          if (hasGoal && calories != null) ...[
+            const SizedBox(height: 5),
+            _DayDeltaPill(
+              delta: calories! - goal!,
+              color: color,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _formatShort(double v) {
+    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
+    return v.round().toString();
+  }
+
+  Color _bgColor(Color status, ThemeData theme) {
+    if (status == Colors.transparent) {
+      return theme.colorScheme.surfaceContainerHighest.withAlpha(120);
+    }
+    return status.withAlpha(40);
+  }
+
+  (_DayStatus, Color) _resolveStatus() {
+    if (!hasGoal || calories == null) {
+      return (_DayStatus.unknown, Colors.transparent);
+    }
+    final delta = calories! - goal!;
+    final ratio = delta.abs() / goal!;
+    if (ratio <= 0.10) {
+      return (_DayStatus.onTarget, _onTargetColor);
+    }
+    if (delta < 0) {
+      return (_DayStatus.deficit, _deficitColor);
+    }
+    return (_DayStatus.surplus, _surplusColor);
+  }
+}
+
+const Color _deficitColor = Color(0xFF2BB673);
+final Color _surplusColor = const Color(0xFF000000) == const Color(0xFF000000)
+    ? const Color(0xFFE0524A)
+    : const Color(0xFFE0524A);
+final Color _onTargetColor = const Color(0xFF000000) == const Color(0xFF000000)
+    ? const Color(0xFF4A90E2)
+    : const Color(0xFF4A90E2);
+
+enum _DayStatus { onTarget, deficit, surplus, unknown }
+
+class _DayDeltaPill extends StatelessWidget {
+  final double delta;
+  final Color color;
+  const _DayDeltaPill({required this.delta, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final abs = delta.abs();
+    final label = abs >= 1000
+        ? '${delta < 0 ? '-' : '+'}${(abs / 1000).toStringAsFixed(1)}k'
+        : '${delta < 0 ? '-' : '+'}${abs.round()}';
+    return Text(
+      label,
+      style: theme.textTheme.labelSmall?.copyWith(
+        color: color,
+        fontWeight: FontWeight.w700,
+        fontSize: 10,
+        height: 1.0,
+      ),
+    );
+  }
+}
+
+bool _isSameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
+// =====================================================================
+// Rolling 7-day average
+// =====================================================================
+
+class _RollingAverageCard extends StatelessWidget {
+  final List<FlSpot> spots;
+  final double? goal;
+  final int windowDays;
+
+  const _RollingAverageCard({
+    required this.spots,
+    required this.goal,
+    required this.windowDays,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final hasData = spots.isNotEmpty;
+    final currentAvg =
+        hasData ? spots.last.y : 0.0;
+    final goalKcal = goal;
+    final diff = (goalKcal != null && hasData) ? currentAvg - goalKcal : null;
+
+    return _SectionCard(
+      icon: Icons.show_chart_rounded,
+      iconColor: theme.colorScheme.tertiary,
+      title: loc.nutritionBalanceRollingTitle,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (hasData)
+            Row(
+              children: [
+                _RollingStat(
+                  label: loc.nutritionBalanceRollingCurrent,
+                  value: '${currentAvg.round()} kcal',
+                  color: diff == null
+                      ? theme.colorScheme.onSurface
+                      : diff < 0
+                          ? _deficitColor
+                          : _surplusColor,
+                ),
+                const SizedBox(width: 12),
+                if (goalKcal != null)
+                  _RollingStat(
+                    label: loc.nutritionBalanceGoalLabel,
+                    value: '${goalKcal.round()} kcal',
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                const SizedBox(width: 12),
+                if (diff != null)
+                  _RollingStat(
+                    label: loc.nutritionBalanceRollingDelta,
+                    value:
+                        '${diff < 0 ? '' : '+'}${diff.round()} kcal',
+                    color: diff < 0
+                        ? _deficitColor
+                        : _surplusColor,
+                  ),
+              ],
+            ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 150,
+            child: hasData
+                ? _RollingLineChart(
+                    spots: spots,
+                    goal: goalKcal,
+                  )
+                : Center(
+                    child: Text(
+                      loc.nutritionBalanceRollingEmpty,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RollingStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _RollingStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: color,
+            height: 1.0,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RollingLineChart extends StatelessWidget {
+  final List<FlSpot> spots;
+  final double? goal;
+
+  const _RollingLineChart({required this.spots, required this.goal});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final maxY = spots.fold<double>(
+      0,
+      (acc, s) => s.y > acc ? s.y : acc,
+    );
+    final chartMax = (maxY > (goal ?? 0) ? maxY : (goal ?? 0)) * 1.2;
+    final safeMax = chartMax <= 0 ? 1000.0 : chartMax;
+
+    return LineChart(
+      LineChartData(
+        minY: 0,
+        maxY: safeMax,
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            tooltipRoundedRadius: 10,
+            tooltipPadding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 6,
+            ),
+            getTooltipColor: (_) => theme.colorScheme.inverseSurface,
+            getTooltipItems: (spots) => spots.map((spot) {
+              return LineTooltipItem(
+                '${spot.y.round()} kcal',
+                TextStyle(
+                  color: theme.colorScheme.onInverseSurface,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 34,
+              getTitlesWidget: (value, meta) {
+                return Text(
+                  value >= 1000
+                      ? '${(value / 1000).toStringAsFixed(1)}k'
+                      : value.round().toString(),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                );
+              },
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 18,
+              interval: 7,
+              getTitlesWidget: (value, meta) {
+                final idx = value.toInt();
+                if (idx != 0 && idx != 14 && idx != 28) {
+                  return const SizedBox.shrink();
+                }
+                final daysAgo = _kWindow30 - idx;
+                final label = daysAgo == 1
+                    ? 'ontem'
+                    : '${daysAgo}d atrás';
+                return Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    label,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: safeMax / 4,
+          getDrawingHorizontalLine: (_) => FlLine(
+            color: theme.colorScheme.outlineVariant.withAlpha(60),
+            strokeWidth: 1,
+            dashArray: const [3, 4],
+          ),
+        ),
+        extraLinesData: goal == null
+            ? const ExtraLinesData()
+            : ExtraLinesData(
+                horizontalLines: [
+                  HorizontalLine(
+                    y: goal!,
+                    color: theme.colorScheme.primary.withAlpha(180),
+                    strokeWidth: 1.4,
+                    dashArray: const [6, 4],
+                  ),
+                ],
+              ),
+        lineBarsData: [
+          LineChartBarData(
+            spots: spots,
+            isCurved: true,
+            curveSmoothness: 0.3,
+            barWidth: 2.6,
+            color: theme.colorScheme.primary,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  theme.colorScheme.primary.withAlpha(70),
+                  theme.colorScheme.primary.withAlpha(10),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+    );
+  }
+}
+
+// =====================================================================
+// Meal distribution
+// =====================================================================
+
+class _MealDistributionCard extends StatelessWidget {
+  final List<MealTypeCalories> distribution;
+
+  const _MealDistributionCard({required this.distribution});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    if (distribution.isEmpty) {
+      return _SectionCard(
+        icon: Icons.restaurant_outlined,
+        iconColor: theme.colorScheme.secondary,
+        title: loc.nutritionBalanceMealDistribution,
+        child: _EmptyNote(text: loc.nutritionBalanceMealEmpty),
+      );
+    }
+    final total =
+        distribution.fold<double>(0, (s, m) => s + m.totalCalories);
+    final top = distribution.take(5).toList();
+    final otherTotal = total -
+        top.fold<double>(0, (s, m) => s + m.totalCalories);
+
+    return _SectionCard(
+      icon: Icons.restaurant_outlined,
+      iconColor: theme.colorScheme.secondary,
+      title: loc.nutritionBalanceMealDistribution,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < top.length; i++)
+            _MealDistributionRow(
+              rank: i + 1,
+              entry: top[i],
+              total: total,
+            ),
+          if (otherTotal > 0 && distribution.length > 5)
+            _MealDistributionRow(
+              rank: top.length + 1,
+              entry: MealTypeCalories(
+                mealType: 'other',
+                displayName: loc.nutritionBalanceOtherMeals,
+                totalCalories: otherTotal,
+                itemCount: 0,
+              ),
+              total: total,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MealDistributionRow extends StatelessWidget {
+  final int rank;
+  final MealTypeCalories entry;
+  final double total;
+
+  const _MealDistributionRow({
+    required this.rank,
+    required this.entry,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    final percent =
+        total == 0 ? 0 : ((entry.totalCalories / total) * 100).round();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 22,
+            child: Text(
+              '$rank',
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        entry.displayName,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${entry.totalCalories.round()} kcal · $percent%',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: total == 0 ? 0 : entry.totalCalories / total,
+                    minHeight: 6,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest
+                        .withAlpha(100),
+                    color: theme.colorScheme.secondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 56,
+            child: Text(
+              loc.nutritionItemCount(entry.itemCount),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.end,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// Top calorie contributors
+// =====================================================================
+
+class _TopContributorsCard extends StatelessWidget {
+  final List<CalorieContributor> contributors;
+  final double totalConsumed;
+
+  const _TopContributorsCard({
+    required this.contributors,
+    required this.totalConsumed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    if (contributors.isEmpty || totalConsumed == 0) {
+      return _SectionCard(
+        icon: Icons.local_dining_outlined,
+        iconColor: theme.colorScheme.tertiary,
+        title: loc.nutritionBalanceTopContributors,
+        child: _EmptyNote(text: loc.nutritionBalanceTopEmpty),
+      );
+    }
+    final top = contributors.take(8).toList();
+    final topShare = top.fold<double>(
+          0,
+          (s, c) => s + c.totalCalories,
+        ) /
+        totalConsumed;
+
+    return _SectionCard(
+      icon: Icons.local_dining_outlined,
+      iconColor: theme.colorScheme.tertiary,
+      title: loc.nutritionBalanceTopContributors,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (top.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                loc.nutritionBalanceTopShare(
+                  top.length,
+                  (topShare * 100).round(),
+                ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(width: 5),
-              Text(
-                item.$1,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+            ),
+          for (var i = 0; i < top.length; i++)
+            _ContributorRow(
+              rank: i + 1,
+              entry: top[i],
+              totalConsumed: totalConsumed,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContributorRow extends StatelessWidget {
+  final int rank;
+  final CalorieContributor entry;
+  final double totalConsumed;
+
+  const _ContributorRow({
+    required this.rank,
+    required this.entry,
+    required this.totalConsumed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    final percent = totalConsumed == 0
+        ? 0
+        : ((entry.totalCalories / totalConsumed) * 100).round();
+    final title = entry.brand == null || entry.brand!.isEmpty
+        ? entry.name
+        : '${entry.name} · ${entry.brand}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 22,
+            child: Text(
+              '$rank',
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 5,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  loc.nutritionBalanceContributorMeta(
+                    entry.totalCalories.round(),
+                    entry.occurrences,
+                  ),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: totalConsumed == 0
+                        ? 0
+                        : entry.totalCalories / totalConsumed,
+                    minHeight: 5,
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest
+                        .withAlpha(100),
+                    color: theme.colorScheme.tertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 36,
+            child: Text(
+              '$percent%',
+              textAlign: TextAlign.end,
+              style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =====================================================================
+// Macros distribution
+// =====================================================================
+
+class _MacroBalanceCard extends StatelessWidget {
+  final _MacroSummary? summary;
+  final NutritionGoal? goal;
+
+  const _MacroBalanceCard({required this.summary, required this.goal});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final data = summary;
+    if (data == null) {
+      return _SectionCard(
+        icon: Icons.pie_chart_outline_rounded,
+        iconColor: theme.colorScheme.primary,
+        title: loc.nutritionBalanceMacros,
+        child: const SizedBox(
+          height: 120,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+    if (data.totalKcal == 0) {
+      return _SectionCard(
+        icon: Icons.pie_chart_outline_rounded,
+        iconColor: theme.colorScheme.primary,
+        title: loc.nutritionBalanceMacros,
+        child: _EmptyNote(text: loc.nutritionBalanceMacrosEmpty),
+      );
+    }
+    final proteinKcal = data.proteinG * 4;
+    final carbsKcal = data.carbsG * 4;
+    final fatKcal = data.fatG * 9;
+    final proteinPct = (proteinKcal / data.totalKcal) * 100;
+    final carbsPct = (carbsKcal / data.totalKcal) * 100;
+    final fatPct = (fatKcal / data.totalKcal) * 100;
+    return _SectionCard(
+      icon: Icons.pie_chart_outline_rounded,
+      iconColor: theme.colorScheme.primary,
+      title: loc.nutritionBalanceMacros,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 130,
+                height: 130,
+                child: _MacroDonut(
+                  proteinPct: proteinPct,
+                  carbsPct: carbsPct,
+                  fatPct: fatPct,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _MacroLegendRow(
+                      label: loc.nutritionProgressProtein,
+                      percent: proteinPct,
+                      grams: data.proteinG,
+                      goalG: goal?.proteinG,
+                      color: const Color(0xFFF29E38),
+                    ),
+                    const SizedBox(height: 10),
+                    _MacroLegendRow(
+                      label: loc.nutritionProgressCarbs,
+                      percent: carbsPct,
+                      grams: data.carbsG,
+                      goalG: goal?.carbsG,
+                      color: const Color(0xFF20A39E),
+                    ),
+                    const SizedBox(height: 10),
+                    _MacroLegendRow(
+                      label: loc.nutritionProgressFat,
+                      percent: fatPct,
+                      grams: data.fatG,
+                      goalG: goal?.fatG,
+                      color: const Color(0xFF8E44AD),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MacroSummary {
+  final double proteinG;
+  final double carbsG;
+  final double fatG;
+  final double totalKcal;
+  const _MacroSummary({
+    required this.proteinG,
+    required this.carbsG,
+    required this.fatG,
+    required this.totalKcal,
+  });
+}
+
+class _MacroDonut extends StatelessWidget {
+  final double proteinPct;
+  final double carbsPct;
+  final double fatPct;
+
+  const _MacroDonut({
+    required this.proteinPct,
+    required this.carbsPct,
+    required this.fatPct,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PieChart(
+      PieChartData(
+        sectionsSpace: 2,
+        centerSpaceRadius: 32,
+        startDegreeOffset: -90,
+        sections: [
+          PieChartSectionData(
+            value: proteinPct,
+            color: const Color(0xFFF29E38),
+            radius: 22,
+            showTitle: false,
+          ),
+          PieChartSectionData(
+            value: carbsPct,
+            color: const Color(0xFF20A39E),
+            radius: 22,
+            showTitle: false,
+          ),
+          PieChartSectionData(
+            value: fatPct,
+            color: const Color(0xFF8E44AD),
+            radius: 22,
+            showTitle: false,
+          ),
+        ],
+      ),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+    );
+  }
+}
+
+class _MacroLegendRow extends StatelessWidget {
+  final String label;
+  final double percent;
+  final double grams;
+  final double? goalG;
+  final Color color;
+
+  const _MacroLegendRow({
+    required this.label,
+    required this.percent,
+    required this.grams,
+    required this.goalG,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasGoal = goalG != null && goalG! > 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Text(
+              '${percent.round()}%',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          hasGoal
+              ? '${_formatG(grams)} / ${_formatG(goalG!)} g'
+              : '${_formatG(grams)} g',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        if (hasGoal) ...[
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: (grams / goalG!).clamp(0.0, 1.0),
+              minHeight: 4,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest
+                  .withAlpha(100),
+              color: color,
+            ),
+          ),
+        ],
       ],
+    );
+  }
+
+  static String _formatG(double v) {
+    if (v == v.roundToDouble()) return v.toStringAsFixed(0);
+    return v.toStringAsFixed(1);
+  }
+}
+
+// =====================================================================
+// Shared building blocks
+// =====================================================================
+
+class _SectionCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final Widget child;
+
+  const _SectionCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: iconColor.withAlpha(30),
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Icon(icon, size: 16, color: iconColor),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            child,
+          ],
+        ),
+      ),
     );
   }
 }
 
 class _EmptyNote extends StatelessWidget {
   final String text;
-
   const _EmptyNote({required this.text});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(Icons.info_outline, color: theme.colorScheme.onSurfaceVariant),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                text,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// This week vs. previous week comparison card.
-class _WeekComparisonCard extends StatelessWidget {
-  final AppLocalizations loc;
-  final _WeekPoint current;
-  final _WeekPoint previous;
-
-  const _WeekComparisonCard({
-    required this.loc,
-    required this.current,
-    required this.previous,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final rows = <(String, double, String)>[
-      (
-        loc.nutritionProgressCalories,
-        current.totalCalories - previous.totalCalories,
-        'kcal',
-      ),
-      (
-        loc.nutritionProgressProtein,
-        current.totalProtein - previous.totalProtein,
-        'g',
-      ),
-      (
-        loc.nutritionProgressCarbs,
-        current.totalCarbs - previous.totalCarbs,
-        'g',
-      ),
-      (
-        loc.nutritionProgressFat,
-        current.totalFat - previous.totalFat,
-        'g',
-      ),
-    ];
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              loc.nutritionProgressWeekComparison,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            for (final row in rows)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  children: [
-                    Expanded(child: Text(row.$1)),
-                    _DeltaPill(value: row.$2, unit: row.$3),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DeltaPill extends StatelessWidget {
-  final double value;
-  final String unit;
-
-  const _DeltaPill({required this.value, required this.unit});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final positive = value > 0;
-    final label = '${positive ? '+' : ''}${_format(value)} $unit';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: (positive
-                ? theme.colorScheme.primary
-                : theme.colorScheme.secondary)
-            .withAlpha(30),
+        color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Text(
-        label,
-        style: theme.textTheme.labelMedium?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: positive
-              ? theme.colorScheme.primary
-              : theme.colorScheme.secondary,
-        ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 16,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
       ),
     );
-  }
-
-  static String _format(double value) {
-    if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
-    }
-    return value.toStringAsFixed(1);
   }
 }

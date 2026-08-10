@@ -1269,6 +1269,71 @@
   "nutritionProgressWeekComparison": "Esta semana vs. semana anterior",
   "nutritionProgressCalories": "Calorias",
 
+  "nutritionBalanceTitle": "Balanço calórico",
+  "nutritionBalanceLast7Days": "7 dias",
+  "nutritionBalanceLast30Days": "30 dias",
+  "nutritionBalanceHeroTitle": "Últimos {days} dias",
+  "@nutritionBalanceHeroTitle": {
+    "placeholders": { "days": { "type": "int" } }
+  },
+  "nutritionBalanceThisWeek": "Esta semana",
+  "nutritionBalanceStatusDeficit": "Déficit",
+  "nutritionBalanceStatusSurplus": "Superávit",
+  "nutritionBalanceStatusMaintaining": "Na meta",
+  "nutritionBalanceStatusNoGoal": "Sem meta",
+  "nutritionBalanceNoGoal": "Defina uma meta de calorias em Configurações para acompanhar superávit e déficit.",
+  "nutritionBalanceFatEquivalent": "≈ {value} kg de gordura",
+  "@nutritionBalanceFatEquivalent": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "nutritionBalanceDaysLogged": "Dias registrados",
+  "nutritionBalanceAverageIntake": "Média diária",
+  "nutritionBalanceGoalKcal": "meta {value} kcal",
+  "@nutritionBalanceGoalKcal": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "nutritionBalanceCurrentStreak": "Sequência na meta",
+  "nutritionBalanceStreakDays": "{count, plural, =0{Sem streak} =1{1 dia} other{{count} dias}}",
+  "@nutritionBalanceStreakDays": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "nutritionBalanceStreakHint": "consecutivos",
+  "nutritionBalanceDistributionTitle": "Distribuição dos dias",
+  "nutritionBalanceDistributionNoGoal": "A meta de calorias é necessária para classificar os dias em déficit e superávit.",
+  "nutritionBalanceNoDaysLogged": "Nenhum dia registrado no período.",
+  "nutritionBalanceInsightConsistent": "Maioria dos dias dentro da meta — ótimo controle.",
+  "nutritionBalanceInsightMostlyDeficit": "Predominância de dias em déficit — verifique se não está cortando demais.",
+  "nutritionBalanceInsightMostlySurplus": "Predominância de dias em superávit — considere revisar porções ou lanches.",
+  "nutritionBalanceInsightSwinging": "Alta variação entre déficit e superávit — tente estabilizar a rotina.",
+  "nutritionBalanceInsightBalanced": "Distribuição equilibrada entre déficit, meta e superávit.",
+  "nutritionBalanceWeekSequence": "Sequência da semana",
+  "nutritionBalanceRollingTitle": "Média móvel de 7 dias",
+  "nutritionBalanceRollingCurrent": "Média atual",
+  "nutritionBalanceRollingDelta": "vs meta",
+  "nutritionBalanceRollingEmpty": "Registre ao menos 3 dias nos últimos 7 para gerar a média móvel.",
+  "nutritionBalanceGoalLabel": "Meta diária",
+  "nutritionBalanceMealDistribution": "Onde estão as calorias",
+  "nutritionBalanceMealEmpty": "Nenhuma refeição registrada no período.",
+  "nutritionBalanceOtherMeals": "Outras refeições",
+  "nutritionBalanceTopContributors": "Alimentos que mais somam calorias",
+  "nutritionBalanceTopEmpty": "Nenhum alimento registrado no período.",
+  "nutritionBalanceTopShare": "{count, plural, =1{1 alimento concentra} other{Os {count} alimentos concentram}} {percent}% das calorias",
+  "@nutritionBalanceTopShare": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "percent": { "type": "int" }
+    }
+  },
+  "nutritionBalanceContributorMeta": "{kcal} kcal · {count, plural, =1{1 vez} other{{count} vezes}}",
+  "@nutritionBalanceContributorMeta": {
+    "placeholders": {
+      "kcal": { "type": "int" },
+      "count": { "type": "int" }
+    }
+  },
+  "nutritionBalanceMacros": "Distribuição de macronutrientes",
+  "nutritionBalanceMacrosEmpty": "Sem dados de macros no período.",
+
   "exportNutritionCsv": "CSV de alimentação",
   "exportNutritionCsvSubtitle": "Exporta o histórico de refeições (data, refeição, alimento, macros) — filtrável por intervalo de datas",
   "exportNutritionHeaderDate": "Data",

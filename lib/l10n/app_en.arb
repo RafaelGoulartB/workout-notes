@@ -1286,6 +1286,71 @@
   "nutritionProgressWeekComparison": "This week vs. last week",
   "nutritionProgressCalories": "Calories",
 
+  "nutritionBalanceTitle": "Calorie balance",
+  "nutritionBalanceLast7Days": "7 days",
+  "nutritionBalanceLast30Days": "30 days",
+  "nutritionBalanceHeroTitle": "Last {days} days",
+  "@nutritionBalanceHeroTitle": {
+    "placeholders": { "days": { "type": "int" } }
+  },
+  "nutritionBalanceThisWeek": "This week",
+  "nutritionBalanceStatusDeficit": "Deficit",
+  "nutritionBalanceStatusSurplus": "Surplus",
+  "nutritionBalanceStatusMaintaining": "On target",
+  "nutritionBalanceStatusNoGoal": "No goal",
+  "nutritionBalanceNoGoal": "Set a calorie goal in Settings to track surplus and deficit.",
+  "nutritionBalanceFatEquivalent": "≈ {value} kg of fat",
+  "@nutritionBalanceFatEquivalent": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "nutritionBalanceDaysLogged": "Days logged",
+  "nutritionBalanceAverageIntake": "Daily average",
+  "nutritionBalanceGoalKcal": "{value} kcal goal",
+  "@nutritionBalanceGoalKcal": {
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "nutritionBalanceCurrentStreak": "Goal streak",
+  "nutritionBalanceStreakDays": "{count, plural, =0{No streak} =1{1 day} other{{count} days}}",
+  "@nutritionBalanceStreakDays": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "nutritionBalanceStreakHint": "in a row",
+  "nutritionBalanceDistributionTitle": "Day distribution",
+  "nutritionBalanceDistributionNoGoal": "A calorie goal is needed to classify days as deficit or surplus.",
+  "nutritionBalanceNoDaysLogged": "No days logged in this period.",
+  "nutritionBalanceInsightConsistent": "Most days on target — great control.",
+  "nutritionBalanceInsightMostlyDeficit": "Mostly deficit days — make sure you are not cutting too much.",
+  "nutritionBalanceInsightMostlySurplus": "Mostly surplus days — consider reviewing portions or snacks.",
+  "nutritionBalanceInsightSwinging": "High variation between deficit and surplus — try to stabilise the routine.",
+  "nutritionBalanceInsightBalanced": "Balanced spread across deficit, target and surplus.",
+  "nutritionBalanceWeekSequence": "Week sequence",
+  "nutritionBalanceRollingTitle": "7-day rolling average",
+  "nutritionBalanceRollingCurrent": "Current average",
+  "nutritionBalanceRollingDelta": "vs goal",
+  "nutritionBalanceRollingEmpty": "Log at least 3 of the last 7 days to compute a rolling average.",
+  "nutritionBalanceGoalLabel": "Daily goal",
+  "nutritionBalanceMealDistribution": "Where the calories come from",
+  "nutritionBalanceMealEmpty": "No meals logged in this period.",
+  "nutritionBalanceOtherMeals": "Other meals",
+  "nutritionBalanceTopContributors": "Top calorie contributors",
+  "nutritionBalanceTopEmpty": "No foods logged in this period.",
+  "nutritionBalanceTopShare": "{count, plural, =1{1 food accounts for} other{The top {count} foods account for}} {percent}% of calories",
+  "@nutritionBalanceTopShare": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "percent": { "type": "int" }
+    }
+  },
+  "nutritionBalanceContributorMeta": "{kcal} kcal · {count, plural, =1{1 time} other{{count} times}}",
+  "@nutritionBalanceContributorMeta": {
+    "placeholders": {
+      "kcal": { "type": "int" },
+      "count": { "type": "int" }
+    }
+  },
+  "nutritionBalanceMacros": "Macronutrient distribution",
+  "nutritionBalanceMacrosEmpty": "No macro data in this period.",
+
   "exportNutritionCsv": "Nutrition CSV",
   "exportNutritionCsvSubtitle": "Export the meal log history (date, meal, food, macros) — filterable by date range",
   "exportNutritionHeaderDate": "Date",
