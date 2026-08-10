@@ -6,6 +6,7 @@ import 'package:workout_notes/services/sleep_mission_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
 import 'package:workout_notes/services/traditional_alarm_service.dart';
+import 'package:workout_notes/widgets/settings/settings.dart';
 
 class SleepSettingsScreen extends StatefulWidget {
   const SleepSettingsScreen({super.key});
@@ -242,24 +243,16 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          loc.sleepSettingsTitle,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
+      appBar: SettingsAppBar(title: loc.sleepSettingsTitle),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                _SectionHeader(text: loc.sleepSettingsGoalSection),
-                const SizedBox(height: 8),
-                _SettingsCard(
+                SettingsSectionHeader(text: loc.sleepSettingsGoalSection),
+                SettingsCard(
                   children: [
-                    _LinkTile(
+                    SettingsLinkTile(
                       icon: Icons.track_changes_rounded,
                       title: loc.sleepGoalTitle,
                       subtitle: loc.sleepGoalCurrent(
@@ -278,23 +271,19 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                _SectionHeader(text: loc.sleepSettingsAlarmsSection),
-                const SizedBox(height: 8),
-                _SettingsCard(
+                SettingsSectionHeader(text: loc.sleepSettingsAlarmsSection),
+                SettingsCard(
                   children: [
-                    SwitchListTile.adaptive(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                      ),
+                    SettingsSwitchTile(
+                      icon: Icons.snooze_rounded,
+                      title: loc.sleepSettingsSnoozeToggle,
+                      subtitle: loc.sleepSettingsSnoozeToggleBody,
                       value: _globalSnoozeEnabled,
                       onChanged: _setGlobalSnoozeEnabled,
-                      title: Text(loc.sleepSettingsSnoozeToggle),
-                      subtitle: Text(loc.sleepSettingsSnoozeToggleBody),
                     ),
-                    const Divider(height: 1),
-                    _LinkTile(
-                      icon: Icons.snooze_rounded,
+                    const SettingsCardDivider(),
+                    SettingsLinkTile(
+                      icon: Icons.timer_outlined,
                       title: loc.alarmMaxSnoozes,
                       subtitle: _globalMaxSnoozes == 0
                           ? loc.alarmNoSnoozes
@@ -314,41 +303,41 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                _SectionHeader(text: loc.sleepSettingsMissionSection),
-                const SizedBox(height: 8),
-                _SettingsCard(
+                SettingsSectionHeader(text: loc.sleepSettingsMissionSection),
+                SettingsCard(
                   children: [
-                    SwitchListTile.adaptive(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                      ),
+                    SettingsSwitchTile(
+                      icon: Icons.bedtime_outlined,
+                      title: loc.sleepMissionToggle,
+                      subtitle: loc.sleepMissionToggleBody,
                       value: _missions.config.enabled,
-                      onChanged: _busy ? null : _toggle,
-                      title: Text(loc.sleepMissionToggle),
-                      subtitle: Text(loc.sleepMissionToggleBody),
+                      onChanged: (v) {
+                        if (_busy) return;
+                        _toggle(v);
+                      },
                     ),
-                    const Divider(height: 1),
-                    _StatusRow(
-                      icon: _missions.config.isConfigured
-                          ? Icons.qr_code_2_rounded
-                          : Icons.qr_code_2_outlined,
-                      title: _missions.config.isConfigured
-                          ? loc.sleepMissionConfigured(
-                              _missions.config.format ??
-                                  loc.sleepMissionFormatUnknown,
-                            )
-                          : loc.sleepMissionNotConfigured,
-                      color: _missions.config.isConfigured
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.onSurfaceVariant,
-                      subtitle: _missions.config.registeredAt == null
-                          ? null
-                          : DateFormat.yMd(
-                              Localizations.localeOf(context).toLanguageTag(),
-                            ).format(_missions.config.registeredAt!.toLocal()),
-                    ),
-                    _LinkTile(
+                    if (_missions.config.isConfigured) const SettingsCardDivider(),
+                    if (_missions.config.isConfigured)
+                      SettingsInfoTile(
+                        icon: Icons.qr_code_2_rounded,
+                        title: loc.sleepMissionConfigured(
+                          _missions.config.format ??
+                              loc.sleepMissionFormatUnknown,
+                        ),
+                        subtitle: _missions.config.registeredAt == null
+                            ? null
+                            : DateFormat.yMd(
+                                Localizations.localeOf(context).toLanguageTag(),
+                              ).format(_missions.config.registeredAt!.toLocal()),
+                      )
+                    else
+                      SettingsInfoTile(
+                        icon: Icons.qr_code_2_outlined,
+                        iconColor: theme.colorScheme.onSurfaceVariant,
+                        title: loc.sleepMissionNotConfigured,
+                      ),
+                    const SettingsCardDivider(),
+                    SettingsLinkTile(
                       icon: _missions.config.isConfigured
                           ? Icons.swap_horiz_rounded
                           : Icons.camera_alt_outlined,
@@ -357,13 +346,15 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                           : loc.sleepMissionScan,
                       onTap: _busy ? null : _scan,
                     ),
-                    if (_missions.config.isConfigured)
-                      _LinkTile(
+                    if (_missions.config.isConfigured) ...[
+                      const SettingsCardDivider(),
+                      SettingsLinkTile(
                         icon: Icons.delete_outline_rounded,
                         title: loc.sleepMissionRemove,
                         destructive: true,
                         onTap: _busy ? null : _remove,
                       ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -390,82 +381,6 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                 ),
               ],
             ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.text});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(left: 4),
-    child: Text(
-      text,
-      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-        letterSpacing: 1.1,
-        fontWeight: FontWeight.w700,
-        color: Theme.of(context).colorScheme.primary,
-      ),
-    ),
-  );
-}
-
-class _SettingsCard extends StatelessWidget {
-  const _SettingsCard({required this.children});
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) => Card(
-    clipBehavior: Clip.antiAlias,
-    child: Column(children: children),
-  );
-}
-
-class _StatusRow extends StatelessWidget {
-  const _StatusRow({
-    required this.icon,
-    required this.title,
-    required this.color,
-    this.subtitle,
-  });
-  final IconData icon;
-  final String title;
-  final Color color;
-  final String? subtitle;
-
-  @override
-  Widget build(BuildContext context) => ListTile(
-    leading: Icon(icon, color: color),
-    title: Text(title),
-    subtitle: subtitle == null ? null : Text(subtitle!),
-  );
-}
-
-class _LinkTile extends StatelessWidget {
-  const _LinkTile({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-    this.destructive = false,
-    this.subtitle,
-  });
-  final IconData icon;
-  final String title;
-  final VoidCallback? onTap;
-  final bool destructive;
-  final String? subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = destructive ? Theme.of(context).colorScheme.error : null;
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(title, style: color == null ? null : TextStyle(color: color)),
-      subtitle: subtitle == null ? null : Text(subtitle!),
-      trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: onTap,
     );
   }
 }

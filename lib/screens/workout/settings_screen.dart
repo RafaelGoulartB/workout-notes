@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/widgets/settings/settings.dart';
 import '../../repositories/settings_repository.dart';
 import '../../repositories/export_import_repository.dart';
 import '../../repositories/nutrition_repository.dart';
@@ -37,22 +38,14 @@ class AppSettingsScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          loc.settingsTitle,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: false,
-      ),
+      appBar: SettingsAppBar(title: loc.settingsTitle),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          _SectionHeader(text: loc.settingsAppPreferencesSection),
-          _SettingsCard(
+          SettingsSectionHeader(text: loc.settingsAppPreferencesSection),
+          SettingsCard(
             children: [
-              _LinkTile(
+              SettingsLinkTile(
                 icon: Icons.tune_rounded,
                 iconColor: theme.colorScheme.primary,
                 title: loc.settingsGeneralTitle,
@@ -66,10 +59,10 @@ class AppSettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-          _SectionHeader(text: loc.settingsBySectionTitle),
-          _SettingsCard(
+          SettingsSectionHeader(text: loc.settingsBySectionTitle),
+          SettingsCard(
             children: [
-              _LinkTile(
+              SettingsLinkTile(
                 icon: Icons.fitness_center_outlined,
                 iconColor: theme.colorScheme.primary,
                 title: loc.tabWorkout,
@@ -81,16 +74,16 @@ class AppSettingsScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const _CardDivider(),
-              _LinkTile(
+              const SettingsCardDivider(),
+              SettingsLinkTile(
                 icon: Icons.nightlight_outlined,
                 iconColor: theme.colorScheme.primary,
                 title: loc.tabSleep,
                 subtitle: loc.settingsSleepSubtitle,
                 onTap: () => _open(context, const SleepSettingsScreen()),
               ),
-              const _CardDivider(),
-              _LinkTile(
+              const SettingsCardDivider(),
+              SettingsLinkTile(
                 icon: Icons.restaurant_outlined,
                 iconColor: theme.colorScheme.primary,
                 title: loc.tabNutrition,
@@ -102,10 +95,10 @@ class AppSettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-          _SectionHeader(text: loc.settingsResourcesSection),
-          _SettingsCard(
+          SettingsSectionHeader(text: loc.settingsResourcesSection),
+          SettingsCard(
             children: [
-              _LinkTile(
+              SettingsLinkTile(
                 icon: Icons.smart_toy_outlined,
                 iconColor: theme.colorScheme.primary,
                 title: loc.settingsAiTitle,
@@ -115,8 +108,8 @@ class AppSettingsScreen extends StatelessWidget {
                   const _SettingsDetailScreen(category: _SettingsCategory.ai),
                 ),
               ),
-              const _CardDivider(),
-              _LinkTile(
+              const SettingsCardDivider(),
+              SettingsLinkTile(
                 icon: Icons.shield_outlined,
                 iconColor: theme.colorScheme.primary,
                 title: loc.settingsDataPrivacyTitle,
@@ -280,39 +273,23 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
       context: context,
       showDragHandle: true,
       builder: (ctx) {
-        final theme = Theme.of(ctx);
         return SafeArea(
           top: false,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.download_outlined,
-                      size: 18,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      loc.settingsExportOptionsTitle,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+              SettingsSheetTitle(
+                icon: Icons.download_outlined,
+                title: loc.settingsExportOptionsTitle,
               ),
               const Divider(height: 1, thickness: 1),
-              _OptionTile(
+              SettingsOptionTile(
                 icon: Icons.share_outlined,
                 title: loc.settingsExportShareOption,
                 subtitle: loc.settingsExportShareSubtitle,
                 onTap: () => Navigator.pop(ctx, 'share'),
               ),
-              _OptionTile(
+              SettingsOptionTile(
                 icon: Icons.save_alt_outlined,
                 title: loc.settingsExportSaveOption,
                 subtitle: loc.settingsExportSaveSubtitle,
@@ -626,26 +603,9 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.restore_outlined,
-                        size: 18,
-                        color: t.colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          loc.settingsImportBackup,
-                          style: t.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                SettingsSheetTitle(
+                  icon: Icons.restore_outlined,
+                  title: loc.settingsImportBackup,
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -829,45 +789,29 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
       context: context,
       showDragHandle: true,
       builder: (ctx) {
-        final t = Theme.of(ctx);
         return SafeArea(
           top: false,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.restore_outlined,
-                      size: 18,
-                      color: t.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      loc.settingsImportBackup,
-                      style: t.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+              SettingsSheetTitle(
+                icon: Icons.restore_outlined,
+                title: loc.settingsImportBackup,
               ),
               const Divider(height: 1, thickness: 1),
-              _OptionTile(
+              SettingsOptionTile(
                 icon: Icons.folder_open_outlined,
                 title: loc.settingsImportLocalOption,
                 subtitle: backupsPath,
                 onTap: () => Navigator.pop(ctx, 'local'),
               ),
-              _OptionTile(
+              SettingsOptionTile(
                 icon: Icons.content_paste_go,
                 title: loc.settingsImportPasteOption,
                 subtitle: loc.settingsImportPasteSubtitle,
                 onTap: () => Navigator.pop(ctx, 'paste'),
               ),
-              _OptionTile(
+              SettingsOptionTile(
                 icon: Icons.attach_file,
                 title: loc.settingsImportPickFileOption,
                 subtitle: loc.settingsImportPickFileSubtitle,
@@ -1117,15 +1061,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
     };
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          pageTitle,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: false,
-      ),
+      appBar: SettingsAppBar(title: pageTitle),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -1133,28 +1069,28 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
               children: [
                 if (widget.category == _SettingsCategory.general) ...[
                   // ===== APARÊNCIA =====
-                  _SectionHeader(text: loc.settingsSectionAppearance),
-                  _SettingsCard(
+                  SettingsSectionHeader(text: loc.settingsSectionAppearance),
+                  SettingsCard(
                     title: loc.settingsThemeMode,
                     icon: Icons.dark_mode_outlined,
                     children: [
-                      _RadioOption(
+                      SettingsRadioOption(
                         icon: Icons.brightness_auto,
                         label: loc.settingsSystem,
                         subtitle: loc.settingsSystemSubtitle,
                         selected: _selectedThemeMode == ThemeMode.system,
                         onTap: () => _changeThemeMode(ThemeMode.system),
                       ),
-                      const _CardDivider(),
-                      _RadioOption(
+                      const SettingsCardDivider(),
+                      SettingsRadioOption(
                         icon: Icons.light_mode,
                         label: loc.settingsLight,
                         subtitle: loc.settingsLightSubtitle,
                         selected: _selectedThemeMode == ThemeMode.light,
                         onTap: () => _changeThemeMode(ThemeMode.light),
                       ),
-                      const _CardDivider(),
-                      _RadioOption(
+                      const SettingsCardDivider(),
+                      SettingsRadioOption(
                         icon: Icons.dark_mode,
                         label: loc.settingsDark,
                         subtitle: loc.settingsDarkSubtitle,
@@ -1164,7 +1100,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _SettingsCard(
+                  SettingsCard(
                     title: loc.settingsThemeColor,
                     icon: Icons.palette_outlined,
                     children: [
@@ -1178,7 +1114,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                           ) {
                             final isSelected = _selectedAccentIndex == i;
                             final color = AccentColors.options[i];
-                            return _ColorSwatch(
+                            return SettingsColorSwatch(
                               color: color,
                               isSelected: isSelected,
                               onTap: () => _changeAccentColor(i),
@@ -1212,11 +1148,11 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _SettingsCard(
+                  SettingsCard(
                     title: loc.settingsLanguage,
                     icon: Icons.language_outlined,
                     children: [
-                      _RadioOption(
+                      SettingsRadioOption(
                         icon: Icons.translate,
                         label: loc.settingsPortuguese,
                         subtitle: loc.settingsLanguageSubtitle,
@@ -1225,8 +1161,8 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                             'pt',
                         onTap: () => _changeLocale(const Locale('pt', 'BR')),
                       ),
-                      const _CardDivider(),
-                      _RadioOption(
+                      const SettingsCardDivider(),
+                      SettingsRadioOption(
                         icon: Icons.translate,
                         label: loc.settingsEnglish,
                         subtitle: loc.settingsLanguageSubtitle,
@@ -1241,10 +1177,10 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
 
                 if (widget.category == _SettingsCategory.workout) ...[
                   // ===== TREINO =====
-                  _SectionHeader(text: loc.settingsSectionWorkout),
-                  _SettingsCard(
+                  SettingsSectionHeader(text: loc.settingsSectionWorkout),
+                  SettingsCard(
                     children: [
-                      _SwitchTile(
+                      SettingsSwitchTile(
                         icon: Icons.straighten,
                         title: loc.settingsUnitSystem,
                         subtitle: _settings['unit_system'] == 'kg'
@@ -1257,11 +1193,11 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _SettingsCard(
+                  SettingsCard(
                     title: loc.settingsTimer,
                     icon: Icons.timer_outlined,
                     children: [
-                      _ValuePickerTile(
+                      SettingsValuePickerTile(
                         icon: Icons.timer,
                         title: loc.settingsDefaultRest,
                         currentValue:
@@ -1281,8 +1217,8 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                         onChanged: (v) =>
                             _update('default_rest_time', v.toString()),
                       ),
-                      const _CardDivider(),
-                      _SwitchTile(
+                      const SettingsCardDivider(),
+                      SettingsSwitchTile(
                         icon: Icons.play_circle_outline,
                         title: loc.settingsAutoStartRest,
                         subtitle: loc.settingsAutoStartRestSubtitle,
@@ -1290,8 +1226,8 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                         onChanged: (v) =>
                             _update('auto_start_rest_timer', v.toString()),
                       ),
-                      const _CardDivider(),
-                      _SwitchTile(
+                      const SettingsCardDivider(),
+                      SettingsSwitchTile(
                         icon: Icons.av_timer,
                         title: loc.settingsAutoStartWorkoutTimer,
                         subtitle: loc.settingsAutoStartWorkoutTimerSubtitle,
@@ -1302,9 +1238,9 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _SettingsCard(
+                  SettingsCard(
                     children: [
-                      _SwitchTile(
+                      SettingsSwitchTile(
                         icon: Icons.lightbulb_outline,
                         title: loc.settingsKeepScreenOn,
                         subtitle: loc.settingsKeepScreenOnSubtitle,
@@ -1316,10 +1252,10 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                   ),
 
                   // ===== NOTIFICAÇÕES =====
-                  _SectionHeader(text: loc.settingsSectionNotifications),
-                  _SettingsCard(
+                  SettingsSectionHeader(text: loc.settingsSectionNotifications),
+                  SettingsCard(
                     children: [
-                      _SwitchTile(
+                      SettingsSwitchTile(
                         icon: Icons.notifications_outlined,
                         title: loc.settingsRestTimerNotif,
                         subtitle: loc.settingsRestTimerNotifSubtitle,
@@ -1333,8 +1269,8 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                       ),
                       if (_settings['notification_rest_timer_enabled'] !=
                           'false') ...[
-                        const _CardDivider(),
-                        _SwitchTile(
+                        const SettingsCardDivider(),
+                        SettingsSwitchTile(
                           icon: Icons.volume_up_outlined,
                           title: loc.settingsSound,
                           subtitle: loc.settingsRestSoundSubtitle,
@@ -1350,8 +1286,8 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                             NotificationService.instance.loadSettings();
                           },
                         ),
-                        const _CardDivider(),
-                        _SwitchTile(
+                        const SettingsCardDivider(),
+                        SettingsSwitchTile(
                           icon: Icons.vibration,
                           title: loc.settingsVibration,
                           subtitle: loc.settingsRestVibrationSubtitle,
@@ -1371,9 +1307,9 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _SettingsCard(
+                  SettingsCard(
                     children: [
-                      _SwitchTile(
+                      SettingsSwitchTile(
                         icon: Icons.notifications_active_outlined,
                         title: loc.settingsWorkoutTimerNotif,
                         subtitle: loc.settingsWorkoutTimerNotifSubtitle,
@@ -1387,8 +1323,8 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                       ),
                       if (_settings['notification_workout_timer_enabled'] !=
                           'false') ...[
-                        const _CardDivider(),
-                        _SwitchTile(
+                        const SettingsCardDivider(),
+                        SettingsSwitchTile(
                           icon: Icons.volume_up_outlined,
                           title: loc.settingsSound,
                           subtitle: loc.settingsWorkoutSoundSubtitle,
@@ -1404,8 +1340,8 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                             NotificationService.instance.loadSettings();
                           },
                         ),
-                        const _CardDivider(),
-                        _SwitchTile(
+                        const SettingsCardDivider(),
+                        SettingsSwitchTile(
                           icon: Icons.vibration,
                           title: loc.settingsVibration,
                           subtitle: loc.settingsWorkoutVibrationSubtitle,
@@ -1428,18 +1364,18 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
 
                 if (widget.category == _SettingsCategory.ai) ...[
                   // ===== INTELIGÊNCIA ARTIFICIAL =====
-                  _SectionHeader(text: loc.aiCoachSection),
-                  _SettingsCard(
+                  SettingsSectionHeader(text: loc.aiCoachSection),
+                  SettingsCard(
                     children: [
-                      _LinkTile(
+                      SettingsLinkTile(
                         icon: Icons.smart_toy_rounded,
                         iconColor: theme.colorScheme.primary,
                         title: loc.aiCoachEntry,
                         subtitle: loc.aiCoachEntrySubtitle,
                         onTap: _openAiCoach,
                       ),
-                      const _CardDivider(),
-                      _LinkTile(
+                      const SettingsCardDivider(),
+                      SettingsLinkTile(
                         icon: Icons.tune_rounded,
                         iconColor: theme.colorScheme.onSurfaceVariant,
                         title: loc.aiCoachConfigureEntry,
@@ -1453,8 +1389,8 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                           );
                         },
                       ),
-                      const _CardDivider(),
-                      _SwitchTile(
+                      const SettingsCardDivider(),
+                      SettingsSwitchTile(
                         icon: Icons.smart_toy_outlined,
                         title: loc.aiSettingsFabTitle,
                         subtitle: loc.aiSettingsFabSubtitle,
@@ -1469,10 +1405,10 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
 
                 if (widget.category == _SettingsCategory.data) ...[
                   // ===== EXPORTAÇÕES =====
-                  _SectionHeader(text: loc.settingsSectionExports),
-                  _SettingsCard(
+                  SettingsSectionHeader(text: loc.settingsSectionExports),
+                  SettingsCard(
                     children: [
-                      _LinkTile(
+                      SettingsLinkTile(
                         icon: Icons.table_view_outlined,
                         iconColor: theme.colorScheme.primary,
                         title: loc.exportNutritionCsv,
@@ -1483,18 +1419,18 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                   ),
 
                   // ===== DADOS =====
-                  _SectionHeader(text: loc.settingsSectionData),
-                  _SettingsCard(
+                  SettingsSectionHeader(text: loc.settingsSectionData),
+                  SettingsCard(
                     children: [
-                      _LinkTile(
+                      SettingsLinkTile(
                         icon: Icons.download_outlined,
                         iconColor: theme.colorScheme.primary,
                         title: loc.settingsExportBackup,
                         subtitle: loc.settingsExportIncludesNutrition,
                         onTap: _exportBackup,
                       ),
-                      const _CardDivider(),
-                      _LinkTile(
+                      const SettingsCardDivider(),
+                      SettingsLinkTile(
                         icon: Icons.upload_outlined,
                         iconColor: theme.colorScheme.primary,
                         title: loc.settingsImportBackup,
@@ -1502,8 +1438,8 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                         onTap: _importBackup,
                       ),
                       if (_showTestData) ...[
-                        const _CardDivider(),
-                        _LinkTile(
+                        const SettingsCardDivider(),
+                        SettingsLinkTile(
                           icon: Icons.bug_report_outlined,
                           iconColor: theme.colorScheme.secondary,
                           title: loc.settingsGenerateTestData,
@@ -1511,16 +1447,16 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                           onTap: _generateTestData,
                         ),
                       ],
-                      const _CardDivider(),
-                      _LinkTile(
+                      const SettingsCardDivider(),
+                      SettingsLinkTile(
                         icon: Icons.info_outline,
                         iconColor: theme.colorScheme.onSurfaceVariant,
                         title: loc.settingsAbout,
                         subtitle: loc.settingsAboutSubtitle,
                         onTap: _showAbout,
                       ),
-                      const _CardDivider(),
-                      _LinkTile(
+                      const SettingsCardDivider(),
+                      SettingsLinkTile(
                         icon: Icons.delete_outline,
                         iconColor: Colors.red,
                         title: loc.settingsDeleteAllHistory,
@@ -1535,608 +1471,6 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                 ],
               ],
             ),
-    );
-  }
-}
-
-// ===================== SHARED WIDGETS =====================
-
-/// Section header (uppercase, tracked, muted). Consistent with the
-/// home screen pattern.
-class _SectionHeader extends StatelessWidget {
-  final String text;
-  const _SectionHeader({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
-      child: Text(
-        text,
-        style: theme.textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.5,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
-
-/// Card container with optional title and rounded outline.
-class _SettingsCard extends StatelessWidget {
-  final String? title;
-  final IconData? icon;
-  final List<Widget> children;
-  const _SettingsCard({this.title, this.icon, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (title != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-              child: Row(
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: 18, color: theme.colorScheme.primary),
-                    const SizedBox(width: 8),
-                  ],
-                  Text(
-                    title!,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ...children,
-        ],
-      ),
-    );
-  }
-}
-
-/// Horizontal divider used between rows inside a [_SettingsCard].
-class _CardDivider extends StatelessWidget {
-  const _CardDivider();
-  @override
-  Widget build(BuildContext context) {
-    return Divider(
-      height: 1,
-      thickness: 1,
-      indent: 56, // aligns under the title text, past the leading icon
-      endIndent: 16,
-      color: Theme.of(context).colorScheme.outlineVariant.withAlpha(60),
-    );
-  }
-}
-
-/// Radio-style row: leading icon, title + subtitle, check icon on the
-/// right when selected. Tapping the whole row triggers [onTap].
-class _RadioOption extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final bool selected;
-  final VoidCallback onTap;
-  const _RadioOption({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: selected
-                    ? theme.colorScheme.primaryContainer
-                    : theme.colorScheme.surfaceContainerHighest.withAlpha(120),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                icon,
-                size: 18,
-                color: selected
-                    ? theme.colorScheme.onPrimaryContainer
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              selected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: selected
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.outlineVariant,
-              size: 22,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Switch tile with leading icon, title + subtitle, switch on the right.
-/// Tapping anywhere on the tile toggles the switch via [onChanged].
-class _SwitchTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-  final bool indent;
-  const _SwitchTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
-    this.indent = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: () => onChanged(!value),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(indent ? 32 : 16, 12, 12, 12),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                icon,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Switch(value: value, onChanged: onChanged),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Tappable row that opens a deeper flow (or a dialog). Shows a chevron
-/// at the trailing edge. Use [titleColor] for destructive tiles.
-class _LinkTile extends StatelessWidget {
-  final IconData icon;
-  final Color? iconColor;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  final Color? titleColor;
-  const _LinkTile({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.titleColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final fg = titleColor ?? theme.colorScheme.onSurface;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: (iconColor ?? theme.colorScheme.primary).withAlpha(25),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                icon,
-                size: 18,
-                color: iconColor ?? theme.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: fg,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right,
-              color: theme.colorScheme.onSurfaceVariant,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Single color swatch used in the accent color grid. The selected
-/// swatch is highlighted with a thicker border and a white check.
-class _ColorSwatch extends StatelessWidget {
-  final Color color;
-  final bool isSelected;
-  final VoidCallback onTap;
-  const _ColorSwatch({
-    required this.color,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Semantics(
-      button: true,
-      selected: isSelected,
-      label: color.toARGB32().toRadixString(16),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(14),
-              border: isSelected
-                  ? Border.all(color: theme.colorScheme.onSurface, width: 2.5)
-                  : Border.all(color: color.withAlpha(120), width: 1),
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                        color: color.withAlpha(100),
-                        blurRadius: 10,
-                        spreadRadius: 1,
-                      ),
-                    ]
-                  : null,
-            ),
-            child: isSelected
-                ? const Icon(Icons.check, color: Colors.white, size: 22)
-                : null,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Tappable row showing the current [displayValue] and a chevron. Tapping
-/// opens a bottom sheet that lets the user pick from [choices]. The chosen
-/// value is forwarded to [onChanged].
-///
-/// Use for "single value from a small set" settings like rest time, where
-/// chips or inline rows would either wrap to multiple lines or take too
-/// much vertical space.
-class _ValuePickerTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final int currentValue;
-  final String displayValue;
-  final List<int> choices;
-  final String Function(int) formatChoice;
-  final String sheetTitle;
-  final ValueChanged<int> onChanged;
-
-  const _ValuePickerTile({
-    required this.icon,
-    required this.title,
-    required this.currentValue,
-    required this.displayValue,
-    required this.choices,
-    required this.formatChoice,
-    required this.sheetTitle,
-    required this.onChanged,
-  });
-
-  Future<void> _openSheet(BuildContext context) async {
-    final theme = Theme.of(context);
-    final selected = await showModalBottomSheet<int>(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) {
-        return SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-                child: Row(
-                  children: [
-                    Icon(icon, size: 18, color: theme.colorScheme.primary),
-                    const SizedBox(width: 8),
-                    Text(
-                      sheetTitle,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1, thickness: 1),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: choices.length,
-                  itemBuilder: (ctx, i) {
-                    final value = choices[i];
-                    final isSelected = value == currentValue;
-                    return InkWell(
-                      onTap: () => Navigator.pop(ctx, value),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 14,
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                formatChoice(value),
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                  color: isSelected
-                                      ? theme.colorScheme.primary
-                                      : theme.colorScheme.onSurface,
-                                ),
-                              ),
-                            ),
-                            Icon(
-                              isSelected
-                                  ? Icons.radio_button_checked
-                                  : Icons.radio_button_off,
-                              color: isSelected
-                                  ? theme.colorScheme.primary
-                                  : theme.colorScheme.outlineVariant,
-                              size: 22,
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-    if (!context.mounted) return;
-    if (selected != null) onChanged(selected);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: () => _openSheet(context),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                icon,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                title,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              displayValue,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.chevron_right,
-              color: theme.colorScheme.onSurfaceVariant,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Tile used in source-picker bottom sheets.
-class _OptionTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  const _OptionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withAlpha(120),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                size: 22,
-                color: theme.colorScheme.onPrimaryContainer,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right,
-              color: theme.colorScheme.onSurfaceVariant,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

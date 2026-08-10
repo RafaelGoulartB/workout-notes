@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/ai_chat_thread.dart';
 import '../../state/ai_chat_service.dart';
 import '../../widgets/empty_state_placeholder.dart';
+import '../../widgets/settings/settings.dart';
 
 enum _HistoryAction { rename, pin, unpin, delete }
 
@@ -39,7 +40,7 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
     final recent = threads.where((thread) => !thread.isPinned).toList();
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.aiHistoryTitle)),
+      appBar: SettingsAppBar(title: l10n.aiHistoryTitle),
       body: threads.isEmpty
           ? EmptyStatePlaceholder(
               icon: Icons.history_rounded,
@@ -49,12 +50,12 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
           : ListView(
               children: [
                 if (pinned.isNotEmpty) ...[
-                  _SectionHeader(label: l10n.aiHistoryPinned),
+                  SettingsSectionHeader(text: l10n.aiHistoryPinned),
                   for (final thread in pinned) _buildThreadTile(thread, l10n),
                 ],
                 if (recent.isNotEmpty) ...[
                   if (pinned.isNotEmpty)
-                    _SectionHeader(label: l10n.aiHistoryRecent),
+                    SettingsSectionHeader(text: l10n.aiHistoryRecent),
                   for (final thread in recent) _buildThreadTile(thread, l10n),
                 ],
               ],
@@ -189,24 +190,14 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
     AiChatThread thread,
     AppLocalizations l10n,
   ) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: Text(l10n.aiHistoryDeleteTitle),
-            content: Text(l10n.aiHistoryDeleteBody(thread.title)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(l10n.commonCancel),
-              ),
-              FilledButton.tonal(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(l10n.commonDelete),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    final ok = await SettingsConfirmDialog.show(
+      context: context,
+      title: l10n.aiHistoryDeleteTitle,
+      message: l10n.aiHistoryDeleteBody(thread.title),
+      confirmLabel: l10n.commonDelete,
+      cancelLabel: l10n.commonCancel,
+    );
+    return ok ?? false;
   }
 
   void _showOperationError(AppLocalizations l10n) {
@@ -290,26 +281,6 @@ class _RenameDialogState extends State<_RenameDialog> {
           child: Text(l10n.commonSave),
         ),
       ],
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String label;
-
-  const _SectionHeader({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
     );
   }
 }

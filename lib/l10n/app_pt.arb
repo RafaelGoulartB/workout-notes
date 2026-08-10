@@ -872,6 +872,7 @@
   "aiCoachConfigureBeforeChat": "Configure um provedor de IA antes de abrir o chat.",
 
   "aiSettingsTitle": "Configurações do AI Coach",
+  "aiSettingsSectionBehavior": "COMPORTAMENTO",
   "aiSettingsFabTitle": "Mostrar botão do Treinador IA",
   "aiSettingsFabSubtitle": "Exibe o atalho do Treinador IA nas telas do app.",
   "aiSettingsProvidersCard": "Provedores",

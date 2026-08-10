@@ -8,6 +8,7 @@ import '../../services/ai_service.dart';
 import '../../state/ai_settings_notifier.dart';
 import '../../utils/ai_error_localizer.dart';
 import '../../widgets/empty_state_placeholder.dart';
+import '../../widgets/settings/settings.dart';
 
 class AiSettingsScreen extends StatefulWidget {
   const AiSettingsScreen({super.key});
@@ -38,72 +39,64 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final settings = _notifier.settings;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.aiSettingsTitle)),
+      appBar: SettingsAppBar(title: l10n.aiSettingsTitle),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
-          _buildProvidersCard(theme, settings),
-          const SizedBox(height: 16),
-          _buildContextModeCard(theme, settings),
-          const SizedBox(height: 16),
-          _buildSystemPromptCard(theme),
-          const SizedBox(height: 16),
-          _buildAboutCard(theme),
+          _buildProvidersCard(settings),
+          SettingsSectionHeader(text: l10n.aiSettingsSectionBehavior),
+          _buildContextModeCard(settings),
+          _buildSystemPromptCard(),
+          _buildAboutCard(),
         ],
       ),
     );
   }
 
-  Widget _buildProvidersCard(ThemeData theme, AiSettings settings) {
+  Widget _buildProvidersCard(AiSettings settings) {
     final l10n = AppLocalizations.of(context)!;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.cloud_outlined, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  l10n.aiSettingsProvidersCard,
-                  style: theme.textTheme.titleMedium,
-                ),
-              ],
+    return SettingsCard(
+      title: l10n.aiSettingsProvidersCard,
+      icon: Icons.cloud_outlined,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          child: Text(
+            l10n.aiSettingsProvidersHelp,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.aiSettingsProvidersHelp,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (settings.providers.isEmpty)
-              EmptyStatePlaceholder(
-                icon: Icons.cloud_off_rounded,
-                title: l10n.aiSettingsNoProviders,
-                subtitle: l10n.aiSettingsNoProvidersSubtitle,
-              )
-            else
-              ...settings.providers.map((p) => _buildProviderTile(p, settings)),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: () => _showAddProviderSheet(),
-                icon: const Icon(Icons.add_rounded),
-                label: Text(l10n.aiSettingsAddProvider),
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+        if (settings.providers.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: EmptyStatePlaceholder(
+              icon: Icons.cloud_off_rounded,
+              title: l10n.aiSettingsNoProviders,
+              subtitle: l10n.aiSettingsNoProvidersSubtitle,
+            ),
+          )
+        else
+          for (var i = 0; i < settings.providers.length; i++) ...[
+            _buildProviderTile(settings.providers[i], settings),
+            if (i < settings.providers.length - 1) const SettingsCardDivider(),
+          ],
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: _showAddProviderSheet,
+              icon: const Icon(Icons.add_rounded),
+              label: Text(l10n.aiSettingsAddProvider),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -111,147 +104,145 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final isActive = p.id == settings.activeProviderId;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isActive
-            ? theme.colorScheme.primaryContainer.withAlpha(80)
-            : theme.colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isActive
-              ? theme.colorScheme.primary
-              : theme.colorScheme.outlineVariant,
-          width: isActive ? 1.5 : 0.5,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isActive ? Icons.check_circle_rounded : Icons.cloud_outlined,
-                size: 18,
-                color: isActive
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  p.name,
-                  style: theme.textTheme.titleSmall,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (!isActive)
-                TextButton(
-                  onPressed: () => _notifier.setActiveProvider(p.id),
-                  child: Text(l10n.aiSettingsActivate),
-                ),
-            ],
-          ),
-          Text(
-            p.baseUrl,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          if (p.selectedModel.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                l10n.aiSettingsModelValue(p.selectedModel),
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton.icon(
-                onPressed: () => _showEditProviderSheet(p),
-                icon: const Icon(Icons.edit_rounded, size: 16),
-                label: Text(l10n.aiSettingsEdit),
-              ),
-              TextButton.icon(
-                onPressed: () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: Text(l10n.aiSettingsRemoveConfirmTitle(p.name)),
-                      content: Text(l10n.aiSettingsRemoveConfirmBody),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: Text(l10n.commonCancel),
-                        ),
-                        FilledButton.tonal(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: Text(l10n.aiSettingsRemove),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirm == true) {
-                    await _notifier.deleteProvider(p.id);
-                  }
-                },
-                icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                label: Text(l10n.aiSettingsRemove),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContextModeCard(ThemeData theme, AiSettings settings) {
-    final l10n = AppLocalizations.of(context)!;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.tune_rounded, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  l10n.aiSettingsContextMode,
-                  style: theme.textTheme.titleMedium,
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? theme.colorScheme.primary.withAlpha(25)
+                        : theme.colorScheme.surfaceContainerHighest.withAlpha(120),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isActive
+                        ? Icons.check_circle_rounded
+                        : Icons.cloud_outlined,
+                    size: 18,
+                    color: isActive
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    p.name,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (!isActive)
+                  TextButton(
+                    onPressed: () => _notifier.setActiveProvider(p.id),
+                    child: Text(l10n.aiSettingsActivate),
+                  ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 48),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
+                  Text(
+                    p.baseUrl,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (p.selectedModel.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        l10n.aiSettingsModelValue(p.selectedModel),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: () => _showEditProviderSheet(p),
+                  icon: const Icon(Icons.edit_rounded, size: 16),
+                  label: Text(l10n.aiSettingsEdit),
+                ),
+                TextButton.icon(
+                  onPressed: () => _confirmRemove(p),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                  label: Text(l10n.aiSettingsRemove),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.aiSettingsContextModeHelp,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            for (final mode in AiContextMode.values)
-              RadioListTile<AiContextMode>(
-                value: mode,
-                // Kept for compatibility with the minimum Flutter SDK.
-                // ignore: deprecated_member_use
-                groupValue: settings.contextMode,
-                title: Text(_modeLabel(mode, l10n)),
-                subtitle: Text(_modeSubtitle(mode, l10n)),
-                // ignore: deprecated_member_use
-                onChanged: (value) {
-                  if (value != null) _notifier.setContextMode(value);
-                },
-              ),
           ],
         ),
-      ),
+      );
+  }
+
+  Future<void> _confirmRemove(AiProvider p) async {
+    final l10n = AppLocalizations.of(context)!;
+    final ok = await SettingsConfirmDialog.show(
+      context: context,
+      title: l10n.aiSettingsRemoveConfirmTitle(p.name),
+      message: l10n.aiSettingsRemoveConfirmBody,
+      confirmLabel: l10n.aiSettingsRemove,
+      cancelLabel: l10n.commonCancel,
     );
+    if (ok == true) {
+      await _notifier.deleteProvider(p.id);
+    }
+  }
+
+  Widget _buildContextModeCard(AiSettings settings) {
+    final l10n = AppLocalizations.of(context)!;
+    return SettingsCard(
+      title: l10n.aiSettingsContextMode,
+      icon: Icons.tune_rounded,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(
+            l10n.aiSettingsContextModeHelp,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        for (var i = 0; i < AiContextMode.values.length; i++) ...[
+          SettingsRadioOption(
+            icon: _modeIcon(AiContextMode.values[i]),
+            label: _modeLabel(AiContextMode.values[i], l10n),
+            subtitle: _modeSubtitle(AiContextMode.values[i], l10n),
+            selected: settings.contextMode == AiContextMode.values[i],
+            onTap: () => _notifier.setContextMode(AiContextMode.values[i]),
+          ),
+          if (i < AiContextMode.values.length - 1) const SettingsCardDivider(),
+        ],
+      ],
+    );
+  }
+
+  IconData _modeIcon(AiContextMode mode) {
+    switch (mode) {
+      case AiContextMode.minimal:
+        return Icons.eco_outlined;
+      case AiContextMode.standard:
+        return Icons.balance_outlined;
+      case AiContextMode.full:
+        return Icons.dashboard_outlined;
+    }
   }
 
   String _modeLabel(AiContextMode mode, AppLocalizations l10n) {
@@ -276,62 +267,40 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     }
   }
 
-  Widget _buildSystemPromptCard(ThemeData theme) {
+  Widget _buildSystemPromptCard() {
     final l10n = AppLocalizations.of(context)!;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.edit_note_rounded, color: theme.colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  l10n.aiSettingsSystemPrompt,
-                  style: theme.textTheme.titleMedium,
-                ),
-              ],
+    return SettingsCard(
+      title: l10n.aiSettingsSystemPrompt,
+      icon: Icons.edit_note_rounded,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Text(
+            l10n.aiSettingsSystemPromptHelp,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.aiSettingsSystemPromptHelp,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _SystemPromptField(notifier: _notifier),
-          ],
+          ),
         ),
-      ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: _SystemPromptField(notifier: _notifier),
+        ),
+      ],
     );
   }
 
-  Widget _buildAboutCard(ThemeData theme) {
+  Widget _buildAboutCard() {
     final l10n = AppLocalizations.of(context)!;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.info_outline_rounded,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(l10n.aiSettingsAbout, style: theme.textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(l10n.aiSettingsAboutBody),
-          ],
+    return SettingsCard(
+      title: l10n.aiSettingsAbout,
+      icon: Icons.info_outline_rounded,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Text(l10n.aiSettingsAboutBody),
         ),
-      ),
+      ],
     );
   }
 

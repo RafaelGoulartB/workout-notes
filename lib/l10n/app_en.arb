@@ -871,6 +871,7 @@
   "aiCoachConfigureBeforeChat": "Configure an AI provider before opening the chat.",
 
   "aiSettingsTitle": "AI Coach settings",
+  "aiSettingsSectionBehavior": "BEHAVIOR",
   "aiSettingsFabTitle": "Show AI Coach button",
   "aiSettingsFabSubtitle": "Display the AI Coach shortcut on app screens.",
   "aiSettingsProvidersCard": "Providers",

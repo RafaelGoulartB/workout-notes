@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -7,6 +7,7 @@ import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
+import 'package:workout_notes/widgets/settings/settings.dart';
 
 import 'nutrition_goal_suggest_sheet.dart';
 
@@ -336,15 +337,7 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          loc.nutritionSettingsTitle,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: false,
-      ),
+      appBar: SettingsAppBar(title: loc.nutritionSettingsTitle),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -356,10 +349,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                   carbsG: _current?.carbsG,
                   fatG: _current?.fatG,
                 ),
-                _SectionHeader(text: loc.nutritionSettingsSectionDaily),
-                _SettingsCard(
+                SettingsSectionHeader(text: loc.nutritionSettingsSectionDaily),
+                SettingsCard(
                   children: [
-                    _ValueTile(
+                    SettingsValueTile(
                       icon: Icons.local_fire_department_outlined,
                       title: loc.nutritionGoalCalories,
                       subtitle: loc.nutritionSettingsCaloriesSubtitle,
@@ -380,8 +373,8 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                         ),
                       ),
                     ),
-                    const _CardDivider(),
-                    _ValueTile(
+                    const SettingsCardDivider(),
+                    SettingsValueTile(
                       icon: Icons.fitness_center_outlined,
                       title: loc.nutritionProgressProtein,
                       subtitle: loc.nutritionSettingsProteinSubtitle,
@@ -402,8 +395,8 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                         ),
                       ),
                     ),
-                    const _CardDivider(),
-                    _ValueTile(
+                    const SettingsCardDivider(),
+                    SettingsValueTile(
                       icon: Icons.grain_outlined,
                       title: loc.nutritionProgressCarbs,
                       subtitle: loc.nutritionSettingsCarbsSubtitle,
@@ -424,8 +417,8 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                         ),
                       ),
                     ),
-                    const _CardDivider(),
-                    _ValueTile(
+                    const SettingsCardDivider(),
+                    SettingsValueTile(
                       icon: Icons.opacity_outlined,
                       title: loc.nutritionProgressFat,
                       subtitle: loc.nutritionSettingsFatSubtitle,
@@ -448,10 +441,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                     ),
                   ],
                 ),
-                _SectionHeader(text: loc.nutritionSettingsSectionTools),
-                _SettingsCard(
+                SettingsSectionHeader(text: loc.nutritionSettingsSectionTools),
+                SettingsCard(
                   children: [
-                    _LinkTile(
+                    SettingsLinkTile(
                       icon: Icons.calculate_outlined,
                       iconColor: theme.colorScheme.primary,
                       title: loc.nutritionSettingsSuggestSection,
@@ -460,11 +453,11 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                     ),
                   ],
                 ),
-                _SectionHeader(text: loc.nutritionSettingsSectionMeals),
-                _SettingsCard(
+                SettingsSectionHeader(text: loc.nutritionSettingsSectionMeals),
+                SettingsCard(
                   children: [
                     if (_mealTypes.isEmpty)
-                      _EmptyHint(
+                      SettingsEmptyHint(
                         icon: Icons.restaurant_outlined,
                         text: loc.nutritionSettingsMealTypeEmpty,
                       )
@@ -474,10 +467,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                           type: _mealTypes[i],
                           onTap: () => _openMealActions(_mealTypes[i], i),
                         ),
-                        if (i < _mealTypes.length - 1) const _CardDivider(),
+                        if (i < _mealTypes.length - 1) const SettingsCardDivider(),
                       ],
-                    if (_mealTypes.isNotEmpty) const _CardDivider(),
-                    _LinkTile(
+                    if (_mealTypes.isNotEmpty) const SettingsCardDivider(),
+                    SettingsLinkTile(
                       icon: Icons.add_circle_outline,
                       iconColor: theme.colorScheme.primary,
                       title: loc.nutritionAddMeal,
@@ -486,10 +479,10 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                   ],
                 ),
                 if (_current != null) ...[
-                  _SectionHeader(text: loc.nutritionSettingsSectionDanger),
-                  _SettingsCard(
+                  SettingsSectionHeader(text: loc.nutritionSettingsSectionDanger),
+                  SettingsCard(
                     children: [
-                      _LinkTile(
+                      SettingsLinkTile(
                         icon: Icons.delete_outline,
                         iconColor: theme.colorScheme.error,
                         titleColor: theme.colorScheme.error,
@@ -506,240 +499,6 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
   }
 }
 
-// =====================================================================
-// Shared visual primitives (mirrors the pattern from settings_screen.dart)
-// =====================================================================
-
-class _SectionHeader extends StatelessWidget {
-  final String text;
-  const _SectionHeader({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
-      child: Text(
-        text,
-        style: theme.textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.5,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingsCard extends StatelessWidget {
-  final List<Widget> children;
-  const _SettingsCard({required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withAlpha(80),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: children,
-      ),
-    );
-  }
-}
-
-class _CardDivider extends StatelessWidget {
-  const _CardDivider();
-  @override
-  Widget build(BuildContext context) {
-    return Divider(
-      height: 1,
-      thickness: 1,
-      indent: 56,
-      endIndent: 16,
-      color: Theme.of(context).colorScheme.outlineVariant.withAlpha(60),
-    );
-  }
-}
-
-class _LinkTile extends StatelessWidget {
-  final IconData icon;
-  final Color? iconColor;
-  final String title;
-  final String? subtitle;
-  final VoidCallback onTap;
-  final Color? titleColor;
-
-  const _LinkTile({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    this.subtitle,
-    required this.onTap,
-    this.titleColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final fg = titleColor ?? theme.colorScheme.onSurface;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: (iconColor ?? theme.colorScheme.primary).withAlpha(25),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                icon,
-                size: 18,
-                color: iconColor ?? theme.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: fg,
-                    ),
-                  ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right,
-              color: theme.colorScheme.onSurfaceVariant,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Row showing a value with a chevron. Tapping opens an editor. When
-/// [value] is null the row reads "[notSetText]" in muted text so the
-/// user immediately sees which fields still need attention.
-class _ValueTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final double? value;
-  final String Function(double) formatValue;
-  final String notSetText;
-  final VoidCallback onTap;
-
-  const _ValueTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.formatValue,
-    required this.notSetText,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final hasValue = value != null;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                icon,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              hasValue ? formatValue(value!) : notSetText,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: hasValue
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant,
-                fontWeight: hasValue ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.chevron_right,
-              color: theme.colorScheme.onSurfaceVariant,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Compact row showing a configured meal type. Tap to open the actions
 /// sheet (rename / delete / move).
 class _MealTypeRow extends StatelessWidget {
   final MealTypeDefinition type;
@@ -787,40 +546,6 @@ class _MealTypeRow extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Inline empty-state row used inside a card (no surrounding card).
-class _EmptyHint extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _EmptyHint({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            color: theme.colorScheme.onSurfaceVariant,
-            size: 18,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1226,7 +951,7 @@ class _MealActionsSheet extends StatelessWidget {
             ),
           ),
           const Divider(height: 1, thickness: 1),
-          _ActionRow(
+          SettingsActionRow(
             icon: Icons.edit_outlined,
             label: loc.nutritionSettingsMealActionRename,
             onTap: () {
@@ -1234,7 +959,7 @@ class _MealActionsSheet extends StatelessWidget {
               onRename();
             },
           ),
-          _ActionRow(
+          SettingsActionRow(
             icon: Icons.arrow_upward,
             label: loc.nutritionSettingsMealActionMoveUp,
             enabled: canMoveUp,
@@ -1243,7 +968,7 @@ class _MealActionsSheet extends StatelessWidget {
               onMoveUp();
             },
           ),
-          _ActionRow(
+          SettingsActionRow(
             icon: Icons.arrow_downward,
             label: loc.nutritionSettingsMealActionMoveDown,
             enabled: canMoveDown,
@@ -1252,7 +977,7 @@ class _MealActionsSheet extends StatelessWidget {
               onMoveDown();
             },
           ),
-          _ActionRow(
+          SettingsActionRow(
             icon: Icons.delete_outline,
             label: loc.nutritionSettingsMealActionDelete,
             destructive: true,
@@ -1262,58 +987,6 @@ class _MealActionsSheet extends StatelessWidget {
             },
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ActionRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool enabled;
-  final bool destructive;
-
-  const _ActionRow({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.enabled = true,
-    this.destructive = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = !enabled
-        ? theme.colorScheme.outline
-        : (destructive ? theme.colorScheme.error : theme.colorScheme.onSurface);
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: color),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                label,
-                style: theme.textTheme.bodyLarge?.copyWith(color: color),
-              ),
-            ),
-            if (!enabled)
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Text(
-                  '—',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.outline,
-                  ),
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }
