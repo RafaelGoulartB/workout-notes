@@ -999,6 +999,8 @@
   "nutritionRemainingLabel": "Restante",
   "nutritionHomeManualFood": "Novo alimento",
   "nutritionHomeSectionTools": "FERRAMENTAS",
+  "nutritionHomeToolHistory": "Histórico",
+  "nutritionHomeToolMeals": "Refeições",
   "nutritionHomeSectionToday": "HOJE",
   "nutritionHomeEmptyMeals": "Nenhuma refeição registrada hoje",
   "nutritionHomeEmptyMealsSubtitle": "Toque em + para adicionar o primeiro alimento",

@@ -998,6 +998,8 @@
   "nutritionRemainingLabel": "Remaining",
   "nutritionHomeManualFood": "New food",
   "nutritionHomeSectionTools": "TOOLS",
+  "nutritionHomeToolHistory": "History",
+  "nutritionHomeToolMeals": "Meals",
   "nutritionHomeSectionToday": "TODAY",
   "nutritionHomeEmptyMeals": "No meals logged today",
   "nutritionHomeEmptyMealsSubtitle": "Tap + to add your first food",

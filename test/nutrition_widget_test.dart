@@ -263,8 +263,8 @@ void main() {
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
     expect(find.byIcon(Icons.calendar_month_outlined), findsOneWidget);
     expect(find.text(loc.nutritionSummaryTitle), findsOneWidget);
-    expect(find.text(loc.nutritionProgressTitle), findsOneWidget);
-    expect(find.text(loc.nutritionSavedMeals), findsOneWidget);
+    expect(find.text(loc.nutritionHomeToolHistory), findsOneWidget);
+    expect(find.text(loc.nutritionHomeToolMeals), findsOneWidget);
     expect(find.text(loc.nutritionFoodLibraryTitle), findsOneWidget);
     expect(find.text(loc.nutritionMealBreakfast), findsNothing);
 

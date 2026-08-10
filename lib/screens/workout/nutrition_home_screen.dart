@@ -746,12 +746,12 @@ class _NutritionToolsGrid extends StatelessWidget {
     final items = [
       _NutritionToolItemData(
         Icons.insights_rounded,
-        loc.nutritionProgressTitle,
+        loc.nutritionHomeToolHistory,
         onProgress,
       ),
       _NutritionToolItemData(
         Icons.bookmark_outline_rounded,
-        loc.nutritionSavedMeals,
+        loc.nutritionHomeToolMeals,
         onSavedMeals,
       ),
       _NutritionToolItemData(
