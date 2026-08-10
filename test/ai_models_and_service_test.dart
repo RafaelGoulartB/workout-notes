@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:workout_notes/models/ai_provider.dart';
 import 'package:workout_notes/models/ai_settings.dart';
 import 'package:workout_notes/models/ai_tool_call.dart';
@@ -11,6 +12,63 @@ import 'package:workout_notes/utils/text_sanitizer.dart';
 import 'package:workout_notes/utils/token_estimator.dart';
 
 void main() {
+  group('AiService vision protocol', () {
+    test('uses Responses API for OpenCode GPT vision models', () async {
+      late http.Request captured;
+      final client = MockClient((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode({
+            'output': [
+              {
+                'type': 'message',
+                'content': [
+                  {'type': 'output_text', 'text': '{"name":"Cola"}'},
+                ],
+              },
+            ],
+            'usage': {'input_tokens': 20, 'output_tokens': 5},
+          }),
+          200,
+        );
+      });
+      final service = AiService(client: client);
+
+      final completion = await service.sendVision(
+        baseUrl: 'https://console.opencode.ai/inference/openai/v1',
+        token: 'token',
+        model: 'gpt-5.6-luna',
+        messages: const [
+          {'role': 'system', 'content': 'Extract JSON.'},
+          {
+            'role': 'user',
+            'content': [
+              {'type': 'text', 'text': 'Read this image.'},
+              {
+                'type': 'image_url',
+                'image_url': {'url': 'data:image/jpeg;base64,/9j/'},
+              },
+            ],
+          },
+        ],
+      );
+
+      expect(
+        captured.url.toString(),
+        'https://console.opencode.ai/inference/openai/v1/responses',
+      );
+      final payload = jsonDecode(captured.body) as Map<String, dynamic>;
+      expect(payload['instructions'], 'Extract JSON.');
+      final input = payload['input'] as List<dynamic>;
+      final content =
+          (input.single as Map<String, dynamic>)['content'] as List<dynamic>;
+      expect(content, contains(containsPair('type', 'input_image')));
+      expect(completion.text, '{"name":"Cola"}');
+      expect(completion.promptTokens, 20);
+      expect(completion.completionTokens, 5);
+    });
+  });
+
   group('AiService.normalizeBaseUri', () {
     test('appends /v1 when missing', () {
       expect(

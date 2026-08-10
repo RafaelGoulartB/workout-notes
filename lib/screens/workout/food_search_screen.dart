@@ -10,13 +10,13 @@ import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
+import 'package:workout_notes/models/nutrition/saved_meal.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 
 import 'barcode_scan_screen.dart';
 import 'food_label_photo_screen.dart';
 import 'manual_food_screen.dart';
-import 'saved_meals_screen.dart';
 
 enum _FoodSearchFilter { all, meals, favorites, myFoods }
 
@@ -34,6 +34,10 @@ class FoodSearchScreen extends StatefulWidget {
   /// localized label).
   final String? mealName;
 
+  /// Day (yyyy-MM-dd) that saved meals are logged into. Defaults to
+  /// today when omitted.
+  final String? date;
+
   const FoodSearchScreen({
     super.key,
     required this.gateway,
@@ -41,6 +45,7 @@ class FoodSearchScreen extends StatefulWidget {
     this.enableManualButton = true,
     this.mealType,
     this.mealName,
+    this.date,
   });
 
   @override
@@ -66,17 +71,21 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   List<FoodSearchResult> _allFoods = const [];
   List<FoodSearchResult> _mealSuggestions = const [];
   List<MealTypeDefinition> _mealTypes = const [];
+  List<SavedMealWithItems> _savedMeals = const [];
   _FoodSearchFilter _activeFilter = _FoodSearchFilter.all;
   String? _selectedMealType;
   String? _selectedMealName;
   bool _suggestionsLoading = true;
   bool _isSearchingRemote = false;
+  bool _isLoggingMeal = false;
   NutritionGatewayError? _remoteError;
   bool _showQueryTooShort = false;
+  late String _date;
 
   @override
   void initState() {
     super.initState();
+    _date = widget.date ?? _todayString();
     _selectedMealType = widget.mealType;
     _selectedMealName = widget.mealName;
     _controller.addListener(_onChanged);
@@ -99,6 +108,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
         widget.repository.getRecentFoods(),
         widget.repository.getAllFoods(),
         widget.repository.getMealTypes(),
+        widget.repository.getSavedMeals(),
         if (_selectedMealType != null)
           widget.repository.getMealSuggestions(_selectedMealType!),
       ]);
@@ -108,9 +118,10 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
         _recents = _attachVariants(results[1]);
         _allFoods = _attachVariants(results[2]);
         _mealTypes = results[3] as List<MealTypeDefinition>;
+        _savedMeals = results[4] as List<SavedMealWithItems>;
         _mealSuggestions = _selectedMealType == null
             ? const []
-            : _attachVariants(results[4]);
+            : _attachVariants(results[5]);
         _suggestionsLoading = false;
       });
     } catch (_) {
@@ -445,14 +456,71 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     );
   }
 
-  Future<void> _openSavedMeals() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => SavedMealsScreen(repository: widget.repository),
-      ),
-    );
-    if (mounted) setState(() => _activeFilter = _FoodSearchFilter.all);
-    await _loadSuggestions();
+  /// Logs a saved meal into the target day. When the search screen is
+  /// bound to a specific meal section (opened from a per-meal row) the
+  /// template goes straight there; otherwise the user picks a section
+  /// from the configured meal catalog.
+  Future<void> _logSavedMeal(SavedMealWithItems meal) async {
+    final loc = AppLocalizations.of(context)!;
+    String mealType;
+    String mealName;
+    if (_selectedMealType != null) {
+      mealType = _selectedMealType!;
+      mealName = _mealLabel(loc);
+    } else if (_mealTypes.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.nutritionSavedMealNoMealTypes)),
+      );
+      return;
+    } else {
+      final picked = await showDialog<String>(
+        context: context,
+        builder: (ctx) => SimpleDialog(
+          title: Text(loc.nutritionSavedMealPickMeal),
+          children: [
+            for (final type in _mealTypes)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(ctx, type.key),
+                child: Text(type.displayName(loc)),
+              ),
+          ],
+        ),
+      );
+      if (picked == null || !mounted) return;
+      final type = _mealTypes.firstWhere((t) => t.key == picked);
+      mealType = type.key;
+      mealName = type.displayName(loc);
+    }
+    if (!mounted) return;
+    setState(() => _isLoggingMeal = true);
+    try {
+      final result = await widget.repository.addSavedMealToDate(
+        date: _date,
+        mealType: mealType,
+        mealName: mealName,
+        savedMealId: meal.meal.id,
+      );
+      if (!mounted) return;
+      final message = result.added == 0
+          ? loc.nutritionSavedMealNothingLogged
+          : (result.skipped > 0
+                ? loc.nutritionSavedMealPartialLogged(
+                    result.added,
+                    result.skipped,
+                  )
+                : loc.nutritionSavedMealLogged(result.added));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+    } finally {
+      if (mounted) setState(() => _isLoggingMeal = false);
+    }
   }
 
   /// Extracts a product code from a raw scan. Handles plain barcodes
@@ -569,7 +637,6 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
               onSelected: (filter) {
                 if (_controller.text.isNotEmpty) _controller.clear();
                 setState(() => _activeFilter = filter);
-                if (filter == _FoodSearchFilter.meals) _openSavedMeals();
               },
             ),
             _FoodSearchActions(
@@ -614,8 +681,13 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
           _activeFilter == _FoodSearchFilter.all && _recents.isNotEmpty;
       final showAllFoods =
           _activeFilter == _FoodSearchFilter.myFoods && _allFoods.isNotEmpty;
+      final showSavedMeals = _activeFilter == _FoodSearchFilter.meals;
       final hasSuggestions =
-          showFavorites || showMeal || showRecents || showAllFoods;
+          showFavorites ||
+          showMeal ||
+          showRecents ||
+          showAllFoods ||
+          (showSavedMeals && _savedMeals.isNotEmpty);
       return CustomScrollView(
         slivers: [
           if (showFavorites) ...[
@@ -692,6 +764,23 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
               ),
             ),
           ],
+          if (showSavedMeals) ...[
+            SliverToBoxAdapter(
+              child: _SectionHeader(text: loc.nutritionSavedMeals),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+              sliver: SliverList.separated(
+                itemCount: _savedMeals.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
+                itemBuilder: (_, index) => _SavedMealCard(
+                  meal: _savedMeals[index],
+                  isLogging: _isLoggingMeal,
+                  onSelected: () => _logSavedMeal(_savedMeals[index]),
+                ),
+              ),
+            ),
+          ],
           if (!hasSuggestions && !_suggestionsLoading)
             SliverFillRemaining(
               hasScrollBody: false,
@@ -702,13 +791,17 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.restaurant_menu_rounded,
+                        showSavedMeals
+                            ? Icons.restaurant_menu_outlined
+                            : Icons.restaurant_menu_rounded,
                         size: 80,
                         color: theme.colorScheme.primary.withAlpha(80),
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        loc.nutritionSearchEmpty,
+                        showSavedMeals
+                            ? loc.nutritionSavedMealsEmptyTitle
+                            : loc.nutritionSearchEmpty,
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -716,7 +809,9 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        loc.nutritionSearchEmptyHint,
+                        showSavedMeals
+                            ? loc.nutritionSavedMealsEmptySubtitle
+                            : loc.nutritionSearchEmptyHint,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyLarge?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
@@ -841,6 +936,13 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
         return loc.nutritionMealSnacks;
     }
     return _selectedMealType ?? '';
+  }
+
+  static String _todayString() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day)
+        .toIso8601String()
+        .substring(0, 10);
   }
 }
 
@@ -1082,6 +1184,146 @@ class _FoodCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// A saved meal template shown under the "Meals" filter. Tapping the
+/// card logs the whole template into the target day's meal section.
+class _SavedMealCard extends StatelessWidget {
+  final SavedMealWithItems meal;
+  final bool isLogging;
+  final VoidCallback onSelected;
+
+  const _SavedMealCard({
+    required this.meal,
+    required this.isLogging,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final totals = meal.totals;
+    final subtitle = <String>[
+      if (meal.meal.mealType != null)
+        _mealTypeLabel(loc, meal.meal.mealType!),
+      if (meal.meal.portions != 1)
+        loc.nutritionSavedMealPortionsLabel(_format(meal.meal.portions)),
+      if (totals?.calories != null)
+        loc.nutritionConsumedKcal(_format(totals!.calories!)),
+    ].join(' · ');
+    final macros = <String>[
+      if (totals?.proteinG != null) 'P ${_format(totals!.proteinG!)} g',
+      if (totals?.carbsG != null) 'C ${_format(totals!.carbsG!)} g',
+      if (totals?.fatG != null) 'G ${_format(totals!.fatG!)} g',
+    ].join(' · ');
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: isLogging ? null : onSelected,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(9),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withAlpha(90),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.restaurant_menu,
+                  color: theme.colorScheme.onPrimaryContainer,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      meal.meal.name,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    if (macros.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        macros,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              if (isLogging)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withAlpha(65),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.add_rounded,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _mealTypeLabel(AppLocalizations loc, String type) {
+    switch (type) {
+      case MealType.breakfast:
+        return loc.nutritionMealBreakfast;
+      case MealType.lunch:
+        return loc.nutritionMealLunch;
+      case MealType.dinner:
+        return loc.nutritionMealDinner;
+      case MealType.snacks:
+        return loc.nutritionMealSnacks;
+    }
+    return type;
+  }
+
+  static String _format(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(1);
   }
 }
 

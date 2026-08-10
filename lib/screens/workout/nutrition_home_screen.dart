@@ -166,6 +166,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
           repository: _repository,
           mealType: mealType,
           mealName: mealLabel,
+          date: _dateString(DateTime.now()),
         ),
       ),
     );
@@ -1283,6 +1284,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
           repository: _repository,
           mealType: mealType,
           mealName: mealLabel,
+          date: _dateString(_selectedDate),
         ),
       ),
     );

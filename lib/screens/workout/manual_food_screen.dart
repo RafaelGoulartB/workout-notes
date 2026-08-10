@@ -80,8 +80,8 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
         _fillNumber(_sugarsController, variant.values.sugarsG);
         _fillNumber(_sodiumController, variant.values.sodiumMg);
         _isEstimated = variant.isEstimated;
-        for (final serving in existing.servings[variant.id] ??
-            const <FoodServing>[]) {
+        for (final serving
+            in existing.servings[variant.id] ?? const <FoodServing>[]) {
           _servings.add(_servingDraftFromFoodServing(serving));
         }
       }
@@ -251,9 +251,7 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
     return draft;
   }
 
-  static _ManualServingDraft _servingDraftFromFoodServing(
-    FoodServing serving,
-  ) {
+  static _ManualServingDraft _servingDraftFromFoodServing(FoodServing serving) {
     final draft = _ManualServingDraft();
     draft.labelController.text = serving.label;
     draft.quantityController.text = _formatAmount(serving.quantity);
@@ -377,10 +375,8 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
                         child: _NumberField(
                           controller: _referenceAmountController,
                           label: loc.nutritionManualReference,
-                          validator: (v) => _validateNumber(
-                            v,
-                            allowZero: false,
-                          ),
+                          validator: (v) =>
+                              _validateNumber(v, allowZero: false),
                           allowDecimal: true,
                         ),
                       ),
@@ -463,12 +459,15 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
                           .withAlpha(60),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: SwitchListTile(
-                      value: _isEstimated,
-                      onChanged: (v) => setState(() => _isEstimated = v),
-                      title: Text(loc.nutritionManualIsEstimated),
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: SwitchListTile(
+                        value: _isEstimated,
+                        onChanged: (v) => setState(() => _isEstimated = v),
+                        title: Text(loc.nutritionManualIsEstimated),
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                      ),
                     ),
                   ),
                 ],
@@ -496,8 +495,7 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
                             .withAlpha(50),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: theme.colorScheme.outlineVariant
-                              .withAlpha(80),
+                          color: theme.colorScheme.outlineVariant.withAlpha(80),
                         ),
                       ),
                       child: Column(
@@ -717,8 +715,8 @@ class _ManualServingCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor:
-                        theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+                    fillColor: theme.colorScheme.surfaceContainerHighest
+                        .withAlpha(60),
                   ),
                 ),
                 const SizedBox(height: 12),

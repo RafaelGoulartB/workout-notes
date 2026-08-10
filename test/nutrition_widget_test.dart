@@ -13,6 +13,7 @@ import 'package:workout_notes/models/nutrition/food_variant.dart';
 import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/screens/workout/food_library_screen.dart';
 import 'package:workout_notes/screens/workout/food_quantity_sheet.dart';
 import 'package:workout_notes/screens/workout/food_search_screen.dart';
 import 'package:workout_notes/screens/workout/nutrition_home_screen.dart';
@@ -321,6 +322,23 @@ void main() {
     },
   );
 
+  testWidgets('Food library add menu offers AI scan and manual entry', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(FoodLibraryScreen(repository: repository)));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text(loc.nutritionScanMeal), findsOneWidget);
+    expect(find.text(loc.nutritionAddManually), findsOneWidget);
+  });
+
   testWidgets('Remote search only runs after an explicit submit', (
     tester,
   ) async {
@@ -529,6 +547,57 @@ void main() {
     );
     expect(save.onPressed, isNotNull);
   });
+
+  testWidgets(
+    'Falls back to the labelled value when the equivalence is the wrong unit',
+    (tester) async {
+      final now = DateTime.now();
+      final food = Food(
+        id: 'food',
+        source: FoodSource.manual,
+        externalId: 'food',
+        name: 'Coca-Cola Sabor Original',
+        searchName: 'coca cola',
+        brand: 'Coca-Cola',
+        fetchedAt: now,
+      );
+      const variant = FoodVariant(
+        id: 'variant',
+        foodId: 'food',
+        referenceAmount: 100,
+        referenceUnit: 'ml',
+        values: NutritionValues(calories: 42),
+      );
+      // Real-world bad data: the source lists only the gram weight of
+      // the can, but the label clearly says "250 ml". The sheet must
+      // treat the labelled value as a volume equivalence.
+      const serving = FoodServing(
+        id: 'serving',
+        foodVariantId: 'variant',
+        label: '250 ml',
+        unit: 'serving',
+        gramsEquivalent: 250,
+      );
+      await tester.pumpWidget(
+        _app(
+          Scaffold(
+            body: FoodQuantitySheet(
+              food: food,
+              primaryVariant: variant,
+              servings: const [serving],
+            ),
+          ),
+        ),
+      );
+      // Default unit is ml (per 100 ml), so the save button must be
+      // enabled without the user touching anything.
+      final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+      final save = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, loc.nutritionSave),
+      );
+      expect(save.onPressed, isNotNull);
+    },
+  );
 
   testWidgets('MainShell renders three tabs (Workout, Sleep, Nutrition)', (
     tester,

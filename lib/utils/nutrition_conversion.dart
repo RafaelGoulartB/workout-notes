@@ -67,23 +67,72 @@ class NutritionConversion {
         throw NutritionConversionException('serving_equivalence_missing');
       }
       if (normalizedRef == 'g') {
-        if (!serving.hasGramConversion) {
-          throw NutritionConversionException('grams_equivalence_missing');
+        if (serving.hasGramConversion) {
+          final grams = quantity * serving.gramsEquivalent!;
+          return grams / referenceAmount;
         }
-        final grams = quantity * serving.gramsEquivalent!;
-        return grams / referenceAmount;
+        final inferred = _inferFromLabel(serving.label, 'g');
+        if (inferred != null) {
+          final grams = quantity * inferred;
+          return grams / referenceAmount;
+        }
+        throw NutritionConversionException('grams_equivalence_missing');
       }
       if (normalizedRef == 'ml') {
-        if (!serving.hasMlConversion) {
-          throw NutritionConversionException('ml_equivalence_missing');
+        if (serving.hasMlConversion) {
+          final ml = quantity * serving.mlEquivalent!;
+          return ml / referenceAmount;
         }
-        final ml = quantity * serving.mlEquivalent!;
-        return ml / referenceAmount;
+        final inferred = _inferFromLabel(serving.label, 'ml');
+        if (inferred != null) {
+          final ml = quantity * inferred;
+          return ml / referenceAmount;
+        }
+        throw NutritionConversionException('ml_equivalence_missing');
       }
       throw NutritionConversionException('unsupported_reference_unit');
     }
 
     throw NutritionConversionException('unsupported_unit_combination');
+  }
+
+  /// Best-effort fallback: when a serving has no explicit
+  /// [FoodServing.gramsEquivalent] / [FoodServing.mlEquivalent] for
+  /// the current reference unit, try to read the value out of the
+  /// serving's free-form label (e.g. "250 ml", "1 fatia · 30 g").
+  /// This handles the common case where the source data lists only
+  /// one of the two equivalences (e.g. a Coca-Cola can that stores
+  /// `gramsEquivalent: 250` but whose label clearly reads "250 ml").
+  ///
+  /// Returns null when no confident match is found, in which case the
+  /// caller surfaces the usual `*_equivalence_missing` error.
+  static double? _inferFromLabel(String label, String refUnit) {
+    return inferEquivalenceFromLabel(label, refUnit);
+  }
+
+  /// Public version of [_inferFromLabel] so the UI can preview the
+  /// inferred value on serving chips (e.g. "250 ml · ~250 ml") before
+  /// the user taps one.
+  static double? inferEquivalenceFromLabel(String label, String refUnit) {
+    final haystack = label.toLowerCase();
+    final needle = refUnit.toLowerCase();
+    // Match "<number> <unit>" or "<unit> <number>" so labels like
+    // "250 ml", "250ml", "ml 250" all work.
+    final patterns = <RegExp>[
+      RegExp(r'(\d+(?:[.,]\d+)?)\s*' + RegExp.escape(needle) + r'\b'),
+      RegExp(r'\b' + RegExp.escape(needle) + r'\s*(\d+(?:[.,]\d+)?)'),
+    ];
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(haystack);
+      if (match == null) continue;
+      final raw = match.group(1);
+      if (raw == null) continue;
+      final value = double.tryParse(raw.replaceAll(',', '.'));
+      if (value != null && value > 0 && value.isFinite) {
+        return value;
+      }
+    }
+    return null;
   }
 
   /// Computes the consumed nutrition values for this conversion.

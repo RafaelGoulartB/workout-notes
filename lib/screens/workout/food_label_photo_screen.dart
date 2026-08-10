@@ -10,6 +10,7 @@ import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/services/ai_food_label_service.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
+import 'package:workout_notes/utils/ai_error_localizer.dart';
 
 import 'ai_settings_screen.dart';
 import 'manual_food_screen.dart';
@@ -36,6 +37,7 @@ class _FoodLabelPhotoScreenState extends State<FoodLabelPhotoScreen> {
   final ImagePicker _picker = ImagePicker();
   late final AiFoodLabelService _service;
   Uint8List? _imageBytes;
+  String _imageMimeType = 'image/jpeg';
   bool _isAnalyzing = false;
 
   @override
@@ -57,8 +59,12 @@ class _FoodLabelPhotoScreenState extends State<FoodLabelPhotoScreen> {
       );
       if (file == null) return;
       final bytes = await file.readAsBytes();
+      final mimeType = _supportedImageMimeType(file.mimeType, bytes);
       if (!mounted) return;
-      setState(() => _imageBytes = bytes);
+      setState(() {
+        _imageBytes = bytes;
+        _imageMimeType = mimeType;
+      });
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -73,7 +79,10 @@ class _FoodLabelPhotoScreenState extends State<FoodLabelPhotoScreen> {
     if (bytes == null || _isAnalyzing) return;
     setState(() => _isAnalyzing = true);
     try {
-      final draft = await _service.analyze(imageBytes: bytes);
+      final draft = await _service.analyze(
+        imageBytes: bytes,
+        mimeType: _imageMimeType,
+      );
       if (!mounted) return;
       final created = await Navigator.of(context).push<Food>(
         MaterialPageRoute(
@@ -102,7 +111,9 @@ class _FoodLabelPhotoScreenState extends State<FoodLabelPhotoScreen> {
     } on AiFoodLabelException catch (e) {
       if (!mounted) return;
       _showAnalysisError(e.code);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('FoodLabelPhotoScreen: unexpected analysis error: $error');
+      debugPrintStack(stackTrace: stackTrace);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -144,10 +155,46 @@ class _FoodLabelPhotoScreenState extends State<FoodLabelPhotoScreen> {
         content: Text(
           code == 'parse_failed' || code == 'no_content'
               ? loc.nutritionPhotoInvalid
-              : loc.nutritionPhotoError,
+              : localizeAiError('ai_error:$code', loc),
         ),
       ),
     );
+  }
+
+  static String _supportedImageMimeType(
+    String? reportedMimeType,
+    Uint8List bytes,
+  ) {
+    const supported = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'};
+    final normalized = reportedMimeType?.trim().toLowerCase();
+    if (normalized != null && supported.contains(normalized)) {
+      return normalized;
+    }
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xff &&
+        bytes[1] == 0xd8 &&
+        bytes[2] == 0xff) {
+      return 'image/jpeg';
+    }
+    if (bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4e &&
+        bytes[3] == 0x47) {
+      return 'image/png';
+    }
+    if (bytes.length >= 12 &&
+        String.fromCharCodes(bytes.sublist(0, 4)) == 'RIFF' &&
+        String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP') {
+      return 'image/webp';
+    }
+    if (bytes.length >= 6 &&
+        String.fromCharCodes(bytes.sublist(0, 3)) == 'GIF') {
+      return 'image/gif';
+    }
+    // image_picker applies JPEG compression on supported mobile sources. Keep
+    // JPEG as the compatibility fallback when the platform omits a MIME type.
+    return 'image/jpeg';
   }
 
   @override

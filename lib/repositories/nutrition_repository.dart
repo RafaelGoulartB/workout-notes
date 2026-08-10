@@ -1537,11 +1537,66 @@ class NutritionRepository extends BaseRepository {
     List<SavedMealItem> items,
     double portions,
   ) async {
-    if (items.isEmpty) {
-      return (totals: null, byItem: <String, NutritionValues>{});
+    final records = [
+      for (final item in items)
+        (
+          foodVariantId: item.foodVariantId,
+          quantity: item.quantity,
+          unit: item.unit,
+        ),
+    ];
+    final computed = await _computeSavedMealTotalsFromRecords(
+      db,
+      records,
+      portions,
+    );
+    final byItem = <String, NutritionValues>{};
+    for (var i = 0; i < items.length; i++) {
+      final v = computed.byIndex[i];
+      if (v != null) byItem[items[i].id] = v;
+    }
+    return (totals: computed.totals, byItem: byItem);
+  }
+
+  /// Public variant of [_computeSavedMealTotals] that operates on the
+  /// editor's in-memory [SavedMealItemDraft] list (the meal hasn't been
+  /// saved yet). Returns `totals == null` when no item could be
+  /// resolved.
+  Future<NutritionValues?> previewSavedMealTotals({
+    required List<SavedMealItemDraft> items,
+    required double portions,
+  }) async {
+    final db = await this.db;
+    final records = [
+      for (final item in items)
+        (
+          foodVariantId: item.foodVariantId,
+          quantity: item.quantity,
+          unit: item.unit,
+        ),
+    ];
+    final computed = await _computeSavedMealTotalsFromRecords(
+      db,
+      records,
+      portions,
+    );
+    return computed.totals;
+  }
+
+  /// Inner computation shared by [_computeSavedMealTotals] (saved items)
+  /// and [previewSavedMealTotals] (editor drafts). Each record is the
+  /// minimum shape needed to replay the conversion.
+  Future<({NutritionValues? totals, Map<int, NutritionValues> byIndex})>
+  _computeSavedMealTotalsFromRecords(
+    DatabaseExecutor db,
+    List<({String? foodVariantId, double quantity, String unit})> records,
+    double portions,
+  ) async {
+    if (records.isEmpty) {
+      return (totals: null, byIndex: <int, NutritionValues>{});
     }
     final variantIds = <String>[];
-    for (final item in items) {
+    for (final item in records) {
       if (item.foodVariantId != null) variantIds.add(item.foodVariantId!);
     }
     final variants = <String, FoodVariant>{};
@@ -1573,19 +1628,20 @@ class NutritionRepository extends BaseRepository {
     var sugarsG = 0.0;
     var sodiumMg = 0.0;
     var hasAny = false;
-    final byItem = <String, NutritionValues>{};
-    for (final item in items) {
-      final variant = item.foodVariantId == null
+    final byIndex = <int, NutritionValues>{};
+    for (var i = 0; i < records.length; i++) {
+      final record = records[i];
+      final variant = record.foodVariantId == null
           ? null
-          : variants[item.foodVariantId];
+          : variants[record.foodVariantId];
       if (variant == null) continue;
       final servings = servingsByVariant[variant.id] ?? const <FoodServing>[];
       final serving = servings.firstWhereOrNull(
-        (s) => s.label == item.unit || s.unit == item.unit,
+        (s) => s.label == record.unit || s.unit == record.unit,
       );
       final conversion = NutritionConversion(
-        quantity: item.quantity * portions,
-        unit: item.unit,
+        quantity: record.quantity * portions,
+        unit: record.unit,
         referenceAmount: variant.referenceAmount,
         referenceUnit: variant.referenceUnit,
         serving: serving,
@@ -1597,7 +1653,7 @@ class NutritionRepository extends BaseRepository {
       } catch (_) {
         continue;
       }
-      byItem[item.id] = consumed;
+      byIndex[i] = consumed;
       calories += consumed.calories ?? 0;
       proteinG += consumed.proteinG ?? 0;
       carbsG += consumed.carbsG ?? 0;
@@ -1607,7 +1663,7 @@ class NutritionRepository extends BaseRepository {
       sodiumMg += consumed.sodiumMg ?? 0;
       hasAny = true;
     }
-    if (!hasAny) return (totals: null, byItem: byItem);
+    if (!hasAny) return (totals: null, byIndex: byIndex);
     return (
       totals: NutritionValues(
         calories: calories,
@@ -1618,7 +1674,7 @@ class NutritionRepository extends BaseRepository {
         sugarsG: sugarsG,
         sodiumMg: sodiumMg,
       ),
-      byItem: byItem,
+      byIndex: byIndex,
     );
   }
 

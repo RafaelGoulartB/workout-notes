@@ -214,6 +214,96 @@ void main() {
       expect(loaded.totals!.calories, 60);
     });
 
+    test(
+      'previewSavedMealTotals returns live totals for unsaved drafts',
+      () async {
+        final rice = await createFood(
+          'Arroz',
+          calories: 130,
+          protein: 0,
+          carbs: 28,
+          fat: 0,
+        );
+        final chicken = await createFood(
+          'Frango',
+          calories: 165,
+          protein: 31,
+          fat: 3.6,
+        );
+        // Mirror the editor's in-memory drafts: no id, no
+        // persisted saved_meal row.
+        final totals = await repository.previewSavedMealTotals(
+          portions: 1,
+          items: [
+            SavedMealItemDraft(
+              foodId: rice.id,
+              foodVariantId: (await variantOf(rice)).id,
+              foodNameSnapshot: rice.name,
+              quantity: 200,
+              unit: 'g',
+            ),
+            SavedMealItemDraft(
+              foodId: chicken.id,
+              foodVariantId: (await variantOf(chicken)).id,
+              foodNameSnapshot: chicken.name,
+              quantity: 150,
+              unit: 'g',
+            ),
+          ],
+        );
+        expect(totals, isNotNull);
+        // 200 g rice (2 × 130 kcal, 2 × 28 g carbs) + 150 g chicken
+        // (1.5 × 165 kcal, 1.5 × 31 g protein, 1.5 × 3.6 g fat, plus
+        // the default 10 g carbs per 100 g of frango).
+        expect(totals!.calories, closeTo(260 + 247.5, 0.01));
+        expect(totals.carbsG, closeTo(56 + 15, 0.01));
+        expect(totals.proteinG, closeTo(46.5, 0.01));
+        expect(totals.fatG, closeTo(5.4, 0.01));
+      },
+    );
+
+    test(
+      'previewSavedMealTotals scales drafts by portions and returns null '
+      'when no item resolves',
+      () async {
+        final rice = await createFood('Arroz', calories: 130);
+        // Empty list -> null totals.
+        expect(
+          await repository.previewSavedMealTotals(
+            portions: 2,
+            items: const [],
+          ),
+          isNull,
+        );
+        // Items without a food/variant id contribute nothing -> null.
+        final totals = await repository.previewSavedMealTotals(
+          portions: 2,
+          items: [
+            SavedMealItemDraft(
+              foodNameSnapshot: 'Invisível',
+              quantity: 100,
+              unit: 'g',
+            ),
+          ],
+        );
+        expect(totals, isNull);
+        // Portions multiplier still applies when an item resolves.
+        final scaled = await repository.previewSavedMealTotals(
+          portions: 2,
+          items: [
+            SavedMealItemDraft(
+              foodId: rice.id,
+              foodVariantId: (await variantOf(rice)).id,
+              foodNameSnapshot: rice.name,
+              quantity: 100,
+              unit: 'g',
+            ),
+          ],
+        );
+        expect(scaled!.calories, closeTo(260, 0.01));
+      },
+    );
+
     test('validates name and portions', () async {
       await expectLater(
         repository.saveSavedMeal(name: '  '),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -12,6 +14,12 @@ import 'package:workout_notes/services/open_food_facts_gateway.dart';
 
 import 'food_quantity_sheet.dart';
 import 'food_search_screen.dart';
+
+/// Macro accent colors shared with `nutrition_home_screen.dart` so the
+/// editor's summary and the home screen render the same color tokens.
+const Color _carbMacroColor = Color(0xFF20A39E);
+const Color _proteinMacroColor = Color(0xFFF29E38);
+const Color _fatMacroColor = Color(0xFF8E44AD);
 
 /// One ingredient being edited, before it is persisted.
 class _Ingredient {
@@ -73,6 +81,19 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
   late List<_Ingredient> _ingredients;
   bool _isSaving = false;
 
+  /// Live-computed nutrition totals for the current ingredients. `null`
+  /// means there are no ingredients, or none of them could be resolved
+  /// against the food cache.
+  NutritionValues? _totals;
+
+  /// `true` while a totals recomputation is running. Used to render the
+  /// card placeholder without flickering between recomputes.
+  bool _isComputingTotals = false;
+
+  /// Debounce timer for the portions text field so the totals card does
+  /// not refetch on every keystroke.
+  Timer? _portionsDebounce;
+
   @override
   void initState() {
     super.initState();
@@ -87,13 +108,65 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
           .replaceAll(',', '.');
     }
     _ingredients = widget.initialItems.map(_Ingredient.fromDraft).toList();
+    _portionsController.addListener(_onPortionsChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _recomputeTotals());
   }
 
   @override
   void dispose() {
+    _portionsDebounce?.cancel();
+    _portionsController.removeListener(_onPortionsChanged);
     _nameController.dispose();
     _portionsController.dispose();
     super.dispose();
+  }
+
+  void _onPortionsChanged() {
+    _portionsDebounce?.cancel();
+    _portionsDebounce = Timer(
+      const Duration(milliseconds: 250),
+      _recomputeTotals,
+    );
+  }
+
+  Future<void> _recomputeTotals() async {
+    final portions = _currentPortions();
+    final drafts = _ingredients
+        .map(
+          (i) => SavedMealItemDraft(
+            foodId: i.foodId,
+            foodVariantId: i.foodVariantId,
+            foodNameSnapshot: i.name,
+            brandSnapshot: i.brand,
+            quantity: i.quantity,
+            unit: i.unit,
+          ),
+        )
+        .toList();
+    if (!mounted) return;
+    setState(() => _isComputingTotals = true);
+    try {
+      final totals = await widget.repository.previewSavedMealTotals(
+        items: drafts,
+        portions: portions,
+      );
+      if (!mounted) return;
+      setState(() {
+        _totals = totals;
+        _isComputingTotals = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isComputingTotals = false);
+    }
+  }
+
+  double _currentPortions() {
+    final parsed = double.tryParse(
+      _portionsController.text.trim().replaceAll(',', '.'),
+    );
+    if (parsed == null || parsed <= 0 || !parsed.isFinite) return 1;
+    return parsed;
   }
 
   Future<void> _addIngredient() async {
@@ -128,6 +201,7 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
         ),
       );
     });
+    _recomputeTotals();
   }
 
   Future<void> _editIngredient(_Ingredient ingredient) async {
@@ -157,6 +231,7 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
       ingredient.quantity = quantity.conversion.quantity;
       ingredient.unit = quantity.conversion.unit;
     });
+    _recomputeTotals();
   }
 
   /// Builds a minimal [MealLogItem] from an ingredient so the quantity
@@ -203,6 +278,7 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
 
   void _removeIngredient(_Ingredient ingredient) {
     setState(() => _ingredients.remove(ingredient));
+    _recomputeTotals();
   }
 
   Future<void> _save() async {
@@ -315,6 +391,13 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
                 }
                 return null;
               },
+            ),
+            const SizedBox(height: 20),
+            _NutritionTotalsCard(
+              totals: _totals,
+              portions: _currentPortions(),
+              isComputing: _isComputingTotals,
+              hasIngredients: _ingredients.isNotEmpty,
             ),
             const SizedBox(height: 20),
             Row(
@@ -446,5 +529,295 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
       return value.toStringAsFixed(0);
     }
     return value.toStringAsFixed(2);
+  }
+}
+
+/// Card that summarises the live nutrition totals for the saved meal
+/// being edited. Mirrors the visual language of the home screen
+/// `_NutritionMacroStat` (same colors, same label hierarchy) so the two
+/// screens feel like part of the same product.
+class _NutritionTotalsCard extends StatelessWidget {
+  final NutritionValues? totals;
+  final double portions;
+  final bool isComputing;
+  final bool hasIngredients;
+
+  const _NutritionTotalsCard({
+    required this.totals,
+    required this.portions,
+    required this.isComputing,
+    required this.hasIngredients,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    final showTotals = totals != null;
+    final showPerPortion = portions > 1;
+
+    return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant.withAlpha(80),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.local_fire_department_outlined,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  loc.nutritionSavedMealTotalsTitle,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (isComputing) ...[
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.5,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (!showTotals)
+              Text(
+                hasIngredients
+                    ? loc.nutritionSavedMealTotalsPartial
+                    : loc.nutritionSavedMealTotalsEmpty,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              )
+            else ...[
+              _CaloriesRow(calories: totals!.calories ?? 0),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MacroColumn(
+                      label: loc.nutritionProgressProtein,
+                      grams: totals!.proteinG ?? 0,
+                      color: _proteinMacroColor,
+                    ),
+                  ),
+                  _MacroDivider(theme: theme),
+                  Expanded(
+                    child: _MacroColumn(
+                      label: loc.nutritionProgressCarbs,
+                      grams: totals!.carbsG ?? 0,
+                      color: _carbMacroColor,
+                    ),
+                  ),
+                  _MacroDivider(theme: theme),
+                  Expanded(
+                    child: _MacroColumn(
+                      label: loc.nutritionProgressFat,
+                      grams: totals!.fatG ?? 0,
+                      color: _fatMacroColor,
+                    ),
+                  ),
+                ],
+              ),
+              if (showPerPortion) ...[
+                const SizedBox(height: 14),
+                Container(
+                  height: 1,
+                  color: theme.colorScheme.outlineVariant.withAlpha(60),
+                ),
+                const SizedBox(height: 10),
+                _PerPortionRow(
+                  totals: totals!,
+                  portions: portions,
+                  label: loc.nutritionSavedMealTotalsPerPortion,
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CaloriesRow extends StatelessWidget {
+  final double calories;
+
+  const _CaloriesRow({required this.calories});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(
+          _formatKcal(calories),
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+            height: 1.0,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          'kcal',
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _formatKcal(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(1);
+  }
+}
+
+class _MacroColumn extends StatelessWidget {
+  final String label;
+  final double grams;
+  final Color color;
+
+  const _MacroColumn({
+    required this.label,
+    required this.grams,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              _formatGrams(grams),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                height: 1.0,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Text(
+              'g',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: grams > 0 ? 1.0 : 0.0,
+            minHeight: 3,
+            backgroundColor: color.withAlpha(35),
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _formatGrams(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(1);
+  }
+}
+
+class _MacroDivider extends StatelessWidget {
+  final ThemeData theme;
+  const _MacroDivider({required this.theme});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 36,
+      margin: const EdgeInsets.symmetric(horizontal: 6),
+      color: theme.colorScheme.outlineVariant.withAlpha(70),
+    );
+  }
+}
+
+class _PerPortionRow extends StatelessWidget {
+  final NutritionValues totals;
+  final double portions;
+  final String label;
+
+  const _PerPortionRow({
+    required this.totals,
+    required this.portions,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final parts = <String>[];
+    final kcal = (totals.calories ?? 0) / portions;
+    parts.add('${_formatGrams(kcal)} kcal');
+    final protein = (totals.proteinG ?? 0) / portions;
+    final carbs = (totals.carbsG ?? 0) / portions;
+    final fat = (totals.fatG ?? 0) / portions;
+    if (protein > 0) parts.add('P ${_formatGrams(protein)} g');
+    if (carbs > 0) parts.add('C ${_formatGrams(carbs)} g');
+    if (fat > 0) parts.add('G ${_formatGrams(fat)} g');
+    return RichText(
+      text: TextSpan(
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+        children: [
+          TextSpan(
+            text: '$label: ',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          TextSpan(text: parts.join(' · ')),
+        ],
+      ),
+    );
+  }
+
+  static String _formatGrams(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(1);
   }
 }

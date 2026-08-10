@@ -96,8 +96,7 @@ void main() {
       expect(bulk.calories, (maintain.tdee * 1.1).roundToDouble());
     });
 
-    test('macro split: protein and fat follow g/kg, carbs absorb the rest',
-        () {
+    test('macro split: protein and fat follow g/kg, carbs absorb the rest', () {
       final suggestion = suggestNutritionGoal(
         weightKg: 80,
         heightCm: 175,
@@ -109,11 +108,50 @@ void main() {
       expect(suggestion.proteinG, (80 * 2.2).roundToDouble());
       expect(suggestion.fatG, (80 * 0.8).roundToDouble());
       final expectedCarbs =
-          ((suggestion.calories - suggestion.proteinG * 4 - suggestion.fatG * 9) /
+          ((suggestion.calories -
+                      suggestion.proteinG * 4 -
+                      suggestion.fatG * 9) /
                   4)
               .clamp(0, double.infinity)
               .roundToDouble();
       expect(suggestion.carbsG, expectedCarbs);
+    });
+
+    test('custom macro ratios override the defaults for the objective', () {
+      final suggestion = suggestNutritionGoal(
+        weightKg: 80,
+        heightCm: 175,
+        ageYears: 30,
+        isMale: true,
+        activity: ActivityLevel.moderate,
+        objective: NutritionObjective.maintenance,
+        macroRatios: const NutritionMacroRatios(
+          proteinPerKg: 2.1,
+          fatPerKg: 0.7,
+        ),
+      );
+
+      expect(suggestion.proteinG, 168);
+      expect(suggestion.fatG, 56);
+      expect(
+        suggestion.carbsG,
+        ((suggestion.calories - 168 * 4 - 56 * 9) / 4).roundToDouble(),
+      );
+    });
+
+    test('rejects non-positive custom macro ratios', () {
+      expect(
+        () => suggestNutritionGoal(
+          weightKg: 80,
+          heightCm: 175,
+          ageYears: 30,
+          isMale: true,
+          activity: ActivityLevel.moderate,
+          objective: NutritionObjective.maintenance,
+          macroRatios: const NutritionMacroRatios(proteinPerKg: 0, fatPerKg: 1),
+        ),
+        throwsArgumentError,
+      );
     });
 
     test('carbs never go negative even for a heavy fat/protein split', () {

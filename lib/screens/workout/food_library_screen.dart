@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
+import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 
+import 'food_label_photo_screen.dart';
 import 'manual_food_screen.dart';
 
 enum _FoodLibraryAction { edit, delete }
+
+enum _FoodLibraryCreateAction { scanWithAi, manual }
 
 /// Browsable list of every food stored on the device.
 class FoodLibraryScreen extends StatefulWidget {
@@ -53,6 +57,15 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
     final created = await Navigator.of(context).push<Food>(
       MaterialPageRoute(
         builder: (_) => ManualFoodScreen(repository: widget.repository),
+      ),
+    );
+    if (created != null) await _load();
+  }
+
+  Future<void> _scanFoodWithAi() async {
+    final created = await Navigator.of(context).push<NutritionSelection>(
+      MaterialPageRoute(
+        builder: (_) => FoodLabelPhotoScreen(repository: widget.repository),
       ),
     );
     if (created != null) await _load();
@@ -136,10 +149,51 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
       appBar: AppBar(
         title: Text(loc.nutritionFoodLibraryTitle),
         actions: [
-          IconButton(
-            tooltip: loc.nutritionHomeManualFood,
-            onPressed: _createFood,
+          PopupMenuButton<_FoodLibraryCreateAction>(
+            tooltip: loc.nutritionAddItem,
             icon: const Icon(Icons.add_rounded),
+            onSelected: (action) {
+              switch (action) {
+                case _FoodLibraryCreateAction.scanWithAi:
+                  _scanFoodWithAi();
+                case _FoodLibraryCreateAction.manual:
+                  _createFood();
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: _FoodLibraryCreateAction.scanWithAi,
+                child: Row(
+                  children: [
+                    const Icon(Icons.document_scanner_outlined),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        loc.nutritionScanMeal,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: _FoodLibraryCreateAction.manual,
+                child: Row(
+                  children: [
+                    const Icon(Icons.edit_outlined),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        loc.nutritionAddManually,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

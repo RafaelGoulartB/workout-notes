@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
 import 'package:workout_notes/services/ai_service.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
@@ -56,8 +57,8 @@ Regras:
   /// Analyzes [imageBytes] and returns the extracted food data.
   ///
   /// Throws [AiFoodLabelException] with codes:
-  /// `not_configured` (no AI provider), `no_model`, `no_content`,
-  /// `parse_failed` or the underlying HTTP errors from [AiService].
+  /// `not_configured` (no AI provider), `missing_token`, `no_model`,
+  /// `no_content`, `parse_failed` or an error code from [AiService].
   Future<AiFoodLabelDraft> analyze({
     required Uint8List imageBytes,
     String mimeType = 'image/jpeg',
@@ -74,6 +75,12 @@ Regras:
       throw const AiFoodLabelException('no_model', 'No model selected');
     }
     final token = await settings.getToken(provider.id) ?? '';
+    // Keep this flow consistent with AiChatService. Without this check a
+    // secure-storage read failure became an unauthenticated request and the
+    // screen hid the resulting 401 behind a generic label-analysis error.
+    if (token.isEmpty) {
+      throw const AiFoodLabelException('missing_token', 'Missing API token');
+    }
 
     final base64 = base64Encode(imageBytes);
     final messages = <Map<String, dynamic>>[
@@ -93,12 +100,38 @@ Regras:
       },
     ];
 
-    final completion = await service.sendChat(
-      baseUrl: provider.baseUrl,
-      token: token,
-      model: model,
-      messages: messages,
-    );
+    if (kDebugMode) {
+      debugPrint(
+        'AiFoodLabelService: sending vision request '
+        '(provider=${provider.name}, model=$model, mimeType=$mimeType, '
+        'imageBytes=${imageBytes.length})',
+      );
+    }
+
+    late final AiChatCompletion completion;
+    try {
+      completion = await service.sendVision(
+        baseUrl: provider.baseUrl,
+        token: token,
+        model: model,
+        messages: messages,
+      );
+    } on AiServiceException catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('AiFoodLabelService: request failed: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+      throw AiFoodLabelException(error.code ?? 'request_failed', error.message);
+    } on TimeoutException catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('AiFoodLabelService: request timed out: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+      throw const AiFoodLabelException('timeout', 'AI request timed out');
+    }
+    if (kDebugMode) {
+      debugPrint('AiFoodLabelService: vision response received');
+    }
     final text = completion.text;
     if (text == null || text.trim().isEmpty) {
       throw const AiFoodLabelException('no_content', 'Empty AI response');

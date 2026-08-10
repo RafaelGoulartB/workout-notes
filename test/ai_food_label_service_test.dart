@@ -49,9 +49,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({});
     prefs = await SharedPreferences.getInstance();
-    ai = _StubAiService(
-      AiChatCompletion(text: jsonEncode(_validJson())),
-    );
+    ai = _StubAiService(AiChatCompletion(text: jsonEncode(_validJson())));
     settings = AiSettingsNotifier(prefs: prefs, service: ai);
     final provider = await settings.addProvider(
       name: 'Stub',
@@ -63,35 +61,37 @@ void main() {
   });
 
   group('AiFoodLabelService', () {
-    test('sends a vision message with the image and parses the draft',
-        () async {
-      final bytes = Uint8List.fromList([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
-      final draft = await service.analyze(imageBytes: bytes);
+    test(
+      'sends a vision message with the image and parses the draft',
+      () async {
+        final bytes = Uint8List.fromList([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+        final draft = await service.analyze(imageBytes: bytes);
 
-      expect(draft.name, 'Iogurte natural');
-      expect(draft.brand, 'Marca Teste');
-      expect(draft.barcode, '7891234567890');
-      expect(draft.referenceAmount, 100);
-      expect(draft.referenceUnit, 'g');
-      expect(draft.values.calories, 64);
-      expect(draft.values.proteinG, 5.5);
-      expect(draft.values.carbsG, 7);
-      expect(draft.values.fatG, 3.5);
-      expect(draft.servings, hasLength(1));
-      expect(draft.servings.first.gramsEquivalent, 170);
+        expect(draft.name, 'Iogurte natural');
+        expect(draft.brand, 'Marca Teste');
+        expect(draft.barcode, '7891234567890');
+        expect(draft.referenceAmount, 100);
+        expect(draft.referenceUnit, 'g');
+        expect(draft.values.calories, 64);
+        expect(draft.values.proteinG, 5.5);
+        expect(draft.values.carbsG, 7);
+        expect(draft.values.fatG, 3.5);
+        expect(draft.servings, hasLength(1));
+        expect(draft.servings.first.gramsEquivalent, 170);
 
-      expect(ai.lastModel, 'vision-model');
-      expect(ai.lastToken, 'secret-token');
-      expect(ai.lastBaseUrl, 'https://api.stub/v1');
-      final userContent = ai.lastMessages!
-          .last['content'] as List<dynamic>;
-      final imagePart = userContent
-          .cast<Map<String, dynamic>>()
-          .firstWhere((part) => part['type'] == 'image_url');
-      final url = (imagePart['image_url'] as Map<String, dynamic>)['url'] as String;
-      expect(url, startsWith('data:image/jpeg;base64,'));
-      expect(url, contains(base64Encode(bytes)));
-    });
+        expect(ai.lastModel, 'vision-model');
+        expect(ai.lastToken, 'secret-token');
+        expect(ai.lastBaseUrl, 'https://api.stub/v1');
+        final userContent = ai.lastMessages!.last['content'] as List<dynamic>;
+        final imagePart = userContent.cast<Map<String, dynamic>>().firstWhere(
+          (part) => part['type'] == 'image_url',
+        );
+        final url =
+            (imagePart['image_url'] as Map<String, dynamic>)['url'] as String;
+        expect(url, startsWith('data:image/jpeg;base64,'));
+        expect(url, contains(base64Encode(bytes)));
+      },
+    );
 
     test('strips markdown fences around the JSON', () async {
       ai.response = AiChatCompletion(
@@ -140,6 +140,39 @@ void main() {
         () => lonely.analyze(imageBytes: Uint8List.fromList([1])),
         throwsA(
           isA<AiFoodLabelException>().having((e) => e.code, 'code', 'no_model'),
+        ),
+      );
+    });
+
+    test('throws missing_token before sending the request', () async {
+      await settings.setToken(settings.activeProvider!.id, null);
+
+      expect(
+        () => service.analyze(imageBytes: Uint8List.fromList([1])),
+        throwsA(
+          isA<AiFoodLabelException>().having(
+            (e) => e.code,
+            'code',
+            'missing_token',
+          ),
+        ),
+      );
+    });
+
+    test('preserves the AI service error code', () async {
+      final failing = AiFoodLabelService(
+        settings: settings,
+        service: _FailingAiService(),
+      );
+
+      expect(
+        () => failing.analyze(imageBytes: Uint8List.fromList([1])),
+        throwsA(
+          isA<AiFoodLabelException>().having(
+            (e) => e.code,
+            'code',
+            'invalid_token',
+          ),
         ),
       );
     });
@@ -209,6 +242,21 @@ void main() {
       expect(draft.values.fatG, closeTo(3.2, 0.001));
     });
   });
+}
+
+class _FailingAiService extends AiService {
+  @override
+  Future<AiChatCompletion> sendVision({
+    required String baseUrl,
+    required String token,
+    required String model,
+    required List<Map<String, dynamic>> messages,
+  }) {
+    throw const AiServiceException(
+      'Invalid or missing API token.',
+      code: 'invalid_token',
+    );
+  }
 }
 
 Map<String, dynamic> _validJson() => {
