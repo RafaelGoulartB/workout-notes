@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
@@ -6,12 +7,16 @@ import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
-import 'package:workout_notes/widgets/form_section_card.dart';
 
 import 'nutrition_goal_suggest_sheet.dart';
 
 /// Screen for managing the daily nutrition goal and the meal types
 /// catalog (the sections rendered by the food diary).
+///
+/// The layout matches the rest of the app's settings surfaces: uppercase
+/// section headers, rounded card groups and tap-to-edit value tiles that
+/// open a focused bottom sheet. Saving is automatic per field so the
+/// user never has to remember a final "Save" tap after editing the goal.
 class NutritionSettingsScreen extends StatefulWidget {
   final NutritionRepository repository;
 
@@ -23,15 +28,10 @@ class NutritionSettingsScreen extends StatefulWidget {
 }
 
 class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _caloriesController = TextEditingController();
-  final _proteinController = TextEditingController();
-  final _carbsController = TextEditingController();
-  final _fatController = TextEditingController();
   final _bodyRepo = BodyMeasurementRepository();
   final _settingsRepo = SettingsRepository();
+
   bool _isLoading = true;
-  bool _isSaving = false;
   NutritionGoal? _current;
   List<MealTypeDefinition> _mealTypes = const [];
 
@@ -41,33 +41,17 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     _load();
   }
 
-  @override
-  void dispose() {
-    _caloriesController.dispose();
-    _proteinController.dispose();
-    _carbsController.dispose();
-    _fatController.dispose();
-    super.dispose();
-  }
-
   Future<void> _load() async {
     try {
       final results = await Future.wait([
         widget.repository.getActiveGoal(),
         widget.repository.getMealTypes(),
       ]);
-      final goal = results[0] as NutritionGoal?;
       if (!mounted) return;
       setState(() {
-        _current = goal;
+        _current = results[0] as NutritionGoal?;
         _mealTypes = results[1] as List<MealTypeDefinition>;
         _isLoading = false;
-        if (goal != null) {
-          _caloriesController.text = _format(goal.calories);
-          _proteinController.text = _format(goal.proteinG);
-          _carbsController.text = _format(goal.carbsG);
-          _fatController.text = _format(goal.fatG);
-        }
       });
     } catch (_) {
       if (!mounted) return;
@@ -75,74 +59,58 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     }
   }
 
-  String _format(double? value) {
-    if (value == null) return '';
-    if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
-    }
-    return value.toStringAsFixed(1);
-  }
+  // ===================================================================
+  // Goal saving
+  // ===================================================================
 
-  String? _validateNumber(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
-    final cleaned = value.trim().replaceAll(',', '.');
-    final parsed = double.tryParse(cleaned);
-    if (parsed == null || parsed.isNaN || parsed.isInfinite) {
-      return AppLocalizations.of(context)!.nutritionInvalidNumber;
-    }
-    if (parsed < 0) {
-      return AppLocalizations.of(context)!.nutritionInvalidNumber;
-    }
-    return null;
-  }
-
-  Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    setState(() => _isSaving = true);
+  Future<void> _saveGoalField({
+    double? calories,
+    double? proteinG,
+    double? carbsG,
+    double? fatG,
+    String? successMessage,
+  }) async {
     final loc = AppLocalizations.of(context)!;
     try {
       final goal = await widget.repository.saveGoal(
-        calories: _parseValue(_caloriesController.text),
-        proteinG: _parseValue(_proteinController.text),
-        carbsG: _parseValue(_carbsController.text),
-        fatG: _parseValue(_fatController.text),
+        calories: calories,
+        proteinG: proteinG,
+        carbsG: carbsG,
+        fatG: fatG,
       );
       if (!mounted) return;
       setState(() => _current = goal);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(loc.nutritionSettingsSaved)));
-      Navigator.of(context).pop();
+      if (successMessage != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(successMessage)));
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  /// Opens the Mifflin-St Jeor suggestion sheet and fills the goal
-  /// fields with its result when the user applies it.
-  Future<void> _openSuggestion() async {
-    await NutritionGoalSuggestSheet.show(
-      context,
-      bodyRepo: _bodyRepo,
-      settingsRepo: _settingsRepo,
-      onApply: (calories, protein, carbs, fat) {
-        if (!mounted) return;
-        setState(() {
-          _caloriesController.text = _format(calories);
-          _proteinController.text = _format(protein);
-          _carbsController.text = _format(carbs);
-          _fatController.text = _format(fat);
-        });
-      },
+  Future<void> _editNumericValue({
+    required String title,
+    required double? currentValue,
+    required String unit,
+    required ValueChanged<double?> onSubmit,
+  }) async {
+    final result = await _openNumberEditor(
+      title: title,
+      unit: unit,
+      initial: currentValue,
     );
+    if (result == _kUnchanged) return;
+    // result is double? here (null = clear, value = set)
+    onSubmit(result as double?);
   }
 
-  Future<void> _clear() async {    final loc = AppLocalizations.of(context)!;
+  Future<void> _clearGoal() async {
+    final loc = AppLocalizations.of(context)!;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -167,30 +135,43 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     if (confirm != true) return;
     await widget.repository.clearActiveGoal();
     if (!mounted) return;
-    setState(() {
-      _current = null;
-      _caloriesController.clear();
-      _proteinController.clear();
-      _carbsController.clear();
-      _fatController.clear();
-    });
+    setState(() => _current = null);
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(loc.nutritionSettingsCleared)));
   }
 
-  static double? _parseValue(String raw) {
-    final cleaned = raw.trim().replaceAll(',', '.');
-    if (cleaned.isEmpty) return null;
-    final value = double.tryParse(cleaned);
-    if (value == null || value.isNaN || value.isInfinite) return null;
-    if (value <= 0) return null;
-    return value;
+  // ===================================================================
+  // Auto-suggest
+  // ===================================================================
+
+  Future<void> _openSuggestion() async {
+    await NutritionGoalSuggestSheet.show(
+      context,
+      bodyRepo: _bodyRepo,
+      settingsRepo: _settingsRepo,
+      onApply: (calories, protein, carbs, fat) async {
+        if (!mounted) return;
+        await _saveGoalField(
+          calories: calories,
+          proteinG: protein,
+          carbsG: carbs,
+          fatG: fat,
+          successMessage: AppLocalizations.of(context)!.nutritionSettingsGoalApplied,
+        );
+      },
+    );
   }
 
   // ===================================================================
   // Meal types catalog
   // ===================================================================
+
+  Future<void> _loadMealTypes() async {
+    final types = await widget.repository.getMealTypes();
+    if (!mounted) return;
+    setState(() => _mealTypes = types);
+  }
 
   Future<void> _addMealType() async {
     final loc = AppLocalizations.of(context)!;
@@ -286,10 +267,22 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     }
   }
 
-  Future<void> _loadMealTypes() async {
-    final types = await widget.repository.getMealTypes();
-    if (!mounted) return;
-    setState(() => _mealTypes = types);
+  Future<void> _openMealActions(MealTypeDefinition type, int index) async {
+    final loc = AppLocalizations.of(context)!;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => _MealActionsSheet(
+        type: type,
+        canMoveUp: index > 0,
+        canMoveDown: index < _mealTypes.length - 1,
+        onRename: () => _renameMealType(type),
+        onDelete: () => _deleteMealType(type),
+        onMoveUp: () => _moveMealType(type, -1),
+        onMoveDown: () => _moveMealType(type, 1),
+        titleOverride: loc.nutritionSettingsMealTypeActions,
+      ),
+    );
   }
 
   Future<String?> _promptMealTypeName({
@@ -302,250 +295,352 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     );
   }
 
-  /// Live values read from the form while editing, used by the
-  /// preview card.
-  double? get _calories => _parseValue(_caloriesController.text);
-  double? get _protein => _parseValue(_proteinController.text);
-  double? get _carbs => _parseValue(_carbsController.text);
-  double? get _fat => _parseValue(_fatController.text);
+  // ===================================================================
+  // Helpers
+  // ===================================================================
+
+  /// Sentinel returned by the number-editor bottom sheet when the user
+  /// dismissed it without saving. Lets `_editNumericValue` tell the
+  /// difference between "no change" and "user typed and saved".
+  static const Object _kUnchanged = Object();
+
+  Future<Object?> _openNumberEditor({
+    required String title,
+    required String unit,
+    required double? initial,
+  }) {
+    return showModalBottomSheet<Object?>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => _NumberEditorSheet(
+        title: title,
+        unit: unit,
+        initial: initial,
+      ),
+    );
+  }
+
+  static String _formatNum(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(1);
+  }
+
+  // ===================================================================
+  // Build
+  // ===================================================================
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.nutritionSettingsTitle),
-        centerTitle: true,
-        actions: [
-          TextButton(
-            onPressed: _isSaving ? null : _save,
-            child: _isSaving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(loc.nutritionSettingsSave),
+        title: Text(
+          loc.nutritionSettingsTitle,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
           ),
-        ],
+        ),
+        centerTitle: false,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: Form(
-                key: _formKey,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              children: [
+                _GoalPreviewCard(
+                  calories: _current?.calories,
+                  proteinG: _current?.proteinG,
+                  carbsG: _current?.carbsG,
+                  fatG: _current?.fatG,
+                ),
+                _SectionHeader(text: loc.nutritionSettingsSectionDaily),
+                _SettingsCard(
                   children: [
-                    _GoalHeaderCard(
-                      subtitle: loc.nutritionSettingsSubtitle,
-                    ),
-                    const SizedBox(height: 14),
-                    _GoalPreviewCard(
-                      calories: _calories,
-                      proteinG: _protein,
-                      carbsG: _carbs,
-                      fatG: _fat,
-                    ),
-                    const SizedBox(height: 14),
-                    FormSectionCard(
-                      icon: Icons.tune_rounded,
-                      title: loc.nutritionSettingsSectionTarget,
-                      children: [
-                        _NumberField(
-                          controller: _caloriesController,
-                          label: loc.nutritionSettingsCalories,
-                          validator: _validateNumber,
-                          prefix: 'kcal',
-                          onChanged: (_) => setState(() {}),
-                        ),
-                        const SizedBox(height: 12),
-                        _NumberField(
-                          controller: _proteinController,
-                          label: loc.nutritionSettingsProtein,
-                          validator: _validateNumber,
-                          prefix: 'g',
-                          onChanged: (_) => setState(() {}),
-                        ),
-                        const SizedBox(height: 12),
-                        _NumberField(
-                          controller: _carbsController,
-                          label: loc.nutritionSettingsCarbs,
-                          validator: _validateNumber,
-                          prefix: 'g',
-                          onChanged: (_) => setState(() {}),
-                        ),
-                        const SizedBox(height: 12),
-                        _NumberField(
-                          controller: _fatController,
-                          label: loc.nutritionSettingsFat,
-                          validator: _validateNumber,
-                          prefix: 'g',
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    FormSectionCard(
-                      icon: Icons.calculate_outlined,
-                      title: loc.nutritionSettingsSuggestSection,
-                      children: [
-                        Text(
-                          loc.nutritionSettingsSuggestBody,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        OutlinedButton.icon(
-                          onPressed: _isSaving ? null : _openSuggestion,
-                          icon: const Icon(Icons.trending_up_rounded),
-                          label: Text(loc.nutritionSettingsSuggestButton),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(44),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    if (_current != null)
-                      Material(
-                        color: theme.colorScheme.errorContainer.withAlpha(60),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: ListTile(
-                          leading: Icon(
-                            Icons.delete_outline,
-                            color: theme.colorScheme.onErrorContainer,
-                          ),
-                          title: Text(
-                            loc.nutritionSettingsClear,
-                            style: TextStyle(
-                              color: theme.colorScheme.onErrorContainer,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          onTap: _isSaving ? null : _clear,
+                    _ValueTile(
+                      icon: Icons.local_fire_department_outlined,
+                      title: loc.nutritionGoalCalories,
+                      subtitle: loc.nutritionSettingsCaloriesSubtitle,
+                      value: _current?.calories,
+                      formatValue: (v) =>
+                          loc.nutritionConsumedKcal(_formatNum(v)),
+                      notSetText: loc.nutritionSettingsNotSet,
+                      onTap: () => _editNumericValue(
+                        title: loc.nutritionSettingsEditCaloriesTitle,
+                        currentValue: _current?.calories,
+                        unit: 'kcal',
+                        onSubmit: (v) => _saveGoalField(
+                          calories: v,
+                          proteinG: _current?.proteinG,
+                          carbsG: _current?.carbsG,
+                          fatG: _current?.fatG,
+                          successMessage: loc.nutritionSettingsSaved,
                         ),
                       ),
-                    const SizedBox(height: 14),
-                    FormSectionCard(
-                      icon: Icons.restaurant_outlined,
-                      title: loc.nutritionMealTypesTitle,
-                      children: [
-                        Text(
-                          loc.nutritionMealTypesSubtitle,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                    ),
+                    const _CardDivider(),
+                    _ValueTile(
+                      icon: Icons.fitness_center_outlined,
+                      title: loc.nutritionProgressProtein,
+                      subtitle: loc.nutritionSettingsProteinSubtitle,
+                      value: _current?.proteinG,
+                      formatValue: (v) =>
+                          loc.nutritionSettingsGramsValue(_formatNum(v)),
+                      notSetText: loc.nutritionSettingsNotSet,
+                      onTap: () => _editNumericValue(
+                        title: loc.nutritionSettingsEditProteinTitle,
+                        currentValue: _current?.proteinG,
+                        unit: 'g',
+                        onSubmit: (v) => _saveGoalField(
+                          calories: _current?.calories,
+                          proteinG: v,
+                          carbsG: _current?.carbsG,
+                          fatG: _current?.fatG,
+                          successMessage: loc.nutritionSettingsSaved,
                         ),
-                        const SizedBox(height: 8),
-                        if (_mealTypes.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              loc.nutritionMealTypeEmpty,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          )
-                        else
-                          for (var i = 0; i < _mealTypes.length; i++)
-                            _MealTypeTile(
-                              type: _mealTypes[i],
-                              canMoveUp: i > 0,
-                              canMoveDown: i < _mealTypes.length - 1,
-                              onMoveUp: () => _moveMealType(_mealTypes[i], -1),
-                              onMoveDown: () =>
-                                  _moveMealType(_mealTypes[i], 1),
-                              onRename: () => _renameMealType(_mealTypes[i]),
-                              onDelete: () => _deleteMealType(_mealTypes[i]),
-                            ),
-                        const SizedBox(height: 4),
-                        OutlinedButton.icon(
-                          onPressed: _addMealType,
-                          icon: const Icon(Icons.add),
-                          label: Text(loc.nutritionAddMeal),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(44),
-                          ),
+                      ),
+                    ),
+                    const _CardDivider(),
+                    _ValueTile(
+                      icon: Icons.grain_outlined,
+                      title: loc.nutritionProgressCarbs,
+                      subtitle: loc.nutritionSettingsCarbsSubtitle,
+                      value: _current?.carbsG,
+                      formatValue: (v) =>
+                          loc.nutritionSettingsGramsValue(_formatNum(v)),
+                      notSetText: loc.nutritionSettingsNotSet,
+                      onTap: () => _editNumericValue(
+                        title: loc.nutritionSettingsEditCarbsTitle,
+                        currentValue: _current?.carbsG,
+                        unit: 'g',
+                        onSubmit: (v) => _saveGoalField(
+                          calories: _current?.calories,
+                          proteinG: _current?.proteinG,
+                          carbsG: v,
+                          fatG: _current?.fatG,
+                          successMessage: loc.nutritionSettingsSaved,
                         ),
-                      ],
+                      ),
+                    ),
+                    const _CardDivider(),
+                    _ValueTile(
+                      icon: Icons.opacity_outlined,
+                      title: loc.nutritionProgressFat,
+                      subtitle: loc.nutritionSettingsFatSubtitle,
+                      value: _current?.fatG,
+                      formatValue: (v) =>
+                          loc.nutritionSettingsGramsValue(_formatNum(v)),
+                      notSetText: loc.nutritionSettingsNotSet,
+                      onTap: () => _editNumericValue(
+                        title: loc.nutritionSettingsEditFatTitle,
+                        currentValue: _current?.fatG,
+                        unit: 'g',
+                        onSubmit: (v) => _saveGoalField(
+                          calories: _current?.calories,
+                          proteinG: _current?.proteinG,
+                          carbsG: _current?.carbsG,
+                          fatG: v,
+                          successMessage: loc.nutritionSettingsSaved,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: FilledButton.icon(
-            onPressed: _isSaving ? null : _save,
-            icon: _isSaving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
+                _SectionHeader(text: loc.nutritionSettingsSectionTools),
+                _SettingsCard(
+                  children: [
+                    _LinkTile(
+                      icon: Icons.calculate_outlined,
+                      iconColor: theme.colorScheme.primary,
+                      title: loc.nutritionSettingsSuggestSection,
+                      subtitle: loc.nutritionSettingsSuggestBody,
+                      onTap: _openSuggestion,
                     ),
-                  )
-                : const Icon(Icons.check_rounded),
-            label: Text(loc.nutritionSettingsSave),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(50),
+                  ],
+                ),
+                _SectionHeader(text: loc.nutritionSettingsSectionMeals),
+                _SettingsCard(
+                  children: [
+                    if (_mealTypes.isEmpty)
+                      _EmptyHint(
+                        icon: Icons.restaurant_outlined,
+                        text: loc.nutritionSettingsMealTypeEmpty,
+                      )
+                    else
+                      for (var i = 0; i < _mealTypes.length; i++) ...[
+                        _MealTypeRow(
+                          type: _mealTypes[i],
+                          onTap: () => _openMealActions(_mealTypes[i], i),
+                        ),
+                        if (i < _mealTypes.length - 1) const _CardDivider(),
+                      ],
+                    if (_mealTypes.isNotEmpty) const _CardDivider(),
+                    _LinkTile(
+                      icon: Icons.add_circle_outline,
+                      iconColor: theme.colorScheme.primary,
+                      title: loc.nutritionAddMeal,
+                      onTap: _addMealType,
+                    ),
+                  ],
+                ),
+                if (_current != null) ...[
+                  _SectionHeader(text: loc.nutritionSettingsSectionDanger),
+                  _SettingsCard(
+                    children: [
+                      _LinkTile(
+                        icon: Icons.delete_outline,
+                        iconColor: theme.colorScheme.error,
+                        titleColor: theme.colorScheme.error,
+                        title: loc.nutritionSettingsClear,
+                        subtitle: loc.nutritionSettingsGoalRemoveSubtitle,
+                        onTap: _clearGoal,
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             ),
-          ),
+    );
+  }
+}
+
+// =====================================================================
+// Shared visual primitives (mirrors the pattern from settings_screen.dart)
+// =====================================================================
+
+class _SectionHeader extends StatelessWidget {
+  final String text;
+  const _SectionHeader({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+      child: Text(
+        text,
+        style: theme.textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.5,
+          color: theme.colorScheme.onSurfaceVariant,
         ),
       ),
     );
   }
 }
 
-class _GoalHeaderCard extends StatelessWidget {
-  final String subtitle;
-
-  const _GoalHeaderCard({required this.subtitle});
+class _SettingsCard extends StatelessWidget {
+  final List<Widget> children;
+  const _SettingsCard({required this.children});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
       elevation: 0,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: theme.colorScheme.outlineVariant.withAlpha(80),
         ),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
+}
+
+class _CardDivider extends StatelessWidget {
+  const _CardDivider();
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      indent: 56,
+      endIndent: 16,
+      color: Theme.of(context).colorScheme.outlineVariant.withAlpha(60),
+    );
+  }
+}
+
+class _LinkTile extends StatelessWidget {
+  final IconData icon;
+  final Color? iconColor;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
+  final Color? titleColor;
+
+  const _LinkTile({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    this.subtitle,
+    required this.onTap,
+    this.titleColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final fg = titleColor ?? theme.colorScheme.onSurface;
+    return InkWell(
+      onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withAlpha(90),
-                borderRadius: BorderRadius.circular(12),
+                color: (iconColor ?? theme.colorScheme.primary).withAlpha(25),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
-                Icons.flag_outlined,
-                color: theme.colorScheme.onPrimaryContainer,
+                icon,
+                size: 18,
+                color: iconColor ?? theme.colorScheme.primary,
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                subtitle,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      color: fg,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
               ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right,
+              color: theme.colorScheme.onSurfaceVariant,
+              size: 20,
             ),
           ],
         ),
@@ -554,8 +649,186 @@ class _GoalHeaderCard extends StatelessWidget {
   }
 }
 
-/// Live preview of the goal being typed: headline calories and the
-/// macro energy split (protein/carbs/fat at 4/4/9 kcal per gram).
+/// Row showing a value with a chevron. Tapping opens an editor. When
+/// [value] is null the row reads "[notSetText]" in muted text so the
+/// user immediately sees which fields still need attention.
+class _ValueTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final double? value;
+  final String Function(double) formatValue;
+  final String notSetText;
+  final VoidCallback onTap;
+
+  const _ValueTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.formatValue,
+    required this.notSetText,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasValue = value != null;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              hasValue ? formatValue(value!) : notSetText,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: hasValue
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+                fontWeight: hasValue ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.chevron_right,
+              color: theme.colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact row showing a configured meal type. Tap to open the actions
+/// sheet (rename / delete / move).
+class _MealTypeRow extends StatelessWidget {
+  final MealTypeDefinition type;
+  final VoidCallback onTap;
+
+  const _MealTypeRow({required this.type, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.restaurant_outlined,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                type.displayName(loc),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.more_horiz,
+              color: theme.colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Inline empty-state row used inside a card (no surrounding card).
+class _EmptyHint extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _EmptyHint({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: theme.colorScheme.onSurfaceVariant,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact summary card showing the calorie headline + macro split bars.
+/// Replaces the previous full-size preview block so the screen starts
+/// with a single dense overview instead of two stacked cards.
 class _GoalPreviewCard extends StatelessWidget {
   final double? calories;
   final double? proteinG;
@@ -583,151 +856,150 @@ class _GoalPreviewCard extends StatelessWidget {
         headline != null || proteinG != null || carbsG != null || fatG != null;
 
     if (!hasAny) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withAlpha(50),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withAlpha(80),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.pie_chart_outline_rounded,
-              color: theme.colorScheme.onSurfaceVariant,
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: theme.colorScheme.outlineVariant.withAlpha(80),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                loc.nutritionSettingsEmpty,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.pie_chart_outline_rounded,
+                color: theme.colorScheme.onSurfaceVariant,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  loc.nutritionSettingsEmpty,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withAlpha(80),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: theme.colorScheme.outlineVariant.withAlpha(80),
+          ),
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.pie_chart_outline_rounded,
-                  size: 18,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  loc.nutritionPreview,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.pie_chart_outline_rounded,
+                    size: 16,
+                    color: theme.colorScheme.primary,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  loc.nutritionConsumedKcal(_format(headline)),
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (macroTotal > 0 && calories == null) ...[
-                  const SizedBox(width: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(
-                      loc.nutritionSettingsFromMacros,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                  const SizedBox(width: 6),
+                  Text(
+                    loc.nutritionSettingsPreviewLabel,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      letterSpacing: 0.4,
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 6),
+              if (headline != null)
+                Text(
+                  loc.nutritionConsumedKcal(_formatNum(headline)),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    height: 1.1,
+                  ),
+                ),
+              if (macroTotal > 0) ...[
+                const SizedBox(height: 12),
+                _MacroBar(
+                  label: loc.nutritionProgressProtein,
+                  value: proteinKcal,
+                  total: macroTotal,
+                  color: theme.colorScheme.tertiary,
+                ),
+                const SizedBox(height: 6),
+                _MacroBar(
+                  label: loc.nutritionProgressCarbs,
+                  value: carbsKcal,
+                  total: macroTotal,
+                  color: theme.colorScheme.secondary,
+                ),
+                const SizedBox(height: 6),
+                _MacroBar(
+                  label: loc.nutritionProgressFat,
+                  value: fatKcal,
+                  total: macroTotal,
+                  color: theme.colorScheme.primary,
+                ),
               ],
-            ),
-            const SizedBox(height: 12),
-            _MacroSplitBar(
-              label: loc.nutritionProgressProtein,
-              valueKcal: proteinKcal,
-              totalKcal: macroTotal,
-              color: theme.colorScheme.tertiary,
-            ),
-            const SizedBox(height: 8),
-            _MacroSplitBar(
-              label: loc.nutritionProgressCarbs,
-              valueKcal: carbsKcal,
-              totalKcal: macroTotal,
-              color: theme.colorScheme.secondary,
-            ),
-            const SizedBox(height: 8),
-            _MacroSplitBar(
-              label: loc.nutritionProgressFat,
-              valueKcal: fatKcal,
-              totalKcal: macroTotal,
-              color: theme.colorScheme.primary,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  static String _format(double? value) {
-    if (value == null) return '';
-    if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
-    }
+  static String _formatNum(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
     return value.toStringAsFixed(1);
   }
 }
 
-class _MacroSplitBar extends StatelessWidget {
+class _MacroBar extends StatelessWidget {
   final String label;
-  final double valueKcal;
-  final double totalKcal;
+  final double value;
+  final double total;
   final Color color;
 
-  const _MacroSplitBar({
+  const _MacroBar({
     required this.label,
-    required this.valueKcal,
-    required this.totalKcal,
+    required this.value,
+    required this.total,
     required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final fraction = totalKcal > 0
-        ? (valueKcal / totalKcal).clamp(0.0, 1.0).toDouble()
+    final fraction = total > 0
+        ? (value / total).clamp(0.0, 1.0).toDouble()
         : 0.0;
-    final percent =
-        totalKcal > 0 ? '${((valueKcal / totalKcal) * 100).round()}%' : '—';
+    final percent = total > 0 ? '${((value / total) * 100).round()}%' : '—';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
-            Expanded(child: Text(label)),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
             Text(
               percent,
               style: theme.textTheme.bodySmall?.copyWith(
@@ -739,10 +1011,10 @@ class _MacroSplitBar extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         ClipRRect(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value: fraction,
-            minHeight: 6,
+            minHeight: 4,
             backgroundColor: color.withAlpha(40),
             valueColor: AlwaysStoppedAnimation<Color>(color),
           ),
@@ -752,101 +1024,297 @@ class _MacroSplitBar extends StatelessWidget {
   }
 }
 
-class _NumberField extends StatelessWidget {
-  final TextEditingController controller;
-  final String label;
-  final String? Function(String?) validator;
-  final String? prefix;
-  final ValueChanged<String>? onChanged;
+// =====================================================================
+// Bottom sheets
+// =====================================================================
 
-  const _NumberField({
-    required this.controller,
-    required this.label,
-    required this.validator,
-    this.prefix,
-    this.onChanged,
+/// Bottom sheet used to edit one numeric goal value (calories, protein,
+/// carbs or fat). Submitting an empty field is treated as "clear this
+/// target" and resolves to null.
+class _NumberEditorSheet extends StatefulWidget {
+  final String title;
+  final String unit;
+  final double? initial;
+
+  const _NumberEditorSheet({
+    required this.title,
+    required this.unit,
+    required this.initial,
   });
 
   @override
+  State<_NumberEditorSheet> createState() => _NumberEditorSheetState();
+}
+
+class _NumberEditorSheetState extends State<_NumberEditorSheet> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.initial != null ? _format(widget.initial!) : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  static String _format(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(1);
+  }
+
+  void _submit() {
+    final loc = AppLocalizations.of(context)!;
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      Navigator.of(context).pop(null);
+      return;
+    }
+    final cleaned = text.replaceAll(',', '.');
+    final parsed = double.tryParse(cleaned);
+    if (parsed == null || parsed.isNaN || parsed.isInfinite || parsed < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.nutritionInvalidNumber)),
+      );
+      return;
+    }
+    Navigator.of(context).pop(parsed);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    return TextFormField(
-      controller: controller,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: InputDecoration(
-        labelText: label,
-        suffixText: prefix,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        filled: true,
-        fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+    final mediaQuery = MediaQuery.of(context);
+    return Padding(
+      padding: EdgeInsets.only(bottom: mediaQuery.viewInsets.bottom),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.edit_outlined,
+                      color: theme.colorScheme.primary,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextField(
+                controller: _controller,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                ],
+                decoration: InputDecoration(
+                  hintText: loc.nutritionSettingsEditHint,
+                  suffixText: widget.unit,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  filled: true,
+                ),
+                onSubmitted: (_) => _submit(),
+              ),
+              const SizedBox(height: 14),
+              FilledButton(
+                onPressed: _submit,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+                child: Text(loc.nutritionSave),
+              ),
+            ],
+          ),
+        ),
       ),
-      validator: validator,
-      onChanged: onChanged,
     );
   }
 }
 
-/// One row of the meal types catalog: name, reorder arrows, edit and
-/// delete actions.
-class _MealTypeTile extends StatelessWidget {
+/// Bottom sheet that exposes the rename / move / delete actions for a
+/// meal type. Replaces the inline row of action buttons previously used
+/// in this screen.
+class _MealActionsSheet extends StatelessWidget {
   final MealTypeDefinition type;
   final bool canMoveUp;
   final bool canMoveDown;
-  final VoidCallback onMoveUp;
-  final VoidCallback onMoveDown;
   final VoidCallback onRename;
   final VoidCallback onDelete;
+  final VoidCallback onMoveUp;
+  final VoidCallback onMoveDown;
+  final String titleOverride;
 
-  const _MealTypeTile({
+  const _MealActionsSheet({
     required this.type,
     required this.canMoveUp,
     required this.canMoveDown,
-    required this.onMoveUp,
-    required this.onMoveDown,
     required this.onRename,
     required this.onDelete,
+    required this.onMoveUp,
+    required this.onMoveDown,
+    required this.titleOverride,
   });
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    return Row(
-      children: [
-        IconButton(
-          tooltip: loc.nutritionMealTypeMoveUp,
-          onPressed: canMoveUp ? onMoveUp : null,
-          icon: const Icon(Icons.arrow_upward, size: 20),
-        ),
-        IconButton(
-          tooltip: loc.nutritionMealTypeMoveDown,
-          onPressed: canMoveDown ? onMoveDown : null,
-          icon: const Icon(Icons.arrow_downward, size: 20),
-        ),
-        Expanded(
-          child: Text(
-            type.displayName(loc),
-            style: theme.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w600,
+    return SafeArea(
+      top: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.restaurant_outlined,
+                  size: 18,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    loc.nutritionSettingsMealActionsTitle(
+                      type.displayName(loc),
+                    ),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        IconButton(
-          tooltip: loc.nutritionRenameMeal,
-          onPressed: onRename,
-          icon: const Icon(Icons.edit_outlined, size: 20),
-        ),
-        IconButton(
-          tooltip: loc.nutritionDeleteMeal,
-          onPressed: onDelete,
-          icon: Icon(
-            Icons.delete_outline,
-            size: 20,
-            color: theme.colorScheme.error,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                titleOverride,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
           ),
+          const Divider(height: 1, thickness: 1),
+          _ActionRow(
+            icon: Icons.edit_outlined,
+            label: loc.nutritionSettingsMealActionRename,
+            onTap: () {
+              Navigator.of(context).pop();
+              onRename();
+            },
+          ),
+          _ActionRow(
+            icon: Icons.arrow_upward,
+            label: loc.nutritionSettingsMealActionMoveUp,
+            enabled: canMoveUp,
+            onTap: () {
+              Navigator.of(context).pop();
+              onMoveUp();
+            },
+          ),
+          _ActionRow(
+            icon: Icons.arrow_downward,
+            label: loc.nutritionSettingsMealActionMoveDown,
+            enabled: canMoveDown,
+            onTap: () {
+              Navigator.of(context).pop();
+              onMoveDown();
+            },
+          ),
+          _ActionRow(
+            icon: Icons.delete_outline,
+            label: loc.nutritionSettingsMealActionDelete,
+            destructive: true,
+            onTap: () {
+              Navigator.of(context).pop();
+              onDelete();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool enabled;
+  final bool destructive;
+
+  const _ActionRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.enabled = true,
+    this.destructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = !enabled
+        ? theme.colorScheme.outline
+        : (destructive ? theme.colorScheme.error : theme.colorScheme.onSurface);
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                label,
+                style: theme.textTheme.bodyLarge?.copyWith(color: color),
+              ),
+            ),
+            if (!enabled)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Text(
+                  '—',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.outline,
+                  ),
+                ),
+              ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
