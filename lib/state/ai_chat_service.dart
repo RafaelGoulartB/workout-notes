@@ -761,15 +761,32 @@ class AiChatService extends ChangeNotifier {
     final title = firstUserText.length > 48
         ? '${firstUserText.substring(0, 45)}…'
         : firstUserText;
+    final resolvedTitle = title.isEmpty ? 'Nova conversa' : title;
+    final preview = firstUserText.length > 96
+        ? '${firstUserText.substring(0, 93)}…'
+        : firstUserText;
     await _db.upsertAiChatThread(
       id: id,
-      title: title.isEmpty ? 'Nova conversa' : title,
+      title: resolvedTitle,
       createdAt: now,
       updatedAt: now,
-      lastMessagePreview: firstUserText.length > 96
-          ? '${firstUserText.substring(0, 93)}…'
-          : firstUserText,
+      lastMessagePreview: preview,
       isPinned: false,
+    );
+    // Keep the just-created thread in memory before the first turn is
+    // persisted. Otherwise `_persistCurrentThread` cannot resolve it and
+    // overwrites its descriptive title with the generic fallback "Conversa".
+    _state = _state.copyWith(
+      threads: [
+        AiChatThread(
+          id: id,
+          title: resolvedTitle,
+          createdAt: now,
+          updatedAt: now,
+          lastMessagePreview: preview,
+        ),
+        ..._state.threads,
+      ],
     );
     return id;
   }
