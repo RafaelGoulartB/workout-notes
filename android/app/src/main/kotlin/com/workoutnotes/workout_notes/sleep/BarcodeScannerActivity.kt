@@ -35,6 +35,7 @@ class BarcodeScannerActivity : ComponentActivity() {
         const val EXTRA_FORMAT = "barcode_format"
         const val EXTRA_CAMERA_DENIED = "barcode_camera_denied"
         const val EXTRA_TIMEOUT = "barcode_timeout"
+        const val EXTRA_TIMEOUT_MILLIS = "barcode_timeout_millis"
         const val RESULT_CANCELLED = 0
         const val RESULT_SUCCESS = 1
         private const val CAMERA_REQUEST = 7654
@@ -66,6 +67,7 @@ class BarcodeScannerActivity : ComponentActivity() {
                     Barcode.FORMAT_CODE_93,
                     Barcode.FORMAT_CODABAR,
                     Barcode.FORMAT_ITF,
+                    Barcode.FORMAT_QR_CODE,
                 )
                 .build(),
         )
@@ -239,7 +241,14 @@ class BarcodeScannerActivity : ComponentActivity() {
 
     private fun startTimeoutTimer() {
         timer?.cancel()
-        val remaining = SleepAlarmScheduler.barcodeRemainingMillis(this)
+        // General-purpose scans (nutrition) pass an explicit timeout;
+        // the sleep mission falls back to the time left until the alarm.
+        val explicitMillis = intent.getLongExtra(EXTRA_TIMEOUT_MILLIS, -1L)
+        val remaining = if (explicitMillis > 0) {
+            explicitMillis
+        } else {
+            SleepAlarmScheduler.barcodeRemainingMillis(this)
+        }
         if (remaining <= 0L) {
             timeoutScanner()
             return
@@ -278,6 +287,7 @@ class BarcodeScannerActivity : ComponentActivity() {
         Barcode.FORMAT_CODE_93 -> "CODE-93"
         Barcode.FORMAT_CODABAR -> "CODABAR"
         Barcode.FORMAT_ITF -> "ITF"
+        Barcode.FORMAT_QR_CODE -> "QR_CODE"
         else -> null
     }
 

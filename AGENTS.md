@@ -389,6 +389,7 @@ Two new tables added in `_dbVersion = 15`:
 - **Entry only via Settings** — no FAB on the home screen. Discovery happens in `settings_screen.dart` under the new `AI COACH` section, with two `LinkTile`s: `Treinador IA` (chat, redirects to settings if not configured) and `Configurar IA` (provider list + system prompt + context mode).
 - **`ChangeNotifier` singleton, not Riverpod** — the app deliberately avoids state-management libraries (§4.1). `AiChatService.instance` is a `ChangeNotifier` consumed via `ListenableBuilder` / `addListener` in the chat screens. `AiSettingsNotifier` is a static field on `WorkoutNotesApp`. This matches the existing `RestTimerService.instance` pattern.
 - **ARB-based l10n** — the app uses `AppLocalizations` (not the hand-rolled `L10n`/`AiStrings` pattern of `gastos`). All AI strings live in `app_en.arb` + `app_pt.arb` with the `ai*` prefix; `flutter gen-l10n` regenerates the `AppLocalizations*` files automatically.
+- **Generated l10n files are NOT versioned** — `lib/l10n/app_localizations*.dart` are build artifacts ignored by git (see `.gitignore`) and regenerated automatically on every build/test via `flutter: generate: true` + `l10n.yaml`. Never edit them by hand; always edit the `.arb` sources and run `flutter gen-l10n`. Note: gen-l10n (this Flutter version) supports exactly ONE `.arb` per locale in a flat `arb-dir` — multi-file synthetic packages were removed, so the ARB sources (~1400 lines each) are the intended size ceiling.
 
 ### Adding a new read tool
 

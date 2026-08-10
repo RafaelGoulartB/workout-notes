@@ -352,7 +352,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         icon: const Icon(Icons.settings_outlined),
         onPressed: () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const WorkoutSettingsScreen()),
+          MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
         ),
         tooltip: loc.workoutHomeSettingsTooltip,
       ),

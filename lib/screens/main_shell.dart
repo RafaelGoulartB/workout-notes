@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/screens/workout/sleep_tracker_screen.dart';
 import 'package:workout_notes/screens/workout/workout_home_screen.dart';
+import 'package:workout_notes/screens/workout/nutrition_home_screen.dart';
 
 /// Primary application navigation. Each tab keeps its own navigation state
-/// while the user switches between workout and sleep tracking.
+/// while the user switches between workout, sleep and nutrition tracking.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -22,7 +23,11 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: const [WorkoutHomeScreen(), SleepTrackerScreen()],
+        children: const [
+          WorkoutHomeScreen(),
+          SleepTrackerScreen(),
+          NutritionHomeScreen(),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
@@ -39,6 +44,11 @@ class _MainShellState extends State<MainShell> {
             icon: const Icon(Icons.nightlight_outlined),
             selectedIcon: const Icon(Icons.nightlight_round),
             label: loc.tabSleep,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.restaurant_outlined),
+            selectedIcon: const Icon(Icons.restaurant),
+            label: loc.tabNutrition,
           ),
         ],
       ),

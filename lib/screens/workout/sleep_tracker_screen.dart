@@ -26,7 +26,7 @@ import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
 import 'sleep_monitor_result_screen.dart';
 import 'sleep_monitor_screen.dart';
 import 'traditional_alarms_screen.dart';
-import 'sleep_settings_screen.dart';
+import 'settings_screen.dart';
 
 class SleepTrackerScreen extends StatefulWidget {
   const SleepTrackerScreen({super.key});
@@ -160,9 +160,9 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
             onPressed: _openTraditionalAlarms,
           ),
           IconButton(
-            tooltip: loc.sleepSettingsTitle,
+            tooltip: loc.settingsTitle,
             icon: const Icon(Icons.settings_outlined),
-            onPressed: _openSleepSettings,
+            onPressed: _openAppSettings,
           ),
         ],
       ),
@@ -301,10 +301,10 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     if (mounted) await _load();
   }
 
-  Future<void> _openSleepSettings() async {
+  Future<void> _openAppSettings() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const SleepSettingsScreen()),
+      MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
     );
     if (mounted) await _load();
   }

@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Used to take photos of nutrition labels so the AI Coach can identify foods.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Used to pick photos of nutrition labels so the AI Coach can identify foods.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

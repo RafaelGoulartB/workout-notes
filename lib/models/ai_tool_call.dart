@@ -1,14 +1,5 @@
 import 'dart:convert';
 
-enum AiToolResultCode {
-  ok,
-  unknownTool,
-  invalidArgs,
-  notFound,
-  error,
-  interrupted,
-}
-
 class AiToolCall {
   final String id;
   final String name;
