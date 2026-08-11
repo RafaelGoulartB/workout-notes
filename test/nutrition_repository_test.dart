@@ -54,6 +54,9 @@ void main() {
               fiber_g REAL,
               sugars_g REAL,
               sodium_mg REAL,
+              potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL,
+              zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL,
+              vitamin_d_ug REAL, vitamin_b12_ug REAL,
               extra_nutrients_json TEXT,
               is_estimated INTEGER NOT NULL DEFAULT 0,
               FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE CASCADE
@@ -99,6 +102,9 @@ void main() {
               fiber_g REAL,
               sugars_g REAL,
               sodium_mg REAL,
+              potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL,
+              zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL,
+              vitamin_d_ug REAL, vitamin_b12_ug REAL,
               nutrition_snapshot_json TEXT NOT NULL,
               created_at TEXT NOT NULL,
               FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE,
@@ -354,6 +360,49 @@ void main() {
       expect(meals, hasLength(1));
       expect(meals.first.log.mealType, 'breakfast');
       expect(meals.first.items, hasLength(1));
+    });
+
+    test('scales, snapshots and aggregates micronutrients by day', () async {
+      final food = await repository.createManualFood(
+        name: 'Espinafre',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(
+          calories: 23,
+          potassiumMg: 558,
+          calciumMg: 99,
+          ironMg: 2.7,
+          magnesiumMg: 79,
+          zincMg: 0.53,
+          vitaminAUg: 469,
+          vitaminCMg: 28.1,
+          vitaminDUg: 0,
+          vitaminB12Ug: 0,
+        ),
+      );
+      final variant = (await repository.getFoodWithDetails(
+        food.id,
+      ))!.variants.first;
+      final item = await repository.addMealLogItem(
+        date: '2026-07-27',
+        mealType: 'lunch',
+        food: food,
+        variant: variant,
+        conversion: NutritionConversion(
+          quantity: 50,
+          unit: 'g',
+          referenceAmount: 100,
+          referenceUnit: 'g',
+        ),
+      );
+
+      expect(item.potassiumMg, closeTo(279, 0.001));
+      expect(item.snapshot.consumed.vitaminAUg, closeTo(234.5, 0.001));
+      final summary = await repository.getDailySummary('2026-07-27');
+      expect(summary.consumed.calciumMg, closeTo(49.5, 0.001));
+      expect(summary.consumed.ironMg, closeTo(1.35, 0.001));
+      expect(summary.consumed.vitaminCMg, closeTo(14.05, 0.001));
+      expect(summary.consumed.vitaminB12Ug, 0);
     });
 
     test('editing an item recomputes the snapshot', () async {

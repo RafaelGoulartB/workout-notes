@@ -28,7 +28,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 33;
+  static const _dbVersion = 34;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -493,17 +493,13 @@ class DatabaseHelper {
     for (var i = 0; i < rows.length; i++) {
       final row = rows[i];
       try {
-        await db.insert(
-          'meal_types',
-          {
-            'id': row['key'],
-            'key': row['key'],
-            'name': null,
-            'order_index': row['order_index'],
-            'created_at': now,
-          },
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+        await db.insert('meal_types', {
+          'id': row['key'],
+          'key': row['key'],
+          'name': null,
+          'order_index': row['order_index'],
+          'created_at': now,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       } catch (_) {}
     }
   }
@@ -2006,6 +2002,26 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE routine_days ADD COLUMN notes TEXT');
       } catch (_) {}
     }
+    if (oldVersion < 34) {
+      const columns = <String>[
+        'potassium_mg',
+        'calcium_mg',
+        'iron_mg',
+        'magnesium_mg',
+        'zinc_mg',
+        'vitamin_a_ug',
+        'vitamin_c_mg',
+        'vitamin_d_ug',
+        'vitamin_b12_ug',
+      ];
+      for (final table in <String>['food_variants', 'meal_log_items']) {
+        for (final column in columns) {
+          try {
+            await db.execute('ALTER TABLE $table ADD COLUMN $column REAL');
+          } catch (_) {}
+        }
+      }
+    }
   }
 
   /// Creates the full nutrition module schema (v22) using
@@ -2042,6 +2058,15 @@ class DatabaseHelper {
         fiber_g REAL,
         sugars_g REAL,
         sodium_mg REAL,
+        potassium_mg REAL,
+        calcium_mg REAL,
+        iron_mg REAL,
+        magnesium_mg REAL,
+        zinc_mg REAL,
+        vitamin_a_ug REAL,
+        vitamin_c_mg REAL,
+        vitamin_d_ug REAL,
+        vitamin_b12_ug REAL,
         extra_nutrients_json TEXT,
         is_estimated INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE CASCADE
@@ -2100,6 +2125,15 @@ class DatabaseHelper {
         fiber_g REAL,
         sugars_g REAL,
         sodium_mg REAL,
+        potassium_mg REAL,
+        calcium_mg REAL,
+        iron_mg REAL,
+        magnesium_mg REAL,
+        zinc_mg REAL,
+        vitamin_a_ug REAL,
+        vitamin_c_mg REAL,
+        vitamin_d_ug REAL,
+        vitamin_b12_ug REAL,
         nutrition_snapshot_json TEXT NOT NULL,
         created_at TEXT NOT NULL,
         FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE,

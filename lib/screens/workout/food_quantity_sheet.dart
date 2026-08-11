@@ -65,7 +65,6 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
   String? _errorText;
   NutritionValues? _preview;
   bool _isEstimated = false;
-  bool _hasMissing = false;
 
   @override
   void initState() {
@@ -173,7 +172,6 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
             ? AppLocalizations.of(context)!.nutritionInvalidQuantity
             : null;
         _isEstimated = widget.primaryVariant.isEstimated;
-        _hasMissing = widget.primaryVariant.values.hasMissingFields;
       });
       return;
     }
@@ -190,14 +188,12 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
         _preview = values;
         _errorText = null;
         _isEstimated = widget.primaryVariant.isEstimated;
-        _hasMissing = values.hasMissingFields;
       });
     } on NutritionConversionException catch (e) {
       setState(() {
         _preview = null;
         _errorText = _humanizeError(e.code);
         _isEstimated = widget.primaryVariant.isEstimated;
-        _hasMissing = widget.primaryVariant.values.hasMissingFields;
       });
     }
   }
@@ -342,7 +338,6 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
               _PreviewSection(
                 preview: _preview,
                 isEstimated: _isEstimated,
-                hasMissing: _hasMissing,
                 loc: loc,
                 theme: theme,
               ),
@@ -857,14 +852,12 @@ class _StepperButton extends StatelessWidget {
 class _PreviewSection extends StatelessWidget {
   final NutritionValues? preview;
   final bool isEstimated;
-  final bool hasMissing;
   final AppLocalizations loc;
   final ThemeData theme;
 
   const _PreviewSection({
     required this.preview,
     required this.isEstimated,
-    required this.hasMissing,
     required this.loc,
     required this.theme,
   });
@@ -902,14 +895,10 @@ class _PreviewSection extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (isEstimated || hasMissing) ...[
+              if (isEstimated) ...[
                 _InlineBadge(
-                  icon: isEstimated
-                      ? Icons.bolt_outlined
-                      : Icons.info_outline_rounded,
-                  label: isEstimated
-                      ? loc.nutritionEstimated
-                      : loc.nutritionMissingValues,
+                  icon: Icons.bolt_outlined,
+                  label: loc.nutritionEstimated,
                 ),
               ],
             ],

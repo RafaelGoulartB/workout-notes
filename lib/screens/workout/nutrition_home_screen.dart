@@ -2064,6 +2064,60 @@ class _DailyStatisticsView extends StatelessWidget {
                 consumed: values.sodiumMg,
                 unit: 'mg',
                 color: Theme.of(context).colorScheme.primary,
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressPotassium,
+                consumed: values.potassiumMg,
+                unit: 'mg',
+                color: const Color(0xFF4E8D7C),
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressCalcium,
+                consumed: values.calciumMg,
+                unit: 'mg',
+                color: const Color(0xFF5C7AEA),
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressIron,
+                consumed: values.ironMg,
+                unit: 'mg',
+                color: const Color(0xFFB75D69),
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressMagnesium,
+                consumed: values.magnesiumMg,
+                unit: 'mg',
+                color: const Color(0xFF6D8299),
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressZinc,
+                consumed: values.zincMg,
+                unit: 'mg',
+                color: const Color(0xFF8F7A66),
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressVitaminA,
+                consumed: values.vitaminAUg,
+                unit: 'µg',
+                color: const Color(0xFFE38B29),
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressVitaminC,
+                consumed: values.vitaminCMg,
+                unit: 'mg',
+                color: const Color(0xFF6A994E),
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressVitaminD,
+                consumed: values.vitaminDUg,
+                unit: 'µg',
+                color: const Color(0xFFF2C14E),
+              ),
+              _NutrientProgressRow(
+                label: loc.nutritionProgressVitaminB12,
+                consumed: values.vitaminB12Ug,
+                unit: 'µg',
+                color: const Color(0xFF7B61A8),
                 isLast: true,
               ),
             ],
@@ -2477,9 +2531,10 @@ class _NutrientProgressRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasValue = consumed != null;
     final current = consumed ?? 0;
     final hasGoal = goal != null && goal! > 0;
-    final remaining = hasGoal ? goal! - current : null;
+    final remaining = hasGoal && hasValue ? goal! - current : null;
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 15),
       child: Column(
@@ -2495,12 +2550,12 @@ class _NutrientProgressRow extends StatelessWidget {
                 ),
               ),
               Text(
-                '${_formatNutritionNumber(current)}$unit',
+                hasValue ? '${_formatNutritionNumber(current)}$unit' : '—',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              if (hasGoal) ...[
+              if (hasGoal && hasValue) ...[
                 Text(
                   '  /  ${_formatNutritionNumber(goal!)}$unit',
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -2850,7 +2905,7 @@ class _MealItemTile extends StatelessWidget {
       if (item.brandSnapshot != null && item.brandSnapshot!.trim().isNotEmpty)
         item.brandSnapshot!,
     ];
-    final hasWarning = item.hasMissingValues || item.isEstimated;
+    final hasWarning = item.isEstimated;
     final calories = item.calories;
     return Column(
       children: [
@@ -2888,7 +2943,7 @@ class _MealItemTile extends StatelessWidget {
                           if (hasWarning) ...[
                             const SizedBox(width: 6),
                             Tooltip(
-                              message: loc.nutritionMissingValues,
+                              message: loc.nutritionEstimated,
                               child: Icon(
                                 Icons.info_outline,
                                 size: 14,

@@ -14,6 +14,15 @@ class NutritionValues {
   final double? fiberG;
   final double? sugarsG;
   final double? sodiumMg;
+  final double? potassiumMg;
+  final double? calciumMg;
+  final double? ironMg;
+  final double? magnesiumMg;
+  final double? zincMg;
+  final double? vitaminAUg;
+  final double? vitaminCMg;
+  final double? vitaminDUg;
+  final double? vitaminB12Ug;
 
   const NutritionValues({
     this.calories,
@@ -23,6 +32,15 @@ class NutritionValues {
     this.fiberG,
     this.sugarsG,
     this.sodiumMg,
+    this.potassiumMg,
+    this.calciumMg,
+    this.ironMg,
+    this.magnesiumMg,
+    this.zincMg,
+    this.vitaminAUg,
+    this.vitaminCMg,
+    this.vitaminDUg,
+    this.vitaminB12Ug,
   });
 
   /// Returns a new instance with the same non-null values of [other]
@@ -37,6 +55,15 @@ class NutritionValues {
       fiberG: other.fiberG ?? fiberG,
       sugarsG: other.sugarsG ?? sugarsG,
       sodiumMg: other.sodiumMg ?? sodiumMg,
+      potassiumMg: other.potassiumMg ?? potassiumMg,
+      calciumMg: other.calciumMg ?? calciumMg,
+      ironMg: other.ironMg ?? ironMg,
+      magnesiumMg: other.magnesiumMg ?? magnesiumMg,
+      zincMg: other.zincMg ?? zincMg,
+      vitaminAUg: other.vitaminAUg ?? vitaminAUg,
+      vitaminCMg: other.vitaminCMg ?? vitaminCMg,
+      vitaminDUg: other.vitaminDUg ?? vitaminDUg,
+      vitaminB12Ug: other.vitaminB12Ug ?? vitaminB12Ug,
     );
   }
 
@@ -47,7 +74,22 @@ class NutritionValues {
 
   /// True when any field is null. Used to flag incomplete data in the UI.
   bool get hasMissingFields =>
-      calories == null || proteinG == null || carbsG == null || fatG == null;
+      calories == null ||
+      proteinG == null ||
+      carbsG == null ||
+      fatG == null ||
+      fiberG == null ||
+      sugarsG == null ||
+      sodiumMg == null ||
+      potassiumMg == null ||
+      calciumMg == null ||
+      ironMg == null ||
+      magnesiumMg == null ||
+      zincMg == null ||
+      vitaminAUg == null ||
+      vitaminCMg == null ||
+      vitaminDUg == null ||
+      vitaminB12Ug == null;
 
   /// All-null instance used when the data source cannot provide any
   /// nutrition values for a food.
@@ -61,6 +103,15 @@ class NutritionValues {
     'fiber_g': fiberG,
     'sugars_g': sugarsG,
     'sodium_mg': sodiumMg,
+    'potassium_mg': potassiumMg,
+    'calcium_mg': calciumMg,
+    'iron_mg': ironMg,
+    'magnesium_mg': magnesiumMg,
+    'zinc_mg': zincMg,
+    'vitamin_a_ug': vitaminAUg,
+    'vitamin_c_mg': vitaminCMg,
+    'vitamin_d_ug': vitaminDUg,
+    'vitamin_b12_ug': vitaminB12Ug,
   };
 
   factory NutritionValues.fromMap(Map<String, dynamic> map) {
@@ -72,6 +123,15 @@ class NutritionValues {
       fiberG: _toDouble(map['fiber_g']),
       sugarsG: _toDouble(map['sugars_g']),
       sodiumMg: _toDouble(map['sodium_mg']),
+      potassiumMg: _toDouble(map['potassium_mg']),
+      calciumMg: _toDouble(map['calcium_mg']),
+      ironMg: _toDouble(map['iron_mg']),
+      magnesiumMg: _toDouble(map['magnesium_mg']),
+      zincMg: _toDouble(map['zinc_mg']),
+      vitaminAUg: _toDouble(map['vitamin_a_ug']),
+      vitaminCMg: _toDouble(map['vitamin_c_mg']),
+      vitaminDUg: _toDouble(map['vitamin_d_ug']),
+      vitaminB12Ug: _toDouble(map['vitamin_b12_ug']),
     );
   }
 
@@ -90,6 +150,15 @@ class NutritionValues {
     Object? fiberG = _sentinel,
     Object? sugarsG = _sentinel,
     Object? sodiumMg = _sentinel,
+    Object? potassiumMg = _sentinel,
+    Object? calciumMg = _sentinel,
+    Object? ironMg = _sentinel,
+    Object? magnesiumMg = _sentinel,
+    Object? zincMg = _sentinel,
+    Object? vitaminAUg = _sentinel,
+    Object? vitaminCMg = _sentinel,
+    Object? vitaminDUg = _sentinel,
+    Object? vitaminB12Ug = _sentinel,
   }) {
     return NutritionValues(
       calories: identical(calories, _sentinel)
@@ -107,6 +176,29 @@ class NutritionValues {
       sodiumMg: identical(sodiumMg, _sentinel)
           ? this.sodiumMg
           : sodiumMg as double?,
+      potassiumMg: identical(potassiumMg, _sentinel)
+          ? this.potassiumMg
+          : potassiumMg as double?,
+      calciumMg: identical(calciumMg, _sentinel)
+          ? this.calciumMg
+          : calciumMg as double?,
+      ironMg: identical(ironMg, _sentinel) ? this.ironMg : ironMg as double?,
+      magnesiumMg: identical(magnesiumMg, _sentinel)
+          ? this.magnesiumMg
+          : magnesiumMg as double?,
+      zincMg: identical(zincMg, _sentinel) ? this.zincMg : zincMg as double?,
+      vitaminAUg: identical(vitaminAUg, _sentinel)
+          ? this.vitaminAUg
+          : vitaminAUg as double?,
+      vitaminCMg: identical(vitaminCMg, _sentinel)
+          ? this.vitaminCMg
+          : vitaminCMg as double?,
+      vitaminDUg: identical(vitaminDUg, _sentinel)
+          ? this.vitaminDUg
+          : vitaminDUg as double?,
+      vitaminB12Ug: identical(vitaminB12Ug, _sentinel)
+          ? this.vitaminB12Ug
+          : vitaminB12Ug as double?,
     );
   }
 }

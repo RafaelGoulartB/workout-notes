@@ -65,6 +65,16 @@ class AiWellnessAnalyticsService {
         SUM(mli.carbs_g) carbs_g,
         SUM(mli.fat_g) fat_g,
         SUM(mli.fiber_g) fiber_g,
+        SUM(mli.sodium_mg) sodium_mg,
+        SUM(mli.potassium_mg) potassium_mg,
+        SUM(mli.calcium_mg) calcium_mg,
+        SUM(mli.iron_mg) iron_mg,
+        SUM(mli.magnesium_mg) magnesium_mg,
+        SUM(mli.zinc_mg) zinc_mg,
+        SUM(mli.vitamin_a_ug) vitamin_a_ug,
+        SUM(mli.vitamin_c_mg) vitamin_c_mg,
+        SUM(mli.vitamin_d_ug) vitamin_d_ug,
+        SUM(mli.vitamin_b12_ug) vitamin_b12_ug,
         COUNT(mli.id) item_count,
         SUM(CASE WHEN mli.calories IS NULL OR mli.protein_g IS NULL OR
           mli.carbs_g IS NULL OR mli.fat_g IS NULL THEN 1 ELSE 0 END)
@@ -99,6 +109,16 @@ class AiWellnessAnalyticsService {
         'carbsG': _roundOrNull(avg('carbs_g')),
         'fatG': _roundOrNull(avg('fat_g')),
         'fiberG': _roundOrNull(avg('fiber_g')),
+        'sodiumMg': _roundOrNull(avg('sodium_mg')),
+        'potassiumMg': _roundOrNull(avg('potassium_mg')),
+        'calciumMg': _roundOrNull(avg('calcium_mg')),
+        'ironMg': _roundOrNull(avg('iron_mg')),
+        'magnesiumMg': _roundOrNull(avg('magnesium_mg')),
+        'zincMg': _roundOrNull(avg('zinc_mg')),
+        'vitaminAUg': _roundOrNull(avg('vitamin_a_ug')),
+        'vitaminCMg': _roundOrNull(avg('vitamin_c_mg')),
+        'vitaminDUg': _roundOrNull(avg('vitamin_d_ug')),
+        'vitaminB12Ug': _roundOrNull(avg('vitamin_b12_ug')),
       },
       'activeDailyGoal': goal == null
           ? null
@@ -315,14 +335,24 @@ class AiWellnessAnalyticsService {
     'source': row['source'],
   };
 
-  static Map<String, dynamic> _compactNutritionRow(Map<String, dynamic> row) =>
-      {
-        'date': row['date'],
-        'calories': _roundOrNull((row['calories'] as num?)?.toDouble()),
-        'proteinG': _roundOrNull((row['protein_g'] as num?)?.toDouble()),
-        'carbsG': _roundOrNull((row['carbs_g'] as num?)?.toDouble()),
-        'fatG': _roundOrNull((row['fat_g'] as num?)?.toDouble()),
-      };
+  static Map<String, dynamic> _compactNutritionRow(
+    Map<String, dynamic> row,
+  ) => {
+    'date': row['date'],
+    'calories': _roundOrNull((row['calories'] as num?)?.toDouble()),
+    'proteinG': _roundOrNull((row['protein_g'] as num?)?.toDouble()),
+    'carbsG': _roundOrNull((row['carbs_g'] as num?)?.toDouble()),
+    'fatG': _roundOrNull((row['fat_g'] as num?)?.toDouble()),
+    'potassiumMg': _roundOrNull((row['potassium_mg'] as num?)?.toDouble()),
+    'calciumMg': _roundOrNull((row['calcium_mg'] as num?)?.toDouble()),
+    'ironMg': _roundOrNull((row['iron_mg'] as num?)?.toDouble()),
+    'magnesiumMg': _roundOrNull((row['magnesium_mg'] as num?)?.toDouble()),
+    'zincMg': _roundOrNull((row['zinc_mg'] as num?)?.toDouble()),
+    'vitaminAUg': _roundOrNull((row['vitamin_a_ug'] as num?)?.toDouble()),
+    'vitaminCMg': _roundOrNull((row['vitamin_c_mg'] as num?)?.toDouble()),
+    'vitaminDUg': _roundOrNull((row['vitamin_d_ug'] as num?)?.toDouble()),
+    'vitaminB12Ug': _roundOrNull((row['vitamin_b12_ug'] as num?)?.toDouble()),
+  };
 
   static double? _effectiveSleep(Map<String, dynamic> row) =>
       ((row['actual_sleep_minutes'] ??

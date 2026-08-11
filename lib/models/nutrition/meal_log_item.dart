@@ -6,7 +6,7 @@ import 'nutrition_values.dart';
 /// logged it. Stored as JSON on the [MealLogItem] row so that future
 /// edits to the food cache never change past meals.
 class NutritionSnapshot {
-  static const int currentVersion = 1;
+  static const int currentVersion = 2;
 
   final int version;
   final String source;
@@ -115,6 +115,15 @@ class MealLogItem {
   final double? fiberG;
   final double? sugarsG;
   final double? sodiumMg;
+  final double? potassiumMg;
+  final double? calciumMg;
+  final double? ironMg;
+  final double? magnesiumMg;
+  final double? zincMg;
+  final double? vitaminAUg;
+  final double? vitaminCMg;
+  final double? vitaminDUg;
+  final double? vitaminB12Ug;
   final String snapshotJson;
   final DateTime createdAt;
 
@@ -134,6 +143,15 @@ class MealLogItem {
     this.fiberG,
     this.sugarsG,
     this.sodiumMg,
+    this.potassiumMg,
+    this.calciumMg,
+    this.ironMg,
+    this.magnesiumMg,
+    this.zincMg,
+    this.vitaminAUg,
+    this.vitaminCMg,
+    this.vitaminDUg,
+    this.vitaminB12Ug,
     required this.snapshotJson,
     required this.createdAt,
   });
@@ -148,6 +166,15 @@ class MealLogItem {
     fiberG: fiberG,
     sugarsG: sugarsG,
     sodiumMg: sodiumMg,
+    potassiumMg: potassiumMg,
+    calciumMg: calciumMg,
+    ironMg: ironMg,
+    magnesiumMg: magnesiumMg,
+    zincMg: zincMg,
+    vitaminAUg: vitaminAUg,
+    vitaminCMg: vitaminCMg,
+    vitaminDUg: vitaminDUg,
+    vitaminB12Ug: vitaminB12Ug,
   );
 
   bool get hasMissingValues => snapshot.hasMissingValues;
@@ -170,6 +197,15 @@ class MealLogItem {
     Object? fiberG = _sentinel,
     Object? sugarsG = _sentinel,
     Object? sodiumMg = _sentinel,
+    Object? potassiumMg = _sentinel,
+    Object? calciumMg = _sentinel,
+    Object? ironMg = _sentinel,
+    Object? magnesiumMg = _sentinel,
+    Object? zincMg = _sentinel,
+    Object? vitaminAUg = _sentinel,
+    Object? vitaminCMg = _sentinel,
+    Object? vitaminDUg = _sentinel,
+    Object? vitaminB12Ug = _sentinel,
     String? snapshotJson,
     DateTime? createdAt,
   }) {
@@ -201,6 +237,29 @@ class MealLogItem {
       sodiumMg: identical(sodiumMg, _sentinel)
           ? this.sodiumMg
           : sodiumMg as double?,
+      potassiumMg: identical(potassiumMg, _sentinel)
+          ? this.potassiumMg
+          : potassiumMg as double?,
+      calciumMg: identical(calciumMg, _sentinel)
+          ? this.calciumMg
+          : calciumMg as double?,
+      ironMg: identical(ironMg, _sentinel) ? this.ironMg : ironMg as double?,
+      magnesiumMg: identical(magnesiumMg, _sentinel)
+          ? this.magnesiumMg
+          : magnesiumMg as double?,
+      zincMg: identical(zincMg, _sentinel) ? this.zincMg : zincMg as double?,
+      vitaminAUg: identical(vitaminAUg, _sentinel)
+          ? this.vitaminAUg
+          : vitaminAUg as double?,
+      vitaminCMg: identical(vitaminCMg, _sentinel)
+          ? this.vitaminCMg
+          : vitaminCMg as double?,
+      vitaminDUg: identical(vitaminDUg, _sentinel)
+          ? this.vitaminDUg
+          : vitaminDUg as double?,
+      vitaminB12Ug: identical(vitaminB12Ug, _sentinel)
+          ? this.vitaminB12Ug
+          : vitaminB12Ug as double?,
       snapshotJson: snapshotJson ?? this.snapshotJson,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -222,6 +281,15 @@ class MealLogItem {
     'fiber_g': fiberG,
     'sugars_g': sugarsG,
     'sodium_mg': sodiumMg,
+    'potassium_mg': potassiumMg,
+    'calcium_mg': calciumMg,
+    'iron_mg': ironMg,
+    'magnesium_mg': magnesiumMg,
+    'zinc_mg': zincMg,
+    'vitamin_a_ug': vitaminAUg,
+    'vitamin_c_mg': vitaminCMg,
+    'vitamin_d_ug': vitaminDUg,
+    'vitamin_b12_ug': vitaminB12Ug,
     'nutrition_snapshot_json': snapshotJson,
     'created_at': createdAt.toIso8601String(),
   };
@@ -243,6 +311,15 @@ class MealLogItem {
       fiberG: (map['fiber_g'] as num?)?.toDouble(),
       sugarsG: (map['sugars_g'] as num?)?.toDouble(),
       sodiumMg: (map['sodium_mg'] as num?)?.toDouble(),
+      potassiumMg: (map['potassium_mg'] as num?)?.toDouble(),
+      calciumMg: (map['calcium_mg'] as num?)?.toDouble(),
+      ironMg: (map['iron_mg'] as num?)?.toDouble(),
+      magnesiumMg: (map['magnesium_mg'] as num?)?.toDouble(),
+      zincMg: (map['zinc_mg'] as num?)?.toDouble(),
+      vitaminAUg: (map['vitamin_a_ug'] as num?)?.toDouble(),
+      vitaminCMg: (map['vitamin_c_mg'] as num?)?.toDouble(),
+      vitaminDUg: (map['vitamin_d_ug'] as num?)?.toDouble(),
+      vitaminB12Ug: (map['vitamin_b12_ug'] as num?)?.toDouble(),
       snapshotJson: map['nutrition_snapshot_json'] as String,
       createdAt: DateTime.parse(map['created_at'] as String),
     );

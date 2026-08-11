@@ -255,6 +255,15 @@ class OpenFoodFactsGateway implements NutritionGateway {
       // Open Food Facts reports sodium (like every other nutrient)
       // per 100 g in *grams*; the app model uses milligrams.
       sodiumMg: _toMilligrams(nutriments['sodium_100g']),
+      potassiumMg: _toMilligrams(nutriments['potassium_100g']),
+      calciumMg: _toMilligrams(nutriments['calcium_100g']),
+      ironMg: _toMilligrams(nutriments['iron_100g']),
+      magnesiumMg: _toMilligrams(nutriments['magnesium_100g']),
+      zincMg: _toMilligrams(nutriments['zinc_100g']),
+      vitaminAUg: _toMicrograms(nutriments['vitamin-a_100g']),
+      vitaminCMg: _toMilligrams(nutriments['vitamin-c_100g']),
+      vitaminDUg: _toMicrograms(nutriments['vitamin-d_100g']),
+      vitaminB12Ug: _toMicrograms(nutriments['vitamin-b12_100g']),
     );
   }
 
@@ -262,6 +271,12 @@ class OpenFoodFactsGateway implements NutritionGateway {
     final value = _nonNegativeDouble(grams);
     if (value == null) return null;
     return value * 1000;
+  }
+
+  static double? _toMicrograms(dynamic grams) {
+    final value = _nonNegativeDouble(grams);
+    if (value == null) return null;
+    return value * 1000000;
   }
 
   Map<String, String> _headers() => {

@@ -241,6 +241,29 @@ void main() {
       expect(draft.values.calories, closeTo(120.5, 0.001));
       expect(draft.values.fatG, closeTo(3.2, 0.001));
     });
+
+    test('parses the supported micronutrients and preserves their units', () {
+      final draft = AiFoodLabelDraft.fromJson({
+        'name': 'Multivitamínico',
+        'per': {
+          'potassium_mg': 350,
+          'calcium_mg': 120,
+          'iron_mg': '2,4',
+          'magnesium_mg': 45,
+          'zinc_mg': 1.1,
+          'vitamin_a_ug': 90,
+          'vitamin_c_mg': 12,
+          'vitamin_d_ug': 2.5,
+          'vitamin_b12_ug': 0.6,
+        },
+      });
+      expect(draft.values.potassiumMg, 350);
+      expect(draft.values.ironMg, 2.4);
+      expect(draft.values.vitaminAUg, 90);
+      expect(draft.values.vitaminCMg, 12);
+      expect(draft.values.vitaminDUg, 2.5);
+      expect(draft.values.vitaminB12Ug, 0.6);
+    });
   });
 }
 

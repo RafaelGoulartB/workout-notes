@@ -48,6 +48,15 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
   final _fiberController = TextEditingController();
   final _sugarsController = TextEditingController();
   final _sodiumController = TextEditingController();
+  final _potassiumController = TextEditingController();
+  final _calciumController = TextEditingController();
+  final _ironController = TextEditingController();
+  final _magnesiumController = TextEditingController();
+  final _zincController = TextEditingController();
+  final _vitaminAController = TextEditingController();
+  final _vitaminCController = TextEditingController();
+  final _vitaminDController = TextEditingController();
+  final _vitaminB12Controller = TextEditingController();
   bool _isEstimated = false;
   final List<_ManualServingDraft> _servings = [];
   bool _isSaving = false;
@@ -79,6 +88,7 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
         _fillNumber(_fiberController, variant.values.fiberG);
         _fillNumber(_sugarsController, variant.values.sugarsG);
         _fillNumber(_sodiumController, variant.values.sodiumMg);
+        _fillMicronutrients(variant.values);
         _isEstimated = variant.isEstimated;
         for (final serving
             in existing.servings[variant.id] ?? const <FoodServing>[]) {
@@ -101,6 +111,7 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
     _fillNumber(_fiberController, initial.values.fiberG);
     _fillNumber(_sugarsController, initial.values.sugarsG);
     _fillNumber(_sodiumController, initial.values.sodiumMg);
+    _fillMicronutrients(initial.values);
     _isEstimated = true;
     for (final serving in initial.servings) {
       _servings.add(_servingDraftFrom(serving));
@@ -122,6 +133,15 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
       _fiberController,
       _sugarsController,
       _sodiumController,
+      _potassiumController,
+      _calciumController,
+      _ironController,
+      _magnesiumController,
+      _zincController,
+      _vitaminAController,
+      _vitaminCController,
+      _vitaminDController,
+      _vitaminB12Controller,
     ]) {
       c.dispose();
     }
@@ -170,6 +190,15 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
         fiberG: _parseDouble(_fiberController.text, null),
         sugarsG: _parseDouble(_sugarsController.text, null),
         sodiumMg: _parseDouble(_sodiumController.text, null),
+        potassiumMg: _parseDouble(_potassiumController.text, null),
+        calciumMg: _parseDouble(_calciumController.text, null),
+        ironMg: _parseDouble(_ironController.text, null),
+        magnesiumMg: _parseDouble(_magnesiumController.text, null),
+        zincMg: _parseDouble(_zincController.text, null),
+        vitaminAUg: _parseDouble(_vitaminAController.text, null),
+        vitaminCMg: _parseDouble(_vitaminCController.text, null),
+        vitaminDUg: _parseDouble(_vitaminDController.text, null),
+        vitaminB12Ug: _parseDouble(_vitaminB12Controller.text, null),
       );
       final existing = widget.existingFood;
       final food = existing == null
@@ -236,6 +265,18 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
   static void _fillNumber(TextEditingController controller, double? value) {
     if (value == null) return;
     controller.text = _formatAmount(value);
+  }
+
+  void _fillMicronutrients(NutritionValues values) {
+    _fillNumber(_potassiumController, values.potassiumMg);
+    _fillNumber(_calciumController, values.calciumMg);
+    _fillNumber(_ironController, values.ironMg);
+    _fillNumber(_magnesiumController, values.magnesiumMg);
+    _fillNumber(_zincController, values.zincMg);
+    _fillNumber(_vitaminAController, values.vitaminAUg);
+    _fillNumber(_vitaminCController, values.vitaminCMg);
+    _fillNumber(_vitaminDController, values.vitaminDUg);
+    _fillNumber(_vitaminB12Controller, values.vitaminB12Ug);
   }
 
   static _ManualServingDraft _servingDraftFrom(
@@ -352,6 +393,66 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
                     controller: _barcodeController,
                     keyboardType: TextInputType.number,
                     decoration: _fieldDecoration(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              FormSectionCard(
+                icon: Icons.eco_outlined,
+                title: loc.nutritionManualSectionMicronutrients,
+                children: [
+                  Text(
+                    loc.nutritionManualMicronutrientsHint,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final row
+                      in <
+                        (
+                          TextEditingController,
+                          String,
+                          TextEditingController,
+                          String,
+                        )
+                      >[
+                        (
+                          _potassiumController,
+                          loc.nutritionProgressPotassium,
+                          _calciumController,
+                          loc.nutritionProgressCalcium,
+                        ),
+                        (
+                          _ironController,
+                          loc.nutritionProgressIron,
+                          _magnesiumController,
+                          loc.nutritionProgressMagnesium,
+                        ),
+                        (
+                          _zincController,
+                          loc.nutritionProgressZinc,
+                          _vitaminAController,
+                          loc.nutritionProgressVitaminA,
+                        ),
+                        (
+                          _vitaminCController,
+                          loc.nutritionProgressVitaminC,
+                          _vitaminDController,
+                          loc.nutritionProgressVitaminD,
+                        ),
+                      ]) ...[
+                    _MacroFieldRow(
+                      children: [
+                        _micronutrientField(row.$1, row.$2),
+                        _micronutrientField(row.$3, row.$4),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  _micronutrientField(
+                    _vitaminB12Controller,
+                    loc.nutritionProgressVitaminB12,
                   ),
                 ],
               ),
@@ -576,6 +677,20 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       filled: true,
       fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+    );
+  }
+
+  Widget _micronutrientField(TextEditingController controller, String label) {
+    final usesMicrograms =
+        identical(controller, _vitaminAController) ||
+        identical(controller, _vitaminDController) ||
+        identical(controller, _vitaminB12Controller);
+    return _NumberField(
+      controller: controller,
+      label: '$label (${usesMicrograms ? 'µg' : 'mg'})',
+      validator: _validateNumber,
+      allowDecimal: true,
+      optional: true,
     );
   }
 }

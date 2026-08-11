@@ -44,13 +44,23 @@ Responda APENAS com JSON válido, sem markdown, sem comentários, exatamente nes
     "fat_g": null,
     "fiber_g": null,
     "sugars_g": null,
-    "sodium_mg": null
+    "sodium_mg": null,
+    "potassium_mg": null,
+    "calcium_mg": null,
+    "iron_mg": null,
+    "magnesium_mg": null,
+    "zinc_mg": null,
+    "vitamin_a_ug": null,
+    "vitamin_c_mg": null,
+    "vitamin_d_ug": null,
+    "vitamin_b12_ug": null
   },
   "servings": []
 }
 Regras:
 - "per" contém os valores POR 100 g ou 100 ml da tabela. Se a tabela só mostrar valores "por porção", converta para 100 g/ml usando o peso da porção; se a conversão não for possível, use os valores por porção e adicione uma serving com quantity 1, unit "porção" e grams_equivalent com o peso da porção.
 - Use null para valores ilegíveis; nunca invente números.
+- Preserve as unidades do formato: minerais em mg, vitamina A/D/B12 em µg e vitamina C em mg. Converta quando o rótulo usar outra unidade.
 - "servings" é uma lista opcional de porções com {label, quantity, unit, grams_equivalent}.
 - Responda somente o JSON.''';
 
