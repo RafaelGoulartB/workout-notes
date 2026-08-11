@@ -846,6 +846,7 @@
   "aiToolSleepPerformance": "Relacionando sono e desempenho",
   "aiToolNutritionBodyTrend": "Relacionando ingestão e peso",
   "aiToolRecoveryTrend": "Calculando recuperação semanal",
+  "aiToolDiscoverAppCapabilities": "Selecionando recursos do app",
   "aiToolProposeRoutineChange": "Preparando proposta de rotina",
   "aiChatPreparingProposal": "Preparando prévia da rotina…",
   "aiChatApplyingProposal": "Aplicando alterações aprovadas…",

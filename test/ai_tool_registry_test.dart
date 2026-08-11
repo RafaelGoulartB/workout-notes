@@ -31,13 +31,41 @@ void main() {
 
   test('openAiChatToolsSchema includes the guarded routine proposal tool', () {
     final tools = registry.openAiChatToolsSchema();
-    expect(tools, hasLength(19));
+    expect(tools, hasLength(20));
     final proposal = tools.firstWhere(
       (tool) => (tool['function'] as Map)['name'] == 'propose_routine_change',
     );
     final parameters = (proposal['function'] as Map)['parameters'] as Map;
     expect(parameters['required'], containsAll(<String>['action', 'routine']));
   });
+
+  test('chat schema always includes lightweight capability discovery', () {
+    final tools = registry.openAiChatToolsSchema(
+      names: const <String>{},
+      includeRoutineProposal: false,
+    );
+    expect(tools, hasLength(1));
+    expect(
+      (tools.single['function'] as Map)['name'],
+      'discover_app_capabilities',
+    );
+  });
+
+  test(
+    'capability discovery unlocks reads and guarded routine proposals',
+    () async {
+      final result = await registry.executeRead(
+        toolName: 'discover_app_capabilities',
+        args: {
+          'capabilities': ['sleep', 'routine_changes'],
+        },
+      );
+      final tools = ((result.data as Map)['tools'] as List).cast<String>();
+      expect(tools, contains('get_sleep_summary'));
+      expect(tools, contains('list_exercises'));
+      expect(tools, contains('propose_routine_change'));
+    },
+  );
 
   test('routine proposal schema uses portable scalar property types', () {
     final proposal = registry.openAiChatToolsSchema().firstWhere(

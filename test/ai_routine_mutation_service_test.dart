@@ -73,7 +73,6 @@ void main() {
       threadId: 'thread_1',
       toolCallId: toolCallId,
       args: {'action': 'create', 'routine': target()},
-      explicitRequest: true,
     );
     expect(result.ok, isTrue);
     return ((result.data as Map)['proposalId'] as String);
@@ -84,6 +83,17 @@ void main() {
     expect(await db.query('routines'), isEmpty);
     expect(await db.query('ai_routine_proposals'), hasLength(1));
   });
+
+  test(
+    'an identical pending proposal is reused when requested again',
+    () async {
+      final first = await prepare(toolCallId: 'call_1');
+      final second = await prepare(toolCallId: 'call_2');
+
+      expect(second, first);
+      expect(await db.query('ai_routine_proposals'), hasLength(1));
+    },
+  );
 
   test('rejecting a proposal does not mutate routines', () async {
     final id = await prepare();
@@ -130,7 +140,6 @@ void main() {
       threadId: 'thread_1',
       toolCallId: 'call_invalid_action',
       args: {'action': 'delete', 'routine': target()},
-      explicitRequest: true,
     );
 
     expect(result.ok, isFalse);
@@ -178,7 +187,6 @@ void main() {
     final update = await service.prepareProposal(
       threadId: 'thread_1',
       toolCallId: 'call_2',
-      explicitRequest: true,
       args: {
         'action': 'update',
         'routine_id': routineId,
@@ -219,7 +227,6 @@ void main() {
     final result = await service.prepareProposal(
       threadId: 'thread_1',
       toolCallId: 'call_duplicate_source',
-      explicitRequest: true,
       args: {
         'action': 'update',
         'routine_id': routineId,

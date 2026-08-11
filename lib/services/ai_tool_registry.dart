@@ -32,6 +32,7 @@ class AiToolRegistry {
     bool includeRoutineProposal = true,
   }) => [
     ...openAiReadToolsSchema(names: names),
+    _schemaFor('discover_app_capabilities'),
     if (includeRoutineProposal) _schemaFor('propose_routine_change'),
   ];
 
@@ -223,6 +224,8 @@ class AiToolRegistry {
           return l10n.aiToolRecoveryTrend;
         case 'propose_routine_change':
           return l10n.aiToolProposeRoutineChange;
+        case 'discover_app_capabilities':
+          return l10n.aiToolDiscoverAppCapabilities;
       }
     }
     switch (toolName) {
@@ -264,6 +267,8 @@ class AiToolRegistry {
         return 'Calculando recuperação semanal';
       case 'propose_routine_change':
         return 'Preparando proposta de rotina';
+      case 'discover_app_capabilities':
+        return 'Selecionando recursos do app';
       default:
         return toolName;
     }
@@ -276,6 +281,8 @@ class AiToolRegistry {
   }) async {
     try {
       switch (toolName) {
+        case 'discover_app_capabilities':
+          return _ok(_discoverAppCapabilities(args));
         case 'list_recent_workouts':
           return _ok(await _listRecentWorkouts(args));
         case 'get_workout_detail':
@@ -738,6 +745,56 @@ class AiToolRegistry {
     };
   }
 
+  Map<String, dynamic> _discoverAppCapabilities(Map<String, dynamic> args) {
+    final requested = (args['capabilities'] as List? ?? const [])
+        .whereType<String>()
+        .toSet();
+    final names = <String>{};
+    for (final capability in requested) {
+      names.addAll(switch (capability) {
+        'workouts' => {
+          'list_recent_workouts',
+          'get_workout_detail',
+          'get_weekly_volume_breakdown',
+        },
+        'exercises' => {
+          'list_exercises',
+          'get_exercise_history',
+          'get_exercise_personal_records',
+          'get_progress_trend',
+        },
+        'routines' => {'list_routines', 'get_routine_detail'},
+        'body' => {'list_body_measurements'},
+        'cardio' => {'get_cardio_summary'},
+        'goals' => {'list_goals', 'get_goal_progress_history'},
+        'sleep' => {'get_sleep_summary', 'analyze_sleep_performance'},
+        'nutrition' => {
+          'get_nutrition_summary',
+          'analyze_nutrition_body_trend',
+        },
+        'recovery' => {
+          'get_weekly_recovery_trend',
+          'get_sleep_summary',
+          'get_nutrition_summary',
+          'list_recent_workouts',
+        },
+        'routine_changes' => {
+          'list_exercises',
+          'list_routines',
+          'get_routine_detail',
+          'propose_routine_change',
+        },
+        _ => const <String>{},
+      });
+    }
+    return {
+      'capabilities': requested.toList(),
+      'tools': names.toList(),
+      'instruction':
+          'Use as ferramentas retornadas que forem necessárias para concluir a solicitação.',
+    };
+  }
+
   // ===========================================================================
   // SCHEMA GENERATION
   // ===========================================================================
@@ -747,6 +804,41 @@ class AiToolRegistry {
 
   Map<String, dynamic> _buildSchemaFor(String name) {
     switch (name) {
+      case 'discover_app_capabilities':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Descobre ferramentas do app por capacidade. Use quando dados do app ou uma ação ajudariam, mas a ferramenta necessária ainda não estiver disponível.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'capabilities': {
+                  'type': 'array',
+                  'items': {
+                    'type': 'string',
+                    'enum': [
+                      'workouts',
+                      'exercises',
+                      'routines',
+                      'body',
+                      'cardio',
+                      'goals',
+                      'sleep',
+                      'nutrition',
+                      'recovery',
+                      'routine_changes',
+                    ],
+                  },
+                  'description':
+                      'Uma ou mais capacidades relevantes para a tarefa.',
+                },
+              },
+              'required': ['capabilities'],
+            },
+          },
+        };
       case 'list_recent_workouts':
         return {
           'type': 'function',

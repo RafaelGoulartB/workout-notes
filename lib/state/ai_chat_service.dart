@@ -29,7 +29,7 @@ const int kTargetInputTokenBudget = 7000;
 const int kMinHistoryTokenBudget = 1200;
 const int kMaxInvalidAnswerRegenerations = 2;
 const String _routineMutationPolicy = r'''# Propostas de rotina (política fixa)
-Você pode preparar uma proposta de rotina somente quando o usuário pedir explicitamente para criar, montar, editar, alterar, adicionar ou remover conteúdo de uma rotina. Nunca proponha alterações apenas por sugestão, análise ou pergunta hipotética.
+Você pode preparar uma proposta quando isso cumprir o pedido do usuário ou transformar uma recomendação relevante em uma prévia útil. Interprete a intenção pelo significado e pelo contexto da conversa, sem exigir palavras-chave ou uma formulação específica.
 
 Quando houver esse pedido, você DEVE usar ferramentas; não responda dizendo que não consegue criar a rotina. Siga este fluxo:
 1. Para criação, chame `list_exercises` para obter IDs reais dos exercícios necessários.
@@ -37,7 +37,7 @@ Quando houver esse pedido, você DEVE usar ferramentas; não responda dizendo qu
 3. Seja proativo: se faltarem nome, divisão, séries, repetições ou descanso, NÃO peça uma lista de detalhes. Use a solicitação atual, a conversa anterior e os dados do app para decidir. Se o usuário disser “crie essa rotina”, a rotina mencionada/sugerida anteriormente na conversa é a especificação principal.
 4. Na ausência de preferência explícita, escolha uma divisão equilibrada coerente com a frequência e os grupos musculares disponíveis, 3 séries de trabalho por exercício, faixas de 8–12 repetições para musculação e 90 segundos de descanso. Dê um nome descritivo à rotina. Essas escolhas são uma prévia segura porque o usuário ainda precisa aprovar.
 5. Chame `propose_routine_change` com a árvore final completa. Campos opcionais podem ser omitidos; não escreva null se não precisar do campo.
-6. Só faça uma pergunta em vez de propor se não houver exercício compatível na biblioteca ou se houver uma restrição de segurança relevante. Caso contrário, sempre entregue a proposta para aprovação.
+6. Só faça uma pergunta em vez de propor se não houver exercício compatível na biblioteca ou se houver uma restrição de segurança relevante. Caso contrário, entregue a proposta para aprovação quando ela ajudar a concluir a tarefa.
 7. Depois do resultado da ferramenta, explique que a prévia está disponível para aprovação.
 
 `propose_routine_change` apenas prepara a prévia: ela não aplica nada. Nunca diga que criou ou editou uma rotina antes da aprovação e do resultado confirmado pelo app. Após uma aprovação, resuma somente os fatos retornados pelo app.''';
@@ -429,34 +429,36 @@ class AiChatService extends ChangeNotifier {
     final imageDataUrls = visionMessage.attachments.isEmpty
         ? const <String>[]
         : await _imageStore.readDataUrls(visionMessage.attachments);
-    final explicitRoutineTurn = _hasExplicitRoutineIntent(current);
     final latestUserText =
         current.lastWhere((message) => message.isUser).content ?? '';
     var toolNames = _tools.toolNamesForQuery(
       _routingQuery(current, latestUserText),
     );
     var proposalAvailable = false;
+    var routineCapabilityActive = toolNames.any(
+      const {'list_routines', 'get_routine_detail', 'list_exercises'}.contains,
+    );
     _context.invalidate();
     final contextJson = await _context.build(mode: contextMode);
 
     for (var round = 0; round < kMaxToolRounds + 1; round++) {
       final toolsSchema = _tools.openAiChatToolsSchema(
         names: toolNames,
-        includeRoutineProposal: explicitRoutineTurn && proposalAvailable,
+        includeRoutineProposal: proposalAvailable,
       );
 
       final wire = _buildWireMessages(
         current,
         systemPrompt: systemPrompt,
         contextJson: contextJson,
-        includeRoutinePolicy: explicitRoutineTurn,
+        includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
         visionMessageId: visionMessage.id,
         imageDataUrls: imageDataUrls,
         historyTokenBudget: _historyBudgetFor(
           systemPrompt: systemPrompt,
           contextJson: contextJson,
           toolsSchema: toolsSchema,
-          includeRoutinePolicy: explicitRoutineTurn,
+          includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
         ),
       );
 
@@ -466,9 +468,7 @@ class AiChatService extends ChangeNotifier {
       );
       notifyListeners();
 
-      final toolChoice = round == 0 && explicitRoutineTurn
-          ? 'required'
-          : 'auto';
+      const toolChoice = 'auto';
       final completion = imageDataUrls.isEmpty
           ? await _service.sendChat(
               baseUrl: baseUrl,
@@ -509,7 +509,7 @@ class AiChatService extends ChangeNotifier {
           model: model,
           systemPrompt: systemPrompt,
           contextJson: contextJson,
-          includeRoutinePolicy: explicitRoutineTurn,
+          includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
           visionMessageId: visionMessage.id,
           imageDataUrls: imageDataUrls,
         );
@@ -552,7 +552,6 @@ class AiChatService extends ChangeNotifier {
                 threadId: _state.activeThreadId ?? '',
                 toolCallId: call.id,
                 args: call.arguments,
-                explicitRequest: _hasExplicitRoutineIntent(current),
               )
             : readResults[i]!;
         if (call.name == 'propose_routine_change' && result.ok) {
@@ -578,16 +577,48 @@ class AiChatService extends ChangeNotifier {
       _state = _state.copyWith(messages: current);
       notifyListeners();
 
-      final calledNames = completion.toolCalls.map((call) => call.name);
-      toolNames = _tools.followUpToolNames(
-        calledNames,
-        routineIntent: explicitRoutineTurn,
-      );
-      proposalAvailable =
-          explicitRoutineTurn &&
-          calledNames.any(
-            (name) => name == 'list_exercises' || name == 'get_routine_detail',
+      final calledNames = completion.toolCalls.map((call) => call.name).toSet();
+      final discoveredNames = <String>{};
+      for (var i = 0; i < completion.toolCalls.length; i++) {
+        if (completion.toolCalls[i].name != 'discover_app_capabilities') {
+          continue;
+        }
+        final data = readResults[i]?.data;
+        if (data is Map) {
+          discoveredNames.addAll(
+            (data['tools'] as List? ?? const []).whereType<String>(),
           );
+        }
+      }
+      routineCapabilityActive =
+          routineCapabilityActive ||
+          discoveredNames.any(
+            const {
+              'list_routines',
+              'get_routine_detail',
+              'list_exercises',
+              'propose_routine_change',
+            }.contains,
+          );
+      final followUpNames = _tools.followUpToolNames(
+        calledNames,
+        routineIntent: routineCapabilityActive,
+      );
+      toolNames = {
+        ...followUpNames,
+        ...discoveredNames.where((name) => name != 'propose_routine_change'),
+      };
+      proposalAvailable =
+          proposalAvailable ||
+          discoveredNames.contains('propose_routine_change') ||
+          (routineCapabilityActive &&
+              calledNames.any(
+                (name) =>
+                    name == 'list_exercises' || name == 'get_routine_detail',
+              ));
+      if (calledNames.contains('propose_routine_change')) {
+        proposalAvailable = false;
+      }
 
       if (round == kMaxToolRounds) {
         // Force final answer with no tools.
@@ -600,7 +631,7 @@ class AiChatService extends ChangeNotifier {
           current,
           systemPrompt: systemPrompt,
           contextJson: contextJson,
-          includeRoutinePolicy: explicitRoutineTurn,
+          includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
           visionMessageId: visionMessage.id,
           imageDataUrls: imageDataUrls,
         );
@@ -633,7 +664,7 @@ class AiChatService extends ChangeNotifier {
           model: model,
           systemPrompt: systemPrompt,
           contextJson: contextJson,
-          includeRoutinePolicy: explicitRoutineTurn,
+          includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
           visionMessageId: visionMessage.id,
           imageDataUrls: imageDataUrls,
         );
@@ -1098,28 +1129,6 @@ class AiChatService extends ChangeNotifier {
       await _db.replaceAiChatMessages(id, rows);
       await refreshThreads();
     } catch (_) {}
-  }
-
-  bool _hasExplicitRoutineIntent(List<AiChatMessage> messages) {
-    AiChatMessage? lastUser;
-    for (final message in messages.reversed) {
-      if (message.isUser) {
-        lastUser = message;
-        break;
-      }
-    }
-    if (lastUser == null) return false;
-    final text = (lastUser.content ?? '').toLowerCase();
-    if (!RegExp(
-      r'\b(rotina|routine|treino)\b',
-      caseSensitive: false,
-    ).hasMatch(text)) {
-      return false;
-    }
-    return RegExp(
-      r'\b(cria|crie|criar|monta|monte|montar|edita|edite|editar|altera|altere|alterar|adiciona|adicione|adicionar|remove|remova|remover|troca|troque|substitua|faça|faca|make|create|edit|change|add)\b',
-      caseSensitive: false,
-    ).hasMatch(text);
   }
 
   void _replaceProposal(AiRoutineProposal proposal, {bool notify = true}) {

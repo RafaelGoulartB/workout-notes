@@ -33,16 +33,7 @@ class AiRoutineMutationService {
     required String threadId,
     required String toolCallId,
     required Map<String, dynamic> args,
-    required bool explicitRequest,
   }) async {
-    if (!explicitRequest) {
-      return const AiToolResult(
-        ok: false,
-        code: 'explicit_request_required',
-        message:
-            'Peça explicitamente para criar ou alterar uma rotina antes de preparar alterações.',
-      );
-    }
     try {
       final rawAction = args['action'];
       if (rawAction != 'create' && rawAction != 'update') {
@@ -76,6 +67,14 @@ class AiRoutineMutationService {
       final sourceValidation = _validateSourceIds(before, target);
       if (sourceValidation != null) return _invalid(sourceValidation);
       await _attachExerciseNames(target);
+      final existing = (await getThreadProposals(threadId)).firstWhereOrNull(
+        (proposal) =>
+            proposal.status == AiRoutineProposalStatus.awaitingApproval &&
+            proposal.action == action &&
+            proposal.routineId == routineId &&
+            const DeepCollectionEquality().equals(proposal.target, target),
+      );
+      if (existing != null) return _proposalResult(existing, reused: true);
       final proposal = AiRoutineProposal(
         id: _uuid.v4(),
         threadId: threadId,
@@ -89,16 +88,7 @@ class AiRoutineMutationService {
         createdAt: DateTime.now(),
       );
       await db.insertAiRoutineProposal(proposal.toRow());
-      return AiToolResult(
-        ok: true,
-        data: {
-          'proposalId': proposal.id,
-          'status': proposal.status.storageValue,
-          'action': proposal.action.storageValue,
-          'routineName': proposal.routineName,
-          'diff': proposal.diff,
-        },
-      );
+      return _proposalResult(proposal);
     } catch (e) {
       return AiToolResult(
         ok: false,
@@ -117,6 +107,21 @@ class AiRoutineMutationService {
       (await db.getAiRoutineProposalsThread(
         threadId,
       )).map(AiRoutineProposal.fromRow).toList();
+
+  AiToolResult _proposalResult(
+    AiRoutineProposal proposal, {
+    bool reused = false,
+  }) => AiToolResult(
+    ok: true,
+    data: {
+      'proposalId': proposal.id,
+      'status': proposal.status.storageValue,
+      'action': proposal.action.storageValue,
+      'routineName': proposal.routineName,
+      'diff': proposal.diff,
+      if (reused) 'reused': true,
+    },
+  );
 
   Future<AiRoutineProposal> reject(String id) async {
     final database = await db.database;
