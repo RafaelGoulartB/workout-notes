@@ -28,9 +28,9 @@ enum _NutritionMenuAction { progress, savedMeals, copyPreviousDay, manageMeals }
 /// Nutrition dashboard. Shows the day's totals at a glance, a tools
 /// grid (progress, saved meals, food library, settings) and a
 /// collapsible "today" panel with one row per configured meal. The
-/// per-meal rows open the food search pre-bound to that meal so the
-/// most common action — adding a food — is a single tap away. Tapping
-/// the summary card opens the detailed diary.
+/// per-meal rows open the detailed diary at that meal. Their trailing
+/// + buttons open food search pre-bound to the meal, while the summary
+/// card opens the detailed diary at the top.
 class NutritionHomeScreen extends StatefulWidget {
   const NutritionHomeScreen({super.key});
 
@@ -80,15 +80,20 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     }
   }
 
-  Future<void> _openDay([DateTime? date]) async {
+  Future<void> _openDay([DateTime? date, String? mealType]) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            NutritionDayDetailScreen(initialDate: date ?? DateTime.now()),
+        builder: (_) => NutritionDayDetailScreen(
+          initialDate: date ?? DateTime.now(),
+          initialMealType: mealType,
+        ),
       ),
     );
     await _load();
   }
+
+  Future<void> _openMealInDay(String mealType) =>
+      _openDay(DateTime.now(), mealType);
 
   Future<void> _pickDay() async {
     final picked = await showDatePicker(
@@ -271,6 +276,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
           child: _NutritionHomeMealRow(
             title: type.displayName(loc),
             meal: _mealFor(type.key),
+            onOpen: () => _openMealInDay(type.key),
             onAdd: () => _addToMeal(type),
           ).animate().fadeIn(duration: 220.ms, delay: 30.ms),
         ),
@@ -279,6 +285,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
           child: _NutritionHomeMealRow(
             title: meal.log.displayName(loc),
             meal: meal,
+            onOpen: () => _openMealInDay(meal.log.mealType),
             onAdd: () => _addToMeal(
               MealTypeDefinition(
                 id: meal.log.mealType,
@@ -350,7 +357,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                         _NutritionDashboardSummaryCard(
                               summary: _summary,
                               goal: _goal,
-                              onTap: _openDay,
+                              onTap: () => _openDay(),
                               onConfigureGoal: _openSettings,
                             )
                             .animate()
@@ -996,11 +1003,13 @@ class _CollapsibleSectionHeader extends StatelessWidget {
 class _NutritionHomeMealRow extends StatelessWidget {
   final String title;
   final MealLogWithItems meal;
+  final VoidCallback onOpen;
   final VoidCallback onAdd;
 
   const _NutritionHomeMealRow({
     required this.title,
     required this.meal,
+    required this.onOpen,
     required this.onAdd,
   });
 
@@ -1021,7 +1030,8 @@ class _NutritionHomeMealRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: onAdd,
+          key: ValueKey('nutrition-home-meal-${meal.log.mealType}'),
+          onTap: onOpen,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
             child: Row(
@@ -1072,16 +1082,21 @@ class _NutritionHomeMealRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withAlpha(
+                IconButton(
+                  key: ValueKey('nutrition-home-add-${meal.log.mealType}'),
+                  tooltip: loc.nutritionAddItem,
+                  onPressed: onAdd,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 36,
+                    height: 36,
+                  ),
+                  padding: EdgeInsets.zero,
+                  style: IconButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary.withAlpha(
                       hasItems ? 18 : 28,
                     ),
-                    shape: BoxShape.circle,
                   ),
-                  child: Icon(
+                  icon: Icon(
                     Icons.add_rounded,
                     color: theme.colorScheme.primary,
                     size: 20,
@@ -1198,8 +1213,13 @@ class _NutritionHomeSkeleton extends StatelessWidget {
 /// management stays focused and does not overwhelm the primary tab.
 class NutritionDayDetailScreen extends StatefulWidget {
   final DateTime? initialDate;
+  final String? initialMealType;
 
-  const NutritionDayDetailScreen({super.key, this.initialDate});
+  const NutritionDayDetailScreen({
+    super.key,
+    this.initialDate,
+    this.initialMealType,
+  });
 
   @override
   State<NutritionDayDetailScreen> createState() =>
@@ -1219,6 +1239,9 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
   bool _isLoading = true;
   bool _isMutating = false;
   late final TabController _tabController;
+  final Map<String, GlobalKey> _mealSectionKeys = {};
+  bool _didScrollToInitialMeal = false;
+  int _initialMealScrollAttempts = 0;
 
   @override
   void initState() {
@@ -1253,11 +1276,39 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
         _goal = results[3] as NutritionGoal?;
         _isLoading = false;
       });
+      _scheduleInitialMealScroll();
     } catch (_) {
       if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
+
+  void _scheduleInitialMealScroll() {
+    final mealType = widget.initialMealType;
+    if (_didScrollToInitialMeal || mealType == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _didScrollToInitialMeal) return;
+      final targetContext = _mealSectionKeys[mealType]?.currentContext;
+      if (targetContext == null) {
+        if (_initialMealScrollAttempts++ < 2) {
+          _scheduleInitialMealScroll();
+        }
+        return;
+      }
+      _didScrollToInitialMeal = true;
+      Scrollable.ensureVisible(
+        targetContext,
+        alignment: 0.08,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  GlobalKey _mealSectionKey(String mealType) => _mealSectionKeys.putIfAbsent(
+    mealType,
+    () => GlobalKey(debugLabel: 'nutrition-diary-meal-$mealType'),
+  );
 
   Future<void> _changeDay(int delta) async {
     setState(() {
@@ -1798,6 +1849,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
         SliverToBoxAdapter(
           child:
               _MealSection(
+                    key: _mealSectionKey(type.key),
                     title: type.displayName(loc),
                     meal: _mealFor(type.key),
                     onAdd: () => _addItem(type.key, type.displayName(loc)),
@@ -1814,6 +1866,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
         SliverToBoxAdapter(
           child:
               _MealSection(
+                    key: _mealSectionKey(meal.log.mealType),
                     title: meal.log.displayName(loc),
                     meal: meal,
                     onAdd: () =>
@@ -2660,6 +2713,7 @@ class _MealSection extends StatelessWidget {
   final VoidCallback onSaveAsMeal;
 
   const _MealSection({
+    super.key,
     required this.title,
     required this.meal,
     required this.onAdd,

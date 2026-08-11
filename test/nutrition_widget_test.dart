@@ -328,6 +328,70 @@ void main() {
   });
 
   testWidgets(
+    'meal row opens and scrolls the diary while its plus opens food search',
+    (tester) async {
+      await tester.runAsync(() async {
+        await tester.pumpWidget(_app(const NutritionHomeScreen()));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        await tester.pump();
+      });
+      final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+      final mealRow = find.byKey(const ValueKey('nutrition-home-meal-snacks'));
+
+      await tester.scrollUntilVisible(
+        mealRow,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -180));
+      await tester.pumpAndSettle();
+      await tester.tap(mealRow);
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 150)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(NutritionDayDetailScreen), findsOneWidget);
+      expect(find.byType(FoodSearchScreen), findsNothing);
+      expect(find.text(loc.nutritionDiaryTab), findsOneWidget);
+      final diaryScrollable = find.descendant(
+        of: find.byKey(const PageStorageKey('nutrition-diary')),
+        matching: find.byType(Scrollable),
+      );
+      expect(
+        tester.state<ScrollableState>(diaryScrollable).position.pixels,
+        greaterThan(0),
+      );
+
+      Navigator.of(tester.element(find.byType(NutritionDayDetailScreen))).pop();
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pumpAndSettle();
+
+      final addButton = find.byKey(const ValueKey('nutrition-home-add-snacks'));
+      await tester.scrollUntilVisible(
+        addButton,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -180));
+      await tester.pumpAndSettle();
+      await tester.tap(addButton);
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FoodSearchScreen), findsOneWidget);
+      expect(find.byType(NutritionDayDetailScreen), findsNothing);
+    },
+  );
+
+  testWidgets(
     'Search screen renders the manual-entry fallback on gateway error',
     (tester) async {
       final gateway = _StubGateway(
