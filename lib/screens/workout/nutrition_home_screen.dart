@@ -2948,7 +2948,6 @@ class _MealItemTile extends StatelessWidget {
       if (item.brandSnapshot != null && item.brandSnapshot!.trim().isNotEmpty)
         item.brandSnapshot!,
     ];
-    final hasWarning = item.isEstimated;
     final calories = item.calories;
     return Column(
       children: [
@@ -2983,17 +2982,6 @@ class _MealItemTile extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (hasWarning) ...[
-                            const SizedBox(width: 6),
-                            Tooltip(
-                              message: loc.nutritionEstimated,
-                              child: Icon(
-                                Icons.info_outline,
-                                size: 14,
-                                color: _nutritionWarningColor,
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                       const SizedBox(height: 2),
@@ -3069,7 +3057,3 @@ class _MealItemTile extends StatelessWidget {
     );
   }
 }
-
-/// Soft amber used for incomplete/estimated data warnings in both
-/// light and dark themes.
-const Color _nutritionWarningColor = Color(0xFFF0A202);
