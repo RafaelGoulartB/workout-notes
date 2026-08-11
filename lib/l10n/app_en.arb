@@ -1131,6 +1131,8 @@
   "nutritionSearchAll": "All",
   "nutritionSearchMyMeals": "My meals",
   "nutritionSearchMyFoods": "My foods",
+  "nutritionSearchManual": "Manual",
+  "nutritionSearchDatabase": "Database",
   "nutritionSearchHistory": "History",
   "nutritionSearchMostRecent": "Most recent",
   "nutritionScanMeal": "Scan food",

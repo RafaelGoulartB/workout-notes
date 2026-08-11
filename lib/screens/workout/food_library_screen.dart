@@ -13,6 +13,8 @@ enum _FoodLibraryAction { edit, delete }
 
 enum _FoodLibraryCreateAction { scanWithAi, manual }
 
+enum _FoodLibraryFilter { all, manual, database }
+
 /// Browsable list of every food stored on the device.
 class FoodLibraryScreen extends StatefulWidget {
   final NutritionRepository repository;
@@ -26,6 +28,7 @@ class FoodLibraryScreen extends StatefulWidget {
 class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<FoodSearchResultLite> _foods = const [];
+  _FoodLibraryFilter _activeFilter = _FoodLibraryFilter.all;
   bool _isLoading = true;
 
   @override
@@ -135,8 +138,14 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
 
   List<FoodSearchResultLite> get _visibleFoods {
     final query = Food.normalizeForSearch(_searchController.text);
-    if (query.isEmpty) return _foods;
     return _foods.where((entry) {
+      final matchesSource = switch (_activeFilter) {
+        _FoodLibraryFilter.all => true,
+        _FoodLibraryFilter.manual => entry.food.isUserCreated,
+        _FoodLibraryFilter.database => !entry.food.isUserCreated,
+      };
+      if (!matchesSource) return false;
+      if (query.isEmpty) return true;
       final brand = Food.normalizeForSearch(entry.food.brand ?? '');
       return entry.food.searchName.contains(query) || brand.contains(query);
     }).toList();
@@ -225,6 +234,12 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
                     ],
                   ),
                 ),
+                _FoodLibraryFilters(
+                  active: _activeFilter,
+                  onSelected: (filter) =>
+                      setState(() => _activeFilter = filter),
+                ),
+                const SizedBox(height: 8),
                 Expanded(child: _buildList(loc)),
               ],
             ),
@@ -256,6 +271,43 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
               ? () => _deleteFood(foods[index])
               : null,
         ),
+      ),
+    );
+  }
+}
+
+class _FoodLibraryFilters extends StatelessWidget {
+  final _FoodLibraryFilter active;
+  final ValueChanged<_FoodLibraryFilter> onSelected;
+
+  const _FoodLibraryFilters({required this.active, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final labels = <_FoodLibraryFilter, String>{
+      _FoodLibraryFilter.all: loc.nutritionSearchAll,
+      _FoodLibraryFilter.manual: loc.nutritionSearchManual,
+      _FoodLibraryFilter.database: loc.nutritionSearchDatabase,
+    };
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        children: [
+          for (final entry in labels.entries)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: ChoiceChip(
+                label: Text(entry.value),
+                selected: active == entry.key,
+                showCheckmark: false,
+                visualDensity: VisualDensity.compact,
+                onSelected: (_) => onSelected(entry.key),
+              ),
+            ),
+        ],
       ),
     );
   }

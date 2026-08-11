@@ -330,11 +330,78 @@ void main() {
       expect(find.text(loc.nutritionSearchAll), findsOneWidget);
       expect(find.text(loc.nutritionSearchMyMeals), findsOneWidget);
       expect(find.text(loc.nutritionSearchFavorites), findsOneWidget);
+      expect(find.text(loc.nutritionSearchMyFoods), findsOneWidget);
+      expect(find.text(loc.nutritionSearchManual), findsNothing);
+      expect(find.text(loc.nutritionSearchDatabase), findsNothing);
       expect(find.text(loc.nutritionScanMeal), findsOneWidget);
       expect(find.text(loc.nutritionScanBarcode), findsOneWidget);
       expect(find.text(loc.nutritionAddManually), findsOneWidget);
     },
   );
+
+  testWidgets('food library filters user-created and gateway foods by source', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await repository.createManualFood(
+        name: 'Manual do usuário',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(calories: 100),
+      );
+      await repository.createManualFood(
+        name: 'Lido por imagem',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(calories: 120),
+        source: FoodSource.aiVision,
+      );
+      final gatewayFood = Food(
+        id: 'gateway-food',
+        source: FoodSource.openFoodFacts,
+        externalId: 'off-123',
+        name: 'Alimento do gateway',
+        searchName: Food.normalizeForSearch('Alimento do gateway'),
+        fetchedAt: DateTime(2026, 8, 11),
+      );
+      await repository.upsertFoodWithDetails(
+        food: gatewayFood,
+        variants: const [
+          FoodVariant(
+            id: 'gateway-variant',
+            foodId: 'gateway-food',
+            referenceAmount: 100,
+            referenceUnit: 'g',
+            values: NutritionValues(calories: 90),
+          ),
+        ],
+      );
+    });
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(FoodLibraryScreen(repository: repository)));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+    expect(find.text(loc.nutritionFoodLibraryTitle), findsOneWidget);
+    expect(find.text(loc.nutritionSearchAll), findsOneWidget);
+    expect(find.text(loc.nutritionSearchManual), findsOneWidget);
+    expect(find.text(loc.nutritionSearchDatabase), findsOneWidget);
+
+    await tester.tap(find.text(loc.nutritionSearchManual));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Manual do usuário'), findsOneWidget);
+    expect(find.text('Lido por imagem'), findsOneWidget);
+    expect(find.text('Alimento do gateway'), findsNothing);
+
+    await tester.tap(find.text(loc.nutritionSearchDatabase));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Manual do usuário'), findsNothing);
+    expect(find.text('Lido por imagem'), findsNothing);
+    expect(find.text('Alimento do gateway'), findsOneWidget);
+  });
 
   testWidgets('Food library add menu offers AI scan and manual entry', (
     tester,

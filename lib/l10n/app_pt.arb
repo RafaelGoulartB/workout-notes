@@ -1120,6 +1120,8 @@
   "nutritionSearchAll": "Todos",
   "nutritionSearchMyMeals": "Refeições",
   "nutritionSearchMyFoods": "Meus alimentos",
+  "nutritionSearchManual": "Manual",
+  "nutritionSearchDatabase": "Base de dados",
   "nutritionSearchHistory": "Histórico",
   "nutritionSearchMostRecent": "Mais recentes",
   "nutritionScanMeal": "Escanear alimento",
