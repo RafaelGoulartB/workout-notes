@@ -56,6 +56,40 @@ void main() {
     expect(threads.first['is_pinned'], 1);
   });
 
+  test(
+    'upserting a thread does not cascade-delete its routine proposal',
+    () async {
+      final helper = DatabaseHelper.instance;
+      final database = await helper.database;
+      final timestamp = DateTime.utc(2026, 1, 2);
+      await helper.upsertAiChatThread(
+        id: 'proposal-thread',
+        title: 'Before',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      );
+      await database.insert('ai_routine_proposals', {
+        'id': 'proposal',
+        'thread_id': 'proposal-thread',
+        'tool_call_id': 'call',
+        'action': 'create',
+        'target_json': '{"name":"Test","days":[]}',
+        'diff_json': '{}',
+        'status': 'awaitingApproval',
+        'created_at': timestamp.toIso8601String(),
+      });
+
+      await helper.upsertAiChatThread(
+        id: 'proposal-thread',
+        title: 'After',
+        createdAt: timestamp,
+        updatedAt: timestamp.add(const Duration(minutes: 1)),
+      );
+
+      expect(await helper.getAiRoutineProposal('proposal'), isNotNull);
+    },
+  );
+
   test('renaming preserves the conversation activity timestamp', () async {
     final helper = DatabaseHelper.instance;
     final timestamp = DateTime.utc(2026, 1, 3, 12);

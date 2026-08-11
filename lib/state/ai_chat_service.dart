@@ -346,6 +346,10 @@ class AiChatService extends ChangeNotifier {
     );
     notifyListeners();
     try {
+      final cachedProposal = _state.proposalById(proposalId);
+      if (cachedProposal != null) {
+        await _routineMutations.restorePendingProposal(cachedProposal);
+      }
       final proposal = await _routineMutations.approve(proposalId);
       _replaceProposal(proposal, notify: false);
       await _persistCurrentThread();
@@ -431,13 +435,30 @@ class AiChatService extends ChangeNotifier {
         : await _imageStore.readDataUrls(visionMessage.attachments);
     final latestUserText =
         current.lastWhere((message) => message.isUser).content ?? '';
+    final routineProposalFollowUp = _isRoutineProposalFollowUp(
+      current,
+      latestUserText,
+    );
     var toolNames = _tools.toolNamesForQuery(
       _routingQuery(current, latestUserText),
     );
+    if (routineProposalFollowUp) {
+      toolNames.addAll({
+        'list_exercises',
+        'list_routines',
+        'get_routine_detail',
+      });
+    }
     var proposalAvailable = false;
-    var routineCapabilityActive = toolNames.any(
-      const {'list_routines', 'get_routine_detail', 'list_exercises'}.contains,
-    );
+    var routineCapabilityActive =
+        routineProposalFollowUp ||
+        toolNames.any(
+          const {
+            'list_routines',
+            'get_routine_detail',
+            'list_exercises',
+          }.contains,
+        );
     _context.invalidate();
     final contextJson = await _context.build(mode: contextMode);
 
@@ -468,7 +489,9 @@ class AiChatService extends ChangeNotifier {
       );
       notifyListeners();
 
-      const toolChoice = 'auto';
+      final toolChoice = round == 0 && routineProposalFollowUp
+          ? 'required'
+          : 'auto';
       final completion = imageDataUrls.isEmpty
           ? await _service.sendChat(
               baseUrl: baseUrl,
@@ -1006,6 +1029,36 @@ class AiChatService extends ChangeNotifier {
     }
     return latestUserText;
   }
+
+  bool _isRoutineProposalFollowUp(
+    List<AiChatMessage> messages,
+    String latestUserText,
+  ) {
+    var hasPreviousProposal = false;
+    for (var i = 0; i < messages.length - 1; i++) {
+      final message = messages[i];
+      if (message.toolName == 'propose_routine_change' ||
+          message.toolCalls.any(
+            (call) => call.name == 'propose_routine_change',
+          )) {
+        hasPreviousProposal = true;
+        break;
+      }
+    }
+    if (!hasPreviousProposal) return false;
+    final text = latestUserText.trim().toLowerCase();
+    if (text.length > 160) return false;
+    return RegExp(
+      r'\b(proposta|prévia|previa|preview|aprova|aprovar|aprovação|aprovacao|reenvia|reenvie|reenviar|envia|envie|manda|mande|mostrar|mostre|repita|repete|mesma|mesmo|novamente|dnv|de novo|outra vez|anterior|antes)\b',
+      caseSensitive: false,
+    ).hasMatch(text);
+  }
+
+  @visibleForTesting
+  bool routineProposalFollowUpForTest(
+    List<AiChatMessage> messages,
+    String latestUserText,
+  ) => _isRoutineProposalFollowUp(messages, latestUserText);
 
   String _encodeToolResult(AiToolResult result) =>
       jsonEncode(_pruneNulls(result.toMap()));

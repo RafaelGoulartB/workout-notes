@@ -2884,15 +2884,25 @@ class DatabaseHelper {
     bool isPinned = false,
   }) async {
     final db = await database;
-    await db.insert('ai_chat_threads', {
-      'id': id,
+    final values = {
       'title': title,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'last_message_preview': lastMessagePreview,
       'archived': archived ? 1 : 0,
       'is_pinned': isPinned ? 1 : 0,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    };
+    await db.transaction((txn) async {
+      final updated = await txn.update(
+        'ai_chat_threads',
+        values,
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      if (updated == 0) {
+        await txn.insert('ai_chat_threads', {'id': id, ...values});
+      }
+    });
     return id;
   }
 

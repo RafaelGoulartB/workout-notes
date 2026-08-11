@@ -95,6 +95,21 @@ void main() {
     },
   );
 
+  test(
+    'a pending in-memory proposal can be restored before approval',
+    () async {
+      final id = await prepare();
+      final cached = await service.getProposal(id);
+      await db.delete('ai_routine_proposals', where: 'id = ?', whereArgs: [id]);
+
+      await service.restorePendingProposal(cached!);
+      final applied = await service.approve(id);
+
+      expect(applied.status.name, 'applied');
+      expect(await db.query('routines'), hasLength(1));
+    },
+  );
+
   test('rejecting a proposal does not mutate routines', () async {
     final id = await prepare();
     final proposal = await service.reject(id);

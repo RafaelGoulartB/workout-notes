@@ -121,6 +121,78 @@ void main() {
 
     expect(wire.where((m) => m['role'] == 'system'), hasLength(2));
   });
+
+  test(
+    'proposal follow-up is detected from tool history, not creation verbs',
+    () {
+      final now = DateTime(2026, 8, 10);
+      final messages = [
+        _message('u1', AiMessageRole.user, now, content: 'Monte algo para mim'),
+        AiChatMessage(
+          id: 'proposal-call',
+          threadId: 'thread',
+          role: AiMessageRole.assistant,
+          toolCalls: const [
+            AiToolCall(
+              id: 'call-proposal',
+              name: 'propose_routine_change',
+              arguments: {},
+            ),
+          ],
+          createdAt: now,
+        ),
+        _message(
+          'tool',
+          AiMessageRole.tool,
+          now,
+          content: '{"ok":true}',
+          toolCallId: 'call-proposal',
+        ),
+        _message(
+          'u2',
+          AiMessageRole.user,
+          now,
+          content: 'Me mande a mesma proposta novamente',
+        ),
+      ];
+
+      expect(
+        AiChatService.instance.routineProposalFollowUpForTest(
+          messages,
+          messages.last.content!,
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  test('unrelated question is not treated as a proposal follow-up', () {
+    final now = DateTime(2026, 8, 10);
+    final messages = [
+      AiChatMessage(
+        id: 'proposal-call',
+        threadId: 'thread',
+        role: AiMessageRole.assistant,
+        toolCalls: const [
+          AiToolCall(
+            id: 'call-proposal',
+            name: 'propose_routine_change',
+            arguments: {},
+          ),
+        ],
+        createdAt: now,
+      ),
+      _message('u2', AiMessageRole.user, now, content: 'Como está meu sono?'),
+    ];
+
+    expect(
+      AiChatService.instance.routineProposalFollowUpForTest(
+        messages,
+        messages.last.content!,
+      ),
+      isFalse,
+    );
+  });
 }
 
 AiChatMessage _message(

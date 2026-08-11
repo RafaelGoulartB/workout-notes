@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:collection/collection.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
@@ -101,6 +103,12 @@ class AiRoutineMutationService {
   Future<AiRoutineProposal?> getProposal(String id) async {
     final row = await db.getAiRoutineProposal(id);
     return row == null ? null : AiRoutineProposal.fromRow(row);
+  }
+
+  Future<void> restorePendingProposal(AiRoutineProposal proposal) async {
+    if (proposal.status != AiRoutineProposalStatus.awaitingApproval) return;
+    if (await getProposal(proposal.id) != null) return;
+    await db.insertAiRoutineProposal(proposal.toRow());
   }
 
   Future<List<AiRoutineProposal>> getThreadProposals(String threadId) async =>
@@ -219,7 +227,13 @@ class AiRoutineMutationService {
         );
       });
       return (await getProposal(id))!;
-    } catch (error) {
+    } catch (error, stackTrace) {
+      developer.log(
+        'Failed to apply routine proposal $id',
+        name: 'AiRoutineMutationService',
+        error: error,
+        stackTrace: stackTrace,
+      );
       throw AiRoutineMutationException(
         code: 'routine_apply_failed',
         message: 'Não foi possível aplicar a proposta de rotina.',
