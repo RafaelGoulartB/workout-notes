@@ -120,12 +120,20 @@ void main() {
               },
             },
           ],
+          toolChoice: const {
+            'type': 'function',
+            'function': {'name': 'get_sleep_summary'},
+          },
         );
 
         final payload = jsonDecode(captured.body) as Map<String, dynamic>;
         final tool = (payload['tools'] as List).single as Map<String, dynamic>;
         expect(tool['name'], 'get_sleep_summary');
         expect(tool.containsKey('function'), isFalse);
+        expect(payload['tool_choice'], {
+          'type': 'function',
+          'name': 'get_sleep_summary',
+        });
         expect(completion.toolCalls.single.name, 'get_sleep_summary');
         expect(completion.toolCalls.single.arguments['days'], 7);
       },

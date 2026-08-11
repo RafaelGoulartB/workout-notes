@@ -193,6 +193,68 @@ void main() {
       isFalse,
     );
   });
+
+  test(
+    'explicit domain in a follow-up takes priority over previous domain',
+    () {
+      final now = DateTime(2026, 8, 10);
+      final messages = [
+        _message(
+          'u1',
+          AiMessageRole.user,
+          now,
+          content: 'Resuma meus treinos da última semana',
+        ),
+        _message(
+          'a1',
+          AiMessageRole.assistant,
+          now,
+          content: 'Resumo dos seus treinos.',
+        ),
+        _message('u2', AiMessageRole.user, now, content: 'E o sono?'),
+      ];
+
+      final names = AiChatService.instance.toolNamesForTurnForTest(
+        messages,
+        messages.last.content!,
+      );
+
+      expect(names, {'get_sleep_summary'});
+    },
+  );
+
+  test('personal data follow-up requires a tool call', () {
+    final service = AiChatService.instance;
+    const tools = {'get_sleep_summary'};
+
+    expect(service.groundedToolCallRequiredForTest('E o sono?', tools), isTrue);
+    expect(
+      service.groundedToolCallRequiredForTest('O que é sono REM?', tools),
+      isFalse,
+    );
+  });
+
+  test('single selected data tool is forced by name', () {
+    final choice = AiChatService.instance.requiredToolChoiceForTest(const {
+      'get_sleep_summary',
+    });
+
+    expect(choice, {
+      'type': 'function',
+      'function': {'name': 'get_sleep_summary'},
+    });
+  });
+
+  test('wire includes the non-editable personal-data grounding policy', () {
+    final now = DateTime(2026, 8, 10);
+    final wire = AiChatService.instance.buildWireMessagesForTest([
+      _message('u1', AiMessageRole.user, now, content: 'E o sono?'),
+    ]);
+    final system = wire.first['content'] as String;
+
+    expect(system, contains('Consulta obrigatória aos dados do app'));
+    expect(system, contains('O usuário nunca precisa pedir explicitamente'));
+  });
 }
 
 AiChatMessage _message(

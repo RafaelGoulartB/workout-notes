@@ -28,6 +28,13 @@ const int kHistoryTokenBudget = 6000;
 const int kTargetInputTokenBudget = 7000;
 const int kMinHistoryTokenBudget = 1200;
 const int kMaxInvalidAnswerRegenerations = 2;
+const int kMaxMissingToolCallRetries = 1;
+const String _dataGroundingPolicy = r'''# Consulta obrigatória aos dados do app
+As ferramentas são a fonte primária para fatos pessoais do usuário. Quando a solicitação depender de treino, sono, nutrição, medidas, metas, rotinas ou qualquer outro dado registrado, consulte a ferramenta relevante neste turno antes de responder. Não substitua a consulta por conhecimento geral, inferência ou lembrança de uma resposta anterior.
+
+Interprete continuações usando a conversa recente. Se o usuário mudar apenas o domínio, preserve os qualificadores ainda aplicáveis do pedido anterior, especialmente período, comparação e objetivo. Exemplo: depois de um resumo da última semana, "E o sono?" exige consultar o resumo de sono para o mesmo período. O usuário nunca precisa pedir explicitamente que você use uma tool.
+
+Use `discover_app_capabilities` somente quando a ferramenta necessária não estiver entre as ferramentas diretas disponíveis. Se uma consulta falhar ou não tiver registros suficientes, informe isso; nunca complete a lacuna com dados inventados.''';
 const String _routineMutationPolicy = r'''# Propostas de rotina (política fixa)
 Você pode preparar uma proposta quando isso cumprir o pedido do usuário ou transformar uma recomendação relevante em uma prévia útil. Interprete a intenção pelo significado e pelo contexto da conversa, sem exigir palavras-chave ou uma formulação específica.
 
@@ -439,9 +446,7 @@ class AiChatService extends ChangeNotifier {
       current,
       latestUserText,
     );
-    var toolNames = _tools.toolNamesForQuery(
-      _routingQuery(current, latestUserText),
-    );
+    var toolNames = _toolNamesForTurn(current, latestUserText);
     if (routineProposalFollowUp) {
       toolNames.addAll({
         'list_exercises',
@@ -459,6 +464,11 @@ class AiChatService extends ChangeNotifier {
             'list_exercises',
           }.contains,
         );
+    final requiresGroundedToolCall = _requiresGroundedToolCall(
+      latestUserText,
+      toolNames,
+      routineProposalFollowUp: routineProposalFollowUp,
+    );
     _context.invalidate();
     final contextJson = await _context.build(mode: contextMode);
 
@@ -489,10 +499,10 @@ class AiChatService extends ChangeNotifier {
       );
       notifyListeners();
 
-      final toolChoice = round == 0 && routineProposalFollowUp
-          ? 'required'
+      final toolChoice = round == 0 && requiresGroundedToolCall
+          ? _requiredToolChoice(toolNames)
           : 'auto';
-      final completion = imageDataUrls.isEmpty
+      var completion = imageDataUrls.isEmpty
           ? await _service.sendChat(
               baseUrl: baseUrl,
               token: token,
@@ -509,6 +519,19 @@ class AiChatService extends ChangeNotifier {
               tools: toolsSchema,
               toolChoice: toolChoice,
             );
+
+      if (round == 0 && requiresGroundedToolCall && !completion.hasToolCalls) {
+        completion = await _retryMissingRequiredToolCall(
+          firstCompletion: completion,
+          wire: wire,
+          baseUrl: baseUrl,
+          token: token,
+          model: model,
+          toolsSchema: toolsSchema,
+          toolChoice: toolChoice,
+          hasImages: imageDataUrls.isNotEmpty,
+        );
+      }
 
       // Persist the assistant message (may be empty if only tool calls).
       final assistant = AiChatMessage(
@@ -711,6 +734,66 @@ class AiChatService extends ChangeNotifier {
     }
   }
 
+  Future<AiChatCompletion> _retryMissingRequiredToolCall({
+    required AiChatCompletion firstCompletion,
+    required List<Map<String, dynamic>> wire,
+    required String baseUrl,
+    required String token,
+    required String model,
+    required List<Map<String, dynamic>> toolsSchema,
+    required Object toolChoice,
+    required bool hasImages,
+  }) async {
+    var completion = firstCompletion;
+    for (
+      var attempt = 0;
+      attempt < kMaxMissingToolCallRetries && !completion.hasToolCalls;
+      attempt++
+    ) {
+      final retryWire = [...wire];
+      final firstConversationMessage = retryWire.indexWhere(
+        (message) => message['role'] != 'system',
+      );
+      retryWire.insert(
+        firstConversationMessage < 0
+            ? retryWire.length
+            : firstConversationMessage,
+        const {
+          'role': 'system',
+          'content':
+              'A solicitação atual depende de dados pessoais do app. A '
+              'resposta sem consulta foi rejeitada. Chame agora uma das '
+              'ferramentas fornecidas e só responda depois do resultado.',
+        },
+      );
+      completion = hasImages
+          ? await _service.sendMultimodalChat(
+              baseUrl: baseUrl,
+              token: token,
+              model: model,
+              messages: retryWire,
+              tools: toolsSchema,
+              toolChoice: toolChoice,
+            )
+          : await _service.sendChat(
+              baseUrl: baseUrl,
+              token: token,
+              model: model,
+              messages: retryWire,
+              tools: toolsSchema,
+              toolChoice: toolChoice,
+            );
+    }
+    if (!completion.hasToolCalls) {
+      throw const AiServiceException(
+        'O provedor respondeu sem consultar os dados obrigatórios do app. '
+        'Tente novamente ou use outro modelo com suporte a tool calls.',
+        code: 'required_tool_call_missing',
+      );
+    }
+    return completion;
+  }
+
   Future<AiChatMessage?> _regenerateInvalidAnswer({
     required AiChatCompletion completion,
     required List<AiChatMessage> current,
@@ -814,7 +897,8 @@ class AiChatService extends ChangeNotifier {
     out.add({
       'role': 'system',
       'content':
-          '$systemPrompt\n\n<workout_data>${jsonEncode(contextJson)}</workout_data>',
+          '$systemPrompt\n\n$_dataGroundingPolicy\n\n'
+          '<workout_data>${jsonEncode(contextJson)}</workout_data>',
     });
     // This product safety policy is intentionally separate from the editable
     // prompt so a custom personality cannot bypass approval requirements.
@@ -997,6 +1081,7 @@ class AiChatService extends ChangeNotifier {
   }) {
     final fixedTokens =
         TokenEstimator.estimateText(systemPrompt) +
+        TokenEstimator.estimateText(_dataGroundingPolicy) +
         (includeRoutinePolicy
             ? TokenEstimator.estimateText(_routineMutationPolicy)
             : 0) +
@@ -1009,17 +1094,18 @@ class AiChatService extends ChangeNotifier {
     );
   }
 
+  Set<String> _toolNamesForTurn(
+    List<AiChatMessage> messages,
+    String latestUserText,
+  ) {
+    final currentNames = _tools.toolNamesForQuery(latestUserText);
+    if (currentNames.isNotEmpty) return currentNames;
+    return _tools.toolNamesForQuery(_routingQuery(messages, latestUserText));
+  }
+
   String _routingQuery(List<AiChatMessage> messages, String latestUserText) {
     final normalized = latestUserText.trim().toLowerCase();
-    final looksLikeFollowUp =
-        normalized.length <= 80 &&
-        (normalized.startsWith('e ') ||
-            normalized.contains('isso') ||
-            normalized.contains('essa') ||
-            normalized.contains('esse') ||
-            normalized.contains('agora') ||
-            normalized.contains('esta semana') ||
-            normalized.contains('última semana'));
+    final looksLikeFollowUp = _looksLikeFollowUp(normalized);
     if (!looksLikeFollowUp) return latestUserText;
     for (var i = messages.length - 2; i >= 0; i--) {
       final message = messages[i];
@@ -1029,6 +1115,89 @@ class AiChatService extends ChangeNotifier {
     }
     return latestUserText;
   }
+
+  bool _requiresGroundedToolCall(
+    String latestUserText,
+    Set<String> toolNames, {
+    required bool routineProposalFollowUp,
+  }) {
+    if (toolNames.isEmpty) return false;
+    if (routineProposalFollowUp) return true;
+    final normalized = latestUserText.trim().toLowerCase();
+    if (_looksLikeFollowUp(normalized)) return true;
+    if (_looksLikeGeneralKnowledgeQuestion(normalized) &&
+        !_mentionsPersonalData(normalized)) {
+      return false;
+    }
+    return true;
+  }
+
+  bool _looksLikeFollowUp(String normalized) =>
+      normalized.length <= 80 &&
+      (normalized.startsWith('e ') ||
+          normalized.contains('isso') ||
+          normalized.contains('essa') ||
+          normalized.contains('esse') ||
+          normalized.contains('agora') ||
+          normalized.contains('esta semana') ||
+          normalized.contains('última semana'));
+
+  bool _looksLikeGeneralKnowledgeQuestion(String normalized) => RegExp(
+    r'^(o que (é|e)|explique|como funciona|para que serve)(\s|$)',
+    caseSensitive: false,
+  ).hasMatch(normalized);
+
+  bool _mentionsPersonalData(String normalized) => const [
+    'meu',
+    'minha',
+    'meus',
+    'minhas',
+    'dados',
+    'registro',
+    'histórico',
+    'historico',
+    'últim',
+    'ultim',
+    'hoje',
+    'ontem',
+    'semana',
+    'mês',
+    'mes',
+    'progresso',
+    'evolução',
+    'evolucao',
+  ].any(normalized.contains);
+
+  Object _requiredToolChoice(Set<String> toolNames) {
+    if (toolNames.length == 1) {
+      return {
+        'type': 'function',
+        'function': {'name': toolNames.single},
+      };
+    }
+    return 'required';
+  }
+
+  @visibleForTesting
+  Set<String> toolNamesForTurnForTest(
+    List<AiChatMessage> messages,
+    String latestUserText,
+  ) => _toolNamesForTurn(messages, latestUserText);
+
+  @visibleForTesting
+  bool groundedToolCallRequiredForTest(
+    String latestUserText,
+    Set<String> toolNames, {
+    bool routineProposalFollowUp = false,
+  }) => _requiresGroundedToolCall(
+    latestUserText,
+    toolNames,
+    routineProposalFollowUp: routineProposalFollowUp,
+  );
+
+  @visibleForTesting
+  Object requiredToolChoiceForTest(Set<String> toolNames) =>
+      _requiredToolChoice(toolNames);
 
   bool _isRoutineProposalFollowUp(
     List<AiChatMessage> messages,

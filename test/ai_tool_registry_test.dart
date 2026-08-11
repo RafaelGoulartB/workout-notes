@@ -110,6 +110,12 @@ void main() {
     );
   });
 
+  test('short sleep follow-up exposes only the direct sleep summary', () {
+    final names = registry.toolNamesForQuery('E o sono?');
+
+    expect(names, {'get_sleep_summary'});
+  });
+
   test('tool routing sends no schemas for casual conversation', () {
     final names = registry.toolNamesForQuery('Olá, tudo bem?');
     expect(names, isEmpty);
