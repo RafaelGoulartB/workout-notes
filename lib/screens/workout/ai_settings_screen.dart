@@ -485,14 +485,6 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
           value: settings.autoExpandToolDetails,
           onChanged: _notifier.setAutoExpandToolDetails,
         ),
-        const SettingsCardDivider(),
-        SettingsSwitchTile(
-          icon: Icons.smart_toy_outlined,
-          title: l10n.aiSettingsFabTitle,
-          subtitle: l10n.aiSettingsFabSubtitle,
-          value: _notifier.fabEnabled,
-          onChanged: _notifier.setFabEnabled,
-        ),
       ],
     );
   }

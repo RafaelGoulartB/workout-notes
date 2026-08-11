@@ -1,4 +1,4 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -1387,16 +1387,6 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                               builder: (_) => const AiSettingsScreen(),
                             ),
                           );
-                        },
-                      ),
-                      const SettingsCardDivider(),
-                      SettingsSwitchTile(
-                        icon: Icons.smart_toy_outlined,
-                        title: loc.aiSettingsFabTitle,
-                        subtitle: loc.aiSettingsFabSubtitle,
-                        value: WorkoutNotesApp.aiSettings.fabEnabled,
-                        onChanged: (value) {
-                          WorkoutNotesApp.aiSettings.setFabEnabled(value);
                         },
                       ),
                     ],

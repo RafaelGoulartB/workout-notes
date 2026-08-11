@@ -12,7 +12,6 @@ const _kPrefsProviders = 'ai_providers_v1';
 const _kPrefsActiveId = 'ai_active_provider_id_v1';
 const _kPrefsSystemPrompt = 'ai_system_prompt_v1';
 const _kPrefsContextMode = 'ai_context_mode_v1';
-const _kPrefsFabEnabled = 'ai_fab_enabled_v1';
 const _kPrefsResponseStyle = 'ai_response_style_v1';
 const _kPrefsShowMessageTimestamps = 'ai_show_message_timestamps_v1';
 const _kPrefsAutoExpandToolDetails = 'ai_auto_expand_tool_details_v1';
@@ -108,7 +107,6 @@ class AiSettingsNotifier extends ChangeNotifier {
 
   AiSettings _settings;
   bool _loaded = false;
-  bool _fabEnabled = true;
 
   AiSettingsNotifier({
     required this.prefs,
@@ -123,7 +121,6 @@ class AiSettingsNotifier extends ChangeNotifier {
   bool get isConfigured => _settings.isConfigured;
   AiProvider? get activeProvider => _settings.activeProvider;
   AiContextMode get contextMode => _settings.contextMode;
-  bool get fabEnabled => _fabEnabled;
   String get systemPrompt => _settings.systemPrompt.isEmpty
       ? kDefaultAiCoachSystemPrompt
       : _settings.systemPrompt;
@@ -165,7 +162,6 @@ class AiSettingsNotifier extends ChangeNotifier {
         prefs.getBool(_kPrefsShowMessageTimestamps) ?? true;
     final autoExpandToolDetails =
         prefs.getBool(_kPrefsAutoExpandToolDetails) ?? false;
-    _fabEnabled = prefs.getBool(_kPrefsFabEnabled) ?? true;
 
     // Replace the prompts shipped by the previous AI implementation. They
     // contained literal reference-marker examples, which primes some models
@@ -361,12 +357,6 @@ class AiSettingsNotifier extends ChangeNotifier {
   Future<void> setAutoExpandToolDetails(bool enabled) async {
     _settings = _settings.copyWith(autoExpandToolDetails: enabled);
     await prefs.setBool(_kPrefsAutoExpandToolDetails, enabled);
-    notifyListeners();
-  }
-
-  Future<void> setFabEnabled(bool enabled) async {
-    _fabEnabled = enabled;
-    await prefs.setBool(_kPrefsFabEnabled, enabled);
     notifyListeners();
   }
 
