@@ -6,7 +6,7 @@ Database? _currentDb;
 /// Opens a new in-memory FFI database with the minimum schema the AI services
 /// need, installs it as [DatabaseHelper.overrideDatabase], and returns the
 /// handle. Tests should call [uninstallAiTestDb] in `tearDown`.
-Future<Database> installAiTestDb() async {
+Future<Database> installAiTestDb({bool includeRoutineDayNotes = true}) async {
   sqfliteFfiInit();
   if (_currentDb != null && _currentDb!.isOpen) {
     await _currentDb!.close();
@@ -35,7 +35,7 @@ Future<Database> installAiTestDb() async {
           'CREATE TABLE routines (id TEXT PRIMARY KEY, name TEXT, notes TEXT, created_at TEXT)',
         );
         await db.execute(
-          'CREATE TABLE routine_days (id TEXT PRIMARY KEY, routine_id TEXT, name TEXT, order_index INTEGER, notes TEXT, FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE)',
+          'CREATE TABLE routine_days (id TEXT PRIMARY KEY, routine_id TEXT, name TEXT, order_index INTEGER${includeRoutineDayNotes ? ', notes TEXT' : ''}, FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE)',
         );
         await db.execute(
           'CREATE TABLE routine_exercises (id TEXT PRIMARY KEY, routine_day_id TEXT, exercise_id TEXT, order_index INTEGER, superset_group_id TEXT, rest_time_seconds INTEGER, FOREIGN KEY (routine_day_id) REFERENCES routine_days(id) ON DELETE CASCADE, FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE)',

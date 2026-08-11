@@ -8,6 +8,9 @@ String localizeAiError(Object? error, AppLocalizations l10n) {
       : error is String && error.startsWith('ai_error:')
       ? error.substring('ai_error:'.length)
       : null;
+  if (code?.startsWith('routine_apply_failed') ?? false) {
+    return l10n.aiChatErrorRoutineApply;
+  }
   switch (code) {
     case 'missing_provider':
       return l10n.aiChatErrorNoProvider;

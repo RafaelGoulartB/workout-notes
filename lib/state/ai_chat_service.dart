@@ -359,7 +359,9 @@ class AiChatService extends ChangeNotifier {
       _state = _state.copyWith(
         phase: AiTurnPhase.failed,
         phaseMessage: null,
-        error: _readableError(e),
+        error: e is AiRoutineMutationException
+            ? 'ai_error:${e.code}:$proposalId'
+            : _readableError(e),
       );
       notifyListeners();
     }
@@ -1224,6 +1226,7 @@ class AiChatService extends ChangeNotifier {
     if (e is AiServiceException) {
       return 'ai_error:${e.code ?? 'generic'}';
     }
+    if (e is AiRoutineMutationException) return 'ai_error:${e.code}';
     return 'ai_error:generic';
   }
 

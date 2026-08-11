@@ -803,6 +803,7 @@
   "aiChatCopy": "Copiar",
   "aiChatCopied": "Mensagem copiada",
   "aiChatErrorGeneric": "Algo deu errado.",
+  "aiChatErrorRoutineApply": "Não foi possível aplicar a rotina. A prévia continua segura e você pode tentar novamente.",
   "aiChatErrorTimeout": "A IA demorou demais para responder.",
   "aiChatErrorNoProvider": "Nenhum provedor de IA configurado.",
   "aiChatErrorInvalidToken": "Token de API inválido ou ausente.",

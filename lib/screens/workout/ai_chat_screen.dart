@@ -634,6 +634,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     String error,
     AppLocalizations l10n,
   ) {
+    final failedProposalId = _failedProposalId(error);
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
       child: Container(
@@ -663,11 +664,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
             IconButton(
               tooltip: l10n.aiChatRetry,
               color: theme.colorScheme.onErrorContainer,
-              onPressed:
-                  AiChatService.instance.state.isSending ||
-                      !AiChatService.instance.state.messages.any(
-                        (message) => message.isUser,
-                      )
+              onPressed: AiChatService.instance.state.isSending
+                  ? null
+                  : failedProposalId != null
+                  ? () => AiChatService.instance.approveRoutineProposal(
+                      failedProposalId,
+                    )
+                  : !AiChatService.instance.state.messages.any(
+                      (message) => message.isUser,
+                    )
                   ? null
                   : AiChatService.instance.retryLastTurn,
               icon: const Icon(Icons.refresh_rounded, size: 20),
@@ -676,6 +681,13 @@ class _AiChatScreenState extends State<AiChatScreen> {
         ),
       ),
     );
+  }
+
+  String? _failedProposalId(String error) {
+    const prefix = 'ai_error:routine_apply_failed:';
+    if (!error.startsWith(prefix)) return null;
+    final id = error.substring(prefix.length);
+    return id.isEmpty ? null : id;
   }
 
   Widget _buildMessageTile(AiChatMessage m, int index, AppLocalizations l10n) {

@@ -802,6 +802,7 @@
   "aiChatCopy": "Copy",
   "aiChatCopied": "Message copied",
   "aiChatErrorGeneric": "Something went wrong.",
+  "aiChatErrorRoutineApply": "The routine could not be applied. The preview is still safe and you can try again.",
   "aiChatErrorTimeout": "The AI took too long to respond.",
   "aiChatErrorNoProvider": "No AI provider configured.",
   "aiChatErrorInvalidToken": "Invalid or missing API token.",

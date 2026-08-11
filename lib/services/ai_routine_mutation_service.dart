@@ -8,6 +8,21 @@ import '../models/ai_routine_proposal.dart';
 
 const _uuid = Uuid();
 
+class AiRoutineMutationException implements Exception {
+  final String code;
+  final String message;
+  final Object cause;
+
+  const AiRoutineMutationException({
+    required this.code,
+    required this.message,
+    required this.cause,
+  });
+
+  @override
+  String toString() => 'AiRoutineMutationException($code): $message';
+}
+
 /// Builds and applies routine proposals. Preparation never mutates routines.
 class AiRoutineMutationService {
   final DatabaseHelper db;
@@ -29,9 +44,11 @@ class AiRoutineMutationService {
       );
     }
     try {
-      final action = AiRoutineProposalAction.fromStorage(
-        args['action'] as String?,
-      );
+      final rawAction = args['action'];
+      if (rawAction != 'create' && rawAction != 'update') {
+        return _invalid('action deve ser create ou update.');
+      }
+      final action = AiRoutineProposalAction.fromStorage(rawAction as String);
       final routineId = args['routine_id'] as String?;
       final rawTarget = args['routine'];
       if (rawTarget is! Map) return _invalid('routine é obrigatória.');
@@ -102,17 +119,6 @@ class AiRoutineMutationService {
       )).map(AiRoutineProposal.fromRow).toList();
 
   Future<AiRoutineProposal> reject(String id) async {
-    final p = await getProposal(id);
-    if (p == null) throw StateError('Proposta não encontrada.');
-    if (p.status != AiRoutineProposalStatus.awaitingApproval) return p;
-    await db.updateAiRoutineProposal(id, {
-      'status': AiRoutineProposalStatus.rejected.storageValue,
-      'resolved_at': DateTime.now().toIso8601String(),
-    });
-    return (await getProposal(id))!;
-  }
-
-  Future<AiRoutineProposal> approve(String id) async {
     final database = await db.database;
     await database.transaction((txn) async {
       final rows = await txn.query(
@@ -123,23 +129,41 @@ class AiRoutineMutationService {
       if (rows.isEmpty) throw StateError('Proposta não encontrada.');
       final p = AiRoutineProposal.fromRow(rows.first);
       if (p.status != AiRoutineProposalStatus.awaitingApproval) return;
-      final claimed = await txn.update(
+      await txn.update(
         'ai_routine_proposals',
-        {'status': AiRoutineProposalStatus.applying.storageValue},
+        {
+          'status': AiRoutineProposalStatus.rejected.storageValue,
+          'resolved_at': DateTime.now().toIso8601String(),
+        },
         where: 'id = ? AND status = ?',
         whereArgs: [id, AiRoutineProposalStatus.awaitingApproval.storageValue],
       );
-      if (claimed != 1) return;
-      if (p.action == AiRoutineProposalAction.update) {
-        final live = await _loadRoutineTree(txn, p.routineId!);
-        if (!const DeepCollectionEquality().equals(live, p.before)) {
+    });
+    return (await getProposal(id))!;
+  }
+
+  Future<AiRoutineProposal> approve(String id) async {
+    final database = await db.database;
+    try {
+      await _repairRoutineDayNotesColumn(database);
+      await database.transaction((txn) async {
+        final rows = await txn.query(
+          'ai_routine_proposals',
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        if (rows.isEmpty) throw StateError('Proposta não encontrada.');
+        final p = AiRoutineProposal.fromRow(rows.first);
+        if (p.status != AiRoutineProposalStatus.awaitingApproval) return;
+        final missingExerciseId = await _missingExerciseId(txn, p.target);
+        if (missingExerciseId != null) {
           await txn.update(
             'ai_routine_proposals',
             {
-              'status': AiRoutineProposalStatus.stale.storageValue,
-              'error_code': 'stale',
+              'status': AiRoutineProposalStatus.failed.storageValue,
+              'error_code': 'exercise_missing',
               'error_message':
-                  'A rotina foi alterada depois que esta proposta foi criada.',
+                  'Um exercício da prévia não existe mais na biblioteca. Gere uma nova proposta.',
               'resolved_at': DateTime.now().toIso8601String(),
             },
             where: 'id = ?',
@@ -147,22 +171,86 @@ class AiRoutineMutationService {
           );
           return;
         }
+        final claimed = await txn.update(
+          'ai_routine_proposals',
+          {'status': AiRoutineProposalStatus.applying.storageValue},
+          where: 'id = ? AND status = ?',
+          whereArgs: [
+            id,
+            AiRoutineProposalStatus.awaitingApproval.storageValue,
+          ],
+        );
+        if (claimed != 1) return;
+        if (p.action == AiRoutineProposalAction.update) {
+          final live = await _loadRoutineTree(txn, p.routineId!);
+          if (!const DeepCollectionEquality().equals(live, p.before)) {
+            await txn.update(
+              'ai_routine_proposals',
+              {
+                'status': AiRoutineProposalStatus.stale.storageValue,
+                'error_code': 'stale',
+                'error_message':
+                    'A rotina foi alterada depois que esta proposta foi criada.',
+                'resolved_at': DateTime.now().toIso8601String(),
+              },
+              where: 'id = ?',
+              whereArgs: [id],
+            );
+            return;
+          }
+        }
+        final appliedId = await _applyTarget(txn, p);
+        await txn.update(
+          'ai_routine_proposals',
+          {
+            'status': AiRoutineProposalStatus.applied.storageValue,
+            'applied_routine_id': appliedId,
+            'resolved_at': DateTime.now().toIso8601String(),
+            'error_code': null,
+            'error_message': null,
+          },
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      });
+      return (await getProposal(id))!;
+    } catch (error) {
+      throw AiRoutineMutationException(
+        code: 'routine_apply_failed',
+        message: 'Não foi possível aplicar a proposta de rotina.',
+        cause: error,
+      );
+    }
+  }
+
+  Future<void> _repairRoutineDayNotesColumn(Database database) async {
+    final columns = await database.rawQuery('PRAGMA table_info(routine_days)');
+    if (columns.any((column) => column['name'] == 'notes')) return;
+    await database.execute('ALTER TABLE routine_days ADD COLUMN notes TEXT');
+  }
+
+  Future<String?> _missingExerciseId(
+    DatabaseExecutor executor,
+    Map<String, dynamic> target,
+  ) async {
+    final ids = <String>{};
+    for (final rawDay in target['days'] as List) {
+      for (final rawExercise in (rawDay as Map)['exercises'] as List) {
+        final id = (rawExercise as Map)['exercise_id'] as String;
+        ids.add(id);
       }
-      final appliedId = await _applyTarget(txn, p);
-      await txn.update(
-        'ai_routine_proposals',
-        {
-          'status': AiRoutineProposalStatus.applied.storageValue,
-          'applied_routine_id': appliedId,
-          'resolved_at': DateTime.now().toIso8601String(),
-          'error_code': null,
-          'error_message': null,
-        },
+    }
+    for (final id in ids) {
+      final rows = await executor.query(
+        'exercises',
+        columns: ['id'],
         where: 'id = ?',
         whereArgs: [id],
+        limit: 1,
       );
-    });
-    return (await getProposal(id))!;
+      if (rows.isEmpty) return id;
+    }
+    return null;
   }
 
   Future<Map<String, dynamic>?> loadRoutineTree(String id) async =>
@@ -356,6 +444,9 @@ class AiRoutineMutationService {
     final oldDays = <String, Map>{};
     final oldExercises = <String, Map>{};
     final oldSetsByExercise = <String, Set<String>>{};
+    final targetDayIds = <String>{};
+    final targetExerciseIds = <String>{};
+    final targetSetIds = <String>{};
     for (final rawDay in before['days'] as List) {
       final day = (rawDay as Map).cast<String, dynamic>();
       final dayId = day['source_day_id'] as String;
@@ -375,6 +466,9 @@ class AiRoutineMutationService {
       if (dayId != null && !oldDays.containsKey(dayId)) {
         return 'source_day_id não pertence à rotina.';
       }
+      if (dayId != null && !targetDayIds.add(dayId)) {
+        return 'source_day_id está duplicado na proposta.';
+      }
       for (final rawExercise in day['exercises'] as List) {
         final exercise = (rawExercise as Map).cast<String, dynamic>();
         final sourceExerciseId =
@@ -382,6 +476,10 @@ class AiRoutineMutationService {
         if (sourceExerciseId != null &&
             !oldExercises.containsKey(sourceExerciseId)) {
           return 'source_routine_exercise_id não pertence à rotina.';
+        }
+        if (sourceExerciseId != null &&
+            !targetExerciseIds.add(sourceExerciseId)) {
+          return 'source_routine_exercise_id está duplicado na proposta.';
         }
         for (final rawSet in exercise['sets'] as List) {
           final set = (rawSet as Map).cast<String, dynamic>();
@@ -393,6 +491,9 @@ class AiRoutineMutationService {
                       ) ??
                       false))) {
             return 'source_set_id não pertence ao exercício informado.';
+          }
+          if (sourceSetId != null && !targetSetIds.add(sourceSetId)) {
+            return 'source_set_id está duplicado na proposta.';
           }
         }
       }

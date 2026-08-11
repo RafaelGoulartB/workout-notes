@@ -23,9 +23,11 @@ enum AiRoutineProposalAction {
 
   String get storageValue => name;
 
-  static AiRoutineProposalAction fromStorage(String? value) => value == 'update'
-      ? AiRoutineProposalAction.update
-      : AiRoutineProposalAction.create;
+  static AiRoutineProposalAction fromStorage(String? value) => switch (value) {
+    'create' => AiRoutineProposalAction.create,
+    'update' => AiRoutineProposalAction.update,
+    _ => throw FormatException('Ação de proposta inválida: $value'),
+  };
 }
 
 /// Persisted, user-approvable routine mutation prepared by the AI.

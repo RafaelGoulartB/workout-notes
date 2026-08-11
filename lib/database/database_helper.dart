@@ -28,7 +28,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 32;
+  static const _dbVersion = 33;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -182,6 +182,7 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         routine_id TEXT NOT NULL,
         name TEXT,
+        notes TEXT,
         order_index INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE
       )
@@ -1996,6 +1997,13 @@ class DatabaseHelper {
         await db.execute(
           'ALTER TABLE ai_chat_messages ADD COLUMN attachments_json TEXT',
         );
+      } catch (_) {}
+    }
+    if (oldVersion < 33) {
+      // Fresh databases before v33 accidentally omitted this column from
+      // _onCreate even though the v10 migration and routine UI use it.
+      try {
+        await db.execute('ALTER TABLE routine_days ADD COLUMN notes TEXT');
       } catch (_) {}
     }
   }

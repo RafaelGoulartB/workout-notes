@@ -8,9 +8,7 @@ void main() {
   late Database db;
   late AiRoutineMutationService service;
 
-  setUp(() async {
-    db = await installAiTestDb();
-    service = AiRoutineMutationService();
+  Future<void> seedPrerequisites() async {
     final now = DateTime.now().toIso8601String();
     await db.insert('ai_chat_threads', {
       'id': 'thread_1',
@@ -33,6 +31,12 @@ void main() {
       'is_favorite': 0,
       'created_at': now,
     });
+  }
+
+  setUp(() async {
+    db = await installAiTestDb();
+    service = AiRoutineMutationService();
+    await seedPrerequisites();
   });
 
   tearDown(() async => uninstallAiTestDb());
@@ -106,6 +110,67 @@ void main() {
     expect(await db.query('routines'), hasLength(1));
   });
 
+  test('approval repairs fresh databases missing routine day notes', () async {
+    await uninstallAiTestDb();
+    db = await installAiTestDb(includeRoutineDayNotes: false);
+    service = AiRoutineMutationService();
+    await seedPrerequisites();
+
+    final id = await prepare();
+    final proposal = await service.approve(id);
+
+    expect(proposal.status.name, 'applied');
+    final columns = await db.rawQuery('PRAGMA table_info(routine_days)');
+    expect(columns.map((column) => column['name']), contains('notes'));
+    expect((await db.query('routine_days')).single['notes'], isNull);
+  });
+
+  test('invalid action is rejected instead of becoming create', () async {
+    final result = await service.prepareProposal(
+      threadId: 'thread_1',
+      toolCallId: 'call_invalid_action',
+      args: {'action': 'delete', 'routine': target()},
+      explicitRequest: true,
+    );
+
+    expect(result.ok, isFalse);
+    expect(result.code, 'invalid_args');
+    expect(await db.query('ai_routine_proposals'), isEmpty);
+  });
+
+  test('failed application rolls back the entire routine tree', () async {
+    final id = await prepare();
+    await db.update(
+      'ai_routine_proposals',
+      {'target_json': '{"name":"Broken","days":"invalid"}'},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    await expectLater(
+      service.approve(id),
+      throwsA(isA<AiRoutineMutationException>()),
+    );
+    expect(await db.query('routines'), isEmpty);
+    final row = (await db.query(
+      'ai_routine_proposals',
+      where: 'id = ?',
+      whereArgs: [id],
+    )).single;
+    expect(row['status'], 'awaitingApproval');
+  });
+
+  test('approval fails safely when an exercise no longer exists', () async {
+    final id = await prepare();
+    await db.delete('exercises', where: 'id = ?', whereArgs: ['bench']);
+
+    final proposal = await service.approve(id);
+
+    expect(proposal.status.name, 'failed');
+    expect(proposal.errorCode, 'exercise_missing');
+    expect(await db.query('routines'), isEmpty);
+  });
+
   test('an outdated update proposal is never applied', () async {
     final createdId = await prepare();
     final created = await service.approve(createdId);
@@ -141,5 +206,32 @@ void main() {
       )).first['name'],
       'Mudança manual',
     );
+  });
+
+  test('duplicate source ids in an update proposal are rejected', () async {
+    final created = await service.approve(await prepare());
+    final routineId = created.appliedRoutineId!;
+    final tree = (await service.loadRoutineTree(routineId))!;
+    final day = Map<String, dynamic>.from((tree['days'] as List).single as Map);
+    final duplicateDay = Map<String, dynamic>.from(day)
+      ..['exercises'] = <Map<String, dynamic>>[];
+
+    final result = await service.prepareProposal(
+      threadId: 'thread_1',
+      toolCallId: 'call_duplicate_source',
+      explicitRequest: true,
+      args: {
+        'action': 'update',
+        'routine_id': routineId,
+        'routine': {
+          'name': 'Duplicada',
+          'days': [day, duplicateDay],
+        },
+      },
+    );
+
+    expect(result.ok, isFalse);
+    expect(result.code, 'invalid_args');
+    expect(result.message, contains('source_day_id está duplicado'));
   });
 }
