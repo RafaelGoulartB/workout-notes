@@ -28,7 +28,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 35;
+  static const _dbVersion = 36;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -2037,6 +2037,20 @@ class DatabaseHelper {
         }
       }
     }
+    if (oldVersion < 36) {
+      // Saved meal ingredients previously persisted only the generic
+      // `serving` unit. With multiple servings that loses which gram/ml
+      // equivalence the user selected, so totals could be understated.
+      for (final statement in <String>[
+        'ALTER TABLE saved_meal_items ADD COLUMN serving_label TEXT',
+        'ALTER TABLE saved_meal_items ADD COLUMN serving_grams_equivalent REAL',
+        'ALTER TABLE saved_meal_items ADD COLUMN serving_ml_equivalent REAL',
+      ]) {
+        try {
+          await db.execute(statement);
+        } catch (_) {}
+      }
+    }
   }
 
   /// Creates the full nutrition module schema (v22) using
@@ -2196,6 +2210,9 @@ class DatabaseHelper {
         brand_snapshot TEXT,
         quantity REAL NOT NULL,
         unit TEXT NOT NULL,
+        serving_label TEXT,
+        serving_grams_equivalent REAL,
+        serving_ml_equivalent REAL,
         order_index INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (saved_meal_id) REFERENCES saved_meals(id) ON DELETE CASCADE,
         FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL,

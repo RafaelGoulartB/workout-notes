@@ -577,9 +577,14 @@ class NutritionRepository extends BaseRepository {
         name: name,
       );
       final consumed = conversion.apply(variant.values);
-      final serving = availableServings.firstWhereOrNull(
-        (s) => s.label == conversion.unit || s.unit == conversion.unit,
-      );
+      // The conversion already carries the exact serving chosen in the
+      // quantity sheet. Looking it up by the generic `serving` unit is
+      // ambiguous when a food defines more than one portion.
+      final serving =
+          conversion.serving ??
+          availableServings.firstWhereOrNull(
+            (s) => s.label == conversion.unit || s.unit == conversion.unit,
+          );
       final snapshot = NutritionSnapshot(
         version: NutritionSnapshot.currentVersion,
         source: food.source,
@@ -1201,6 +1206,9 @@ class NutritionRepository extends BaseRepository {
           'brand_snapshot': item.brandSnapshot,
           'quantity': item.quantity,
           'unit': item.unit,
+          'serving_label': item.servingLabel,
+          'serving_grams_equivalent': item.servingGramsEquivalent,
+          'serving_ml_equivalent': item.servingMlEquivalent,
           'order_index': i,
         });
       }
@@ -1282,8 +1290,13 @@ class NutritionRepository extends BaseRepository {
         orElse: () => variants.first,
       );
       final servings = details.servings[variant.id] ?? const <FoodServing>[];
-      final serving = servings.firstWhereOrNull(
-        (s) => s.label == item.unit || s.unit == item.unit,
+      final serving = _resolveSavedMealServing(
+        servings: servings,
+        variantId: variant.id,
+        unit: item.unit,
+        servingLabel: item.servingLabel,
+        gramsEquivalent: item.servingGramsEquivalent,
+        mlEquivalent: item.servingMlEquivalent,
       );
       final conversion = NutritionConversion(
         quantity: item.quantity * meal.meal.portions,
@@ -1646,6 +1659,9 @@ class NutritionRepository extends BaseRepository {
           foodVariantId: item.foodVariantId,
           quantity: item.quantity,
           unit: item.unit,
+          servingLabel: item.servingLabel,
+          servingGramsEquivalent: item.servingGramsEquivalent,
+          servingMlEquivalent: item.servingMlEquivalent,
         ),
     ];
     final computed = await _computeSavedMealTotalsFromRecords(
@@ -1676,6 +1692,9 @@ class NutritionRepository extends BaseRepository {
           foodVariantId: item.foodVariantId,
           quantity: item.quantity,
           unit: item.unit,
+          servingLabel: item.servingLabel,
+          servingGramsEquivalent: item.servingGramsEquivalent,
+          servingMlEquivalent: item.servingMlEquivalent,
         ),
     ];
     final computed = await _computeSavedMealTotalsFromRecords(
@@ -1692,7 +1711,17 @@ class NutritionRepository extends BaseRepository {
   Future<({NutritionValues? totals, Map<int, NutritionValues> byIndex})>
   _computeSavedMealTotalsFromRecords(
     DatabaseExecutor db,
-    List<({String? foodVariantId, double quantity, String unit})> records,
+    List<
+      ({
+        String? foodVariantId,
+        double quantity,
+        String unit,
+        String? servingLabel,
+        double? servingGramsEquivalent,
+        double? servingMlEquivalent,
+      })
+    >
+    records,
     double portions,
   ) async {
     if (records.isEmpty) {
@@ -1752,8 +1781,13 @@ class NutritionRepository extends BaseRepository {
           : variants[record.foodVariantId];
       if (variant == null) continue;
       final servings = servingsByVariant[variant.id] ?? const <FoodServing>[];
-      final serving = servings.firstWhereOrNull(
-        (s) => s.label == record.unit || s.unit == record.unit,
+      final serving = _resolveSavedMealServing(
+        servings: servings,
+        variantId: variant.id,
+        unit: record.unit,
+        servingLabel: record.servingLabel,
+        gramsEquivalent: record.servingGramsEquivalent,
+        mlEquivalent: record.servingMlEquivalent,
       );
       final conversion = NutritionConversion(
         quantity: record.quantity * portions,
@@ -1818,6 +1852,59 @@ class NutritionRepository extends BaseRepository {
       ),
       byIndex: byIndex,
     );
+  }
+
+  /// Resolves the precise serving selected for a saved-meal ingredient.
+  ///
+  /// New rows carry both a label and an equivalence snapshot. The current
+  /// library serving wins when its label still exists, keeping saved-meal
+  /// totals live. The snapshot is the safe fallback when the serving was
+  /// edited or deleted. Legacy rows are used only when their old unit match
+  /// identifies exactly one serving; choosing the first of several would
+  /// silently calculate the wrong calories and macros.
+  static FoodServing? _resolveSavedMealServing({
+    required List<FoodServing> servings,
+    required String variantId,
+    required String unit,
+    String? servingLabel,
+    double? gramsEquivalent,
+    double? mlEquivalent,
+  }) {
+    final normalizedUnit = NutritionConversion.normalizeUnit(unit);
+    if (normalizedUnit != 'serving' && normalizedUnit != 'unit') return null;
+
+    if (servingLabel != null && servingLabel.isNotEmpty) {
+      final byLabel = servings.where((s) => s.label == servingLabel);
+      if (byLabel.isNotEmpty) return byLabel.first;
+    }
+
+    if (gramsEquivalent != null || mlEquivalent != null) {
+      final byEquivalence = servings.where(
+        (s) =>
+            _sameNullableDouble(s.gramsEquivalent, gramsEquivalent) &&
+            _sameNullableDouble(s.mlEquivalent, mlEquivalent),
+      );
+      if (byEquivalence.isNotEmpty) return byEquivalence.first;
+
+      return FoodServing(
+        id: 'saved-meal-snapshot',
+        foodVariantId: variantId,
+        label: servingLabel ?? unit,
+        unit: unit,
+        gramsEquivalent: gramsEquivalent,
+        mlEquivalent: mlEquivalent,
+      );
+    }
+
+    final legacyMatches = servings
+        .where((s) => s.label == unit || s.unit == unit)
+        .toList();
+    return legacyMatches.length == 1 ? legacyMatches.first : null;
+  }
+
+  static bool _sameNullableDouble(double? a, double? b) {
+    if (a == null || b == null) return a == b;
+    return (a - b).abs() < 0.000001;
   }
 
   Future<List<FoodSearchResultLite>> _hydrateResults(
@@ -1968,6 +2055,9 @@ class SavedMealItemDraft {
   final String? brandSnapshot;
   final double quantity;
   final String unit;
+  final String? servingLabel;
+  final double? servingGramsEquivalent;
+  final double? servingMlEquivalent;
 
   const SavedMealItemDraft({
     this.foodId,
@@ -1976,6 +2066,9 @@ class SavedMealItemDraft {
     this.brandSnapshot,
     required this.quantity,
     required this.unit,
+    this.servingLabel,
+    this.servingGramsEquivalent,
+    this.servingMlEquivalent,
   });
 
   factory SavedMealItemDraft.fromMealLogItem(MealLogItem item) {
@@ -1986,6 +2079,8 @@ class SavedMealItemDraft {
       brandSnapshot: item.brandSnapshot,
       quantity: item.quantity,
       unit: item.unit,
+      servingGramsEquivalent: item.snapshot.gramsEquivalent,
+      servingMlEquivalent: item.snapshot.mlEquivalent,
     );
   }
 }

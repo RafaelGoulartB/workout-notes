@@ -30,6 +30,9 @@ class _Ingredient {
   String? brand;
   double quantity;
   String unit;
+  String? servingLabel;
+  double? servingGramsEquivalent;
+  double? servingMlEquivalent;
 
   _Ingredient({
     required this.id,
@@ -39,6 +42,9 @@ class _Ingredient {
     this.brand,
     required this.quantity,
     required this.unit,
+    this.servingLabel,
+    this.servingGramsEquivalent,
+    this.servingMlEquivalent,
   });
 
   factory _Ingredient.fromDraft(SavedMealItemDraft draft) => _Ingredient(
@@ -49,6 +55,9 @@ class _Ingredient {
     brand: draft.brandSnapshot,
     quantity: draft.quantity,
     unit: draft.unit,
+    servingLabel: draft.servingLabel,
+    servingGramsEquivalent: draft.servingGramsEquivalent,
+    servingMlEquivalent: draft.servingMlEquivalent,
   );
 }
 
@@ -140,6 +149,9 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
             brandSnapshot: i.brand,
             quantity: i.quantity,
             unit: i.unit,
+            servingLabel: i.servingLabel,
+            servingGramsEquivalent: i.servingGramsEquivalent,
+            servingMlEquivalent: i.servingMlEquivalent,
           ),
         )
         .toList();
@@ -198,6 +210,9 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
           brand: quantity.food.brand,
           quantity: quantity.conversion.quantity,
           unit: quantity.conversion.unit,
+          servingLabel: quantity.conversion.serving?.label,
+          servingGramsEquivalent: quantity.conversion.serving?.gramsEquivalent,
+          servingMlEquivalent: quantity.conversion.serving?.mlEquivalent,
         ),
       );
     });
@@ -206,8 +221,9 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
 
   Future<void> _editIngredient(_Ingredient ingredient) async {
     if (ingredient.foodId == null) return;
-    final details = await widget.repository
-        .getFoodWithDetails(ingredient.foodId!);
+    final details = await widget.repository.getFoodWithDetails(
+      ingredient.foodId!,
+    );
     if (details == null) return;
     if (!mounted) return;
     final variant = details.variants.isEmpty
@@ -222,7 +238,11 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
       food: details.food,
       primaryVariant: variant,
       servings: details.servings[variant.id] ?? const <FoodServing>[],
-      existing: _itemForDraft(ingredient, variant, details.servings[variant.id] ?? const []),
+      existing: _itemForDraft(
+        ingredient,
+        variant,
+        details.servings[variant.id] ?? const [],
+      ),
     );
     if (quantity == null) return;
     if (!mounted) return;
@@ -230,6 +250,11 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
       ingredient.foodVariantId = quantity.variant.id;
       ingredient.quantity = quantity.conversion.quantity;
       ingredient.unit = quantity.conversion.unit;
+      ingredient.servingLabel = quantity.conversion.serving?.label;
+      ingredient.servingGramsEquivalent =
+          quantity.conversion.serving?.gramsEquivalent;
+      ingredient.servingMlEquivalent =
+          quantity.conversion.serving?.mlEquivalent;
     });
     _recomputeTotals();
   }
@@ -241,10 +266,8 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
     FoodVariant variant,
     List<FoodServing> servings,
   ) {
-    final serving = servings.where(
-      (s) => s.label == ingredient.unit || s.unit == ingredient.unit,
-    );
-    final matched = serving.isEmpty ? null : serving.first;
+    final byLabel = servings.where((s) => s.label == ingredient.servingLabel);
+    final matched = byLabel.isNotEmpty ? byLabel.first : null;
     final snapshot = NutritionSnapshot(
       version: NutritionSnapshot.currentVersion,
       source: FoodSource.manual,
@@ -256,8 +279,9 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
       referenceUnit: variant.referenceUnit,
       quantity: ingredient.quantity,
       unit: ingredient.unit,
-      gramsEquivalent: matched?.gramsEquivalent,
-      mlEquivalent: matched?.mlEquivalent,
+      gramsEquivalent:
+          matched?.gramsEquivalent ?? ingredient.servingGramsEquivalent,
+      mlEquivalent: matched?.mlEquivalent ?? ingredient.servingMlEquivalent,
       consumed: NutritionValues.empty,
       isEstimated: variant.isEstimated,
       hasMissingValues: true,
@@ -286,7 +310,8 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
     final loc = AppLocalizations.of(context)!;
     setState(() => _isSaving = true);
     try {
-      final portions = double.tryParse(
+      final portions =
+          double.tryParse(
             _portionsController.text.trim().replaceAll(',', '.'),
           ) ??
           1;
@@ -303,6 +328,9 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
               brandSnapshot: ingredient.brand,
               quantity: ingredient.quantity,
               unit: ingredient.unit,
+              servingLabel: ingredient.servingLabel,
+              servingGramsEquivalent: ingredient.servingGramsEquivalent,
+              servingMlEquivalent: ingredient.servingMlEquivalent,
             ),
         ],
       );
@@ -359,11 +387,11 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest
-                    .withAlpha(60),
+                fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                  60,
+                ),
               ),
-              validator: (value) =>
-                  (value == null || value.trim().isEmpty)
+              validator: (value) => (value == null || value.trim().isEmpty)
                   ? loc.nutritionFieldRequired
                   : null,
             ),
@@ -379,8 +407,9 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest
-                    .withAlpha(60),
+                fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                  60,
+                ),
               ),
               validator: (value) {
                 final parsed = double.tryParse(
@@ -422,8 +451,9 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest
-                      .withAlpha(50),
+                  color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                    50,
+                  ),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Column(
@@ -462,8 +492,7 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
                           height: 1,
                           indent: 16,
                           endIndent: 16,
-                          color: theme.colorScheme.outlineVariant
-                              .withAlpha(60),
+                          color: theme.colorScheme.outlineVariant.withAlpha(60),
                         ),
                       ListTile(
                         title: Text(_ingredients[i].name),
@@ -561,9 +590,7 @@ class _NutritionTotalsCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withAlpha(80),
-        ),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),

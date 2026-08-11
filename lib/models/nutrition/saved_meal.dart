@@ -76,6 +76,15 @@ class SavedMealItem {
   final String? brandSnapshot;
   final double quantity;
   final String unit;
+
+  /// Snapshot of the exact serving selected when [unit] is `serving`.
+  ///
+  /// The label identifies the serving while it still exists in the food
+  /// library. The equivalences keep the meal calculable if that serving is
+  /// later edited or removed.
+  final String? servingLabel;
+  final double? servingGramsEquivalent;
+  final double? servingMlEquivalent;
   final int orderIndex;
 
   const SavedMealItem({
@@ -87,6 +96,9 @@ class SavedMealItem {
     this.brandSnapshot,
     required this.quantity,
     required this.unit,
+    this.servingLabel,
+    this.servingGramsEquivalent,
+    this.servingMlEquivalent,
     this.orderIndex = 0,
   });
 
@@ -99,6 +111,9 @@ class SavedMealItem {
     Object? brandSnapshot = _sentinel,
     double? quantity,
     String? unit,
+    Object? servingLabel = _sentinel,
+    Object? servingGramsEquivalent = _sentinel,
+    Object? servingMlEquivalent = _sentinel,
     int? orderIndex,
   }) {
     return SavedMealItem(
@@ -114,6 +129,15 @@ class SavedMealItem {
           : brandSnapshot as String?,
       quantity: quantity ?? this.quantity,
       unit: unit ?? this.unit,
+      servingLabel: identical(servingLabel, _sentinel)
+          ? this.servingLabel
+          : servingLabel as String?,
+      servingGramsEquivalent: identical(servingGramsEquivalent, _sentinel)
+          ? this.servingGramsEquivalent
+          : servingGramsEquivalent as double?,
+      servingMlEquivalent: identical(servingMlEquivalent, _sentinel)
+          ? this.servingMlEquivalent
+          : servingMlEquivalent as double?,
       orderIndex: orderIndex ?? this.orderIndex,
     );
   }
@@ -127,6 +151,9 @@ class SavedMealItem {
     'brand_snapshot': brandSnapshot,
     'quantity': quantity,
     'unit': unit,
+    'serving_label': servingLabel,
+    'serving_grams_equivalent': servingGramsEquivalent,
+    'serving_ml_equivalent': servingMlEquivalent,
     'order_index': orderIndex,
   };
 
@@ -140,6 +167,10 @@ class SavedMealItem {
       brandSnapshot: map['brand_snapshot'] as String?,
       quantity: (map['quantity'] as num).toDouble(),
       unit: map['unit'] as String,
+      servingLabel: map['serving_label'] as String?,
+      servingGramsEquivalent: (map['serving_grams_equivalent'] as num?)
+          ?.toDouble(),
+      servingMlEquivalent: (map['serving_ml_equivalent'] as num?)?.toDouble(),
       orderIndex: (map['order_index'] as num?)?.toInt() ?? 0,
     );
   }
