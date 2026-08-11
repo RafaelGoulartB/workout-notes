@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
@@ -46,12 +48,23 @@ class AiMessageBubble extends StatelessWidget {
                   bottomRight: Radius.circular(6),
                 ),
               ),
-              child: SelectableText(
-                message.content ?? '',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: colors.onPrimaryContainer,
-                  height: 1.4,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (message.attachments.isNotEmpty)
+                    _MessageImageGrid(message: message),
+                  if (message.attachments.isNotEmpty &&
+                      message.content?.trim().isNotEmpty == true)
+                    const SizedBox(height: 10),
+                  if (message.content?.trim().isNotEmpty == true)
+                    SelectableText(
+                      message.content!,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colors.onPrimaryContainer,
+                        height: 1.4,
+                      ),
+                    ),
+                ],
               ),
             ),
             if (showTimestamp || onCopy != null)
@@ -114,6 +127,87 @@ class AiMessageBubble extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _MessageImageGrid extends StatelessWidget {
+  final AiChatMessage message;
+
+  const _MessageImageGrid({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final attachments = message.attachments;
+    final single = attachments.length == 1;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final attachment in attachments)
+          Semantics(
+            button: true,
+            label: attachment.fileName,
+            child: GestureDetector(
+              onTap: () => showDialog<void>(
+                context: context,
+                barrierColor: Colors.black87,
+                builder: (_) => Dialog.fullscreen(
+                  backgroundColor: Colors.black,
+                  child: Stack(
+                    children: [
+                      Center(
+                        child: InteractiveViewer(
+                          minScale: .8,
+                          maxScale: 5,
+                          child: Image.file(
+                            File(attachment.path),
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, _, _) => const Icon(
+                              Icons.broken_image_outlined,
+                              color: Colors.white70,
+                              size: 48,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SafeArea(
+                        child: Align(
+                          alignment: Alignment.topRight,
+                          child: IconButton(
+                            tooltip: MaterialLocalizations.of(
+                              context,
+                            ).closeButtonTooltip,
+                            color: Colors.white,
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  File(attachment.path),
+                  width: single ? 260 : 104,
+                  height: single ? 176 : 104,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    width: single ? 260 : 104,
+                    height: single ? 176 : 104,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    child: const Icon(Icons.broken_image_outlined),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

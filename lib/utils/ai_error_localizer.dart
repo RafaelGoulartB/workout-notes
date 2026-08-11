@@ -26,6 +26,16 @@ String localizeAiError(Object? error, AppLocalizations l10n) {
     case 'http_error':
     case 'list_models_failed':
       return l10n.aiChatErrorRequest;
+    case 'vision_not_supported':
+      return l10n.aiChatErrorVisionUnsupported;
+    case 'image_missing':
+      return l10n.aiChatErrorImageMissing;
+    case 'too_many_images':
+      return l10n.aiChatTooManyImages;
+    case 'image_too_large':
+      return l10n.aiChatImageTooLarge;
+    case 'unsupported_image':
+      return l10n.aiChatUnsupportedImage;
     case 'user_message_missing':
       return l10n.aiChatErrorUserMessage;
     case 'generic':

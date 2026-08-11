@@ -53,7 +53,7 @@ Future<Database> installAiTestDb() async {
           'CREATE TABLE ai_chat_threads (id TEXT PRIMARY KEY, title TEXT, created_at TEXT, updated_at TEXT, last_message_preview TEXT, archived INTEGER DEFAULT 0, is_pinned INTEGER DEFAULT 0)',
         );
         await db.execute(
-          'CREATE TABLE ai_chat_messages (id TEXT PRIMARY KEY, thread_id TEXT, role TEXT, content TEXT, tool_call_id TEXT, tool_name TEXT, tool_calls_json TEXT, created_at TEXT, FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE)',
+          'CREATE TABLE ai_chat_messages (id TEXT PRIMARY KEY, thread_id TEXT, role TEXT, content TEXT, tool_call_id TEXT, tool_name TEXT, tool_calls_json TEXT, attachments_json TEXT, created_at TEXT, FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE)',
         );
         await db.execute(
           'CREATE TABLE ai_routine_proposals (id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, tool_call_id TEXT NOT NULL, action TEXT NOT NULL, routine_id TEXT, before_json TEXT, target_json TEXT NOT NULL, diff_json TEXT NOT NULL, status TEXT NOT NULL, applied_routine_id TEXT, error_code TEXT, error_message TEXT, created_at TEXT NOT NULL, resolved_at TEXT, FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE)',

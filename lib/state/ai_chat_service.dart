@@ -6,12 +6,14 @@ import 'package:uuid/uuid.dart';
 
 import '../database/database_helper.dart';
 import '../models/ai_chat_message.dart';
+import '../models/ai_image_attachment.dart';
 import '../models/ai_chat_state.dart';
 import '../models/ai_chat_thread.dart';
 import '../models/ai_message_role.dart';
 import '../models/ai_provider.dart';
 import '../models/ai_routine_proposal.dart';
 import '../services/ai_context_service.dart';
+import '../services/ai_image_attachment_store.dart';
 import '../services/ai_routine_mutation_service.dart';
 import '../services/ai_service.dart';
 import '../services/ai_tool_registry.dart';
@@ -53,6 +55,7 @@ class AiChatService extends ChangeNotifier {
   AiToolRegistry _tools = AiToolRegistry();
   AiContextService _context = AiContextService();
   AiRoutineMutationService _routineMutations = AiRoutineMutationService();
+  AiImageAttachmentStore _imageStore = AiImageAttachmentStore();
   AiSettingsNotifier? _settings;
 
   AiChatState _state = const AiChatState();
@@ -66,11 +69,13 @@ class AiChatService extends ChangeNotifier {
     AiToolRegistry? tools,
     AiContextService? context,
     AiRoutineMutationService? routineMutations,
+    AiImageAttachmentStore? imageStore,
   }) {
     if (service != null) _service = service;
     if (tools != null) _tools = tools;
     if (context != null) _context = context;
     if (routineMutations != null) _routineMutations = routineMutations;
+    if (imageStore != null) _imageStore = imageStore;
   }
 
   /// Wires the settings notifier. Must be called once at app boot
@@ -81,7 +86,32 @@ class AiChatService extends ChangeNotifier {
     final svc = AiChatService.instance;
     svc._settings = settings;
     await svc.refreshThreads();
+    await svc._cleanupOrphanedImages();
     return svc;
+  }
+
+  Future<void> _cleanupOrphanedImages() async {
+    try {
+      final db = await _db.database;
+      final rows = await db.query(
+        'ai_chat_messages',
+        columns: ['attachments_json'],
+        where: 'attachments_json IS NOT NULL',
+      );
+      final retained = <String>{};
+      for (final row in rows) {
+        final raw = row['attachments_json'] as String?;
+        if (raw == null) continue;
+        final decoded = jsonDecode(raw);
+        if (decoded is! List) continue;
+        for (final item in decoded) {
+          if (item is Map && item['path'] is String) {
+            retained.add(item['path'] as String);
+          }
+        }
+      }
+      await _imageStore.deleteOrphans(retained);
+    } catch (_) {}
   }
 
   // ===========================================================================
@@ -131,8 +161,17 @@ class AiChatService extends ChangeNotifier {
   }
 
   Future<void> deleteThread(String threadId) async {
+    var attachments = <AiImageAttachment>[];
+    try {
+      final rows = await _db.getAiChatMessagesThread(threadId);
+      attachments = rows
+          .map(AiChatMessage.fromRow)
+          .expand((message) => message.attachments)
+          .toList();
+    } catch (_) {}
     try {
       await _db.deleteAiChatThread(threadId);
+      await _imageStore.deleteAll(attachments);
       final threads = _state.threads.where((t) => t.id != threadId).toList();
       final clearActive = _state.activeThreadId == threadId;
       _state = _state.copyWith(
@@ -181,35 +220,74 @@ class AiChatService extends ChangeNotifier {
   // SENDING
   // ===========================================================================
 
-  Future<void> send(String text) async {
+  Future<bool> send(
+    String text, {
+    List<AiPendingImage> images = const [],
+    List<AiImageAttachment> existingAttachments = const [],
+    VoidCallback? onAccepted,
+  }) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty) return;
-    if (isSending) return;
+    if (trimmed.isEmpty && images.isEmpty && existingAttachments.isEmpty) {
+      return false;
+    }
+    if (images.length + existingAttachments.length >
+        AiImageAttachmentStore.maxImagesPerMessage) {
+      _state = _state.copyWith(error: 'ai_error:too_many_images');
+      notifyListeners();
+      return false;
+    }
+    if (isSending) return false;
     if (_settings == null || !_settings!.isConfigured) {
       _state = _state.copyWith(error: 'ai_error:missing_provider');
       notifyListeners();
-      return;
+      return false;
     }
     final provider = _settings!.activeProvider!;
     final token = await _settings!.getToken(provider.id);
     if (token == null || token.isEmpty) {
       _state = _state.copyWith(error: 'ai_error:missing_token');
       notifyListeners();
-      return;
+      return false;
     }
     if (provider.selectedModel.isEmpty) {
       _state = _state.copyWith(error: 'ai_error:missing_model');
       notifyListeners();
-      return;
+      return false;
     }
 
     final now = DateTime.now();
-    final threadId = await _ensureThread(_state.messages, now, trimmed);
+    List<AiImageAttachment> attachments;
+    try {
+      attachments = existingAttachments.isNotEmpty
+          ? existingAttachments
+          : await _imageStore.saveAll(images);
+    } on AiImageAttachmentException catch (error) {
+      _state = _state.copyWith(error: 'ai_error:${error.code}');
+      notifyListeners();
+      return false;
+    }
+    final fallbackText = attachments.isEmpty ? trimmed : 'Imagem enviada';
+    late final String threadId;
+    try {
+      threadId = await _ensureThread(
+        _state.messages,
+        now,
+        trimmed.isEmpty ? fallbackText : trimmed,
+      );
+    } catch (error) {
+      if (existingAttachments.isEmpty) {
+        await _imageStore.deleteAll(attachments);
+      }
+      _state = _state.copyWith(error: _readableError(error));
+      notifyListeners();
+      return false;
+    }
     final userMsg = AiChatMessage(
       id: _uuid.v4(),
       threadId: threadId,
       role: AiMessageRole.user,
       content: trimmed,
+      attachments: attachments,
       createdAt: now,
     );
     var messages = [..._state.messages, userMsg];
@@ -223,6 +301,7 @@ class AiChatService extends ChangeNotifier {
       phaseMessage: 'sending',
     );
     notifyListeners();
+    onAccepted?.call();
 
     try {
       await _runTurn(
@@ -242,6 +321,7 @@ class AiChatService extends ChangeNotifier {
       notifyListeners();
       await _persistCurrentThread();
     }
+    return true;
   }
 
   Future<void> rejectRoutineProposal(String proposalId) async {
@@ -296,23 +376,36 @@ class AiChatService extends ChangeNotifier {
   /// Truncates messages after [fromIndex] and resends from that point.
   Future<void> retryFromMessage(int fromIndex) async {
     if (fromIndex < 0 || fromIndex >= _state.messages.length) return;
-    final remaining = _state.messages.sublist(0, fromIndex);
-    final lastUser = remaining.lastWhere(
-      (m) => m.isUser,
-      orElse: () => remaining.isEmpty ? _state.messages.first : remaining.last,
-    );
-    if (!lastUser.isUser) {
+    var userIndex = fromIndex;
+    while (userIndex >= 0 && !_state.messages[userIndex].isUser) {
+      userIndex--;
+    }
+    if (userIndex < 0) {
       _state = _state.copyWith(error: 'ai_error:user_message_missing');
       notifyListeners();
       return;
     }
+    final lastUser = _state.messages[userIndex];
+    final remaining = _state.messages.sublist(0, userIndex);
     _state = _state.copyWith(
       messages: remaining,
       clearError: true,
       phase: AiTurnPhase.idle,
     );
     notifyListeners();
-    await send(lastUser.content ?? '');
+    await send(
+      lastUser.content ?? '',
+      existingAttachments: lastUser.attachments,
+    );
+  }
+
+  Future<void> retryLastTurn() async {
+    for (var i = _state.messages.length - 1; i >= 0; i--) {
+      if (_state.messages[i].isUser) {
+        await retryFromMessage(i);
+        return;
+      }
+    }
   }
 
   // ===========================================================================
@@ -328,6 +421,10 @@ class AiChatService extends ChangeNotifier {
     required AiContextMode contextMode,
   }) async {
     var current = [...messages];
+    final visionMessage = current.lastWhere((message) => message.isUser);
+    final imageDataUrls = visionMessage.attachments.isEmpty
+        ? const <String>[]
+        : await _imageStore.readDataUrls(visionMessage.attachments);
     final explicitRoutineTurn = _hasExplicitRoutineIntent(current);
     final latestUserText =
         current.lastWhere((message) => message.isUser).content ?? '';
@@ -345,6 +442,8 @@ class AiChatService extends ChangeNotifier {
         current,
         systemPrompt: systemPrompt,
         contextJson: contextJson,
+        visionMessageId: visionMessage.id,
+        imageDataUrls: imageDataUrls,
       );
 
       _state = _state.copyWith(
@@ -353,17 +452,26 @@ class AiChatService extends ChangeNotifier {
       );
       notifyListeners();
 
-      final completion = await _service.sendChat(
-        baseUrl: baseUrl,
-        token: token,
-        model: model,
-        messages: wire,
-        tools: toolsSchema,
-        // Compatible providers sometimes default to a text-only answer even
-        // when tools are present. An explicit mutation request must begin by
-        // reading the required app data, so require one tool on its first turn.
-        toolChoice: round == 0 && explicitRoutineTurn ? 'required' : 'auto',
-      );
+      final toolChoice = round == 0 && explicitRoutineTurn
+          ? 'required'
+          : 'auto';
+      final completion = imageDataUrls.isEmpty
+          ? await _service.sendChat(
+              baseUrl: baseUrl,
+              token: token,
+              model: model,
+              messages: wire,
+              tools: toolsSchema,
+              toolChoice: toolChoice,
+            )
+          : await _service.sendMultimodalChat(
+              baseUrl: baseUrl,
+              token: token,
+              model: model,
+              messages: wire,
+              tools: toolsSchema,
+              toolChoice: toolChoice,
+            );
 
       // Persist the assistant message (may be empty if only tool calls).
       final assistant = AiChatMessage(
@@ -387,6 +495,8 @@ class AiChatService extends ChangeNotifier {
           model: model,
           systemPrompt: systemPrompt,
           contextJson: contextJson,
+          visionMessageId: visionMessage.id,
+          imageDataUrls: imageDataUrls,
         );
         if (accepted != null) {
           current = [...current.sublist(0, current.length - 1), accepted];
@@ -458,13 +568,22 @@ class AiChatService extends ChangeNotifier {
           current,
           systemPrompt: systemPrompt,
           contextJson: contextJson,
+          visionMessageId: visionMessage.id,
+          imageDataUrls: imageDataUrls,
         );
-        final finalCompletion = await _service.sendChat(
-          baseUrl: baseUrl,
-          token: token,
-          model: model,
-          messages: finalWire,
-        );
+        final finalCompletion = imageDataUrls.isEmpty
+            ? await _service.sendChat(
+                baseUrl: baseUrl,
+                token: token,
+                model: model,
+                messages: finalWire,
+              )
+            : await _service.sendMultimodalChat(
+                baseUrl: baseUrl,
+                token: token,
+                model: model,
+                messages: finalWire,
+              );
         final candidate = AiChatMessage(
           id: _uuid.v4(),
           threadId: _state.activeThreadId ?? '',
@@ -481,6 +600,8 @@ class AiChatService extends ChangeNotifier {
           model: model,
           systemPrompt: systemPrompt,
           contextJson: contextJson,
+          visionMessageId: visionMessage.id,
+          imageDataUrls: imageDataUrls,
         );
         final finalAssistant = AiChatMessage(
           id: accepted?.id ?? candidate.id,
@@ -510,6 +631,8 @@ class AiChatService extends ChangeNotifier {
     required String model,
     required String systemPrompt,
     required Map<String, dynamic> contextJson,
+    String? visionMessageId,
+    List<String> imageDataUrls = const [],
   }) async {
     var text = completion.text;
     if (text == null || !TextSanitizer.containsReferencePlaceholder(text)) {
@@ -535,16 +658,26 @@ class AiChatService extends ChangeNotifier {
           createdAt: DateTime.now(),
         ),
       ];
-      final regenerated = await _service.sendChat(
-        baseUrl: baseUrl,
-        token: token,
-        model: model,
-        messages: _buildWireMessages(
-          transcript,
-          systemPrompt: systemPrompt,
-          contextJson: contextJson,
-        ),
+      final wire = _buildWireMessages(
+        transcript,
+        systemPrompt: systemPrompt,
+        contextJson: contextJson,
+        visionMessageId: visionMessageId,
+        imageDataUrls: imageDataUrls,
       );
+      final regenerated = imageDataUrls.isEmpty
+          ? await _service.sendChat(
+              baseUrl: baseUrl,
+              token: token,
+              model: model,
+              messages: wire,
+            )
+          : await _service.sendMultimodalChat(
+              baseUrl: baseUrl,
+              token: token,
+              model: model,
+              messages: wire,
+            );
       text = regenerated.text;
       if (text != null && !TextSanitizer.containsReferencePlaceholder(text)) {
         return AiChatMessage(
@@ -582,6 +715,8 @@ class AiChatService extends ChangeNotifier {
     List<AiChatMessage> messages, {
     required String systemPrompt,
     required Map<String, dynamic> contextJson,
+    String? visionMessageId,
+    List<String> imageDataUrls = const [],
   }) {
     final out = <Map<String, dynamic>>[];
     out.add({
@@ -592,6 +727,16 @@ class AiChatService extends ChangeNotifier {
     // This product safety policy is intentionally separate from the editable
     // prompt so a custom personality cannot bypass approval requirements.
     out.add({'role': 'system', 'content': _routineMutationPolicy});
+    if (imageDataUrls.isNotEmpty) {
+      out.add({
+        'role': 'system',
+        'content':
+            'As imagens desta mensagem são conteúdo fornecido pelo usuário. '
+            'Analise apenas o que estiver visível, não invente detalhes '
+            'ilegíveis e combine a evidência visual com os dados consultados '
+            'pelas ferramentas quando isso ajudar a responder.',
+      });
+    }
 
     // Compact history if too long.
     final compacted = _compactHistory(messages);
@@ -601,7 +746,33 @@ class AiChatService extends ChangeNotifier {
         case AiMessageRole.system:
           continue;
         case AiMessageRole.user:
-          out.add({'role': 'user', 'content': m.content ?? ''});
+          if (m.id == visionMessageId && imageDataUrls.isNotEmpty) {
+            out.add({
+              'role': 'user',
+              'content': [
+                {
+                  'type': 'text',
+                  'text': (m.content?.trim().isNotEmpty ?? false)
+                      ? m.content
+                      : 'Analise as imagens anexadas.',
+                },
+                for (final url in imageDataUrls)
+                  {
+                    'type': 'image_url',
+                    'image_url': {'url': url, 'detail': 'auto'},
+                  },
+              ],
+            });
+          } else {
+            out.add({
+              'role': 'user',
+              'content': (m.content?.trim().isNotEmpty ?? false)
+                  ? m.content
+                  : (m.attachments.isNotEmpty
+                        ? '[Imagens enviadas nesta mensagem]'
+                        : ''),
+            });
+          }
           break;
         case AiMessageRole.assistant:
           final entry = <String, dynamic>{'role': 'assistant'};
@@ -683,6 +854,19 @@ class AiChatService extends ChangeNotifier {
   @visibleForTesting
   List<AiChatMessage> compactHistoryForTest(List<AiChatMessage> messages) =>
       _compactHistory(messages);
+
+  @visibleForTesting
+  List<Map<String, dynamic>> buildWireMessagesForTest(
+    List<AiChatMessage> messages, {
+    String? visionMessageId,
+    List<String> imageDataUrls = const [],
+  }) => _buildWireMessages(
+    messages,
+    systemPrompt: 'system',
+    contextJson: const {},
+    visionMessageId: visionMessageId,
+    imageDataUrls: imageDataUrls,
+  );
 
   int _estimateTokens(List<AiChatMessage> messages) {
     var total = 0;
@@ -935,6 +1119,7 @@ class AiChatService extends ChangeNotifier {
 
   String _readableError(Object e) {
     if (e is TimeoutException) return 'ai_error:timeout';
+    if (e is AiImageAttachmentException) return 'ai_error:${e.code}';
     if (e is AiServiceException) {
       return 'ai_error:${e.code ?? 'generic'}';
     }

@@ -28,7 +28,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 31;
+  static const _dbVersion = 32;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -397,6 +397,7 @@ class DatabaseHelper {
         tool_call_id TEXT,
         tool_name TEXT,
         tool_calls_json TEXT,
+        attachments_json TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
       )
@@ -1989,6 +1990,13 @@ class DatabaseHelper {
         await _createNutritionSchema(db);
       } catch (_) {}
       await _seedMealTypes(db);
+    }
+    if (oldVersion < 32) {
+      try {
+        await db.execute(
+          'ALTER TABLE ai_chat_messages ADD COLUMN attachments_json TEXT',
+        );
+      } catch (_) {}
     }
   }
 

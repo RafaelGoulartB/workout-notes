@@ -206,20 +206,51 @@ class AiService {
     required String model,
     required List<Map<String, dynamic>> messages,
   }) {
-    if (_usesResponsesApiForVision(baseUrl: baseUrl, model: model)) {
-      return _sendResponsesVision(
-        baseUrl: baseUrl,
-        token: token,
-        model: model,
-        messages: messages,
-      );
-    }
-    return sendChat(
+    return sendMultimodalChat(
       baseUrl: baseUrl,
       token: token,
       model: model,
       messages: messages,
     );
+  }
+
+  /// Sends a multimodal chat while preserving tool calling support.
+  Future<AiChatCompletion> sendMultimodalChat({
+    required String baseUrl,
+    required String token,
+    required String model,
+    required List<Map<String, dynamic>> messages,
+    List<Map<String, dynamic>>? tools,
+    Object? toolChoice,
+  }) async {
+    try {
+      if (_usesResponsesApiForVision(baseUrl: baseUrl, model: model)) {
+        return await _sendResponsesVision(
+          baseUrl: baseUrl,
+          token: token,
+          model: model,
+          messages: messages,
+          tools: tools,
+          toolChoice: toolChoice,
+        );
+      }
+      return await sendChat(
+        baseUrl: baseUrl,
+        token: token,
+        model: model,
+        messages: messages,
+        tools: tools,
+        toolChoice: toolChoice,
+      );
+    } on AiServiceException catch (error) {
+      if (error.code == 'http_error' || error.code == 'invalid_response') {
+        throw const AiServiceException(
+          'The provider rejected the multimodal request.',
+          code: 'vision_not_supported',
+        );
+      }
+      rethrow;
+    }
   }
 
   bool _usesResponsesApiForVision({
@@ -236,6 +267,8 @@ class AiService {
     required String token,
     required String model,
     required List<Map<String, dynamic>> messages,
+    List<Map<String, dynamic>>? tools,
+    Object? toolChoice,
   }) async {
     final instructions = messages
         .where((message) => message['role'] == 'system')
@@ -246,6 +279,15 @@ class AiService {
     for (final message in messages.where(
       (message) => message['role'] != 'system',
     )) {
+      final role = message['role'];
+      if (role == 'tool') {
+        input.add({
+          'type': 'function_call_output',
+          'call_id': message['tool_call_id'],
+          'output': message['content'] ?? '',
+        });
+        continue;
+      }
       final content = message['content'];
       final parts = <Map<String, dynamic>>[];
       if (content is String) {
@@ -265,7 +307,21 @@ class AiService {
         }
       }
       if (parts.isNotEmpty) {
-        input.add({'role': message['role'], 'content': parts});
+        input.add({'role': role, 'content': parts});
+      }
+      final toolCalls = message['tool_calls'];
+      if (toolCalls is List) {
+        for (final rawCall in toolCalls) {
+          if (rawCall is! Map) continue;
+          final function = rawCall['function'];
+          if (function is! Map) continue;
+          input.add({
+            'type': 'function_call',
+            'call_id': rawCall['id'],
+            'name': function['name'],
+            'arguments': function['arguments'] ?? '{}',
+          });
+        }
       }
     }
 
@@ -274,6 +330,10 @@ class AiService {
       'model': model,
       if (instructions.isNotEmpty) 'instructions': instructions,
       'input': input,
+      if (tools != null && tools.isNotEmpty)
+        'tools': tools.map(_responsesTool).toList(),
+      if (tools != null && tools.isNotEmpty)
+        'tool_choice': toolChoice ?? 'auto',
     };
     final res = await _client
         .post(
@@ -314,6 +374,7 @@ class AiService {
     final usage = body['usage'];
     return AiChatCompletion(
       text: text,
+      toolCalls: _extractResponsesToolCalls(body),
       hadReferencePlaceholders:
           rawText != null &&
           TextSanitizer.containsReferencePlaceholder(rawText),
@@ -324,6 +385,38 @@ class AiService {
           ? (usage['output_tokens'] as num?)?.toInt()
           : null,
     );
+  }
+
+  Map<String, dynamic> _responsesTool(Map<String, dynamic> tool) {
+    final function = tool['function'];
+    if (function is! Map) return tool;
+    return {
+      'type': 'function',
+      'name': function['name'],
+      if (function['description'] != null)
+        'description': function['description'],
+      'parameters': function['parameters'] ?? const <String, dynamic>{},
+    };
+  }
+
+  List<AiToolCall> _extractResponsesToolCalls(Map<dynamic, dynamic> body) {
+    final output = body['output'];
+    if (output is! List) return const [];
+    final calls = <AiToolCall>[];
+    for (final item in output) {
+      if (item is! Map || item['type'] != 'function_call') continue;
+      calls.add(
+        AiToolCall.fromJson({
+          'id': item['call_id'] ?? item['id'] ?? '',
+          'type': 'function',
+          'function': {
+            'name': item['name'] ?? '',
+            'arguments': item['arguments'] ?? '{}',
+          },
+        }),
+      );
+    }
+    return calls;
   }
 
   String? _extractResponsesText(Map<dynamic, dynamic> body) {

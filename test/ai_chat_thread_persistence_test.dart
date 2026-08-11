@@ -1,6 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/ai_chat_thread.dart';
+import 'package:workout_notes/models/ai_chat_message.dart';
+import 'package:workout_notes/models/ai_image_attachment.dart';
+import 'package:workout_notes/models/ai_message_role.dart';
 
 import 'support/ai_test_db.dart';
 
@@ -67,5 +70,39 @@ void main() {
     final thread = (await helper.getAiChatThreads()).single;
     expect(thread['title'], 'After');
     expect(thread['updated_at'], timestamp.toIso8601String());
+  });
+
+  test('message image metadata survives SQLite persistence', () async {
+    final helper = DatabaseHelper.instance;
+    final timestamp = DateTime.utc(2026, 1, 3, 12);
+    await helper.upsertAiChatThread(
+      id: 'thread-images',
+      title: 'Images',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    );
+    final message = AiChatMessage(
+      id: 'message-images',
+      threadId: 'thread-images',
+      role: AiMessageRole.user,
+      content: 'Analise',
+      attachments: const [
+        AiImageAttachment(
+          id: 'image',
+          path: '/local/image.jpg',
+          mimeType: 'image/jpeg',
+          fileName: 'image.jpg',
+          sizeBytes: 42,
+        ),
+      ],
+      createdAt: timestamp,
+    );
+
+    await helper.replaceAiChatMessages('thread-images', [message.toRow()]);
+    final restored = AiChatMessage.fromRow(
+      (await helper.getAiChatMessagesThread('thread-images')).single,
+    );
+    expect(restored.attachments.single.fileName, 'image.jpg');
+    expect(restored.attachments.single.sizeBytes, 42);
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../models/ai_image_attachment.dart';
 
 /// Mobile-first composer inspired by current conversational AI apps.
 ///
@@ -12,6 +13,10 @@ class AiChatInputBar extends StatefulWidget {
   final bool enabled;
   final bool sending;
   final VoidCallback onSend;
+  final List<AiPendingImage> images;
+  final VoidCallback? onAddImages;
+  final ValueChanged<int>? onRemoveImage;
+  final bool pickingImages;
 
   const AiChatInputBar({
     super.key,
@@ -19,6 +24,10 @@ class AiChatInputBar extends StatefulWidget {
     required this.enabled,
     required this.sending,
     required this.onSend,
+    this.images = const [],
+    this.onAddImages,
+    this.onRemoveImage,
+    this.pickingImages = false,
   });
 
   @override
@@ -29,7 +38,7 @@ class _AiChatInputBarState extends State<AiChatInputBar> {
   bool get _canSend =>
       widget.enabled &&
       !widget.sending &&
-      widget.controller.text.trim().isNotEmpty;
+      (widget.controller.text.trim().isNotEmpty || widget.images.isNotEmpty);
 
   @override
   void initState() {
@@ -81,79 +90,129 @@ class _AiChatInputBarState extends State<AiChatInputBar> {
                 side: BorderSide(color: colors.outlineVariant),
               ),
               clipBehavior: Clip.antiAlias,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: widget.controller,
-                      // Keep drafting available while the model is working;
-                      // only sending is locked until the current turn ends.
-                      enabled: widget.enabled,
-                      minLines: 1,
-                      maxLines: 6,
-                      keyboardType: TextInputType.multiline,
-                      textCapitalization: TextCapitalization.sentences,
-                      textInputAction: TextInputAction.newline,
-                      style: theme.textTheme.bodyLarge?.copyWith(height: 1.35),
-                      decoration: InputDecoration(
-                        hintText: widget.enabled
-                            ? l10n.aiChatInputHint
-                            : l10n.aiChatInputHintDisabled,
-                        hintStyle: TextStyle(color: colors.onSurfaceVariant),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        disabledBorder: InputBorder.none,
-                        filled: false,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.fromLTRB(
-                          16,
-                          14,
-                          8,
-                          14,
+                  if (widget.images.isNotEmpty)
+                    SizedBox(
+                      height: 82,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                        itemCount: widget.images.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) => _PendingImagePreview(
+                          image: widget.images[index],
+                          removeTooltip: l10n.aiChatRemoveImage,
+                          onRemove: widget.sending
+                              ? null
+                              : () => widget.onRemoveImage?.call(index),
                         ),
                       ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 6, bottom: 6),
-                    child: Semantics(
-                      button: true,
-                      enabled: _canSend,
-                      label: l10n.aiChatSend,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 160),
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _canSend
-                              ? colors.primary
-                              : colors.surfaceContainerHighest,
-                        ),
-                        child: widget.sending
-                            ? Padding(
-                                padding: const EdgeInsets.all(11),
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: colors.onSurfaceVariant,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 5, bottom: 6),
+                        child: widget.pickingImages
+                            ? const SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: Padding(
+                                  padding: EdgeInsets.all(11),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 ),
                               )
                             : IconButton(
-                                tooltip: l10n.aiChatSend,
-                                onPressed: _canSend ? _handleSend : null,
-                                padding: EdgeInsets.zero,
-                                icon: Icon(
-                                  Icons.arrow_upward_rounded,
-                                  size: 22,
-                                  color: _canSend
-                                      ? colors.onPrimary
-                                      : colors.onSurfaceVariant,
+                                tooltip: l10n.aiChatAddImages,
+                                onPressed:
+                                    widget.enabled &&
+                                        !widget.sending &&
+                                        widget.images.length < kMaxAiChatImages
+                                    ? widget.onAddImages
+                                    : null,
+                                icon: const Icon(
+                                  Icons.add_photo_alternate_outlined,
                                 ),
                               ),
                       ),
-                    ),
+                      Expanded(
+                        child: TextField(
+                          controller: widget.controller,
+                          enabled: widget.enabled,
+                          minLines: 1,
+                          maxLines: 6,
+                          keyboardType: TextInputType.multiline,
+                          textCapitalization: TextCapitalization.sentences,
+                          textInputAction: TextInputAction.newline,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            height: 1.35,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: widget.enabled
+                                ? l10n.aiChatInputHint
+                                : l10n.aiChatInputHintDisabled,
+                            hintStyle: TextStyle(
+                              color: colors.onSurfaceVariant,
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
+                            filled: false,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.fromLTRB(
+                              4,
+                              14,
+                              8,
+                              14,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 6, bottom: 6),
+                        child: Semantics(
+                          button: true,
+                          enabled: _canSend,
+                          label: l10n.aiChatSend,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 160),
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _canSend
+                                  ? colors.primary
+                                  : colors.surfaceContainerHighest,
+                            ),
+                            child: widget.sending
+                                ? Padding(
+                                    padding: const EdgeInsets.all(11),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: colors.onSurfaceVariant,
+                                    ),
+                                  )
+                                : IconButton(
+                                    tooltip: l10n.aiChatSend,
+                                    onPressed: _canSend ? _handleSend : null,
+                                    padding: EdgeInsets.zero,
+                                    icon: Icon(
+                                      Icons.arrow_upward_rounded,
+                                      size: 22,
+                                      color: _canSend
+                                          ? colors.onPrimary
+                                          : colors.onSurfaceVariant,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -161,6 +220,66 @@ class _AiChatInputBarState extends State<AiChatInputBar> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PendingImagePreview extends StatelessWidget {
+  final AiPendingImage image;
+  final String removeTooltip;
+  final VoidCallback? onRemove;
+
+  const _PendingImagePreview({
+    required this.image,
+    required this.removeTooltip,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.memory(
+            image.bytes,
+            width: 64,
+            height: 64,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => Container(
+              width: 64,
+              height: 64,
+              color: colors.surfaceContainerHighest,
+              child: const Icon(Icons.broken_image_outlined),
+            ),
+          ),
+        ),
+        Positioned(
+          top: -5,
+          right: -5,
+          child: Tooltip(
+            message: removeTooltip,
+            child: Material(
+              color: colors.inverseSurface,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onRemove,
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 14,
+                    color: colors.onInverseSurface,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

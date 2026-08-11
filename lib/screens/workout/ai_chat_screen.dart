@@ -1,13 +1,17 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../main.dart';
 import '../../navigation/ai_coach_navigation.dart';
 import '../../models/ai_chat_message.dart';
+import '../../models/ai_image_attachment.dart';
 import '../../models/ai_chat_state.dart';
 import '../../services/ai_tool_registry.dart';
+import '../../services/ai_image_attachment_store.dart';
 import '../../state/ai_chat_service.dart';
 import '../../state/ai_settings_notifier.dart';
 import '../../utils/ai_error_localizer.dart';
@@ -34,6 +38,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
   String? _lastActiveThreadId;
   late final AiSettingsNotifier _settings;
   late final AiToolRegistry _toolLabels;
+  final ImagePicker _imagePicker = ImagePicker();
+  final List<AiPendingImage> _pendingImages = [];
+  bool _pickingImages = false;
 
   @override
   void initState() {
@@ -94,8 +101,141 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Future<void> _send() async {
     final text = _controller.text;
-    _controller.clear();
-    await AiChatService.instance.send(text);
+    final images = List<AiPendingImage>.of(_pendingImages);
+    await AiChatService.instance.send(
+      text,
+      images: images,
+      onAccepted: () {
+        if (!mounted) return;
+        _controller.clear();
+        setState(_pendingImages.clear);
+      },
+    );
+  }
+
+  Future<void> _showImageSourcePicker() async {
+    if (_pendingImages.length >= kMaxAiChatImages || _pickingImages) return;
+    final l10n = AppLocalizations.of(context)!;
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: Text(l10n.aiChatChooseGallery),
+              subtitle: Text(l10n.aiChatImageLimitHelp),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            if (!kIsWeb &&
+                (defaultTargetPlatform == TargetPlatform.android ||
+                    defaultTargetPlatform == TargetPlatform.iOS))
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: Text(l10n.aiChatTakePhoto),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+    await _pickImages(source);
+  }
+
+  Future<void> _pickImages(ImageSource source) async {
+    final l10n = AppLocalizations.of(context)!;
+    final remaining = kMaxAiChatImages - _pendingImages.length;
+    setState(() => _pickingImages = true);
+    try {
+      final List<XFile> files;
+      if (source == ImageSource.camera) {
+        final file = await _imagePicker.pickImage(
+          source: ImageSource.camera,
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 82,
+          requestFullMetadata: false,
+        );
+        files = file == null ? [] : [file];
+      } else {
+        files = await _imagePicker.pickMultiImage(
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 82,
+          limit: remaining,
+          requestFullMetadata: false,
+        );
+      }
+      final selected = files.take(remaining);
+      final pending = <AiPendingImage>[];
+      for (final file in selected) {
+        final bytes = await file.readAsBytes();
+        if (bytes.length > kMaxAiChatImageBytes) {
+          throw const AiImageAttachmentException('image_too_large');
+        }
+        final mimeType = _detectImageMimeType(file.mimeType, bytes);
+        if (mimeType == null) {
+          throw const AiImageAttachmentException('unsupported_image');
+        }
+        pending.add(
+          AiPendingImage(bytes: bytes, mimeType: mimeType, fileName: file.name),
+        );
+      }
+      if (!mounted) return;
+      setState(() => _pendingImages.addAll(pending));
+      if (files.length > remaining) {
+        _showImageSnack(l10n.aiChatTooManyImages);
+      }
+    } on AiImageAttachmentException catch (error) {
+      if (!mounted) return;
+      _showImageSnack(
+        error.code == 'image_too_large'
+            ? l10n.aiChatImageTooLarge
+            : l10n.aiChatUnsupportedImage,
+      );
+    } catch (_) {
+      if (mounted) _showImageSnack(l10n.aiChatImagePickFailed);
+    } finally {
+      if (mounted) setState(() => _pickingImages = false);
+    }
+  }
+
+  void _showImageSnack(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String? _detectImageMimeType(String? reported, List<int> bytes) {
+    const supported = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'};
+    final normalized = reported?.toLowerCase();
+    if (normalized != null && supported.contains(normalized)) return normalized;
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xff &&
+        bytes[1] == 0xd8 &&
+        bytes[2] == 0xff) {
+      return 'image/jpeg';
+    }
+    if (bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4e &&
+        bytes[3] == 0x47) {
+      return 'image/png';
+    }
+    if (bytes.length >= 12 &&
+        String.fromCharCodes(bytes.sublist(0, 4)) == 'RIFF' &&
+        String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP') {
+      return 'image/webp';
+    }
+    if (bytes.length >= 6 &&
+        String.fromCharCodes(bytes.sublist(0, 3)) == 'GIF') {
+      return 'image/gif';
+    }
+    return null;
   }
 
   @override
@@ -210,6 +350,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   enabled: configured,
                   sending: state.isSending,
                   onSend: _send,
+                  images: _pendingImages,
+                  pickingImages: _pickingImages,
+                  onAddImages: _showImageSourcePicker,
+                  onRemoveImage: (index) {
+                    setState(() => _pendingImages.removeAt(index));
+                  },
                 ),
               ],
             ),
@@ -513,6 +659,18 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   color: theme.colorScheme.onErrorContainer,
                 ),
               ),
+            ),
+            IconButton(
+              tooltip: l10n.aiChatRetry,
+              color: theme.colorScheme.onErrorContainer,
+              onPressed:
+                  AiChatService.instance.state.isSending ||
+                      !AiChatService.instance.state.messages.any(
+                        (message) => message.isUser,
+                      )
+                  ? null
+                  : AiChatService.instance.retryLastTurn,
+              icon: const Icon(Icons.refresh_rounded, size: 20),
             ),
           ],
         ),
