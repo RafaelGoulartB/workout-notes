@@ -3,7 +3,11 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/models/ai_provider.dart';
+import 'package:workout_notes/models/ai_chat_message.dart';
+import 'package:workout_notes/models/ai_image_attachment.dart';
+import 'package:workout_notes/models/ai_message_role.dart';
 import 'package:workout_notes/models/ai_settings.dart';
 import 'package:workout_notes/models/ai_tool_call.dart';
 import 'package:workout_notes/services/ai_service.dart';
@@ -67,6 +71,110 @@ void main() {
       expect(completion.promptTokens, 20);
       expect(completion.completionTokens, 5);
     });
+
+    test(
+      'Responses vision preserves tools and parses function calls',
+      () async {
+        late http.Request captured;
+        final client = MockClient((request) async {
+          captured = request;
+          return http.Response(
+            jsonEncode({
+              'output': [
+                {
+                  'type': 'function_call',
+                  'call_id': 'call_sleep',
+                  'name': 'get_sleep_summary',
+                  'arguments': '{"days":7}',
+                },
+              ],
+            }),
+            200,
+          );
+        });
+        final service = AiService(client: client);
+
+        final completion = await service.sendMultimodalChat(
+          baseUrl: 'https://console.opencode.ai/inference/openai/v1',
+          token: 'token',
+          model: 'gpt-5.6-luna',
+          messages: const [
+            {
+              'role': 'user',
+              'content': [
+                {'type': 'text', 'text': 'Compare com meu sono'},
+                {
+                  'type': 'image_url',
+                  'image_url': {'url': 'data:image/jpeg;base64,/9j/'},
+                },
+              ],
+            },
+          ],
+          tools: const [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'get_sleep_summary',
+                'description': 'Sleep summary',
+                'parameters': {'type': 'object'},
+              },
+            },
+          ],
+        );
+
+        final payload = jsonDecode(captured.body) as Map<String, dynamic>;
+        final tool = (payload['tools'] as List).single as Map<String, dynamic>;
+        expect(tool['name'], 'get_sleep_summary');
+        expect(tool.containsKey('function'), isFalse);
+        expect(completion.toolCalls.single.name, 'get_sleep_summary');
+        expect(completion.toolCalls.single.arguments['days'], 7);
+      },
+    );
+
+    test(
+      'Chat Completions multimodal request keeps images and tools',
+      () async {
+        late http.Request captured;
+        final client = MockClient((request) async {
+          captured = request;
+          return http.Response(
+            '{"choices":[{"message":{"content":"ok"}}]}',
+            200,
+          );
+        });
+        final service = AiService(client: client);
+        await service.sendMultimodalChat(
+          baseUrl: 'https://api.example.test/v1',
+          token: 'token',
+          model: 'vision-model',
+          messages: const [
+            {
+              'role': 'user',
+              'content': [
+                {'type': 'text', 'text': 'Analise'},
+                {
+                  'type': 'image_url',
+                  'image_url': {'url': 'data:image/png;base64,AA=='},
+                },
+              ],
+            },
+          ],
+          tools: const [
+            {
+              'type': 'function',
+              'function': {
+                'name': 'list_recent_workouts',
+                'parameters': {'type': 'object'},
+              },
+            },
+          ],
+        );
+
+        final payload = jsonDecode(captured.body) as Map<String, dynamic>;
+        expect(payload['messages'].toString(), contains('image_url'));
+        expect(payload['tools'], isNotEmpty);
+      },
+    );
   });
 
   group('AiService.normalizeBaseUri', () {
@@ -109,6 +217,56 @@ void main() {
       expect(AiContextModeX.fromStorageKey(null), AiContextMode.standard);
       expect(AiContextModeX.fromStorageKey('weird'), AiContextMode.standard);
     });
+  });
+
+  group('AiResponseStyle', () {
+    test('round-trips through storageKey and has safe fallback', () {
+      for (final style in AiResponseStyle.values) {
+        expect(AiResponseStyleX.fromStorageKey(style.storageKey), style);
+      }
+      expect(
+        AiResponseStyleX.fromStorageKey('unknown'),
+        AiResponseStyle.balanced,
+      );
+    });
+
+    test(
+      'effective prompt applies style without changing editable prompt',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final notifier = AiSettingsNotifier(prefs: prefs);
+        await notifier.load();
+        await notifier.setSystemPrompt('Meu prompt personalizado');
+        await notifier.setResponseStyle(AiResponseStyle.concise);
+
+        expect(notifier.systemPrompt, 'Meu prompt personalizado');
+        expect(notifier.effectiveSystemPrompt, contains('seja conciso'));
+        expect(
+          notifier.effectiveSystemPrompt,
+          startsWith(notifier.systemPrompt),
+        );
+      },
+    );
+
+    test(
+      'chat appearance preferences persist across notifier reloads',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final prefs = await SharedPreferences.getInstance();
+        final notifier = AiSettingsNotifier(prefs: prefs);
+        await notifier.load();
+        await notifier.setShowMessageTimestamps(false);
+        await notifier.setAutoExpandToolDetails(true);
+        await notifier.setResponseStyle(AiResponseStyle.detailed);
+
+        final reloaded = AiSettingsNotifier(prefs: prefs);
+        await reloaded.load();
+        expect(reloaded.settings.showMessageTimestamps, isFalse);
+        expect(reloaded.settings.autoExpandToolDetails, isTrue);
+        expect(reloaded.settings.responseStyle, AiResponseStyle.detailed);
+      },
+    );
   });
 
   group('AiProvider', () {
@@ -191,6 +349,42 @@ void main() {
       final cleared = s.copyWith(clearActiveProvider: true);
       expect(cleared.activeProviderId, isNull);
     });
+
+    test('copyWith preserves and updates chat preferences', () {
+      const settings = AiSettings(
+        responseStyle: AiResponseStyle.concise,
+        showMessageTimestamps: false,
+      );
+      final updated = settings.copyWith(autoExpandToolDetails: true);
+      expect(updated.responseStyle, AiResponseStyle.concise);
+      expect(updated.showMessageTimestamps, isFalse);
+      expect(updated.autoExpandToolDetails, isTrue);
+    });
+  });
+
+  test('AiChatMessage persists attachment metadata without image bytes', () {
+    final message = AiChatMessage(
+      id: 'm1',
+      threadId: 't1',
+      role: AiMessageRole.user,
+      content: 'Analise',
+      attachments: const [
+        AiImageAttachment(
+          id: 'img1',
+          path: '/local/img1.jpg',
+          mimeType: 'image/jpeg',
+          fileName: 'foto.jpg',
+          sizeBytes: 1234,
+        ),
+      ],
+      createdAt: DateTime.utc(2026, 8, 10),
+    );
+
+    final row = message.toRow();
+    expect(row['attachments_json'], isNot(contains('base64')));
+    final restored = AiChatMessage.fromRow(row);
+    expect(restored.attachments.single.path, '/local/img1.jpg');
+    expect(restored.attachments.single.sizeBytes, 1234);
   });
 
   group('AiToolCall JSON', () {

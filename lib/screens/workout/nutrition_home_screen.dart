@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 
@@ -10,6 +10,7 @@ import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
 
@@ -110,9 +111,9 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   }
 
   Future<void> _openAppSettings() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const AppSettingsScreen()));
     await _load();
   }
 
@@ -158,7 +159,10 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     return value.toStringAsFixed(1);
   }
 
-  Future<void> _openFoodSearchForMeal(String? mealType, String? mealLabel) async {
+  Future<void> _openFoodSearchForMeal(
+    String? mealType,
+    String? mealLabel,
+  ) async {
     final result = await Navigator.of(context).push<NutritionSelection>(
       MaterialPageRoute(
         builder: (_) => FoodSearchScreen(
@@ -193,7 +197,9 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   }
 
   void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _persistAdd(
@@ -207,14 +213,16 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     // didn't bind a meal, fall back to the first configured type so
     // we always persist to a real section.
     final resolvedType = mealType ?? _mealTypes.firstOrNull?.key;
-    final resolvedLabel = mealLabel ?? (resolvedType == null
-        ? null
-        : _mealTypes
-              .firstWhere(
-                (t) => t.key == resolvedType,
-                orElse: () => _mealTypes.first,
-              )
-              .displayName(loc));
+    final resolvedLabel =
+        mealLabel ??
+        (resolvedType == null
+            ? null
+            : _mealTypes
+                  .firstWhere(
+                    (t) => t.key == resolvedType,
+                    orElse: () => _mealTypes.first,
+                  )
+                  .displayName(loc));
     if (resolvedType == null || resolvedLabel == null) {
       _showSnack(loc.nutritionSavedMealNoMealTypes);
       return;
@@ -253,8 +261,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     final orphanMeals = _meals
         .where((m) => !configuredKeys.contains(m.log.mealType))
         .toList();
-    final empty =
-        _mealTypes.isEmpty && orphanMeals.isEmpty && _meals.isEmpty;
+    final empty = _mealTypes.isEmpty && orphanMeals.isEmpty && _meals.isEmpty;
     if (empty) {
       return [SliverToBoxAdapter(child: _NutritionHomeEmptyMeals())];
     }
@@ -318,6 +325,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         centerTitle: false,
         automaticallyImplyLeading: false,
         actions: [
+          const AiCoachHeaderButton(),
           IconButton(
             tooltip: loc.nutritionChooseDate,
             onPressed: _pickDay,
@@ -338,14 +346,16 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
                   SliverToBoxAdapter(
-                    child: _NutritionDashboardSummaryCard(
-                      summary: _summary,
-                      goal: _goal,
-                      onTap: _openDay,
-                      onConfigureGoal: _openSettings,
-                    ).animate().fadeIn(duration: 300.ms, delay: 60.ms).slideY(
-                      begin: 0.05,
-                    ),
+                    child:
+                        _NutritionDashboardSummaryCard(
+                              summary: _summary,
+                              goal: _goal,
+                              onTap: _openDay,
+                              onConfigureGoal: _openSettings,
+                            )
+                            .animate()
+                            .fadeIn(duration: 300.ms, delay: 60.ms)
+                            .slideY(begin: 0.05),
                   ),
                   SliverToBoxAdapter(
                     child: _NutritionSectionHeader(
@@ -366,10 +376,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                       iconBg: theme.colorScheme.primaryContainer,
                       iconFg: theme.colorScheme.onPrimaryContainer,
                       title: loc.nutritionHomeSectionToday,
-                      value: _formatKcalLabel(
-                        loc,
-                        _summary.consumed.calories,
-                      ),
+                      value: _formatKcalLabel(loc, _summary.consumed.calories),
                       count: _totalItemsToday,
                       expanded: _showMeals,
                       onTap: () => setState(() => _showMeals = !_showMeals),
@@ -512,8 +519,9 @@ class _NutritionDashboardSummaryCard extends StatelessWidget {
                       minHeight: 8,
                       backgroundColor: hasGoal
                           ? theme.colorScheme.surfaceContainerHighest
-                          : theme.colorScheme.surfaceContainerHighest
-                                .withAlpha(180),
+                          : theme.colorScheme.surfaceContainerHighest.withAlpha(
+                              180,
+                            ),
                       color: progress > 1
                           ? theme.colorScheme.error
                           : theme.colorScheme.primary,
@@ -956,8 +964,7 @@ class _CollapsibleSectionHeader extends StatelessWidget {
             ],
             if (count > 0) ...[
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(999),
@@ -1029,9 +1036,7 @@ class _NutritionHomeMealRow extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    hasItems
-                        ? Icons.restaurant_rounded
-                        : Icons.add_rounded,
+                    hasItems ? Icons.restaurant_rounded : Icons.add_rounded,
                     color: hasItems
                         ? theme.colorScheme.primary
                         : theme.colorScheme.onSurfaceVariant,
@@ -1071,7 +1076,9 @@ class _NutritionHomeMealRow extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withAlpha(hasItems ? 18 : 28),
+                    color: theme.colorScheme.primary.withAlpha(
+                      hasItems ? 18 : 28,
+                    ),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -2744,11 +2751,7 @@ class _MealEmptyState extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Row(
           children: [
-            Icon(
-              Icons.add_rounded,
-              size: 18,
-              color: theme.colorScheme.primary,
-            ),
+            Icon(Icons.add_rounded, size: 18, color: theme.colorScheme.primary),
             const SizedBox(width: 8),
             Text(
               loc.nutritionAddItem,

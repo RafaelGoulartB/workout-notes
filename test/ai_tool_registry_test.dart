@@ -17,9 +17,9 @@ void main() {
     await uninstallAiTestDb();
   });
 
-  test('openAiReadToolsSchema returns 13 tools with valid shape', () {
+  test('openAiReadToolsSchema returns 18 tools with valid shape', () {
     final tools = registry.openAiReadToolsSchema();
-    expect(tools.length, 13);
+    expect(tools.length, 18);
     for (final t in tools) {
       expect(t['type'], 'function');
       expect(t['function'], isA<Map>());
@@ -31,13 +31,41 @@ void main() {
 
   test('openAiChatToolsSchema includes the guarded routine proposal tool', () {
     final tools = registry.openAiChatToolsSchema();
-    expect(tools, hasLength(14));
+    expect(tools, hasLength(20));
     final proposal = tools.firstWhere(
       (tool) => (tool['function'] as Map)['name'] == 'propose_routine_change',
     );
     final parameters = (proposal['function'] as Map)['parameters'] as Map;
     expect(parameters['required'], containsAll(<String>['action', 'routine']));
   });
+
+  test('chat schema always includes lightweight capability discovery', () {
+    final tools = registry.openAiChatToolsSchema(
+      names: const <String>{},
+      includeRoutineProposal: false,
+    );
+    expect(tools, hasLength(1));
+    expect(
+      (tools.single['function'] as Map)['name'],
+      'discover_app_capabilities',
+    );
+  });
+
+  test(
+    'capability discovery unlocks reads and guarded routine proposals',
+    () async {
+      final result = await registry.executeRead(
+        toolName: 'discover_app_capabilities',
+        args: {
+          'capabilities': ['sleep', 'routine_changes'],
+        },
+      );
+      final tools = ((result.data as Map)['tools'] as List).cast<String>();
+      expect(tools, contains('get_sleep_summary'));
+      expect(tools, contains('list_exercises'));
+      expect(tools, contains('propose_routine_change'));
+    },
+  );
 
   test('routine proposal schema uses portable scalar property types', () {
     final proposal = registry.openAiChatToolsSchema().firstWhere(
@@ -67,6 +95,66 @@ void main() {
       final name = (t['function'] as Map)['name'] as String;
       expect(registry.humanLabel(name), isNotEmpty);
     }
+  });
+
+  test('tool routing exposes a compact domain-specific catalog', () {
+    final names = registry.toolNamesForQuery(
+      'Meu sono está afetando meu desempenho no treino?',
+    );
+    expect(names, contains('get_sleep_summary'));
+    expect(names, contains('analyze_sleep_performance'));
+    expect(names, isNot(contains('get_routine_detail')));
+    expect(
+      registry.openAiReadToolsSchema(names: names).length,
+      lessThan(registry.openAiReadToolsSchema().length),
+    );
+  });
+
+  test('tool routing sends no schemas for casual conversation', () {
+    final names = registry.toolNamesForQuery('Olá, tudo bem?');
+    expect(names, isEmpty);
+    expect(registry.openAiReadToolsSchema(names: names), isEmpty);
+  });
+
+  test('generic workout routing does not expose unrelated tools', () {
+    final names = registry.toolNamesForQuery('Como foi meu último treino?');
+    expect(names, {'list_recent_workouts', 'get_workout_detail'});
+  });
+
+  test('follow-up catalog contains only valid dependent reads', () {
+    final names = registry.followUpToolNames(const [
+      'list_recent_workouts',
+    ], routineIntent: false);
+    expect(names, {'get_workout_detail'});
+    expect(names, isNot(contains('get_sleep_summary')));
+  });
+
+  test('tool results preserve all rows requested by the query', () async {
+    await db.insert('exercise_categories', {
+      'id': 'large',
+      'name': 'Categoria',
+      'color': 0,
+      'order_index': 0,
+      'energy_system': 'anaerobic',
+    });
+    for (var i = 0; i < 50; i++) {
+      await db.insert('exercises', {
+        'id': 'large-$i',
+        'name': 'Exercício $i ${List.filled(500, 'x').join()}',
+        'category_id': 'large',
+        'type': 'weightReps',
+        'is_favorite': 0,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    }
+    final result = await registry.executeRead(
+      toolName: 'list_exercises',
+      args: const {'limit': 50},
+    );
+    expect(result.ok, isTrue);
+    final exercises = (result.data as Map)['exercises'] as List;
+    expect(exercises, hasLength(50));
+    expect((result.data as Map).containsKey('_truncated'), isFalse);
   });
 
   test('executeRead on unknown tool returns unknown_tool', () async {
@@ -225,6 +313,73 @@ void main() {
     final sets = ex['sets'] as List;
     expect(sets, hasLength(1));
   });
+
+  test(
+    'routine list and detail preserve aggregate counts and set tree',
+    () async {
+      final now = DateTime.now().toIso8601String();
+      await db.insert('exercise_categories', {
+        'id': 'legs',
+        'name': 'Pernas',
+        'color': 0,
+        'order_index': 0,
+        'energy_system': 'anaerobic',
+      });
+      await db.insert('exercises', {
+        'id': 'squat',
+        'name': 'Agachamento',
+        'category_id': 'legs',
+        'type': 'weightReps',
+        'is_favorite': 0,
+        'created_at': now,
+      });
+      await db.insert('routines', {
+        'id': 'routine-1',
+        'name': 'Pernas',
+        'created_at': now,
+      });
+      await db.insert('routine_days', {
+        'id': 'day-1',
+        'routine_id': 'routine-1',
+        'name': 'Dia A',
+        'order_index': 0,
+      });
+      await db.insert('routine_exercises', {
+        'id': 'routine-exercise-1',
+        'routine_day_id': 'day-1',
+        'exercise_id': 'squat',
+        'order_index': 0,
+        'rest_time_seconds': 90,
+      });
+      await db.insert('predefined_sets', {
+        'id': 'predefined-1',
+        'routine_exercise_id': 'routine-exercise-1',
+        'weight': 80.0,
+        'reps': 8,
+        'is_warmup': 0,
+        'order_index': 0,
+      });
+
+      final listed = await registry.executeRead(
+        toolName: 'list_routines',
+        args: const {},
+      );
+      final listItem = ((listed.data as Map)['routines'] as List).single as Map;
+      expect(listItem['dayCount'], 1);
+      expect(listItem['exerciseCount'], 1);
+
+      final detailed = await registry.executeRead(
+        toolName: 'get_routine_detail',
+        args: const {'routine_id': 'routine-1'},
+      );
+      final day = ((detailed.data as Map)['days'] as List).single as Map;
+      final exercise = (day['exercises'] as List).single as Map;
+      final set = (exercise['predefinedSets'] as List).single as Map;
+      expect(exercise['source_routine_exercise_id'], 'routine-exercise-1');
+      expect(set['source_set_id'], 'predefined-1');
+      expect(set['reps'], 8);
+    },
+  );
 
   test('list_goals returns empty list on empty DB', () async {
     final r = await registry.executeRead(

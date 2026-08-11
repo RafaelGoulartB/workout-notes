@@ -6,6 +6,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_search_result.dart';
@@ -262,6 +263,7 @@ void main() {
     final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
 
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+    expect(find.byType(AiCoachHeaderButton), findsOneWidget);
     expect(find.byIcon(Icons.calendar_month_outlined), findsOneWidget);
     expect(find.text(loc.nutritionSummaryTitle), findsOneWidget);
     expect(find.text(loc.nutritionHomeToolBalance), findsOneWidget);

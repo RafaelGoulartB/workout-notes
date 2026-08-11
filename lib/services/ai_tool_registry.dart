@@ -2,24 +2,185 @@ import '../database/database_helper.dart';
 import '../l10n/app_localizations.dart';
 import '../models/ai_message_role.dart';
 import '../repositories/goal_repository.dart';
+import 'ai_wellness_analytics_service.dart';
 
 class AiToolRegistry {
   final DatabaseHelper db;
   final GoalRepository goalRepo;
-  AiToolRegistry({DatabaseHelper? db, GoalRepository? goalRepo})
-    : db = db ?? DatabaseHelper.instance,
-      goalRepo = goalRepo ?? GoalRepository();
+  final AiWellnessAnalyticsService wellness;
+  final Map<String, Map<String, dynamic>> _schemaCache = {};
+  AiToolRegistry({
+    DatabaseHelper? db,
+    GoalRepository? goalRepo,
+    AiWellnessAnalyticsService? wellness,
+  }) : db = db ?? DatabaseHelper.instance,
+       goalRepo = goalRepo ?? GoalRepository(),
+       wellness = wellness ?? AiWellnessAnalyticsService(db: db);
 
   /// OpenAI function-calling JSON schemas for all read tools.
-  List<Map<String, dynamic>> openAiReadToolsSchema() {
-    return _tools.map((t) => _schemaFor(t['name'] as String)).toList();
+  List<Map<String, dynamic>> openAiReadToolsSchema({Iterable<String>? names}) {
+    final selected = names?.toSet();
+    return _tools
+        .where((tool) => selected == null || selected.contains(tool['name']))
+        .map((tool) => _schemaFor(tool['name'] as String))
+        .toList();
   }
 
   /// All tools available during a chat turn, including guarded proposals.
-  List<Map<String, dynamic>> openAiChatToolsSchema() => [
-    ...openAiReadToolsSchema(),
-    _schemaFor('propose_routine_change'),
+  List<Map<String, dynamic>> openAiChatToolsSchema({
+    Iterable<String>? names,
+    bool includeRoutineProposal = true,
+  }) => [
+    ...openAiReadToolsSchema(names: names),
+    _schemaFor('discover_app_capabilities'),
+    if (includeRoutineProposal) _schemaFor('propose_routine_change'),
   ];
+
+  /// Selects a compact tool catalog for the current user request.
+  Set<String> toolNamesForQuery(String query) {
+    final text = query.toLowerCase();
+    final selected = <String>{};
+    bool hasAny(Iterable<String> terms) => terms.any(text.contains);
+
+    if (hasAny(['sono', 'sleep', 'dormi', 'insonia', 'insônia'])) {
+      selected.addAll({
+        'get_sleep_summary',
+        'analyze_sleep_performance',
+        'get_weekly_recovery_trend',
+        'list_recent_workouts',
+      });
+    }
+    if (hasAny([
+      'nutri',
+      'caloria',
+      'macro',
+      'proteina',
+      'proteína',
+      'carbo',
+      'gordura',
+      'comida',
+      'dieta',
+      'ingestao',
+      'ingestão',
+      'refeicao',
+      'refeição',
+    ])) {
+      selected.addAll({
+        'get_nutrition_summary',
+        'analyze_nutrition_body_trend',
+        'list_body_measurements',
+      });
+    }
+    if (hasAny(['recuper', 'fadiga', 'cansa', 'readiness', 'descanso'])) {
+      selected.addAll({
+        'get_weekly_recovery_trend',
+        'get_sleep_summary',
+        'get_nutrition_summary',
+        'list_recent_workouts',
+      });
+    }
+    if (hasAny([
+      'peso',
+      'weight',
+      'medida',
+      'corpo',
+      'composicao',
+      'composição',
+    ])) {
+      selected.addAll({
+        'list_body_measurements',
+        'analyze_nutrition_body_trend',
+      });
+    }
+    if (hasAny(['rotina', 'routine', 'ficha', 'divisao', 'divisão'])) {
+      selected.addAll({
+        'list_routines',
+        'get_routine_detail',
+        'list_exercises',
+      });
+    }
+    if (hasAny(['treino', 'workout', 'sessao', 'sessão'])) {
+      selected.addAll({'list_recent_workouts', 'get_workout_detail'});
+    }
+    if (hasAny(['exercicio', 'exercício', 'serie', 'série', 'carga'])) {
+      selected.addAll({'list_exercises', 'get_exercise_history'});
+    }
+    if (hasAny(['recorde', 'record', 'pr ', '1rm'])) {
+      selected.addAll({'list_exercises', 'get_exercise_personal_records'});
+    }
+    if (hasAny(['volume'])) {
+      selected.add('get_weekly_volume_breakdown');
+    }
+    if (hasAny([
+      'progresso',
+      'progressao',
+      'progressão',
+      'evolucao',
+      'evolução',
+    ])) {
+      selected.addAll({'list_exercises', 'get_progress_trend'});
+    }
+    if (hasAny(['cardio', 'corrida', 'correr', 'distancia', 'distância'])) {
+      selected.add('get_cardio_summary');
+    }
+    if (hasAny(['meta', 'goal', 'objetivo'])) {
+      selected.addAll({'list_goals', 'get_goal_progress_history'});
+    }
+    if (hasAny([
+      'como estou',
+      'meus dados',
+      'meu desempenho',
+      'resumo geral',
+      'visao geral',
+      'visão geral',
+    ])) {
+      selected.addAll({
+        'list_recent_workouts',
+        'get_sleep_summary',
+        'get_nutrition_summary',
+        'get_weekly_recovery_trend',
+        'list_goals',
+      });
+    }
+    return selected;
+  }
+
+  /// Returns only tools that can naturally continue the calls just executed.
+  /// This avoids billing the entire first-round schema catalog repeatedly.
+  Set<String> followUpToolNames(
+    Iterable<String> calledNames, {
+    required bool routineIntent,
+  }) {
+    final next = <String>{};
+    for (final name in calledNames) {
+      switch (name) {
+        case 'list_recent_workouts':
+          next.add('get_workout_detail');
+          break;
+        case 'list_exercises':
+          if (routineIntent) {
+            next.addAll({'list_routines', 'get_routine_detail'});
+          } else {
+            next.addAll({
+              'get_exercise_history',
+              'get_exercise_personal_records',
+              'get_progress_trend',
+            });
+          }
+          break;
+        case 'list_routines':
+          next.add('get_routine_detail');
+          break;
+        case 'get_routine_detail':
+          next.add('list_exercises');
+          break;
+        case 'list_goals':
+          next.add('get_goal_progress_history');
+          break;
+      }
+    }
+    return next;
+  }
 
   /// Human-friendly label for a tool name (used in chat bubbles).
   String humanLabel(String toolName, [AppLocalizations? l10n]) {
@@ -51,8 +212,20 @@ class AiToolRegistry {
           return l10n.aiToolListGoals;
         case 'get_goal_progress_history':
           return l10n.aiToolGoalHistory;
+        case 'get_sleep_summary':
+          return l10n.aiToolSleepSummary;
+        case 'get_nutrition_summary':
+          return l10n.aiToolNutritionSummary;
+        case 'analyze_sleep_performance':
+          return l10n.aiToolSleepPerformance;
+        case 'analyze_nutrition_body_trend':
+          return l10n.aiToolNutritionBodyTrend;
+        case 'get_weekly_recovery_trend':
+          return l10n.aiToolRecoveryTrend;
         case 'propose_routine_change':
           return l10n.aiToolProposeRoutineChange;
+        case 'discover_app_capabilities':
+          return l10n.aiToolDiscoverAppCapabilities;
       }
     }
     switch (toolName) {
@@ -82,8 +255,20 @@ class AiToolRegistry {
         return 'Metas ativas';
       case 'get_goal_progress_history':
         return 'Histórico da meta';
+      case 'get_sleep_summary':
+        return 'Analisando sono recente';
+      case 'get_nutrition_summary':
+        return 'Analisando nutrição';
+      case 'analyze_sleep_performance':
+        return 'Relacionando sono e desempenho';
+      case 'analyze_nutrition_body_trend':
+        return 'Relacionando ingestão e peso';
+      case 'get_weekly_recovery_trend':
+        return 'Calculando recuperação semanal';
       case 'propose_routine_change':
         return 'Preparando proposta de rotina';
+      case 'discover_app_capabilities':
+        return 'Selecionando recursos do app';
       default:
         return toolName;
     }
@@ -96,6 +281,8 @@ class AiToolRegistry {
   }) async {
     try {
       switch (toolName) {
+        case 'discover_app_capabilities':
+          return _ok(_discoverAppCapabilities(args));
         case 'list_recent_workouts':
           return _ok(await _listRecentWorkouts(args));
         case 'get_workout_detail':
@@ -122,6 +309,36 @@ class AiToolRegistry {
           return _ok(await _listGoals(args));
         case 'get_goal_progress_history':
           return _ok(await _getGoalProgressHistory(args));
+        case 'get_sleep_summary':
+          return _ok(
+            await wellness.sleepSummary(
+              days: _boundedInt(args, 'days', 14, 3, 90),
+            ),
+          );
+        case 'get_nutrition_summary':
+          return _ok(
+            await wellness.nutritionSummary(
+              days: _boundedInt(args, 'days', 14, 3, 90),
+            ),
+          );
+        case 'analyze_sleep_performance':
+          return _ok(
+            await wellness.sleepPerformance(
+              days: _boundedInt(args, 'days', 42, 7, 90),
+            ),
+          );
+        case 'analyze_nutrition_body_trend':
+          return _ok(
+            await wellness.nutritionBodyTrend(
+              days: _boundedInt(args, 'days', 84, 14, 180),
+            ),
+          );
+        case 'get_weekly_recovery_trend':
+          return _ok(
+            await wellness.weeklyRecoveryTrend(
+              weeks: _boundedInt(args, 'weeks', 8, 2, 12),
+            ),
+          );
         default:
           return AiToolResult(
             ok: false,
@@ -141,32 +358,37 @@ class AiToolRegistry {
   Future<Map<String, dynamic>> _listRecentWorkouts(
     Map<String, dynamic> args,
   ) async {
-    final limit = (args['limit'] as int?) ?? 10;
-    final rows = await db.getWorkouts(limit: limit);
-    final out = <Map<String, dynamic>>[];
-    for (final w in rows) {
-      final id = w['id'] as String;
-      final entries = await db.getWorkoutExercises(id);
-      double vol = 0;
-      for (final e in entries) {
-        final sets = await db.getExerciseSets(e['id'] as String);
-        for (final s in sets) {
-          if ((s['is_warmup'] as int? ?? 0) == 1) continue;
-          final wt = (s['weight'] as num?)?.toDouble() ?? 0;
-          final reps = (s['reps'] as num?)?.toInt() ?? 0;
-          vol += wt * reps;
-        }
-      }
-      out.add({
-        'id': id,
-        'date': w['date'],
-        'durationSeconds': w['duration_seconds'],
-        'feeling': w['feeling_rating'],
-        'exerciseCount': entries.length,
-        'volumeKg': vol,
-        'comment': w['comment'],
-      });
-    }
+    final limit = _boundedInt(args, 'limit', 8, 1, 20);
+    final rawDb = await db.database;
+    final rows = await rawDb.rawQuery(
+      '''
+      SELECT w.id, w.date, w.duration_seconds, w.feeling_rating, w.comment,
+        COUNT(DISTINCT ee.id) AS exercise_count,
+        COALESCE(SUM(CASE WHEN COALESCE(s.is_warmup, 0) = 0
+          THEN COALESCE(s.weight, 0) * COALESCE(s.reps, 0) ELSE 0 END), 0)
+          AS volume_kg
+      FROM workouts w
+      LEFT JOIN exercise_entries ee ON ee.workout_id = w.id
+      LEFT JOIN sets s ON s.exercise_entry_id = ee.id
+      GROUP BY w.id
+      ORDER BY w.date DESC, w.start_time DESC
+      LIMIT ?
+    ''',
+      [limit],
+    );
+    final out = rows
+        .map(
+          (w) => {
+            'id': w['id'],
+            'date': w['date'],
+            'durationSeconds': w['duration_seconds'],
+            'feeling': w['feeling_rating'],
+            'exerciseCount': (w['exercise_count'] as num?)?.toInt() ?? 0,
+            'volumeKg': (w['volume_kg'] as num?)?.toDouble() ?? 0.0,
+            'comment': w['comment'],
+          },
+        )
+        .toList();
     return {'workouts': out};
   }
 
@@ -180,30 +402,47 @@ class AiToolRegistry {
     }
     final w = await db.getWorkout(id);
     if (w == null) return {'error': 'workout não encontrado'};
-    final entries = await db.getWorkoutExercises(id);
-    final out = <Map<String, dynamic>>[];
-    for (final e in entries) {
-      final sets = await db.getExerciseSets(e['id'] as String);
-      out.add({
-        'exerciseId': e['exercise_id'],
-        'exerciseName': e['exercise_name'],
-        'order': e['order_index'],
-        'sets': sets
-            .map(
-              (s) => {
-                'weight': s['weight'],
-                'reps': s['reps'],
-                'distance': s['distance'],
-                'timeSeconds': s['time_seconds'],
-                'isWarmup': (s['is_warmup'] as int? ?? 0) == 1,
-                'isComplete': (s['is_complete'] as int? ?? 0) == 1,
-                'rpe': s['rpe'],
-                'comment': s['comment'],
-              },
-            )
-            .toList(),
-      });
+    final rawDb = await db.database;
+    final rows = await rawDb.rawQuery(
+      '''
+      SELECT ee.id AS entry_id, ee.exercise_id, ee.order_index,
+        e.name AS exercise_name, s.id AS set_id, s.weight, s.reps,
+        s.distance, s.time_seconds, s.is_warmup, s.is_complete, s.rpe,
+        s.comment AS set_comment
+      FROM exercise_entries ee
+      JOIN exercises e ON e.id = ee.exercise_id
+      LEFT JOIN sets s ON s.exercise_entry_id = ee.id
+      WHERE ee.workout_id = ?
+      ORDER BY ee.order_index ASC, s.order_index ASC
+    ''',
+      [id],
+    );
+    final byEntry = <String, Map<String, dynamic>>{};
+    for (final row in rows) {
+      final entryId = row['entry_id'] as String;
+      final entry = byEntry.putIfAbsent(
+        entryId,
+        () => {
+          'exerciseId': row['exercise_id'],
+          'exerciseName': row['exercise_name'],
+          'order': row['order_index'],
+          'sets': <Map<String, dynamic>>[],
+        },
+      );
+      if (row['set_id'] != null) {
+        (entry['sets'] as List<Map<String, dynamic>>).add({
+          'weight': row['weight'],
+          'reps': row['reps'],
+          'distance': row['distance'],
+          'timeSeconds': row['time_seconds'],
+          'isWarmup': (row['is_warmup'] as int? ?? 0) == 1,
+          'isComplete': (row['is_complete'] as int? ?? 0) == 1,
+          'rpe': row['rpe'],
+          'comment': row['set_comment'],
+        });
+      }
     }
+    final out = byEntry.values.toList();
     return {
       'id': id,
       'date': w['date'],
@@ -220,7 +459,9 @@ class AiToolRegistry {
       search: args['name_contains'] as String?,
       favorites: args['is_favorite'] as bool?,
     );
+    final limit = _boundedInt(args, 'limit', 20, 1, 50);
     final compact = rows
+        .take(limit)
         .map(
           (e) => {
             'id': e['id'],
@@ -240,7 +481,7 @@ class AiToolRegistry {
     final id =
         (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
     if (id == null) return {'error': 'exercise_id é obrigatório'};
-    final limit = (args['limit'] as int?) ?? 20;
+    final limit = _boundedInt(args, 'limit', 12, 1, 40);
     final history = await db.getExerciseHistory(id, limit: limit);
     return {
       'exerciseId': id,
@@ -266,8 +507,7 @@ class AiToolRegistry {
   Future<Map<String, dynamic>> _getWeeklyVolumeBreakdown(
     Map<String, dynamic> args,
   ) async {
-    final weeks =
-        (args['weeks_back'] as int?) ?? (args['weeksBack'] as int?) ?? 8;
+    final weeks = _boundedInt(args, 'weeks', 8, 2, 16);
     final byCategory = await db.getWeeklyVolumeByCategory(weeks: weeks);
     return {'weeksBack': weeks, 'byCategory': byCategory};
   }
@@ -278,9 +518,11 @@ class AiToolRegistry {
     final id =
         (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
     if (id == null) return {'error': 'exercise_id é obrigatório'};
-    final weeks =
-        (args['weeks_back'] as int?) ?? (args['weeksBack'] as int?) ?? 8;
-    final history = await db.getExerciseHistory(id, limit: weeks * 5);
+    final weeks = _boundedInt(args, 'weeks', 8, 2, 16);
+    final history = await db.getExerciseHistory(
+      id,
+      limit: (weeks * 3).clamp(6, 40),
+    );
     return {
       'exerciseId': id,
       'weeksBack': weeks,
@@ -289,28 +531,33 @@ class AiToolRegistry {
   }
 
   Future<Map<String, dynamic>> _listRoutines(Map<String, dynamic> args) async {
-    final routines = await db.getRoutines();
     final search = (args['name_contains'] as String?)?.toLowerCase();
-    final out = <Map<String, dynamic>>[];
-    for (final r in routines) {
-      if (search != null &&
-          !(r['name'] as String).toLowerCase().contains(search)) {
-        continue;
-      }
-      final days = await db.getRoutineDays(r['id'] as String);
-      int exCount = 0;
-      for (final d in days) {
-        final exs = await db.getRoutineExercises(d['id'] as String);
-        exCount += exs.length;
-      }
-      out.add({
-        'id': r['id'],
-        'name': r['name'],
-        'notes': r['notes'],
-        'dayCount': days.length,
-        'exerciseCount': exCount,
-      });
-    }
+    final rawDb = await db.database;
+    final rows = await rawDb.rawQuery(
+      '''
+      SELECT r.id, r.name, r.notes,
+        COUNT(DISTINCT rd.id) AS day_count,
+        COUNT(DISTINCT re.id) AS exercise_count
+      FROM routines r
+      LEFT JOIN routine_days rd ON rd.routine_id = r.id
+      LEFT JOIN routine_exercises re ON re.routine_day_id = rd.id
+      WHERE (? IS NULL OR LOWER(r.name) LIKE ?)
+      GROUP BY r.id
+      ORDER BY r.created_at DESC
+    ''',
+      [search, search == null ? null : '%$search%'],
+    );
+    final out = rows
+        .map(
+          (r) => {
+            'id': r['id'],
+            'name': r['name'],
+            'notes': r['notes'],
+            'dayCount': (r['day_count'] as num?)?.toInt() ?? 0,
+            'exerciseCount': (r['exercise_count'] as num?)?.toInt() ?? 0,
+          },
+        )
+        .toList();
     return {'routines': out};
   }
 
@@ -322,44 +569,65 @@ class AiToolRegistry {
     if (id == null) return {'error': 'routine_id é obrigatório'};
     final r = await db.getRoutine(id);
     if (r == null) return {'error': 'rotina não encontrada'};
-    final days = await db.getRoutineDays(id);
-    final daysOut = <Map<String, dynamic>>[];
-    for (final d in days) {
-      final exs = await db.getRoutineExercises(d['id'] as String);
-      final exsOut = <Map<String, dynamic>>[];
-      for (final e in exs) {
-        final sets = await db.getPredefinedSets(e['id'] as String);
-        exsOut.add({
-          'routineExerciseId': e['id'],
-          'source_routine_exercise_id': e['id'],
-          'exerciseId': e['exercise_id'],
-          'order': e['order_index'],
-          'restTimeSeconds': e['rest_time_seconds'],
-          'supersetGroupId': e['superset_group_id'],
-          'predefinedSets': sets
-              .map(
-                (s) => {
-                  'id': s['id'],
-                  'source_set_id': s['id'],
-                  'weight': s['weight'],
-                  'reps': s['reps'],
-                  'distance': s['distance'],
-                  'timeSeconds': s['time_seconds'],
-                  'isWarmup': (s['is_warmup'] as int? ?? 0) == 1,
-                },
-              )
-              .toList(),
+    final rawDb = await db.database;
+    final rows = await rawDb.rawQuery(
+      '''
+      SELECT rd.id AS day_id, rd.name AS day_name, rd.order_index AS day_order,
+        rd.notes AS day_notes, re.id AS routine_exercise_id, re.exercise_id,
+        re.order_index AS exercise_order, re.rest_time_seconds,
+        re.superset_group_id, ps.id AS set_id, ps.weight, ps.reps,
+        ps.distance, ps.time_seconds, ps.is_warmup
+      FROM routine_days rd
+      LEFT JOIN routine_exercises re ON re.routine_day_id = rd.id
+      LEFT JOIN predefined_sets ps ON ps.routine_exercise_id = re.id
+      WHERE rd.routine_id = ?
+      ORDER BY rd.order_index ASC, re.order_index ASC, ps.order_index ASC
+    ''',
+      [id],
+    );
+    final byDay = <String, Map<String, dynamic>>{};
+    final byExercise = <String, Map<String, dynamic>>{};
+    for (final row in rows) {
+      final dayId = row['day_id'] as String;
+      final day = byDay.putIfAbsent(
+        dayId,
+        () => {
+          'id': dayId,
+          'source_day_id': dayId,
+          'name': row['day_name'],
+          'order': row['day_order'],
+          'notes': row['day_notes'],
+          'exercises': <Map<String, dynamic>>[],
+        },
+      );
+      final exerciseId = row['routine_exercise_id'] as String?;
+      if (exerciseId == null) continue;
+      final exercise = byExercise.putIfAbsent(exerciseId, () {
+        final value = <String, dynamic>{
+          'routineExerciseId': exerciseId,
+          'source_routine_exercise_id': exerciseId,
+          'exerciseId': row['exercise_id'],
+          'order': row['exercise_order'],
+          'restTimeSeconds': row['rest_time_seconds'],
+          'supersetGroupId': row['superset_group_id'],
+          'predefinedSets': <Map<String, dynamic>>[],
+        };
+        (day['exercises'] as List<Map<String, dynamic>>).add(value);
+        return value;
+      });
+      if (row['set_id'] != null) {
+        (exercise['predefinedSets'] as List<Map<String, dynamic>>).add({
+          'id': row['set_id'],
+          'source_set_id': row['set_id'],
+          'weight': row['weight'],
+          'reps': row['reps'],
+          'distance': row['distance'],
+          'timeSeconds': row['time_seconds'],
+          'isWarmup': (row['is_warmup'] as int? ?? 0) == 1,
         });
       }
-      daysOut.add({
-        'id': d['id'],
-        'source_day_id': d['id'],
-        'name': d['name'],
-        'order': d['order_index'],
-        'notes': d['notes'],
-        'exercises': exsOut,
-      });
     }
+    final daysOut = byDay.values.toList();
     return {'id': id, 'name': r['name'], 'notes': r['notes'], 'days': daysOut};
   }
 
@@ -367,7 +635,7 @@ class AiToolRegistry {
     Map<String, dynamic> args,
   ) async {
     final type = args['type'] as String?;
-    final limit = (args['limit'] as int?) ?? 30;
+    final limit = _boundedInt(args, 'limit', 20, 1, 50);
     final rows = await db.getBodyMeasurements(type: type, limit: limit);
     return {
       'type': type,
@@ -390,8 +658,7 @@ class AiToolRegistry {
   Future<Map<String, dynamic>> _getCardioSummary(
     Map<String, dynamic> args,
   ) async {
-    final weeks =
-        (args['weeks_back'] as int?) ?? (args['weeksBack'] as int?) ?? 4;
+    final weeks = _boundedInt(args, 'weeks', 4, 2, 16);
     final weekly = await db.getCardioWeeklyDistance(weeks: weeks);
     final byModality = await db.getCardioDistanceByModality();
     return {
@@ -406,35 +673,39 @@ class AiToolRegistry {
     final metric = args['metric'] as String?;
     final activeOnly = (args['is_active'] as bool?) ?? true;
     final goals = await goalRepo.getAll(activeOnly: activeOnly);
-    final out = <Map<String, dynamic>>[];
-    for (final g in goals) {
-      if (scope != null && g.scope.value != scope) continue;
-      if (metric != null && g.metric.value != metric) continue;
-      try {
-        final p = await goalRepo.getProgress(g);
-        out.add({
-          'id': g.id,
-          'title': g.title,
-          'scope': g.scope.value,
-          'metric': g.metric.value,
-          'period': g.period.value,
-          'currentValue': p.currentValue,
-          'targetValue': p.targetValue,
-          'progressPct': p.percent,
-          'isComplete': p.isComplete,
-          'daysRemaining': p.daysRemaining,
-        });
-      } catch (_) {
-        out.add({
-          'id': g.id,
-          'title': g.title,
-          'scope': g.scope.value,
-          'metric': g.metric.value,
-          'period': g.period.value,
-          'targetValue': g.targetValue,
-        });
-      }
-    }
+    final filtered = goals.where(
+      (g) =>
+          (scope == null || g.scope.value == scope) &&
+          (metric == null || g.metric.value == metric),
+    );
+    final out = await Future.wait(
+      filtered.map((g) async {
+        try {
+          final p = await goalRepo.getProgress(g);
+          return <String, dynamic>{
+            'id': g.id,
+            'title': g.title,
+            'scope': g.scope.value,
+            'metric': g.metric.value,
+            'period': g.period.value,
+            'currentValue': p.currentValue,
+            'targetValue': p.targetValue,
+            'progressPct': p.percent,
+            'isComplete': p.isComplete,
+            'daysRemaining': p.daysRemaining,
+          };
+        } catch (_) {
+          return <String, dynamic>{
+            'id': g.id,
+            'title': g.title,
+            'scope': g.scope.value,
+            'metric': g.metric.value,
+            'period': g.period.value,
+            'targetValue': g.targetValue,
+          };
+        }
+      }),
+    );
     return {'goals': out};
   }
 
@@ -443,7 +714,7 @@ class AiToolRegistry {
   ) async {
     final id = (args['goal_id'] as String?) ?? (args['goalId'] as String?);
     if (id == null) return {'error': 'goal_id é obrigatório'};
-    final periods = (args['periods_back'] as int?) ?? 6;
+    final periods = _boundedInt(args, 'periods', 6, 1, 12);
     final goal = await goalRepo.getById(id);
     if (goal == null) return {'error': 'meta não encontrada'};
     final (current, history) = await goalRepo.getProgressWithHistory(
@@ -474,12 +745,100 @@ class AiToolRegistry {
     };
   }
 
+  Map<String, dynamic> _discoverAppCapabilities(Map<String, dynamic> args) {
+    final requested = (args['capabilities'] as List? ?? const [])
+        .whereType<String>()
+        .toSet();
+    final names = <String>{};
+    for (final capability in requested) {
+      names.addAll(switch (capability) {
+        'workouts' => {
+          'list_recent_workouts',
+          'get_workout_detail',
+          'get_weekly_volume_breakdown',
+        },
+        'exercises' => {
+          'list_exercises',
+          'get_exercise_history',
+          'get_exercise_personal_records',
+          'get_progress_trend',
+        },
+        'routines' => {'list_routines', 'get_routine_detail'},
+        'body' => {'list_body_measurements'},
+        'cardio' => {'get_cardio_summary'},
+        'goals' => {'list_goals', 'get_goal_progress_history'},
+        'sleep' => {'get_sleep_summary', 'analyze_sleep_performance'},
+        'nutrition' => {
+          'get_nutrition_summary',
+          'analyze_nutrition_body_trend',
+        },
+        'recovery' => {
+          'get_weekly_recovery_trend',
+          'get_sleep_summary',
+          'get_nutrition_summary',
+          'list_recent_workouts',
+        },
+        'routine_changes' => {
+          'list_exercises',
+          'list_routines',
+          'get_routine_detail',
+          'propose_routine_change',
+        },
+        _ => const <String>{},
+      });
+    }
+    return {
+      'capabilities': requested.toList(),
+      'tools': names.toList(),
+      'instruction':
+          'Use as ferramentas retornadas que forem necessárias para concluir a solicitação.',
+    };
+  }
+
   // ===========================================================================
   // SCHEMA GENERATION
   // ===========================================================================
 
-  Map<String, dynamic> _schemaFor(String name) {
+  Map<String, dynamic> _schemaFor(String name) =>
+      _schemaCache.putIfAbsent(name, () => _buildSchemaFor(name));
+
+  Map<String, dynamic> _buildSchemaFor(String name) {
     switch (name) {
+      case 'discover_app_capabilities':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Descobre ferramentas do app por capacidade. Use quando dados do app ou uma ação ajudariam, mas a ferramenta necessária ainda não estiver disponível.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'capabilities': {
+                  'type': 'array',
+                  'items': {
+                    'type': 'string',
+                    'enum': [
+                      'workouts',
+                      'exercises',
+                      'routines',
+                      'body',
+                      'cardio',
+                      'goals',
+                      'sleep',
+                      'nutrition',
+                      'recovery',
+                      'routine_changes',
+                    ],
+                  },
+                  'description':
+                      'Uma ou mais capacidades relevantes para a tarefa.',
+                },
+              },
+              'required': ['capabilities'],
+            },
+          },
+        };
       case 'list_recent_workouts':
         return {
           'type': 'function',
@@ -492,8 +851,8 @@ class AiToolRegistry {
               'properties': {
                 'limit': {
                   'type': 'integer',
-                  'description': 'Quantos treinos retornar (padrão 10).',
-                  'default': 10,
+                  'description': 'Quantos treinos retornar (padrão 8).',
+                  'default': 8,
                 },
               },
               'required': const [],
@@ -532,6 +891,7 @@ class AiToolRegistry {
                 'name_contains': {'type': 'string'},
                 'category_id': {'type': 'string'},
                 'is_favorite': {'type': 'boolean'},
+                'limit': {'type': 'integer', 'default': 20},
               },
               'required': const [],
             },
@@ -548,7 +908,7 @@ class AiToolRegistry {
               'type': 'object',
               'properties': {
                 'exercise_id': {'type': 'string'},
-                'limit': {'type': 'integer', 'default': 20},
+                'limit': {'type': 'integer', 'default': 12},
               },
               'required': ['exercise_id'],
             },
@@ -648,7 +1008,7 @@ class AiToolRegistry {
                   'type': 'string',
                   'description': 'Tipo de medida. Vazio = todas.',
                 },
-                'limit': {'type': 'integer', 'default': 30},
+                'limit': {'type': 'integer', 'default': 20},
               },
               'required': const [],
             },
@@ -706,6 +1066,60 @@ class AiToolRegistry {
                 'periods_back': {'type': 'integer', 'default': 6},
               },
               'required': ['goal_id'],
+            },
+          },
+        };
+      case 'get_sleep_summary':
+        return _windowToolSchema(
+          name,
+          'Resumo agregado do sono recente: duração, eficiência, cobertura e regularidade de horários. Use antes de opinar sobre sono.',
+          defaultValue: 14,
+          minimum: 3,
+          maximum: 90,
+        );
+      case 'get_nutrition_summary':
+        return _windowToolSchema(
+          name,
+          'Resumo agregado de calorias e macronutrientes, meta ativa, cobertura e qualidade dos registros.',
+          defaultValue: 14,
+          minimum: 3,
+          maximum: 90,
+        );
+      case 'analyze_sleep_performance':
+        return _windowToolSchema(
+          name,
+          'Calcula associações observacionais entre sono e volume/sensação dos treinos em datas pareadas. Não implica causalidade.',
+          defaultValue: 42,
+          minimum: 7,
+          maximum: 90,
+        );
+      case 'analyze_nutrition_body_trend':
+        return _windowToolSchema(
+          name,
+          'Relaciona ingestão semanal de calorias/macros com medidas de peso corporal e informa cobertura dos dados.',
+          defaultValue: 84,
+          minimum: 14,
+          maximum: 180,
+        );
+      case 'get_weekly_recovery_trend':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Tendência semanal não clínica de recuperação, combinando apenas componentes disponíveis de sono, regularidade e sensação dos treinos.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'weeks': {
+                  'type': 'integer',
+                  'description': 'Semanas (2 a 12; padrão 8).',
+                  'default': 8,
+                  'minimum': 2,
+                  'maximum': 12,
+                },
+              },
+              'required': const [],
             },
           },
         };
@@ -795,6 +1209,45 @@ class AiToolRegistry {
     }
   }
 
+  Map<String, dynamic> _windowToolSchema(
+    String name,
+    String description, {
+    required int defaultValue,
+    required int minimum,
+    required int maximum,
+  }) => {
+    'type': 'function',
+    'function': {
+      'name': name,
+      'description': description,
+      'parameters': {
+        'type': 'object',
+        'properties': {
+          'days': {
+            'type': 'integer',
+            'description': 'Janela em dias ($minimum a $maximum).',
+            'default': defaultValue,
+            'minimum': minimum,
+            'maximum': maximum,
+          },
+        },
+        'required': const [],
+      },
+    },
+  };
+
+  int _boundedInt(
+    Map<String, dynamic> args,
+    String key,
+    int fallback,
+    int minimum,
+    int maximum,
+  ) {
+    final raw = args[key] ?? args['${key}_back'];
+    final value = raw is num ? raw.toInt() : int.tryParse('$raw');
+    return (value ?? fallback).clamp(minimum, maximum);
+  }
+
   AiToolResult _ok(Map<String, dynamic> data) =>
       AiToolResult(ok: true, data: data);
 
@@ -821,6 +1274,23 @@ class AiToolRegistry {
     {
       'name': 'get_goal_progress_history',
       'description': 'Goal progress history',
+    },
+    {'name': 'get_sleep_summary', 'description': 'Recent sleep summary'},
+    {
+      'name': 'get_nutrition_summary',
+      'description': 'Calories and macros summary',
+    },
+    {
+      'name': 'analyze_sleep_performance',
+      'description': 'Sleep and workout performance association',
+    },
+    {
+      'name': 'analyze_nutrition_body_trend',
+      'description': 'Nutrition and body-weight trend',
+    },
+    {
+      'name': 'get_weekly_recovery_trend',
+      'description': 'Weekly recovery trend',
     },
   ];
 }

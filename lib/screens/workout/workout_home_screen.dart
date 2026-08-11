@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import '../../navigation/ai_coach_navigation.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/analytics_repository.dart';
@@ -328,6 +329,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   // ===================== APP BAR =====================
   List<Widget> _buildAppBarActions(ThemeData theme, AppLocalizations loc) {
     return [
+      const AiCoachHeaderButton(),
       if (_timerService.isActive)
         _TimerPill(
           remainingSeconds: _timerService.remainingSeconds,

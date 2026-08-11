@@ -47,11 +47,84 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
+          _buildConnectionStatus(settings),
+          SettingsSectionHeader(text: l10n.aiSettingsSectionConnection),
           _buildProvidersCard(settings),
           SettingsSectionHeader(text: l10n.aiSettingsSectionBehavior),
+          _buildResponseStyleCard(settings),
           _buildContextModeCard(settings),
-          _buildSystemPromptCard(),
+          SettingsSectionHeader(text: l10n.aiSettingsSectionAppearance),
+          _buildAppearanceCard(settings),
+          SettingsSectionHeader(text: l10n.aiSettingsSectionAdvanced),
+          _buildAdvancedCard(),
           _buildAboutCard(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConnectionStatus(AiSettings settings) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final provider = settings.activeProvider;
+    final isReady =
+        settings.isConfigured &&
+        provider != null &&
+        provider.selectedModel.isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isReady
+            ? colors.primaryContainer.withAlpha(90)
+            : colors.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.outlineVariant.withAlpha(100)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: isReady ? colors.primary : colors.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(
+              isReady ? Icons.auto_awesome_rounded : Icons.tune_rounded,
+              color: isReady ? colors.onPrimary : colors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isReady ? l10n.aiSettingsReady : l10n.aiSettingsNeedsSetup,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  isReady
+                      ? l10n.aiSettingsReadySubtitle(
+                          provider.name,
+                          provider.selectedModel,
+                        )
+                      : l10n.aiSettingsNeedsSetupSubtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -133,19 +206,69 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  p.name,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      p.name,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      p.baseUrl,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               if (!isActive)
                 TextButton(
                   onPressed: () => _notifier.setActiveProvider(p.id),
                   child: Text(l10n.aiSettingsActivate),
+                )
+              else
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 20,
+                  color: theme.colorScheme.primary,
                 ),
+              PopupMenuButton<String>(
+                tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
+                onSelected: (value) {
+                  if (value == 'edit') _showEditProviderSheet(p);
+                  if (value == 'remove') _confirmRemove(p);
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.edit_outlined),
+                      title: Text(l10n.aiSettingsEdit),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'remove',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        Icons.delete_outline_rounded,
+                        color: theme.colorScheme.error,
+                      ),
+                      title: Text(
+                        l10n.aiSettingsRemove,
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
           Padding(
@@ -153,13 +276,6 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 4),
-                Text(
-                  p.baseUrl,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
                 const SizedBox(height: 8),
                 InkWell(
                   borderRadius: BorderRadius.circular(10),
@@ -206,25 +322,72 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton.icon(
-                onPressed: () => _showEditProviderSheet(p),
-                icon: const Icon(Icons.edit_rounded, size: 16),
-                label: Text(l10n.aiSettingsEdit),
-              ),
-              TextButton.icon(
-                onPressed: () => _confirmRemove(p),
-                icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                label: Text(l10n.aiSettingsRemove),
-              ),
-            ],
-          ),
         ],
       ),
     );
+  }
+
+  Widget _buildResponseStyleCard(AiSettings settings) {
+    final l10n = AppLocalizations.of(context)!;
+    return SettingsCard(
+      title: l10n.aiSettingsResponseStyle,
+      icon: Icons.notes_rounded,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(
+            l10n.aiSettingsResponseStyleHelp,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        for (var i = 0; i < AiResponseStyle.values.length; i++) ...[
+          SettingsRadioOption(
+            icon: _responseStyleIcon(AiResponseStyle.values[i]),
+            label: _responseStyleLabel(AiResponseStyle.values[i], l10n),
+            subtitle: _responseStyleSubtitle(AiResponseStyle.values[i], l10n),
+            selected: settings.responseStyle == AiResponseStyle.values[i],
+            onTap: () => _notifier.setResponseStyle(AiResponseStyle.values[i]),
+          ),
+          if (i < AiResponseStyle.values.length - 1)
+            const SettingsCardDivider(),
+        ],
+      ],
+    );
+  }
+
+  IconData _responseStyleIcon(AiResponseStyle style) {
+    switch (style) {
+      case AiResponseStyle.concise:
+        return Icons.short_text_rounded;
+      case AiResponseStyle.balanced:
+        return Icons.notes_rounded;
+      case AiResponseStyle.detailed:
+        return Icons.subject_rounded;
+    }
+  }
+
+  String _responseStyleLabel(AiResponseStyle style, AppLocalizations l10n) {
+    switch (style) {
+      case AiResponseStyle.concise:
+        return l10n.aiSettingsResponseConcise;
+      case AiResponseStyle.balanced:
+        return l10n.aiSettingsResponseBalanced;
+      case AiResponseStyle.detailed:
+        return l10n.aiSettingsResponseDetailed;
+    }
+  }
+
+  String _responseStyleSubtitle(AiResponseStyle style, AppLocalizations l10n) {
+    switch (style) {
+      case AiResponseStyle.concise:
+        return l10n.aiSettingsResponseConciseSubtitle;
+      case AiResponseStyle.balanced:
+        return l10n.aiSettingsResponseBalancedSubtitle;
+      case AiResponseStyle.detailed:
+        return l10n.aiSettingsResponseDetailedSubtitle;
+    }
   }
 
   Future<void> _confirmRemove(AiProvider p) async {
@@ -303,24 +466,38 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     }
   }
 
-  Widget _buildSystemPromptCard() {
+  Widget _buildAppearanceCard(AiSettings settings) {
     final l10n = AppLocalizations.of(context)!;
     return SettingsCard(
-      title: l10n.aiSettingsSystemPrompt,
-      icon: Icons.edit_note_rounded,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: Text(
-            l10n.aiSettingsSystemPromptHelp,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
+        SettingsSwitchTile(
+          icon: Icons.schedule_rounded,
+          title: l10n.aiSettingsShowTimestamps,
+          subtitle: l10n.aiSettingsShowTimestampsSubtitle,
+          value: settings.showMessageTimestamps,
+          onChanged: _notifier.setShowMessageTimestamps,
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: _SystemPromptField(notifier: _notifier),
+        const SettingsCardDivider(),
+        SettingsSwitchTile(
+          icon: Icons.data_object_rounded,
+          title: l10n.aiSettingsExpandTools,
+          subtitle: l10n.aiSettingsExpandToolsSubtitle,
+          value: settings.autoExpandToolDetails,
+          onChanged: _notifier.setAutoExpandToolDetails,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAdvancedCard() {
+    final l10n = AppLocalizations.of(context)!;
+    return SettingsCard(
+      children: [
+        SettingsLinkTile(
+          icon: Icons.edit_note_rounded,
+          title: l10n.aiSettingsSystemPrompt,
+          subtitle: l10n.aiSettingsSystemPromptSubtitle,
+          onTap: _showSystemPromptEditor,
         ),
       ],
     );
@@ -365,11 +542,26 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (_) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
         child: _ProviderEditorSheet(notifier: _notifier, existing: existing),
+      ),
+    );
+  }
+
+  void _showSystemPromptEditor() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: _SystemPromptEditorSheet(notifier: _notifier),
       ),
     );
   }
@@ -389,6 +581,7 @@ class _ProviderEditorSheetState extends State<_ProviderEditorSheet> {
   late TextEditingController _baseUrl;
   late TextEditingController _token;
   bool _saving = false;
+  bool _showToken = false;
   String? _error;
 
   @override
@@ -413,12 +606,23 @@ class _ProviderEditorSheetState extends State<_ProviderEditorSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    return Padding(
-      padding: const EdgeInsets.all(20),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 18),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
           Text(
             widget.existing == null
                 ? l10n.aiSettingsNewProvider
@@ -444,11 +648,21 @@ class _ProviderEditorSheetState extends State<_ProviderEditorSheet> {
           const SizedBox(height: 12),
           TextField(
             controller: _token,
-            obscureText: true,
+            obscureText: !_showToken,
+            enableSuggestions: false,
+            autocorrect: false,
             decoration: InputDecoration(
               labelText: widget.existing == null
                   ? l10n.aiSettingsToken
                   : l10n.aiSettingsTokenHint,
+              suffixIcon: IconButton(
+                onPressed: () => setState(() => _showToken = !_showToken),
+                icon: Icon(
+                  _showToken
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                ),
+              ),
             ),
           ),
           if (_error != null) ...[
@@ -525,15 +739,16 @@ class _ProviderEditorSheetState extends State<_ProviderEditorSheet> {
   }
 }
 
-class _SystemPromptField extends StatefulWidget {
+class _SystemPromptEditorSheet extends StatefulWidget {
   final AiSettingsNotifier notifier;
-  const _SystemPromptField({required this.notifier});
+  const _SystemPromptEditorSheet({required this.notifier});
 
   @override
-  State<_SystemPromptField> createState() => _SystemPromptFieldState();
+  State<_SystemPromptEditorSheet> createState() =>
+      _SystemPromptEditorSheetState();
 }
 
-class _SystemPromptFieldState extends State<_SystemPromptField> {
+class _SystemPromptEditorSheetState extends State<_SystemPromptEditorSheet> {
   late TextEditingController _controller;
   bool _dirty = false;
 
@@ -555,50 +770,94 @@ class _SystemPromptFieldState extends State<_SystemPromptField> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: _controller,
-          maxLines: 12,
-          minLines: 6,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            isDense: true,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+    final theme = Theme.of(context);
+    return FractionallySizedBox(
+      heightFactor: .9,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextButton.icon(
-              onPressed: () async {
-                await widget.notifier.resetSystemPrompt();
-                if (!mounted) return;
-                _controller.text = widget.notifier.systemPrompt;
-                setState(() => _dirty = false);
-              },
-              icon: const Icon(Icons.restart_alt_rounded, size: 16),
-              label: Text(l10n.aiSettingsRestoreDefault),
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 18),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
             ),
-            const SizedBox(width: 8),
-            FilledButton.tonal(
-              onPressed: !_dirty
-                  ? null
-                  : () async {
-                      await widget.notifier.setSystemPrompt(_controller.text);
-                      if (!context.mounted) return;
-                      final messenger = ScaffoldMessenger.of(context);
-                      setState(() => _dirty = false);
-                      messenger.showSnackBar(
-                        SnackBar(content: Text(l10n.aiSettingsSaved)),
-                      );
-                    },
-              child: Text(l10n.commonSave),
+            Text(
+              l10n.aiSettingsSystemPrompt,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              l10n.aiSettingsSystemPromptHelp,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                expands: true,
+                maxLines: null,
+                minLines: null,
+                textAlignVertical: TextAlignVertical.top,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  alignLabelWithHint: true,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () async {
+                  await widget.notifier.resetSystemPrompt();
+                  if (!mounted) return;
+                  _controller.text = widget.notifier.systemPrompt;
+                  setState(() => _dirty = false);
+                },
+                icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                label: Text(l10n.aiSettingsRestoreDefault),
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(l10n.commonCancel),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: !_dirty
+                      ? null
+                      : () async {
+                          await widget.notifier.setSystemPrompt(
+                            _controller.text,
+                          );
+                          if (!context.mounted) return;
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(l10n.aiSettingsSaved)),
+                          );
+                        },
+                  child: Text(l10n.commonSave),
+                ),
+              ],
             ),
           ],
         ),
-      ],
+      ),
     );
   }
 }

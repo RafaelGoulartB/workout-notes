@@ -6,12 +6,14 @@ import 'package:uuid/uuid.dart';
 
 import '../database/database_helper.dart';
 import '../models/ai_chat_message.dart';
+import '../models/ai_image_attachment.dart';
 import '../models/ai_chat_state.dart';
 import '../models/ai_chat_thread.dart';
 import '../models/ai_message_role.dart';
 import '../models/ai_provider.dart';
 import '../models/ai_routine_proposal.dart';
 import '../services/ai_context_service.dart';
+import '../services/ai_image_attachment_store.dart';
 import '../services/ai_routine_mutation_service.dart';
 import '../services/ai_service.dart';
 import '../services/ai_tool_registry.dart';
@@ -22,10 +24,12 @@ import 'ai_settings_notifier.dart';
 const _uuid = Uuid();
 
 const int kMaxToolRounds = 3;
-const int kHistoryTokenBudget = 8000;
+const int kHistoryTokenBudget = 6000;
+const int kTargetInputTokenBudget = 7000;
+const int kMinHistoryTokenBudget = 1200;
 const int kMaxInvalidAnswerRegenerations = 2;
 const String _routineMutationPolicy = r'''# Propostas de rotina (política fixa)
-Você pode preparar uma proposta de rotina somente quando o usuário pedir explicitamente para criar, montar, editar, alterar, adicionar ou remover conteúdo de uma rotina. Nunca proponha alterações apenas por sugestão, análise ou pergunta hipotética.
+Você pode preparar uma proposta quando isso cumprir o pedido do usuário ou transformar uma recomendação relevante em uma prévia útil. Interprete a intenção pelo significado e pelo contexto da conversa, sem exigir palavras-chave ou uma formulação específica.
 
 Quando houver esse pedido, você DEVE usar ferramentas; não responda dizendo que não consegue criar a rotina. Siga este fluxo:
 1. Para criação, chame `list_exercises` para obter IDs reais dos exercícios necessários.
@@ -33,7 +37,7 @@ Quando houver esse pedido, você DEVE usar ferramentas; não responda dizendo qu
 3. Seja proativo: se faltarem nome, divisão, séries, repetições ou descanso, NÃO peça uma lista de detalhes. Use a solicitação atual, a conversa anterior e os dados do app para decidir. Se o usuário disser “crie essa rotina”, a rotina mencionada/sugerida anteriormente na conversa é a especificação principal.
 4. Na ausência de preferência explícita, escolha uma divisão equilibrada coerente com a frequência e os grupos musculares disponíveis, 3 séries de trabalho por exercício, faixas de 8–12 repetições para musculação e 90 segundos de descanso. Dê um nome descritivo à rotina. Essas escolhas são uma prévia segura porque o usuário ainda precisa aprovar.
 5. Chame `propose_routine_change` com a árvore final completa. Campos opcionais podem ser omitidos; não escreva null se não precisar do campo.
-6. Só faça uma pergunta em vez de propor se não houver exercício compatível na biblioteca ou se houver uma restrição de segurança relevante. Caso contrário, sempre entregue a proposta para aprovação.
+6. Só faça uma pergunta em vez de propor se não houver exercício compatível na biblioteca ou se houver uma restrição de segurança relevante. Caso contrário, entregue a proposta para aprovação quando ela ajudar a concluir a tarefa.
 7. Depois do resultado da ferramenta, explique que a prévia está disponível para aprovação.
 
 `propose_routine_change` apenas prepara a prévia: ela não aplica nada. Nunca diga que criou ou editou uma rotina antes da aprovação e do resultado confirmado pelo app. Após uma aprovação, resuma somente os fatos retornados pelo app.''';
@@ -53,6 +57,7 @@ class AiChatService extends ChangeNotifier {
   AiToolRegistry _tools = AiToolRegistry();
   AiContextService _context = AiContextService();
   AiRoutineMutationService _routineMutations = AiRoutineMutationService();
+  AiImageAttachmentStore _imageStore = AiImageAttachmentStore();
   AiSettingsNotifier? _settings;
 
   AiChatState _state = const AiChatState();
@@ -66,11 +71,13 @@ class AiChatService extends ChangeNotifier {
     AiToolRegistry? tools,
     AiContextService? context,
     AiRoutineMutationService? routineMutations,
+    AiImageAttachmentStore? imageStore,
   }) {
     if (service != null) _service = service;
     if (tools != null) _tools = tools;
     if (context != null) _context = context;
     if (routineMutations != null) _routineMutations = routineMutations;
+    if (imageStore != null) _imageStore = imageStore;
   }
 
   /// Wires the settings notifier. Must be called once at app boot
@@ -81,7 +88,32 @@ class AiChatService extends ChangeNotifier {
     final svc = AiChatService.instance;
     svc._settings = settings;
     await svc.refreshThreads();
+    await svc._cleanupOrphanedImages();
     return svc;
+  }
+
+  Future<void> _cleanupOrphanedImages() async {
+    try {
+      final db = await _db.database;
+      final rows = await db.query(
+        'ai_chat_messages',
+        columns: ['attachments_json'],
+        where: 'attachments_json IS NOT NULL',
+      );
+      final retained = <String>{};
+      for (final row in rows) {
+        final raw = row['attachments_json'] as String?;
+        if (raw == null) continue;
+        final decoded = jsonDecode(raw);
+        if (decoded is! List) continue;
+        for (final item in decoded) {
+          if (item is Map && item['path'] is String) {
+            retained.add(item['path'] as String);
+          }
+        }
+      }
+      await _imageStore.deleteOrphans(retained);
+    } catch (_) {}
   }
 
   // ===========================================================================
@@ -131,8 +163,17 @@ class AiChatService extends ChangeNotifier {
   }
 
   Future<void> deleteThread(String threadId) async {
+    var attachments = <AiImageAttachment>[];
+    try {
+      final rows = await _db.getAiChatMessagesThread(threadId);
+      attachments = rows
+          .map(AiChatMessage.fromRow)
+          .expand((message) => message.attachments)
+          .toList();
+    } catch (_) {}
     try {
       await _db.deleteAiChatThread(threadId);
+      await _imageStore.deleteAll(attachments);
       final threads = _state.threads.where((t) => t.id != threadId).toList();
       final clearActive = _state.activeThreadId == threadId;
       _state = _state.copyWith(
@@ -181,35 +222,74 @@ class AiChatService extends ChangeNotifier {
   // SENDING
   // ===========================================================================
 
-  Future<void> send(String text) async {
+  Future<bool> send(
+    String text, {
+    List<AiPendingImage> images = const [],
+    List<AiImageAttachment> existingAttachments = const [],
+    VoidCallback? onAccepted,
+  }) async {
     final trimmed = text.trim();
-    if (trimmed.isEmpty) return;
-    if (isSending) return;
+    if (trimmed.isEmpty && images.isEmpty && existingAttachments.isEmpty) {
+      return false;
+    }
+    if (images.length + existingAttachments.length >
+        AiImageAttachmentStore.maxImagesPerMessage) {
+      _state = _state.copyWith(error: 'ai_error:too_many_images');
+      notifyListeners();
+      return false;
+    }
+    if (isSending) return false;
     if (_settings == null || !_settings!.isConfigured) {
       _state = _state.copyWith(error: 'ai_error:missing_provider');
       notifyListeners();
-      return;
+      return false;
     }
     final provider = _settings!.activeProvider!;
     final token = await _settings!.getToken(provider.id);
     if (token == null || token.isEmpty) {
       _state = _state.copyWith(error: 'ai_error:missing_token');
       notifyListeners();
-      return;
+      return false;
     }
     if (provider.selectedModel.isEmpty) {
       _state = _state.copyWith(error: 'ai_error:missing_model');
       notifyListeners();
-      return;
+      return false;
     }
 
     final now = DateTime.now();
-    final threadId = await _ensureThread(_state.messages, now, trimmed);
+    List<AiImageAttachment> attachments;
+    try {
+      attachments = existingAttachments.isNotEmpty
+          ? existingAttachments
+          : await _imageStore.saveAll(images);
+    } on AiImageAttachmentException catch (error) {
+      _state = _state.copyWith(error: 'ai_error:${error.code}');
+      notifyListeners();
+      return false;
+    }
+    final fallbackText = attachments.isEmpty ? trimmed : 'Imagem enviada';
+    late final String threadId;
+    try {
+      threadId = await _ensureThread(
+        _state.messages,
+        now,
+        trimmed.isEmpty ? fallbackText : trimmed,
+      );
+    } catch (error) {
+      if (existingAttachments.isEmpty) {
+        await _imageStore.deleteAll(attachments);
+      }
+      _state = _state.copyWith(error: _readableError(error));
+      notifyListeners();
+      return false;
+    }
     final userMsg = AiChatMessage(
       id: _uuid.v4(),
       threadId: threadId,
       role: AiMessageRole.user,
       content: trimmed,
+      attachments: attachments,
       createdAt: now,
     );
     var messages = [..._state.messages, userMsg];
@@ -223,6 +303,7 @@ class AiChatService extends ChangeNotifier {
       phaseMessage: 'sending',
     );
     notifyListeners();
+    onAccepted?.call();
 
     try {
       await _runTurn(
@@ -230,7 +311,7 @@ class AiChatService extends ChangeNotifier {
         baseUrl: provider.baseUrl,
         token: token,
         model: provider.selectedModel,
-        systemPrompt: _settings!.systemPrompt,
+        systemPrompt: _settings!.effectiveSystemPrompt,
         contextMode: _settings!.contextMode,
       );
     } catch (e) {
@@ -242,6 +323,7 @@ class AiChatService extends ChangeNotifier {
       notifyListeners();
       await _persistCurrentThread();
     }
+    return true;
   }
 
   Future<void> rejectRoutineProposal(String proposalId) async {
@@ -264,6 +346,10 @@ class AiChatService extends ChangeNotifier {
     );
     notifyListeners();
     try {
+      final cachedProposal = _state.proposalById(proposalId);
+      if (cachedProposal != null) {
+        await _routineMutations.restorePendingProposal(cachedProposal);
+      }
       final proposal = await _routineMutations.approve(proposalId);
       _replaceProposal(proposal, notify: false);
       await _persistCurrentThread();
@@ -277,7 +363,9 @@ class AiChatService extends ChangeNotifier {
       _state = _state.copyWith(
         phase: AiTurnPhase.failed,
         phaseMessage: null,
-        error: _readableError(e),
+        error: e is AiRoutineMutationException
+            ? 'ai_error:${e.code}:$proposalId'
+            : _readableError(e),
       );
       notifyListeners();
     }
@@ -296,23 +384,36 @@ class AiChatService extends ChangeNotifier {
   /// Truncates messages after [fromIndex] and resends from that point.
   Future<void> retryFromMessage(int fromIndex) async {
     if (fromIndex < 0 || fromIndex >= _state.messages.length) return;
-    final remaining = _state.messages.sublist(0, fromIndex);
-    final lastUser = remaining.lastWhere(
-      (m) => m.isUser,
-      orElse: () => remaining.isEmpty ? _state.messages.first : remaining.last,
-    );
-    if (!lastUser.isUser) {
+    var userIndex = fromIndex;
+    while (userIndex >= 0 && !_state.messages[userIndex].isUser) {
+      userIndex--;
+    }
+    if (userIndex < 0) {
       _state = _state.copyWith(error: 'ai_error:user_message_missing');
       notifyListeners();
       return;
     }
+    final lastUser = _state.messages[userIndex];
+    final remaining = _state.messages.sublist(0, userIndex);
     _state = _state.copyWith(
       messages: remaining,
       clearError: true,
       phase: AiTurnPhase.idle,
     );
     notifyListeners();
-    await send(lastUser.content ?? '');
+    await send(
+      lastUser.content ?? '',
+      existingAttachments: lastUser.attachments,
+    );
+  }
+
+  Future<void> retryLastTurn() async {
+    for (var i = _state.messages.length - 1; i >= 0; i--) {
+      if (_state.messages[i].isUser) {
+        await retryFromMessage(i);
+        return;
+      }
+    }
   }
 
   // ===========================================================================
@@ -328,18 +429,58 @@ class AiChatService extends ChangeNotifier {
     required AiContextMode contextMode,
   }) async {
     var current = [...messages];
-    final toolsSchema = _tools.openAiChatToolsSchema();
-    final explicitRoutineTurn = _hasExplicitRoutineIntent(current);
+    final visionMessage = current.lastWhere((message) => message.isUser);
+    final imageDataUrls = visionMessage.attachments.isEmpty
+        ? const <String>[]
+        : await _imageStore.readDataUrls(visionMessage.attachments);
+    final latestUserText =
+        current.lastWhere((message) => message.isUser).content ?? '';
+    final routineProposalFollowUp = _isRoutineProposalFollowUp(
+      current,
+      latestUserText,
+    );
+    var toolNames = _tools.toolNamesForQuery(
+      _routingQuery(current, latestUserText),
+    );
+    if (routineProposalFollowUp) {
+      toolNames.addAll({
+        'list_exercises',
+        'list_routines',
+        'get_routine_detail',
+      });
+    }
+    var proposalAvailable = false;
+    var routineCapabilityActive =
+        routineProposalFollowUp ||
+        toolNames.any(
+          const {
+            'list_routines',
+            'get_routine_detail',
+            'list_exercises',
+          }.contains,
+        );
+    _context.invalidate();
+    final contextJson = await _context.build(mode: contextMode);
 
     for (var round = 0; round < kMaxToolRounds + 1; round++) {
-      // Refresh context cache at the start of a turn.
-      if (round == 0) _context.invalidate();
-      final contextJson = await _context.build(mode: contextMode);
+      final toolsSchema = _tools.openAiChatToolsSchema(
+        names: toolNames,
+        includeRoutineProposal: proposalAvailable,
+      );
 
       final wire = _buildWireMessages(
         current,
         systemPrompt: systemPrompt,
         contextJson: contextJson,
+        includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
+        visionMessageId: visionMessage.id,
+        imageDataUrls: imageDataUrls,
+        historyTokenBudget: _historyBudgetFor(
+          systemPrompt: systemPrompt,
+          contextJson: contextJson,
+          toolsSchema: toolsSchema,
+          includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
+        ),
       );
 
       _state = _state.copyWith(
@@ -348,17 +489,26 @@ class AiChatService extends ChangeNotifier {
       );
       notifyListeners();
 
-      final completion = await _service.sendChat(
-        baseUrl: baseUrl,
-        token: token,
-        model: model,
-        messages: wire,
-        tools: toolsSchema,
-        // Compatible providers sometimes default to a text-only answer even
-        // when tools are present. An explicit mutation request must begin by
-        // reading the required app data, so require one tool on its first turn.
-        toolChoice: round == 0 && explicitRoutineTurn ? 'required' : 'auto',
-      );
+      final toolChoice = round == 0 && routineProposalFollowUp
+          ? 'required'
+          : 'auto';
+      final completion = imageDataUrls.isEmpty
+          ? await _service.sendChat(
+              baseUrl: baseUrl,
+              token: token,
+              model: model,
+              messages: wire,
+              tools: toolsSchema,
+              toolChoice: toolChoice,
+            )
+          : await _service.sendMultimodalChat(
+              baseUrl: baseUrl,
+              token: token,
+              model: model,
+              messages: wire,
+              tools: toolsSchema,
+              toolChoice: toolChoice,
+            );
 
       // Persist the assistant message (may be empty if only tool calls).
       final assistant = AiChatMessage(
@@ -382,6 +532,9 @@ class AiChatService extends ChangeNotifier {
           model: model,
           systemPrompt: systemPrompt,
           contextJson: contextJson,
+          includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
+          visionMessageId: visionMessage.id,
+          imageDataUrls: imageDataUrls,
         );
         if (accepted != null) {
           current = [...current.sublist(0, current.length - 1), accepted];
@@ -407,18 +560,23 @@ class AiChatService extends ChangeNotifier {
       );
       notifyListeners();
 
-      for (final call in completion.toolCalls) {
+      // Read-only calls are independent and can run concurrently. Proposal
+      // preparation remains ordered and executes after all reads finish.
+      final readResults = await Future.wait(
+        completion.toolCalls.map((call) async {
+          if (call.name == 'propose_routine_change') return null;
+          return _tools.executeRead(toolName: call.name, args: call.arguments);
+        }),
+      );
+      for (var i = 0; i < completion.toolCalls.length; i++) {
+        final call = completion.toolCalls[i];
         final result = call.name == 'propose_routine_change'
             ? await _routineMutations.prepareProposal(
                 threadId: _state.activeThreadId ?? '',
                 toolCallId: call.id,
                 args: call.arguments,
-                explicitRequest: _hasExplicitRoutineIntent(current),
               )
-            : await _tools.executeRead(
-                toolName: call.name,
-                args: call.arguments,
-              );
+            : readResults[i]!;
         if (call.name == 'propose_routine_change' && result.ok) {
           final data = result.data as Map?;
           final proposalId = data?['proposalId'] as String?;
@@ -431,7 +589,7 @@ class AiChatService extends ChangeNotifier {
           id: _uuid.v4(),
           threadId: _state.activeThreadId ?? '',
           role: AiMessageRole.tool,
-          content: jsonEncode(result.toMap()),
+          content: _encodeToolResult(result),
           toolCallId: call.id,
           toolName: call.name,
           toolResult: result,
@@ -441,6 +599,49 @@ class AiChatService extends ChangeNotifier {
       }
       _state = _state.copyWith(messages: current);
       notifyListeners();
+
+      final calledNames = completion.toolCalls.map((call) => call.name).toSet();
+      final discoveredNames = <String>{};
+      for (var i = 0; i < completion.toolCalls.length; i++) {
+        if (completion.toolCalls[i].name != 'discover_app_capabilities') {
+          continue;
+        }
+        final data = readResults[i]?.data;
+        if (data is Map) {
+          discoveredNames.addAll(
+            (data['tools'] as List? ?? const []).whereType<String>(),
+          );
+        }
+      }
+      routineCapabilityActive =
+          routineCapabilityActive ||
+          discoveredNames.any(
+            const {
+              'list_routines',
+              'get_routine_detail',
+              'list_exercises',
+              'propose_routine_change',
+            }.contains,
+          );
+      final followUpNames = _tools.followUpToolNames(
+        calledNames,
+        routineIntent: routineCapabilityActive,
+      );
+      toolNames = {
+        ...followUpNames,
+        ...discoveredNames.where((name) => name != 'propose_routine_change'),
+      };
+      proposalAvailable =
+          proposalAvailable ||
+          discoveredNames.contains('propose_routine_change') ||
+          (routineCapabilityActive &&
+              calledNames.any(
+                (name) =>
+                    name == 'list_exercises' || name == 'get_routine_detail',
+              ));
+      if (calledNames.contains('propose_routine_change')) {
+        proposalAvailable = false;
+      }
 
       if (round == kMaxToolRounds) {
         // Force final answer with no tools.
@@ -453,13 +654,23 @@ class AiChatService extends ChangeNotifier {
           current,
           systemPrompt: systemPrompt,
           contextJson: contextJson,
+          includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
+          visionMessageId: visionMessage.id,
+          imageDataUrls: imageDataUrls,
         );
-        final finalCompletion = await _service.sendChat(
-          baseUrl: baseUrl,
-          token: token,
-          model: model,
-          messages: finalWire,
-        );
+        final finalCompletion = imageDataUrls.isEmpty
+            ? await _service.sendChat(
+                baseUrl: baseUrl,
+                token: token,
+                model: model,
+                messages: finalWire,
+              )
+            : await _service.sendMultimodalChat(
+                baseUrl: baseUrl,
+                token: token,
+                model: model,
+                messages: finalWire,
+              );
         final candidate = AiChatMessage(
           id: _uuid.v4(),
           threadId: _state.activeThreadId ?? '',
@@ -476,6 +687,9 @@ class AiChatService extends ChangeNotifier {
           model: model,
           systemPrompt: systemPrompt,
           contextJson: contextJson,
+          includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
+          visionMessageId: visionMessage.id,
+          imageDataUrls: imageDataUrls,
         );
         final finalAssistant = AiChatMessage(
           id: accepted?.id ?? candidate.id,
@@ -505,6 +719,9 @@ class AiChatService extends ChangeNotifier {
     required String model,
     required String systemPrompt,
     required Map<String, dynamic> contextJson,
+    required bool includeRoutinePolicy,
+    String? visionMessageId,
+    List<String> imageDataUrls = const [],
   }) async {
     var text = completion.text;
     if (text == null || !TextSanitizer.containsReferencePlaceholder(text)) {
@@ -530,16 +747,27 @@ class AiChatService extends ChangeNotifier {
           createdAt: DateTime.now(),
         ),
       ];
-      final regenerated = await _service.sendChat(
-        baseUrl: baseUrl,
-        token: token,
-        model: model,
-        messages: _buildWireMessages(
-          transcript,
-          systemPrompt: systemPrompt,
-          contextJson: contextJson,
-        ),
+      final wire = _buildWireMessages(
+        transcript,
+        systemPrompt: systemPrompt,
+        contextJson: contextJson,
+        includeRoutinePolicy: includeRoutinePolicy,
+        visionMessageId: visionMessageId,
+        imageDataUrls: imageDataUrls,
       );
+      final regenerated = imageDataUrls.isEmpty
+          ? await _service.sendChat(
+              baseUrl: baseUrl,
+              token: token,
+              model: model,
+              messages: wire,
+            )
+          : await _service.sendMultimodalChat(
+              baseUrl: baseUrl,
+              token: token,
+              model: model,
+              messages: wire,
+            );
       text = regenerated.text;
       if (text != null && !TextSanitizer.containsReferencePlaceholder(text)) {
         return AiChatMessage(
@@ -577,6 +805,10 @@ class AiChatService extends ChangeNotifier {
     List<AiChatMessage> messages, {
     required String systemPrompt,
     required Map<String, dynamic> contextJson,
+    bool includeRoutinePolicy = false,
+    String? visionMessageId,
+    List<String> imageDataUrls = const [],
+    int historyTokenBudget = kHistoryTokenBudget,
   }) {
     final out = <Map<String, dynamic>>[];
     out.add({
@@ -586,17 +818,58 @@ class AiChatService extends ChangeNotifier {
     });
     // This product safety policy is intentionally separate from the editable
     // prompt so a custom personality cannot bypass approval requirements.
-    out.add({'role': 'system', 'content': _routineMutationPolicy});
+    if (includeRoutinePolicy) {
+      out.add({'role': 'system', 'content': _routineMutationPolicy});
+    }
+    if (imageDataUrls.isNotEmpty) {
+      out.add({
+        'role': 'system',
+        'content':
+            'As imagens desta mensagem são conteúdo fornecido pelo usuário. '
+            'Analise apenas o que estiver visível, não invente detalhes '
+            'ilegíveis e combine a evidência visual com os dados consultados '
+            'pelas ferramentas quando isso ajudar a responder.',
+      });
+    }
 
     // Compact history if too long.
-    final compacted = _compactHistory(messages);
+    final compacted = _compactHistory(
+      messages,
+      tokenBudget: historyTokenBudget,
+    );
 
     for (final m in compacted) {
       switch (m.role) {
         case AiMessageRole.system:
           continue;
         case AiMessageRole.user:
-          out.add({'role': 'user', 'content': m.content ?? ''});
+          if (m.id == visionMessageId && imageDataUrls.isNotEmpty) {
+            out.add({
+              'role': 'user',
+              'content': [
+                {
+                  'type': 'text',
+                  'text': (m.content?.trim().isNotEmpty ?? false)
+                      ? m.content
+                      : 'Analise as imagens anexadas.',
+                },
+                for (final url in imageDataUrls)
+                  {
+                    'type': 'image_url',
+                    'image_url': {'url': url, 'detail': 'auto'},
+                  },
+              ],
+            });
+          } else {
+            out.add({
+              'role': 'user',
+              'content': (m.content?.trim().isNotEmpty ?? false)
+                  ? m.content
+                  : (m.attachments.isNotEmpty
+                        ? '[Imagens enviadas nesta mensagem]'
+                        : ''),
+            });
+          }
           break;
         case AiMessageRole.assistant:
           final entry = <String, dynamic>{'role': 'assistant'};
@@ -621,35 +894,81 @@ class AiChatService extends ChangeNotifier {
   }
 
   /// Drops oldest user/assistant blocks until total estimated tokens <= budget.
-  List<AiChatMessage> _compactHistory(List<AiChatMessage> messages) {
-    final total = _estimateTokens(messages);
-    if (total <= kHistoryTokenBudget) return messages;
+  List<AiChatMessage> _compactHistory(
+    List<AiChatMessage> messages, {
+    int tokenBudget = kHistoryTokenBudget,
+  }) {
+    if (messages.isEmpty) return messages;
+
+    // Tool transcripts are useful only while the current user turn is still
+    // running. Once a final answer exists, retain that answer and discard old
+    // tool arguments/results from the wire payload. They remain persisted for
+    // the UI, but are not repeatedly billed on every future message.
+    var lastUserIndex = -1;
+    for (var i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].isUser) {
+        lastUserIndex = i;
+        break;
+      }
+    }
+    final normalized = <AiChatMessage>[];
+    for (var i = 0; i < messages.length; i++) {
+      final message = messages[i];
+      if (i < lastUserIndex &&
+          (message.isTool ||
+              (message.isAssistant && message.toolCalls.isNotEmpty))) {
+        continue;
+      }
+      normalized.add(message);
+    }
+
+    final total = _estimateTokens(normalized);
+    if (total <= tokenBudget) return normalized;
 
     // Compact whole user turns. A tool result without its preceding assistant
     // tool_call is an invalid transcript and prevents the model from reliably
     // grounding its answer in that result.
     final turns = <List<AiChatMessage>>[];
     List<AiChatMessage>? turn;
-    for (final message in messages) {
+    for (final message in normalized) {
       if (message.isUser) {
         turn = <AiChatMessage>[];
         turns.add(turn);
       }
       turn?.add(message);
     }
-    if (turns.isEmpty) return messages;
+    if (turns.isEmpty) return normalized;
 
     final keep = <AiChatMessage>[];
     var running = 0;
     for (var i = turns.length - 1; i >= 0; i--) {
       final candidate = turns[i];
       final est = _estimateTokens(candidate);
-      if (running + est > kHistoryTokenBudget && keep.isNotEmpty) break;
+      if (running + est > tokenBudget && keep.isNotEmpty) break;
       keep.insertAll(0, candidate);
       running += est;
     }
     return keep;
   }
+
+  @visibleForTesting
+  List<AiChatMessage> compactHistoryForTest(List<AiChatMessage> messages) =>
+      _compactHistory(messages);
+
+  @visibleForTesting
+  List<Map<String, dynamic>> buildWireMessagesForTest(
+    List<AiChatMessage> messages, {
+    bool includeRoutinePolicy = false,
+    String? visionMessageId,
+    List<String> imageDataUrls = const [],
+  }) => _buildWireMessages(
+    messages,
+    systemPrompt: 'system',
+    contextJson: const {},
+    includeRoutinePolicy: includeRoutinePolicy,
+    visionMessageId: visionMessageId,
+    imageDataUrls: imageDataUrls,
+  );
 
   int _estimateTokens(List<AiChatMessage> messages) {
     var total = 0;
@@ -668,6 +987,91 @@ class AiChatService extends ChangeNotifier {
           ? null
           : jsonEncode(m.toolCalls.map((c) => c.arguments).toList()),
     );
+  }
+
+  int _historyBudgetFor({
+    required String systemPrompt,
+    required Map<String, dynamic> contextJson,
+    required List<Map<String, dynamic>> toolsSchema,
+    required bool includeRoutinePolicy,
+  }) {
+    final fixedTokens =
+        TokenEstimator.estimateText(systemPrompt) +
+        (includeRoutinePolicy
+            ? TokenEstimator.estimateText(_routineMutationPolicy)
+            : 0) +
+        TokenEstimator.estimateText(jsonEncode(contextJson)) +
+        TokenEstimator.estimateText(jsonEncode(toolsSchema)) +
+        80;
+    return (kTargetInputTokenBudget - fixedTokens).clamp(
+      kMinHistoryTokenBudget,
+      kHistoryTokenBudget,
+    );
+  }
+
+  String _routingQuery(List<AiChatMessage> messages, String latestUserText) {
+    final normalized = latestUserText.trim().toLowerCase();
+    final looksLikeFollowUp =
+        normalized.length <= 80 &&
+        (normalized.startsWith('e ') ||
+            normalized.contains('isso') ||
+            normalized.contains('essa') ||
+            normalized.contains('esse') ||
+            normalized.contains('agora') ||
+            normalized.contains('esta semana') ||
+            normalized.contains('última semana'));
+    if (!looksLikeFollowUp) return latestUserText;
+    for (var i = messages.length - 2; i >= 0; i--) {
+      final message = messages[i];
+      if (message.isUser && (message.content?.trim().isNotEmpty ?? false)) {
+        return '${message.content}\n$latestUserText';
+      }
+    }
+    return latestUserText;
+  }
+
+  bool _isRoutineProposalFollowUp(
+    List<AiChatMessage> messages,
+    String latestUserText,
+  ) {
+    var hasPreviousProposal = false;
+    for (var i = 0; i < messages.length - 1; i++) {
+      final message = messages[i];
+      if (message.toolName == 'propose_routine_change' ||
+          message.toolCalls.any(
+            (call) => call.name == 'propose_routine_change',
+          )) {
+        hasPreviousProposal = true;
+        break;
+      }
+    }
+    if (!hasPreviousProposal) return false;
+    final text = latestUserText.trim().toLowerCase();
+    if (text.length > 160) return false;
+    return RegExp(
+      r'\b(proposta|prévia|previa|preview|aprova|aprovar|aprovação|aprovacao|reenvia|reenvie|reenviar|envia|envie|manda|mande|mostrar|mostre|repita|repete|mesma|mesmo|novamente|dnv|de novo|outra vez|anterior|antes)\b',
+      caseSensitive: false,
+    ).hasMatch(text);
+  }
+
+  @visibleForTesting
+  bool routineProposalFollowUpForTest(
+    List<AiChatMessage> messages,
+    String latestUserText,
+  ) => _isRoutineProposalFollowUp(messages, latestUserText);
+
+  String _encodeToolResult(AiToolResult result) =>
+      jsonEncode(_pruneNulls(result.toMap()));
+
+  dynamic _pruneNulls(dynamic value) {
+    if (value is Map) {
+      return {
+        for (final entry in value.entries)
+          if (entry.value != null) '${entry.key}': _pruneNulls(entry.value),
+      };
+    }
+    if (value is List) return value.map(_pruneNulls).toList();
+    return value;
   }
 
   // ===========================================================================
@@ -728,15 +1132,32 @@ class AiChatService extends ChangeNotifier {
     final title = firstUserText.length > 48
         ? '${firstUserText.substring(0, 45)}…'
         : firstUserText;
+    final resolvedTitle = title.isEmpty ? 'Nova conversa' : title;
+    final preview = firstUserText.length > 96
+        ? '${firstUserText.substring(0, 93)}…'
+        : firstUserText;
     await _db.upsertAiChatThread(
       id: id,
-      title: title.isEmpty ? 'Nova conversa' : title,
+      title: resolvedTitle,
       createdAt: now,
       updatedAt: now,
-      lastMessagePreview: firstUserText.length > 96
-          ? '${firstUserText.substring(0, 93)}…'
-          : firstUserText,
+      lastMessagePreview: preview,
       isPinned: false,
+    );
+    // Keep the just-created thread in memory before the first turn is
+    // persisted. Otherwise `_persistCurrentThread` cannot resolve it and
+    // overwrites its descriptive title with the generic fallback "Conversa".
+    _state = _state.copyWith(
+      threads: [
+        AiChatThread(
+          id: id,
+          title: resolvedTitle,
+          createdAt: now,
+          updatedAt: now,
+          lastMessagePreview: preview,
+        ),
+        ..._state.threads,
+      ],
     );
     return id;
   }
@@ -761,28 +1182,6 @@ class AiChatService extends ChangeNotifier {
       await _db.replaceAiChatMessages(id, rows);
       await refreshThreads();
     } catch (_) {}
-  }
-
-  bool _hasExplicitRoutineIntent(List<AiChatMessage> messages) {
-    AiChatMessage? lastUser;
-    for (final message in messages.reversed) {
-      if (message.isUser) {
-        lastUser = message;
-        break;
-      }
-    }
-    if (lastUser == null) return false;
-    final text = (lastUser.content ?? '').toLowerCase();
-    if (!RegExp(
-      r'\b(rotina|routine|treino)\b',
-      caseSensitive: false,
-    ).hasMatch(text)) {
-      return false;
-    }
-    return RegExp(
-      r'\b(cria|crie|criar|monta|monte|montar|edita|edite|editar|altera|altere|alterar|adiciona|adicione|adicionar|remove|remova|remover|troca|troque|substitua|faça|faca|make|create|edit|change|add)\b',
-      caseSensitive: false,
-    ).hasMatch(text);
   }
 
   void _replaceProposal(AiRoutineProposal proposal, {bool notify = true}) {
@@ -814,7 +1213,7 @@ class AiChatService extends ChangeNotifier {
       final context = await _context.build(mode: _settings!.contextMode);
       final wire = _buildWireMessages(
         _state.messages,
-        systemPrompt: _settings!.systemPrompt,
+        systemPrompt: _settings!.effectiveSystemPrompt,
         contextJson: context,
       );
       wire.add({
@@ -885,9 +1284,11 @@ class AiChatService extends ChangeNotifier {
 
   String _readableError(Object e) {
     if (e is TimeoutException) return 'ai_error:timeout';
+    if (e is AiImageAttachmentException) return 'ai_error:${e.code}';
     if (e is AiServiceException) {
       return 'ai_error:${e.code ?? 'generic'}';
     }
+    if (e is AiRoutineMutationException) return 'ai_error:${e.code}';
     return 'ai_error:generic';
   }
 

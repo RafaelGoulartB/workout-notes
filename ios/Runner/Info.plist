@@ -27,9 +27,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Used to take photos of nutrition labels so the AI Coach can identify foods.</string>
+	<string>Used to take photos for AI Coach conversations and nutrition label analysis.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Used to pick photos of nutrition labels so the AI Coach can identify foods.</string>
+	<string>Used to attach photos to AI Coach conversations and nutrition label analysis.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

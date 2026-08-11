@@ -6,7 +6,7 @@ Database? _currentDb;
 /// Opens a new in-memory FFI database with the minimum schema the AI services
 /// need, installs it as [DatabaseHelper.overrideDatabase], and returns the
 /// handle. Tests should call [uninstallAiTestDb] in `tearDown`.
-Future<Database> installAiTestDb() async {
+Future<Database> installAiTestDb({bool includeRoutineDayNotes = true}) async {
   sqfliteFfiInit();
   if (_currentDb != null && _currentDb!.isOpen) {
     await _currentDb!.close();
@@ -35,7 +35,7 @@ Future<Database> installAiTestDb() async {
           'CREATE TABLE routines (id TEXT PRIMARY KEY, name TEXT, notes TEXT, created_at TEXT)',
         );
         await db.execute(
-          'CREATE TABLE routine_days (id TEXT PRIMARY KEY, routine_id TEXT, name TEXT, order_index INTEGER, notes TEXT, FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE)',
+          'CREATE TABLE routine_days (id TEXT PRIMARY KEY, routine_id TEXT, name TEXT, order_index INTEGER${includeRoutineDayNotes ? ', notes TEXT' : ''}, FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE)',
         );
         await db.execute(
           'CREATE TABLE routine_exercises (id TEXT PRIMARY KEY, routine_day_id TEXT, exercise_id TEXT, order_index INTEGER, superset_group_id TEXT, rest_time_seconds INTEGER, FOREIGN KEY (routine_day_id) REFERENCES routine_days(id) ON DELETE CASCADE, FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE)',
@@ -53,7 +53,7 @@ Future<Database> installAiTestDb() async {
           'CREATE TABLE ai_chat_threads (id TEXT PRIMARY KEY, title TEXT, created_at TEXT, updated_at TEXT, last_message_preview TEXT, archived INTEGER DEFAULT 0, is_pinned INTEGER DEFAULT 0)',
         );
         await db.execute(
-          'CREATE TABLE ai_chat_messages (id TEXT PRIMARY KEY, thread_id TEXT, role TEXT, content TEXT, tool_call_id TEXT, tool_name TEXT, tool_calls_json TEXT, created_at TEXT, FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE)',
+          'CREATE TABLE ai_chat_messages (id TEXT PRIMARY KEY, thread_id TEXT, role TEXT, content TEXT, tool_call_id TEXT, tool_name TEXT, tool_calls_json TEXT, attachments_json TEXT, created_at TEXT, FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE)',
         );
         await db.execute(
           'CREATE TABLE ai_routine_proposals (id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, tool_call_id TEXT NOT NULL, action TEXT NOT NULL, routine_id TEXT, before_json TEXT, target_json TEXT NOT NULL, diff_json TEXT NOT NULL, status TEXT NOT NULL, applied_routine_id TEXT, error_code TEXT, error_message TEXT, created_at TEXT NOT NULL, resolved_at TEXT, FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE)',
@@ -75,6 +75,9 @@ Future<Database> installAiTestDb() async {
         );
         await db.execute(
           'CREATE TABLE nutrition_goals (id TEXT PRIMARY KEY, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1)',
+        );
+        await db.execute(
+          "CREATE TABLE sleep_entries (id TEXT PRIMARY KEY, date TEXT NOT NULL UNIQUE, sleep_minutes INTEGER NOT NULL, actual_sleep_minutes INTEGER, bedtime_minutes INTEGER, wake_time_minutes INTEGER, comment TEXT, source TEXT NOT NULL DEFAULT 'manual', time_in_bed_minutes INTEGER, estimated_sleep_minutes INTEGER, created_at TEXT NOT NULL)",
         );
         await db.execute(
           'CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)',

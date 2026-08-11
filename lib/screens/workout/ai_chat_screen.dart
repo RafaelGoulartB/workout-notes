@@ -1,11 +1,17 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../main.dart';
 import '../../navigation/ai_coach_navigation.dart';
 import '../../models/ai_chat_message.dart';
+import '../../models/ai_image_attachment.dart';
 import '../../models/ai_chat_state.dart';
 import '../../services/ai_tool_registry.dart';
+import '../../services/ai_image_attachment_store.dart';
 import '../../state/ai_chat_service.dart';
 import '../../state/ai_settings_notifier.dart';
 import '../../utils/ai_error_localizer.dart';
@@ -18,7 +24,6 @@ import '../../widgets/ai/ai_tool_result_bubble.dart';
 import 'ai_chat_history_screen.dart';
 import 'ai_settings_screen.dart';
 import 'routines_screen.dart';
-import 'dart:convert';
 
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
@@ -33,6 +38,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
   String? _lastActiveThreadId;
   late final AiSettingsNotifier _settings;
   late final AiToolRegistry _toolLabels;
+  final ImagePicker _imagePicker = ImagePicker();
+  final List<AiPendingImage> _pendingImages = [];
+  bool _pickingImages = false;
 
   @override
   void initState() {
@@ -93,8 +101,141 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Future<void> _send() async {
     final text = _controller.text;
-    _controller.clear();
-    await AiChatService.instance.send(text);
+    final images = List<AiPendingImage>.of(_pendingImages);
+    await AiChatService.instance.send(
+      text,
+      images: images,
+      onAccepted: () {
+        if (!mounted) return;
+        _controller.clear();
+        setState(_pendingImages.clear);
+      },
+    );
+  }
+
+  Future<void> _showImageSourcePicker() async {
+    if (_pendingImages.length >= kMaxAiChatImages || _pickingImages) return;
+    final l10n = AppLocalizations.of(context)!;
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: Text(l10n.aiChatChooseGallery),
+              subtitle: Text(l10n.aiChatImageLimitHelp),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            if (!kIsWeb &&
+                (defaultTargetPlatform == TargetPlatform.android ||
+                    defaultTargetPlatform == TargetPlatform.iOS))
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: Text(l10n.aiChatTakePhoto),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+    await _pickImages(source);
+  }
+
+  Future<void> _pickImages(ImageSource source) async {
+    final l10n = AppLocalizations.of(context)!;
+    final remaining = kMaxAiChatImages - _pendingImages.length;
+    setState(() => _pickingImages = true);
+    try {
+      final List<XFile> files;
+      if (source == ImageSource.camera) {
+        final file = await _imagePicker.pickImage(
+          source: ImageSource.camera,
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 82,
+          requestFullMetadata: false,
+        );
+        files = file == null ? [] : [file];
+      } else {
+        files = await _imagePicker.pickMultiImage(
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 82,
+          limit: remaining,
+          requestFullMetadata: false,
+        );
+      }
+      final selected = files.take(remaining);
+      final pending = <AiPendingImage>[];
+      for (final file in selected) {
+        final bytes = await file.readAsBytes();
+        if (bytes.length > kMaxAiChatImageBytes) {
+          throw const AiImageAttachmentException('image_too_large');
+        }
+        final mimeType = _detectImageMimeType(file.mimeType, bytes);
+        if (mimeType == null) {
+          throw const AiImageAttachmentException('unsupported_image');
+        }
+        pending.add(
+          AiPendingImage(bytes: bytes, mimeType: mimeType, fileName: file.name),
+        );
+      }
+      if (!mounted) return;
+      setState(() => _pendingImages.addAll(pending));
+      if (files.length > remaining) {
+        _showImageSnack(l10n.aiChatTooManyImages);
+      }
+    } on AiImageAttachmentException catch (error) {
+      if (!mounted) return;
+      _showImageSnack(
+        error.code == 'image_too_large'
+            ? l10n.aiChatImageTooLarge
+            : l10n.aiChatUnsupportedImage,
+      );
+    } catch (_) {
+      if (mounted) _showImageSnack(l10n.aiChatImagePickFailed);
+    } finally {
+      if (mounted) setState(() => _pickingImages = false);
+    }
+  }
+
+  void _showImageSnack(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String? _detectImageMimeType(String? reported, List<int> bytes) {
+    const supported = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'};
+    final normalized = reported?.toLowerCase();
+    if (normalized != null && supported.contains(normalized)) return normalized;
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xff &&
+        bytes[1] == 0xd8 &&
+        bytes[2] == 0xff) {
+      return 'image/jpeg';
+    }
+    if (bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4e &&
+        bytes[3] == 0x47) {
+      return 'image/png';
+    }
+    if (bytes.length >= 12 &&
+        String.fromCharCodes(bytes.sublist(0, 4)) == 'RIFF' &&
+        String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP') {
+      return 'image/webp';
+    }
+    if (bytes.length >= 6 &&
+        String.fromCharCodes(bytes.sublist(0, 3)) == 'GIF') {
+      return 'image/gif';
+    }
+    return null;
   }
 
   @override
@@ -105,14 +246,22 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final configured = _settings.isConfigured;
 
     return Scaffold(
-      backgroundColor: theme.brightness == Brightness.dark
-          ? const Color(0xFF0D0E12)
-          : theme.colorScheme.surface,
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: theme.brightness == Brightness.dark
-            ? const Color(0xFF17181F)
-            : theme.colorScheme.surface,
-        title: const SizedBox.shrink(),
+        backgroundColor: theme.colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        toolbarHeight: 68,
+        titleSpacing: 0,
+        title: _buildChatHeader(theme, l10n),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: theme.colorScheme.outlineVariant.withAlpha(120),
+          ),
+        ),
         actions: [
           IconButton(
             tooltip: l10n.aiChatNewChat,
@@ -134,6 +283,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             },
           ),
           PopupMenuButton<String>(
+            tooltip: l10n.aiChatMoreOptions,
             onSelected: (v) {
               switch (v) {
                 case 'settings':
@@ -144,19 +294,16 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     ),
                   );
                   break;
-                case 'provider':
-                  _showProviderSheet();
-                  break;
               }
             },
             itemBuilder: (_) => [
               PopupMenuItem(
-                value: 'provider',
-                child: Text(l10n.aiChatChooseProvider),
-              ),
-              PopupMenuItem(
                 value: 'settings',
-                child: Text(l10n.aiChatSettings),
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.settings_outlined),
+                  title: Text(l10n.aiChatSettings),
+                ),
               ),
             ],
           ),
@@ -169,16 +316,25 @@ class _AiChatScreenState extends State<AiChatScreen> {
             )
           : Column(
               children: [
-                if (state.phase != AiTurnPhase.idle)
-                  _buildPhaseBanner(theme, state, l10n),
                 Expanded(
                   child: state.messages.isEmpty
                       ? _buildWelcome(theme, l10n)
                       : ListView.builder(
                           controller: _scroll,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          itemCount: state.messages.length,
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: const EdgeInsets.fromLTRB(0, 6, 0, 14),
+                          itemCount:
+                              state.messages.length +
+                              (_showActivity(state) ? 1 : 0),
                           itemBuilder: (_, i) {
+                            if (i == state.messages.length) {
+                              return _buildActivityIndicator(
+                                theme,
+                                state,
+                                l10n,
+                              );
+                            }
                             return _buildMessageTile(
                               state.messages[i],
                               i,
@@ -193,82 +349,191 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   controller: _controller,
                   enabled: configured,
                   sending: state.isSending,
-                  providerName: _settings.activeProvider?.name,
-                  modelName: _settings.activeProvider?.selectedModel,
-                  onChooseProvider: _showProviderSheet,
                   onSend: _send,
+                  images: _pendingImages,
+                  pickingImages: _pickingImages,
+                  onAddImages: _showImageSourcePicker,
+                  onRemoveImage: (index) {
+                    setState(() => _pendingImages.removeAt(index));
+                  },
                 ),
               ],
             ),
     );
   }
 
-  // Kept as a compatibility helper for callers using the older chat layout.
-  // ignore: unused_element
-  Widget _buildProviderHeader(ThemeData theme) {
+  Widget _buildChatHeader(ThemeData theme, AppLocalizations l10n) {
     final active = _settings.activeProvider;
-    final l10n = AppLocalizations.of(context)!;
-    if (active == null) return const SizedBox.shrink();
-    return Material(
-      color: theme.colorScheme.surfaceContainerHigh,
-      child: InkWell(
-        onTap: _showProviderSheet,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              Icon(
-                Icons.cloud_outlined,
-                size: 16,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  active.selectedModel.isEmpty
-                      ? l10n.aiChatNoModel(active.name)
-                      : l10n.aiChatActiveModel(
-                          active.name,
-                          active.selectedModel,
-                        ),
-                  style: theme.textTheme.bodySmall,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const Icon(Icons.swap_horiz_rounded, size: 16),
-            ],
+    final model = active?.selectedModel ?? '';
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: active == null ? null : _showProviderSheet,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              size: 19,
+              color: theme.colorScheme.onPrimaryContainer,
+            ),
           ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.aiChatCoachName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  active == null
+                      ? l10n.aiChatNotConfigured
+                      : model.isEmpty
+                      ? active.name
+                      : model,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (active != null) ...[
+            const SizedBox(width: 2),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 18,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  bool _showActivity(AiChatState state) =>
+      state.phase != AiTurnPhase.idle && state.phase != AiTurnPhase.failed;
+
+  Widget _buildActivityIndicator(
+    ThemeData theme,
+    AiChatState state,
+    AppLocalizations l10n,
+  ) {
+    return Semantics(
+      liveRegion: true,
+      label: _phaseText(state, l10n),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 10, 12, 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.primaryContainer,
+              ),
+              child: Icon(
+                Icons.auto_awesome_rounded,
+                size: 16,
+                color: theme.colorScheme.onPrimaryContainer,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              margin: const EdgeInsets.only(top: 1),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 15,
+                    height: 15,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Text(
+                    _phaseText(state, l10n),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildPhaseBanner(
-    ThemeData theme,
-    AiChatState state,
-    AppLocalizations l10n,
-  ) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: theme.colorScheme.secondaryContainer,
-      child: Row(
-        children: [
-          const SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              _phaseText(state, l10n),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSecondaryContainer,
+  void _sendSuggestion(String text) {
+    _controller.text = text;
+    _controller.selection = TextSelection.collapsed(offset: text.length);
+    _send();
+  }
+
+  Widget _suggestionCard(
+    ThemeData theme, {
+    required IconData icon,
+    required String text,
+  }) {
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _sendSuggestion(text),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          child: Row(
+            children: [
+              Icon(icon, size: 19, color: theme.colorScheme.primary),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Text(
+                  text,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
+              Icon(
+                Icons.arrow_forward_rounded,
+                size: 17,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -291,32 +556,74 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   Widget _buildWelcome(ThemeData theme, AppLocalizations l10n) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.fitness_center_rounded,
-              size: 64,
-              color: theme.colorScheme.primary.withAlpha(120),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              l10n.aiChatWelcomeTitle,
-              style: theme.textTheme.titleLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              l10n.aiChatWelcomeSubtitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight - 40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 28,
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 18),
+              Text(
+                l10n.aiChatWelcomeTitle,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: Text(
+                  l10n.aiChatWelcomeSubtitle,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    height: 1.45,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 26),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  children: [
+                    _suggestionCard(
+                      theme,
+                      icon: Icons.battery_charging_full_rounded,
+                      text: l10n.aiChatSuggestionRecovery,
+                    ),
+                    const SizedBox(height: 10),
+                    _suggestionCard(
+                      theme,
+                      icon: Icons.bedtime_outlined,
+                      text: l10n.aiChatSuggestionSleep,
+                    ),
+                    const SizedBox(height: 10),
+                    _suggestionCard(
+                      theme,
+                      icon: Icons.trending_up_rounded,
+                      text: l10n.aiChatSuggestionProgress,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -327,34 +634,67 @@ class _AiChatScreenState extends State<AiChatScreen> {
     String error,
     AppLocalizations l10n,
   ) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: theme.colorScheme.errorContainer,
-      child: Row(
-        children: [
-          Icon(
-            Icons.error_outline_rounded,
-            color: theme.colorScheme.onErrorContainer,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              localizeAiError(error, l10n),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onErrorContainer,
+    final failedProposalId = _failedProposalId(error);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.errorContainer,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.error_outline_rounded,
+              size: 20,
+              color: theme.colorScheme.onErrorContainer,
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(
+                localizeAiError(error, l10n),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  height: 1.35,
+                  color: theme.colorScheme.onErrorContainer,
+                ),
               ),
             ),
-          ),
-        ],
+            IconButton(
+              tooltip: l10n.aiChatRetry,
+              color: theme.colorScheme.onErrorContainer,
+              onPressed: AiChatService.instance.state.isSending
+                  ? null
+                  : failedProposalId != null
+                  ? () => AiChatService.instance.approveRoutineProposal(
+                      failedProposalId,
+                    )
+                  : !AiChatService.instance.state.messages.any(
+                      (message) => message.isUser,
+                    )
+                  ? null
+                  : AiChatService.instance.retryLastTurn,
+              icon: const Icon(Icons.refresh_rounded, size: 20),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  String? _failedProposalId(String error) {
+    const prefix = 'ai_error:routine_apply_failed:';
+    if (!error.startsWith(prefix)) return null;
+    final id = error.substring(prefix.length);
+    return id.isEmpty ? null : id;
   }
 
   Widget _buildMessageTile(AiChatMessage m, int index, AppLocalizations l10n) {
     if (m.isUser) {
       return AiMessageBubble(
         message: m,
+        showTimestamp: _settings.settings.showMessageTimestamps,
         onCopy: () => MessageCopyAction.copy(context, m.content ?? ''),
       );
     }
@@ -366,6 +706,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
         children.add(
           AiMessageBubble(
             message: m,
+            showTimestamp: _settings.settings.showMessageTimestamps,
             onCopy: () => MessageCopyAction.copy(context, m.content ?? ''),
             onRetry: hasVisibleText
                 ? () => AiChatService.instance.retryFromMessage(index - 1)
@@ -413,6 +754,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               AiToolResultBubble(
                 message: n,
                 toolLabel: _toolLabels.humanLabel(n.toolName ?? '', l10n),
+                initiallyExpanded: _settings.settings.autoExpandToolDetails,
               ),
             );
           }

@@ -15,6 +15,7 @@ import 'package:workout_notes/services/sleep_monitor_service.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
 
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
+import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/sleep/sleep_duration_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_latest_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_goal_metrics_card.dart';
@@ -154,6 +155,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         centerTitle: false,
         automaticallyImplyLeading: false,
         actions: [
+          const AiCoachHeaderButton(),
           IconButton(
             tooltip: 'Alarmes',
             icon: const Icon(Icons.alarm_rounded),

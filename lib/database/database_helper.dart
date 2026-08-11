@@ -28,7 +28,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 31;
+  static const _dbVersion = 33;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -182,6 +182,7 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         routine_id TEXT NOT NULL,
         name TEXT,
+        notes TEXT,
         order_index INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE
       )
@@ -397,6 +398,7 @@ class DatabaseHelper {
         tool_call_id TEXT,
         tool_name TEXT,
         tool_calls_json TEXT,
+        attachments_json TEXT,
         created_at TEXT NOT NULL,
         FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
       )
@@ -1990,6 +1992,20 @@ class DatabaseHelper {
       } catch (_) {}
       await _seedMealTypes(db);
     }
+    if (oldVersion < 32) {
+      try {
+        await db.execute(
+          'ALTER TABLE ai_chat_messages ADD COLUMN attachments_json TEXT',
+        );
+      } catch (_) {}
+    }
+    if (oldVersion < 33) {
+      // Fresh databases before v33 accidentally omitted this column from
+      // _onCreate even though the v10 migration and routine UI use it.
+      try {
+        await db.execute('ALTER TABLE routine_days ADD COLUMN notes TEXT');
+      } catch (_) {}
+    }
   }
 
   /// Creates the full nutrition module schema (v22) using
@@ -2868,15 +2884,25 @@ class DatabaseHelper {
     bool isPinned = false,
   }) async {
     final db = await database;
-    await db.insert('ai_chat_threads', {
-      'id': id,
+    final values = {
       'title': title,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'last_message_preview': lastMessagePreview,
       'archived': archived ? 1 : 0,
       'is_pinned': isPinned ? 1 : 0,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    };
+    await db.transaction((txn) async {
+      final updated = await txn.update(
+        'ai_chat_threads',
+        values,
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      if (updated == 0) {
+        await txn.insert('ai_chat_threads', {'id': id, ...values});
+      }
+    });
     return id;
   }
 

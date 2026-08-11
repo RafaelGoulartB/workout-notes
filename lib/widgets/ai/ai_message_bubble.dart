@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
-import '../../models/ai_chat_message.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/ai_chat_message.dart';
 
 class AiMessageBubble extends StatelessWidget {
   final AiChatMessage message;
@@ -21,160 +23,308 @@ class AiMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return message.isUser ? _buildUser(context) : _buildAssistant(context);
+  }
+
+  Widget _buildUser(BuildContext context) {
     final theme = Theme.of(context);
-    final isUser = message.isUser;
-
-    final color = isUser
-        ? (theme.brightness == Brightness.dark
-              ? const Color(0xFF304C86)
-              : theme.colorScheme.primaryContainer)
-        : (theme.brightness == Brightness.dark
-              ? const Color(0xFF27282E)
-              : theme.colorScheme.surfaceContainerHigh);
-    final textColor = isUser
-        ? theme.colorScheme.onPrimaryContainer
-        : theme.colorScheme.onSurface;
-
-    final align = isUser ? Alignment.centerRight : Alignment.centerLeft;
-    final radius = isUser
-        ? const BorderRadius.only(
-            topLeft: Radius.circular(16),
-            topRight: Radius.circular(16),
-            bottomLeft: Radius.circular(16),
-            bottomRight: Radius.circular(4),
-          )
-        : const BorderRadius.only(
-            topLeft: Radius.circular(16),
-            topRight: Radius.circular(16),
-            bottomLeft: Radius.circular(4),
-            bottomRight: Radius.circular(16),
-          );
-
+    final colors = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 19, vertical: 5),
+      padding: const EdgeInsets.fromLTRB(56, 8, 16, 8),
       child: Align(
-        alignment: align,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.86,
-          ),
-          child: Column(
-            crossAxisAlignment: isUser
-                ? CrossAxisAlignment.end
-                : CrossAxisAlignment.start,
-            children: [
-              Container(
-                decoration: BoxDecoration(color: color, borderRadius: radius),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 15,
-                  vertical: 13,
+        alignment: Alignment.centerRight,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Container(
+              constraints: const BoxConstraints(maxWidth: 340),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: colors.primaryContainer,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(6),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (message.content != null && message.content!.isNotEmpty)
-                      _BodyText(
-                        text: message.content!,
-                        isUser: isUser,
-                        textColor: textColor,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (message.attachments.isNotEmpty)
+                    _MessageImageGrid(message: message),
+                  if (message.attachments.isNotEmpty &&
+                      message.content?.trim().isNotEmpty == true)
+                    const SizedBox(height: 10),
+                  if (message.content?.trim().isNotEmpty == true)
+                    SelectableText(
+                      message.content!,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colors.onPrimaryContainer,
+                        height: 1.4,
                       ),
-                    // Tool calls are represented by the separate result bar below.
-                    // Do not duplicate the tool name inside the message bubble.
-                    if (showTimestamp) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatTime(message.createdAt),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: textColor.withAlpha(160),
-                          fontSize: 10,
+                    ),
+                ],
+              ),
+            ),
+            if (showTimestamp || onCopy != null)
+              _MessageMeta(
+                timestamp: showTimestamp
+                    ? _formatTime(message.createdAt)
+                    : null,
+                onCopy: onCopy,
+                onRetry: null,
+                alignEnd: true,
+                compact: true,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssistant(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 12, 12, 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CoachAvatar(colors: colors),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, bottom: 7),
+                  child: Text(
+                    l10n.aiChatCoachName,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                ),
+                if (message.content?.isNotEmpty == true)
+                  _MarkdownBody(
+                    text: message.content!,
+                    textColor: colors.onSurface,
+                  ),
+                if (showTimestamp || onCopy != null || onRetry != null)
+                  _MessageMeta(
+                    timestamp: showTimestamp
+                        ? _formatTime(message.createdAt)
+                        : null,
+                    onCopy: onCopy,
+                    onRetry: onRetry,
+                    alignEnd: false,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MessageImageGrid extends StatelessWidget {
+  final AiChatMessage message;
+
+  const _MessageImageGrid({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final attachments = message.attachments;
+    final single = attachments.length == 1;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (final attachment in attachments)
+          Semantics(
+            button: true,
+            label: attachment.fileName,
+            child: GestureDetector(
+              onTap: () => showDialog<void>(
+                context: context,
+                barrierColor: Colors.black87,
+                builder: (_) => Dialog.fullscreen(
+                  backgroundColor: Colors.black,
+                  child: Stack(
+                    children: [
+                      Center(
+                        child: InteractiveViewer(
+                          minScale: .8,
+                          maxScale: 5,
+                          child: Image.file(
+                            File(attachment.path),
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, _, _) => const Icon(
+                              Icons.broken_image_outlined,
+                              color: Colors.white70,
+                              size: 48,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SafeArea(
+                        child: Align(
+                          alignment: Alignment.topRight,
+                          child: IconButton(
+                            tooltip: MaterialLocalizations.of(
+                              context,
+                            ).closeButtonTooltip,
+                            color: Colors.white,
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
                         ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
               ),
-              if (!isUser && (onRetry != null || onCopy != null))
-                Padding(
-                  padding: EdgeInsets.zero,
-                  child: Transform.translate(
-                    offset: const Offset(0, -4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (onCopy != null)
-                          IconButton(
-                            tooltip: AppLocalizations.of(context)!.aiChatCopy,
-                            icon: const Icon(Icons.copy_rounded, size: 16),
-                            visualDensity: VisualDensity.compact,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 22,
-                              height: 24,
-                            ),
-                            padding: EdgeInsets.zero,
-                            onPressed: onCopy,
-                          ),
-                        if (onRetry != null)
-                          IconButton(
-                            tooltip: AppLocalizations.of(context)!.aiChatRetry,
-                            icon: const Icon(Icons.refresh_rounded, size: 16),
-                            visualDensity: VisualDensity.compact,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 22,
-                              height: 24,
-                            ),
-                            padding: EdgeInsets.zero,
-                            onPressed: onRetry,
-                          ),
-                      ],
-                    ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.file(
+                  File(attachment.path),
+                  width: single ? 260 : 104,
+                  height: single ? 176 : 104,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => Container(
+                    width: single ? 260 : 104,
+                    height: single ? 176 : 104,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    child: const Icon(Icons.broken_image_outlined),
                   ),
                 ),
-              if (isUser && onCopy != null)
-                Padding(
-                  padding: EdgeInsets.zero,
-                  child: Transform.translate(
-                    offset: const Offset(0, -4),
-                    child: IconButton(
-                      tooltip: AppLocalizations.of(context)!.aiChatCopy,
-                      icon: const Icon(Icons.copy_rounded, size: 16),
-                      visualDensity: VisualDensity.compact,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 22,
-                        height: 24,
-                      ),
-                      padding: EdgeInsets.zero,
-                      onPressed: onCopy,
-                    ),
-                  ),
-                ),
-            ],
+              ),
+            ),
           ),
+      ],
+    );
+  }
+}
+
+class _CoachAvatar extends StatelessWidget {
+  final ColorScheme colors;
+  const _CoachAvatar({required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        Icons.auto_awesome_rounded,
+        size: 16,
+        color: colors.onPrimaryContainer,
+      ),
+    );
+  }
+}
+
+class _MessageMeta extends StatelessWidget {
+  final String? timestamp;
+  final VoidCallback? onCopy;
+  final VoidCallback? onRetry;
+  final bool alignEnd;
+  final bool compact;
+
+  const _MessageMeta({
+    required this.timestamp,
+    required this.onCopy,
+    required this.onRetry,
+    required this.alignEnd,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    return Transform.translate(
+      offset: Offset(0, compact ? -4 : 0),
+      child: Padding(
+        padding: EdgeInsets.only(top: compact ? 0 : 3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: alignEnd
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
+          children: [
+            if (timestamp != null)
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: compact ? 5 : 6),
+                child: Text(
+                  timestamp!,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            if (onCopy != null)
+              _ActionButton(
+                tooltip: l10n.aiChatCopy,
+                icon: Icons.content_copy_rounded,
+                onPressed: onCopy!,
+                compact: compact,
+              ),
+            if (onRetry != null)
+              _ActionButton(
+                tooltip: l10n.aiChatRetry,
+                icon: Icons.refresh_rounded,
+                onPressed: onRetry!,
+              ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _BodyText extends StatelessWidget {
-  final String text;
-  final bool isUser;
-  final Color textColor;
+class _ActionButton extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool compact;
 
-  const _BodyText({
-    required this.text,
-    required this.isUser,
-    required this.textColor,
+  const _ActionButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (isUser) {
-      return SelectableText(
-        text,
-        style: TextStyle(color: textColor, fontSize: 15, height: 1.35),
-      );
-    }
-    return _MarkdownBody(text: text, textColor: textColor);
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      visualDensity: VisualDensity.compact,
+      constraints: BoxConstraints.tightFor(
+        width: compact ? 30 : 36,
+        height: compact ? 30 : 36,
+      ),
+      padding: EdgeInsets.zero,
+      icon: Icon(
+        icon,
+        size: compact ? 15 : 17,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    );
   }
 }
 
@@ -186,7 +336,10 @@ class _MarkdownBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final body = TextStyle(color: textColor, fontSize: 15, height: 1.35);
+    final body = theme.textTheme.bodyLarge?.copyWith(
+      color: textColor,
+      height: 1.45,
+    );
     return MarkdownBody(
       data: text,
       selectable: true,
@@ -194,45 +347,42 @@ class _MarkdownBody extends StatelessWidget {
       shrinkWrap: true,
       styleSheet: MarkdownStyleSheet(
         p: body,
-        strong: body.copyWith(fontWeight: FontWeight.w700),
-        em: body.copyWith(fontStyle: FontStyle.italic),
-        h1: theme.textTheme.titleLarge?.copyWith(
+        strong: body?.copyWith(fontWeight: FontWeight.w700),
+        em: body?.copyWith(fontStyle: FontStyle.italic),
+        h1: theme.textTheme.headlineSmall?.copyWith(
           color: textColor,
           fontWeight: FontWeight.w700,
         ),
-        h2: theme.textTheme.titleMedium?.copyWith(
+        h2: theme.textTheme.titleLarge?.copyWith(
           color: textColor,
           fontWeight: FontWeight.w700,
         ),
-        h3: theme.textTheme.titleSmall?.copyWith(
+        h3: theme.textTheme.titleMedium?.copyWith(
           color: textColor,
           fontWeight: FontWeight.w700,
         ),
-        listBullet: body.copyWith(fontWeight: FontWeight.w700),
-        blockquote: body.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        listBullet: body?.copyWith(fontWeight: FontWeight.w700),
+        blockquote: body?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         blockquoteDecoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(8),
           border: Border(
             left: BorderSide(color: theme.colorScheme.primary, width: 3),
           ),
         ),
-        code: body.copyWith(
+        code: body?.copyWith(
           fontFamily: 'monospace',
           fontSize: 13,
           backgroundColor: theme.colorScheme.surfaceContainerHighest,
         ),
         codeblockDecoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
         ),
-        horizontalRuleDecoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(color: theme.colorScheme.outlineVariant),
-          ),
-        ),
-        pPadding: const EdgeInsets.only(bottom: 6),
-        listIndent: 20,
-        blockSpacing: 8,
+        pPadding: const EdgeInsets.only(bottom: 7),
+        listIndent: 22,
+        blockSpacing: 9,
       ),
     );
   }
@@ -251,7 +401,7 @@ class MessageCopyAction {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(AppLocalizations.of(context)!.aiChatCopied),
-          duration: Duration(seconds: 1),
+          duration: const Duration(seconds: 1),
         ),
       );
     }
