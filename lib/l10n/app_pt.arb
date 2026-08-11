@@ -1141,8 +1141,17 @@
   "nutritionScanError": "Não foi possível consultar o produto.",
   "nutritionPhotoTitle": "Foto da tabela nutricional",
   "nutritionPhotoTake": "Tirar foto",
-  "nutritionPhotoGallery": "Escolher da galeria",
-  "nutritionPhotoSelectHint": "Tire uma foto da tabela nutricional do alimento. A IA do AI Coach identifica o alimento e os valores para você revisar.",
+  "nutritionPhotoGallery": "Selecionar imagens",
+  "nutritionPhotoSelectHint": "Adicione uma ou mais fotos do mesmo alimento. Se a tabela for grande, fotografe cada parte com nitidez; a IA combinará tudo em um único cadastro para você revisar.",
+  "nutritionPhotoSelectedCount": "{count} de {max} imagens selecionadas",
+  "@nutritionPhotoSelectedCount": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "max": {"type": "int"}
+    }
+  },
+  "nutritionPhotoLimitReached": "Você pode enviar até 5 imagens por alimento.",
+  "nutritionPhotoRemove": "Remover imagem",
   "nutritionPhotoAnalyze": "Analisar tabela",
   "nutritionPhotoAnalyzing": "Analisando a tabela nutricional…",
   "nutritionPhotoNotConfigured": "AI Coach não configurado",

@@ -93,6 +93,48 @@ void main() {
       },
     );
 
+    test('sends multiple label images in the same vision request', () async {
+      final first = Uint8List.fromList([1, 2, 3]);
+      final second = Uint8List.fromList([4, 5, 6, 7]);
+
+      final draft = await service.analyzeImages(
+        images: [
+          AiFoodLabelImage(bytes: first, mimeType: 'image/png'),
+          AiFoodLabelImage(bytes: second, mimeType: 'image/webp'),
+        ],
+      );
+
+      expect(draft.name, 'Iogurte natural');
+      final userContent = ai.lastMessages!.last['content'] as List<dynamic>;
+      final parts = userContent.cast<Map<String, dynamic>>();
+      expect(parts.first['text'], contains('2 imagens'));
+      final imageParts = parts
+          .where((part) => part['type'] == 'image_url')
+          .toList();
+      expect(imageParts, hasLength(2));
+      expect(
+        (imageParts[0]['image_url'] as Map<String, dynamic>)['url'],
+        'data:image/png;base64,${base64Encode(first)}',
+      );
+      expect(
+        (imageParts[1]['image_url'] as Map<String, dynamic>)['url'],
+        'data:image/webp;base64,${base64Encode(second)}',
+      );
+    });
+
+    test('rejects an empty image list before contacting the provider', () {
+      expect(
+        () => service.analyzeImages(images: const []),
+        throwsA(
+          isA<AiFoodLabelException>().having(
+            (error) => error.code,
+            'code',
+            'no_images',
+          ),
+        ),
+      );
+    });
+
     test('strips markdown fences around the JSON', () async {
       ai.response = AiChatCompletion(
         text: '```json\n${jsonEncode(_validJson())}\n```',

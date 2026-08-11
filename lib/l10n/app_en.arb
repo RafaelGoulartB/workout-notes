@@ -1152,8 +1152,17 @@
   "nutritionScanError": "Could not look up the product.",
   "nutritionPhotoTitle": "Nutrition label photo",
   "nutritionPhotoTake": "Take photo",
-  "nutritionPhotoGallery": "Choose from gallery",
-  "nutritionPhotoSelectHint": "Take a photo of the product's nutrition label. The AI Coach identifies the food and its values for you to review.",
+  "nutritionPhotoGallery": "Select images",
+  "nutritionPhotoSelectHint": "Add one or more photos of the same food. If the label is large, photograph each part clearly; AI will combine everything into one entry for you to review.",
+  "nutritionPhotoSelectedCount": "{count} of {max} images selected",
+  "@nutritionPhotoSelectedCount": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "max": {"type": "int"}
+    }
+  },
+  "nutritionPhotoLimitReached": "You can send up to 5 images per food.",
+  "nutritionPhotoRemove": "Remove image",
   "nutritionPhotoAnalyze": "Analyze label",
   "nutritionPhotoAnalyzing": "Analyzing nutrition label…",
   "nutritionPhotoNotConfigured": "AI Coach not configured",
