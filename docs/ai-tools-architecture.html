@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Arquitetura de Tool Calls — Workout Notes</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --surface-2: #eef2f8;
+      --text: #18212f;
+      --muted: #607086;
+      --border: #d9e0ea;
+      --primary: #3157d5;
+      --primary-soft: #e7ecff;
+      --primary-text: #17358e;
+      --green: #18794e;
+      --green-soft: #def7e9;
+      --amber: #9a5b00;
+      --amber-soft: #fff0cd;
+      --purple: #7146b5;
+      --purple-soft: #f0e7ff;
+      --red: #b42318;
+      --red-soft: #fee9e7;
+      --shadow: 0 12px 32px rgba(31, 45, 69, 0.08);
+      --radius: 18px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e1219;
+        --surface: #171d27;
+        --surface-2: #212a37;
+        --text: #edf1f7;
+        --muted: #a5b0c0;
+        --border: #303a49;
+        --primary: #9bb0ff;
+        --primary-soft: #202d5c;
+        --primary-text: #dbe3ff;
+        --green: #76d6a5;
+        --green-soft: #173b2b;
+        --amber: #ffc56e;
+        --amber-soft: #463115;
+        --purple: #c7a6ff;
+        --purple-soft: #35254c;
+        --red: #ffaaa4;
+        --red-soft: #4b211f;
+        --shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    button, input { font: inherit; }
+    a { color: var(--primary); }
+    code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    code {
+      padding: 0.12rem 0.32rem;
+      border-radius: 6px;
+      background: var(--surface-2);
+      font-size: 0.9em;
+    }
+    pre {
+      max-width: 100%;
+      margin: 0;
+      padding: 16px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 0.82rem;
+      line-height: 1.55;
+    }
+    h1, h2, h3 { line-height: 1.2; letter-spacing: -0.025em; }
+    h1 { margin: 0 0 14px; font-size: clamp(2rem, 5vw, 3.6rem); }
+    h2 { margin: 0 0 18px; font-size: clamp(1.45rem, 3vw, 2rem); }
+    h3 { margin: 0; font-size: 1.02rem; }
+    p { margin: 0 0 14px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 28px 20px;
+      border-right: 1px solid var(--border);
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      backdrop-filter: blur(14px);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      margin-bottom: 30px;
+      font-weight: 750;
+    }
+    .brand-mark {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border-radius: 11px;
+      background: var(--primary);
+      color: var(--surface);
+      font-size: 18px;
+    }
+    .sidebar nav { display: grid; gap: 5px; }
+    .sidebar nav a {
+      padding: 9px 11px;
+      border-radius: 9px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    .sidebar nav a:hover { background: var(--surface-2); color: var(--text); }
+    .sidebar-note {
+      position: absolute;
+      right: 20px;
+      bottom: 24px;
+      left: 20px;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+    main { width: min(1180px, 100%); min-width: 0; padding: 48px clamp(24px, 5vw, 72px) 90px; }
+    section { scroll-margin-top: 28px; margin-top: 72px; }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(28px, 5vw, 56px);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      background:
+        radial-gradient(circle at 90% 10%, color-mix(in srgb, var(--primary) 20%, transparent), transparent 34%),
+        var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .eyebrow {
+      margin-bottom: 14px;
+      color: var(--primary);
+      font-size: 0.8rem;
+      font-weight: 750;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .hero p { max-width: 760px; color: var(--muted); font-size: 1.08rem; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 28px;
+    }
+    .stat { padding: 16px; border-radius: 14px; background: var(--surface-2); }
+    .stat strong { display: block; font-size: 1.5rem; }
+    .stat span { color: var(--muted); font-size: 0.82rem; }
+
+    .callout {
+      padding: 17px 19px;
+      border-left: 4px solid var(--primary);
+      border-radius: 0 12px 12px 0;
+      background: var(--primary-soft);
+      color: var(--primary-text);
+    }
+    .callout.warning { border-color: var(--amber); background: var(--amber-soft); color: var(--text); }
+    .callout.success { border-color: var(--green); background: var(--green-soft); color: var(--text); }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(110px, 1fr));
+      gap: 22px;
+      align-items: stretch;
+    }
+    .flow-step {
+      position: relative;
+      min-height: 145px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+    }
+    .flow-step:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      top: 50%;
+      right: -18px;
+      color: var(--muted);
+      font-size: 19px;
+      transform: translateY(-50%);
+    }
+    .flow-num {
+      display: inline-grid;
+      width: 26px;
+      height: 26px;
+      margin-bottom: 10px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--primary-soft);
+      color: var(--primary-text);
+      font-size: 0.75rem;
+      font-weight: 750;
+    }
+    .flow-step p { margin: 8px 0 0; color: var(--muted); font-size: 0.78rem; }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .grid-2 > *, .sequence > *, .panel { min-width: 0; }
+    .panel {
+      padding: 22px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .panel p:last-child { margin-bottom: 0; }
+    .panel-title { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+    .icon {
+      display: inline-grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border-radius: 9px;
+      background: var(--primary-soft);
+      color: var(--primary-text);
+      font-size: 0.85rem;
+      font-weight: 750;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .search {
+      flex: 1 1 280px;
+      min-width: 0;
+      padding: 11px 13px;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      outline: none;
+      background: var(--surface);
+      color: var(--text);
+    }
+    .search:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+    .filters { display: flex; flex-wrap: wrap; gap: 7px; }
+    .filter {
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .filter:hover, .filter.active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-text); }
+    .result-count { margin: -5px 0 14px; color: var(--muted); font-size: 0.84rem; }
+
+    .tool-list { display: grid; gap: 12px; }
+    details.tool {
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+    details.tool[open] { box-shadow: var(--shadow); }
+    .tool summary {
+      display: grid;
+      grid-template-columns: minmax(210px, 0.9fr) minmax(250px, 1.4fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding: 17px 18px;
+      cursor: pointer;
+      list-style: none;
+    }
+    .tool summary::-webkit-details-marker { display: none; }
+    .tool-name { overflow-wrap: anywhere; font-family: "SFMono-Regular", Consolas, monospace; font-weight: 700; }
+    .tool-purpose { color: var(--muted); font-size: 0.88rem; }
+    .badges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge.read { background: var(--green-soft); color: var(--green); }
+    .badge.proposal { background: var(--purple-soft); color: var(--purple); }
+    .tool-body {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      padding: 0 18px 20px;
+      border-top: 1px solid var(--border);
+    }
+    .tool-block { min-width: 0; padding-top: 17px; }
+    .tool-block h4 { margin: 0 0 9px; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+    .tool-block p, .tool-block li { font-size: 0.88rem; }
+    .tool-block ul { margin: 0; padding-left: 19px; }
+    .tool-block.full { grid-column: 1 / -1; }
+    .empty-state { padding: 34px; text-align: center; color: var(--muted); }
+
+    .sequence {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+    .seq-node { padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+    .seq-node strong { display: block; margin-bottom: 6px; }
+    .seq-node span { color: var(--muted); font-size: 0.84rem; }
+    .seq-arrow { color: var(--muted); font-size: 1.3rem; }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 13px 12px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: 0.78rem; letter-spacing: 0.05em; text-transform: uppercase; }
+    td { font-size: 0.88rem; }
+
+    .source-list { display: grid; gap: 10px; }
+    .source-row { display: grid; grid-template-columns: 270px 1fr; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+    .source-row code { overflow-wrap: anywhere; }
+    .source-row span { color: var(--muted); font-size: 0.88rem; }
+
+    footer { margin-top: 74px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.82rem; }
+
+    @media (max-width: 1120px) {
+      .flow { grid-template-columns: repeat(4, 1fr); }
+      .flow-step::after { display: none; }
+    }
+    @media (max-width: 820px) {
+      .layout { display: block; }
+      .sidebar { position: static; width: auto; height: auto; padding: 18px 20px; border-right: 0; border-bottom: 1px solid var(--border); }
+      .sidebar nav { display: flex; max-width: 100%; overflow-x: auto; padding-bottom: 3px; }
+      .sidebar nav a { white-space: nowrap; }
+      .sidebar-note { display: none; }
+      .brand { margin-bottom: 12px; }
+      main { padding-top: 28px; }
+      .stats, .flow { grid-template-columns: repeat(2, 1fr); }
+      .tool summary { grid-template-columns: 1fr; gap: 7px; }
+      .badges { justify-content: flex-start; }
+      .sequence { grid-template-columns: 1fr; }
+      .seq-arrow { transform: rotate(90deg); justify-self: center; }
+    }
+    @media (max-width: 560px) {
+      main { padding-inline: 15px; }
+      section { margin-top: 54px; }
+      .hero { padding: 26px 20px; border-radius: 20px; }
+      .stats, .flow, .grid-2, .tool-body { grid-template-columns: 1fr; }
+      .tool-block.full { grid-column: auto; }
+      .source-row { grid-template-columns: 1fr; gap: 3px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">W</span><span>Workout Notes<br><small>AI Coach</small></span></div>
+      <nav aria-label="Navegação do documento">
+        <a href="#visao-geral">Visão geral</a>
+        <a href="#fluxo">Fluxo de uma mensagem</a>
+        <a href="#catalogo">Catálogo das tools</a>
+        <a href="#roteamento">Roteamento e rodadas</a>
+        <a href="#formato">Formato no wire</a>
+        <a href="#rotinas">Propostas de rotina</a>
+        <a href="#contexto">Contexto e tokens</a>
+        <a href="#fontes">Mapa do código</a>
+      </nav>
+      <div class="sidebar-note">Documento técnico gerado a partir da implementação atual.</div>
+    </aside>
+
+    <main>
+      <header id="visao-geral" class="hero">
+        <div class="eyebrow">Arquitetura interna • Tool calling</div>
+        <h1>Como a IA consulta os dados do app</h1>
+        <p>O modelo não acessa o SQLite diretamente. Ele recebe schemas selecionados para a pergunta, escolhe uma função, o app executa a leitura local e devolve JSON. A única operação especial prepara uma proposta de rotina — a alteração real só acontece após aprovação humana.</p>
+        <div class="stats" aria-label="Resumo da arquitetura">
+          <div class="stat"><strong>19</strong><span>tools registradas</span></div>
+          <div class="stat"><strong>18</strong><span>leituras locais</span></div>
+          <div class="stat"><strong>1</strong><span>proposta protegida</span></div>
+          <div class="stat"><strong>3</strong><span>rodadas máximas de tools</span></div>
+        </div>
+      </header>
+
+      <section>
+        <div class="callout success"><strong>Regra central:</strong> as tools não são endpoints públicos nem chamadas feitas pela IA diretamente ao banco. São funções Dart registradas em <code>AiToolRegistry</code> e orquestradas por <code>AiChatService</code>.</div>
+      </section>
+
+      <section id="fluxo">
+        <div class="eyebrow">Ciclo completo</div>
+        <h2>Fluxo de uma mensagem</h2>
+        <div class="flow" aria-label="Fluxo de sete etapas de uma mensagem">
+          <article class="flow-step"><span class="flow-num">1</span><h3>Validar</h3><p>Provider, token, modelo, anexos e estado do envio.</p></article>
+          <article class="flow-step"><span class="flow-num">2</span><h3>Montar</h3><p>Prompt, contexto compacto, histórico e intenção atual.</p></article>
+          <article class="flow-step"><span class="flow-num">3</span><h3>Selecionar</h3><p>Apenas os schemas relacionados à pergunta são expostos.</p></article>
+          <article class="flow-step"><span class="flow-num">4</span><h3>Consultar IA</h3><p>POST OpenAI-compatible com <code>tool_choice</code>.</p></article>
+          <article class="flow-step"><span class="flow-num">5</span><h3>Executar</h3><p>Leituras independentes rodam em paralelo no dispositivo.</p></article>
+          <article class="flow-step"><span class="flow-num">6</span><h3>Devolver JSON</h3><p>Cada resultado vira uma mensagem com role <code>tool</code>.</p></article>
+          <article class="flow-step"><span class="flow-num">7</span><h3>Responder</h3><p>A IA usa os resultados e o app persiste a conversa.</p></article>
+        </div>
+      </section>
+
+      <section id="catalogo">
+        <div class="eyebrow">Contratos disponíveis</div>
+        <h2>Catálogo das tools</h2>
+        <p style="color:var(--muted)">Busque por nome, domínio, parâmetro ou campo retornado. Abra uma tool para ver quando ela aparece, seus argumentos e o formato da resposta.</p>
+        <div class="toolbar">
+          <input id="tool-search" class="search" type="search" placeholder="Ex.: sono, exercise_id, volume, rotina…" aria-label="Buscar tools">
+          <div id="tool-filters" class="filters" aria-label="Filtrar por domínio"></div>
+        </div>
+        <div id="tool-count" class="result-count" aria-live="polite"></div>
+        <div id="tool-list" class="tool-list"></div>
+      </section>
+
+      <section id="roteamento">
+        <div class="eyebrow">Economia de tokens</div>
+        <h2>Roteamento e encadeamento</h2>
+        <div class="grid-2">
+          <article class="panel">
+            <div class="panel-title"><span class="icon">A</span><h3>Primeira rodada</h3></div>
+            <p><code>toolNamesForQuery</code> procura termos de domínio no texto. “Sono” expõe ferramentas de sono; “meta” expõe metas; uma conversa casual pode expor zero tools.</p>
+            <p>Follow-ups curtos como “e esta semana?” reutilizam a última pergunta do usuário para não perder o domínio.</p>
+          </article>
+          <article class="panel">
+            <div class="panel-title"><span class="icon">B</span><h3>Próxima rodada</h3></div>
+            <p><code>followUpToolNames</code> expõe somente dependências úteis. Depois de listar treinos, por exemplo, fica disponível apenas o detalhe de treino.</p>
+            <p>Isso evita reenviar o catálogo inteiro em todas as chamadas ao provider.</p>
+          </article>
+        </div>
+        <div class="table-wrap" style="margin-top:18px">
+          <table>
+            <thead><tr><th>Tool executada</th><th>Possível próxima tool</th><th>Motivo</th></tr></thead>
+            <tbody>
+              <tr><td><code>list_recent_workouts</code></td><td><code>get_workout_detail</code></td><td>O primeiro retorno fornece os IDs.</td></tr>
+              <tr><td><code>list_exercises</code></td><td>histórico, PRs ou tendência</td><td>Os detalhes exigem <code>exercise_id</code>.</td></tr>
+              <tr><td><code>list_routines</code></td><td><code>get_routine_detail</code></td><td>A lista fornece <code>routine_id</code>.</td></tr>
+              <tr><td><code>get_routine_detail</code></td><td><code>list_exercises</code></td><td>Edições precisam validar IDs da biblioteca.</td></tr>
+              <tr><td><code>list_goals</code></td><td><code>get_goal_progress_history</code></td><td>A lista fornece <code>goal_id</code>.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="formato">
+        <div class="eyebrow">Protocolo</div>
+        <h2>Formato de uma tool call</h2>
+        <div class="grid-2">
+          <article class="panel">
+            <div class="panel-title"><span class="icon">1</span><h3>A IA solicita</h3></div>
+            <pre><code>{
+  "id": "call_abc123",
+  "type": "function",
+  "function": {
+    "name": "get_exercise_history",
+    "arguments": "{\"exercise_id\":\"uuid\",\"limit\":12}"
+  }
+}</code></pre>
+          </article>
+          <article class="panel">
+            <div class="panel-title"><span class="icon">2</span><h3>O app responde</h3></div>
+            <pre><code>{
+  "role": "tool",
+  "tool_call_id": "call_abc123",
+  "content": "{\"ok\":true,\"data\":{...}}"
+}</code></pre>
+          </article>
+        </div>
+        <div class="grid-2" style="margin-top:18px">
+          <article class="panel">
+            <h3 style="margin-bottom:10px">Envelope de sucesso</h3>
+            <pre><code>{ "ok": true, "data": { ... } }</code></pre>
+            <p style="margin-top:10px;color:var(--muted)">Campos nulos são removidos antes do envio ao modelo para economizar tokens.</p>
+          </article>
+          <article class="panel">
+            <h3 style="margin-bottom:10px">Envelope de erro</h3>
+            <pre><code>{
+  "ok": false,
+  "code": "unknown_tool | error | invalid_args | ...",
+  "message": "Descrição legível"
+}</code></pre>
+          </article>
+        </div>
+      </section>
+
+      <section id="rotinas">
+        <div class="eyebrow">Exceção protegida</div>
+        <h2>Como uma proposta de rotina funciona</h2>
+        <div class="callout warning"><strong><code>propose_routine_change</code> não edita a rotina.</strong> Ela grava um rascunho em <code>ai_routine_proposals</code>. O usuário precisa aprovar o card; só então <code>AiRoutineMutationService.approve</code> aplica a árvore em uma transação SQLite.</div>
+        <div class="sequence" style="margin-top:20px">
+          <div class="seq-node"><strong>1. Intenção explícita</strong><span>“Crie”, “edite”, “adicione” ou “remova” conteúdo de rotina.</span></div>
+          <div class="seq-arrow">→</div>
+          <div class="seq-node"><strong>2. Dados reais</strong><span>Lista exercícios; em edição, lista e detalha a rotina existente.</span></div>
+          <div class="seq-arrow">→</div>
+          <div class="seq-node"><strong>3. Proposta</strong><span>Valida IDs, salva snapshot, árvore-alvo e diff com status aguardando aprovação.</span></div>
+        </div>
+        <div class="sequence" style="margin-top:14px">
+          <div class="seq-node"><strong>4. Card no chat</strong><span>O usuário aprova ou rejeita. Rejeitar não altera nada.</span></div>
+          <div class="seq-arrow">→</div>
+          <div class="seq-node"><strong>5. Revalidação</strong><span>Para edição, compara a rotina atual com o snapshot. Mudanças externas tornam a proposta stale.</span></div>
+          <div class="seq-arrow">→</div>
+          <div class="seq-node"><strong>6. Transação</strong><span>Aplica tudo atomicamente e pede à IA apenas um resumo factual, sem tools.</span></div>
+        </div>
+      </section>
+
+      <section id="contexto">
+        <div class="eyebrow">Prompt e limites</div>
+        <h2>Contexto, histórico e custo</h2>
+        <div class="grid-2">
+          <article class="panel">
+            <div class="panel-title"><span class="icon">C</span><h3>Contexto automático</h3></div>
+            <p><code>AiContextService</code> injeta um JSON compacto em <code>&lt;workout_data&gt;</code>. Ele contém totais, streak e, conforme o modo, disponibilidade dos domínios.</p>
+            <ul>
+              <li><strong>minimal:</strong> totais e streak.</li>
+              <li><strong>standard:</strong> adiciona cobertura recente de dados.</li>
+              <li><strong>full:</strong> também anuncia todos os domínios consultáveis.</li>
+            </ul>
+          </article>
+          <article class="panel">
+            <div class="panel-title"><span class="icon">T</span><h3>Controle de tokens</h3></div>
+            <p>O alvo de entrada é aproximadamente <strong>7.000 tokens</strong>. O orçamento do histórico diminui conforme crescem prompt, contexto e schemas, com piso de 1.200 e teto de 6.000.</p>
+            <p>Transcrições antigas de tools são removidas do wire após a resposta final; continuam persistidas para a interface.</p>
+          </article>
+          <article class="panel">
+            <div class="panel-title"><span class="icon">P</span><h3>Paralelismo</h3></div>
+            <p>Quando a IA pede várias leituras independentes na mesma resposta, o app usa <code>Future.wait</code>. A ordem original é preservada ao montar as mensagens de retorno.</p>
+          </article>
+          <article class="panel">
+            <div class="panel-title"><span class="icon">R</span><h3>Limites de rodadas</h3></div>
+            <p>São permitidas até três rodadas com tools. Se ainda houver novas chamadas, o app faz uma requisição final sem schemas para forçar uma conclusão textual.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="fontes">
+        <div class="eyebrow">Onde estudar</div>
+        <h2>Mapa do código</h2>
+        <div class="panel source-list">
+          <div class="source-row"><code>lib/state/ai_chat_service.dart</code><span>Orquestra envio, rodadas, paralelismo, contexto, compactação, persistência e regeneração.</span></div>
+          <div class="source-row"><code>lib/services/ai_tool_registry.dart</code><span>Catálogo, schemas, roteamento, dispatch e implementação das 18 leituras.</span></div>
+          <div class="source-row"><code>lib/services/ai_wellness_analytics_service.dart</code><span>Agregações de sono, nutrição, correlações e recovery score.</span></div>
+          <div class="source-row"><code>lib/services/ai_routine_mutation_service.dart</code><span>Prepara, valida, aprova ou rejeita propostas protegidas de rotina.</span></div>
+          <div class="source-row"><code>lib/services/ai_context_service.dart</code><span>Constrói o snapshot compacto injetado no system prompt.</span></div>
+          <div class="source-row"><code>lib/services/ai_service.dart</code><span>Transporte HTTP OpenAI-compatible, multimodal e parsing de tool calls.</span></div>
+          <div class="source-row"><code>lib/models/ai_message_role.dart</code><span>Define o envelope <code>AiToolResult</code> e os papéis das mensagens.</span></div>
+        </div>
+      </section>
+
+      <footer>Workout Notes • Documento da arquitetura de AI Coach tools • Consulte o código-fonte como contrato definitivo.</footer>
+    </main>
+  </div>
+
+  <script>
+    const tools = [
+      {
+        name: 'list_recent_workouts', domain: 'Treinos', type: 'read',
+        purpose: 'Lista os treinos mais recentes já agregados.',
+        when: 'Perguntas sobre treinos recentes, desempenho geral ou escolha de um treino para detalhar.',
+        args: ['limit: integer opcional, padrão 8, intervalo 1–20'],
+        returns: ['workouts[]', 'id, date, durationSeconds, feeling', 'exerciseCount, volumeKg, comment'],
+        example: '{"ok":true,"data":{"workouts":[{"id":"w1","date":"2026-08-09","durationSeconds":3600,"feeling":4,"exerciseCount":6,"volumeKg":8240}]}}'
+      },
+      {
+        name: 'get_workout_detail', domain: 'Treinos', type: 'read',
+        purpose: 'Retorna exercícios e séries de um treino específico.',
+        when: 'Depois que existe um workout_id, normalmente vindo de list_recent_workouts.',
+        args: ['workout_id: UUID obrigatório (aceita alias workoutId)'],
+        returns: ['id, date, durationSeconds, feeling, comment', 'exercises[]: exerciseId, exerciseName, order', 'sets[]: weight, reps, distance, timeSeconds, isWarmup, isComplete, rpe, comment'],
+        example: '{"ok":true,"data":{"id":"w1","date":"2026-08-09","exercises":[{"exerciseId":"e1","exerciseName":"Supino reto","sets":[{"weight":80,"reps":8,"isComplete":true}]}]}}'
+      },
+      {
+        name: 'list_exercises', domain: 'Exercícios', type: 'read',
+        purpose: 'Pesquisa a biblioteca de exercícios e fornece IDs reais.',
+        when: 'Busca por exercício, preparação de análises ou criação/edição de rotina.',
+        args: ['name_contains: texto opcional', 'category_id: UUID opcional', 'is_favorite: boolean opcional', 'limit: padrão 20, intervalo 1–50'],
+        returns: ['exercises[]', 'id, name, categoryId, type, isFavorite'],
+        example: '{"ok":true,"data":{"exercises":[{"id":"e1","name":"Supino reto","categoryId":"chest","type":"weightReps","isFavorite":true}]}}'
+      },
+      {
+        name: 'get_exercise_history', domain: 'Exercícios', type: 'read',
+        purpose: 'Obtém histórico, top sets e médias de um exercício.',
+        when: 'Perguntas sobre cargas, séries anteriores ou desempenho histórico.',
+        args: ['exercise_id: UUID obrigatório (aceita exerciseId)', 'limit: padrão 12, intervalo 1–40'],
+        returns: ['exerciseId', 'topSets[]', 'avgWeight, avgReps, totalSets', 'history[]'],
+        example: '{"ok":true,"data":{"exerciseId":"e1","topSets":[...],"avgWeight":74.5,"avgReps":8.2,"totalSets":36,"history":[...]}}'
+      },
+      {
+        name: 'get_exercise_personal_records', domain: 'Exercícios', type: 'read',
+        purpose: 'Busca recordes pessoais de um exercício.',
+        when: 'Perguntas sobre PR, recorde ou melhor marca.',
+        args: ['exercise_id: UUID obrigatório (aceita exerciseId)'],
+        returns: ['exerciseId', 'records[] filtrados para o exercício'],
+        example: '{"ok":true,"data":{"exerciseId":"e1","records":[{"type":"max_weight","value":100,"date":"2026-07-20"}]}}'
+      },
+      {
+        name: 'get_weekly_volume_breakdown', domain: 'Progresso', type: 'read',
+        purpose: 'Agrupa volume semanal por categoria muscular.',
+        when: 'Análise de distribuição, equilíbrio ou mudança de volume.',
+        args: ['weeks_back: inteiro opcional (aceita weeks), padrão 8, intervalo 2–16'],
+        returns: ['weeksBack', 'byCategory[] com agregações semanais'],
+        example: '{"ok":true,"data":{"weeksBack":8,"byCategory":[...]}}'
+      },
+      {
+        name: 'get_progress_trend', domain: 'Progresso', type: 'read',
+        purpose: 'Retorna pontos de tendência de um exercício.',
+        when: 'Perguntas sobre evolução de peso, repetições ou volume.',
+        args: ['exercise_id: UUID obrigatório', 'weeks_back: padrão 8, intervalo 2–16'],
+        returns: ['exerciseId, weeksBack', 'dataPoints[]; no máximo 40 entradas consultadas'],
+        example: '{"ok":true,"data":{"exerciseId":"e1","weeksBack":8,"dataPoints":[...]}}'
+      },
+      {
+        name: 'list_routines', domain: 'Rotinas', type: 'read',
+        purpose: 'Lista rotinas com contagem de dias e exercícios.',
+        when: 'Descoberta de rotinas e primeiro passo para editar uma existente.',
+        args: ['name_contains: texto opcional'],
+        returns: ['routines[]', 'id, name, notes, dayCount, exerciseCount'],
+        example: '{"ok":true,"data":{"routines":[{"id":"r1","name":"Upper/Lower","dayCount":4,"exerciseCount":24}]}}'
+      },
+      {
+        name: 'get_routine_detail', domain: 'Rotinas', type: 'read',
+        purpose: 'Carrega a árvore completa de uma rotina.',
+        when: 'Visualização detalhada ou edição segura de uma rotina existente.',
+        args: ['routine_id: UUID obrigatório (aceita routineId)'],
+        returns: ['id, name, notes', 'days[] com source_day_id', 'exercises[] com source_routine_exercise_id, exercício, descanso e supersérie', 'predefinedSets[] com source_set_id, carga, reps, distância, tempo e aquecimento'],
+        example: '{"ok":true,"data":{"id":"r1","name":"Upper/Lower","days":[{"source_day_id":"d1","name":"Upper A","exercises":[...]}]}}'
+      },
+      {
+        name: 'list_body_measurements', domain: 'Corpo', type: 'read',
+        purpose: 'Lista medidas corporais cronológicas.',
+        when: 'Perguntas sobre peso, circunferências ou composição corporal.',
+        args: ['type: filtro opcional', 'limit: padrão 20, intervalo 1–50'],
+        returns: ['type aplicado', 'measurements[]: id, type, value, unit, date, timeOfDay, comment'],
+        example: '{"ok":true,"data":{"type":"weight","measurements":[{"value":78.4,"unit":"kg","date":"2026-08-10"}]}}'
+      },
+      {
+        name: 'get_cardio_summary', domain: 'Cardio', type: 'read',
+        purpose: 'Resume distância semanal e distribuição por modalidade.',
+        when: 'Perguntas sobre corrida, cardio ou distância.',
+        args: ['weeks_back: inteiro opcional (aceita weeks), padrão 4, intervalo 2–16'],
+        returns: ['weeksBack', 'weeklyDistance[]', 'byModality[]'],
+        example: '{"ok":true,"data":{"weeksBack":4,"weeklyDistance":[...],"byModality":[...]}}'
+      },
+      {
+        name: 'list_goals', domain: 'Metas', type: 'read',
+        purpose: 'Lista metas e calcula seu progresso atual.',
+        when: 'Perguntas sobre metas, objetivos ou conclusão de períodos.',
+        args: ['scope: anaerobic | aerobic opcional', 'metric: volume | days | distance | time opcional', 'is_active: padrão true'],
+        returns: ['goals[]', 'id, title, scope, metric, period', 'currentValue, targetValue, progressPct, isComplete, daysRemaining'],
+        example: '{"ok":true,"data":{"goals":[{"id":"g1","title":"Treinar 4x","currentValue":3,"targetValue":4,"progressPct":75}]}}'
+      },
+      {
+        name: 'get_goal_progress_history', domain: 'Metas', type: 'read',
+        purpose: 'Compara o período atual de uma meta com períodos anteriores.',
+        when: 'Depois de obter goal_id em list_goals.',
+        args: ['goal_id: UUID obrigatório', 'periods_back: padrão 6, intervalo 1–12'],
+        returns: ['goalId, title', 'current: currentValue, targetValue, progressPct, isComplete, daysRemaining', 'history[]: start, end, value, targetValue, wasCompleted'],
+        example: '{"ok":true,"data":{"goalId":"g1","current":{...},"history":[...]}}'
+      },
+      {
+        name: 'get_sleep_summary', domain: 'Bem-estar', type: 'read',
+        purpose: 'Produz um resumo agregado do sono recente.',
+        when: 'Antes de opinar sobre duração, eficiência ou regularidade do sono.',
+        args: ['days: padrão 14, intervalo 3–90'],
+        returns: ['windowDays, recordedNights, coveragePct', 'average/minimum/maximumSleepMinutes', 'averageEfficiencyPct, scheduleRegularityScore', 'recentNights[] e dataQuality'],
+        example: '{"ok":true,"data":{"windowDays":14,"recordedNights":11,"coveragePct":78.6,"averageSleepMinutes":423,"averageEfficiencyPct":88.2,"recentNights":[...]}}'
+      },
+      {
+        name: 'get_nutrition_summary', domain: 'Bem-estar', type: 'read',
+        purpose: 'Resume calorias, macros, cobertura e meta nutricional.',
+        when: 'Perguntas sobre dieta, ingestão, calorias, proteína ou macros.',
+        args: ['days: padrão 14, intervalo 3–90'],
+        returns: ['windowDays, loggedDays, coveragePct', 'dailyAverage: calories, proteinG, carbsG, fatG, fiberG', 'activeDailyGoal', 'daysWithIncompleteMacros, recentDays[]'],
+        example: '{"ok":true,"data":{"windowDays":14,"loggedDays":12,"dailyAverage":{"calories":2240,"proteinG":156},"activeDailyGoal":{...}}}'
+      },
+      {
+        name: 'analyze_sleep_performance', domain: 'Bem-estar', type: 'read',
+        purpose: 'Calcula associações observacionais entre sono e treino.',
+        when: 'Perguntas sobre impacto do sono em volume ou sensação.',
+        args: ['days: padrão 42, intervalo 7–90'],
+        returns: ['windowDays, pairingRule, pairedDays', 'correlations: coeficiente, sampleSize e quality', 'recentPairs[]', 'interpretationWarning'],
+        example: '{"ok":true,"data":{"pairedDays":12,"correlations":{"sleepMinutesVsFeeling":{"coefficient":0.41,"sampleSize":12,"quality":"low_sample"}},"interpretationWarning":"observational association only..."}}'
+      },
+      {
+        name: 'analyze_nutrition_body_trend', domain: 'Bem-estar', type: 'read',
+        purpose: 'Relaciona ingestão semanal e tendência de peso.',
+        when: 'Perguntas sobre nutrição, composição corporal e mudança de peso.',
+        args: ['days: padrão 84, intervalo 14–180'],
+        returns: ['windowDays, loggedNutritionDays, weightMeasurements', 'weightChangeKg', 'weeklyTrend[]', 'caloriesVsWeightCorrelation', 'interpretationWarning'],
+        example: '{"ok":true,"data":{"windowDays":84,"weightChangeKg":-1.8,"weeklyTrend":[...],"caloriesVsWeightCorrelation":{...}}}'
+      },
+      {
+        name: 'get_weekly_recovery_trend', domain: 'Bem-estar', type: 'read',
+        purpose: 'Calcula uma tendência não clínica de recuperação.',
+        when: 'Perguntas sobre recuperação, fadiga, cansaço ou readiness.',
+        args: ['weeks: padrão 8, intervalo 2–12'],
+        returns: ['weeks', 'weeklyTrend[] com recoveryScore, sono, eficiência, regularidade, sensação, volume e contagens', 'direction: improving | declining | stable | insufficient_data', 'method'],
+        example: '{"ok":true,"data":{"weeks":8,"weeklyTrend":[...],"direction":"improving","method":"non-clinical 0-100 score..."}}'
+      },
+      {
+        name: 'propose_routine_change', domain: 'Rotinas', type: 'proposal',
+        purpose: 'Prepara uma proposta completa de criação ou edição de rotina.',
+        when: 'Somente após pedido explícito do usuário e após consultar IDs reais. O schema é adiado até os pré-requisitos estarem disponíveis.',
+        args: ['action: create | update', 'routine_id: obrigatório em update', 'routine: {name, notes?, days[]}', 'cada dia: source_day_id?, name, notes?, exercises[]', 'cada exercício: source_routine_exercise_id?, exercise_id, rest_time_seconds?, superset_group_id?, sets[]', 'cada set: source_set_id?, weight?, reps?, distance?, time_seconds?, is_warmup?'],
+        returns: ['proposalId', 'status: awaiting_approval', 'action, routineName', 'diff da árvore proposta'],
+        example: '{"ok":true,"data":{"proposalId":"p1","status":"awaiting_approval","action":"create","routineName":"Full Body 3x","diff":{...}}}'
+      }
+    ];
+
+    const domains = ['Todas', ...new Set(tools.map(tool => tool.domain))];
+    const list = document.getElementById('tool-list');
+    const count = document.getElementById('tool-count');
+    const search = document.getElementById('tool-search');
+    const filters = document.getElementById('tool-filters');
+    let activeDomain = 'Todas';
+
+    const escapeHtml = value => String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+
+    const formatExample = value => {
+      try {
+        return JSON.stringify(JSON.parse(value), null, 2);
+      } catch (_) {
+        return value;
+      }
+    };
+
+    function renderFilters() {
+      filters.innerHTML = domains.map(domain =>
+        `<button class="filter ${domain === activeDomain ? 'active' : ''}" type="button" data-domain="${escapeHtml(domain)}">${escapeHtml(domain)}</button>`
+      ).join('');
+      filters.querySelectorAll('button').forEach(button => {
+        button.addEventListener('click', () => {
+          activeDomain = button.dataset.domain;
+          renderFilters();
+          renderTools();
+        });
+      });
+    }
+
+    function renderTools() {
+      const query = search.value.trim().toLocaleLowerCase('pt-BR');
+      const filtered = tools.filter(tool => {
+        const domainMatch = activeDomain === 'Todas' || tool.domain === activeDomain;
+        const haystack = [tool.name, tool.domain, tool.purpose, tool.when, ...tool.args, ...tool.returns].join(' ').toLocaleLowerCase('pt-BR');
+        return domainMatch && (!query || haystack.includes(query));
+      });
+      count.textContent = `${filtered.length} de ${tools.length} tools exibidas`;
+      if (!filtered.length) {
+        list.innerHTML = '<div class="empty-state">Nenhuma tool corresponde aos filtros.</div>';
+        return;
+      }
+      list.innerHTML = filtered.map(tool => `
+        <details class="tool">
+          <summary>
+            <span class="tool-name">${escapeHtml(tool.name)}</span>
+            <span class="tool-purpose">${escapeHtml(tool.purpose)}</span>
+            <span class="badges">
+              <span class="badge">${escapeHtml(tool.domain)}</span>
+              <span class="badge ${tool.type}">${tool.type === 'read' ? 'somente leitura' : 'proposta protegida'}</span>
+            </span>
+          </summary>
+          <div class="tool-body">
+            <div class="tool-block"><h4>Quando é usada</h4><p>${escapeHtml(tool.when)}</p></div>
+            <div class="tool-block"><h4>Argumentos</h4><ul>${tool.args.map(item => `<li><code>${escapeHtml(item)}</code></li>`).join('')}</ul></div>
+            <div class="tool-block"><h4>O que retorna</h4><ul>${tool.returns.map(item => `<li><code>${escapeHtml(item)}</code></li>`).join('')}</ul></div>
+            <div class="tool-block"><h4>Exemplo compacto</h4><pre><code>${escapeHtml(formatExample(tool.example))}</code></pre></div>
+          </div>
+        </details>
+      `).join('');
+    }
+
+    search.addEventListener('input', renderTools);
+    renderFilters();
+    renderTools();
+  </script>
+</body>
+</html>
