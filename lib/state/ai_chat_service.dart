@@ -25,6 +25,8 @@ const _uuid = Uuid();
 
 const int kMaxToolRounds = 3;
 const int kHistoryTokenBudget = 6000;
+const int kTargetInputTokenBudget = 7000;
+const int kMinHistoryTokenBudget = 1200;
 const int kMaxInvalidAnswerRegenerations = 2;
 const String _routineMutationPolicy = r'''# Propostas de rotina (política fixa)
 Você pode preparar uma proposta de rotina somente quando o usuário pedir explicitamente para criar, montar, editar, alterar, adicionar ou remover conteúdo de uma rotina. Nunca proponha alterações apenas por sugestão, análise ou pergunta hipotética.
@@ -428,22 +430,32 @@ class AiChatService extends ChangeNotifier {
     final explicitRoutineTurn = _hasExplicitRoutineIntent(current);
     final latestUserText =
         current.lastWhere((message) => message.isUser).content ?? '';
-    final toolsSchema = _tools.openAiChatToolsSchema(
-      names: _tools.toolNamesForQuery(latestUserText),
-      includeRoutineProposal: explicitRoutineTurn,
+    var toolNames = _tools.toolNamesForQuery(
+      _routingQuery(current, latestUserText),
     );
+    var proposalAvailable = false;
+    _context.invalidate();
+    final contextJson = await _context.build(mode: contextMode);
 
     for (var round = 0; round < kMaxToolRounds + 1; round++) {
-      // Refresh context cache at the start of a turn.
-      if (round == 0) _context.invalidate();
-      final contextJson = await _context.build(mode: contextMode);
+      final toolsSchema = _tools.openAiChatToolsSchema(
+        names: toolNames,
+        includeRoutineProposal: explicitRoutineTurn && proposalAvailable,
+      );
 
       final wire = _buildWireMessages(
         current,
         systemPrompt: systemPrompt,
         contextJson: contextJson,
+        includeRoutinePolicy: explicitRoutineTurn,
         visionMessageId: visionMessage.id,
         imageDataUrls: imageDataUrls,
+        historyTokenBudget: _historyBudgetFor(
+          systemPrompt: systemPrompt,
+          contextJson: contextJson,
+          toolsSchema: toolsSchema,
+          includeRoutinePolicy: explicitRoutineTurn,
+        ),
       );
 
       _state = _state.copyWith(
@@ -495,6 +507,7 @@ class AiChatService extends ChangeNotifier {
           model: model,
           systemPrompt: systemPrompt,
           contextJson: contextJson,
+          includeRoutinePolicy: explicitRoutineTurn,
           visionMessageId: visionMessage.id,
           imageDataUrls: imageDataUrls,
         );
@@ -522,7 +535,16 @@ class AiChatService extends ChangeNotifier {
       );
       notifyListeners();
 
-      for (final call in completion.toolCalls) {
+      // Read-only calls are independent and can run concurrently. Proposal
+      // preparation remains ordered and executes after all reads finish.
+      final readResults = await Future.wait(
+        completion.toolCalls.map((call) async {
+          if (call.name == 'propose_routine_change') return null;
+          return _tools.executeRead(toolName: call.name, args: call.arguments);
+        }),
+      );
+      for (var i = 0; i < completion.toolCalls.length; i++) {
+        final call = completion.toolCalls[i];
         final result = call.name == 'propose_routine_change'
             ? await _routineMutations.prepareProposal(
                 threadId: _state.activeThreadId ?? '',
@@ -530,10 +552,7 @@ class AiChatService extends ChangeNotifier {
                 args: call.arguments,
                 explicitRequest: _hasExplicitRoutineIntent(current),
               )
-            : await _tools.executeRead(
-                toolName: call.name,
-                args: call.arguments,
-              );
+            : readResults[i]!;
         if (call.name == 'propose_routine_change' && result.ok) {
           final data = result.data as Map?;
           final proposalId = data?['proposalId'] as String?;
@@ -546,7 +565,7 @@ class AiChatService extends ChangeNotifier {
           id: _uuid.v4(),
           threadId: _state.activeThreadId ?? '',
           role: AiMessageRole.tool,
-          content: jsonEncode(result.toMap()),
+          content: _encodeToolResult(result),
           toolCallId: call.id,
           toolName: call.name,
           toolResult: result,
@@ -556,6 +575,17 @@ class AiChatService extends ChangeNotifier {
       }
       _state = _state.copyWith(messages: current);
       notifyListeners();
+
+      final calledNames = completion.toolCalls.map((call) => call.name);
+      toolNames = _tools.followUpToolNames(
+        calledNames,
+        routineIntent: explicitRoutineTurn,
+      );
+      proposalAvailable =
+          explicitRoutineTurn &&
+          calledNames.any(
+            (name) => name == 'list_exercises' || name == 'get_routine_detail',
+          );
 
       if (round == kMaxToolRounds) {
         // Force final answer with no tools.
@@ -568,6 +598,7 @@ class AiChatService extends ChangeNotifier {
           current,
           systemPrompt: systemPrompt,
           contextJson: contextJson,
+          includeRoutinePolicy: explicitRoutineTurn,
           visionMessageId: visionMessage.id,
           imageDataUrls: imageDataUrls,
         );
@@ -600,6 +631,7 @@ class AiChatService extends ChangeNotifier {
           model: model,
           systemPrompt: systemPrompt,
           contextJson: contextJson,
+          includeRoutinePolicy: explicitRoutineTurn,
           visionMessageId: visionMessage.id,
           imageDataUrls: imageDataUrls,
         );
@@ -631,6 +663,7 @@ class AiChatService extends ChangeNotifier {
     required String model,
     required String systemPrompt,
     required Map<String, dynamic> contextJson,
+    required bool includeRoutinePolicy,
     String? visionMessageId,
     List<String> imageDataUrls = const [],
   }) async {
@@ -662,6 +695,7 @@ class AiChatService extends ChangeNotifier {
         transcript,
         systemPrompt: systemPrompt,
         contextJson: contextJson,
+        includeRoutinePolicy: includeRoutinePolicy,
         visionMessageId: visionMessageId,
         imageDataUrls: imageDataUrls,
       );
@@ -715,8 +749,10 @@ class AiChatService extends ChangeNotifier {
     List<AiChatMessage> messages, {
     required String systemPrompt,
     required Map<String, dynamic> contextJson,
+    bool includeRoutinePolicy = false,
     String? visionMessageId,
     List<String> imageDataUrls = const [],
+    int historyTokenBudget = kHistoryTokenBudget,
   }) {
     final out = <Map<String, dynamic>>[];
     out.add({
@@ -726,7 +762,9 @@ class AiChatService extends ChangeNotifier {
     });
     // This product safety policy is intentionally separate from the editable
     // prompt so a custom personality cannot bypass approval requirements.
-    out.add({'role': 'system', 'content': _routineMutationPolicy});
+    if (includeRoutinePolicy) {
+      out.add({'role': 'system', 'content': _routineMutationPolicy});
+    }
     if (imageDataUrls.isNotEmpty) {
       out.add({
         'role': 'system',
@@ -739,7 +777,10 @@ class AiChatService extends ChangeNotifier {
     }
 
     // Compact history if too long.
-    final compacted = _compactHistory(messages);
+    final compacted = _compactHistory(
+      messages,
+      tokenBudget: historyTokenBudget,
+    );
 
     for (final m in compacted) {
       switch (m.role) {
@@ -797,7 +838,10 @@ class AiChatService extends ChangeNotifier {
   }
 
   /// Drops oldest user/assistant blocks until total estimated tokens <= budget.
-  List<AiChatMessage> _compactHistory(List<AiChatMessage> messages) {
+  List<AiChatMessage> _compactHistory(
+    List<AiChatMessage> messages, {
+    int tokenBudget = kHistoryTokenBudget,
+  }) {
     if (messages.isEmpty) return messages;
 
     // Tool transcripts are useful only while the current user turn is still
@@ -823,7 +867,7 @@ class AiChatService extends ChangeNotifier {
     }
 
     final total = _estimateTokens(normalized);
-    if (total <= kHistoryTokenBudget) return normalized;
+    if (total <= tokenBudget) return normalized;
 
     // Compact whole user turns. A tool result without its preceding assistant
     // tool_call is an invalid transcript and prevents the model from reliably
@@ -844,7 +888,7 @@ class AiChatService extends ChangeNotifier {
     for (var i = turns.length - 1; i >= 0; i--) {
       final candidate = turns[i];
       final est = _estimateTokens(candidate);
-      if (running + est > kHistoryTokenBudget && keep.isNotEmpty) break;
+      if (running + est > tokenBudget && keep.isNotEmpty) break;
       keep.insertAll(0, candidate);
       running += est;
     }
@@ -858,12 +902,14 @@ class AiChatService extends ChangeNotifier {
   @visibleForTesting
   List<Map<String, dynamic>> buildWireMessagesForTest(
     List<AiChatMessage> messages, {
+    bool includeRoutinePolicy = false,
     String? visionMessageId,
     List<String> imageDataUrls = const [],
   }) => _buildWireMessages(
     messages,
     systemPrompt: 'system',
     contextJson: const {},
+    includeRoutinePolicy: includeRoutinePolicy,
     visionMessageId: visionMessageId,
     imageDataUrls: imageDataUrls,
   );
@@ -885,6 +931,61 @@ class AiChatService extends ChangeNotifier {
           ? null
           : jsonEncode(m.toolCalls.map((c) => c.arguments).toList()),
     );
+  }
+
+  int _historyBudgetFor({
+    required String systemPrompt,
+    required Map<String, dynamic> contextJson,
+    required List<Map<String, dynamic>> toolsSchema,
+    required bool includeRoutinePolicy,
+  }) {
+    final fixedTokens =
+        TokenEstimator.estimateText(systemPrompt) +
+        (includeRoutinePolicy
+            ? TokenEstimator.estimateText(_routineMutationPolicy)
+            : 0) +
+        TokenEstimator.estimateText(jsonEncode(contextJson)) +
+        TokenEstimator.estimateText(jsonEncode(toolsSchema)) +
+        80;
+    return (kTargetInputTokenBudget - fixedTokens).clamp(
+      kMinHistoryTokenBudget,
+      kHistoryTokenBudget,
+    );
+  }
+
+  String _routingQuery(List<AiChatMessage> messages, String latestUserText) {
+    final normalized = latestUserText.trim().toLowerCase();
+    final looksLikeFollowUp =
+        normalized.length <= 80 &&
+        (normalized.startsWith('e ') ||
+            normalized.contains('isso') ||
+            normalized.contains('essa') ||
+            normalized.contains('esse') ||
+            normalized.contains('agora') ||
+            normalized.contains('esta semana') ||
+            normalized.contains('última semana'));
+    if (!looksLikeFollowUp) return latestUserText;
+    for (var i = messages.length - 2; i >= 0; i--) {
+      final message = messages[i];
+      if (message.isUser && (message.content?.trim().isNotEmpty ?? false)) {
+        return '${message.content}\n$latestUserText';
+      }
+    }
+    return latestUserText;
+  }
+
+  String _encodeToolResult(AiToolResult result) =>
+      jsonEncode(_pruneNulls(result.toMap()));
+
+  dynamic _pruneNulls(dynamic value) {
+    if (value is Map) {
+      return {
+        for (final entry in value.entries)
+          if (entry.value != null) '${entry.key}': _pruneNulls(entry.value),
+      };
+    }
+    if (value is List) return value.map(_pruneNulls).toList();
+    return value;
   }
 
   // ===========================================================================

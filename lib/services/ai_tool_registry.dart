@@ -8,6 +8,7 @@ class AiToolRegistry {
   final DatabaseHelper db;
   final GoalRepository goalRepo;
   final AiWellnessAnalyticsService wellness;
+  final Map<String, Map<String, dynamic>> _schemaCache = {};
   AiToolRegistry({
     DatabaseHelper? db,
     GoalRepository? goalRepo,
@@ -97,34 +98,41 @@ class AiToolRegistry {
         'list_exercises',
       });
     }
+    if (hasAny(['treino', 'workout', 'sessao', 'sessão'])) {
+      selected.addAll({'list_recent_workouts', 'get_workout_detail'});
+    }
+    if (hasAny(['exercicio', 'exercício', 'serie', 'série', 'carga'])) {
+      selected.addAll({'list_exercises', 'get_exercise_history'});
+    }
+    if (hasAny(['recorde', 'record', 'pr ', '1rm'])) {
+      selected.addAll({'list_exercises', 'get_exercise_personal_records'});
+    }
+    if (hasAny(['volume'])) {
+      selected.add('get_weekly_volume_breakdown');
+    }
     if (hasAny([
-      'treino',
-      'workout',
-      'exercicio',
-      'exercício',
-      'serie',
-      'série',
-      'carga',
-      'volume',
-      'recorde',
-      'cardio',
-      'corrida',
+      'progresso',
+      'progressao',
+      'progressão',
+      'evolucao',
+      'evolução',
     ])) {
-      selected.addAll({
-        'list_recent_workouts',
-        'get_workout_detail',
-        'list_exercises',
-        'get_exercise_history',
-        'get_exercise_personal_records',
-        'get_weekly_volume_breakdown',
-        'get_progress_trend',
-        'get_cardio_summary',
-      });
+      selected.addAll({'list_exercises', 'get_progress_trend'});
+    }
+    if (hasAny(['cardio', 'corrida', 'correr', 'distancia', 'distância'])) {
+      selected.add('get_cardio_summary');
     }
     if (hasAny(['meta', 'goal', 'objetivo'])) {
       selected.addAll({'list_goals', 'get_goal_progress_history'});
     }
-    if (selected.isEmpty) {
+    if (hasAny([
+      'como estou',
+      'meus dados',
+      'meu desempenho',
+      'resumo geral',
+      'visao geral',
+      'visão geral',
+    ])) {
       selected.addAll({
         'list_recent_workouts',
         'get_sleep_summary',
@@ -134,6 +142,43 @@ class AiToolRegistry {
       });
     }
     return selected;
+  }
+
+  /// Returns only tools that can naturally continue the calls just executed.
+  /// This avoids billing the entire first-round schema catalog repeatedly.
+  Set<String> followUpToolNames(
+    Iterable<String> calledNames, {
+    required bool routineIntent,
+  }) {
+    final next = <String>{};
+    for (final name in calledNames) {
+      switch (name) {
+        case 'list_recent_workouts':
+          next.add('get_workout_detail');
+          break;
+        case 'list_exercises':
+          if (routineIntent) {
+            next.addAll({'list_routines', 'get_routine_detail'});
+          } else {
+            next.addAll({
+              'get_exercise_history',
+              'get_exercise_personal_records',
+              'get_progress_trend',
+            });
+          }
+          break;
+        case 'list_routines':
+          next.add('get_routine_detail');
+          break;
+        case 'get_routine_detail':
+          next.add('list_exercises');
+          break;
+        case 'list_goals':
+          next.add('get_goal_progress_history');
+          break;
+      }
+    }
+    return next;
   }
 
   /// Human-friendly label for a tool name (used in chat bubbles).
@@ -306,32 +351,37 @@ class AiToolRegistry {
   Future<Map<String, dynamic>> _listRecentWorkouts(
     Map<String, dynamic> args,
   ) async {
-    final limit = _boundedInt(args, 'limit', 10, 1, 20);
-    final rows = await db.getWorkouts(limit: limit);
-    final out = <Map<String, dynamic>>[];
-    for (final w in rows) {
-      final id = w['id'] as String;
-      final entries = await db.getWorkoutExercises(id);
-      double vol = 0;
-      for (final e in entries) {
-        final sets = await db.getExerciseSets(e['id'] as String);
-        for (final s in sets) {
-          if ((s['is_warmup'] as int? ?? 0) == 1) continue;
-          final wt = (s['weight'] as num?)?.toDouble() ?? 0;
-          final reps = (s['reps'] as num?)?.toInt() ?? 0;
-          vol += wt * reps;
-        }
-      }
-      out.add({
-        'id': id,
-        'date': w['date'],
-        'durationSeconds': w['duration_seconds'],
-        'feeling': w['feeling_rating'],
-        'exerciseCount': entries.length,
-        'volumeKg': vol,
-        'comment': w['comment'],
-      });
-    }
+    final limit = _boundedInt(args, 'limit', 8, 1, 20);
+    final rawDb = await db.database;
+    final rows = await rawDb.rawQuery(
+      '''
+      SELECT w.id, w.date, w.duration_seconds, w.feeling_rating, w.comment,
+        COUNT(DISTINCT ee.id) AS exercise_count,
+        COALESCE(SUM(CASE WHEN COALESCE(s.is_warmup, 0) = 0
+          THEN COALESCE(s.weight, 0) * COALESCE(s.reps, 0) ELSE 0 END), 0)
+          AS volume_kg
+      FROM workouts w
+      LEFT JOIN exercise_entries ee ON ee.workout_id = w.id
+      LEFT JOIN sets s ON s.exercise_entry_id = ee.id
+      GROUP BY w.id
+      ORDER BY w.date DESC, w.start_time DESC
+      LIMIT ?
+    ''',
+      [limit],
+    );
+    final out = rows
+        .map(
+          (w) => {
+            'id': w['id'],
+            'date': w['date'],
+            'durationSeconds': w['duration_seconds'],
+            'feeling': w['feeling_rating'],
+            'exerciseCount': (w['exercise_count'] as num?)?.toInt() ?? 0,
+            'volumeKg': (w['volume_kg'] as num?)?.toDouble() ?? 0.0,
+            'comment': w['comment'],
+          },
+        )
+        .toList();
     return {'workouts': out};
   }
 
@@ -345,30 +395,47 @@ class AiToolRegistry {
     }
     final w = await db.getWorkout(id);
     if (w == null) return {'error': 'workout não encontrado'};
-    final entries = await db.getWorkoutExercises(id);
-    final out = <Map<String, dynamic>>[];
-    for (final e in entries) {
-      final sets = await db.getExerciseSets(e['id'] as String);
-      out.add({
-        'exerciseId': e['exercise_id'],
-        'exerciseName': e['exercise_name'],
-        'order': e['order_index'],
-        'sets': sets
-            .map(
-              (s) => {
-                'weight': s['weight'],
-                'reps': s['reps'],
-                'distance': s['distance'],
-                'timeSeconds': s['time_seconds'],
-                'isWarmup': (s['is_warmup'] as int? ?? 0) == 1,
-                'isComplete': (s['is_complete'] as int? ?? 0) == 1,
-                'rpe': s['rpe'],
-                'comment': s['comment'],
-              },
-            )
-            .toList(),
-      });
+    final rawDb = await db.database;
+    final rows = await rawDb.rawQuery(
+      '''
+      SELECT ee.id AS entry_id, ee.exercise_id, ee.order_index,
+        e.name AS exercise_name, s.id AS set_id, s.weight, s.reps,
+        s.distance, s.time_seconds, s.is_warmup, s.is_complete, s.rpe,
+        s.comment AS set_comment
+      FROM exercise_entries ee
+      JOIN exercises e ON e.id = ee.exercise_id
+      LEFT JOIN sets s ON s.exercise_entry_id = ee.id
+      WHERE ee.workout_id = ?
+      ORDER BY ee.order_index ASC, s.order_index ASC
+    ''',
+      [id],
+    );
+    final byEntry = <String, Map<String, dynamic>>{};
+    for (final row in rows) {
+      final entryId = row['entry_id'] as String;
+      final entry = byEntry.putIfAbsent(
+        entryId,
+        () => {
+          'exerciseId': row['exercise_id'],
+          'exerciseName': row['exercise_name'],
+          'order': row['order_index'],
+          'sets': <Map<String, dynamic>>[],
+        },
+      );
+      if (row['set_id'] != null) {
+        (entry['sets'] as List<Map<String, dynamic>>).add({
+          'weight': row['weight'],
+          'reps': row['reps'],
+          'distance': row['distance'],
+          'timeSeconds': row['time_seconds'],
+          'isWarmup': (row['is_warmup'] as int? ?? 0) == 1,
+          'isComplete': (row['is_complete'] as int? ?? 0) == 1,
+          'rpe': row['rpe'],
+          'comment': row['set_comment'],
+        });
+      }
     }
+    final out = byEntry.values.toList();
     return {
       'id': id,
       'date': w['date'],
@@ -385,7 +452,7 @@ class AiToolRegistry {
       search: args['name_contains'] as String?,
       favorites: args['is_favorite'] as bool?,
     );
-    final limit = _boundedInt(args, 'limit', 30, 1, 50);
+    final limit = _boundedInt(args, 'limit', 20, 1, 50);
     final compact = rows
         .take(limit)
         .map(
@@ -407,7 +474,7 @@ class AiToolRegistry {
     final id =
         (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
     if (id == null) return {'error': 'exercise_id é obrigatório'};
-    final limit = _boundedInt(args, 'limit', 20, 1, 40);
+    final limit = _boundedInt(args, 'limit', 12, 1, 40);
     final history = await db.getExerciseHistory(id, limit: limit);
     return {
       'exerciseId': id,
@@ -445,7 +512,10 @@ class AiToolRegistry {
         (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
     if (id == null) return {'error': 'exercise_id é obrigatório'};
     final weeks = _boundedInt(args, 'weeks', 8, 2, 16);
-    final history = await db.getExerciseHistory(id, limit: weeks * 5);
+    final history = await db.getExerciseHistory(
+      id,
+      limit: (weeks * 3).clamp(6, 40),
+    );
     return {
       'exerciseId': id,
       'weeksBack': weeks,
@@ -454,28 +524,33 @@ class AiToolRegistry {
   }
 
   Future<Map<String, dynamic>> _listRoutines(Map<String, dynamic> args) async {
-    final routines = await db.getRoutines();
     final search = (args['name_contains'] as String?)?.toLowerCase();
-    final out = <Map<String, dynamic>>[];
-    for (final r in routines) {
-      if (search != null &&
-          !(r['name'] as String).toLowerCase().contains(search)) {
-        continue;
-      }
-      final days = await db.getRoutineDays(r['id'] as String);
-      int exCount = 0;
-      for (final d in days) {
-        final exs = await db.getRoutineExercises(d['id'] as String);
-        exCount += exs.length;
-      }
-      out.add({
-        'id': r['id'],
-        'name': r['name'],
-        'notes': r['notes'],
-        'dayCount': days.length,
-        'exerciseCount': exCount,
-      });
-    }
+    final rawDb = await db.database;
+    final rows = await rawDb.rawQuery(
+      '''
+      SELECT r.id, r.name, r.notes,
+        COUNT(DISTINCT rd.id) AS day_count,
+        COUNT(DISTINCT re.id) AS exercise_count
+      FROM routines r
+      LEFT JOIN routine_days rd ON rd.routine_id = r.id
+      LEFT JOIN routine_exercises re ON re.routine_day_id = rd.id
+      WHERE (? IS NULL OR LOWER(r.name) LIKE ?)
+      GROUP BY r.id
+      ORDER BY r.created_at DESC
+    ''',
+      [search, search == null ? null : '%$search%'],
+    );
+    final out = rows
+        .map(
+          (r) => {
+            'id': r['id'],
+            'name': r['name'],
+            'notes': r['notes'],
+            'dayCount': (r['day_count'] as num?)?.toInt() ?? 0,
+            'exerciseCount': (r['exercise_count'] as num?)?.toInt() ?? 0,
+          },
+        )
+        .toList();
     return {'routines': out};
   }
 
@@ -487,44 +562,65 @@ class AiToolRegistry {
     if (id == null) return {'error': 'routine_id é obrigatório'};
     final r = await db.getRoutine(id);
     if (r == null) return {'error': 'rotina não encontrada'};
-    final days = await db.getRoutineDays(id);
-    final daysOut = <Map<String, dynamic>>[];
-    for (final d in days) {
-      final exs = await db.getRoutineExercises(d['id'] as String);
-      final exsOut = <Map<String, dynamic>>[];
-      for (final e in exs) {
-        final sets = await db.getPredefinedSets(e['id'] as String);
-        exsOut.add({
-          'routineExerciseId': e['id'],
-          'source_routine_exercise_id': e['id'],
-          'exerciseId': e['exercise_id'],
-          'order': e['order_index'],
-          'restTimeSeconds': e['rest_time_seconds'],
-          'supersetGroupId': e['superset_group_id'],
-          'predefinedSets': sets
-              .map(
-                (s) => {
-                  'id': s['id'],
-                  'source_set_id': s['id'],
-                  'weight': s['weight'],
-                  'reps': s['reps'],
-                  'distance': s['distance'],
-                  'timeSeconds': s['time_seconds'],
-                  'isWarmup': (s['is_warmup'] as int? ?? 0) == 1,
-                },
-              )
-              .toList(),
+    final rawDb = await db.database;
+    final rows = await rawDb.rawQuery(
+      '''
+      SELECT rd.id AS day_id, rd.name AS day_name, rd.order_index AS day_order,
+        rd.notes AS day_notes, re.id AS routine_exercise_id, re.exercise_id,
+        re.order_index AS exercise_order, re.rest_time_seconds,
+        re.superset_group_id, ps.id AS set_id, ps.weight, ps.reps,
+        ps.distance, ps.time_seconds, ps.is_warmup
+      FROM routine_days rd
+      LEFT JOIN routine_exercises re ON re.routine_day_id = rd.id
+      LEFT JOIN predefined_sets ps ON ps.routine_exercise_id = re.id
+      WHERE rd.routine_id = ?
+      ORDER BY rd.order_index ASC, re.order_index ASC, ps.order_index ASC
+    ''',
+      [id],
+    );
+    final byDay = <String, Map<String, dynamic>>{};
+    final byExercise = <String, Map<String, dynamic>>{};
+    for (final row in rows) {
+      final dayId = row['day_id'] as String;
+      final day = byDay.putIfAbsent(
+        dayId,
+        () => {
+          'id': dayId,
+          'source_day_id': dayId,
+          'name': row['day_name'],
+          'order': row['day_order'],
+          'notes': row['day_notes'],
+          'exercises': <Map<String, dynamic>>[],
+        },
+      );
+      final exerciseId = row['routine_exercise_id'] as String?;
+      if (exerciseId == null) continue;
+      final exercise = byExercise.putIfAbsent(exerciseId, () {
+        final value = <String, dynamic>{
+          'routineExerciseId': exerciseId,
+          'source_routine_exercise_id': exerciseId,
+          'exerciseId': row['exercise_id'],
+          'order': row['exercise_order'],
+          'restTimeSeconds': row['rest_time_seconds'],
+          'supersetGroupId': row['superset_group_id'],
+          'predefinedSets': <Map<String, dynamic>>[],
+        };
+        (day['exercises'] as List<Map<String, dynamic>>).add(value);
+        return value;
+      });
+      if (row['set_id'] != null) {
+        (exercise['predefinedSets'] as List<Map<String, dynamic>>).add({
+          'id': row['set_id'],
+          'source_set_id': row['set_id'],
+          'weight': row['weight'],
+          'reps': row['reps'],
+          'distance': row['distance'],
+          'timeSeconds': row['time_seconds'],
+          'isWarmup': (row['is_warmup'] as int? ?? 0) == 1,
         });
       }
-      daysOut.add({
-        'id': d['id'],
-        'source_day_id': d['id'],
-        'name': d['name'],
-        'order': d['order_index'],
-        'notes': d['notes'],
-        'exercises': exsOut,
-      });
     }
+    final daysOut = byDay.values.toList();
     return {'id': id, 'name': r['name'], 'notes': r['notes'], 'days': daysOut};
   }
 
@@ -532,7 +628,7 @@ class AiToolRegistry {
     Map<String, dynamic> args,
   ) async {
     final type = args['type'] as String?;
-    final limit = _boundedInt(args, 'limit', 30, 1, 50);
+    final limit = _boundedInt(args, 'limit', 20, 1, 50);
     final rows = await db.getBodyMeasurements(type: type, limit: limit);
     return {
       'type': type,
@@ -570,35 +666,39 @@ class AiToolRegistry {
     final metric = args['metric'] as String?;
     final activeOnly = (args['is_active'] as bool?) ?? true;
     final goals = await goalRepo.getAll(activeOnly: activeOnly);
-    final out = <Map<String, dynamic>>[];
-    for (final g in goals) {
-      if (scope != null && g.scope.value != scope) continue;
-      if (metric != null && g.metric.value != metric) continue;
-      try {
-        final p = await goalRepo.getProgress(g);
-        out.add({
-          'id': g.id,
-          'title': g.title,
-          'scope': g.scope.value,
-          'metric': g.metric.value,
-          'period': g.period.value,
-          'currentValue': p.currentValue,
-          'targetValue': p.targetValue,
-          'progressPct': p.percent,
-          'isComplete': p.isComplete,
-          'daysRemaining': p.daysRemaining,
-        });
-      } catch (_) {
-        out.add({
-          'id': g.id,
-          'title': g.title,
-          'scope': g.scope.value,
-          'metric': g.metric.value,
-          'period': g.period.value,
-          'targetValue': g.targetValue,
-        });
-      }
-    }
+    final filtered = goals.where(
+      (g) =>
+          (scope == null || g.scope.value == scope) &&
+          (metric == null || g.metric.value == metric),
+    );
+    final out = await Future.wait(
+      filtered.map((g) async {
+        try {
+          final p = await goalRepo.getProgress(g);
+          return <String, dynamic>{
+            'id': g.id,
+            'title': g.title,
+            'scope': g.scope.value,
+            'metric': g.metric.value,
+            'period': g.period.value,
+            'currentValue': p.currentValue,
+            'targetValue': p.targetValue,
+            'progressPct': p.percent,
+            'isComplete': p.isComplete,
+            'daysRemaining': p.daysRemaining,
+          };
+        } catch (_) {
+          return <String, dynamic>{
+            'id': g.id,
+            'title': g.title,
+            'scope': g.scope.value,
+            'metric': g.metric.value,
+            'period': g.period.value,
+            'targetValue': g.targetValue,
+          };
+        }
+      }),
+    );
     return {'goals': out};
   }
 
@@ -642,7 +742,10 @@ class AiToolRegistry {
   // SCHEMA GENERATION
   // ===========================================================================
 
-  Map<String, dynamic> _schemaFor(String name) {
+  Map<String, dynamic> _schemaFor(String name) =>
+      _schemaCache.putIfAbsent(name, () => _buildSchemaFor(name));
+
+  Map<String, dynamic> _buildSchemaFor(String name) {
     switch (name) {
       case 'list_recent_workouts':
         return {
@@ -656,8 +759,8 @@ class AiToolRegistry {
               'properties': {
                 'limit': {
                   'type': 'integer',
-                  'description': 'Quantos treinos retornar (padrão 10).',
-                  'default': 10,
+                  'description': 'Quantos treinos retornar (padrão 8).',
+                  'default': 8,
                 },
               },
               'required': const [],
@@ -696,6 +799,7 @@ class AiToolRegistry {
                 'name_contains': {'type': 'string'},
                 'category_id': {'type': 'string'},
                 'is_favorite': {'type': 'boolean'},
+                'limit': {'type': 'integer', 'default': 20},
               },
               'required': const [],
             },
@@ -712,7 +816,7 @@ class AiToolRegistry {
               'type': 'object',
               'properties': {
                 'exercise_id': {'type': 'string'},
-                'limit': {'type': 'integer', 'default': 20},
+                'limit': {'type': 'integer', 'default': 12},
               },
               'required': ['exercise_id'],
             },
@@ -812,7 +916,7 @@ class AiToolRegistry {
                   'type': 'string',
                   'description': 'Tipo de medida. Vazio = todas.',
                 },
-                'limit': {'type': 'integer', 'default': 30},
+                'limit': {'type': 'integer', 'default': 20},
               },
               'required': const [],
             },

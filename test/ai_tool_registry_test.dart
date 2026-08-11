@@ -82,6 +82,25 @@ void main() {
     );
   });
 
+  test('tool routing sends no schemas for casual conversation', () {
+    final names = registry.toolNamesForQuery('Olá, tudo bem?');
+    expect(names, isEmpty);
+    expect(registry.openAiReadToolsSchema(names: names), isEmpty);
+  });
+
+  test('generic workout routing does not expose unrelated tools', () {
+    final names = registry.toolNamesForQuery('Como foi meu último treino?');
+    expect(names, {'list_recent_workouts', 'get_workout_detail'});
+  });
+
+  test('follow-up catalog contains only valid dependent reads', () {
+    final names = registry.followUpToolNames(const [
+      'list_recent_workouts',
+    ], routineIntent: false);
+    expect(names, {'get_workout_detail'});
+    expect(names, isNot(contains('get_sleep_summary')));
+  });
+
   test('tool results preserve all rows requested by the query', () async {
     await db.insert('exercise_categories', {
       'id': 'large',
@@ -266,6 +285,73 @@ void main() {
     final sets = ex['sets'] as List;
     expect(sets, hasLength(1));
   });
+
+  test(
+    'routine list and detail preserve aggregate counts and set tree',
+    () async {
+      final now = DateTime.now().toIso8601String();
+      await db.insert('exercise_categories', {
+        'id': 'legs',
+        'name': 'Pernas',
+        'color': 0,
+        'order_index': 0,
+        'energy_system': 'anaerobic',
+      });
+      await db.insert('exercises', {
+        'id': 'squat',
+        'name': 'Agachamento',
+        'category_id': 'legs',
+        'type': 'weightReps',
+        'is_favorite': 0,
+        'created_at': now,
+      });
+      await db.insert('routines', {
+        'id': 'routine-1',
+        'name': 'Pernas',
+        'created_at': now,
+      });
+      await db.insert('routine_days', {
+        'id': 'day-1',
+        'routine_id': 'routine-1',
+        'name': 'Dia A',
+        'order_index': 0,
+      });
+      await db.insert('routine_exercises', {
+        'id': 'routine-exercise-1',
+        'routine_day_id': 'day-1',
+        'exercise_id': 'squat',
+        'order_index': 0,
+        'rest_time_seconds': 90,
+      });
+      await db.insert('predefined_sets', {
+        'id': 'predefined-1',
+        'routine_exercise_id': 'routine-exercise-1',
+        'weight': 80.0,
+        'reps': 8,
+        'is_warmup': 0,
+        'order_index': 0,
+      });
+
+      final listed = await registry.executeRead(
+        toolName: 'list_routines',
+        args: const {},
+      );
+      final listItem = ((listed.data as Map)['routines'] as List).single as Map;
+      expect(listItem['dayCount'], 1);
+      expect(listItem['exerciseCount'], 1);
+
+      final detailed = await registry.executeRead(
+        toolName: 'get_routine_detail',
+        args: const {'routine_id': 'routine-1'},
+      );
+      final day = ((detailed.data as Map)['days'] as List).single as Map;
+      final exercise = (day['exercises'] as List).single as Map;
+      final set = (exercise['predefinedSets'] as List).single as Map;
+      expect(exercise['source_routine_exercise_id'], 'routine-exercise-1');
+      expect(set['source_set_id'], 'predefined-1');
+      expect(set['reps'], 8);
+    },
+  );
 
   test('list_goals returns empty list on empty DB', () async {
     final r = await registry.executeRead(

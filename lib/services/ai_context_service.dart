@@ -1,5 +1,3 @@
-import 'package:sqflite/sqflite.dart';
-
 import '../database/database_helper.dart';
 import '../models/ai_provider.dart';
 
@@ -34,9 +32,16 @@ class AiContextService {
     required AiContextMode mode,
     required DateTime now,
   }) async {
-    final overview = await _safeMap(() => db.getWorkoutOverviewStats());
-    final counts = await _loadBaseCounts();
-    final availability = await _loadDataAvailability(now);
+    final parts = await Future.wait<Map<String, dynamic>>([
+      _safeMap(() => db.getWorkoutOverviewStats()),
+      _loadBaseCounts(),
+      if (mode != AiContextMode.minimal) _loadDataAvailability(now),
+    ]);
+    final overview = parts[0];
+    final counts = parts[1];
+    final availability = mode == AiContextMode.minimal
+        ? const <String, dynamic>{}
+        : parts[2];
 
     final summary = <String, dynamic>{
       'totals': {
@@ -90,28 +95,25 @@ class AiContextService {
           .subtract(const Duration(days: 29))
           .toIso8601String()
           .substring(0, 10);
-      Future<int> count(String sql, List<Object?> args) async =>
-          Sqflite.firstIntValue(await rawDb.rawQuery(sql, args)) ?? 0;
+      final rows = await rawDb.rawQuery(
+        '''
+        SELECT
+          (SELECT COUNT(*) FROM sleep_entries WHERE date >= ?) AS sleep_7d,
+          (SELECT COUNT(DISTINCT ml.date) FROM meal_logs ml
+            JOIN meal_log_items mli ON mli.meal_log_id = ml.id
+            WHERE ml.date >= ?) AS nutrition_7d,
+          (SELECT COUNT(*) FROM workouts WHERE date >= ?) AS workouts_30d,
+          (SELECT COUNT(*) FROM body_measurements
+            WHERE type = ? AND date >= ?) AS weight_30d
+      ''',
+        [start7, start7, start30, 'weight', start30],
+      );
+      final row = rows.first;
       return {
-        'sleepNights7d': await count(
-          'SELECT COUNT(*) FROM sleep_entries WHERE date >= ?',
-          [start7],
-        ),
-        'nutritionDays7d': await count(
-          'SELECT COUNT(DISTINCT ml.date) FROM meal_logs ml '
-          'JOIN meal_log_items mli ON mli.meal_log_id = ml.id '
-          'WHERE ml.date >= ?',
-          [start7],
-        ),
-        'workouts30d': await count(
-          'SELECT COUNT(*) FROM workouts WHERE date >= ?',
-          [start30],
-        ),
-        'weightMeasurements30d': await count(
-          'SELECT COUNT(*) FROM body_measurements '
-          'WHERE type = ? AND date >= ?',
-          ['weight', start30],
-        ),
+        'sleepNights7d': (row['sleep_7d'] as num?)?.toInt() ?? 0,
+        'nutritionDays7d': (row['nutrition_7d'] as num?)?.toInt() ?? 0,
+        'workouts30d': (row['workouts_30d'] as num?)?.toInt() ?? 0,
+        'weightMeasurements30d': (row['weight_30d'] as num?)?.toInt() ?? 0,
       };
     } catch (_) {
       return const {};
@@ -121,33 +123,19 @@ class AiContextService {
   Future<Map<String, int>> _loadBaseCounts() async {
     try {
       final rawDb = await db.database;
-      final exercises =
-          Sqflite.firstIntValue(
-            await rawDb.rawQuery('SELECT COUNT(*) FROM exercises'),
-          ) ??
-          0;
-      final routines =
-          Sqflite.firstIntValue(
-            await rawDb.rawQuery('SELECT COUNT(*) FROM routines'),
-          ) ??
-          0;
-      final body =
-          Sqflite.firstIntValue(
-            await rawDb.rawQuery('SELECT COUNT(*) FROM body_measurements'),
-          ) ??
-          0;
-      final goals =
-          Sqflite.firstIntValue(
-            await rawDb.rawQuery(
-              'SELECT COUNT(*) FROM user_goals WHERE is_active = 1',
-            ),
-          ) ??
-          0;
+      final rows = await rawDb.rawQuery('''
+        SELECT
+          (SELECT COUNT(*) FROM exercises) AS exercises,
+          (SELECT COUNT(*) FROM routines) AS routines,
+          (SELECT COUNT(*) FROM body_measurements) AS body_measurements,
+          (SELECT COUNT(*) FROM user_goals WHERE is_active = 1) AS active_goals
+      ''');
+      final row = rows.first;
       return {
-        'exercises': exercises,
-        'routines': routines,
-        'bodyMeasurements': body,
-        'activeGoals': goals,
+        'exercises': (row['exercises'] as num?)?.toInt() ?? 0,
+        'routines': (row['routines'] as num?)?.toInt() ?? 0,
+        'bodyMeasurements': (row['body_measurements'] as num?)?.toInt() ?? 0,
+        'activeGoals': (row['active_goals'] as num?)?.toInt() ?? 0,
       };
     } catch (_) {
       return const {};

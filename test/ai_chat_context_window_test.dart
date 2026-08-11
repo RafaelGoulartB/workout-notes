@@ -102,6 +102,25 @@ void main() {
     expect(users.first.toString(), isNot(contains('base64')));
     expect(users.last.toString(), contains('data:image/jpeg;base64,abc'));
   });
+
+  test('routine safety policy is omitted from unrelated turns', () {
+    final now = DateTime(2026, 8, 10);
+    final messages = [_message('u1', AiMessageRole.user, now, content: 'Olá')];
+
+    final wire = AiChatService.instance.buildWireMessagesForTest(messages);
+    final systemMessages = wire.where((m) => m['role'] == 'system');
+
+    expect(systemMessages, hasLength(1));
+  });
+
+  test('routine safety policy remains present for mutation turns', () {
+    final now = DateTime(2026, 8, 10);
+    final wire = AiChatService.instance.buildWireMessagesForTest([
+      _message('u1', AiMessageRole.user, now, content: 'Crie uma rotina'),
+    ], includeRoutinePolicy: true);
+
+    expect(wire.where((m) => m['role'] == 'system'), hasLength(2));
+  });
 }
 
 AiChatMessage _message(
