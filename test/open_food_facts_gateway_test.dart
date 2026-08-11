@@ -70,6 +70,10 @@ void main() {
                   'proteins_100g': 7.2,
                   'carbohydrates_100g': 77,
                   'fat_100g': 2.4,
+                  'saturated-fat_100g': 0.6,
+                  'monounsaturated-fat_100g': 0.8,
+                  'polyunsaturated-fat_100g': 0.7,
+                  'trans-fat_100g': 0.1,
                   'fiber_100g': 4,
                   'sugars_100g': 0.5,
                   'sodium_100g': 0.3,
@@ -111,6 +115,10 @@ void main() {
       expect(variant.values.proteinG, 7.2);
       expect(variant.values.carbsG, 77);
       expect(variant.values.fatG, 2.4);
+      expect(variant.values.saturatedFatG, 0.6);
+      expect(variant.values.monounsaturatedFatG, 0.8);
+      expect(variant.values.polyunsaturatedFatG, 0.7);
+      expect(variant.values.transFatG, 0.1);
       expect(variant.values.fiberG, 4);
       expect(variant.values.sugarsG, 0.5);
       // OFF reports sodium per 100 g in grams; the model stores mg.

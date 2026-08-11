@@ -48,6 +48,10 @@ void main() {
         proteinG: 20,
         carbsG: 30,
         fatG: 10,
+        saturatedFatG: 3,
+        monounsaturatedFatG: 4,
+        polyunsaturatedFatG: 2,
+        transFatG: 0.2,
         fiberG: 5,
         sugarsG: 2,
         sodiumMg: 100,
@@ -66,6 +70,11 @@ void main() {
       expect(result.proteinG, 10);
       expect(result.carbsG, 15);
       expect(result.fatG, 5);
+      expect(result.saturatedFatG, 1.5);
+      expect(result.monounsaturatedFatG, 2);
+      expect(result.polyunsaturatedFatG, 1);
+      expect(result.transFatG, 0.1);
+      expect(result.reportedFatBreakdownG, closeTo(4.6, 0.001));
     });
 
     test('computes per-ml multiplier for an ml-referenced variant', () {

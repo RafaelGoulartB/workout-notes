@@ -8,6 +8,7 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
+import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
 import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_search_result.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
@@ -17,6 +18,7 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/screens/workout/food_library_screen.dart';
 import 'package:workout_notes/screens/workout/food_quantity_sheet.dart';
 import 'package:workout_notes/screens/workout/food_search_screen.dart';
+import 'package:workout_notes/screens/workout/manual_food_screen.dart';
 import 'package:workout_notes/screens/workout/nutrition_home_screen.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 
@@ -55,6 +57,8 @@ Future<void> _installSchema(Database db) async {
       protein_g REAL,
       carbs_g REAL,
       fat_g REAL,
+      saturated_fat_g REAL, monounsaturated_fat_g REAL,
+      polyunsaturated_fat_g REAL, trans_fat_g REAL,
       fiber_g REAL,
       sugars_g REAL,
       sodium_mg REAL,
@@ -122,6 +126,8 @@ Future<void> _installSchema(Database db) async {
       protein_g REAL,
       carbs_g REAL,
       fat_g REAL,
+      saturated_fat_g REAL, monounsaturated_fat_g REAL,
+      polyunsaturated_fat_g REAL, trans_fat_g REAL,
       fiber_g REAL,
       sugars_g REAL,
       sodium_mg REAL,
@@ -345,6 +351,70 @@ void main() {
 
     expect(find.text(loc.nutritionScanMeal), findsOneWidget);
     expect(find.text(loc.nutritionAddManually), findsOneWidget);
+  });
+
+  testWidgets(
+    'manual food keeps calories and macros prominent and details collapsed',
+    (tester) async {
+      await tester.pumpWidget(_app(ManualFoodScreen(repository: repository)));
+      final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+      expect(find.text(loc.nutritionManualSectionMacros), findsOneWidget);
+      expect(find.text(loc.nutritionManualCalories), findsOneWidget);
+      expect(find.text(loc.nutritionManualProtein), findsOneWidget);
+      expect(find.text(loc.nutritionManualCarbs), findsOneWidget);
+      expect(find.text(loc.nutritionManualFat), findsOneWidget);
+      await tester.drag(find.byType(ListView), const Offset(0, -500));
+      await tester.pumpAndSettle();
+      expect(find.text(loc.nutritionFatBreakdownTitle), findsWidgets);
+      expect(find.text(loc.nutritionFatSaturated), findsNothing);
+      expect(find.text(loc.nutritionProgressPotassium), findsNothing);
+
+      await tester.tap(find.text(loc.nutritionFatBreakdownTitle).first);
+      await tester.pumpAndSettle();
+      expect(find.text(loc.nutritionFatSaturated), findsOneWidget);
+      expect(find.text(loc.nutritionFatMonounsaturated), findsOneWidget);
+      expect(find.text(loc.nutritionFatPolyunsaturated), findsOneWidget);
+      expect(find.text(loc.nutritionFatTrans), findsOneWidget);
+      expect(find.text(loc.nutritionProgressPotassium), findsNothing);
+    },
+  );
+
+  testWidgets('AI label fat details are prefilled and expanded for review', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        ManualFoodScreen(
+          repository: repository,
+          initial: const AiFoodLabelDraft(
+            name: 'Peanut butter',
+            values: NutritionValues(
+              calories: 590,
+              proteinG: 25,
+              carbsG: 20,
+              fatG: 50,
+              saturatedFatG: 8,
+              monounsaturatedFatG: 24,
+              polyunsaturatedFatG: 15,
+              transFatG: 0,
+            ),
+          ),
+        ),
+      ),
+    );
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+
+    final saturated = tester.widget<TextFormField>(
+      find.widgetWithText(TextFormField, loc.nutritionFatSaturated),
+    );
+    final mono = tester.widget<TextFormField>(
+      find.widgetWithText(TextFormField, loc.nutritionFatMonounsaturated),
+    );
+    expect(saturated.controller!.text, '8');
+    expect(mono.controller!.text, '24');
   });
 
   testWidgets('Remote search only runs after an explicit submit', (

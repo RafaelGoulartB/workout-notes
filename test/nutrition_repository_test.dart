@@ -51,6 +51,8 @@ void main() {
               protein_g REAL,
               carbs_g REAL,
               fat_g REAL,
+              saturated_fat_g REAL, monounsaturated_fat_g REAL,
+              polyunsaturated_fat_g REAL, trans_fat_g REAL,
               fiber_g REAL,
               sugars_g REAL,
               sodium_mg REAL,
@@ -99,6 +101,8 @@ void main() {
               protein_g REAL,
               carbs_g REAL,
               fat_g REAL,
+              saturated_fat_g REAL, monounsaturated_fat_g REAL,
+              polyunsaturated_fat_g REAL, trans_fat_g REAL,
               fiber_g REAL,
               sugars_g REAL,
               sodium_mg REAL,
@@ -369,6 +373,11 @@ void main() {
         referenceUnit: 'g',
         referenceValues: const NutritionValues(
           calories: 23,
+          fatG: 4,
+          saturatedFatG: 1,
+          monounsaturatedFatG: 1.5,
+          polyunsaturatedFatG: 1.2,
+          transFatG: 0.1,
           potassiumMg: 558,
           calciumMg: 99,
           ironMg: 2.7,
@@ -397,12 +406,16 @@ void main() {
       );
 
       expect(item.potassiumMg, closeTo(279, 0.001));
+      expect(item.saturatedFatG, closeTo(0.5, 0.001));
+      expect(item.snapshot.consumed.monounsaturatedFatG, closeTo(0.75, 0.001));
       expect(item.snapshot.consumed.vitaminAUg, closeTo(234.5, 0.001));
       final summary = await repository.getDailySummary('2026-07-27');
       expect(summary.consumed.calciumMg, closeTo(49.5, 0.001));
       expect(summary.consumed.ironMg, closeTo(1.35, 0.001));
       expect(summary.consumed.vitaminCMg, closeTo(14.05, 0.001));
       expect(summary.consumed.vitaminB12Ug, 0);
+      expect(summary.consumed.polyunsaturatedFatG, closeTo(0.6, 0.001));
+      expect(summary.consumed.transFatG, closeTo(0.05, 0.001));
     });
 
     test('editing an item recomputes the snapshot', () async {
@@ -771,6 +784,10 @@ void main() {
           proteinG: 1.1,
           carbsG: 22.8,
           fatG: 0.3,
+          saturatedFatG: 0.1,
+          monounsaturatedFatG: 0.05,
+          polyunsaturatedFatG: 0.12,
+          transFatG: 0,
         ),
       );
       final details = await repository.getFoodWithDetails(food.id);
@@ -794,6 +811,10 @@ void main() {
       expect(rows, hasLength(1));
       expect(rows.first.food, 'Banana');
       expect(rows.first.calories, closeTo(89 * 1.2, 0.001));
+      expect(rows.first.saturatedFatG, closeTo(0.12, 0.001));
+      expect(rows.first.monounsaturatedFatG, closeTo(0.06, 0.001));
+      expect(rows.first.polyunsaturatedFatG, closeTo(0.144, 0.001));
+      expect(rows.first.transFatG, 0);
       expect(rows.first.source, 'manual');
     });
   });

@@ -75,6 +75,10 @@ void main() {
       expect(result['loggedDays'], 2);
       expect(averages['calories'], 2000.0);
       expect(averages['proteinG'], 140.0);
+      expect(averages['saturatedFatG'], 18.0);
+      expect(averages['monounsaturatedFatG'], 22.0);
+      expect(averages['polyunsaturatedFatG'], 16.0);
+      expect(averages['transFatG'], 0.0);
       expect((result['activeDailyGoal'] as Map)['calories'], 2000.0);
     },
   );
@@ -214,6 +218,10 @@ Future<void> insertMeal(
     'protein_g': protein,
     'carbs_g': 200,
     'fat_g': 60,
+    'saturated_fat_g': 18,
+    'monounsaturated_fat_g': 22,
+    'polyunsaturated_fat_g': 16,
+    'trans_fat_g': 0,
     'fiber_g': 25,
     'sugars_g': 20,
     'sodium_mg': 1000,

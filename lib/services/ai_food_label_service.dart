@@ -42,6 +42,10 @@ Responda APENAS com JSON válido, sem markdown, sem comentários, exatamente nes
     "protein_g": null,
     "carbs_g": null,
     "fat_g": null,
+    "saturated_fat_g": null,
+    "monounsaturated_fat_g": null,
+    "polyunsaturated_fat_g": null,
+    "trans_fat_g": null,
     "fiber_g": null,
     "sugars_g": null,
     "sodium_mg": null,
@@ -60,6 +64,7 @@ Responda APENAS com JSON válido, sem markdown, sem comentários, exatamente nes
 Regras:
 - "per" contém os valores POR 100 g ou 100 ml da tabela. Se a tabela só mostrar valores "por porção", converta para 100 g/ml usando o peso da porção; se a conversão não for possível, use os valores por porção e adicione uma serving com quantity 1, unit "porção" e grams_equivalent com o peso da porção.
 - Use null para valores ilegíveis; nunca invente números.
+- Gordura total e cada subtipo são campos independentes. Não calcule um subtipo ausente por diferença e não use gordura total como gordura saturada.
 - Preserve as unidades do formato: minerais em mg, vitamina A/D/B12 em µg e vitamina C em mg. Converta quando o rótulo usar outra unidade.
 - "servings" é uma lista opcional de porções com {label, quantity, unit, grams_equivalent}.
 - Responda somente o JSON.''';

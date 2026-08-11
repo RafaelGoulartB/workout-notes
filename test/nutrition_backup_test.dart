@@ -68,6 +68,8 @@ void main() {
               protein_g REAL,
               carbs_g REAL,
               fat_g REAL,
+              saturated_fat_g REAL, monounsaturated_fat_g REAL,
+              polyunsaturated_fat_g REAL, trans_fat_g REAL,
               fiber_g REAL,
               sugars_g REAL,
               sodium_mg REAL,
@@ -116,6 +118,8 @@ void main() {
               protein_g REAL,
               carbs_g REAL,
               fat_g REAL,
+              saturated_fat_g REAL, monounsaturated_fat_g REAL,
+              polyunsaturated_fat_g REAL, trans_fat_g REAL,
               fiber_g REAL,
               sugars_g REAL,
               sodium_mg REAL,
@@ -472,6 +476,10 @@ void main() {
       'protein_g': 0.4,
       'carbs_g': 17,
       'fat_g': 0.2,
+      'saturated_fat_g': 0.05,
+      'monounsaturated_fat_g': 0.08,
+      'polyunsaturated_fat_g': 0.06,
+      'trans_fat_g': 0,
       'nutrition_snapshot_json': jsonEncode({
         'version': 1,
         'consumed': {
@@ -479,6 +487,10 @@ void main() {
           'protein_g': 0.4,
           'carbs_g': 17,
           'fat_g': 0.2,
+          'saturated_fat_g': 0.05,
+          'monounsaturated_fat_g': 0.08,
+          'polyunsaturated_fat_g': 0.06,
+          'trans_fat_g': 0,
         },
         'is_estimated': false,
         'has_missing_values': true,
@@ -495,6 +507,11 @@ void main() {
     final json = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
     expect(json['version'], ExportImportRepository.currentBackupVersion);
     expect(json['meal_log_items'], isNotEmpty);
+    final exportedItem = (json['meal_log_items'] as List).single as Map;
+    expect(exportedItem['saturated_fat_g'], 0.05);
+    expect(exportedItem['monounsaturated_fat_g'], 0.08);
+    expect(exportedItem['polyunsaturated_fat_g'], 0.06);
+    expect(exportedItem['trans_fat_g'], 0);
 
     // The nutrition CSV needs a localizations stub.
   });

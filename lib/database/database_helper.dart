@@ -28,7 +28,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 34;
+  static const _dbVersion = 35;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -2022,6 +2022,21 @@ class DatabaseHelper {
         }
       }
     }
+    if (oldVersion < 35) {
+      const columns = <String>[
+        'saturated_fat_g',
+        'monounsaturated_fat_g',
+        'polyunsaturated_fat_g',
+        'trans_fat_g',
+      ];
+      for (final table in <String>['food_variants', 'meal_log_items']) {
+        for (final column in columns) {
+          try {
+            await db.execute('ALTER TABLE $table ADD COLUMN $column REAL');
+          } catch (_) {}
+        }
+      }
+    }
   }
 
   /// Creates the full nutrition module schema (v22) using
@@ -2055,6 +2070,10 @@ class DatabaseHelper {
         protein_g REAL,
         carbs_g REAL,
         fat_g REAL,
+        saturated_fat_g REAL,
+        monounsaturated_fat_g REAL,
+        polyunsaturated_fat_g REAL,
+        trans_fat_g REAL,
         fiber_g REAL,
         sugars_g REAL,
         sodium_mg REAL,
@@ -2122,6 +2141,10 @@ class DatabaseHelper {
         protein_g REAL,
         carbs_g REAL,
         fat_g REAL,
+        saturated_fat_g REAL,
+        monounsaturated_fat_g REAL,
+        polyunsaturated_fat_g REAL,
+        trans_fat_g REAL,
         fiber_g REAL,
         sugars_g REAL,
         sodium_mg REAL,

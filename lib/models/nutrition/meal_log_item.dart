@@ -6,7 +6,7 @@ import 'nutrition_values.dart';
 /// logged it. Stored as JSON on the [MealLogItem] row so that future
 /// edits to the food cache never change past meals.
 class NutritionSnapshot {
-  static const int currentVersion = 2;
+  static const int currentVersion = 3;
 
   final int version;
   final String source;
@@ -112,6 +112,10 @@ class MealLogItem {
   final double? proteinG;
   final double? carbsG;
   final double? fatG;
+  final double? saturatedFatG;
+  final double? monounsaturatedFatG;
+  final double? polyunsaturatedFatG;
+  final double? transFatG;
   final double? fiberG;
   final double? sugarsG;
   final double? sodiumMg;
@@ -140,6 +144,10 @@ class MealLogItem {
     this.proteinG,
     this.carbsG,
     this.fatG,
+    this.saturatedFatG,
+    this.monounsaturatedFatG,
+    this.polyunsaturatedFatG,
+    this.transFatG,
     this.fiberG,
     this.sugarsG,
     this.sodiumMg,
@@ -163,6 +171,10 @@ class MealLogItem {
     proteinG: proteinG,
     carbsG: carbsG,
     fatG: fatG,
+    saturatedFatG: saturatedFatG,
+    monounsaturatedFatG: monounsaturatedFatG,
+    polyunsaturatedFatG: polyunsaturatedFatG,
+    transFatG: transFatG,
     fiberG: fiberG,
     sugarsG: sugarsG,
     sodiumMg: sodiumMg,
@@ -194,6 +206,10 @@ class MealLogItem {
     Object? proteinG = _sentinel,
     Object? carbsG = _sentinel,
     Object? fatG = _sentinel,
+    Object? saturatedFatG = _sentinel,
+    Object? monounsaturatedFatG = _sentinel,
+    Object? polyunsaturatedFatG = _sentinel,
+    Object? transFatG = _sentinel,
     Object? fiberG = _sentinel,
     Object? sugarsG = _sentinel,
     Object? sodiumMg = _sentinel,
@@ -230,6 +246,18 @@ class MealLogItem {
           : proteinG as double?,
       carbsG: identical(carbsG, _sentinel) ? this.carbsG : carbsG as double?,
       fatG: identical(fatG, _sentinel) ? this.fatG : fatG as double?,
+      saturatedFatG: identical(saturatedFatG, _sentinel)
+          ? this.saturatedFatG
+          : saturatedFatG as double?,
+      monounsaturatedFatG: identical(monounsaturatedFatG, _sentinel)
+          ? this.monounsaturatedFatG
+          : monounsaturatedFatG as double?,
+      polyunsaturatedFatG: identical(polyunsaturatedFatG, _sentinel)
+          ? this.polyunsaturatedFatG
+          : polyunsaturatedFatG as double?,
+      transFatG: identical(transFatG, _sentinel)
+          ? this.transFatG
+          : transFatG as double?,
       fiberG: identical(fiberG, _sentinel) ? this.fiberG : fiberG as double?,
       sugarsG: identical(sugarsG, _sentinel)
           ? this.sugarsG
@@ -278,6 +306,10 @@ class MealLogItem {
     'protein_g': proteinG,
     'carbs_g': carbsG,
     'fat_g': fatG,
+    'saturated_fat_g': saturatedFatG,
+    'monounsaturated_fat_g': monounsaturatedFatG,
+    'polyunsaturated_fat_g': polyunsaturatedFatG,
+    'trans_fat_g': transFatG,
     'fiber_g': fiberG,
     'sugars_g': sugarsG,
     'sodium_mg': sodiumMg,
@@ -308,6 +340,10 @@ class MealLogItem {
       proteinG: (map['protein_g'] as num?)?.toDouble(),
       carbsG: (map['carbs_g'] as num?)?.toDouble(),
       fatG: (map['fat_g'] as num?)?.toDouble(),
+      saturatedFatG: (map['saturated_fat_g'] as num?)?.toDouble(),
+      monounsaturatedFatG: (map['monounsaturated_fat_g'] as num?)?.toDouble(),
+      polyunsaturatedFatG: (map['polyunsaturated_fat_g'] as num?)?.toDouble(),
+      transFatG: (map['trans_fat_g'] as num?)?.toDouble(),
       fiberG: (map['fiber_g'] as num?)?.toDouble(),
       sugarsG: (map['sugars_g'] as num?)?.toDouble(),
       sodiumMg: (map['sodium_mg'] as num?)?.toDouble(),

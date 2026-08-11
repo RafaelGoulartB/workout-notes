@@ -957,6 +957,35 @@ class _PreviewSection extends StatelessWidget {
               ),
             ],
           ),
+          if (preview!.hasFatBreakdown) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                if (preview!.saturatedFatG != null)
+                  _FatDetailChip(
+                    label: loc.nutritionFatSaturated,
+                    value: _formatMacro(preview!.saturatedFatG),
+                  ),
+                if (preview!.monounsaturatedFatG != null)
+                  _FatDetailChip(
+                    label: loc.nutritionFatMonounsaturated,
+                    value: _formatMacro(preview!.monounsaturatedFatG),
+                  ),
+                if (preview!.polyunsaturatedFatG != null)
+                  _FatDetailChip(
+                    label: loc.nutritionFatPolyunsaturated,
+                    value: _formatMacro(preview!.polyunsaturatedFatG),
+                  ),
+                if (preview!.transFatG != null)
+                  _FatDetailChip(
+                    label: loc.nutritionFatTrans,
+                    value: _formatMacro(preview!.transFatG),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -978,6 +1007,31 @@ class _PreviewSection extends StatelessWidget {
 const Color _carbMacroColor = Color(0xFF20A39E);
 const Color _proteinMacroColor = Color(0xFFF29E38);
 const Color _fatMacroColor = Color(0xFF8E44AD);
+
+class _FatDetailChip extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _FatDetailChip({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        '${label.replaceAll(' (g)', '')}: $value',
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
 
 class _MacroPill extends StatelessWidget {
   final String label;

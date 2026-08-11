@@ -57,6 +57,14 @@ class AiFoodLabelDraft {
             proteinG: _nonNegativeDouble(per['protein_g']),
             carbsG: _nonNegativeDouble(per['carbs_g']),
             fatG: _nonNegativeDouble(per['fat_g']),
+            saturatedFatG: _nonNegativeDouble(per['saturated_fat_g']),
+            monounsaturatedFatG: _nonNegativeDouble(
+              per['monounsaturated_fat_g'],
+            ),
+            polyunsaturatedFatG: _nonNegativeDouble(
+              per['polyunsaturated_fat_g'],
+            ),
+            transFatG: _nonNegativeDouble(per['trans_fat_g']),
             fiberG: _nonNegativeDouble(per['fiber_g']),
             sugarsG: _nonNegativeDouble(per['sugars_g']),
             sodiumMg: _nonNegativeDouble(per['sodium_mg']),

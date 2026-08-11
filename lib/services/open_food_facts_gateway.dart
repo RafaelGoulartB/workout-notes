@@ -250,6 +250,14 @@ class OpenFoodFactsGateway implements NutritionGateway {
       proteinG: _nonNegativeDouble(nutriments['proteins_100g']),
       carbsG: _nonNegativeDouble(nutriments['carbohydrates_100g']),
       fatG: _nonNegativeDouble(nutriments['fat_100g']),
+      saturatedFatG: _nonNegativeDouble(nutriments['saturated-fat_100g']),
+      monounsaturatedFatG: _nonNegativeDouble(
+        nutriments['monounsaturated-fat_100g'],
+      ),
+      polyunsaturatedFatG: _nonNegativeDouble(
+        nutriments['polyunsaturated-fat_100g'],
+      ),
+      transFatG: _nonNegativeDouble(nutriments['trans-fat_100g']),
       fiberG: _nonNegativeDouble(nutriments['fiber_100g']),
       sugarsG: _nonNegativeDouble(nutriments['sugars_100g']),
       // Open Food Facts reports sodium (like every other nutrient)

@@ -11,6 +11,10 @@ class NutritionValues {
   final double? proteinG;
   final double? carbsG;
   final double? fatG;
+  final double? saturatedFatG;
+  final double? monounsaturatedFatG;
+  final double? polyunsaturatedFatG;
+  final double? transFatG;
   final double? fiberG;
   final double? sugarsG;
   final double? sodiumMg;
@@ -29,6 +33,10 @@ class NutritionValues {
     this.proteinG,
     this.carbsG,
     this.fatG,
+    this.saturatedFatG,
+    this.monounsaturatedFatG,
+    this.polyunsaturatedFatG,
+    this.transFatG,
     this.fiberG,
     this.sugarsG,
     this.sodiumMg,
@@ -52,6 +60,10 @@ class NutritionValues {
       proteinG: other.proteinG ?? proteinG,
       carbsG: other.carbsG ?? carbsG,
       fatG: other.fatG ?? fatG,
+      saturatedFatG: other.saturatedFatG ?? saturatedFatG,
+      monounsaturatedFatG: other.monounsaturatedFatG ?? monounsaturatedFatG,
+      polyunsaturatedFatG: other.polyunsaturatedFatG ?? polyunsaturatedFatG,
+      transFatG: other.transFatG ?? transFatG,
       fiberG: other.fiberG ?? fiberG,
       sugarsG: other.sugarsG ?? sugarsG,
       sodiumMg: other.sodiumMg ?? sodiumMg,
@@ -72,24 +84,26 @@ class NutritionValues {
   bool get hasCoreMacros =>
       calories != null && proteinG != null && carbsG != null && fatG != null;
 
-  /// True when any field is null. Used to flag incomplete data in the UI.
+  /// True when one of the primary calorie/macro fields is missing.
+  /// Secondary nutrients are optional and do not make a food incomplete.
   bool get hasMissingFields =>
-      calories == null ||
-      proteinG == null ||
-      carbsG == null ||
-      fatG == null ||
-      fiberG == null ||
-      sugarsG == null ||
-      sodiumMg == null ||
-      potassiumMg == null ||
-      calciumMg == null ||
-      ironMg == null ||
-      magnesiumMg == null ||
-      zincMg == null ||
-      vitaminAUg == null ||
-      vitaminCMg == null ||
-      vitaminDUg == null ||
-      vitaminB12Ug == null;
+      calories == null || proteinG == null || carbsG == null || fatG == null;
+
+  /// True when at least one detailed fat value was supplied.
+  bool get hasFatBreakdown =>
+      saturatedFatG != null ||
+      monounsaturatedFatG != null ||
+      polyunsaturatedFatG != null ||
+      transFatG != null;
+
+  /// Sum of the reported fat subtypes. Null means none was reported.
+  double? get reportedFatBreakdownG {
+    if (!hasFatBreakdown) return null;
+    return (saturatedFatG ?? 0) +
+        (monounsaturatedFatG ?? 0) +
+        (polyunsaturatedFatG ?? 0) +
+        (transFatG ?? 0);
+  }
 
   /// All-null instance used when the data source cannot provide any
   /// nutrition values for a food.
@@ -100,6 +114,10 @@ class NutritionValues {
     'protein_g': proteinG,
     'carbs_g': carbsG,
     'fat_g': fatG,
+    'saturated_fat_g': saturatedFatG,
+    'monounsaturated_fat_g': monounsaturatedFatG,
+    'polyunsaturated_fat_g': polyunsaturatedFatG,
+    'trans_fat_g': transFatG,
     'fiber_g': fiberG,
     'sugars_g': sugarsG,
     'sodium_mg': sodiumMg,
@@ -120,6 +138,10 @@ class NutritionValues {
       proteinG: _toDouble(map['protein_g']),
       carbsG: _toDouble(map['carbs_g']),
       fatG: _toDouble(map['fat_g']),
+      saturatedFatG: _toDouble(map['saturated_fat_g']),
+      monounsaturatedFatG: _toDouble(map['monounsaturated_fat_g']),
+      polyunsaturatedFatG: _toDouble(map['polyunsaturated_fat_g']),
+      transFatG: _toDouble(map['trans_fat_g']),
       fiberG: _toDouble(map['fiber_g']),
       sugarsG: _toDouble(map['sugars_g']),
       sodiumMg: _toDouble(map['sodium_mg']),
@@ -147,6 +169,10 @@ class NutritionValues {
     Object? proteinG = _sentinel,
     Object? carbsG = _sentinel,
     Object? fatG = _sentinel,
+    Object? saturatedFatG = _sentinel,
+    Object? monounsaturatedFatG = _sentinel,
+    Object? polyunsaturatedFatG = _sentinel,
+    Object? transFatG = _sentinel,
     Object? fiberG = _sentinel,
     Object? sugarsG = _sentinel,
     Object? sodiumMg = _sentinel,
@@ -169,6 +195,18 @@ class NutritionValues {
           : proteinG as double?,
       carbsG: identical(carbsG, _sentinel) ? this.carbsG : carbsG as double?,
       fatG: identical(fatG, _sentinel) ? this.fatG : fatG as double?,
+      saturatedFatG: identical(saturatedFatG, _sentinel)
+          ? this.saturatedFatG
+          : saturatedFatG as double?,
+      monounsaturatedFatG: identical(monounsaturatedFatG, _sentinel)
+          ? this.monounsaturatedFatG
+          : monounsaturatedFatG as double?,
+      polyunsaturatedFatG: identical(polyunsaturatedFatG, _sentinel)
+          ? this.polyunsaturatedFatG
+          : polyunsaturatedFatG as double?,
+      transFatG: identical(transFatG, _sentinel)
+          ? this.transFatG
+          : transFatG as double?,
       fiberG: identical(fiberG, _sentinel) ? this.fiberG : fiberG as double?,
       sugarsG: identical(sugarsG, _sentinel)
           ? this.sugarsG

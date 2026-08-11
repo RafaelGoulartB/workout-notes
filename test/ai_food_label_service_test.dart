@@ -242,6 +242,24 @@ void main() {
       expect(draft.values.fatG, closeTo(3.2, 0.001));
     });
 
+    test('parses all supported fat subtypes independently', () {
+      final draft = AiFoodLabelDraft.fromJson({
+        'name': 'Pasta de amendoim',
+        'per': {
+          'fat_g': 50,
+          'saturated_fat_g': 8,
+          'monounsaturated_fat_g': 24,
+          'polyunsaturated_fat_g': 15,
+          'trans_fat_g': 0,
+        },
+      });
+      expect(draft.values.fatG, 50);
+      expect(draft.values.saturatedFatG, 8);
+      expect(draft.values.monounsaturatedFatG, 24);
+      expect(draft.values.polyunsaturatedFatG, 15);
+      expect(draft.values.transFatG, 0);
+    });
+
     test('parses the supported micronutrients and preserves their units', () {
       final draft = AiFoodLabelDraft.fromJson({
         'name': 'Multivitamínico',

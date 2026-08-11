@@ -610,6 +610,10 @@ class NutritionRepository extends BaseRepository {
         proteinG: consumed.proteinG,
         carbsG: consumed.carbsG,
         fatG: consumed.fatG,
+        saturatedFatG: consumed.saturatedFatG,
+        monounsaturatedFatG: consumed.monounsaturatedFatG,
+        polyunsaturatedFatG: consumed.polyunsaturatedFatG,
+        transFatG: consumed.transFatG,
         fiberG: consumed.fiberG,
         sugarsG: consumed.sugarsG,
         sodiumMg: consumed.sodiumMg,
@@ -667,6 +671,10 @@ class NutritionRepository extends BaseRepository {
       proteinG: consumed.proteinG,
       carbsG: consumed.carbsG,
       fatG: consumed.fatG,
+      saturatedFatG: consumed.saturatedFatG,
+      monounsaturatedFatG: consumed.monounsaturatedFatG,
+      polyunsaturatedFatG: consumed.polyunsaturatedFatG,
+      transFatG: consumed.transFatG,
       fiberG: consumed.fiberG,
       sugarsG: consumed.sugarsG,
       sodiumMg: consumed.sodiumMg,
@@ -711,6 +719,10 @@ class NutritionRepository extends BaseRepository {
       proteinG: updated.proteinG,
       carbsG: updated.carbsG,
       fatG: updated.fatG,
+      saturatedFatG: updated.saturatedFatG,
+      monounsaturatedFatG: updated.monounsaturatedFatG,
+      polyunsaturatedFatG: updated.polyunsaturatedFatG,
+      transFatG: updated.transFatG,
       fiberG: updated.fiberG,
       sugarsG: updated.sugarsG,
       sodiumMg: updated.sodiumMg,
@@ -842,6 +854,10 @@ class NutritionRepository extends BaseRepository {
           proteinG: item.proteinG,
           carbsG: item.carbsG,
           fatG: item.fatG,
+          saturatedFatG: item.saturatedFatG,
+          monounsaturatedFatG: item.monounsaturatedFatG,
+          polyunsaturatedFatG: item.polyunsaturatedFatG,
+          transFatG: item.transFatG,
           fiberG: item.fiberG,
           sugarsG: item.sugarsG,
           sodiumMg: item.sodiumMg,
@@ -920,6 +936,10 @@ class NutritionRepository extends BaseRepository {
         SUM(protein_g) as protein_g,
         SUM(carbs_g) as carbs_g,
         SUM(fat_g) as fat_g,
+        SUM(saturated_fat_g) as saturated_fat_g,
+        SUM(monounsaturated_fat_g) as monounsaturated_fat_g,
+        SUM(polyunsaturated_fat_g) as polyunsaturated_fat_g,
+        SUM(trans_fat_g) as trans_fat_g,
         SUM(fiber_g) as fiber_g,
         SUM(sugars_g) as sugars_g,
         SUM(sodium_mg) as sodium_mg,
@@ -947,6 +967,10 @@ class NutritionRepository extends BaseRepository {
       proteinG: _sum(row['protein_g']),
       carbsG: _sum(row['carbs_g']),
       fatG: _sum(row['fat_g']),
+      saturatedFatG: _sum(row['saturated_fat_g']),
+      monounsaturatedFatG: _sum(row['monounsaturated_fat_g']),
+      polyunsaturatedFatG: _sum(row['polyunsaturated_fat_g']),
+      transFatG: _sum(row['trans_fat_g']),
       fiberG: _sum(row['fiber_g']),
       sugarsG: _sum(row['sugars_g']),
       sodiumMg: _sum(row['sodium_mg']),
@@ -1003,6 +1027,10 @@ class NutritionRepository extends BaseRepository {
         SUM(mli.protein_g) as protein_g,
         SUM(mli.carbs_g) as carbs_g,
         SUM(mli.fat_g) as fat_g,
+        SUM(mli.saturated_fat_g) as saturated_fat_g,
+        SUM(mli.monounsaturated_fat_g) as monounsaturated_fat_g,
+        SUM(mli.polyunsaturated_fat_g) as polyunsaturated_fat_g,
+        SUM(mli.trans_fat_g) as trans_fat_g,
         SUM(mli.fiber_g) as fiber_g,
         SUM(mli.sugars_g) as sugars_g,
         SUM(mli.sodium_mg) as sodium_mg,
@@ -1513,6 +1541,10 @@ class NutritionRepository extends BaseRepository {
         mli.protein_g as protein_g,
         mli.carbs_g as carbs_g,
         mli.fat_g as fat_g,
+        mli.saturated_fat_g as saturated_fat_g,
+        mli.monounsaturated_fat_g as monounsaturated_fat_g,
+        mli.polyunsaturated_fat_g as polyunsaturated_fat_g,
+        mli.trans_fat_g as trans_fat_g,
         mli.fiber_g as fiber_g,
         mli.sugars_g as sugars_g,
         mli.sodium_mg as sodium_mg,
@@ -1695,6 +1727,10 @@ class NutritionRepository extends BaseRepository {
     var proteinG = 0.0;
     var carbsG = 0.0;
     var fatG = 0.0;
+    var saturatedFatG = 0.0;
+    var monounsaturatedFatG = 0.0;
+    var polyunsaturatedFatG = 0.0;
+    var transFatG = 0.0;
     var fiberG = 0.0;
     var sugarsG = 0.0;
     var sodiumMg = 0.0;
@@ -1738,6 +1774,10 @@ class NutritionRepository extends BaseRepository {
       proteinG += consumed.proteinG ?? 0;
       carbsG += consumed.carbsG ?? 0;
       fatG += consumed.fatG ?? 0;
+      saturatedFatG += consumed.saturatedFatG ?? 0;
+      monounsaturatedFatG += consumed.monounsaturatedFatG ?? 0;
+      polyunsaturatedFatG += consumed.polyunsaturatedFatG ?? 0;
+      transFatG += consumed.transFatG ?? 0;
       fiberG += consumed.fiberG ?? 0;
       sugarsG += consumed.sugarsG ?? 0;
       sodiumMg += consumed.sodiumMg ?? 0;
@@ -1759,6 +1799,10 @@ class NutritionRepository extends BaseRepository {
         proteinG: proteinG,
         carbsG: carbsG,
         fatG: fatG,
+        saturatedFatG: saturatedFatG,
+        monounsaturatedFatG: monounsaturatedFatG,
+        polyunsaturatedFatG: polyunsaturatedFatG,
+        transFatG: transFatG,
         fiberG: fiberG,
         sugarsG: sugarsG,
         sodiumMg: sodiumMg,
@@ -1961,6 +2005,10 @@ class NutritionExportRow {
   final double? proteinG;
   final double? carbsG;
   final double? fatG;
+  final double? saturatedFatG;
+  final double? monounsaturatedFatG;
+  final double? polyunsaturatedFatG;
+  final double? transFatG;
   final double? fiberG;
   final double? sugarsG;
   final double? sodiumMg;
@@ -1989,6 +2037,10 @@ class NutritionExportRow {
     this.proteinG,
     this.carbsG,
     this.fatG,
+    this.saturatedFatG,
+    this.monounsaturatedFatG,
+    this.polyunsaturatedFatG,
+    this.transFatG,
     this.fiberG,
     this.sugarsG,
     this.sodiumMg,
@@ -2031,6 +2083,10 @@ class NutritionExportRow {
       proteinG: (map['protein_g'] as num?)?.toDouble(),
       carbsG: (map['carbs_g'] as num?)?.toDouble(),
       fatG: (map['fat_g'] as num?)?.toDouble(),
+      saturatedFatG: (map['saturated_fat_g'] as num?)?.toDouble(),
+      monounsaturatedFatG: (map['monounsaturated_fat_g'] as num?)?.toDouble(),
+      polyunsaturatedFatG: (map['polyunsaturated_fat_g'] as num?)?.toDouble(),
+      transFatG: (map['trans_fat_g'] as num?)?.toDouble(),
       fiberG: (map['fiber_g'] as num?)?.toDouble(),
       sugarsG: (map['sugars_g'] as num?)?.toDouble(),
       sodiumMg: (map['sodium_mg'] as num?)?.toDouble(),

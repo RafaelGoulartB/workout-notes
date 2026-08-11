@@ -2021,109 +2021,180 @@ class _DailyStatisticsView extends StatelessWidget {
           ),
         ).animate().fadeIn(duration: 260.ms, delay: 40.ms),
         const SizedBox(height: 12),
-        _StatisticsSectionCard(
-          title: loc.nutritionNutrientsTitle,
-          icon: Icons.monitor_heart_outlined,
-          child: Column(
-            children: [
-              _NutrientProgressRow(
-                label: loc.nutritionProgressProtein,
-                consumed: values.proteinG,
-                goal: goal?.proteinG,
-                unit: 'g',
-                color: const Color(0xFFF29E38),
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressCarbs,
-                consumed: values.carbsG,
-                goal: goal?.carbsG,
-                unit: 'g',
-                color: const Color(0xFF20A39E),
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressFiber,
-                consumed: values.fiberG,
-                unit: 'g',
-                color: const Color(0xFF5B9D63),
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressSugars,
-                consumed: values.sugarsG,
-                unit: 'g',
-                color: const Color(0xFFD4758F),
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressFat,
-                consumed: values.fatG,
-                goal: goal?.fatG,
-                unit: 'g',
-                color: const Color(0xFF8E44AD),
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressSodium,
-                consumed: values.sodiumMg,
-                unit: 'mg',
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressPotassium,
-                consumed: values.potassiumMg,
-                unit: 'mg',
-                color: const Color(0xFF4E8D7C),
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressCalcium,
-                consumed: values.calciumMg,
-                unit: 'mg',
-                color: const Color(0xFF5C7AEA),
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressIron,
-                consumed: values.ironMg,
-                unit: 'mg',
-                color: const Color(0xFFB75D69),
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressMagnesium,
-                consumed: values.magnesiumMg,
-                unit: 'mg',
-                color: const Color(0xFF6D8299),
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressZinc,
-                consumed: values.zincMg,
-                unit: 'mg',
-                color: const Color(0xFF8F7A66),
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressVitaminA,
-                consumed: values.vitaminAUg,
-                unit: 'µg',
-                color: const Color(0xFFE38B29),
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressVitaminC,
-                consumed: values.vitaminCMg,
-                unit: 'mg',
-                color: const Color(0xFF6A994E),
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressVitaminD,
-                consumed: values.vitaminDUg,
-                unit: 'µg',
-                color: const Color(0xFFF2C14E),
-              ),
-              _NutrientProgressRow(
-                label: loc.nutritionProgressVitaminB12,
-                consumed: values.vitaminB12Ug,
-                unit: 'µg',
-                color: const Color(0xFF7B61A8),
-                isLast: true,
-              ),
-            ],
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 10),
+          child: Text(
+            loc.nutritionNutrientsTitle,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
-        ).animate().fadeIn(duration: 300.ms, delay: 80.ms),
+        ),
+        _SecondaryNutrientsCard(
+          title: loc.nutritionFatBreakdownTitle,
+          icon: Icons.opacity_outlined,
+          children: [
+            _NutrientProgressRow(
+              label: loc.nutritionFatSaturated,
+              consumed: values.saturatedFatG,
+              unit: 'g',
+              color: const Color(0xFFA95C68),
+            ),
+            _NutrientProgressRow(
+              label: loc.nutritionFatMonounsaturated,
+              consumed: values.monounsaturatedFatG,
+              unit: 'g',
+              color: const Color(0xFFB58B3C),
+            ),
+            _NutrientProgressRow(
+              label: loc.nutritionFatPolyunsaturated,
+              consumed: values.polyunsaturatedFatG,
+              unit: 'g',
+              color: const Color(0xFF658B6F),
+            ),
+            _NutrientProgressRow(
+              label: loc.nutritionFatTrans,
+              consumed: values.transFatG,
+              unit: 'g',
+              color: const Color(0xFF9A6B73),
+              isLast: true,
+            ),
+          ],
+        ).animate().fadeIn(duration: 280.ms, delay: 70.ms),
+        const SizedBox(height: 12),
+        _SecondaryNutrientsCard(
+          title: loc.nutritionOtherNutrientsTitle,
+          icon: Icons.tune_rounded,
+          children: [
+            _NutrientProgressRow(
+              label: loc.nutritionProgressFiber,
+              consumed: values.fiberG,
+              unit: 'g',
+              color: const Color(0xFF5B9D63),
+            ),
+            _NutrientProgressRow(
+              label: loc.nutritionProgressSugars,
+              consumed: values.sugarsG,
+              unit: 'g',
+              color: const Color(0xFFD4758F),
+            ),
+            _NutrientProgressRow(
+              label: loc.nutritionProgressSodium,
+              consumed: values.sodiumMg,
+              unit: 'mg',
+              color: Theme.of(context).colorScheme.primary,
+              isLast: true,
+            ),
+          ],
+        ).animate().fadeIn(duration: 300.ms, delay: 90.ms),
+        const SizedBox(height: 12),
+        _SecondaryNutrientsCard(
+          title: loc.nutritionManualSectionMicronutrients,
+          icon: Icons.eco_outlined,
+          children: [
+            _NutrientProgressRow(
+              label: loc.nutritionProgressPotassium,
+              consumed: values.potassiumMg,
+              unit: 'mg',
+              color: const Color(0xFF4E8D7C),
+            ),
+            _NutrientProgressRow(
+              label: loc.nutritionProgressCalcium,
+              consumed: values.calciumMg,
+              unit: 'mg',
+              color: const Color(0xFF5C7AEA),
+            ),
+            _NutrientProgressRow(
+              label: loc.nutritionProgressIron,
+              consumed: values.ironMg,
+              unit: 'mg',
+              color: const Color(0xFFB75D69),
+            ),
+            _NutrientProgressRow(
+              label: loc.nutritionProgressMagnesium,
+              consumed: values.magnesiumMg,
+              unit: 'mg',
+              color: const Color(0xFF6D8299),
+            ),
+            _NutrientProgressRow(
+              label: loc.nutritionProgressZinc,
+              consumed: values.zincMg,
+              unit: 'mg',
+              color: const Color(0xFF8F7A66),
+            ),
+            _NutrientProgressRow(
+              label: loc.nutritionProgressVitaminA,
+              consumed: values.vitaminAUg,
+              unit: 'µg',
+              color: const Color(0xFFE38B29),
+            ),
+            _NutrientProgressRow(
+              label: loc.nutritionProgressVitaminC,
+              consumed: values.vitaminCMg,
+              unit: 'mg',
+              color: const Color(0xFF6A994E),
+            ),
+            _NutrientProgressRow(
+              label: loc.nutritionProgressVitaminD,
+              consumed: values.vitaminDUg,
+              unit: 'µg',
+              color: const Color(0xFFF2C14E),
+            ),
+            _NutrientProgressRow(
+              label: loc.nutritionProgressVitaminB12,
+              consumed: values.vitaminB12Ug,
+              unit: 'µg',
+              color: const Color(0xFF7B61A8),
+              isLast: true,
+            ),
+          ],
+        ).animate().fadeIn(duration: 320.ms, delay: 110.ms),
       ],
+    );
+  }
+}
+
+class _SecondaryNutrientsCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+
+  const _SecondaryNutrientsCard({
+    required this.title,
+    required this.icon,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(70)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        leading: Icon(icon, size: 20, color: theme.colorScheme.primary),
+        title: Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        subtitle: Text(
+          AppLocalizations.of(context)!.nutritionTapForDetails,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        children: children,
+      ),
     );
   }
 }
@@ -2514,7 +2585,6 @@ class _MacroRing extends StatelessWidget {
 class _NutrientProgressRow extends StatelessWidget {
   final String label;
   final double? consumed;
-  final double? goal;
   final String unit;
   final Color color;
   final bool isLast;
@@ -2522,7 +2592,6 @@ class _NutrientProgressRow extends StatelessWidget {
   const _NutrientProgressRow({
     required this.label,
     required this.consumed,
-    this.goal,
     required this.unit,
     required this.color,
     this.isLast = false,
@@ -2533,14 +2602,18 @@ class _NutrientProgressRow extends StatelessWidget {
     final theme = Theme.of(context);
     final hasValue = consumed != null;
     final current = consumed ?? 0;
-    final hasGoal = goal != null && goal! > 0;
-    final remaining = hasGoal && hasValue ? goal! - current : null;
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 15),
       child: Column(
         children: [
           Row(
             children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 9),
               Expanded(
                 child: Text(
                   label,
@@ -2555,37 +2628,7 @@ class _NutrientProgressRow extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              if (hasGoal && hasValue) ...[
-                Text(
-                  '  /  ${_formatNutritionNumber(goal!)}$unit',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                SizedBox(
-                  width: 62,
-                  child: Text(
-                    '${_formatNutritionNumber(remaining!)}$unit',
-                    textAlign: TextAlign.end,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: remaining < 0
-                          ? theme.colorScheme.error
-                          : theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
             ],
-          ),
-          const SizedBox(height: 7),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: hasGoal ? (current / goal!).clamp(0.0, 1.0) : 0,
-              minHeight: 4,
-              color: color,
-              backgroundColor: color.withAlpha(32),
-            ),
           ),
         ],
       ),
