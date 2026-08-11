@@ -2032,6 +2032,7 @@ class _DailyStatisticsView extends StatelessWidget {
           ),
         ),
         _SecondaryNutrientsCard(
+          storageKey: 'fat-breakdown',
           title: loc.nutritionFatBreakdownTitle,
           icon: Icons.opacity_outlined,
           children: [
@@ -2064,6 +2065,7 @@ class _DailyStatisticsView extends StatelessWidget {
         ).animate().fadeIn(duration: 280.ms, delay: 70.ms),
         const SizedBox(height: 12),
         _SecondaryNutrientsCard(
+          storageKey: 'other-nutrients',
           title: loc.nutritionOtherNutrientsTitle,
           icon: Icons.tune_rounded,
           children: [
@@ -2090,6 +2092,7 @@ class _DailyStatisticsView extends StatelessWidget {
         ).animate().fadeIn(duration: 300.ms, delay: 90.ms),
         const SizedBox(height: 12),
         _SecondaryNutrientsCard(
+          storageKey: 'micronutrients',
           title: loc.nutritionManualSectionMicronutrients,
           icon: Icons.eco_outlined,
           children: [
@@ -2156,11 +2159,13 @@ class _DailyStatisticsView extends StatelessWidget {
 }
 
 class _SecondaryNutrientsCard extends StatelessWidget {
+  final String storageKey;
   final String title;
   final IconData icon;
   final List<Widget> children;
 
   const _SecondaryNutrientsCard({
+    required this.storageKey,
     required this.title,
     required this.icon,
     required this.children,
@@ -2179,6 +2184,7 @@ class _SecondaryNutrientsCard extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
+        key: PageStorageKey<String>('nutrition-$storageKey'),
         leading: Icon(icon, size: 20, color: theme.colorScheme.primary),
         title: Text(
           title,

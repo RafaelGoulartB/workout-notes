@@ -306,6 +306,22 @@ void main() {
     expect(find.text(loc.nutritionCaloriesTitle), findsNothing);
     expect(find.text(loc.nutritionMacrosTitle), findsOneWidget);
     expect(find.text(loc.nutritionNutrientsTitle), findsOneWidget);
+    final nutrientTiles = tester
+        .widgetList<ExpansionTile>(find.byType(ExpansionTile))
+        .toList();
+    expect(nutrientTiles, hasLength(3));
+    expect(
+      nutrientTiles.map((tile) => tile.key).toSet(),
+      hasLength(nutrientTiles.length),
+    );
+
+    await tester.tap(find.text(loc.nutritionFatBreakdownTitle));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(loc.nutritionDiaryTab));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(loc.nutritionDailyStatsTab));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
