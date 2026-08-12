@@ -165,15 +165,24 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
         ),
       ),
     );
-    if (result == null) return;
     if (!mounted) return;
+    if (result == null) {
+      // Saved meals are persisted inside FoodSearchScreen and do not return
+      // a food selection. Reload the diary after leaving the search route.
+      await _load();
+      return;
+    }
     final quantity = await showFoodQuantitySheet(
       context: context,
       food: result.food,
       primaryVariant: result.primaryVariant,
       servings: result.servings,
     );
-    if (quantity == null) return;
+    if (quantity == null) {
+      // A saved meal may already have been logged during this search visit.
+      await _load();
+      return;
+    }
     await _persistAdd(
       result.mealType ?? mealType,
       result.mealName ?? mealLabel,

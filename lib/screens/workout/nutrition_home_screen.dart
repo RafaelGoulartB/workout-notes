@@ -178,14 +178,25 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         ),
       ),
     );
-    if (result == null || !mounted) return;
+    if (!mounted) return;
+    if (result == null) {
+      // Saved meals are logged directly by FoodSearchScreen and therefore
+      // return no food selection. Refresh when the route closes so those
+      // changes are reflected on the dashboard as well.
+      await _load();
+      return;
+    }
     final quantity = await showFoodQuantitySheet(
       context: context,
       food: result.food,
       primaryVariant: result.primaryVariant,
       servings: result.servings,
     );
-    if (quantity == null) return;
+    if (quantity == null) {
+      // The user may have logged a saved meal before selecting this food.
+      await _load();
+      return;
+    }
     await _persistAdd(
       result.mealType ?? mealType,
       result.mealName ?? mealLabel,
