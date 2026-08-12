@@ -1341,7 +1341,8 @@ class NutritionRepository extends BaseRepository {
     final rows = await db.rawQuery(
       '''
       SELECT ml.date as date,
-        SUM(mli.calories) as calories
+        SUM(mli.calories) as calories,
+        COUNT(*) as item_count
       FROM meal_log_items mli
       JOIN meal_logs ml ON mli.meal_log_id = ml.id
       WHERE ml.date >= ?
@@ -1352,8 +1353,10 @@ class NutritionRepository extends BaseRepository {
     );
     final totalsByDate = <String, double>{};
     for (final row in rows) {
-      final v = _sum(row['calories']) ?? 0;
-      if (v > 0) totalsByDate[row['date'] as String] = v;
+      final itemCount = (row['item_count'] as num?)?.toInt() ?? 0;
+      if (itemCount > 0) {
+        totalsByDate[row['date'] as String] = _sum(row['calories']) ?? 0;
+      }
     }
     final result = <DailyCalorieTotal>[];
     final startDate = DateTime.parse(start);
@@ -1419,7 +1422,7 @@ class NutritionRepository extends BaseRepository {
       }
     }
     final avg = loggedDays == 0 ? 0.0 : consumed / loggedDays;
-    final totalGoal = goal == null ? null : goal * days;
+    final totalGoal = goal == null ? null : goal * loggedDays;
     return CalorieBalance(
       days: days,
       totalConsumed: consumed,
@@ -1685,6 +1688,20 @@ class NutritionRepository extends BaseRepository {
     required List<SavedMealItemDraft> items,
     required double portions,
   }) async {
+    final preview = await previewSavedMealNutrition(
+      items: items,
+      portions: portions,
+    );
+    return preview.totals;
+  }
+
+  /// Returns both the aggregate and each ingredient's calculated values so
+  /// editor cards can mirror the nutrition shown in the final total.
+  Future<({NutritionValues? totals, List<NutritionValues?> byItem})>
+  previewSavedMealNutrition({
+    required List<SavedMealItemDraft> items,
+    required double portions,
+  }) async {
     final db = await this.db;
     final records = [
       for (final item in items)
@@ -1702,7 +1719,10 @@ class NutritionRepository extends BaseRepository {
       records,
       portions,
     );
-    return computed.totals;
+    return (
+      totals: computed.totals,
+      byItem: [for (var i = 0; i < records.length; i++) computed.byIndex[i]],
+    );
   }
 
   /// Inner computation shared by [_computeSavedMealTotals] (saved items)
@@ -2228,9 +2248,9 @@ class CalorieBalance {
   final int days;
   final double totalConsumed;
 
-  /// Sum of the active goal over the whole window (or null when no
-  /// goal is configured). Combined with [totalConsumed] to produce
-  /// the net surplus / deficit.
+  /// Sum of the active goal over days with at least one logged item
+  /// (or null when no goal is configured). Combined with
+  /// [totalConsumed] to produce the net surplus / deficit.
   final double? totalGoal;
 
   /// `consumed - totalGoal`. Null when no goal is set.

@@ -1390,8 +1390,17 @@
     "placeholders": { "portions": { "type": "String" } }
   },
   "nutritionSavedMealSaved": "Refeição salva",
+  "nutritionSavedMealDetails": "Informações da refeição",
   "nutritionSavedMealName": "Nome da refeição",
   "nutritionSavedMealPortions": "Porções",
+  "nutritionSavedMealDecreasePortions": "Diminuir porções",
+  "nutritionSavedMealIncreasePortions": "Aumentar porções",
+  "nutritionSavedMealFoodsCount": "{count, plural, =0{Nenhum alimento} =1{1 alimento} other{{count} alimentos}}",
+  "@nutritionSavedMealFoodsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "nutritionSavedMealIngredients": "Ingredientes",
   "nutritionSavedMealEmptyIngredients": "Nenhum ingrediente ainda. Adicione os alimentos desta refeição.",
   "nutritionSavedMealTotalsTitle": "Valores totais",

@@ -776,6 +776,43 @@ void main() {
     );
   });
 
+  group('calorie balance', () {
+    test('counts the calorie goal only on days with logged food', () async {
+      final food = await repository.createManualFood(
+        name: 'Refeição do dia',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(calories: 1500),
+      );
+      final details = await repository.getFoodWithDetails(food.id);
+      final variant = details!.variants.first;
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      await repository.addMealLogItem(
+        date: today,
+        mealType: 'lunch',
+        food: food,
+        variant: variant,
+        conversion: const NutritionConversion(
+          quantity: 100,
+          unit: 'g',
+          referenceAmount: 100,
+          referenceUnit: 'g',
+        ),
+      );
+
+      for (final days in [7, 30]) {
+        final balance = await repository.getCalorieBalance(
+          days: days,
+          goal: 2000,
+        );
+        expect(balance.daysLogged, 1);
+        expect(balance.totalConsumed, 1500);
+        expect(balance.totalGoal, 2000);
+        expect(balance.balance, -500);
+      }
+    });
+  });
+
   group('CSV export', () {
     test('returns a row per meal_log_item with the food source', () async {
       final food = await repository.createManualFood(

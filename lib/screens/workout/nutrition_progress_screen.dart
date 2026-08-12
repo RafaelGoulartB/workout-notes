@@ -37,6 +37,7 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
 
   int _windowDays = _kWindow7;
 
+  CalorieBalance? _balance7;
   CalorieBalance? _balance;
   List<DailyCalorieTotal> _dailies30 = const [];
   List<DailyCalorieTotal> _dailies7 = const [];
@@ -49,11 +50,7 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(
-      length: 2,
-      vsync: this,
-      initialIndex: 0,
-    );
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 0);
     _tabController.addListener(_onTabChanged);
     _load();
   }
@@ -80,20 +77,17 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
       final results = await Future.wait([
         _repository.getActiveGoal(),
         _repository.getDailyCalorieTotals(days: _kWindow30),
-        _repository.getTopCalorieContributors(
-          days: _kWindow30,
-          limit: 8,
-        ),
+        _repository.getTopCalorieContributors(days: _kWindow30, limit: 8),
         _repository.getCaloriesByMealType(days: _kWindow30),
         _repository.getDailyNutritionHistory(days: _kWindow30),
       ]);
       if (!mounted) return;
       final goal = results[0] as NutritionGoal?;
       final dailies = results[1] as List<DailyCalorieTotal>;
-      final balance = await _repository.getCalorieBalance(
-        days: _kWindow30,
-        goal: goal?.calories,
-      );
+      final balances = await Future.wait([
+        _repository.getCalorieBalance(days: _kWindow7, goal: goal?.calories),
+        _repository.getCalorieBalance(days: _kWindow30, goal: goal?.calories),
+      ]);
       if (!mounted) return;
       setState(() {
         _goal = goal;
@@ -101,12 +95,11 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
         _dailies7 = dailies.length <= _kWindow7
             ? dailies
             : dailies.sublist(dailies.length - _kWindow7);
-        _balance = balance;
+        _balance7 = balances[0];
+        _balance = balances[1];
         _contributors = results[2] as List<CalorieContributor>;
         _mealDistribution = results[3] as List<MealTypeCalories>;
-        _macros = _summarizeMacros(
-          results[4] as List<Map<String, dynamic>>,
-        );
+        _macros = _summarizeMacros(results[4] as List<Map<String, dynamic>>);
         _isLoading = false;
       });
     } catch (_) {
@@ -123,71 +116,15 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
       f += (row['fat_g'] as num?)?.toDouble() ?? 0;
       k += (row['calories'] as num?)?.toDouble() ?? 0;
     }
-    return _MacroSummary(
-      proteinG: p,
-      carbsG: c,
-      fatG: f,
-      totalKcal: k,
-    );
+    return _MacroSummary(proteinG: p, carbsG: c, fatG: f, totalKcal: k);
   }
 
   // ------------------------------------------------------------------
   // Derived
   // ------------------------------------------------------------------
 
-  CalorieBalance? get _windowBalance {
-    final balance = _balance;
-    if (balance == null) return null;
-    if (_windowDays == _kWindow7) {
-      final goal = _goal?.calories;
-      final consumed = _dailies7.fold<double>(
-        0,
-        (sum, d) => sum + (d.calories ?? 0),
-      );
-      final logged = _dailies7.where((d) => d.calories != null).length;
-      var deficit = 0, onTarget = 0, surplus = 0;
-      var streak = 0;
-      final loggedList = <DailyCalorieTotal>[];
-      for (final d in _dailies7) {
-        if (d.calories == null) continue;
-        loggedList.add(d);
-        if (goal != null && goal > 0) {
-          final delta = d.calories! - goal;
-          final ratio = delta.abs() / goal;
-          if (ratio <= 0.10) {
-            onTarget++;
-          } else if (delta < 0) {
-            deficit++;
-          } else {
-            surplus++;
-          }
-        }
-      }
-      if (goal != null && goal > 0) {
-        for (var i = loggedList.length - 1; i >= 0; i--) {
-          final delta = (loggedList[i].calories! - goal).abs() / goal;
-          if (delta <= 0.10) {
-            streak++;
-          } else {
-            break;
-          }
-        }
-      }
-      return CalorieBalance(
-        days: _kWindow7,
-        totalConsumed: consumed,
-        totalGoal: goal == null ? null : goal * _kWindow7,
-        balance: goal == null ? null : consumed - (goal * _kWindow7),
-        daysLogged: logged,
-        daysInDeficit: deficit,
-        daysOnTarget: onTarget,
-        daysInSurplus: surplus,
-        currentStreak: streak,
-        averageDailyIntake: logged == 0 ? 0 : consumed / logged,
-      );
-    }
-    return balance;
-  }
+  CalorieBalance? get _windowBalance =>
+      _windowDays == _kWindow7 ? _balance7 : _balance;
 
   List<DailyCalorieTotal> get _windowDailies =>
       _windowDays == _kWindow7 ? _dailies7 : _dailies30;
@@ -328,9 +265,7 @@ class _BalanceHeroCard extends StatelessWidget {
             ],
           ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: statusColor.withAlpha(80),
-          ),
+          border: Border.all(color: statusColor.withAlpha(80)),
         ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
@@ -339,11 +274,7 @@ class _BalanceHeroCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(
-                    _iconForStatus(status),
-                    color: statusColor,
-                    size: 22,
-                  ),
+                  Icon(_iconForStatus(status), color: statusColor, size: 22),
                   const SizedBox(width: 8),
                   Text(
                     windowDays == _kWindow7
@@ -789,16 +720,10 @@ class _WeekDayCell extends StatelessWidget {
                 color: _bgColor(color, theme),
                 borderRadius: BorderRadius.circular(10),
                 border: isToday
-                    ? Border.all(
-                        color: theme.colorScheme.primary,
-                        width: 1.5,
-                      )
+                    ? Border.all(color: theme.colorScheme.primary, width: 1.5)
                     : null,
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 2,
-                vertical: 6,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 6),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -835,10 +760,7 @@ class _WeekDayCell extends StatelessWidget {
           ),
           if (hasGoal && calories != null) ...[
             const SizedBox(height: 5),
-            _DayDeltaPill(
-              delta: calories! - goal!,
-              color: color,
-            ),
+            _DayDeltaPill(delta: calories! - goal!, color: color),
           ],
         ],
       ),
@@ -930,8 +852,7 @@ class _RollingAverageCard extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final hasData = spots.isNotEmpty;
-    final currentAvg =
-        hasData ? spots.last.y : 0.0;
+    final currentAvg = hasData ? spots.last.y : 0.0;
     final goalKcal = goal;
     final diff = (goalKcal != null && hasData) ? currentAvg - goalKcal : null;
 
@@ -951,8 +872,8 @@ class _RollingAverageCard extends StatelessWidget {
                   color: diff == null
                       ? theme.colorScheme.onSurface
                       : diff < 0
-                          ? _deficitColor
-                          : _surplusColor,
+                      ? _deficitColor
+                      : _surplusColor,
                 ),
                 const SizedBox(width: 12),
                 if (goalKcal != null)
@@ -965,11 +886,8 @@ class _RollingAverageCard extends StatelessWidget {
                 if (diff != null)
                   _RollingStat(
                     label: loc.nutritionBalanceRollingDelta,
-                    value:
-                        '${diff < 0 ? '' : '+'}${diff.round()} kcal',
-                    color: diff < 0
-                        ? _deficitColor
-                        : _surplusColor,
+                    value: '${diff < 0 ? '' : '+'}${diff.round()} kcal',
+                    color: diff < 0 ? _deficitColor : _surplusColor,
                   ),
               ],
             ),
@@ -977,10 +895,7 @@ class _RollingAverageCard extends StatelessWidget {
           SizedBox(
             height: 150,
             child: hasData
-                ? _RollingLineChart(
-                    spots: spots,
-                    goal: goalKcal,
-                  )
+                ? _RollingLineChart(spots: spots, goal: goalKcal)
                 : Center(
                     child: Text(
                       loc.nutritionBalanceRollingEmpty,
@@ -1042,10 +957,7 @@ class _RollingLineChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final maxY = spots.fold<double>(
-      0,
-      (acc, s) => s.y > acc ? s.y : acc,
-    );
+    final maxY = spots.fold<double>(0, (acc, s) => s.y > acc ? s.y : acc);
     final chartMax = (maxY > (goal ?? 0) ? maxY : (goal ?? 0)) * 1.2;
     final safeMax = chartMax <= 0 ? 1000.0 : chartMax;
 
@@ -1107,9 +1019,7 @@ class _RollingLineChart extends StatelessWidget {
                   return const SizedBox.shrink();
                 }
                 final daysAgo = _kWindow30 - idx;
-                final label = daysAgo == 1
-                    ? 'ontem'
-                    : '${daysAgo}d atrás';
+                final label = daysAgo == 1 ? 'ontem' : '${daysAgo}d atrás';
                 return Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
@@ -1195,11 +1105,10 @@ class _MealDistributionCard extends StatelessWidget {
         child: _EmptyNote(text: loc.nutritionBalanceMealEmpty),
       );
     }
-    final total =
-        distribution.fold<double>(0, (s, m) => s + m.totalCalories);
+    final total = distribution.fold<double>(0, (s, m) => s + m.totalCalories);
     final top = distribution.take(5).toList();
-    final otherTotal = total -
-        top.fold<double>(0, (s, m) => s + m.totalCalories);
+    final otherTotal =
+        total - top.fold<double>(0, (s, m) => s + m.totalCalories);
 
     return _SectionCard(
       icon: Icons.restaurant_outlined,
@@ -1209,11 +1118,7 @@ class _MealDistributionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < top.length; i++)
-            _MealDistributionRow(
-              rank: i + 1,
-              entry: top[i],
-              total: total,
-            ),
+            _MealDistributionRow(rank: i + 1, entry: top[i], total: total),
           if (otherTotal > 0 && distribution.length > 5)
             _MealDistributionRow(
               rank: top.length + 1,
@@ -1246,8 +1151,9 @@ class _MealDistributionRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
-    final percent =
-        total == 0 ? 0 : ((entry.totalCalories / total) * 100).round();
+    final percent = total == 0
+        ? 0
+        : ((entry.totalCalories / total) * 100).round();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -1347,11 +1253,8 @@ class _TopContributorsCard extends StatelessWidget {
       );
     }
     final top = contributors.take(8).toList();
-    final topShare = top.fold<double>(
-          0,
-          (s, c) => s + c.totalCalories,
-        ) /
-        totalConsumed;
+    final topShare =
+        top.fold<double>(0, (s, c) => s + c.totalCalories) / totalConsumed;
 
     return _SectionCard(
       icon: Icons.local_dining_outlined,

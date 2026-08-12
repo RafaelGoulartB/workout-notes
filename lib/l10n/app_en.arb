@@ -1407,8 +1407,17 @@
     "placeholders": { "portions": { "type": "String" } }
   },
   "nutritionSavedMealSaved": "Meal saved",
+  "nutritionSavedMealDetails": "Meal information",
   "nutritionSavedMealName": "Meal name",
   "nutritionSavedMealPortions": "Portions",
+  "nutritionSavedMealDecreasePortions": "Decrease portions",
+  "nutritionSavedMealIncreasePortions": "Increase portions",
+  "nutritionSavedMealFoodsCount": "{count, plural, =0{No foods} =1{1 food} other{{count} foods}}",
+  "@nutritionSavedMealFoodsCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "nutritionSavedMealIngredients": "Ingredients",
   "nutritionSavedMealEmptyIngredients": "No ingredients yet. Add the foods of this meal.",
   "nutritionSavedMealTotalsTitle": "Total values",

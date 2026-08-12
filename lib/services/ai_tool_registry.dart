@@ -374,7 +374,8 @@ class AiToolRegistry {
     final rawDb = await db.database;
     final rows = await rawDb.rawQuery(
       '''
-      SELECT w.id, w.date, w.duration_seconds, w.feeling_rating, w.comment,
+      SELECT w.id, w.date, w.duration_seconds, w.estimated_calories,
+        w.feeling_rating, w.comment,
         COUNT(DISTINCT ee.id) AS exercise_count,
         COALESCE(SUM(CASE WHEN COALESCE(s.is_warmup, 0) = 0
           THEN COALESCE(s.weight, 0) * COALESCE(s.reps, 0) ELSE 0 END), 0)
@@ -394,6 +395,7 @@ class AiToolRegistry {
             'id': w['id'],
             'date': w['date'],
             'durationSeconds': w['duration_seconds'],
+            'estimatedCalories': (w['estimated_calories'] as num?)?.toDouble(),
             'feeling': w['feeling_rating'],
             'exerciseCount': (w['exercise_count'] as num?)?.toInt() ?? 0,
             'volumeKg': (w['volume_kg'] as num?)?.toDouble() ?? 0.0,
@@ -459,6 +461,7 @@ class AiToolRegistry {
       'id': id,
       'date': w['date'],
       'durationSeconds': w['duration_seconds'],
+      'estimatedCalories': (w['estimated_calories'] as num?)?.toDouble(),
       'feeling': w['feeling_rating'],
       'comment': w['comment'],
       'exercises': out,

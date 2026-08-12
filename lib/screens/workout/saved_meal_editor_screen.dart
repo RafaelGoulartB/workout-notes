@@ -33,6 +33,7 @@ class _Ingredient {
   String? servingLabel;
   double? servingGramsEquivalent;
   double? servingMlEquivalent;
+  double? calories;
 
   _Ingredient({
     required this.id,
@@ -140,6 +141,9 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
 
   Future<void> _recomputeTotals() async {
     final portions = _currentPortions();
+    final ingredientIds = _ingredients
+        .map((ingredient) => ingredient.id)
+        .toList(growable: false);
     final drafts = _ingredients
         .map(
           (i) => SavedMealItemDraft(
@@ -158,13 +162,21 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
     if (!mounted) return;
     setState(() => _isComputingTotals = true);
     try {
-      final totals = await widget.repository.previewSavedMealTotals(
+      final preview = await widget.repository.previewSavedMealNutrition(
         items: drafts,
         portions: portions,
       );
       if (!mounted) return;
       setState(() {
-        _totals = totals;
+        _totals = preview.totals;
+        for (var i = 0; i < drafts.length; i++) {
+          final currentIndex = _ingredients.indexWhere(
+            (ingredient) => ingredient.id == ingredientIds[i],
+          );
+          if (currentIndex >= 0) {
+            _ingredients[currentIndex].calories = preview.byItem[i]?.calories;
+          }
+        }
         _isComputingTotals = false;
       });
     } catch (_) {
@@ -305,6 +317,41 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
     _recomputeTotals();
   }
 
+  Future<void> _confirmRemoveIngredient(_Ingredient ingredient) async {
+    final loc = AppLocalizations.of(context)!;
+    final shouldRemove = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.delete_outline_rounded),
+        title: Text(loc.nutritionDeleteItem),
+        content: Text(loc.nutritionDeleteItemConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(loc.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            child: Text(loc.nutritionDeleteItem),
+          ),
+        ],
+      ),
+    );
+    if (shouldRemove == true && mounted) _removeIngredient(ingredient);
+  }
+
+  void _changePortions(double delta) {
+    final next = (_currentPortions() + delta).clamp(1, 999).toDouble();
+    _portionsController.text = _format(next);
+    _portionsController.selection = TextSelection.collapsed(
+      offset: _portionsController.text.length,
+    );
+  }
+
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final loc = AppLocalizations.of(context)!;
@@ -361,169 +408,75 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
               : loc.nutritionSavedMealEdit,
         ),
         centerTitle: true,
-        actions: [
-          TextButton(
-            onPressed: _isSaving ? null : _save,
-            child: _isSaving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(loc.nutritionSave),
-          ),
-        ],
       ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
           children: [
-            TextFormField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: loc.nutritionSavedMealName,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(
-                  60,
-                ),
-              ),
-              validator: (value) => (value == null || value.trim().isEmpty)
-                  ? loc.nutritionFieldRequired
-                  : null,
+            _MealDetailsCard(
+              nameController: _nameController,
+              portionsController: _portionsController,
+              onDecreasePortions: _isSaving || _currentPortions() <= 1
+                  ? null
+                  : () => _changePortions(-1),
+              onIncreasePortions: _isSaving || _currentPortions() >= 999
+                  ? null
+                  : () => _changePortions(1),
             ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _portionsController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: InputDecoration(
-                labelText: loc.nutritionSavedMealPortions,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(
-                  60,
-                ),
-              ),
-              validator: (value) {
-                final parsed = double.tryParse(
-                  (value ?? '').trim().replaceAll(',', '.'),
-                );
-                if (parsed == null || parsed <= 0) {
-                  return loc.nutritionInvalidQuantity;
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             _NutritionTotalsCard(
               totals: _totals,
               portions: _currentPortions(),
               isComputing: _isComputingTotals,
               hasIngredients: _ingredients.isNotEmpty,
+              ingredientCount: _ingredients.length,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    loc.nutritionSavedMealIngredients,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                TextButton.icon(
-                  onPressed: _isSaving ? null : _addIngredient,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: Text(loc.nutritionAddItem),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            if (_ingredients.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withAlpha(
-                    50,
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.restaurant_outlined,
-                      color: theme.colorScheme.onSurfaceVariant,
-                      size: 36,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      loc.nutritionSavedMealEmptyIngredients,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        loc.nutritionSavedMealIngredients,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              Card(
-                elevation: 0,
-                clipBehavior: Clip.antiAlias,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  side: BorderSide(
-                    color: theme.colorScheme.outlineVariant.withAlpha(80),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    for (var i = 0; i < _ingredients.length; i++) ...[
-                      if (i > 0)
-                        Divider(
-                          height: 1,
-                          indent: 16,
-                          endIndent: 16,
-                          color: theme.colorScheme.outlineVariant.withAlpha(60),
-                        ),
-                      ListTile(
-                        title: Text(_ingredients[i].name),
-                        subtitle: Text(
-                          '${_format(_ingredients[i].quantity)} '
-                          '${_ingredients[i].unit}',
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              tooltip: loc.nutritionEditItem,
-                              onPressed: _isSaving
-                                  ? null
-                                  : () => _editIngredient(_ingredients[i]),
-                              icon: const Icon(Icons.edit_outlined),
-                            ),
-                            IconButton(
-                              tooltip: loc.nutritionDeleteItem,
-                              onPressed: _isSaving
-                                  ? null
-                                  : () => _removeIngredient(_ingredients[i]),
-                              icon: const Icon(Icons.delete_outline),
-                            ),
-                          ],
+                      const SizedBox(height: 2),
+                      Text(
+                        loc.nutritionSavedMealFoodsCount(_ingredients.length),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
+                if (_ingredients.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: _isSaving ? null : _addIngredient,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: Text(loc.nutritionAddItem),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_ingredients.isEmpty)
+              _EmptyIngredientsCard(onAdd: _isSaving ? null : _addIngredient)
+            else
+              for (var i = 0; i < _ingredients.length; i++) ...[
+                _IngredientCard(
+                  ingredient: _ingredients[i],
+                  enabled: !_isSaving,
+                  onEdit: () => _editIngredient(_ingredients[i]),
+                  onRemove: () => _confirmRemoveIngredient(_ingredients[i]),
+                ),
+                if (i < _ingredients.length - 1) const SizedBox(height: 10),
+              ],
           ],
         ),
       ),
@@ -545,7 +498,10 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
                 : const Icon(Icons.check_rounded),
             label: Text(loc.nutritionSave),
             style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(50),
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
           ),
         ),
@@ -561,6 +517,376 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
   }
 }
 
+class _MealDetailsCard extends StatelessWidget {
+  final TextEditingController nameController;
+  final TextEditingController portionsController;
+  final VoidCallback? onDecreasePortions;
+  final VoidCallback? onIncreasePortions;
+
+  const _MealDetailsCard({
+    required this.nameController,
+    required this.portionsController,
+    required this.onDecreasePortions,
+    required this.onIncreasePortions,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    final fieldColor = theme.colorScheme.surfaceContainerHighest.withAlpha(75);
+
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(75)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _SectionIcon(
+                  icon: Icons.restaurant_menu_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  loc.nutritionSavedMealDetails,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: nameController,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: loc.nutritionSavedMealName,
+                prefixIcon: const Icon(Icons.edit_outlined, size: 20),
+                filled: true,
+                fillColor: fieldColor,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(
+                    color: theme.colorScheme.outlineVariant.withAlpha(65),
+                  ),
+                ),
+              ),
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? loc.nutritionFieldRequired
+                  : null,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              loc.nutritionSavedMealPortions,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: 196,
+                child: Row(
+                  children: [
+                    _PortionButton(
+                      icon: Icons.remove_rounded,
+                      tooltip: loc.nutritionSavedMealDecreasePortions,
+                      onPressed: onDecreasePortions,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextFormField(
+                        controller: portionsController,
+                        textAlign: TextAlign.center,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: fieldColor,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 12,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: theme.colorScheme.outlineVariant.withAlpha(
+                                65,
+                              ),
+                            ),
+                          ),
+                        ),
+                        validator: (value) {
+                          final parsed = double.tryParse(
+                            (value ?? '').trim().replaceAll(',', '.'),
+                          );
+                          if (parsed == null || parsed <= 0) {
+                            return loc.nutritionInvalidQuantity;
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _PortionButton(
+                      icon: Icons.add_rounded,
+                      tooltip: loc.nutritionSavedMealIncreasePortions,
+                      onPressed: onIncreasePortions,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PortionButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  const _PortionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton.filledTonal(
+      onPressed: onPressed,
+      tooltip: tooltip,
+      icon: Icon(icon),
+      style: IconButton.styleFrom(
+        minimumSize: const Size.square(44),
+        maximumSize: const Size.square(44),
+        padding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+}
+
+class _EmptyIngredientsCard extends StatelessWidget {
+  final VoidCallback? onAdd;
+
+  const _EmptyIngredientsCard({required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withAlpha(75),
+        ),
+      ),
+      child: Column(
+        children: [
+          _SectionIcon(
+            icon: Icons.add_shopping_cart_rounded,
+            color: theme.colorScheme.primary,
+            size: 44,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            loc.nutritionSavedMealEmptyIngredients,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add_rounded),
+            label: Text(loc.nutritionAddItem),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IngredientCard extends StatelessWidget {
+  final _Ingredient ingredient;
+  final bool enabled;
+  final VoidCallback onEdit;
+  final VoidCallback onRemove;
+
+  const _IngredientCard({
+    required this.ingredient,
+    required this.enabled,
+    required this.onEdit,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    final brand = ingredient.brand?.trim();
+    final quantity = _SavedMealEditorScreenState._format(ingredient.quantity);
+    final unitSuffix = ingredient.unit.trim().isEmpty
+        ? ''
+        : ' ${ingredient.unit}';
+    final subtitle = <String>[
+      '$quantity$unitSuffix',
+      if (brand != null && brand.isNotEmpty) brand,
+    ].join(' · ');
+    final calories = ingredient.calories;
+
+    return Card(
+      key: ValueKey(ingredient.id),
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(75)),
+      ),
+      child: InkWell(
+        onTap: enabled ? onEdit : null,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 4, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      ingredient.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (calories != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Text(
+                    loc.nutritionConsumedKcal(
+                      calories.toStringAsFixed(calories < 10 ? 1 : 0),
+                    ),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              PopupMenuButton<_IngredientAction>(
+                enabled: enabled,
+                tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
+                onSelected: (action) {
+                  switch (action) {
+                    case _IngredientAction.edit:
+                      onEdit();
+                    case _IngredientAction.remove:
+                      onRemove();
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    value: _IngredientAction.edit,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.edit_outlined),
+                      title: Text(loc.nutritionEditItem),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: _IngredientAction.remove,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        Icons.delete_outline_rounded,
+                        color: theme.colorScheme.error,
+                      ),
+                      title: Text(
+                        loc.nutritionDeleteItem,
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum _IngredientAction { edit, remove }
+
+class _SectionIcon extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final double size;
+
+  const _SectionIcon({required this.icon, required this.color, this.size = 34});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color.withAlpha(28),
+        borderRadius: BorderRadius.circular(size * .32),
+      ),
+      child: Icon(icon, size: size * .55, color: color),
+    );
+  }
+}
+
 /// Card that summarises the live nutrition totals for the saved meal
 /// being edited. Mirrors the visual language of the home screen
 /// `_NutritionMacroStat` (same colors, same label hierarchy) so the two
@@ -570,12 +896,14 @@ class _NutritionTotalsCard extends StatelessWidget {
   final double portions;
   final bool isComputing;
   final bool hasIngredients;
+  final int ingredientCount;
 
   const _NutritionTotalsCard({
     required this.totals,
     required this.portions,
     required this.isComputing,
     required this.hasIngredients,
+    required this.ingredientCount,
   });
 
   @override
@@ -586,45 +914,65 @@ class _NutritionTotalsCard extends StatelessWidget {
     final showPerPortion = portions > 1;
 
     return Card(
+      margin: EdgeInsets.zero,
       elevation: 0,
+      color: theme.colorScheme.surfaceContainerLow,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(75)),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.local_fire_department_outlined,
-                  size: 18,
+                _SectionIcon(
+                  icon: Icons.local_fire_department_rounded,
                   color: theme.colorScheme.primary,
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  loc.nutritionSavedMealTotalsTitle,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    loc.nutritionSavedMealTotalsTitle,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 if (isComputing) ...[
-                  const SizedBox(width: 8),
                   SizedBox(
-                    width: 12,
-                    height: 12,
+                    width: 14,
+                    height: 14,
                     child: CircularProgressIndicator(
                       strokeWidth: 1.5,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  const SizedBox(width: 10),
                 ],
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    loc.nutritionSavedMealFoodsCount(ingredientCount),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             if (!showTotals)
               Text(
                 hasIngredients

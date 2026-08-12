@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:workout_notes/models/exercise_with_sets.dart';
 import 'package:workout_notes/models/workout_stats.dart';
+import 'package:workout_notes/utils/workout_estimator.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'base_repository.dart';
@@ -672,18 +673,96 @@ class WorkoutRepository extends BaseRepository {
       duration = now.difference(startTime).inSeconds;
     }
 
+    final calories =
+        estimatedCalories ??
+        await _estimateCaloriesForWorkout(db, id, durationSeconds: duration);
+
     await db.update(
       'workouts',
       {
         'end_time': now.toIso8601String(),
         'duration_seconds': duration,
-        'estimated_calories': estimatedCalories,
+        'estimated_calories': calories,
         'start_time': startTimeStr ?? now.toIso8601String(),
         'comment': comment,
         'feeling_rating': feelingRating,
       },
       where: 'id = ?',
       whereArgs: [id],
+    );
+  }
+
+  /// Provides a persistence-level fallback so every workout completion flow
+  /// uses the same calorie estimate, including quick add and future callers.
+  Future<double?> _estimateCaloriesForWorkout(
+    Database db,
+    String workoutId, {
+    required int durationSeconds,
+  }) async {
+    final weightRows = await db.query(
+      'body_measurements',
+      columns: ['value', 'unit'],
+      where: 'type = ?',
+      whereArgs: ['weight'],
+      orderBy: 'date DESC, created_at DESC',
+      limit: 1,
+    );
+    if (weightRows.isEmpty) return null;
+
+    final weightValue = (weightRows.first['value'] as num?)?.toDouble();
+    if (weightValue == null || weightValue <= 0) return null;
+    final unit = (weightRows.first['unit'] as String? ?? 'kg').toLowerCase();
+    final double bodyWeightKg;
+    if (unit == 'kg' || unit.isEmpty) {
+      bodyWeightKg = weightValue;
+    } else if (unit == 'lb' ||
+        unit == 'lbs' ||
+        unit == 'pound' ||
+        unit == 'pounds') {
+      bodyWeightKg = weightValue * 0.45359237;
+    } else {
+      return null;
+    }
+
+    var calorieDurationSeconds = durationSeconds;
+    if (calorieDurationSeconds <= 0) {
+      final entries = await db.query(
+        'exercise_entries',
+        columns: ['id', 'rest_time_seconds'],
+        where: 'workout_id = ?',
+        whereArgs: [workoutId],
+        orderBy: 'order_index ASC',
+      );
+      final exercises = <WorkoutEstimateExercise>[];
+      for (final entry in entries) {
+        final sets = await db.query(
+          'sets',
+          columns: ['reps', 'time_seconds'],
+          where: 'exercise_entry_id = ?',
+          whereArgs: [entry['id']],
+          orderBy: 'order_index ASC',
+        );
+        exercises.add(
+          WorkoutEstimateExercise(
+            restTimeSeconds: (entry['rest_time_seconds'] as num?)?.toInt(),
+            sets: sets
+                .map(
+                  (set) => WorkoutEstimateSet(
+                    reps: (set['reps'] as num?)?.toInt(),
+                    timeSeconds: (set['time_seconds'] as num?)?.toInt(),
+                  ),
+                )
+                .toList(growable: false),
+          ),
+        );
+      }
+      calorieDurationSeconds =
+          WorkoutEstimateCalculator.estimateDurationSeconds(exercises);
+    }
+
+    return WorkoutEstimateCalculator.estimateCalories(
+      durationSeconds: calorieDurationSeconds,
+      bodyWeightKg: bodyWeightKg,
     );
   }
 
