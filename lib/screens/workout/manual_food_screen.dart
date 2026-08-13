@@ -319,6 +319,9 @@ class _ManualFoodScreenState extends State<ManualFoodScreen> {
     if (serving.gramsEquivalent != null) {
       draft.gramsController.text = _formatAmount(serving.gramsEquivalent!);
     }
+    if (serving.mlEquivalent != null) {
+      draft.mlController.text = _formatAmount(serving.mlEquivalent!);
+    }
     return draft;
   }
 

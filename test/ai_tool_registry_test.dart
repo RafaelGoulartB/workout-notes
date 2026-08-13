@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:workout_notes/models/nutrition/ai_manual_food_proposal.dart';
 import 'package:workout_notes/services/ai_tool_registry.dart';
 
 import 'support/ai_test_db.dart';
@@ -31,12 +32,49 @@ void main() {
 
   test('openAiChatToolsSchema includes the guarded routine proposal tool', () {
     final tools = registry.openAiChatToolsSchema();
-    expect(tools, hasLength(20));
+    expect(tools, hasLength(21));
     final proposal = tools.firstWhere(
       (tool) => (tool['function'] as Map)['name'] == 'propose_routine_change',
     );
     final parameters = (proposal['function'] as Map)['parameters'] as Map;
     expect(parameters['required'], containsAll(<String>['action', 'routine']));
+  });
+
+  test('manual food proposal schema covers the complete editable draft', () {
+    final tools = registry.openAiChatToolsSchema(
+      names: const {'propose_manual_food_creation'},
+      includeRoutineProposal: false,
+    );
+    expect(tools, hasLength(2));
+    final proposal = tools.firstWhere(
+      (tool) =>
+          (tool['function'] as Map)['name'] == 'propose_manual_food_creation',
+    );
+    final parameters = (proposal['function'] as Map)['parameters'] as Map;
+    expect(
+      parameters['required'],
+      containsAll(<String>[
+        'name',
+        'reference_amount',
+        'reference_unit',
+        'per',
+        'servings',
+      ]),
+    );
+    final properties = parameters['properties'] as Map;
+    final nutrients = (properties['per'] as Map)['properties'] as Map;
+    expect(
+      nutrients.keys,
+      containsAll(<String>[
+        'calories',
+        'protein_g',
+        'carbs_g',
+        'fat_g',
+        'sodium_mg',
+        'potassium_mg',
+        'vitamin_b12_ug',
+      ]),
+    );
   });
 
   test('chat schema always includes lightweight capability discovery', () {
@@ -108,6 +146,72 @@ void main() {
       registry.openAiReadToolsSchema(names: names).length,
       lessThan(registry.openAiReadToolsSchema().length),
     );
+  });
+
+  test('manual food creation routes directly to the guarded preview tool', () {
+    expect(
+      registry.toolNamesForQuery(
+        'Crie um alimento manual de arroz integral cozido',
+      ),
+      {'propose_manual_food_creation'},
+    );
+  });
+
+  test(
+    'manual food proposal normalizes a rich draft without writing food',
+    () async {
+      final result = await registry.executeRead(
+        toolName: 'propose_manual_food_creation',
+        args: const {
+          'name': 'Arroz integral cozido',
+          'reference_amount': 100,
+          'reference_unit': 'g',
+          'per': {
+            'calories': 124,
+            'protein_g': 2.6,
+            'carbs_g': 25.8,
+            'fat_g': 1,
+            'fiber_g': 2.7,
+            'magnesium_mg': 44,
+          },
+          'servings': [
+            {
+              'label': '1 xícara',
+              'quantity': 1,
+              'unit': 'xícara',
+              'grams_equivalent': 195,
+            },
+          ],
+          'notes': 'Valores típicos para o alimento cozido sem sal.',
+        },
+      );
+
+      expect(result.ok, isTrue);
+      final proposal = AiManualFoodProposal.fromJson(
+        (result.data as Map).cast<String, dynamic>(),
+      );
+      expect(proposal.status, AiManualFoodProposalStatus.awaitingApproval);
+      expect(proposal.draft.name, 'Arroz integral cozido');
+      expect(proposal.draft.values.carbsG, 25.8);
+      expect(proposal.draft.values.magnesiumMg, 44);
+      expect(proposal.draft.servings.single.gramsEquivalent, 195);
+      expect(await db.query('foods'), isEmpty);
+    },
+  );
+
+  test('manual food proposal rejects a draft without a food name', () async {
+    final result = await registry.executeRead(
+      toolName: 'propose_manual_food_creation',
+      args: const {
+        'reference_amount': 100,
+        'reference_unit': 'g',
+        'per': {},
+        'servings': [],
+      },
+    );
+
+    expect(result.ok, isFalse);
+    expect(result.code, 'invalid_args');
   });
 
   test('short sleep follow-up exposes only the direct sleep summary', () {

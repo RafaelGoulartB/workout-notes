@@ -4,11 +4,13 @@ import 'dart:convert';
 ///
 /// - `manual`: created by the user directly in the app.
 /// - `ai_vision`: extracted from a nutrition label photo by the AI Coach.
+/// - `ai_coach`: proposed from a text conversation with the AI Coach.
 /// - Other values are gateway-defined (e.g. `open_food_facts`, `usda`).
 ///   New sources can be added without schema changes.
 class FoodSource {
   static const String manual = 'manual';
   static const String aiVision = 'ai_vision';
+  static const String aiCoach = 'ai_coach';
   static const String openFoodFacts = 'open_food_facts';
 }
 
@@ -43,7 +45,9 @@ class Food {
 
   /// Foods entered by the user, either directly or from a label photo.
   bool get isUserCreated =>
-      source == FoodSource.manual || source == FoodSource.aiVision;
+      source == FoodSource.manual ||
+      source == FoodSource.aiVision ||
+      source == FoodSource.aiCoach;
 
   /// (source, externalId) pair used as the deduplication key for
   /// upserts and search-result merging.

@@ -6,12 +6,14 @@ class AiFoodLabelServingDraft {
   final double quantity;
   final String unit;
   final double? gramsEquivalent;
+  final double? mlEquivalent;
 
   const AiFoodLabelServingDraft({
     required this.label,
     this.quantity = 1,
     required this.unit,
     this.gramsEquivalent,
+    this.mlEquivalent,
   });
 
   factory AiFoodLabelServingDraft.fromJson(Map<String, dynamic> json) {
@@ -20,8 +22,17 @@ class AiFoodLabelServingDraft {
       quantity: _nonNegativeDouble(json['quantity']) ?? 1,
       unit: _nullableString(json['unit']) ?? '',
       gramsEquivalent: _nonNegativeDouble(json['grams_equivalent']),
+      mlEquivalent: _nonNegativeDouble(json['ml_equivalent']),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'label': label,
+    'quantity': quantity,
+    'unit': unit,
+    if (gramsEquivalent != null) 'grams_equivalent': gramsEquivalent,
+    if (mlEquivalent != null) 'ml_equivalent': mlEquivalent,
+  };
 }
 
 /// Food identified by the AI from a nutrition label photo. Values refer
@@ -103,6 +114,19 @@ class AiFoodLabelDraft {
       servings: servings,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    if (brand != null) 'brand': brand,
+    if (barcode != null) 'barcode': barcode,
+    'reference_amount': referenceAmount,
+    'reference_unit': referenceUnit,
+    'per': {
+      for (final entry in values.toMap().entries)
+        if (entry.value != null) entry.key: entry.value,
+    },
+    'servings': servings.map((serving) => serving.toJson()).toList(),
+  };
 }
 
 double? _nonNegativeDouble(dynamic value) {

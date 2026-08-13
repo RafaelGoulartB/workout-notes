@@ -848,7 +848,9 @@
   "aiToolRecoveryTrend": "Calculando recuperação semanal",
   "aiToolDiscoverAppCapabilities": "Selecionando recursos do app",
   "aiToolProposeRoutineChange": "Preparando proposta de rotina",
+  "aiToolProposeManualFoodCreation": "Preparando prévia de alimento manual",
   "aiChatPreparingProposal": "Preparando prévia da rotina…",
+  "aiChatPreparingFoodProposal": "Identificando alimento e valores nutricionais…",
   "aiChatApplyingProposal": "Aplicando alterações aprovadas…",
   "aiRoutineProposalCreate": "Nova rotina",
   "aiRoutineProposalUpdate": "Alterar rotina",
@@ -875,6 +877,27 @@
   "aiRoutineProposalRejectedBody": "Nenhuma alteração foi aplicada.",
   "aiRoutineProposalAppliedBody": "Alterações aplicadas com sucesso.",
   "aiRoutineProposalRetrySummary": "Gerar resumo",
+  "aiFoodProposalTitle": "Novo alimento manual",
+  "aiFoodProposalAwaiting": "Aguardando aprovação",
+  "aiFoodProposalCreated": "Criado",
+  "aiFoodProposalRejected": "Recusado",
+  "aiFoodProposalPreview": "Revise os valores estimados. A aprovação abre o formulário editável e não salva automaticamente.",
+  "aiFoodProposalCreatedBody": "O alimento foi salvo pelo formulário de revisão.",
+  "aiFoodProposalRejectedBody": "A prévia foi descartada. Nenhum alimento foi criado.",
+  "aiFoodProposalEstimated": "Os valores identificados pela IA podem ser estimativas. Revise antes de salvar.",
+  "aiFoodProposalReference": "Valores por {amount} {unit}",
+  "@aiFoodProposalReference": {
+    "placeholders": {
+      "amount": {"type": "String"},
+      "unit": {"type": "String"}
+    }
+  },
+  "aiFoodProposalNotes": "Notas da identificação",
+  "aiFoodProposalServings": "Porções sugeridas",
+  "aiFoodProposalDetails": "Ver todos os valores identificados",
+  "aiFoodProposalHideDetails": "Ocultar detalhes",
+  "aiFoodProposalApprove": "Aprovar e revisar formulário",
+  "aiFoodProposalReject": "Descartar prévia",
   "aiProviderPickerTitle": "Provedor e modelo",
   "aiProviderPickerSearch": "Buscar modelo",
 

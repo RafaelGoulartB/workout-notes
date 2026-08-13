@@ -324,6 +324,30 @@ void main() {
       expect(draft.values.vitaminDUg, 2.5);
       expect(draft.values.vitaminB12Ug, 0.6);
     });
+
+    test('round-trips AI food drafts including gram and ml servings', () {
+      final original = AiFoodLabelDraft.fromJson({
+        'name': 'Leite',
+        'reference_amount': 100,
+        'reference_unit': 'ml',
+        'per': {'calories': 61, 'protein_g': 3.2},
+        'servings': [
+          {
+            'label': '1 copo',
+            'quantity': 1,
+            'unit': 'copo',
+            'grams_equivalent': 206,
+            'ml_equivalent': 200,
+          },
+        ],
+      });
+
+      final decoded = AiFoodLabelDraft.fromJson(original.toJson());
+      expect(decoded.referenceUnit, 'ml');
+      expect(decoded.values.calories, 61);
+      expect(decoded.servings.single.gramsEquivalent, 206);
+      expect(decoded.servings.single.mlEquivalent, 200);
+    });
   });
 }
 
