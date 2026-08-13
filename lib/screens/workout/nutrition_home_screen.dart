@@ -40,50 +40,74 @@ class NutritionHomeScreen extends StatefulWidget {
 class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   final NutritionRepository _repository = NutritionRepository();
   final NutritionGateway _gateway = OpenFoodFactsGateway();
+  final ScrollController _scrollController = ScrollController();
 
   DailyNutritionSummary _summary = DailyNutritionSummary.empty;
   NutritionGoal? _goal;
   List<MealTypeDefinition> _mealTypes = const [];
   List<MealLogWithItems> _meals = const [];
+  late DateTime _selectedDate;
   bool _isLoading = true;
+  bool _hasLoaded = false;
   bool _showMeals = true;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
     super.initState();
+    _selectedDate = _dateOnly(DateTime.now());
     _load();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
     if (!mounted) return;
+    final generation = ++_loadGeneration;
+    final selectedDate = _selectedDate;
     setState(() => _isLoading = true);
     try {
-      final date = _dateString(DateTime.now());
+      final date = _dateString(selectedDate);
       final results = await Future.wait([
         _repository.getDailySummary(date),
         _repository.getActiveGoal(),
         _repository.getMealTypes(),
         _repository.getDayMeals(date),
       ]);
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _summary = results[0] as DailyNutritionSummary;
         _goal = results[1] as NutritionGoal?;
         _mealTypes = results[2] as List<MealTypeDefinition>;
         _meals = results[3] as List<MealLogWithItems>;
         _isLoading = false;
+        _hasLoaded = true;
       });
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() {
+        _isLoading = false;
+        _hasLoaded = true;
+      });
     }
+  }
+
+  Future<void> _selectDate(DateTime date) async {
+    final normalized = _dateOnly(date);
+    if (_isSameDay(normalized, _selectedDate)) return;
+    setState(() => _selectedDate = normalized);
+    await _load();
   }
 
   Future<void> _openDay([DateTime? date, String? mealType]) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => NutritionDayDetailScreen(
-          initialDate: date ?? DateTime.now(),
+          initialDate: date ?? _selectedDate,
           initialMealType: mealType,
         ),
       ),
@@ -92,17 +116,17 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   }
 
   Future<void> _openMealInDay(String mealType) =>
-      _openDay(DateTime.now(), mealType);
+      _openDay(_selectedDate, mealType);
 
   Future<void> _pickDay() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: _selectedDate,
       firstDate: DateTime(2018),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
     if (picked == null || !mounted) return;
-    await _openDay(picked);
+    await _selectDate(picked);
   }
 
   Future<void> _openSettings() async {
@@ -145,8 +169,8 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     await _load();
   }
 
-  /// Total number of food items logged today across all meal sections.
-  int get _totalItemsToday =>
+  /// Total number of food items logged for the selected day.
+  int get _totalItemsForSelectedDay =>
       _meals.fold<int>(0, (sum, meal) => sum + meal.items.length);
 
   /// Formats a calorie value as a compact label for the section header
@@ -174,7 +198,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
           repository: _repository,
           mealType: mealType,
           mealName: mealLabel,
-          date: _dateString(DateTime.now()),
+          date: _dateString(_selectedDate),
         ),
       ),
     );
@@ -223,7 +247,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     NutritionQuantitySelection selection,
   ) async {
     final loc = AppLocalizations.of(context)!;
-    final date = _dateString(DateTime.now());
+    final date = _dateString(_selectedDate);
     // If the user came from a per-meal tap and the search screen
     // didn't bind a meal, fall back to the first configured type so
     // we always persist to a real section.
@@ -317,7 +341,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     return MealLogWithItems(
       log: MealLog(
         id: '',
-        date: _dateString(DateTime.now()),
+        date: _dateString(_selectedDate),
         mealType: mealType,
         createdAt: DateTime.now(),
       ),
@@ -331,23 +355,48 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          DateFormat('EEEE, d MMMM', Intl.defaultLocale).format(DateTime.now()),
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
+        backgroundColor: theme.colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: Tooltip(
+          message: loc.nutritionChooseDate,
+          child: InkWell(
+            onTap: _pickDay,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      DateFormat(
+                        'EEEE, d MMMM',
+                        Intl.defaultLocale,
+                      ).format(_selectedDate),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.arrow_drop_down_rounded,
+                    size: 22,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
         centerTitle: false,
         automaticallyImplyLeading: false,
         actions: [
           const AiCoachHeaderButton(),
-          IconButton(
-            tooltip: loc.nutritionChooseDate,
-            onPressed: _pickDay,
-            icon: const Icon(Icons.calendar_month_outlined),
-          ),
           IconButton(
             tooltip: loc.settingsTitle,
             onPressed: _openAppSettings,
@@ -355,54 +404,90 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const _NutritionHomeSkeleton()
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverToBoxAdapter(
-                    child:
-                        _NutritionDashboardSummaryCard(
-                              summary: _summary,
-                              goal: _goal,
-                              onTap: () => _openDay(),
-                              onConfigureGoal: _openSettings,
-                            )
-                            .animate()
-                            .fadeIn(duration: 300.ms, delay: 60.ms)
-                            .slideY(begin: 0.05),
+      body: _isLoading && !_hasLoaded
+          ? Column(
+              children: [
+                _NutritionWeekSelector(
+                  selectedDate: _selectedDate,
+                  onSelected: _selectDate,
+                  collapseProgress: 0,
+                ),
+                const Expanded(child: _NutritionHomeSkeleton()),
+              ],
+            )
+          : Stack(
+              children: [
+                RefreshIndicator(
+                  onRefresh: _load,
+                  child: CustomScrollView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverPersistentHeader(
+                        pinned: true,
+                        delegate: _NutritionWeekHeaderDelegate(
+                          selectedDate: _selectedDate,
+                          onSelected: _selectDate,
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child:
+                            _NutritionDashboardSummaryCard(
+                                  summary: _summary,
+                                  goal: _goal,
+                                  onTap: () => _openDay(),
+                                  onConfigureGoal: _openSettings,
+                                )
+                                .animate()
+                                .fadeIn(duration: 300.ms, delay: 60.ms)
+                                .slideY(begin: 0.05),
+                      ),
+                      SliverToBoxAdapter(
+                        child: _NutritionSectionHeader(
+                          text: loc.nutritionHomeSectionTools,
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: _NutritionToolsGrid(
+                          onProgress: _openProgress,
+                          onSavedMeals: _openSavedMeals,
+                          onFoods: _openFoodLibrary,
+                          onSettings: _openSettings,
+                        ).animate().fadeIn(duration: 350.ms, delay: 120.ms),
+                      ),
+                      SliverToBoxAdapter(
+                        child: _CollapsibleSectionHeader(
+                          icon: Icons.today_outlined,
+                          iconBg: theme.colorScheme.primaryContainer,
+                          iconFg: theme.colorScheme.onPrimaryContainer,
+                          title: _isSameDay(_selectedDate, DateTime.now())
+                              ? loc.nutritionHomeSectionToday
+                              : DateFormat(
+                                  'EEEE',
+                                  Intl.defaultLocale,
+                                ).format(_selectedDate).toUpperCase(),
+                          value: _formatKcalLabel(
+                            loc,
+                            _summary.consumed.calories,
+                          ),
+                          count: _totalItemsForSelectedDay,
+                          expanded: _showMeals,
+                          onTap: () => setState(() => _showMeals = !_showMeals),
+                        ),
+                      ),
+                      if (_showMeals) ..._buildMealSlivers(loc, theme),
+                      const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                    ],
                   ),
-                  SliverToBoxAdapter(
-                    child: _NutritionSectionHeader(
-                      text: loc.nutritionHomeSectionTools,
-                    ),
+                ),
+                if (_isLoading)
+                  const Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: LinearProgressIndicator(minHeight: 2),
                   ),
-                  SliverToBoxAdapter(
-                    child: _NutritionToolsGrid(
-                      onProgress: _openProgress,
-                      onSavedMeals: _openSavedMeals,
-                      onFoods: _openFoodLibrary,
-                      onSettings: _openSettings,
-                    ).animate().fadeIn(duration: 350.ms, delay: 120.ms),
-                  ),
-                  SliverToBoxAdapter(
-                    child: _CollapsibleSectionHeader(
-                      icon: Icons.today_outlined,
-                      iconBg: theme.colorScheme.primaryContainer,
-                      iconFg: theme.colorScheme.onPrimaryContainer,
-                      title: loc.nutritionHomeSectionToday,
-                      value: _formatKcalLabel(loc, _summary.consumed.calories),
-                      count: _totalItemsToday,
-                      expanded: _showMeals,
-                      onTap: () => setState(() => _showMeals = !_showMeals),
-                    ),
-                  ),
-                  if (_showMeals) ..._buildMealSlivers(loc, theme),
-                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
-                ],
-              ),
+              ],
             ),
     );
   }
@@ -412,6 +497,209 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     value.month,
     value.day,
   ).toIso8601String().substring(0, 10);
+
+  static DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
+  static bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+}
+
+class _NutritionWeekSelector extends StatelessWidget {
+  final DateTime selectedDate;
+  final ValueChanged<DateTime> onSelected;
+  final double collapseProgress;
+
+  const _NutritionWeekSelector({
+    required this.selectedDate,
+    required this.onSelected,
+    required this.collapseProgress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final today = DateTime.now();
+    final weekStart = selectedDate.subtract(
+      Duration(days: selectedDate.weekday % DateTime.daysPerWeek),
+    );
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(12, 4, 12, 10 - (collapseProgress * 4)),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: theme.colorScheme.outlineVariant.withAlpha(80),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          for (var index = 0; index < DateTime.daysPerWeek; index++)
+            Expanded(
+              child: _NutritionDayButton(
+                date: weekStart.add(Duration(days: index)),
+                locale: locale,
+                collapseProgress: collapseProgress,
+                isSelected: _isSameDay(
+                  weekStart.add(Duration(days: index)),
+                  selectedDate,
+                ),
+                isToday: _isSameDay(
+                  weekStart.add(Duration(days: index)),
+                  today,
+                ),
+                onTap: onSelected,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+}
+
+class _NutritionWeekHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final DateTime selectedDate;
+  final ValueChanged<DateTime> onSelected;
+
+  const _NutritionWeekHeaderDelegate({
+    required this.selectedDate,
+    required this.onSelected,
+  });
+
+  @override
+  double get minExtent => 58;
+
+  @override
+  double get maxExtent => 86;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    final progress = (shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0);
+    // SliverPersistentHeaderDelegate receives a loose box constraint. Force
+    // the child to the exact current sliver extent so its paintExtent never
+    // becomes smaller than the layoutExtent while the header is pinned.
+    return SizedBox.expand(
+      child: Material(
+        elevation: overlapsContent ? 1 : 0,
+        color: Theme.of(context).colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+        child: _NutritionWeekSelector(
+          selectedDate: selectedDate,
+          onSelected: onSelected,
+          collapseProgress: progress,
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _NutritionWeekHeaderDelegate oldDelegate) =>
+      oldDelegate.selectedDate != selectedDate ||
+      oldDelegate.onSelected != onSelected;
+}
+
+class _NutritionDayButton extends StatelessWidget {
+  final DateTime date;
+  final String locale;
+  final double collapseProgress;
+  final bool isSelected;
+  final bool isToday;
+  final ValueChanged<DateTime> onTap;
+
+  const _NutritionDayButton({
+    required this.date,
+    required this.locale,
+    required this.collapseProgress,
+    required this.isSelected,
+    required this.isToday,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final weekday = DateFormat.E(locale).format(date).characters.first;
+    final fullDate = DateFormat.yMMMMEEEEd(locale).format(date);
+
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: fullDate,
+      child: InkResponse(
+        onTap: () => onTap(date),
+        radius: 28,
+        containedInkWell: true,
+        highlightShape: BoxShape.circle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipRect(
+                child: Align(
+                  heightFactor: 1 - collapseProgress,
+                  child: Opacity(
+                    opacity: 1 - collapseProgress,
+                    child: Text(
+                      weekday.toUpperCase(),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: isSelected
+                            ? colors.primary
+                            : colors.onSurfaceVariant,
+                        fontWeight: isSelected
+                            ? FontWeight.w800
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: 5 * (1 - collapseProgress)),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSelected ? colors.primary : Colors.transparent,
+                  border: Border.all(
+                    width: isSelected || isToday ? 2 : 1.5,
+                    color: isSelected
+                        ? colors.primary
+                        : isToday
+                        ? colors.primary
+                        : colors.outlineVariant,
+                  ),
+                ),
+                child: Text(
+                  '${date.day}',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: isSelected ? colors.onPrimary : colors.onSurface,
+                    fontWeight: isSelected || isToday
+                        ? FontWeight.w800
+                        : FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _NutritionDashboardSummaryCard extends StatelessWidget {

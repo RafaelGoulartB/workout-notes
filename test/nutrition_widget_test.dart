@@ -280,7 +280,8 @@ void main() {
 
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
     expect(find.byType(AiCoachHeaderButton), findsOneWidget);
-    expect(find.byIcon(Icons.calendar_month_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_drop_down_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.calendar_month_outlined), findsNothing);
     expect(find.text(loc.nutritionSummaryTitle), findsOneWidget);
     expect(find.text(loc.nutritionHomeToolBalance), findsOneWidget);
     expect(find.text(loc.nutritionHomeToolMeals), findsOneWidget);

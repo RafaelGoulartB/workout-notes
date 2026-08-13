@@ -1101,7 +1101,7 @@
   "nutritionHomeToolBalance": "Balanço",
   "nutritionHomeToolMeals": "Refeições",
   "nutritionHomeSectionToday": "HOJE",
-  "nutritionHomeEmptyMeals": "Nenhuma refeição registrada hoje",
+  "nutritionHomeEmptyMeals": "Nenhuma refeição registrada neste dia",
   "nutritionHomeEmptyMealsSubtitle": "Toque em + para adicionar o primeiro alimento",
   "nutritionHomePickMeal": "Adicionar a qual refeição?",
   "nutritionHomeConfigureGoalPrompt": "Defina uma meta para acompanhar seu progresso",

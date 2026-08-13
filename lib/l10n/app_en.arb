@@ -1100,7 +1100,7 @@
   "nutritionHomeToolBalance": "Balance",
   "nutritionHomeToolMeals": "Meals",
   "nutritionHomeSectionToday": "TODAY",
-  "nutritionHomeEmptyMeals": "No meals logged today",
+  "nutritionHomeEmptyMeals": "No meals logged for this day",
   "nutritionHomeEmptyMealsSubtitle": "Tap + to add your first food",
   "nutritionHomePickMeal": "Add to which meal?",
   "nutritionHomeConfigureGoalPrompt": "Set a goal to track your progress",
