@@ -336,7 +336,7 @@ class _NutrientTableHeader extends StatelessWidget {
     return ColoredBox(
       color: theme.colorScheme.surfaceContainer,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        padding: const EdgeInsets.fromLTRB(16, 5, 16, 5),
         child: Row(
           children: [
             const Expanded(flex: 5, child: SizedBox.shrink()),
@@ -366,6 +366,7 @@ class _NutrientHeaderCell extends StatelessWidget {
       style: Theme.of(context).textTheme.labelSmall?.copyWith(
         color: Theme.of(context).colorScheme.onSurfaceVariant,
         fontWeight: FontWeight.w700,
+        fontSize: 10,
       ),
     ),
   );
