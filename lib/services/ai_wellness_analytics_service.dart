@@ -49,6 +49,17 @@ class AiWellnessAnalyticsService {
         'durationSamples': durations.length,
         'efficiencySamples': efficiencies.length,
         'scheduleSamples': math.min(bedtimes.length, wakeTimes.length),
+        'durationSourceCounts': {
+          'actual': rows
+              .where((row) => _effectiveSleepSource(row) == 'actual')
+              .length,
+          'estimated': rows
+              .where((row) => _effectiveSleepSource(row) == 'estimated')
+              .length,
+          'recorded': rows
+              .where((row) => _effectiveSleepSource(row) == 'recorded')
+              .length,
+        },
       },
     };
   }
@@ -349,6 +360,11 @@ class AiWellnessAnalyticsService {
   static Map<String, dynamic> _compactSleepRow(Map<String, dynamic> row) => {
     'date': row['date'],
     'sleepMinutes': _effectiveSleep(row),
+    'recordedSleepMinutes': row['sleep_minutes'],
+    'actualSleepMinutes': row['actual_sleep_minutes'],
+    'estimatedSleepMinutes': row['estimated_sleep_minutes'],
+    'effectiveSleepSource': _effectiveSleepSource(row),
+    'timeInBedMinutes': row['time_in_bed_minutes'],
     'bedtimeMinutes': row['bedtime_minutes'],
     'wakeTimeMinutes': row['wake_time_minutes'],
     'efficiencyPct': _roundOrNull(_sleepEfficiency(row)),
@@ -391,6 +407,12 @@ class AiWellnessAnalyticsService {
                   row['sleep_minutes'])
               as num?)
           ?.toDouble();
+
+  static String _effectiveSleepSource(Map<String, dynamic> row) {
+    if (row['actual_sleep_minutes'] != null) return 'actual';
+    if (row['estimated_sleep_minutes'] != null) return 'estimated';
+    return 'recorded';
+  }
 
   static double? _sleepEfficiency(Map<String, dynamic> row) {
     final asleep = _effectiveSleep(row);

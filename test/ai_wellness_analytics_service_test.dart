@@ -40,6 +40,15 @@ void main() {
       expect(result['averageSleepMinutes'], 453.0);
       expect(result['scheduleRegularityScore'], greaterThan(90));
       expect(result['recentNights'], hasLength(7));
+      final latest = (result['recentNights'] as List).first as Map;
+      expect(latest['recordedSleepMinutes'], 480);
+      expect(latest['actualSleepMinutes'], 450);
+      expect(latest['effectiveSleepSource'], 'actual');
+      expect(
+        ((result['dataQuality'] as Map)['durationSourceCounts']
+            as Map)['actual'],
+        7,
+      );
     },
   );
 

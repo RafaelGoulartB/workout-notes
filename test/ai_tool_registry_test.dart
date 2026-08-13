@@ -20,9 +20,9 @@ void main() {
     await uninstallAiTestDb();
   });
 
-  test('openAiReadToolsSchema returns 26 tools with valid shape', () {
+  test('openAiReadToolsSchema returns 29 tools with valid shape', () {
     final tools = registry.openAiReadToolsSchema();
-    expect(tools.length, 26);
+    expect(tools.length, 29);
     for (final t in tools) {
       expect(t['type'], 'function');
       expect(t['function'], isA<Map>());
@@ -34,7 +34,7 @@ void main() {
 
   test('openAiChatToolsSchema includes the guarded routine proposal tool', () {
     final tools = registry.openAiChatToolsSchema();
-    expect(tools, hasLength(29));
+    expect(tools, hasLength(32));
     final proposal = tools.firstWhere(
       (tool) => (tool['function'] as Map)['name'] == 'propose_routine_change',
     );
@@ -119,6 +119,9 @@ void main() {
       );
       final tools = ((result.data as Map)['tools'] as List).cast<String>();
       expect(tools, contains('get_sleep_summary'));
+      expect(tools, contains('get_sleep_night_detail'));
+      expect(tools, contains('get_sleep_history'));
+      expect(tools, contains('get_sleep_profile'));
       expect(tools, contains('list_exercises'));
       expect(tools, contains('propose_routine_change'));
     },
@@ -241,6 +244,39 @@ void main() {
     final names = registry.toolNamesForQuery('E o sono?');
 
     expect(names, {'get_sleep_summary'});
+  });
+
+  test('dated sleep question routes directly to the night detail', () {
+    expect(registry.toolNamesForQuery('Como eu dormi ontem?'), {
+      'get_sleep_night_detail',
+    });
+    expect(registry.toolNamesForQuery('Quantos despertares tive nesse dia?'), {
+      'get_sleep_night_detail',
+    });
+  });
+
+  test('sleep history and profile requests use their dedicated tools', () {
+    expect(
+      registry.toolNamesForQuery(
+        'Mostre meu histórico de sono noite por noite',
+      ),
+      {'get_sleep_history'},
+    );
+    expect(registry.toolNamesForQuery('Qual é a minha meta de sono?'), {
+      'get_sleep_profile',
+    });
+  });
+
+  test('sleep monitor vocabulary exposes night detail', () {
+    for (final query in [
+      'Eu ronquei?',
+      'Teve muito barulho?',
+      'Como está a latência?',
+      'Qual foi a qualidade da gravação?',
+      'Quantas vezes acordei?',
+    ]) {
+      expect(registry.toolNamesForQuery(query), {'get_sleep_night_detail'});
+    }
   });
 
   test('tool routing sends no schemas for casual conversation', () {

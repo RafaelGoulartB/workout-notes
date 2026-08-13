@@ -89,6 +89,12 @@ Future<Database> installAiTestDb({bool includeRoutineDayNotes = true}) async {
           "CREATE TABLE sleep_entries (id TEXT PRIMARY KEY, date TEXT NOT NULL UNIQUE, sleep_minutes INTEGER NOT NULL, actual_sleep_minutes INTEGER, bedtime_minutes INTEGER, wake_time_minutes INTEGER, comment TEXT, source TEXT NOT NULL DEFAULT 'manual', time_in_bed_minutes INTEGER, estimated_sleep_minutes INTEGER, created_at TEXT NOT NULL)",
         );
         await db.execute(
+          "CREATE TABLE sleep_monitor_sessions (id TEXT PRIMARY KEY, sleep_entry_id TEXT, status TEXT NOT NULL, started_at TEXT NOT NULL, ended_at TEXT, alarm_at TEXT, monitor_mode TEXT, mission_type TEXT, alarm_dismiss_method TEXT, alarm_dismissed_at TEXT, utc_offset_start_minutes INTEGER NOT NULL, utc_offset_end_minutes INTEGER, sensor_mode TEXT NOT NULL DEFAULT 'audio', algorithm_version TEXT NOT NULL, time_in_bed_minutes INTEGER, quiet_minutes INTEGER, noisy_minutes INTEGER, estimated_sleep_minutes INTEGER, noise_event_count INTEGER NOT NULL DEFAULT 0, signal_quality_score REAL, analysis_status TEXT NOT NULL DEFAULT 'legacy_unavailable', sleep_onset_at TEXT, final_wake_at TEXT, sleep_latency_minutes INTEGER, awake_minutes INTEGER, sleeping_minutes INTEGER, deep_sleep_minutes INTEGER, unknown_minutes INTEGER, awakening_count INTEGER, sleep_efficiency REAL, stage_confidence REAL, stage_algorithm_version TEXT, end_reason TEXT, created_at TEXT NOT NULL, FOREIGN KEY (sleep_entry_id) REFERENCES sleep_entries(id) ON DELETE CASCADE)",
+        );
+        await db.execute(
+          "CREATE TABLE sleep_stage_epochs (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, started_at TEXT NOT NULL, duration_seconds INTEGER NOT NULL, stage TEXT NOT NULL, confidence REAL NOT NULL, awake_probability REAL, sleeping_probability REAL, deep_probability REAL, algorithm_version TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'acoustic_model', FOREIGN KEY (session_id) REFERENCES sleep_monitor_sessions(id) ON DELETE CASCADE)",
+        );
+        await db.execute(
           'CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)',
         );
       },

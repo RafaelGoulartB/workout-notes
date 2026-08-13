@@ -5,6 +5,7 @@ import '../models/nutrition/ai_food_label_draft.dart';
 import '../models/nutrition/ai_manual_food_proposal.dart';
 import '../repositories/goal_repository.dart';
 import 'ai_nutrition_tool_service.dart';
+import 'ai_sleep_tool_service.dart';
 import 'ai_wellness_analytics_service.dart';
 
 class AiToolRegistry {
@@ -12,16 +13,19 @@ class AiToolRegistry {
   final GoalRepository goalRepo;
   final AiWellnessAnalyticsService wellness;
   final AiNutritionToolService nutrition;
+  final AiSleepToolService sleep;
   final Map<String, Map<String, dynamic>> _schemaCache = {};
   AiToolRegistry({
     DatabaseHelper? db,
     GoalRepository? goalRepo,
     AiWellnessAnalyticsService? wellness,
     AiNutritionToolService? nutrition,
+    AiSleepToolService? sleep,
   }) : db = db ?? DatabaseHelper.instance,
        goalRepo = goalRepo ?? GoalRepository(),
        wellness = wellness ?? AiWellnessAnalyticsService(db: db),
-       nutrition = nutrition ?? AiNutritionToolService(db: db);
+       nutrition = nutrition ?? AiNutritionToolService(db: db),
+       sleep = sleep ?? AiSleepToolService(db: db);
 
   /// OpenAI function-calling JSON schemas for all read tools.
   List<Map<String, dynamic>> openAiReadToolsSchema({Iterable<String>? names}) {
@@ -119,21 +123,97 @@ class AiToolRegistry {
       'sono',
       'sleep',
       'dormi',
+      'dormir',
       'insonia',
       'insônia',
+      'acordei',
+      'acordar',
+      'despertar',
+      'despertares',
+      'latencia',
+      'latência',
+      'barulho',
+      'ruido',
+      'ruído',
+      'ronc',
+      'ronq',
+      'qualidade da gravacao',
+      'qualidade da gravação',
     ]);
     final workoutIntent = hasAny(['treino', 'workout', 'sessao', 'sessão']);
     final sleepPerformanceIntent =
         workoutIntent ||
         hasAny(['desempenho', 'performance', 'volume', 'carga']);
+    final sleepDetailIntent =
+        sleepIntent &&
+        (hasAny([
+              'hoje',
+              'ontem',
+              'esta noite',
+              'essa noite',
+              'ultima noite',
+              'última noite',
+              'nesse dia',
+              'neste dia',
+              'profundo',
+              'acordei',
+              'acordar',
+              'despert',
+              'latencia',
+              'latência',
+              'barulho',
+              'ruido',
+              'ruído',
+              'ronc',
+              'ronq',
+              'gravacao',
+              'gravação',
+            ]) ||
+            RegExp(r'\b\d{4}-\d{2}-\d{2}\b').hasMatch(text));
+    final sleepHistoryIntent =
+        sleepIntent &&
+        hasAny([
+          'historico',
+          'histórico',
+          'noite por noite',
+          'ultimas noites',
+          'últimas noites',
+          'por dia',
+        ]);
+    final sleepProfileIntent =
+        sleepIntent &&
+        hasAny([
+          'meta',
+          'objetivo',
+          'configuracao',
+          'configuração',
+          'modo de monitoramento',
+          'perfil',
+        ]);
+    if (sleepProfileIntent &&
+        !sleepPerformanceIntent &&
+        !sleepHistoryIntent &&
+        !sleepDetailIntent) {
+      return {'get_sleep_profile'};
+    }
+    if (sleepHistoryIntent &&
+        !sleepPerformanceIntent &&
+        !sleepProfileIntent &&
+        !sleepDetailIntent) {
+      return {'get_sleep_history'};
+    }
     if (sleepIntent) {
-      // A common sleep question only needs the sleep summary. Cross-domain
-      // tools are added only when the request actually mentions performance
-      // or training, keeping short follow-ups such as "E o sono?" precise.
-      selected.add('get_sleep_summary');
+      if (sleepDetailIntent) {
+        selected.add('get_sleep_night_detail');
+      } else {
+        selected.add('get_sleep_summary');
+      }
+      if (sleepHistoryIntent) selected.add('get_sleep_history');
+      if (sleepProfileIntent) selected.add('get_sleep_profile');
       if (sleepPerformanceIntent) {
         selected.add('analyze_sleep_performance');
       }
+      if (sleepDetailIntent && !sleepPerformanceIntent) return selected;
     }
     if (nutritionIntent) {
       selected.add('get_nutrition_summary');
@@ -250,7 +330,9 @@ class AiToolRegistry {
     if (hasAny(['cardio', 'corrida', 'correr', 'distancia', 'distância'])) {
       selected.add('get_cardio_summary');
     }
-    if (hasAny(['meta', 'goal', 'objetivo'])) {
+    if (!sleepIntent &&
+        !nutritionIntent &&
+        hasAny(['meta', 'goal', 'objetivo'])) {
       selected.addAll({'list_goals', 'get_goal_progress_history'});
     }
     if (hasAny([
@@ -304,6 +386,16 @@ class AiToolRegistry {
         case 'list_goals':
           next.add('get_goal_progress_history');
           break;
+        case 'get_sleep_summary':
+          next.addAll({
+            'get_sleep_night_detail',
+            'get_sleep_history',
+            'get_sleep_profile',
+          });
+          break;
+        case 'get_sleep_history':
+          next.add('get_sleep_night_detail');
+          break;
         case 'get_nutrition_summary':
           next.addAll({
             'get_nutrition_diary_day',
@@ -356,6 +448,12 @@ class AiToolRegistry {
           return l10n.aiToolGoalHistory;
         case 'get_sleep_summary':
           return l10n.aiToolSleepSummary;
+        case 'get_sleep_night_detail':
+          return l10n.aiToolSleepNightDetail;
+        case 'get_sleep_history':
+          return l10n.aiToolSleepHistory;
+        case 'get_sleep_profile':
+          return l10n.aiToolSleepProfile;
         case 'get_nutrition_summary':
           return l10n.aiToolNutritionSummary;
         case 'get_nutrition_diary_day':
@@ -417,6 +515,12 @@ class AiToolRegistry {
         return 'Histórico da meta';
       case 'get_sleep_summary':
         return 'Analisando sono recente';
+      case 'get_sleep_night_detail':
+        return 'Consultando detalhes da noite';
+      case 'get_sleep_history':
+        return 'Consultando histórico de sono';
+      case 'get_sleep_profile':
+        return 'Consultando perfil de sono';
       case 'get_nutrition_summary':
         return 'Analisando nutrição';
       case 'get_nutrition_diary_day':
@@ -495,6 +599,21 @@ class AiToolRegistry {
               days: _boundedInt(args, 'days', 14, 3, 90),
             ),
           );
+        case 'get_sleep_night_detail':
+          return _ok(
+            await sleep.nightDetail(
+              date: _nullableString(args['date'] ?? args['day']),
+            ),
+          );
+        case 'get_sleep_history':
+          return _ok(
+            await sleep.history(
+              days: _boundedInt(args, 'days', 30, 1, 31),
+              endDate: _nullableString(args['end_date'] ?? args['endDate']),
+            ),
+          );
+        case 'get_sleep_profile':
+          return _ok(await sleep.profile());
         case 'get_nutrition_summary':
           return _ok(
             await wellness.nutritionSummary(
@@ -1011,7 +1130,13 @@ class AiToolRegistry {
         'body' => {'list_body_measurements'},
         'cardio' => {'get_cardio_summary'},
         'goals' => {'list_goals', 'get_goal_progress_history'},
-        'sleep' => {'get_sleep_summary', 'analyze_sleep_performance'},
+        'sleep' => {
+          'get_sleep_summary',
+          'get_sleep_night_detail',
+          'get_sleep_history',
+          'get_sleep_profile',
+          'analyze_sleep_performance',
+        },
         'nutrition' => {
           'get_nutrition_summary',
           'get_nutrition_diary_day',
@@ -1338,6 +1463,66 @@ class AiToolRegistry {
           minimum: 3,
           maximum: 90,
         );
+      case 'get_sleep_night_detail':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Detalha uma noite de sono por data local: duração registrada, real, estimada e efetiva com sua origem; horários; tempo na cama; comentário; estágios; latência; despertares; eficiência; confiança; ruído e qualidade do sinal. Use para perguntas sobre hoje, ontem ou uma noite específica. Dados acústicos são estimativas não clínicas e não diagnosticam ronco ou apneia.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'date': {
+                  'type': 'string',
+                  'description':
+                      'Data local no formato YYYY-MM-DD. Se omitida, usa a data local atual.',
+                },
+              },
+              'required': const [],
+            },
+          },
+        };
+      case 'get_sleep_history':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Histórico diário paginado do sono. Retorna todas as noites registradas na janela, durações separadas e sua origem efetiva, horários, eficiência e disponibilidade de estágios. Datas sem registro ficam ausentes.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'days': {
+                  'type': 'integer',
+                  'minimum': 1,
+                  'maximum': 31,
+                  'default': 30,
+                },
+                'end_date': {
+                  'type': 'string',
+                  'description':
+                      'Último dia da janela em YYYY-MM-DD; o padrão é hoje.',
+                },
+              },
+              'required': const [],
+            },
+          },
+        };
+      case 'get_sleep_profile':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Retorna a meta diária de sono, modo padrão de monitoramento, contagens de noites manuais e monitoradas, cobertura de estágios e comparação da média com a meta em todo o histórico e nos últimos 30 dias. Não expõe segredos de missões ou alarmes.',
+            'parameters': {
+              'type': 'object',
+              'properties': const <String, dynamic>{},
+              'required': const [],
+            },
+          },
+        };
       case 'get_nutrition_summary':
         return _windowToolSchema(
           name,
@@ -1786,6 +1971,9 @@ class AiToolRegistry {
       'description': 'Goal progress history',
     },
     {'name': 'get_sleep_summary', 'description': 'Recent sleep summary'},
+    {'name': 'get_sleep_night_detail', 'description': 'Sleep night details'},
+    {'name': 'get_sleep_history', 'description': 'Paginated sleep history'},
+    {'name': 'get_sleep_profile', 'description': 'Sleep goal and profile'},
     {
       'name': 'get_nutrition_summary',
       'description': 'Complete nutrition summary',
