@@ -237,18 +237,18 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
                 children: [
-                  _BalanceHeroCard(
-                    balance: _windowBalance,
-                    goal: _goal,
-                    windowDays: _windowDays,
-                  ).animate().fadeIn(duration: 250.ms),
-                  if (_windowDays == _kWindow7) ...[
-                    const SizedBox(height: 12),
+                  if (_windowDays == _kWindow7)
                     _WeekSequenceCard(
                       dailies: _windowDailies,
                       goal: _goal?.calories,
-                    ).animate().fadeIn(duration: 250.ms, delay: 60.ms),
-                  ],
+                      balance: _windowBalance,
+                    ).animate().fadeIn(duration: 250.ms)
+                  else
+                    _BalanceHeroCard(
+                      balance: _windowBalance,
+                      goal: _goal,
+                      windowDays: _windowDays,
+                    ).animate().fadeIn(duration: 250.ms),
                   const SizedBox(height: 12),
                   _RollingAverageCard(
                     spots: _rollingSpots(),
@@ -584,14 +584,23 @@ class _BalanceMetric extends StatelessWidget {
 class _WeekSequenceCard extends StatelessWidget {
   final List<DailyCalorieTotal> dailies;
   final double? goal;
+  final CalorieBalance? balance;
 
-  const _WeekSequenceCard({required this.dailies, required this.goal});
+  const _WeekSequenceCard({
+    required this.dailies,
+    required this.goal,
+    required this.balance,
+  });
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final hasGoal = goal != null && goal! > 0;
+    final status = _BalanceHeroCard._statusFor(balance, hasGoal);
+    final statusColor = _BalanceHeroCard._colorForStatus(status, theme);
+    final statusLabel = _BalanceHeroCard._labelForStatus(status, loc, 7);
+    final caloriesValue = balance?.balance;
     var deficit = 0, onTarget = 0, surplus = 0, logged = 0;
     for (final d in dailies) {
       if (d.calories == null) continue;
@@ -608,44 +617,181 @@ class _WeekSequenceCard extends StatelessWidget {
         }
       }
     }
-    return _SectionCard(
-      icon: Icons.view_week_outlined,
-      iconColor: theme.colorScheme.secondary,
-      title: loc.nutritionBalanceWeekSequence,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withAlpha(90),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (final day in dailies)
-                Expanded(
-                  child: _WeekDayCell(
-                    date: day.date,
-                    calories: day.calories,
-                    goal: goal,
-                    hasGoal: hasGoal,
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: statusColor.withAlpha(30),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Icon(
+                      Icons.view_week_outlined,
+                      size: 16,
+                      color: statusColor,
+                    ),
                   ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      loc.nutritionBalanceWeekSequence,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      statusLabel.toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (caloriesValue == null)
+                Text(
+                  loc.nutritionBalanceNoGoal,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                )
+              else
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      _BalanceHeroCard._signedKcal(caloriesValue),
+                      style: theme.textTheme.headlineLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: statusColor,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        'kcal',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    if (caloriesValue.abs() >= 1)
+                      Text(
+                        loc.nutritionBalanceFatEquivalent(
+                          _BalanceHeroCard._formatFatKg(caloriesValue.abs()),
+                        ),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _BalanceMetric(
+                      label: loc.nutritionBalanceDaysLogged,
+                      value: '${balance?.daysLogged ?? 0}/7',
+                    ),
+                  ),
+                  Expanded(
+                    child: _BalanceMetric(
+                      label: loc.nutritionBalanceAverageIntake,
+                      value:
+                          '${_BalanceHeroCard._formatKcal(balance?.averageDailyIntake ?? 0)} kcal',
+                      sub: hasGoal
+                          ? loc.nutritionBalanceGoalKcal(
+                              _BalanceHeroCard._formatKcal(goal!),
+                            )
+                          : null,
+                    ),
+                  ),
+                  Expanded(
+                    child: _BalanceMetric(
+                      label: loc.nutritionBalanceCurrentStreak,
+                      value: balance == null
+                          ? '—'
+                          : loc.nutritionBalanceStreakDays(
+                              balance!.currentStreak,
+                            ),
+                      valueColor: (balance?.currentStreak ?? 0) > 0
+                          ? statusColor
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Divider(color: theme.colorScheme.outlineVariant.withAlpha(90)),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  for (final day in dailies)
+                    Expanded(
+                      child: _WeekDayCell(
+                        date: day.date,
+                        calories: day.calories,
+                        goal: goal,
+                        hasGoal: hasGoal,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (!hasGoal)
+                _EmptyNote(text: loc.nutritionProgressNoGoal)
+              else if (logged == 0)
+                Text(
+                  loc.nutritionBalanceNoDaysLogged,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                )
+              else
+                _WeekSequenceSummary(
+                  deficit: deficit,
+                  onTarget: onTarget,
+                  surplus: surplus,
+                  logged: logged,
                 ),
             ],
           ),
-          const SizedBox(height: 10),
-          if (!hasGoal)
-            _EmptyNote(text: loc.nutritionProgressNoGoal)
-          else if (logged == 0)
-            Text(
-              loc.nutritionBalanceNoDaysLogged,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            )
-          else
-            _WeekSequenceSummary(
-              deficit: deficit,
-              onTarget: onTarget,
-              surplus: surplus,
-              logged: logged,
-            ),
-        ],
+        ),
       ),
     );
   }

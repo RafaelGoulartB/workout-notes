@@ -424,6 +424,24 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('seven-day balance merges summary into the week sequence', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(const NutritionProgressScreen()));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+    expect(find.text(loc.nutritionBalanceWeekSequence), findsOneWidget);
+    expect(find.text(loc.nutritionBalanceThisWeek), findsNothing);
+    expect(find.text(loc.nutritionBalanceDaysLogged), findsOneWidget);
+    expect(find.text(loc.nutritionBalanceAverageIntake), findsOneWidget);
+    expect(find.text(loc.nutritionBalanceCurrentStreak), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'meal row opens and scrolls the diary while its plus opens food search',
     (tester) async {
