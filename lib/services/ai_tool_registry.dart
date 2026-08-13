@@ -4,20 +4,24 @@ import '../models/ai_message_role.dart';
 import '../models/nutrition/ai_food_label_draft.dart';
 import '../models/nutrition/ai_manual_food_proposal.dart';
 import '../repositories/goal_repository.dart';
+import 'ai_nutrition_tool_service.dart';
 import 'ai_wellness_analytics_service.dart';
 
 class AiToolRegistry {
   final DatabaseHelper db;
   final GoalRepository goalRepo;
   final AiWellnessAnalyticsService wellness;
+  final AiNutritionToolService nutrition;
   final Map<String, Map<String, dynamic>> _schemaCache = {};
   AiToolRegistry({
     DatabaseHelper? db,
     GoalRepository? goalRepo,
     AiWellnessAnalyticsService? wellness,
+    AiNutritionToolService? nutrition,
   }) : db = db ?? DatabaseHelper.instance,
        goalRepo = goalRepo ?? GoalRepository(),
-       wellness = wellness ?? AiWellnessAnalyticsService(db: db);
+       wellness = wellness ?? AiWellnessAnalyticsService(db: db),
+       nutrition = nutrition ?? AiNutritionToolService(db: db);
 
   /// OpenAI function-calling JSON schemas for all read tools.
   List<Map<String, dynamic>> openAiReadToolsSchema({Iterable<String>? names}) {
@@ -66,6 +70,51 @@ class AiToolRegistry {
       return {'propose_manual_food_creation'};
     }
 
+    final nutritionTerms = [
+      'nutri',
+      'caloria',
+      'macro',
+      'proteina',
+      'proteína',
+      'carbo',
+      'gordura',
+      'comida',
+      'dieta',
+      'ingestao',
+      'ingestão',
+      'refeicao',
+      'refeição',
+      'alimento',
+      'alimenta',
+      'comi',
+      'comer',
+    ];
+    final nutritionIntent = hasAny(nutritionTerms);
+    final diaryIntent =
+        hasAny([
+          'diario alimentar',
+          'diário alimentar',
+          'diario de alimentacao',
+          'diário de alimentação',
+          'o que comi',
+          'o que eu comi',
+          'comi hoje',
+          'comi ontem',
+          'refeicoes de hoje',
+          'refeições de hoje',
+          'meal diary',
+          'food diary',
+        ]) ||
+        (nutritionIntent &&
+            (hasAny(['hoje', 'ontem', 'nesse dia', 'neste dia']) ||
+                RegExp(r'\b\d{4}-\d{2}-\d{2}\b').hasMatch(text)));
+    if (diaryIntent) {
+      // The diary already carries day totals, goal, meals, items and every
+      // tracked nutrient. Going through the aggregate summary or capability
+      // discovery first only adds provider round-trips and failure points.
+      return {'get_nutrition_diary_day'};
+    }
+
     final sleepIntent = hasAny([
       'sono',
       'sleep',
@@ -86,26 +135,68 @@ class AiToolRegistry {
         selected.add('analyze_sleep_performance');
       }
     }
+    if (nutritionIntent) {
+      selected.add('get_nutrition_summary');
+    }
     if (hasAny([
-      'nutri',
-      'caloria',
-      'macro',
-      'proteina',
-      'proteína',
-      'carbo',
-      'gordura',
-      'comida',
-      'dieta',
-      'ingestao',
-      'ingestão',
-      'refeicao',
-      'refeição',
+      'micronutriente',
+      'vitamina',
+      'mineral',
+      'fibra',
+      'acucar',
+      'açúcar',
+      'sodio',
+      'sódio',
+      'potassio',
+      'potássio',
+      'calcio',
+      'cálcio',
+      'ferro',
+      'magnesio',
+      'magnésio',
+      'zinco',
+      'b12',
     ])) {
-      selected.addAll({
-        'get_nutrition_summary',
-        'analyze_nutrition_body_trend',
-        'list_body_measurements',
-      });
+      selected.add('get_micronutrient_summary');
+    }
+    if (nutritionIntent &&
+        hasAny([
+          'historico',
+          'histórico',
+          'ultimos dias',
+          'últimos dias',
+          'por dia',
+          'evolucao',
+          'evolução',
+          'tendencia',
+          'tendência',
+        ])) {
+      selected.add('get_nutrition_history');
+    }
+    if (hasAny([
+      'biblioteca de alimentos',
+      'meus alimentos',
+      'alimento favorito',
+      'alimentos favoritos',
+      'alimento recente',
+      'alimentos recentes',
+      'food library',
+    ])) {
+      selected.add('search_food_library');
+    }
+    if (hasAny([
+      'refeicao salva',
+      'refeição salva',
+      'refeicoes salvas',
+      'refeições salvas',
+      'saved meal',
+      'saved meals',
+    ])) {
+      selected.add('list_saved_meals');
+    }
+    if (nutritionIntent &&
+        hasAny(['meta', 'objetivo', 'configuracao', 'configuração'])) {
+      selected.add('get_nutrition_profile');
     }
     if (hasAny(['recuper', 'fadiga', 'cansa', 'readiness', 'descanso'])) {
       selected.addAll({
@@ -213,6 +304,21 @@ class AiToolRegistry {
         case 'list_goals':
           next.add('get_goal_progress_history');
           break;
+        case 'get_nutrition_summary':
+          next.addAll({
+            'get_nutrition_diary_day',
+            'get_nutrition_history',
+            'get_micronutrient_summary',
+            'get_nutrition_profile',
+          });
+          break;
+        case 'get_nutrition_diary_day':
+        case 'search_food_library':
+          next.add('get_food_detail');
+          break;
+        case 'list_saved_meals':
+          next.add('get_saved_meal_detail');
+          break;
       }
     }
     return next;
@@ -252,6 +358,22 @@ class AiToolRegistry {
           return l10n.aiToolSleepSummary;
         case 'get_nutrition_summary':
           return l10n.aiToolNutritionSummary;
+        case 'get_nutrition_diary_day':
+          return l10n.aiToolNutritionDiaryDay;
+        case 'get_nutrition_history':
+          return l10n.aiToolNutritionHistory;
+        case 'get_micronutrient_summary':
+          return l10n.aiToolMicronutrientSummary;
+        case 'search_food_library':
+          return l10n.aiToolSearchFoodLibrary;
+        case 'get_food_detail':
+          return l10n.aiToolFoodDetail;
+        case 'list_saved_meals':
+          return l10n.aiToolListSavedMeals;
+        case 'get_saved_meal_detail':
+          return l10n.aiToolSavedMealDetail;
+        case 'get_nutrition_profile':
+          return l10n.aiToolNutritionProfile;
         case 'analyze_sleep_performance':
           return l10n.aiToolSleepPerformance;
         case 'analyze_nutrition_body_trend':
@@ -297,6 +419,22 @@ class AiToolRegistry {
         return 'Analisando sono recente';
       case 'get_nutrition_summary':
         return 'Analisando nutrição';
+      case 'get_nutrition_diary_day':
+        return 'Consultando diário alimentar';
+      case 'get_nutrition_history':
+        return 'Consultando histórico nutricional';
+      case 'get_micronutrient_summary':
+        return 'Analisando micronutrientes';
+      case 'search_food_library':
+        return 'Buscando alimentos';
+      case 'get_food_detail':
+        return 'Detalhando alimento';
+      case 'list_saved_meals':
+        return 'Listando refeições salvas';
+      case 'get_saved_meal_detail':
+        return 'Detalhando refeição salva';
+      case 'get_nutrition_profile':
+        return 'Consultando perfil nutricional';
       case 'analyze_sleep_performance':
         return 'Relacionando sono e desempenho';
       case 'analyze_nutrition_body_trend':
@@ -363,6 +501,67 @@ class AiToolRegistry {
               days: _boundedInt(args, 'days', 14, 3, 90),
             ),
           );
+        case 'get_nutrition_diary_day':
+          return _ok(
+            await nutrition.diaryDay(
+              date: _nullableString(args['date'] ?? args['day']),
+            ),
+          );
+        case 'get_nutrition_history':
+          return _ok(
+            await nutrition.history(
+              days: _boundedInt(args, 'days', 30, 1, 31),
+              endDate: _nullableString(args['end_date'] ?? args['endDate']),
+            ),
+          );
+        case 'get_micronutrient_summary':
+          return _ok(
+            await nutrition.micronutrientSummary(
+              days: _boundedInt(args, 'days', 30, 1, 90),
+            ),
+          );
+        case 'search_food_library':
+          return _ok(
+            await nutrition.searchFoods(
+              query: _nullableString(args['query'] ?? args['search']),
+              favoritesOnly:
+                  args['favorites_only'] == true ||
+                  args['favoritesOnly'] == true,
+              recentOnly:
+                  args['recent_only'] == true || args['recentOnly'] == true,
+              limit: _boundedInt(args, 'limit', 15, 1, 30),
+            ),
+          );
+        case 'get_food_detail':
+          final foodId = _nullableString(args['food_id'] ?? args['foodId']);
+          if (foodId == null) {
+            return const AiToolResult(
+              ok: false,
+              code: 'invalid_args',
+              message: 'food_id é obrigatório.',
+            );
+          }
+          return _ok(await nutrition.foodDetail(foodId));
+        case 'list_saved_meals':
+          return _ok(
+            await nutrition.listSavedMeals(
+              limit: _boundedInt(args, 'limit', 20, 1, 50),
+            ),
+          );
+        case 'get_saved_meal_detail':
+          final savedMealId = _nullableString(
+            args['saved_meal_id'] ?? args['savedMealId'],
+          );
+          if (savedMealId == null) {
+            return const AiToolResult(
+              ok: false,
+              code: 'invalid_args',
+              message: 'saved_meal_id é obrigatório.',
+            );
+          }
+          return _ok(await nutrition.savedMealDetail(savedMealId));
+        case 'get_nutrition_profile':
+          return _ok(await nutrition.profile());
         case 'analyze_sleep_performance':
           return _ok(
             await wellness.sleepPerformance(
@@ -815,8 +1014,19 @@ class AiToolRegistry {
         'sleep' => {'get_sleep_summary', 'analyze_sleep_performance'},
         'nutrition' => {
           'get_nutrition_summary',
+          'get_nutrition_diary_day',
+          'get_nutrition_history',
+          'get_micronutrient_summary',
+          'get_nutrition_profile',
           'analyze_nutrition_body_trend',
         },
+        'nutrition_diary' => {
+          'get_nutrition_diary_day',
+          'get_nutrition_history',
+        },
+        'micronutrients' => {'get_micronutrient_summary'},
+        'food_library' => {'search_food_library', 'get_food_detail'},
+        'saved_meals' => {'list_saved_meals', 'get_saved_meal_detail'},
         'food_creation' => {'propose_manual_food_creation'},
         'recovery' => {
           'get_weekly_recovery_trend',
@@ -873,6 +1083,10 @@ class AiToolRegistry {
                       'goals',
                       'sleep',
                       'nutrition',
+                      'nutrition_diary',
+                      'micronutrients',
+                      'food_library',
+                      'saved_meals',
                       'food_creation',
                       'recovery',
                       'routine_changes',
@@ -1127,11 +1341,165 @@ class AiToolRegistry {
       case 'get_nutrition_summary':
         return _windowToolSchema(
           name,
-          'Resumo agregado de calorias e macronutrientes, meta ativa, cobertura e qualidade dos registros.',
+          'Resumo agregado de calorias, macros, gorduras, fibras, açúcares e micronutrientes, com meta ativa, cobertura e qualidade dos registros. Para itens/refeições de um dia use get_nutrition_diary_day.',
           defaultValue: 14,
           minimum: 3,
           maximum: 90,
         );
+      case 'get_nutrition_diary_day':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Retorna o diário alimentar completo de um dia: refeições, alimentos, quantidades, origem, calorias, macros, gorduras, fibras, açúcares, sódio e todos os micronutrientes registrados. Preserva null como valor não informado.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'date': {
+                  'type': 'string',
+                  'description':
+                      'Data local no formato YYYY-MM-DD. O padrão é hoje.',
+                },
+              },
+              'required': const [],
+            },
+          },
+        };
+      case 'get_nutrition_history':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Histórico diário completo de nutrientes. Retorna totais e cobertura por nutriente para cada dia registrado; dias sem registro ficam ausentes. Use end_date para paginar janelas antigas.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'days': {
+                  'type': 'integer',
+                  'minimum': 1,
+                  'maximum': 31,
+                  'default': 30,
+                },
+                'end_date': {
+                  'type': 'string',
+                  'description':
+                      'Último dia da janela em YYYY-MM-DD; padrão hoje.',
+                },
+              },
+              'required': const [],
+            },
+          },
+        };
+      case 'get_micronutrient_summary':
+        return _windowToolSchema(
+          name,
+          'Análise dedicada de fibras, açúcares, sódio, potássio, cálcio, ferro, magnésio, zinco e vitaminas A, C, D e B12. Inclui cobertura, médias somente em dias reportados e principais alimentos-fonte.',
+          defaultValue: 30,
+          minimum: 1,
+          maximum: 90,
+        );
+      case 'search_food_library':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Busca na biblioteca local de alimentos do usuário. Retorna IDs, origem, favorito, uso recente e a variante nutricional principal. Use get_food_detail com o ID para todas as variantes e porções.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'query': {
+                  'type': 'string',
+                  'description': 'Nome ou marca; vazio lista a biblioteca.',
+                },
+                'favorites_only': {'type': 'boolean', 'default': false},
+                'recent_only': {'type': 'boolean', 'default': false},
+                'limit': {
+                  'type': 'integer',
+                  'minimum': 1,
+                  'maximum': 30,
+                  'default': 15,
+                },
+              },
+              'required': const [],
+            },
+          },
+        };
+      case 'get_food_detail':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Detalha um alimento da biblioteca pelo ID: metadados, todas as variantes, nutrientes padronizados, nutrientes extras e porções/conversões.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'food_id': {
+                  'type': 'string',
+                  'description': 'ID retornado por search_food_library.',
+                },
+              },
+              'required': ['food_id'],
+            },
+          },
+        };
+      case 'list_saved_meals':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Lista refeições-modelo salvas pelo usuário, com totais nutricionais atuais e IDs para detalhamento.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'limit': {
+                  'type': 'integer',
+                  'minimum': 1,
+                  'maximum': 50,
+                  'default': 20,
+                },
+              },
+              'required': const [],
+            },
+          },
+        };
+      case 'get_saved_meal_detail':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Detalha uma refeição salva: porções, ingredientes, quantidades, referências de alimento e todos os nutrientes calculáveis.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'saved_meal_id': {
+                  'type': 'string',
+                  'description': 'ID retornado por list_saved_meals.',
+                },
+              },
+              'required': ['saved_meal_id'],
+            },
+          },
+        };
+      case 'get_nutrition_profile':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Retorna a meta diária ativa e seu histórico, perfil usado na sugestão de meta (idade, sexo, altura, peso, atividade e razões de macros), tipos de refeição e contagens do diário, biblioteca e refeições salvas.',
+            'parameters': {
+              'type': 'object',
+              'properties': const <String, dynamic>{},
+              'required': const [],
+            },
+          },
+        };
       case 'analyze_sleep_performance':
         return _windowToolSchema(
           name,
@@ -1420,8 +1788,19 @@ class AiToolRegistry {
     {'name': 'get_sleep_summary', 'description': 'Recent sleep summary'},
     {
       'name': 'get_nutrition_summary',
-      'description': 'Calories and macros summary',
+      'description': 'Complete nutrition summary',
     },
+    {'name': 'get_nutrition_diary_day', 'description': 'Nutrition diary day'},
+    {'name': 'get_nutrition_history', 'description': 'Nutrition history'},
+    {
+      'name': 'get_micronutrient_summary',
+      'description': 'Micronutrient summary',
+    },
+    {'name': 'search_food_library', 'description': 'Search food library'},
+    {'name': 'get_food_detail', 'description': 'Food details'},
+    {'name': 'list_saved_meals', 'description': 'List saved meals'},
+    {'name': 'get_saved_meal_detail', 'description': 'Saved meal details'},
+    {'name': 'get_nutrition_profile', 'description': 'Nutrition profile'},
     {
       'name': 'analyze_sleep_performance',
       'description': 'Sleep and workout performance association',

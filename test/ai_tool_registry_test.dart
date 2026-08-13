@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:workout_notes/models/nutrition/ai_manual_food_proposal.dart';
@@ -18,9 +20,9 @@ void main() {
     await uninstallAiTestDb();
   });
 
-  test('openAiReadToolsSchema returns 18 tools with valid shape', () {
+  test('openAiReadToolsSchema returns 26 tools with valid shape', () {
     final tools = registry.openAiReadToolsSchema();
-    expect(tools.length, 18);
+    expect(tools.length, 26);
     for (final t in tools) {
       expect(t['type'], 'function');
       expect(t['function'], isA<Map>());
@@ -32,7 +34,7 @@ void main() {
 
   test('openAiChatToolsSchema includes the guarded routine proposal tool', () {
     final tools = registry.openAiChatToolsSchema();
-    expect(tools, hasLength(21));
+    expect(tools, hasLength(29));
     final proposal = tools.firstWhere(
       (tool) => (tool['function'] as Map)['name'] == 'propose_routine_change',
     );
@@ -525,4 +527,284 @@ void main() {
     final list = (r.data as Map)['goals'] as List;
     expect(list, isEmpty);
   });
+
+  test('nutrition routing exposes focused diary and micronutrient tools', () {
+    final diary = registry.toolNamesForQuery(
+      'O que comi hoje no meu diário alimentar?',
+    );
+    expect(diary, {'get_nutrition_diary_day'});
+
+    final micros = registry.toolNamesForQuery(
+      'Como estão meu magnésio, ferro e vitamina B12?',
+    );
+    expect(micros, contains('get_micronutrient_summary'));
+
+    expect(
+      registry.toolNamesForQuery('Como foi a minha alimentação de ontem?'),
+      {'get_nutrition_diary_day'},
+    );
+    expect(
+      registry.toolNamesForQuery('E me fale sobre o que eu comi nesse dia'),
+      {'get_nutrition_diary_day'},
+    );
+
+    final library = registry.toolNamesForQuery(
+      'Mostre meus alimentos favoritos da biblioteca de alimentos',
+    );
+    expect(library, contains('search_food_library'));
+  });
+
+  test(
+    'nutrition diary exposes meals, foods and every tracked nutrient',
+    () async {
+      final date = await _seedNutritionData(db);
+
+      final result = await registry.executeRead(
+        toolName: 'get_nutrition_diary_day',
+        args: {'date': date},
+      );
+
+      expect(result.ok, isTrue);
+      final data = result.data as Map;
+      expect(data['mealCount'], 1);
+      expect(data['itemCount'], 1);
+      final totals = data['totals'] as Map;
+      expect(totals['proteinG'], 31.0);
+      expect(totals['magnesiumMg'], 29.0);
+      expect(totals['vitaminB12Ug'], 0.3);
+      expect(totals['vitaminDUg'], isNull);
+      final item =
+          (((data['meals'] as List).single as Map)['items'] as List).single
+              as Map;
+      expect(item['foodName'], 'Peito de frango grelhado');
+      expect((item['nutrients'] as Map)['sodiumMg'], 74.0);
+      expect(item['isEstimated'], isFalse);
+      final coverage = (data['dataCoverage'] as Map)['byNutrient'] as Map;
+      expect((coverage['vitaminDUg'] as Map)['pct'], 0.0);
+      expect((coverage['ironMg'] as Map)['pct'], 100.0);
+    },
+  );
+
+  test(
+    'nutrition history and micronutrient summary preserve coverage',
+    () async {
+      final date = await _seedNutritionData(db);
+
+      final history = await registry.executeRead(
+        toolName: 'get_nutrition_history',
+        args: const {'days': 7},
+      );
+      final day = ((history.data as Map)['days'] as List).single as Map;
+      expect(day['date'], date);
+      expect((day['totals'] as Map)['potassiumMg'], 256.0);
+      expect((day['totals'] as Map)['vitaminDUg'], isNull);
+
+      final micros = await registry.executeRead(
+        toolName: 'get_micronutrient_summary',
+        args: const {'days': 7},
+      );
+      final nutrients = (micros.data as Map)['nutrients'] as Map;
+      final magnesium = nutrients['magnesiumMg'] as Map;
+      expect(magnesium['averageOnReportedDays'], 29.0);
+      expect(magnesium['dayCoveragePct'], 100.0);
+      expect(
+        (magnesium['topFoodSources'] as List).single['name'],
+        'Peito de frango grelhado',
+      );
+      expect((nutrients['vitaminDUg'] as Map)['dayCoveragePct'], 0.0);
+    },
+  );
+
+  test('food tools expose variants, extra nutrients and servings', () async {
+    await _seedNutritionData(db);
+
+    final searched = await registry.executeRead(
+      toolName: 'search_food_library',
+      args: const {'query': 'frango'},
+    );
+    final food = ((searched.data as Map)['foods'] as List).single as Map;
+    expect(food['id'], 'food-chicken');
+    expect((food['primaryVariant'] as Map)['nutrients'], isA<Map>());
+
+    final detailed = await registry.executeRead(
+      toolName: 'get_food_detail',
+      args: const {'food_id': 'food-chicken'},
+    );
+    final variant = ((detailed.data as Map)['variants'] as List).single as Map;
+    expect((variant['extraNutrients'] as Map)['selenium_ug'], 27.6);
+    expect((variant['servings'] as List).single['gramsEquivalent'], 120.0);
+  });
+
+  test(
+    'saved meals and nutrition profile cover remaining nutrition data',
+    () async {
+      await _seedNutritionData(db);
+
+      final listed = await registry.executeRead(
+        toolName: 'list_saved_meals',
+        args: const {},
+      );
+      final saved = ((listed.data as Map)['savedMeals'] as List).single as Map;
+      expect(saved['name'], 'Frango base');
+      expect((saved['totals'] as Map)['proteinG'], 31.0);
+
+      final detail = await registry.executeRead(
+        toolName: 'get_saved_meal_detail',
+        args: const {'saved_meal_id': 'saved-chicken'},
+      );
+      expect(((detail.data as Map)['items'] as List), hasLength(1));
+      final savedItem = ((detail.data as Map)['items'] as List).single as Map;
+      expect((savedItem['nutrients'] as Map)['magnesiumMg'], 29.0);
+
+      final profile = await registry.executeRead(
+        toolName: 'get_nutrition_profile',
+        args: const {},
+      );
+      final profileData = profile.data as Map;
+      expect((profileData['activeDailyGoal'] as Map)['calories'], 2200.0);
+      expect(
+        (profileData['goalSuggestionProfile'] as Map)['activityLevel'],
+        'moderate',
+      );
+      expect((profileData['mealTypes'] as List).single['key'], 'lunch');
+      expect((profileData['libraryCounts'] as Map)['savedMeals'], 1);
+    },
+  );
+}
+
+Future<String> _seedNutritionData(Database db) async {
+  final now = DateTime.now();
+  final date = now.toIso8601String().substring(0, 10);
+  final timestamp = now.toIso8601String();
+  await db.insert('foods', {
+    'id': 'food-chicken',
+    'source': 'manual',
+    'external_id': 'food-chicken',
+    'name': 'Peito de frango grelhado',
+    'search_name': 'peito de frango grelhado',
+    'brand': null,
+    'fetched_at': timestamp,
+    'last_used_at': timestamp,
+    'is_favorite': 1,
+  });
+  final nutrients = <String, Object?>{
+    'calories': 165.0,
+    'protein_g': 31.0,
+    'carbs_g': 0.0,
+    'fat_g': 3.6,
+    'saturated_fat_g': 1.0,
+    'monounsaturated_fat_g': 1.2,
+    'polyunsaturated_fat_g': 0.8,
+    'trans_fat_g': 0.0,
+    'fiber_g': 0.0,
+    'sugars_g': 0.0,
+    'sodium_mg': 74.0,
+    'potassium_mg': 256.0,
+    'calcium_mg': 15.0,
+    'iron_mg': 1.0,
+    'magnesium_mg': 29.0,
+    'zinc_mg': 1.0,
+    'vitamin_a_ug': 6.0,
+    'vitamin_c_mg': 0.0,
+    'vitamin_d_ug': null,
+    'vitamin_b12_ug': 0.3,
+  };
+  await db.insert('food_variants', {
+    'id': 'variant-chicken',
+    'food_id': 'food-chicken',
+    'label': 'Grelhado',
+    'reference_amount': 100.0,
+    'reference_unit': 'g',
+    ...nutrients,
+    'extra_nutrients_json': jsonEncode({'selenium_ug': 27.6}),
+    'is_estimated': 0,
+  });
+  await db.insert('food_servings', {
+    'id': 'serving-chicken',
+    'food_variant_id': 'variant-chicken',
+    'label': '1 filé médio',
+    'quantity': 1.0,
+    'unit': 'filé',
+    'grams_equivalent': 120.0,
+  });
+  await db.insert('meal_logs', {
+    'id': 'meal-lunch',
+    'date': date,
+    'meal_type': 'lunch',
+    'name': 'Almoço',
+    'notes': 'Após o treino',
+    'created_at': timestamp,
+  });
+  await db.insert('meal_log_items', {
+    'id': 'item-chicken',
+    'meal_log_id': 'meal-lunch',
+    'food_id': 'food-chicken',
+    'food_variant_id': 'variant-chicken',
+    'food_name_snapshot': 'Peito de frango grelhado',
+    'quantity': 100.0,
+    'unit': 'g',
+    ...nutrients,
+    'nutrition_snapshot_json': jsonEncode({
+      'version': 3,
+      'source': 'manual',
+      'external_id': 'food-chicken',
+      'food_name': 'Peito de frango grelhado',
+      'food_brand': null,
+      'variant_label': 'Grelhado',
+      'reference_amount': 100.0,
+      'reference_unit': 'g',
+      'quantity': 100.0,
+      'unit': 'g',
+      'grams_equivalent': 100.0,
+      'ml_equivalent': null,
+      'consumed': nutrients,
+      'is_estimated': false,
+      'has_missing_values': false,
+    }),
+    'created_at': timestamp,
+  });
+  await db.insert('nutrition_goals', {
+    'id': 'goal-nutrition',
+    'calories': 2200.0,
+    'protein_g': 160.0,
+    'carbs_g': 230.0,
+    'fat_g': 70.0,
+    'created_at': timestamp,
+    'updated_at': timestamp,
+    'is_active': 1,
+  });
+  await db.insert('app_settings', {
+    'key': 'nutrition_profile_activity',
+    'value': 'moderate',
+  });
+  await db.insert('app_settings', {
+    'key': 'nutrition_profile_age',
+    'value': '32',
+  });
+  await db.insert('meal_types', {
+    'id': 'meal-type-lunch',
+    'key': 'lunch',
+    'name': null,
+    'order_index': 0,
+    'created_at': timestamp,
+  });
+  await db.insert('saved_meals', {
+    'id': 'saved-chicken',
+    'name': 'Frango base',
+    'meal_type': 'lunch',
+    'portions': 1.0,
+    'created_at': timestamp,
+    'updated_at': timestamp,
+  });
+  await db.insert('saved_meal_items', {
+    'id': 'saved-item-chicken',
+    'saved_meal_id': 'saved-chicken',
+    'food_id': 'food-chicken',
+    'food_variant_id': 'variant-chicken',
+    'food_name_snapshot': 'Peito de frango grelhado',
+    'quantity': 100.0,
+    'unit': 'g',
+    'order_index': 0,
+  });
+  return date;
 }

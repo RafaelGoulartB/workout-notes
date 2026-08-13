@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../database/database_helper.dart';
 import '../models/ai_chat_message.dart';
+import '../models/ai_chat_error_details.dart';
 import '../models/ai_image_attachment.dart';
 import '../models/ai_chat_state.dart';
 import '../models/ai_chat_thread.dart';
@@ -41,6 +42,8 @@ As ferramentas são a fonte primária para fatos pessoais do usuário. Quando a 
 Interprete continuações usando a conversa recente. Se o usuário mudar apenas o domínio, preserve os qualificadores ainda aplicáveis do pedido anterior, especialmente período, comparação e objetivo. Exemplo: depois de um resumo da última semana, "E o sono?" exige consultar o resumo de sono para o mesmo período. O usuário nunca precisa pedir explicitamente que você use uma tool.
 
 Use `discover_app_capabilities` somente quando a ferramenta necessária não estiver entre as ferramentas diretas disponíveis. Se uma consulta falhar ou não tiver registros suficientes, informe isso; nunca complete a lacuna com dados inventados.
+
+Para alimentação, escolha a ferramenta mais específica: diário do dia para refeições e itens consumidos; histórico para totais por dia; micronutrientes para vitaminas, minerais, fibras, açúcares e sódio; biblioteca para alimentos cadastrados; refeições salvas para modelos; perfil para meta e tipos de refeição. Preserve `null` como dado não informado, nunca como zero.
 
 # Propostas de alimentos manuais (política fixa)
 Quando o usuário pedir para criar ou cadastrar um alimento, use `propose_manual_food_creation`. Identifique a descrição com precisão e preencha o máximo possível dos dados suportados: nome, marca e código somente quando conhecidos, referência nutricional, calorias, macronutrientes, tipos de gordura, fibras, açúcares, sódio, micronutrientes e porções comuns.
@@ -90,6 +93,7 @@ class AiChatService extends ChangeNotifier {
   AiRoutineMutationService _routineMutations = AiRoutineMutationService();
   AiImageAttachmentStore _imageStore = AiImageAttachmentStore();
   AiSettingsNotifier? _settings;
+  _AiTurnDiagnostics? _activeTurnDiagnostics;
 
   AiChatState _state = const AiChatState();
 
@@ -241,6 +245,11 @@ class AiChatService extends ChangeNotifier {
     onAccepted?.call();
 
     try {
+      _activeTurnDiagnostics = _AiTurnDiagnostics(
+        stage: 'preparing_context',
+        provider: provider.name,
+        model: provider.selectedModel,
+      );
       await _runTurn(
         messages: messages,
         baseUrl: provider.baseUrl,
@@ -253,10 +262,13 @@ class AiChatService extends ChangeNotifier {
       _state = _state.copyWith(
         phase: AiTurnPhase.failed,
         error: _readableError(e),
+        errorDetails: _technicalErrorDetails(e),
         phaseMessage: null,
       );
       notifyListeners();
       await _persistCurrentThread();
+    } finally {
+      _activeTurnDiagnostics = null;
     }
     return true;
   }
@@ -463,7 +475,8 @@ class AiChatService extends ChangeNotifier {
       final toolsSchema = _tools.openAiChatToolsSchema(
         names: toolNames,
         includeRoutineProposal: proposalAvailable,
-        includeCapabilityDiscovery: !manualFoodTextTurn || round > 0,
+        includeCapabilityDiscovery:
+            toolNames.isEmpty && (!manualFoodTextTurn || round > 0),
       );
       final wire = manualFoodTextTurn && round == 0
           ? _buildManualFoodProposalWire(current)
@@ -493,6 +506,15 @@ class AiChatService extends ChangeNotifier {
       final toolChoice = round == 0 && requiresGroundedToolCall
           ? _requiredToolChoice(toolNames)
           : 'auto';
+      _activeTurnDiagnostics = _activeTurnDiagnostics?.copyWith(
+        stage: round == 0
+            ? 'initial_provider_request'
+            : 'followup_provider_request',
+        round: round + 1,
+        schemaToolCount: toolsSchema.length,
+        requestCharacters: jsonEncode(wire).length,
+        tools: toolNames.toList()..sort(),
+      );
       var completion = imageDataUrls.isEmpty
           ? manualFoodTextTurn && round == 0
                 ? await _sendManualFoodProposalCompletion(
@@ -521,6 +543,9 @@ class AiChatService extends ChangeNotifier {
             );
 
       if (round == 0 && requiresGroundedToolCall && !completion.hasToolCalls) {
+        _activeTurnDiagnostics = _activeTurnDiagnostics?.copyWith(
+          stage: 'required_tool_retry',
+        );
         completion = await _retryMissingRequiredToolCall(
           firstCompletion: completion,
           wire: wire,
@@ -543,8 +568,6 @@ class AiChatService extends ChangeNotifier {
         createdAt: DateTime.now(),
       );
       current = [...current, assistant];
-      _state = _state.copyWith(messages: current);
-      notifyListeners();
 
       if (!completion.hasToolCalls) {
         final accepted = await _regenerateInvalidAnswer(
@@ -561,14 +584,21 @@ class AiChatService extends ChangeNotifier {
         );
         if (accepted != null) {
           current = [...current.sublist(0, current.length - 1), accepted];
-          _state = _state.copyWith(messages: current);
         }
         // Done only after the answer has passed output validation.
-        _state = _state.copyWith(phase: AiTurnPhase.idle, phaseMessage: null);
+        _state = _state.copyWith(
+          messages: current,
+          phase: AiTurnPhase.idle,
+          phaseMessage: null,
+          clearError: true,
+        );
         notifyListeners();
         await _persistCurrentThread();
         return;
       }
+
+      _state = _state.copyWith(messages: current);
+      notifyListeners();
 
       // Execute reads sequentially; tool-call order is preserved.
       final hasRoutineProposal = completion.toolCalls.any(
@@ -702,6 +732,13 @@ class AiChatService extends ChangeNotifier {
           includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
           visionMessageId: visionMessage.id,
           imageDataUrls: imageDataUrls,
+        );
+        _activeTurnDiagnostics = _activeTurnDiagnostics?.copyWith(
+          stage: 'final_provider_request',
+          round: round + 2,
+          schemaToolCount: 0,
+          requestCharacters: jsonEncode(finalWire).length,
+          tools: const [],
         );
         final finalCompletion = imageDataUrls.isEmpty
             ? await _service.sendChat(
@@ -993,19 +1030,31 @@ class AiChatService extends ChangeNotifier {
         visionMessageId: visionMessageId,
         imageDataUrls: imageDataUrls,
       );
-      final regenerated = imageDataUrls.isEmpty
-          ? await _service.sendChat(
-              baseUrl: baseUrl,
-              token: token,
-              model: model,
-              messages: wire,
-            )
-          : await _service.sendMultimodalChat(
-              baseUrl: baseUrl,
-              token: token,
-              model: model,
-              messages: wire,
-            );
+      _activeTurnDiagnostics = _activeTurnDiagnostics?.copyWith(
+        stage: 'answer_validation_retry',
+        round: attempt + 1,
+        schemaToolCount: 0,
+        requestCharacters: jsonEncode(wire).length,
+        tools: const [],
+      );
+      AiChatCompletion regenerated;
+      try {
+        regenerated = imageDataUrls.isEmpty
+            ? await _service.sendChat(
+                baseUrl: baseUrl,
+                token: token,
+                model: model,
+                messages: wire,
+              )
+            : await _service.sendMultimodalChat(
+                baseUrl: baseUrl,
+                token: token,
+                model: model,
+                messages: wire,
+              );
+      } catch (_) {
+        break;
+      }
       text = regenerated.text;
       if (text != null && !TextSanitizer.containsReferencePlaceholder(text)) {
         return AiChatMessage(
@@ -1027,13 +1076,35 @@ class AiChatService extends ChangeNotifier {
         ),
       ];
     }
-    // Do not silently erase placeholders or fabricate a local summary.
+    // Some compatible providers repeat citation placeholders even after a
+    // rewrite request or throttle the rewrite itself. The narrow sanitizer is
+    // the final safety net: it removes only those markers and preserves the
+    // factual answer already grounded in the tool result.
+    final fallback = _sanitizedAnswerFallback(completion.text);
+    if (fallback != null) {
+      return AiChatMessage(
+        id: _uuid.v4(),
+        threadId: _state.activeThreadId ?? '',
+        role: AiMessageRole.assistant,
+        content: fallback,
+        createdAt: DateTime.now(),
+      );
+    }
     throw const AiServiceException(
-      'A IA não conseguiu preencher os dados retornados pelas ferramentas. '
-      'Tente novamente.',
+      'A IA retornou uma resposta vazia após a validação.',
       code: 'invalid_grounded_answer',
     );
   }
+
+  String? _sanitizedAnswerFallback(String? text) {
+    if (text == null) return null;
+    final sanitized = TextSanitizer.sanitize(text).trim();
+    return sanitized.isEmpty ? null : sanitized;
+  }
+
+  @visibleForTesting
+  String? sanitizedAnswerFallbackForTest(String? text) =>
+      _sanitizedAnswerFallback(text);
   // ===========================================================================
   // INTERRUPTED-TURN RECOVERY
   // ===========================================================================
@@ -1093,10 +1164,92 @@ class AiChatService extends ChangeNotifier {
     return 'ai_error:generic';
   }
 
+  AiChatErrorDetails _technicalErrorDetails(Object error) {
+    final diagnostics = _activeTurnDiagnostics;
+    final serviceError = error is AiServiceException ? error : null;
+    return AiChatErrorDetails(
+      code:
+          serviceError?.code ??
+          (error is TimeoutException ? 'timeout' : 'generic'),
+      stage: diagnostics?.stage ?? 'unknown',
+      message: _safeTechnicalMessage(serviceError?.message ?? error.toString()),
+      httpStatus: serviceError?.statusCode,
+      endpoint: _safeEndpoint(serviceError?.endpoint),
+      provider: diagnostics?.provider,
+      model: diagnostics?.model,
+      round: diagnostics?.round,
+      schemaToolCount: diagnostics?.schemaToolCount,
+      requestCharacters: diagnostics?.requestCharacters,
+      tools: diagnostics?.tools ?? const [],
+    );
+  }
+
+  String _safeTechnicalMessage(String message) {
+    var safe = message
+        .replaceAll(
+          RegExp(
+            r'(bearer|api[_-]?key|token)\s*[:=]?\s*[^\s,;]+',
+            caseSensitive: false,
+          ),
+          r'$1 [oculto]',
+        )
+        .replaceAll(
+          RegExp(r'sk-[a-z0-9_-]+', caseSensitive: false),
+          '[chave oculta]',
+        )
+        .replaceAll(RegExp(r'[\r\n\t]+'), ' ')
+        .trim();
+    if (safe.length > 360) safe = '${safe.substring(0, 357)}…';
+    return safe;
+  }
+
+  String? _safeEndpoint(String? endpoint) {
+    if (endpoint == null) return null;
+    final uri = Uri.tryParse(endpoint);
+    if (uri == null) return null;
+    return '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}${uri.path}';
+  }
+
   String? _formatCompletion(
     AiChatCompletion completion,
     Iterable<AiChatMessage> messages,
   ) {
     return completion.text;
   }
+}
+
+class _AiTurnDiagnostics {
+  final String stage;
+  final String provider;
+  final String model;
+  final int? round;
+  final int? schemaToolCount;
+  final int? requestCharacters;
+  final List<String> tools;
+
+  const _AiTurnDiagnostics({
+    required this.stage,
+    required this.provider,
+    required this.model,
+    this.round,
+    this.schemaToolCount,
+    this.requestCharacters,
+    this.tools = const [],
+  });
+
+  _AiTurnDiagnostics copyWith({
+    String? stage,
+    int? round,
+    int? schemaToolCount,
+    int? requestCharacters,
+    List<String>? tools,
+  }) => _AiTurnDiagnostics(
+    stage: stage ?? this.stage,
+    provider: provider,
+    model: model,
+    round: round ?? this.round,
+    schemaToolCount: schemaToolCount ?? this.schemaToolCount,
+    requestCharacters: requestCharacters ?? this.requestCharacters,
+    tools: tools ?? this.tools,
+  );
 }

@@ -74,7 +74,16 @@ Future<Database> installAiTestDb({bool includeRoutineDayNotes = true}) async {
           'CREATE TABLE meal_log_items (id TEXT PRIMARY KEY, meal_log_id TEXT NOT NULL, food_id TEXT, food_variant_id TEXT, food_name_snapshot TEXT NOT NULL, brand_snapshot TEXT, quantity REAL NOT NULL, unit TEXT NOT NULL, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, saturated_fat_g REAL, monounsaturated_fat_g REAL, polyunsaturated_fat_g REAL, trans_fat_g REAL, fiber_g REAL, sugars_g REAL, sodium_mg REAL, potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL, zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL, vitamin_d_ug REAL, vitamin_b12_ug REAL, nutrition_snapshot_json TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE, FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL, FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE SET NULL)',
         );
         await db.execute(
+          'CREATE TABLE meal_types (id TEXT PRIMARY KEY, key TEXT UNIQUE NOT NULL, name TEXT, order_index INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL)',
+        );
+        await db.execute(
           'CREATE TABLE nutrition_goals (id TEXT PRIMARY KEY, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1)',
+        );
+        await db.execute(
+          'CREATE TABLE saved_meals (id TEXT PRIMARY KEY, name TEXT NOT NULL, meal_type TEXT, portions REAL NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)',
+        );
+        await db.execute(
+          'CREATE TABLE saved_meal_items (id TEXT PRIMARY KEY, saved_meal_id TEXT NOT NULL, food_id TEXT, food_variant_id TEXT, food_name_snapshot TEXT NOT NULL, brand_snapshot TEXT, quantity REAL NOT NULL, unit TEXT NOT NULL, serving_label TEXT, serving_grams_equivalent REAL, serving_ml_equivalent REAL, order_index INTEGER NOT NULL DEFAULT 0, FOREIGN KEY (saved_meal_id) REFERENCES saved_meals(id) ON DELETE CASCADE, FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL, FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE SET NULL)',
         );
         await db.execute(
           "CREATE TABLE sleep_entries (id TEXT PRIMARY KEY, date TEXT NOT NULL UNIQUE, sleep_minutes INTEGER NOT NULL, actual_sleep_minutes INTEGER, bedtime_minutes INTEGER, wake_time_minutes INTEGER, comment TEXT, source TEXT NOT NULL DEFAULT 'manual', time_in_bed_minutes INTEGER, estimated_sleep_minutes INTEGER, created_at TEXT NOT NULL)",

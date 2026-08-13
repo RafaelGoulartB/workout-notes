@@ -9,6 +9,7 @@ import '../../l10n/app_localizations.dart';
 import '../../main.dart';
 import '../../navigation/ai_coach_navigation.dart';
 import '../../models/ai_chat_message.dart';
+import '../../models/ai_chat_error_details.dart';
 import '../../models/ai_image_attachment.dart';
 import '../../models/ai_chat_state.dart';
 import '../../models/nutrition/ai_manual_food_proposal.dart';
@@ -349,7 +350,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
                         ),
                 ),
                 if (state.error != null)
-                  _buildErrorBanner(theme, state.error!, l10n),
+                  _buildErrorBanner(
+                    theme,
+                    state.error!,
+                    state.errorDetails,
+                    l10n,
+                  ),
                 AiChatInputBar(
                   controller: _controller,
                   enabled: configured,
@@ -639,9 +645,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Widget _buildErrorBanner(
     ThemeData theme,
     String error,
+    AiChatErrorDetails? details,
     AppLocalizations l10n,
   ) {
     final failedProposalId = _failedProposalId(error);
+    final technicalLines = _technicalErrorLines(error, details, l10n);
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
       child: Container(
@@ -660,12 +668,36 @@ class _AiChatScreenState extends State<AiChatScreen> {
             ),
             const SizedBox(width: 9),
             Expanded(
-              child: Text(
-                localizeAiError(error, l10n),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  height: 1.35,
-                  color: theme.colorScheme.onErrorContainer,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    localizeAiError(error, l10n),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      height: 1.35,
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    l10n.aiChatErrorTechnicalTitle,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onErrorContainer,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  SelectableText(
+                    technicalLines.join('\n'),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      height: 1.35,
+                      color: theme.colorScheme.onErrorContainer.withValues(
+                        alpha: 0.88,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             IconButton(
@@ -688,6 +720,41 @@ class _AiChatScreenState extends State<AiChatScreen> {
         ),
       ),
     );
+  }
+
+  List<String> _technicalErrorLines(
+    String error,
+    AiChatErrorDetails? details,
+    AppLocalizations l10n,
+  ) {
+    final fallbackCode = error.startsWith('ai_error:')
+        ? error.substring('ai_error:'.length).split(':').first
+        : 'generic';
+    if (details == null) {
+      return ['${l10n.aiChatErrorTechnicalCode}: $fallbackCode'];
+    }
+    return [
+      '${l10n.aiChatErrorTechnicalStage}: ${details.stage}',
+      [
+        '${l10n.aiChatErrorTechnicalCode}: ${details.code}',
+        if (details.httpStatus != null) 'HTTP ${details.httpStatus}',
+        if (details.round != null)
+          '${l10n.aiChatErrorTechnicalRound}: ${details.round}',
+      ].join(' · '),
+      if (details.provider != null || details.model != null)
+        '${l10n.aiChatErrorTechnicalProvider}: '
+            '${details.provider ?? '—'} / ${details.model ?? '—'}',
+      if (details.endpoint != null)
+        '${l10n.aiChatErrorTechnicalEndpoint}: ${details.endpoint}',
+      if (details.schemaToolCount != null || details.requestCharacters != null)
+        '${l10n.aiChatErrorTechnicalRequest}: '
+            '${details.schemaToolCount ?? 0} tools · '
+            '${details.requestCharacters ?? 0} chars',
+      if (details.tools.isNotEmpty)
+        '${l10n.aiChatErrorTechnicalTools}: ${details.tools.join(', ')}',
+      if (details.message?.isNotEmpty ?? false)
+        '${l10n.aiChatErrorTechnicalDetail}: ${details.message}',
+    ];
   }
 
   String? _failedProposalId(String error) {

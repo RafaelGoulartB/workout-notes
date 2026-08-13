@@ -287,13 +287,11 @@ extension AiChatWireTesting on AiChatService {
   ].any(normalized.contains);
 
   Object _requiredToolChoice(Set<String> toolNames) {
-    if (toolNames.length == 1) {
-      return {
-        'type': 'function',
-        'function': {'name': toolNames.single},
-      };
-    }
-    return 'required';
+    // `auto` is the only representation consistently accepted by every
+    // OpenAI-compatible provider supported by the app. Grounding is still
+    // mandatory: the orchestrator rejects an answer without tool calls and
+    // retries with an explicit instruction in `_retryMissingRequiredToolCall`.
+    return 'auto';
   }
 
   @visibleForTesting

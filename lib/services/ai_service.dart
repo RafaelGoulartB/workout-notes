@@ -27,7 +27,14 @@ class AiChatCompletion {
 class AiServiceException implements Exception {
   final String message;
   final String? code;
-  const AiServiceException(this.message, {this.code});
+  final int? statusCode;
+  final String? endpoint;
+  const AiServiceException(
+    this.message, {
+    this.code,
+    this.statusCode,
+    this.endpoint,
+  });
 
   @override
   String toString() => 'AiServiceException($code): $message';
@@ -120,21 +127,27 @@ class AiService {
         .timeout(timeout);
 
     if (res.statusCode == 401) {
-      throw const AiServiceException(
+      throw AiServiceException(
         'Invalid or missing API token.',
         code: 'invalid_token',
+        statusCode: res.statusCode,
+        endpoint: uri.toString(),
       );
     }
     if (res.statusCode == 404) {
-      throw const AiServiceException(
+      throw AiServiceException(
         'Model or endpoint not found (404).',
         code: 'not_found',
+        statusCode: res.statusCode,
+        endpoint: uri.toString(),
       );
     }
     if (res.statusCode >= 400) {
       throw AiServiceException(
         'Request failed (${res.statusCode}): ${_truncate(res.body)}',
         code: 'http_error',
+        statusCode: res.statusCode,
+        endpoint: uri.toString(),
       );
     }
 
@@ -353,21 +366,27 @@ class AiService {
         .timeout(timeout);
 
     if (res.statusCode == 401) {
-      throw const AiServiceException(
+      throw AiServiceException(
         'Invalid or missing API token.',
         code: 'invalid_token',
+        statusCode: res.statusCode,
+        endpoint: uri.toString(),
       );
     }
     if (res.statusCode == 404) {
-      throw const AiServiceException(
+      throw AiServiceException(
         'Model or endpoint not found (404).',
         code: 'not_found',
+        statusCode: res.statusCode,
+        endpoint: uri.toString(),
       );
     }
     if (res.statusCode >= 400) {
       throw AiServiceException(
         'Request failed (${res.statusCode}): ${_truncate(res.body)}',
         code: 'http_error',
+        statusCode: res.statusCode,
+        endpoint: uri.toString(),
       );
     }
 

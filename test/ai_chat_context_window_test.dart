@@ -234,15 +234,12 @@ void main() {
     );
   });
 
-  test('single selected data tool is forced by name', () {
+  test('single selected data tool uses portable auto choice', () {
     final choice = AiChatService.instance.requiredToolChoiceForTest(const {
       'get_sleep_summary',
     });
 
-    expect(choice, {
-      'type': 'function',
-      'function': {'name': 'get_sleep_summary'},
-    });
+    expect(choice, 'auto');
   });
 
   test('wire includes the non-editable personal-data grounding policy', () {
@@ -254,6 +251,18 @@ void main() {
 
     expect(system, contains('Consulta obrigatória aos dados do app'));
     expect(system, contains('O usuário nunca precisa pedir explicitamente'));
+  });
+
+  test('placeholder validation has a clean local fallback', () {
+    final service = AiChatService.instance;
+
+    expect(
+      service.sanitizedAnswerFallbackForTest(
+        r'Ontem você consumiu $1 2.200 kcal e $2 150 g de proteína.',
+      ),
+      'Ontem você consumiu  2.200 kcal e  150 g de proteína.',
+    );
+    expect(service.sanitizedAnswerFallbackForTest(r'$1'), isNull);
   });
 }
 

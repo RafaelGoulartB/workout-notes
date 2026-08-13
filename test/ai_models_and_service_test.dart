@@ -5,7 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/models/ai_provider.dart';
+import 'package:workout_notes/models/ai_chat_error_details.dart';
 import 'package:workout_notes/models/ai_chat_message.dart';
+import 'package:workout_notes/models/ai_chat_state.dart';
 import 'package:workout_notes/models/ai_image_attachment.dart';
 import 'package:workout_notes/models/ai_message_role.dart';
 import 'package:workout_notes/models/ai_settings.dart';
@@ -16,6 +18,30 @@ import 'package:workout_notes/utils/text_sanitizer.dart';
 import 'package:workout_notes/utils/token_estimator.dart';
 
 void main() {
+  test('AiChatState retains and clears technical error details atomically', () {
+    const details = AiChatErrorDetails(
+      code: 'http_error',
+      stage: 'initial_provider_request',
+      httpStatus: 400,
+      model: 'gpt-5.6-luna',
+      requestCharacters: 4200,
+      tools: ['get_nutrition_diary_day'],
+    );
+    final failed = const AiChatState().copyWith(
+      phase: AiTurnPhase.failed,
+      error: 'ai_error:http_error',
+      errorDetails: details,
+    );
+
+    expect(failed.errorDetails, same(details));
+    final recovered = failed.copyWith(
+      phase: AiTurnPhase.idle,
+      clearError: true,
+    );
+    expect(recovered.error, isNull);
+    expect(recovered.errorDetails, isNull);
+  });
+
   group('AiService vision protocol', () {
     test('uses Responses API for OpenCode GPT vision models', () async {
       late http.Request captured;
@@ -502,6 +528,34 @@ void main() {
   });
 
   group('AiService sanitisation', () {
+    test('HTTP failures preserve safe diagnostic metadata', () async {
+      final svc = AiService(
+        client: _StatusHttpClient(
+          statusCode: 400,
+          body: '{"error":{"message":"tool_choice is unsupported"}}',
+        ),
+        timeout: const Duration(seconds: 5),
+      );
+
+      try {
+        await svc.sendChat(
+          baseUrl: 'https://example.test/v1',
+          token: 'secret-token',
+          model: 'm',
+          messages: const [
+            {'role': 'user', 'content': 'oi'},
+          ],
+        );
+        fail('expected AiServiceException');
+      } on AiServiceException catch (error) {
+        expect(error.code, 'http_error');
+        expect(error.statusCode, 400);
+        expect(error.endpoint, 'https://example.test/v1/chat/completions');
+        expect(error.message, contains('tool_choice is unsupported'));
+        expect(error.message, isNot(contains('secret-token')));
+      }
+    });
+
     test('supplies a valid id when a compatible provider omits one', () async {
       final fakeClient = _StubHttpClient((req) {
         return r'''
@@ -636,4 +690,19 @@ class _StubHttpClient extends http.BaseClient {
       headers: {'content-type': 'application/json; charset=utf-8'},
     );
   }
+}
+
+class _StatusHttpClient extends http.BaseClient {
+  final int statusCode;
+  final String body;
+
+  _StatusHttpClient({required this.statusCode, required this.body});
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async =>
+      http.StreamedResponse(
+        Stream.value(utf8.encode(body)),
+        statusCode,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
 }

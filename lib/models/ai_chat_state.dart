@@ -1,4 +1,5 @@
 import 'ai_chat_message.dart';
+import 'ai_chat_error_details.dart';
 import 'ai_chat_thread.dart';
 import 'ai_routine_proposal.dart';
 
@@ -17,6 +18,7 @@ class AiChatState {
   final List<AiChatMessage> messages;
   final AiTurnPhase phase;
   final String? error;
+  final AiChatErrorDetails? errorDetails;
   final String? phaseMessage;
   final int? phaseToolCount;
   final List<AiRoutineProposal> routineProposals;
@@ -27,6 +29,7 @@ class AiChatState {
     this.messages = const [],
     this.phase = AiTurnPhase.idle,
     this.error,
+    this.errorDetails,
     this.phaseMessage,
     this.phaseToolCount,
     this.routineProposals = const [],
@@ -60,6 +63,7 @@ class AiChatState {
     List<AiChatMessage>? messages,
     AiTurnPhase? phase,
     String? error,
+    AiChatErrorDetails? errorDetails,
     bool clearError = false,
     String? phaseMessage,
     bool clearPhaseMessage = false,
@@ -74,6 +78,9 @@ class AiChatState {
       messages: messages ?? this.messages,
       phase: phase ?? this.phase,
       error: clearError ? null : (error ?? this.error),
+      errorDetails: clearError
+          ? null
+          : (errorDetails ?? (error != null ? null : this.errorDetails)),
       phaseMessage: clearPhaseMessage
           ? null
           : (phaseMessage ?? this.phaseMessage),
