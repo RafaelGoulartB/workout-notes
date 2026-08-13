@@ -847,7 +847,9 @@
   "aiToolRecoveryTrend": "Calculating weekly recovery",
   "aiToolDiscoverAppCapabilities": "Selecting app capabilities",
   "aiToolProposeRoutineChange": "Preparing routine proposal",
+  "aiToolProposeManualFoodCreation": "Preparing manual food preview",
   "aiChatPreparingProposal": "Preparing routine preview…",
+  "aiChatPreparingFoodProposal": "Identifying food and nutrition values…",
   "aiChatApplyingProposal": "Applying approved changes…",
   "aiRoutineProposalCreate": "New routine",
   "aiRoutineProposalUpdate": "Update routine",
@@ -874,6 +876,27 @@
   "aiRoutineProposalRejectedBody": "No changes were applied.",
   "aiRoutineProposalAppliedBody": "Changes were applied successfully.",
   "aiRoutineProposalRetrySummary": "Generate summary",
+  "aiFoodProposalTitle": "New manual food",
+  "aiFoodProposalAwaiting": "Awaiting approval",
+  "aiFoodProposalCreated": "Created",
+  "aiFoodProposalRejected": "Rejected",
+  "aiFoodProposalPreview": "Review the estimated values. Approval opens the editable food form and does not save automatically.",
+  "aiFoodProposalCreatedBody": "The food was saved from the review form.",
+  "aiFoodProposalRejectedBody": "The preview was discarded. No food was created.",
+  "aiFoodProposalEstimated": "AI-identified values may be estimates. Review them before saving.",
+  "aiFoodProposalReference": "Values per {amount} {unit}",
+  "@aiFoodProposalReference": {
+    "placeholders": {
+      "amount": {"type": "String"},
+      "unit": {"type": "String"}
+    }
+  },
+  "aiFoodProposalNotes": "Identification notes",
+  "aiFoodProposalServings": "Suggested portions",
+  "aiFoodProposalDetails": "View all identified values",
+  "aiFoodProposalHideDetails": "Hide details",
+  "aiFoodProposalApprove": "Approve and review form",
+  "aiFoodProposalReject": "Discard preview",
   "aiProviderPickerTitle": "Provider and model",
   "aiProviderPickerSearch": "Search model",
 

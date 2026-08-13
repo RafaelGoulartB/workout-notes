@@ -1,6 +1,8 @@
 import '../database/database_helper.dart';
 import '../l10n/app_localizations.dart';
 import '../models/ai_message_role.dart';
+import '../models/nutrition/ai_food_label_draft.dart';
+import '../models/nutrition/ai_manual_food_proposal.dart';
 import '../repositories/goal_repository.dart';
 import 'ai_wellness_analytics_service.dart';
 
@@ -30,17 +32,38 @@ class AiToolRegistry {
   List<Map<String, dynamic>> openAiChatToolsSchema({
     Iterable<String>? names,
     bool includeRoutineProposal = true,
-  }) => [
-    ...openAiReadToolsSchema(names: names),
-    _schemaFor('discover_app_capabilities'),
-    if (includeRoutineProposal) _schemaFor('propose_routine_change'),
-  ];
+  }) {
+    final selected = names?.toSet();
+    return [
+      ...openAiReadToolsSchema(names: names),
+      _schemaFor('discover_app_capabilities'),
+      if (selected == null || selected.contains('propose_manual_food_creation'))
+        _schemaFor('propose_manual_food_creation'),
+      if (includeRoutineProposal) _schemaFor('propose_routine_change'),
+    ];
+  }
 
   /// Selects a compact tool catalog for the current user request.
   Set<String> toolNamesForQuery(String query) {
     final text = query.toLowerCase();
     final selected = <String>{};
     bool hasAny(Iterable<String> terms) => terms.any(text.contains);
+
+    final foodCreationIntent =
+        RegExp(
+          r'\b(criar|crie|cria|cadastrar|cadastre|cadastra|create|register)\b',
+          caseSensitive: false,
+        ).hasMatch(text) &&
+        RegExp(
+          r'\b(alimento|alimentos|comida|comidas|food|foods|produto alimenticio|produto alimentício)\b',
+          caseSensitive: false,
+        ).hasMatch(text);
+    final manualFoodIntent =
+        hasAny(['alimento manual', 'comida manual', 'manual food']) &&
+        hasAny(['novo', 'nova', 'adicionar', 'incluir', 'add']);
+    if (foodCreationIntent || manualFoodIntent) {
+      return {'propose_manual_food_creation'};
+    }
 
     final sleepIntent = hasAny([
       'sono',
@@ -236,6 +259,8 @@ class AiToolRegistry {
           return l10n.aiToolRecoveryTrend;
         case 'propose_routine_change':
           return l10n.aiToolProposeRoutineChange;
+        case 'propose_manual_food_creation':
+          return l10n.aiToolProposeManualFoodCreation;
         case 'discover_app_capabilities':
           return l10n.aiToolDiscoverAppCapabilities;
       }
@@ -279,6 +304,8 @@ class AiToolRegistry {
         return 'Calculando recuperação semanal';
       case 'propose_routine_change':
         return 'Preparando proposta de rotina';
+      case 'propose_manual_food_creation':
+        return 'Preparando alimento manual';
       case 'discover_app_capabilities':
         return 'Selecionando recursos do app';
       default:
@@ -295,6 +322,8 @@ class AiToolRegistry {
       switch (toolName) {
         case 'discover_app_capabilities':
           return _ok(_discoverAppCapabilities(args));
+        case 'propose_manual_food_creation':
+          return _prepareManualFoodProposal(args);
         case 'list_recent_workouts':
           return _ok(await _listRecentWorkouts(args));
         case 'get_workout_detail':
@@ -787,6 +816,7 @@ class AiToolRegistry {
           'get_nutrition_summary',
           'analyze_nutrition_body_trend',
         },
+        'food_creation' => {'propose_manual_food_creation'},
         'recovery' => {
           'get_weekly_recovery_trend',
           'get_sleep_summary',
@@ -842,6 +872,7 @@ class AiToolRegistry {
                       'goals',
                       'sleep',
                       'nutrition',
+                      'food_creation',
                       'recovery',
                       'routine_changes',
                     ],
@@ -1208,6 +1239,79 @@ class AiToolRegistry {
             },
           },
         };
+      case 'propose_manual_food_creation':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Prepare a prévia de um NOVO ALIMENTO MANUAL quando o usuário pedir para criar ou cadastrar um alimento. Identifique o alimento descrito e preencha o máximo possível de calorias, macronutrientes, gorduras, fibras, açúcares, sódio, micronutrientes e porções usuais. Use valores típicos estimados quando não houver rótulo exato e deixe de fora somente o que não puder ser identificado com segurança. Não salva nada: o app exibirá uma prévia e, após aprovação, abrirá o formulário manual preenchido para revisão e salvamento pelo usuário.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'name': {
+                  'type': 'string',
+                  'description': 'Nome claro e específico do alimento.',
+                },
+                'brand': {
+                  'type': 'string',
+                  'description':
+                      'Marca somente quando informada ou identificada; omita se desconhecida.',
+                },
+                'barcode': {
+                  'type': 'string',
+                  'description':
+                      'Código de barras somente quando informado; nunca invente.',
+                },
+                'reference_amount': {
+                  'type': 'number',
+                  'minimum': 0.01,
+                  'description':
+                      'Quantidade à qual todos os nutrientes se referem; prefira 100.',
+                },
+                'reference_unit': {
+                  'type': 'string',
+                  'description':
+                      'Unidade da referência; prefira g ou ml conforme o alimento.',
+                },
+                'per': {
+                  'type': 'object',
+                  'properties': _manualFoodNutrientProperties,
+                  'required': const [],
+                },
+                'servings': {
+                  'type': 'array',
+                  'maxItems': 5,
+                  'description':
+                      'Porções comuns úteis para registrar o alimento.',
+                  'items': {
+                    'type': 'object',
+                    'properties': {
+                      'label': {'type': 'string'},
+                      'quantity': {'type': 'number', 'minimum': 0.01},
+                      'unit': {'type': 'string'},
+                      'grams_equivalent': {'type': 'number', 'minimum': 0},
+                      'ml_equivalent': {'type': 'number', 'minimum': 0},
+                    },
+                    'required': ['label', 'quantity', 'unit'],
+                  },
+                },
+                'notes': {
+                  'type': 'string',
+                  'description':
+                      'Resumo curto das estimativas, preparo ou variedade assumidos; não exponha raciocínio interno.',
+                },
+              },
+              'required': [
+                'name',
+                'reference_amount',
+                'reference_unit',
+                'per',
+                'servings',
+              ],
+            },
+          },
+        };
       default:
         return {
           'type': 'function',
@@ -1266,6 +1370,30 @@ class AiToolRegistry {
   AiToolResult _ok(Map<String, dynamic> data) =>
       AiToolResult(ok: true, data: data);
 
+  AiToolResult _prepareManualFoodProposal(Map<String, dynamic> args) {
+    try {
+      final draft = AiFoodLabelDraft.fromJson(args);
+      if (draft.referenceAmount <= 0 || draft.referenceUnit.trim().isEmpty) {
+        return const AiToolResult(
+          ok: false,
+          code: 'invalid_args',
+          message: 'A referência nutricional deve ter quantidade e unidade.',
+        );
+      }
+      final proposal = AiManualFoodProposal(
+        draft: draft,
+        notes: _nullableString(args['notes']),
+      );
+      return _ok(proposal.toJson());
+    } on FormatException catch (error) {
+      return AiToolResult(
+        ok: false,
+        code: 'invalid_args',
+        message: error.message,
+      );
+    }
+  }
+
   // ===========================================================================
   // TOOL CATALOG
   // ===========================================================================
@@ -1308,4 +1436,33 @@ class AiToolRegistry {
       'description': 'Weekly recovery trend',
     },
   ];
+
+  static const Map<String, dynamic> _manualFoodNutrientProperties = {
+    'calories': {'type': 'number', 'minimum': 0},
+    'protein_g': {'type': 'number', 'minimum': 0},
+    'carbs_g': {'type': 'number', 'minimum': 0},
+    'fat_g': {'type': 'number', 'minimum': 0},
+    'saturated_fat_g': {'type': 'number', 'minimum': 0},
+    'monounsaturated_fat_g': {'type': 'number', 'minimum': 0},
+    'polyunsaturated_fat_g': {'type': 'number', 'minimum': 0},
+    'trans_fat_g': {'type': 'number', 'minimum': 0},
+    'fiber_g': {'type': 'number', 'minimum': 0},
+    'sugars_g': {'type': 'number', 'minimum': 0},
+    'sodium_mg': {'type': 'number', 'minimum': 0},
+    'potassium_mg': {'type': 'number', 'minimum': 0},
+    'calcium_mg': {'type': 'number', 'minimum': 0},
+    'iron_mg': {'type': 'number', 'minimum': 0},
+    'magnesium_mg': {'type': 'number', 'minimum': 0},
+    'zinc_mg': {'type': 'number', 'minimum': 0},
+    'vitamin_a_ug': {'type': 'number', 'minimum': 0},
+    'vitamin_c_mg': {'type': 'number', 'minimum': 0},
+    'vitamin_d_ug': {'type': 'number', 'minimum': 0},
+    'vitamin_b12_ug': {'type': 'number', 'minimum': 0},
+  };
+}
+
+String? _nullableString(dynamic value) {
+  if (value is! String) return null;
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
 }

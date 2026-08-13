@@ -12,6 +12,7 @@ import '../models/ai_chat_thread.dart';
 import '../models/ai_message_role.dart';
 import '../models/ai_provider.dart';
 import '../models/ai_routine_proposal.dart';
+import '../models/nutrition/ai_manual_food_proposal.dart';
 import '../services/ai_context_service.dart';
 import '../services/ai_image_attachment_store.dart';
 import '../services/ai_routine_mutation_service.dart';
@@ -38,7 +39,14 @@ As ferramentas são a fonte primária para fatos pessoais do usuário. Quando a 
 
 Interprete continuações usando a conversa recente. Se o usuário mudar apenas o domínio, preserve os qualificadores ainda aplicáveis do pedido anterior, especialmente período, comparação e objetivo. Exemplo: depois de um resumo da última semana, "E o sono?" exige consultar o resumo de sono para o mesmo período. O usuário nunca precisa pedir explicitamente que você use uma tool.
 
-Use `discover_app_capabilities` somente quando a ferramenta necessária não estiver entre as ferramentas diretas disponíveis. Se uma consulta falhar ou não tiver registros suficientes, informe isso; nunca complete a lacuna com dados inventados.''';
+Use `discover_app_capabilities` somente quando a ferramenta necessária não estiver entre as ferramentas diretas disponíveis. Se uma consulta falhar ou não tiver registros suficientes, informe isso; nunca complete a lacuna com dados inventados.
+
+# Propostas de alimentos manuais (política fixa)
+Quando o usuário pedir para criar ou cadastrar um alimento, use `propose_manual_food_creation`. Identifique a descrição com precisão e preencha o máximo possível dos dados suportados: nome, marca e código somente quando conhecidos, referência nutricional, calorias, macronutrientes, tipos de gordura, fibras, açúcares, sódio, micronutrientes e porções comuns.
+
+Para alimentos genéricos, use valores típicos plausíveis e marque nas notas o preparo, a variedade ou a estimativa assumida. Para produtos de marca sem rótulo suficiente, não invente números exatos nem código de barras: use apenas o que o usuário forneceu e deixe os demais campos ausentes. Faça uma pergunta somente se a ambiguidade impedir uma prévia útil; caso contrário, gere a melhor prévia editável possível.
+
+A ferramenta nunca salva o alimento. Explique que a prévia precisa ser aprovada e que a aprovação apenas abrirá o formulário manual preenchido; a criação só acontecerá quando o usuário revisar e tocar em Salvar nessa tela.''';
 const String _routineMutationPolicy = r'''# Propostas de rotina (política fixa)
 Você pode preparar uma proposta quando isso cumprir o pedido do usuário ou transformar uma recomendação relevante em uma prévia útil. Interprete a intenção pelo significado e pelo contexto da conversa, sem exigir palavras-chave ou uma formulação específica.
 
@@ -296,6 +304,60 @@ class AiChatService extends ChangeNotifier {
     await _sendAppliedProposalSummary(proposal!);
   }
 
+  /// Records the outcome of a manual-food preview in the persisted chat.
+  /// The actual food has already been saved by the manual-food form when this
+  /// is called; this only prevents the preview card from looking pending after
+  /// the user returns to the conversation.
+  Future<void> completeManualFoodProposal({
+    required String toolMessageId,
+    required String foodId,
+  }) => _updateManualFoodProposal(
+    toolMessageId: toolMessageId,
+    status: AiManualFoodProposalStatus.created,
+    foodId: foodId,
+  );
+
+  Future<void> rejectManualFoodProposal(String toolMessageId) =>
+      _updateManualFoodProposal(
+        toolMessageId: toolMessageId,
+        status: AiManualFoodProposalStatus.rejected,
+      );
+
+  Future<void> _updateManualFoodProposal({
+    required String toolMessageId,
+    required AiManualFoodProposalStatus status,
+    String? foodId,
+  }) async {
+    final index = _state.messages.indexWhere(
+      (message) =>
+          message.id == toolMessageId &&
+          message.toolName == 'propose_manual_food_creation',
+    );
+    if (index < 0) return;
+    try {
+      final decoded = jsonDecode(_state.messages[index].content ?? '');
+      if (decoded is! Map) return;
+      final resultMap = decoded.cast<String, dynamic>();
+      final rawData = resultMap['data'];
+      if (rawData is! Map) return;
+      final proposal = AiManualFoodProposal.fromJson(
+        rawData.cast<String, dynamic>(),
+      ).copyWith(status: status, createdFoodId: foodId);
+      resultMap['data'] = proposal.toJson();
+      final result = AiToolResult.fromMap(resultMap);
+      final messages = [..._state.messages];
+      messages[index] = messages[index].copyWith(
+        content: jsonEncode(_pruneNulls(result.toMap())),
+        toolResult: result,
+      );
+      _state = _state.copyWith(messages: messages);
+      notifyListeners();
+      await _persistCurrentThread();
+    } catch (_) {
+      // A malformed historic tool result falls back to the generic tool card.
+    }
+  }
+
   /// Truncates messages after [fromIndex] and resends from that point.
   Future<void> retryFromMessage(int fromIndex) async {
     if (fromIndex < 0 || fromIndex >= _state.messages.length) return;
@@ -477,14 +539,22 @@ class AiChatService extends ChangeNotifier {
       }
 
       // Execute reads sequentially; tool-call order is preserved.
-      final hasProposal = completion.toolCalls.any(
+      final hasRoutineProposal = completion.toolCalls.any(
         (call) => call.name == 'propose_routine_change',
       );
+      final hasFoodProposal = completion.toolCalls.any(
+        (call) => call.name == 'propose_manual_food_creation',
+      );
+      final hasProposal = hasRoutineProposal || hasFoodProposal;
       _state = _state.copyWith(
         phase: hasProposal
             ? AiTurnPhase.preparingProposal
             : AiTurnPhase.executingReads,
-        phaseMessage: hasProposal ? 'preparing_proposal' : 'reading',
+        phaseMessage: hasFoodProposal
+            ? 'preparing_food_proposal'
+            : hasRoutineProposal
+            ? 'preparing_proposal'
+            : 'reading',
         phaseToolCount: completion.toolCalls.length,
       );
       notifyListeners();

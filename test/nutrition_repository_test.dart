@@ -774,6 +774,26 @@ void main() {
         expect(details.food.barcode, '7896000000000');
       },
     );
+
+    test('AI Coach food remains user-editable and deletable', () async {
+      final food = await repository.createManualFood(
+        name: 'Banana prata',
+        source: FoodSource.aiCoach,
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(
+          calories: 98,
+          proteinG: 1.3,
+          carbsG: 26,
+          fatG: 0.1,
+        ),
+        isEstimated: true,
+      );
+
+      expect(food.isUserCreated, isTrue);
+      await repository.deleteManualFood(food.id);
+      expect(await repository.getFoodWithDetails(food.id), isNull);
+    });
   });
 
   group('calorie balance', () {

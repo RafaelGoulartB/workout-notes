@@ -4,12 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../database/database_helper.dart';
 import '../../l10n/app_localizations.dart';
 import '../../main.dart';
 import '../../navigation/ai_coach_navigation.dart';
 import '../../models/ai_chat_message.dart';
 import '../../models/ai_image_attachment.dart';
 import '../../models/ai_chat_state.dart';
+import '../../models/nutrition/ai_manual_food_proposal.dart';
+import '../../models/nutrition/food.dart';
 import '../../services/ai_tool_registry.dart';
 import '../../services/ai_image_attachment_store.dart';
 import '../../state/ai_chat_service.dart';
@@ -18,11 +21,13 @@ import '../../utils/ai_error_localizer.dart';
 import '../../widgets/ai/ai_chat_input_bar.dart';
 import '../../widgets/ai/ai_empty_state.dart';
 import '../../widgets/ai/ai_message_bubble.dart';
+import '../../widgets/ai/ai_manual_food_proposal_card.dart';
 import '../../widgets/ai/ai_provider_picker_sheet.dart';
 import '../../widgets/ai/ai_routine_proposal_card.dart';
 import '../../widgets/ai/ai_tool_result_bubble.dart';
 import 'ai_chat_history_screen.dart';
 import 'ai_settings_screen.dart';
+import 'manual_food_screen.dart';
 import 'routines_screen.dart';
 
 class AiChatScreen extends StatefulWidget {
@@ -548,6 +553,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
         return l10n.aiChatFinalising;
       case 'preparing_proposal':
         return l10n.aiChatPreparingProposal;
+      case 'preparing_food_proposal':
+        return l10n.aiChatPreparingFoodProposal;
       case 'applying_proposal':
         return l10n.aiChatApplyingProposal;
       default:
@@ -750,6 +757,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
               ),
             );
           } else {
+            final foodProposal = _manualFoodProposalFromTool(n);
+            if (foodProposal != null) {
+              children.add(
+                AiManualFoodProposalCard(
+                  proposal: foodProposal,
+                  onApprove: () => _openManualFoodProposal(n, foodProposal),
+                  onReject: () =>
+                      AiChatService.instance.rejectManualFoodProposal(n.id),
+                ),
+              );
+              j++;
+              continue;
+            }
             children.add(
               AiToolResultBubble(
                 message: n,
@@ -784,6 +804,39 @@ class _AiChatScreenState extends State<AiChatScreen> {
     } catch (_) {
       return null;
     }
+  }
+
+  AiManualFoodProposal? _manualFoodProposalFromTool(AiChatMessage message) {
+    if (message.toolName != 'propose_manual_food_creation') return null;
+    try {
+      final raw = jsonDecode(message.content ?? '');
+      final data = raw is Map ? raw['data'] : null;
+      if (data is! Map) return null;
+      return AiManualFoodProposal.fromJson(data.cast<String, dynamic>());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _openManualFoodProposal(
+    AiChatMessage message,
+    AiManualFoodProposal proposal,
+  ) async {
+    if (proposal.status != AiManualFoodProposalStatus.awaitingApproval) return;
+    final food = await Navigator.of(context).push<Food>(
+      MaterialPageRoute(
+        builder: (_) => ManualFoodScreen(
+          repository: DatabaseHelper.instance.nutritionRepository,
+          source: FoodSource.aiCoach,
+          initial: proposal.draft,
+        ),
+      ),
+    );
+    if (food == null || !mounted) return;
+    await AiChatService.instance.completeManualFoodProposal(
+      toolMessageId: message.id,
+      foodId: food.id,
+    );
   }
 
   void _showProviderSheet() {

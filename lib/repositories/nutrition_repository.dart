@@ -220,7 +220,8 @@ class NutritionRepository extends BaseRepository {
 
   /// Registers a manual food entry and returns the persisted [Food].
   /// [source] defaults to [FoodSource.manual]; the AI label flow uses
-  /// [FoodSource.aiVision] so estimated foods stay distinguishable.
+  /// AI-assisted flows use their own source so estimated foods remain
+  /// distinguishable.
   Future<Food> createManualFood({
     required String name,
     String? brand,
@@ -353,7 +354,9 @@ class NutritionRepository extends BaseRepository {
       );
       if (rows.isEmpty) return;
       final source = rows.first['source'] as String?;
-      if (source != FoodSource.manual && source != FoodSource.aiVision) {
+      if (source != FoodSource.manual &&
+          source != FoodSource.aiVision &&
+          source != FoodSource.aiCoach) {
         throw const NutritionValidationException('manual_food_only');
       }
       await txn.delete('foods', where: 'id = ?', whereArgs: [foodId]);
