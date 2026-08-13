@@ -1500,7 +1500,7 @@
   "nutritionBalanceMealDistribution": "Where the calories come from",
   "nutritionBalanceMealEmpty": "No meals logged in this period.",
   "nutritionBalanceOtherMeals": "Other meals",
-  "nutritionBalanceTopContributors": "Top calorie contributors",
+  "nutritionBalanceTopContributors": "Top foods",
   "nutritionBalanceTopEmpty": "No foods logged in this period.",
   "nutritionBalanceTopShare": "{count, plural, =1{1 food accounts for} other{The top {count} foods account for}} {percent}% of calories",
   "@nutritionBalanceTopShare": {
@@ -1518,6 +1518,10 @@
   },
   "nutritionBalanceMacros": "Macronutrient distribution",
   "nutritionBalanceMacrosEmpty": "No macro data in this period.",
+  "nutritionBalanceAverageNutrients": "Average nutrients",
+  "nutritionBalanceAverageNutrientsSubtitle": "Daily average for the selected period",
+  "nutritionBalanceAverageNutrientsEmpty": "No nutrient data in this period.",
+  "nutritionBalanceAverageNutrientsError": "Could not load nutrient averages.",
 
   "exportNutritionCsv": "Nutrition CSV",
   "exportNutritionCsvSubtitle": "Export the meal log history (date, meal, food, macros) — filterable by date range",

@@ -1483,7 +1483,7 @@
   "nutritionBalanceMealDistribution": "Onde estão as calorias",
   "nutritionBalanceMealEmpty": "Nenhuma refeição registrada no período.",
   "nutritionBalanceOtherMeals": "Outras refeições",
-  "nutritionBalanceTopContributors": "Alimentos que mais somam calorias",
+  "nutritionBalanceTopContributors": "Principais alimentos",
   "nutritionBalanceTopEmpty": "Nenhum alimento registrado no período.",
   "nutritionBalanceTopShare": "{count, plural, =1{1 alimento concentra} other{Os {count} alimentos concentram}} {percent}% das calorias",
   "@nutritionBalanceTopShare": {
@@ -1501,6 +1501,10 @@
   },
   "nutritionBalanceMacros": "Distribuição de macronutrientes",
   "nutritionBalanceMacrosEmpty": "Sem dados de macros no período.",
+  "nutritionBalanceAverageNutrients": "Média de nutrientes",
+  "nutritionBalanceAverageNutrientsSubtitle": "Média diária do período selecionado",
+  "nutritionBalanceAverageNutrientsEmpty": "Sem dados de nutrientes no período.",
+  "nutritionBalanceAverageNutrientsError": "Não foi possível carregar as médias dos nutrientes.",
 
   "exportNutritionCsv": "CSV de alimentação",
   "exportNutritionCsvSubtitle": "Exporta o histórico de refeições (data, refeição, alimento, macros) — filtrável por intervalo de datas",

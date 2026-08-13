@@ -20,6 +20,7 @@ import 'package:workout_notes/screens/workout/food_quantity_sheet.dart';
 import 'package:workout_notes/screens/workout/food_search_screen.dart';
 import 'package:workout_notes/screens/workout/manual_food_screen.dart';
 import 'package:workout_notes/screens/workout/nutrition_home_screen.dart';
+import 'package:workout_notes/screens/workout/nutrition_progress_screen.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 
 Widget _app(Widget child) => MaterialApp(
@@ -360,6 +361,66 @@ void main() {
     expect(find.byKey(const ValueKey('nutrition-stat-fiber')), findsOneWidget);
     expect(find.byKey(const ValueKey('nutrition-stat-sugars')), findsOneWidget);
     expect(find.byKey(const ValueKey('nutrition-stat-sodium')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('balance nutrient averages start collapsed and load on expand', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final date = now.toIso8601String().substring(0, 10);
+    await tester.runAsync(() async {
+      await database.insert('meal_logs', {
+        'id': 'balance-meal',
+        'date': date,
+        'meal_type': 'lunch',
+        'name': 'Lunch',
+        'created_at': now.toIso8601String(),
+      });
+      await database.insert('meal_log_items', {
+        'id': 'balance-item',
+        'meal_log_id': 'balance-meal',
+        'food_name_snapshot': 'Test food',
+        'quantity': 1,
+        'unit': 'serving',
+        'calories': 400,
+        'fiber_g': 8,
+        'sugars_g': 12,
+        'sodium_mg': 500,
+        'nutrition_snapshot_json': '{}',
+        'created_at': now.toIso8601String(),
+      });
+    });
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(const NutritionProgressScreen()));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+    final title = find.text(loc.nutritionBalanceAverageNutrients);
+
+    await tester.scrollUntilVisible(
+      title,
+      350,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(title, findsOneWidget);
+    expect(find.text(loc.nutritionNutrientConsumedHeader), findsNothing);
+
+    await tester.tap(title);
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text(loc.nutritionNutrientConsumedHeader), findsOneWidget);
+    expect(find.text(loc.nutritionProgressFiber), findsOneWidget);
+
+    await tester.tap(find.text(loc.nutritionBalanceLast30Days));
+    await tester.pumpAndSettle();
+    expect(find.text(loc.nutritionNutrientConsumedHeader), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
