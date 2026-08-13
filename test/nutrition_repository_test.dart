@@ -811,6 +811,61 @@ void main() {
         expect(balance.balance, -500);
       }
     });
+
+    test('calendar range queries exclude records outside the period', () async {
+      final food = await repository.createManualFood(
+        name: 'Range food',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(calories: 500, fiberG: 5),
+      );
+      final details = await repository.getFoodWithDetails(food.id);
+      final variant = details!.variants.first;
+      const conversion = NutritionConversion(
+        quantity: 100,
+        unit: 'g',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+      );
+      for (final date in ['2026-07-31', '2026-08-02', '2026-08-09']) {
+        await repository.addMealLogItem(
+          date: date,
+          mealType: 'lunch',
+          food: food,
+          variant: variant,
+          conversion: conversion,
+        );
+      }
+
+      final start = DateTime(2026, 8, 2);
+      final end = DateTime(2026, 8, 8);
+      final dailies = await repository.getDailyCalorieTotalsForRange(
+        startDate: start,
+        endDate: end,
+      );
+      final balance = await repository.getCalorieBalanceForRange(
+        startDate: start,
+        endDate: end,
+        goal: 1000,
+      );
+      final history = await repository.getDailyNutritionHistoryForRange(
+        startDate: start,
+        endDate: end,
+      );
+      final contributors = await repository.getTopCalorieContributorsForRange(
+        startDate: start,
+        endDate: end,
+      );
+
+      expect(dailies, hasLength(7));
+      expect(dailies.where((day) => day.calories != null), hasLength(1));
+      expect(balance.days, 7);
+      expect(balance.daysLogged, 1);
+      expect(balance.totalConsumed, 500);
+      expect(history, hasLength(1));
+      expect(history.single['date'], '2026-08-02');
+      expect(contributors.single.totalCalories, 500);
+    });
   });
 
   group('CSV export', () {

@@ -1462,8 +1462,12 @@
   "nutritionProgressCalories": "Calories",
 
   "nutritionBalanceTitle": "Calorie balance",
-  "nutritionBalanceLast7Days": "7 days",
-  "nutritionBalanceLast30Days": "30 days",
+  "nutritionBalanceLast7Days": "Week",
+  "nutritionBalanceLast30Days": "Month",
+  "nutritionBalanceThisMonth": "This month",
+  "nutritionBalanceMonthSummary": "Month summary",
+  "nutritionBalancePreviousPeriod": "Previous period",
+  "nutritionBalanceNextPeriod": "Next period",
   "nutritionBalanceHeroTitle": "Last {days} days",
   "@nutritionBalanceHeroTitle": {
     "placeholders": { "days": { "type": "int" } }

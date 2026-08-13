@@ -14,7 +14,7 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 /// distribution of days across the three bands, the rolling 7-day
 /// average against the goal, where the calories are coming from
 /// (per meal and per food), and how the macros stack up against the
-/// target.
+/// target. Analytics follow navigable calendar weeks and months.
 class NutritionProgressScreen extends StatefulWidget {
   const NutritionProgressScreen({super.key});
 
@@ -23,25 +23,27 @@ class NutritionProgressScreen extends StatefulWidget {
       _NutritionProgressScreenState();
 }
 
-const int _kWindow7 = 7;
-const int _kWindow30 = 30;
 const int _kRollingWindow = 7;
+
+enum _BalancePeriod { week, month }
 
 /// Roughly 7,700 kcal ≈ 1 kg of body fat. Used only for the
 /// informational "equivalent in fat" label on the hero card.
 const double _kKcalPerKgFat = 7700;
+
+DateTime _dateOnly(DateTime value) =>
+    DateTime(value.year, value.month, value.day);
 
 class _NutritionProgressScreenState extends State<NutritionProgressScreen>
     with SingleTickerProviderStateMixin {
   final NutritionRepository _repository = NutritionRepository();
   late final TabController _tabController;
 
-  int _windowDays = _kWindow7;
+  _BalancePeriod _period = _BalancePeriod.week;
+  DateTime _periodAnchor = _dateOnly(DateTime.now());
 
-  CalorieBalance? _balance7;
   CalorieBalance? _balance;
-  List<DailyCalorieTotal> _dailies30 = const [];
-  List<DailyCalorieTotal> _dailies7 = const [];
+  List<DailyCalorieTotal> _dailies = const [];
   List<CalorieContributor> _contributors = const [];
   List<MealTypeCalories> _mealDistribution = const [];
   NutritionGoal? _goal;
@@ -53,6 +55,7 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
   _NutrientAverages? _nutrientAverages;
   int _nutrientRequestId = 0;
   int _nutrientViewVersion = 0;
+  int _loadRequestId = 0;
 
   @override
   void initState() {
@@ -71,62 +74,127 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
 
   void _onTabChanged() {
     if (!_tabController.indexIsChanging) return;
-    final days = _tabController.index == 0 ? _kWindow7 : _kWindow30;
-    if (days != _windowDays) {
+    final period = _tabController.index == 0
+        ? _BalancePeriod.week
+        : _BalancePeriod.month;
+    if (period != _period) {
       setState(() {
-        _windowDays = days;
-        _nutrientsExpanded = false;
-        _isLoadingNutrients = false;
-        _nutrientLoadFailed = false;
-        _nutrientAverages = null;
-        _nutrientRequestId++;
-        _nutrientViewVersion++;
+        _period = period;
+        _resetLazyNutrients();
       });
+      _load();
     }
+  }
+
+  DateTime get _periodStart => switch (_period) {
+    _BalancePeriod.week => _periodAnchor.subtract(
+      Duration(days: _periodAnchor.weekday % DateTime.daysPerWeek),
+    ),
+    _BalancePeriod.month => DateTime(_periodAnchor.year, _periodAnchor.month),
+  };
+
+  DateTime get _periodEnd => switch (_period) {
+    _BalancePeriod.week => _periodStart.add(const Duration(days: 6)),
+    _BalancePeriod.month => DateTime(
+      _periodAnchor.year,
+      _periodAnchor.month + 1,
+      0,
+    ),
+  };
+
+  int get _periodDays => _periodEnd.difference(_periodStart).inDays + 1;
+
+  bool get _isCurrentPeriod {
+    final today = _dateOnly(DateTime.now());
+    return !today.isBefore(_periodStart) && !today.isAfter(_periodEnd);
+  }
+
+  bool get _canMoveNext {
+    final today = _dateOnly(DateTime.now());
+    final currentStart = switch (_period) {
+      _BalancePeriod.week => today.subtract(
+        Duration(days: today.weekday % DateTime.daysPerWeek),
+      ),
+      _BalancePeriod.month => DateTime(today.year, today.month),
+    };
+    return _periodStart.isBefore(currentStart);
+  }
+
+  void _resetLazyNutrients() {
+    _nutrientsExpanded = false;
+    _isLoadingNutrients = false;
+    _nutrientLoadFailed = false;
+    _nutrientAverages = null;
+    _nutrientRequestId++;
+    _nutrientViewVersion++;
+  }
+
+  Future<void> _movePeriod(int delta) async {
+    if (delta > 0 && !_canMoveNext) return;
+    setState(() {
+      _periodAnchor = switch (_period) {
+        _BalancePeriod.week => _periodAnchor.add(Duration(days: 7 * delta)),
+        _BalancePeriod.month => DateTime(
+          _periodAnchor.year,
+          _periodAnchor.month + delta,
+          1,
+        ),
+      };
+      _resetLazyNutrients();
+    });
+    await _load();
   }
 
   Future<void> _load() async {
     if (!mounted) return;
+    final requestId = ++_loadRequestId;
+    final start = _periodStart;
+    final end = _periodEnd;
     setState(() {
       _isLoading = true;
-      _nutrientsExpanded = false;
-      _isLoadingNutrients = false;
-      _nutrientLoadFailed = false;
-      _nutrientAverages = null;
-      _nutrientRequestId++;
-      _nutrientViewVersion++;
+      _resetLazyNutrients();
     });
     try {
       final results = await Future.wait([
         _repository.getActiveGoal(),
-        _repository.getDailyCalorieTotals(days: _kWindow30),
-        _repository.getTopCalorieContributors(days: _kWindow30, limit: 8),
-        _repository.getCaloriesByMealType(days: _kWindow30),
-        _repository.getDailyNutritionHistory(days: _kWindow30),
+        _repository.getDailyCalorieTotalsForRange(
+          startDate: start,
+          endDate: end,
+        ),
+        _repository.getTopCalorieContributorsForRange(
+          startDate: start,
+          endDate: end,
+          limit: 8,
+        ),
+        _repository.getCaloriesByMealTypeForRange(
+          startDate: start,
+          endDate: end,
+        ),
+        _repository.getDailyNutritionHistoryForRange(
+          startDate: start,
+          endDate: end,
+        ),
       ]);
-      if (!mounted) return;
+      if (!mounted || requestId != _loadRequestId) return;
       final goal = results[0] as NutritionGoal?;
       final dailies = results[1] as List<DailyCalorieTotal>;
-      final balances = await Future.wait([
-        _repository.getCalorieBalance(days: _kWindow7, goal: goal?.calories),
-        _repository.getCalorieBalance(days: _kWindow30, goal: goal?.calories),
-      ]);
-      if (!mounted) return;
+      final balance = await _repository.getCalorieBalanceForRange(
+        startDate: start,
+        endDate: end,
+        goal: goal?.calories,
+      );
+      if (!mounted || requestId != _loadRequestId) return;
       setState(() {
         _goal = goal;
-        _dailies30 = dailies;
-        _dailies7 = dailies.length <= _kWindow7
-            ? dailies
-            : dailies.sublist(dailies.length - _kWindow7);
-        _balance7 = balances[0];
-        _balance = balances[1];
+        _dailies = dailies;
+        _balance = balance;
         _contributors = results[2] as List<CalorieContributor>;
         _mealDistribution = results[3] as List<MealTypeCalories>;
         _macros = _summarizeMacros(results[4] as List<Map<String, dynamic>>);
         _isLoading = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || requestId != _loadRequestId) return;
       setState(() => _isLoading = false);
     }
   }
@@ -152,13 +220,17 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
     if (!expanded || _nutrientAverages != null || _isLoadingNutrients) return;
 
     final requestId = ++_nutrientRequestId;
-    final days = _windowDays;
+    final start = _periodStart;
+    final end = _periodEnd;
     setState(() {
       _isLoadingNutrients = true;
       _nutrientLoadFailed = false;
     });
     try {
-      final rows = await _repository.getDailyNutritionHistory(days: days);
+      final rows = await _repository.getDailyNutritionHistoryForRange(
+        startDate: start,
+        endDate: end,
+      );
       if (!mounted || requestId != _nutrientRequestId) return;
       setState(() {
         _nutrientAverages = _NutrientAverages.fromRows(rows);
@@ -177,13 +249,7 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
   // Derived
   // ------------------------------------------------------------------
 
-  CalorieBalance? get _windowBalance =>
-      _windowDays == _kWindow7 ? _balance7 : _balance;
-
-  List<DailyCalorieTotal> get _windowDailies =>
-      _windowDays == _kWindow7 ? _dailies7 : _dailies30;
-
-  /// 7-day rolling average series over the 30-day window. Each point
+  /// 7-day rolling average series over the selected calendar period. Each point
   /// is the mean of the last [window] days ending at that date. Days
   /// without any log pull the mean down; we use a trailing mean of
   /// non-null days within the window so a quiet day doesn't tank the
@@ -191,9 +257,9 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
   List<FlSpot> _rollingSpots() {
     final goal = _goal?.calories;
     final spots = <FlSpot>[];
-    for (var i = 0; i < _dailies30.length; i++) {
-      final start = (i - _kRollingWindow + 1).clamp(0, _dailies30.length);
-      final window = _dailies30.sublist(start, i + 1);
+    for (var i = 0; i < _dailies.length; i++) {
+      final start = (i - _kRollingWindow + 1).clamp(0, _dailies.length);
+      final window = _dailies.sublist(start, i + 1);
       final logged = window.where((d) => d.calories != null).toList();
       if (logged.length < 3) continue;
       final sum = logged.fold<double>(0, (s, d) => s + d.calories!);
@@ -210,6 +276,25 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
 
   double? get _rollingGoal => _goal?.calories;
 
+  String _periodLabel(AppLocalizations loc) {
+    if (_isCurrentPeriod) {
+      return _period == _BalancePeriod.week
+          ? loc.nutritionBalanceThisWeek
+          : loc.nutritionBalanceThisMonth;
+    }
+    if (_period == _BalancePeriod.month) {
+      final label = DateFormat.yMMMM(Intl.defaultLocale).format(_periodStart);
+      return label.characters.first.toUpperCase() + label.substring(1);
+    }
+    final start = _periodStart;
+    final end = _periodEnd;
+    if (start.month == end.month && start.year == end.year) {
+      return '${start.day}–${DateFormat.MMM(Intl.defaultLocale).format(end)} ${end.year}';
+    }
+    return '${DateFormat.MMMd(Intl.defaultLocale).format(start)} – '
+        '${DateFormat.MMMd(Intl.defaultLocale).format(end)}';
+  }
+
   // ------------------------------------------------------------------
   // Build
   // ------------------------------------------------------------------
@@ -219,8 +304,34 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
     final loc = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.nutritionBalanceTitle),
-        centerTitle: true,
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            IconButton(
+              key: const ValueKey('balance-previous-period'),
+              tooltip: loc.nutritionBalancePreviousPeriod,
+              onPressed: () => _movePeriod(-1),
+              icon: const Icon(Icons.chevron_left_rounded),
+            ),
+            Expanded(
+              child: Text(
+                _periodLabel(loc),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            IconButton(
+              key: const ValueKey('balance-next-period'),
+              tooltip: loc.nutritionBalanceNextPeriod,
+              onPressed: !_canMoveNext ? null : () => _movePeriod(1),
+              icon: const Icon(Icons.chevron_right_rounded),
+            ),
+          ],
+        ),
         bottom: TabBar(
           controller: _tabController,
           tabs: [
@@ -237,23 +348,25 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
                 children: [
-                  if (_windowDays == _kWindow7)
+                  if (_period == _BalancePeriod.week)
                     _WeekSequenceCard(
-                      dailies: _windowDailies,
+                      dailies: _dailies,
                       goal: _goal?.calories,
-                      balance: _windowBalance,
+                      balance: _balance,
                     ).animate().fadeIn(duration: 250.ms)
                   else
                     _BalanceHeroCard(
-                      balance: _windowBalance,
+                      balance: _balance,
                       goal: _goal,
-                      windowDays: _windowDays,
+                      windowDays: _periodDays,
+                      title: loc.nutritionBalanceMonthSummary,
                     ).animate().fadeIn(duration: 250.ms),
                   const SizedBox(height: 12),
                   _RollingAverageCard(
                     spots: _rollingSpots(),
                     goal: _rollingGoal,
-                    windowDays: _kWindow30,
+                    windowDays: _periodDays,
+                    startDate: _periodStart,
                   ).animate().fadeIn(duration: 250.ms, delay: 140.ms),
                   const SizedBox(height: 12),
                   _MacroBalanceCard(
@@ -267,7 +380,7 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
                   const SizedBox(height: 12),
                   _AverageNutrientsCard(
                     key: ValueKey(
-                      'average-nutrients-$_windowDays-$_nutrientViewVersion',
+                      'average-nutrients-${_period.name}-$_nutrientViewVersion',
                     ),
                     expanded: _nutrientsExpanded,
                     loading: _isLoadingNutrients,
@@ -297,11 +410,13 @@ class _BalanceHeroCard extends StatelessWidget {
   final CalorieBalance? balance;
   final NutritionGoal? goal;
   final int windowDays;
+  final String? title;
 
   const _BalanceHeroCard({
     required this.balance,
     required this.goal,
     required this.windowDays,
+    this.title,
   });
 
   @override
@@ -343,9 +458,7 @@ class _BalanceHeroCard extends StatelessWidget {
                   Icon(_iconForStatus(status), color: statusColor, size: 22),
                   const SizedBox(width: 8),
                   Text(
-                    windowDays == _kWindow7
-                        ? loc.nutritionBalanceThisWeek
-                        : loc.nutritionBalanceHeroTitle(windowDays),
+                    title ?? loc.nutritionBalanceHeroTitle(windowDays),
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -1052,11 +1165,13 @@ class _RollingAverageCard extends StatelessWidget {
   final List<FlSpot> spots;
   final double? goal;
   final int windowDays;
+  final DateTime startDate;
 
   const _RollingAverageCard({
     required this.spots,
     required this.goal,
     required this.windowDays,
+    required this.startDate,
   });
 
   @override
@@ -1107,7 +1222,12 @@ class _RollingAverageCard extends StatelessWidget {
           SizedBox(
             height: 150,
             child: hasData
-                ? _RollingLineChart(spots: spots, goal: goalKcal)
+                ? _RollingLineChart(
+                    spots: spots,
+                    goal: goalKcal,
+                    windowDays: windowDays,
+                    startDate: startDate,
+                  )
                 : Center(
                     child: Text(
                       loc.nutritionBalanceRollingEmpty,
@@ -1163,8 +1283,15 @@ class _RollingStat extends StatelessWidget {
 class _RollingLineChart extends StatelessWidget {
   final List<FlSpot> spots;
   final double? goal;
+  final int windowDays;
+  final DateTime startDate;
 
-  const _RollingLineChart({required this.spots, required this.goal});
+  const _RollingLineChart({
+    required this.spots,
+    required this.goal,
+    required this.windowDays,
+    required this.startDate,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1224,14 +1351,16 @@ class _RollingLineChart extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 18,
-              interval: 7,
+              interval: windowDays <= 7 ? 3 : 7,
               getTitlesWidget: (value, meta) {
                 final idx = value.toInt();
-                if (idx != 0 && idx != 14 && idx != 28) {
+                final isEdge = idx == 0 || idx == windowDays - 1;
+                final isInterval = windowDays > 7 && idx % 7 == 0;
+                if (!isEdge && !isInterval) {
                   return const SizedBox.shrink();
                 }
-                final daysAgo = _kWindow30 - idx;
-                final label = daysAgo == 1 ? 'ontem' : '${daysAgo}d atrás';
+                final date = startDate.add(Duration(days: idx));
+                final label = DateFormat.Md(Intl.defaultLocale).format(date);
                 return Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(

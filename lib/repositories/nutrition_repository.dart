@@ -1020,11 +1020,18 @@ class NutritionRepository extends BaseRepository {
   /// days without any logged item are absent.
   Future<List<Map<String, dynamic>>> getDailyNutritionHistory({
     int days = 30,
+  }) => getDailyNutritionHistoryForRange(
+    startDate: DateTime.now().subtract(Duration(days: days - 1)),
+    endDate: DateTime.now(),
+  );
+
+  Future<List<Map<String, dynamic>>> getDailyNutritionHistoryForRange({
+    required DateTime startDate,
+    required DateTime endDate,
   }) async {
     final db = await this.db;
-    final start = _dateString(
-      DateTime.now().subtract(Duration(days: days - 1)),
-    );
+    final start = _dateString(startDate);
+    final end = _dateString(endDate);
     final rows = await db.rawQuery(
       '''
       SELECT ml.date as date,
@@ -1050,11 +1057,11 @@ class NutritionRepository extends BaseRepository {
         SUM(mli.vitamin_b12_ug) as vitamin_b12_ug
       FROM meal_log_items mli
       JOIN meal_logs ml ON mli.meal_log_id = ml.id
-      WHERE ml.date >= ?
+      WHERE ml.date BETWEEN ? AND ?
       GROUP BY ml.date
       ORDER BY ml.date ASC
       ''',
-      [start],
+      [start, end],
     );
     return rows;
   }
@@ -1331,13 +1338,19 @@ class NutritionRepository extends BaseRepository {
   /// Per-day totals for the [days] window, oldest first. Days with no
   /// logged items are emitted with `calories` (and the macros) null so
   /// the screen can render continuous timelines and detect missed days.
-  Future<List<DailyCalorieTotal>> getDailyCalorieTotals({
-    required int days,
+  Future<List<DailyCalorieTotal>> getDailyCalorieTotals({required int days}) =>
+      getDailyCalorieTotalsForRange(
+        startDate: DateTime.now().subtract(Duration(days: days - 1)),
+        endDate: DateTime.now(),
+      );
+
+  Future<List<DailyCalorieTotal>> getDailyCalorieTotalsForRange({
+    required DateTime startDate,
+    required DateTime endDate,
   }) async {
     final db = await this.db;
-    final start = _dateString(
-      DateTime.now().subtract(Duration(days: days - 1)),
-    );
+    final start = _dateString(startDate);
+    final end = _dateString(endDate);
     final rows = await db.rawQuery(
       '''
       SELECT ml.date as date,
@@ -1345,11 +1358,11 @@ class NutritionRepository extends BaseRepository {
         COUNT(*) as item_count
       FROM meal_log_items mli
       JOIN meal_logs ml ON mli.meal_log_id = ml.id
-      WHERE ml.date >= ?
+      WHERE ml.date BETWEEN ? AND ?
       GROUP BY ml.date
       ORDER BY ml.date ASC
       ''',
-      [start],
+      [start, end],
     );
     final totalsByDate = <String, double>{};
     for (final row in rows) {
@@ -1359,9 +1372,11 @@ class NutritionRepository extends BaseRepository {
       }
     }
     final result = <DailyCalorieTotal>[];
-    final startDate = DateTime.parse(start);
+    final firstDay = DateTime.parse(start);
+    final lastDay = DateTime.parse(end);
+    final days = lastDay.difference(firstDay).inDays + 1;
     for (var i = 0; i < days; i++) {
-      final d = DateTime(startDate.year, startDate.month, startDate.day + i);
+      final d = DateTime(firstDay.year, firstDay.month, firstDay.day + i);
       final key = _dateString(d);
       result.add(DailyCalorieTotal(date: d, calories: totalsByDate[key]));
     }
@@ -1373,8 +1388,22 @@ class NutritionRepository extends BaseRepository {
   Future<CalorieBalance> getCalorieBalance({
     required int days,
     required double? goal,
+  }) => getCalorieBalanceForRange(
+    startDate: DateTime.now().subtract(Duration(days: days - 1)),
+    endDate: DateTime.now(),
+    goal: goal,
+  );
+
+  Future<CalorieBalance> getCalorieBalanceForRange({
+    required DateTime startDate,
+    required DateTime endDate,
+    required double? goal,
   }) async {
-    final dailies = await getDailyCalorieTotals(days: days);
+    final dailies = await getDailyCalorieTotalsForRange(
+      startDate: startDate,
+      endDate: endDate,
+    );
+    final days = dailies.length;
     var consumed = 0.0;
     var loggedDays = 0;
     var inDeficit = 0;
@@ -1442,11 +1471,20 @@ class NutritionRepository extends BaseRepository {
   Future<List<CalorieContributor>> getTopCalorieContributors({
     required int days,
     int limit = 10,
+  }) => getTopCalorieContributorsForRange(
+    startDate: DateTime.now().subtract(Duration(days: days - 1)),
+    endDate: DateTime.now(),
+    limit: limit,
+  );
+
+  Future<List<CalorieContributor>> getTopCalorieContributorsForRange({
+    required DateTime startDate,
+    required DateTime endDate,
+    int limit = 10,
   }) async {
     final db = await this.db;
-    final start = _dateString(
-      DateTime.now().subtract(Duration(days: days - 1)),
-    );
+    final start = _dateString(startDate);
+    final end = _dateString(endDate);
     final rows = await db.rawQuery(
       '''
       SELECT mli.food_name_snapshot as food_name,
@@ -1455,14 +1493,14 @@ class NutritionRepository extends BaseRepository {
         COUNT(*) as occurrences
       FROM meal_log_items mli
       JOIN meal_logs ml ON mli.meal_log_id = ml.id
-      WHERE ml.date >= ?
+      WHERE ml.date BETWEEN ? AND ?
         AND mli.food_name_snapshot IS NOT NULL
         AND mli.calories IS NOT NULL
       GROUP BY mli.food_name_snapshot, mli.brand_snapshot
       ORDER BY total_calories DESC
       LIMIT ?
       ''',
-      [start, limit],
+      [start, end, limit],
     );
     return rows
         .map(
@@ -1479,13 +1517,19 @@ class NutritionRepository extends BaseRepository {
   /// Calorie distribution across meal types in the [days] window.
   /// Excludes days with no logged items and meal types that never
   /// appear so the chart only renders what the user actually uses.
-  Future<List<MealTypeCalories>> getCaloriesByMealType({
-    required int days,
+  Future<List<MealTypeCalories>> getCaloriesByMealType({required int days}) =>
+      getCaloriesByMealTypeForRange(
+        startDate: DateTime.now().subtract(Duration(days: days - 1)),
+        endDate: DateTime.now(),
+      );
+
+  Future<List<MealTypeCalories>> getCaloriesByMealTypeForRange({
+    required DateTime startDate,
+    required DateTime endDate,
   }) async {
     final db = await this.db;
-    final start = _dateString(
-      DateTime.now().subtract(Duration(days: days - 1)),
-    );
+    final start = _dateString(startDate);
+    final end = _dateString(endDate);
     final rows = await db.rawQuery(
       '''
       SELECT ml.meal_type as meal_type,
@@ -1494,12 +1538,12 @@ class NutritionRepository extends BaseRepository {
         COUNT(*) as item_count
       FROM meal_log_items mli
       JOIN meal_logs ml ON mli.meal_log_id = ml.id
-      WHERE ml.date >= ?
+      WHERE ml.date BETWEEN ? AND ?
         AND mli.calories IS NOT NULL
       GROUP BY ml.meal_type, display_name
       ORDER BY total_calories DESC
       ''',
-      [start],
+      [start, end],
     );
     return rows
         .map(

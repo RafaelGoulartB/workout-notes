@@ -419,7 +419,12 @@ void main() {
     expect(find.text(loc.nutritionProgressFiber), findsOneWidget);
 
     await tester.tap(find.text(loc.nutritionBalanceLast30Days));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await tester.pump();
+    });
+    await tester.pump(const Duration(milliseconds: 300));
     expect(find.text(loc.nutritionNutrientConsumedHeader), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -435,10 +440,56 @@ void main() {
     final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
 
     expect(find.text(loc.nutritionBalanceWeekSequence), findsOneWidget);
-    expect(find.text(loc.nutritionBalanceThisWeek), findsNothing);
+    expect(find.text(loc.nutritionBalanceTitle), findsNothing);
+    expect(find.text(loc.nutritionBalanceThisWeek), findsOneWidget);
     expect(find.text(loc.nutritionBalanceDaysLogged), findsOneWidget);
     expect(find.text(loc.nutritionBalanceAverageIntake), findsOneWidget);
     expect(find.text(loc.nutritionBalanceCurrentStreak), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('balance header navigates calendar weeks and months', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(const NutritionProgressScreen()));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+    final previous = find.byKey(const ValueKey('balance-previous-period'));
+    final next = find.byKey(const ValueKey('balance-next-period'));
+
+    expect(find.text(loc.nutritionBalanceThisWeek), findsOneWidget);
+    expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
+
+    await tester.tap(previous);
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      await tester.pump();
+    });
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(loc.nutritionBalanceThisWeek), findsNothing);
+    expect(tester.widget<IconButton>(next).onPressed, isNotNull);
+
+    await tester.tap(next);
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      await tester.pump();
+    });
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(loc.nutritionBalanceThisWeek), findsOneWidget);
+
+    await tester.tap(find.text(loc.nutritionBalanceLast30Days));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      await tester.pump();
+    });
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(loc.nutritionBalanceThisMonth), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
