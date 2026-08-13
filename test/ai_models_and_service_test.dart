@@ -502,6 +502,50 @@ void main() {
   });
 
   group('AiService sanitisation', () {
+    test('supplies a valid id when a compatible provider omits one', () async {
+      final fakeClient = _StubHttpClient((req) {
+        return r'''
+{
+  "choices": [
+    {
+      "message": {
+        "content": null,
+        "tool_calls": [
+          {
+            "type": "function",
+            "function": {
+              "name": "propose_manual_food_creation",
+              "arguments": "{\"name\":\"Pão francês médio\"}"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
+''';
+      });
+      final svc = AiService(
+        client: fakeClient,
+        timeout: const Duration(seconds: 5),
+      );
+
+      final completion = await svc.sendChat(
+        baseUrl: 'https://example.test/v1',
+        token: 'tok',
+        model: 'qwen-compatible',
+        messages: const [
+          {'role': 'user', 'content': 'crie o alimento'},
+        ],
+      );
+
+      expect(completion.toolCalls.single.id, 'call_1');
+      expect(
+        completion.toolCalls.single.arguments['name'],
+        'Pão francês médio',
+      );
+    });
+
     test(r'preserves $1 so the orchestrator can reject it', () async {
       final fakeClient = _StubHttpClient((req) {
         return r'''

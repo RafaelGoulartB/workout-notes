@@ -77,6 +77,23 @@ void main() {
     );
   });
 
+  test(
+    'manual food request can omit capability discovery for compatibility',
+    () {
+      final tools = registry.openAiChatToolsSchema(
+        names: const {'propose_manual_food_creation'},
+        includeRoutineProposal: false,
+        includeCapabilityDiscovery: false,
+      );
+
+      expect(tools, hasLength(1));
+      expect(
+        (tools.single['function'] as Map)['name'],
+        'propose_manual_food_creation',
+      );
+    },
+  );
+
   test('chat schema always includes lightweight capability discovery', () {
     final tools = registry.openAiChatToolsSchema(
       names: const <String>{},
@@ -153,6 +170,10 @@ void main() {
       registry.toolNamesForQuery(
         'Crie um alimento manual de arroz integral cozido',
       ),
+      {'propose_manual_food_creation'},
+    );
+    expect(
+      registry.toolNamesForQuery('Adicione o alimento banana prata média'),
       {'propose_manual_food_creation'},
     );
   });

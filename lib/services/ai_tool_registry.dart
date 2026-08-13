@@ -32,11 +32,12 @@ class AiToolRegistry {
   List<Map<String, dynamic>> openAiChatToolsSchema({
     Iterable<String>? names,
     bool includeRoutineProposal = true,
+    bool includeCapabilityDiscovery = true,
   }) {
     final selected = names?.toSet();
     return [
       ...openAiReadToolsSchema(names: names),
-      _schemaFor('discover_app_capabilities'),
+      if (includeCapabilityDiscovery) _schemaFor('discover_app_capabilities'),
       if (selected == null || selected.contains('propose_manual_food_creation'))
         _schemaFor('propose_manual_food_creation'),
       if (includeRoutineProposal) _schemaFor('propose_routine_change'),
@@ -51,7 +52,7 @@ class AiToolRegistry {
 
     final foodCreationIntent =
         RegExp(
-          r'\b(criar|crie|cria|cadastrar|cadastre|cadastra|create|register)\b',
+          r'\b(criar|crie|cria|cadastrar|cadastre|cadastra|adicionar|adicione|adiciona|incluir|inclua|registrar|registre|salvar|salve|create|register|add)\b',
           caseSensitive: false,
         ).hasMatch(text) &&
         RegExp(
@@ -1265,7 +1266,6 @@ class AiToolRegistry {
                 },
                 'reference_amount': {
                   'type': 'number',
-                  'minimum': 0.01,
                   'description':
                       'Quantidade à qual todos os nutrientes se referem; prefira 100.',
                 },
@@ -1281,17 +1281,16 @@ class AiToolRegistry {
                 },
                 'servings': {
                   'type': 'array',
-                  'maxItems': 5,
                   'description':
                       'Porções comuns úteis para registrar o alimento.',
                   'items': {
                     'type': 'object',
                     'properties': {
                       'label': {'type': 'string'},
-                      'quantity': {'type': 'number', 'minimum': 0.01},
+                      'quantity': {'type': 'number'},
                       'unit': {'type': 'string'},
-                      'grams_equivalent': {'type': 'number', 'minimum': 0},
-                      'ml_equivalent': {'type': 'number', 'minimum': 0},
+                      'grams_equivalent': {'type': 'number'},
+                      'ml_equivalent': {'type': 'number'},
                     },
                     'required': ['label', 'quantity', 'unit'],
                   },
@@ -1438,26 +1437,26 @@ class AiToolRegistry {
   ];
 
   static const Map<String, dynamic> _manualFoodNutrientProperties = {
-    'calories': {'type': 'number', 'minimum': 0},
-    'protein_g': {'type': 'number', 'minimum': 0},
-    'carbs_g': {'type': 'number', 'minimum': 0},
-    'fat_g': {'type': 'number', 'minimum': 0},
-    'saturated_fat_g': {'type': 'number', 'minimum': 0},
-    'monounsaturated_fat_g': {'type': 'number', 'minimum': 0},
-    'polyunsaturated_fat_g': {'type': 'number', 'minimum': 0},
-    'trans_fat_g': {'type': 'number', 'minimum': 0},
-    'fiber_g': {'type': 'number', 'minimum': 0},
-    'sugars_g': {'type': 'number', 'minimum': 0},
-    'sodium_mg': {'type': 'number', 'minimum': 0},
-    'potassium_mg': {'type': 'number', 'minimum': 0},
-    'calcium_mg': {'type': 'number', 'minimum': 0},
-    'iron_mg': {'type': 'number', 'minimum': 0},
-    'magnesium_mg': {'type': 'number', 'minimum': 0},
-    'zinc_mg': {'type': 'number', 'minimum': 0},
-    'vitamin_a_ug': {'type': 'number', 'minimum': 0},
-    'vitamin_c_mg': {'type': 'number', 'minimum': 0},
-    'vitamin_d_ug': {'type': 'number', 'minimum': 0},
-    'vitamin_b12_ug': {'type': 'number', 'minimum': 0},
+    'calories': {'type': 'number'},
+    'protein_g': {'type': 'number'},
+    'carbs_g': {'type': 'number'},
+    'fat_g': {'type': 'number'},
+    'saturated_fat_g': {'type': 'number'},
+    'monounsaturated_fat_g': {'type': 'number'},
+    'polyunsaturated_fat_g': {'type': 'number'},
+    'trans_fat_g': {'type': 'number'},
+    'fiber_g': {'type': 'number'},
+    'sugars_g': {'type': 'number'},
+    'sodium_mg': {'type': 'number'},
+    'potassium_mg': {'type': 'number'},
+    'calcium_mg': {'type': 'number'},
+    'iron_mg': {'type': 'number'},
+    'magnesium_mg': {'type': 'number'},
+    'zinc_mg': {'type': 'number'},
+    'vitamin_a_ug': {'type': 'number'},
+    'vitamin_c_mg': {'type': 'number'},
+    'vitamin_d_ug': {'type': 'number'},
+    'vitamin_b12_ug': {'type': 'number'},
   };
 }
 

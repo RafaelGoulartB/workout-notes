@@ -171,7 +171,16 @@ class AiService {
     if (rawCalls is List) {
       for (final raw in rawCalls) {
         if (raw is Map) {
-          calls.add(AiToolCall.fromJson(raw.cast<String, dynamic>()));
+          final parsed = AiToolCall.fromJson(raw.cast<String, dynamic>());
+          calls.add(
+            parsed.id.isEmpty
+                ? AiToolCall(
+                    id: 'call_${calls.length + 1}',
+                    name: parsed.name,
+                    arguments: parsed.arguments,
+                  )
+                : parsed,
+          );
         }
       }
     }

@@ -12,6 +12,7 @@ import '../models/ai_chat_thread.dart';
 import '../models/ai_message_role.dart';
 import '../models/ai_provider.dart';
 import '../models/ai_routine_proposal.dart';
+import '../models/ai_tool_call.dart';
 import '../models/nutrition/ai_manual_food_proposal.dart';
 import '../services/ai_context_service.dart';
 import '../services/ai_image_attachment_store.dart';
@@ -60,6 +61,17 @@ Quando houver esse pedido, você DEVE usar ferramentas; não responda dizendo qu
 7. Depois do resultado da ferramenta, explique que a prévia está disponível para aprovação.
 
 `propose_routine_change` apenas prepara a prévia: ela não aplica nada. Nunca diga que criou ou editou uma rotina antes da aprovação e do resultado confirmado pelo app. Após uma aprovação, resuma somente os fatos retornados pelo app.''';
+const String _manualFoodProposalPrompt =
+    r'''Você prepara rascunhos de alimentos para revisão humana em um app de nutrição.
+
+Quando solicitado, chame `propose_manual_food_creation` uma única vez. Identifique o alimento e preencha o máximo possível de: nome, marca e código de barras quando realmente conhecidos; referência em g ou ml; calorias; proteínas; carboidratos; gorduras e seus tipos; fibras; açúcares; sódio; potássio; cálcio; ferro; magnésio; zinco; vitaminas A, C, D e B12; e porções comuns.
+
+Para alimentos genéricos, use valores típicos plausíveis e informe em `notes` o preparo ou variedade assumidos. Para produtos de marca sem rótulo suficiente, não invente valores exatos nem código de barras. Todos os nutrientes devem corresponder à quantidade de referência. A ferramenta só cria uma prévia: o usuário ainda revisará e salvará o formulário.''';
+const String _manualFoodJsonFallbackPrompt =
+    r'''Converta o pedido do usuário em um único objeto JSON, sem markdown nem comentários, usando exatamente esta estrutura:
+{"name":"...","brand":"... opcional","barcode":"... opcional","reference_amount":100,"reference_unit":"g ou ml","per":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"saturated_fat_g":0,"monounsaturated_fat_g":0,"polyunsaturated_fat_g":0,"trans_fat_g":0,"fiber_g":0,"sugars_g":0,"sodium_mg":0,"potassium_mg":0,"calcium_mg":0,"iron_mg":0,"magnesium_mg":0,"zinc_mg":0,"vitamin_a_ug":0,"vitamin_c_mg":0,"vitamin_d_ug":0,"vitamin_b12_ug":0},"servings":[{"label":"...","quantity":1,"unit":"...","grams_equivalent":0,"ml_equivalent":0}],"notes":"..."}
+
+Omita campos opcionais ou nutrientes que não puder identificar com segurança; não escreva null. Para alimentos genéricos, use valores típicos plausíveis e descreva a hipótese em notes. Todos os nutrientes devem corresponder à quantidade de referência.''';
 
 /// Singleton orchestrator for AI chat turns. Owns the chat state.
 ///
@@ -416,6 +428,10 @@ class AiChatService extends ChangeNotifier {
       latestUserText,
     );
     var toolNames = _toolNamesForTurn(current, latestUserText);
+    final manualFoodProposalTurn =
+        toolNames.length == 1 &&
+        toolNames.contains('propose_manual_food_creation');
+    final manualFoodTextTurn = manualFoodProposalTurn && imageDataUrls.isEmpty;
     if (routineProposalFollowUp) {
       toolNames.addAll({
         'list_exercises',
@@ -439,27 +455,34 @@ class AiChatService extends ChangeNotifier {
       routineProposalFollowUp: routineProposalFollowUp,
     );
     _context.invalidate();
-    final contextJson = await _context.build(mode: contextMode);
+    final contextJson = manualFoodTextTurn
+        ? const <String, dynamic>{}
+        : await _context.build(mode: contextMode);
 
     for (var round = 0; round < kMaxToolRounds + 1; round++) {
       final toolsSchema = _tools.openAiChatToolsSchema(
         names: toolNames,
         includeRoutineProposal: proposalAvailable,
+        includeCapabilityDiscovery: !manualFoodTextTurn || round > 0,
       );
-      final wire = _buildWireMessages(
-        current,
-        systemPrompt: systemPrompt,
-        contextJson: contextJson,
-        includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
-        visionMessageId: visionMessage.id,
-        imageDataUrls: imageDataUrls,
-        historyTokenBudget: _historyBudgetFor(
-          systemPrompt: systemPrompt,
-          contextJson: contextJson,
-          toolsSchema: toolsSchema,
-          includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
-        ),
-      );
+      final wire = manualFoodTextTurn && round == 0
+          ? _buildManualFoodProposalWire(current)
+          : _buildWireMessages(
+              current,
+              systemPrompt: systemPrompt,
+              contextJson: contextJson,
+              includeRoutinePolicy:
+                  routineCapabilityActive || proposalAvailable,
+              visionMessageId: visionMessage.id,
+              imageDataUrls: imageDataUrls,
+              historyTokenBudget: _historyBudgetFor(
+                systemPrompt: systemPrompt,
+                contextJson: contextJson,
+                toolsSchema: toolsSchema,
+                includeRoutinePolicy:
+                    routineCapabilityActive || proposalAvailable,
+              ),
+            );
 
       _state = _state.copyWith(
         phase: round == 0 ? AiTurnPhase.sending : AiTurnPhase.executingReads,
@@ -471,14 +494,23 @@ class AiChatService extends ChangeNotifier {
           ? _requiredToolChoice(toolNames)
           : 'auto';
       var completion = imageDataUrls.isEmpty
-          ? await _service.sendChat(
-              baseUrl: baseUrl,
-              token: token,
-              model: model,
-              messages: wire,
-              tools: toolsSchema,
-              toolChoice: toolChoice,
-            )
+          ? manualFoodTextTurn && round == 0
+                ? await _sendManualFoodProposalCompletion(
+                    baseUrl: baseUrl,
+                    token: token,
+                    model: model,
+                    messages: wire,
+                    toolsSchema: toolsSchema,
+                    toolChoice: toolChoice,
+                  )
+                : await _service.sendChat(
+                    baseUrl: baseUrl,
+                    token: token,
+                    model: model,
+                    messages: wire,
+                    tools: toolsSchema,
+                    toolChoice: toolChoice,
+                  )
           : await _service.sendMultimodalChat(
               baseUrl: baseUrl,
               token: token,
@@ -567,6 +599,7 @@ class AiChatService extends ChangeNotifier {
           return _tools.executeRead(toolName: call.name, args: call.arguments);
         }),
       );
+      var preparedManualFood = false;
       for (var i = 0; i < completion.toolCalls.length; i++) {
         final call = completion.toolCalls[i];
         final result = call.name == 'propose_routine_change'
@@ -584,6 +617,9 @@ class AiChatService extends ChangeNotifier {
             if (proposal != null) _replaceProposal(proposal, notify: false);
           }
         }
+        if (call.name == 'propose_manual_food_creation' && result.ok) {
+          preparedManualFood = true;
+        }
         final toolMsg = AiChatMessage(
           id: _uuid.v4(),
           threadId: _state.activeThreadId ?? '',
@@ -598,6 +634,16 @@ class AiChatService extends ChangeNotifier {
       }
       _state = _state.copyWith(messages: current);
       notifyListeners();
+
+      // The preview card is the final product of this turn. A second provider
+      // request adds no value and several OpenAI-compatible backends reject
+      // the assistant/tool transcript even after accepting the first call.
+      if (preparedManualFood) {
+        _state = _state.copyWith(phase: AiTurnPhase.idle, phaseMessage: null);
+        notifyListeners();
+        await _persistCurrentThread();
+        return;
+      }
 
       final calledNames = completion.toolCalls.map((call) => call.name).toSet();
       final discoveredNames = <String>{};
@@ -708,6 +754,139 @@ class AiChatService extends ChangeNotifier {
         return;
       }
     }
+  }
+
+  List<Map<String, dynamic>> _buildManualFoodProposalWire(
+    List<AiChatMessage> messages,
+  ) {
+    final recent = <Map<String, dynamic>>[];
+    var characters = 0;
+    for (var i = messages.length - 1; i >= 0 && recent.length < 6; i--) {
+      final message = messages[i];
+      if (!message.isUser && !message.isAssistant) continue;
+      final content = message.content?.trim();
+      if (content == null || content.isEmpty) continue;
+      final remaining = 4000 - characters;
+      if (remaining <= 0) break;
+      final compact = content.length <= remaining
+          ? content
+          : content.substring(content.length - remaining);
+      recent.insert(0, {
+        'role': message.isUser ? 'user' : 'assistant',
+        'content': compact,
+      });
+      characters += compact.length;
+    }
+    return [
+      const {'role': 'system', 'content': _manualFoodProposalPrompt},
+      ...recent,
+    ];
+  }
+
+  Future<AiChatCompletion> _sendManualFoodProposalCompletion({
+    required String baseUrl,
+    required String token,
+    required String model,
+    required List<Map<String, dynamic>> messages,
+    required List<Map<String, dynamic>> toolsSchema,
+    required Object toolChoice,
+  }) async {
+    try {
+      final completion = await _service.sendChat(
+        baseUrl: baseUrl,
+        token: token,
+        model: model,
+        messages: messages,
+        tools: toolsSchema,
+        toolChoice: toolChoice,
+      );
+      if (completion.hasToolCalls) return completion;
+      if (kDebugMode) {
+        debugPrint(
+          'AiChatService: provider ignored the required manual-food tool; '
+          'retrying with JSON fallback.',
+        );
+      }
+      return _sendManualFoodJsonFallback(
+        baseUrl: baseUrl,
+        token: token,
+        model: model,
+        messages: messages,
+      );
+    } on AiServiceException catch (error) {
+      if (error.code != 'http_error') rethrow;
+      if (kDebugMode) {
+        debugPrint(
+          'AiChatService: provider rejected manual-food tool schema; '
+          'retrying with JSON fallback. $error',
+        );
+      }
+      return _sendManualFoodJsonFallback(
+        baseUrl: baseUrl,
+        token: token,
+        model: model,
+        messages: messages,
+      );
+    }
+  }
+
+  Future<AiChatCompletion> _sendManualFoodJsonFallback({
+    required String baseUrl,
+    required String token,
+    required String model,
+    required List<Map<String, dynamic>> messages,
+  }) async {
+    final fallback = await _service.sendChat(
+      baseUrl: baseUrl,
+      token: token,
+      model: model,
+      messages: [
+        const {'role': 'system', 'content': _manualFoodJsonFallbackPrompt},
+        ...messages.where((message) => message['role'] != 'system'),
+      ],
+    );
+    final text = fallback.text?.trim();
+    if (text == null || text.isEmpty) {
+      throw const AiServiceException(
+        'The provider returned no manual-food draft.',
+        code: 'invalid_response',
+      );
+    }
+    final arguments = _parseJsonObject(text);
+    return AiChatCompletion(
+      toolCalls: [
+        AiToolCall(
+          id: 'food_${_uuid.v4()}',
+          name: 'propose_manual_food_creation',
+          arguments: arguments,
+        ),
+      ],
+      promptTokens: fallback.promptTokens,
+      completionTokens: fallback.completionTokens,
+    );
+  }
+
+  Map<String, dynamic> _parseJsonObject(String raw) {
+    var cleaned = raw.trim();
+    final fenced = RegExp(
+      r'```(?:json)?\s*([\s\S]*?)```',
+      caseSensitive: false,
+    ).firstMatch(cleaned);
+    if (fenced != null) cleaned = fenced.group(1)!.trim();
+    final start = cleaned.indexOf('{');
+    final end = cleaned.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      cleaned = cleaned.substring(start, end + 1);
+    }
+    try {
+      final decoded = jsonDecode(cleaned);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return decoded.cast<String, dynamic>();
+    } catch (_) {}
+    throw const AiServiceException(
+      'The provider returned an invalid manual-food draft.',
+      code: 'invalid_response',
+    );
   }
 
   Future<AiChatCompletion> _retryMissingRequiredToolCall({
