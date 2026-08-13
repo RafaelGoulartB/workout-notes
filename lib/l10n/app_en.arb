@@ -1496,6 +1496,11 @@
   "nutritionBalanceStreakHint": "in a row",
   "nutritionBalanceNoDaysLogged": "No days logged in this period.",
   "nutritionBalanceWeekSequence": "Week sequence",
+  "nutritionBalanceMonthSequence": "Month sequence",
+  "nutritionBalanceWeekNumber": "W{number}",
+  "@nutritionBalanceWeekNumber": {
+    "placeholders": { "number": { "type": "int" } }
+  },
   "nutritionBalanceRollingTitle": "7-day rolling average",
   "nutritionBalanceRollingCurrent": "Current average",
   "nutritionBalanceRollingDelta": "vs goal",

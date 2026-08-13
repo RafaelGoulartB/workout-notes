@@ -1479,6 +1479,11 @@
   "nutritionBalanceStreakHint": "consecutivos",
   "nutritionBalanceNoDaysLogged": "Nenhum dia registrado no período.",
   "nutritionBalanceWeekSequence": "Sequência da semana",
+  "nutritionBalanceMonthSequence": "Sequência do mês",
+  "nutritionBalanceWeekNumber": "S{number}",
+  "@nutritionBalanceWeekNumber": {
+    "placeholders": { "number": { "type": "int" } }
+  },
   "nutritionBalanceRollingTitle": "Média móvel de 7 dias",
   "nutritionBalanceRollingCurrent": "Média atual",
   "nutritionBalanceRollingDelta": "vs meta",

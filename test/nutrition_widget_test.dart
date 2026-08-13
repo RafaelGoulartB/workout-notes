@@ -448,6 +448,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('monthly balance uses the sequence card grouped by week', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(const NutritionProgressScreen()));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+    expect(find.text(loc.nutritionBalanceWeekSequence), findsOneWidget);
+
+    await tester.tap(find.text(loc.nutritionBalanceLast30Days));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await tester.pump();
+    });
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text(loc.nutritionBalanceMonthSequence), findsOneWidget);
+    expect(find.byKey(const ValueKey('balance-month-week-1')), findsOneWidget);
+    expect(find.text(loc.nutritionBalanceMonthSummary), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('balance header navigates calendar weeks and months', (
     tester,
   ) async {

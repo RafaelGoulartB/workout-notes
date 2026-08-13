@@ -178,9 +178,8 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
       if (!mounted || requestId != _loadRequestId) return;
       final goal = results[0] as NutritionGoal?;
       final dailies = results[1] as List<DailyCalorieTotal>;
-      final balance = await _repository.getCalorieBalanceForRange(
-        startDate: start,
-        endDate: end,
+      final balance = _repository.calculateCalorieBalance(
+        dailies: dailies,
         goal: goal?.calories,
       );
       if (!mounted || requestId != _loadRequestId) return;
@@ -353,13 +352,14 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
                       dailies: _dailies,
                       goal: _goal?.calories,
                       balance: _balance,
+                      period: _BalancePeriod.week,
                     ).animate().fadeIn(duration: 250.ms)
                   else
-                    _BalanceHeroCard(
+                    _WeekSequenceCard(
+                      dailies: _dailies,
+                      goal: _goal?.calories,
                       balance: _balance,
-                      goal: _goal,
-                      windowDays: _periodDays,
-                      title: loc.nutritionBalanceMonthSummary,
+                      period: _BalancePeriod.month,
                     ).animate().fadeIn(duration: 250.ms),
                   const SizedBox(height: 12),
                   _RollingAverageCard(
@@ -410,13 +410,11 @@ class _BalanceHeroCard extends StatelessWidget {
   final CalorieBalance? balance;
   final NutritionGoal? goal;
   final int windowDays;
-  final String? title;
 
   const _BalanceHeroCard({
     required this.balance,
     required this.goal,
     required this.windowDays,
-    this.title,
   });
 
   @override
@@ -458,7 +456,7 @@ class _BalanceHeroCard extends StatelessWidget {
                   Icon(_iconForStatus(status), color: statusColor, size: 22),
                   const SizedBox(width: 8),
                   Text(
-                    title ?? loc.nutritionBalanceHeroTitle(windowDays),
+                    loc.nutritionBalanceHeroTitle(windowDays),
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -698,11 +696,13 @@ class _WeekSequenceCard extends StatelessWidget {
   final List<DailyCalorieTotal> dailies;
   final double? goal;
   final CalorieBalance? balance;
+  final _BalancePeriod period;
 
   const _WeekSequenceCard({
     required this.dailies,
     required this.goal,
     required this.balance,
+    required this.period,
   });
 
   @override
@@ -712,14 +712,21 @@ class _WeekSequenceCard extends StatelessWidget {
     final hasGoal = goal != null && goal! > 0;
     final status = _BalanceHeroCard._statusFor(balance, hasGoal);
     final statusColor = _BalanceHeroCard._colorForStatus(status, theme);
-    final statusLabel = _BalanceHeroCard._labelForStatus(status, loc, 7);
+    final statusLabel = _BalanceHeroCard._labelForStatus(
+      status,
+      loc,
+      dailies.length,
+    );
     final caloriesValue = balance?.balance;
+    final sequenceItems = period == _BalancePeriod.month
+        ? _monthlySequenceItems(loc)
+        : _dailySequenceItems();
     var deficit = 0, onTarget = 0, surplus = 0, logged = 0;
-    for (final d in dailies) {
-      if (d.calories == null) continue;
+    for (final item in sequenceItems) {
+      if (item.calories == null) continue;
       logged++;
       if (hasGoal) {
-        final delta = d.calories! - goal!;
+        final delta = item.calories! - goal!;
         final ratio = delta.abs() / goal!;
         if (ratio <= 0.10) {
           onTarget++;
@@ -756,7 +763,9 @@ class _WeekSequenceCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(7),
                     ),
                     child: Icon(
-                      Icons.view_week_outlined,
+                      period == _BalancePeriod.month
+                          ? Icons.calendar_view_month_outlined
+                          : Icons.view_week_outlined,
                       size: 16,
                       color: statusColor,
                     ),
@@ -764,7 +773,9 @@ class _WeekSequenceCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      loc.nutritionBalanceWeekSequence,
+                      period == _BalancePeriod.month
+                          ? loc.nutritionBalanceMonthSequence
+                          : loc.nutritionBalanceWeekSequence,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -839,7 +850,7 @@ class _WeekSequenceCard extends StatelessWidget {
                   Expanded(
                     child: _BalanceMetric(
                       label: loc.nutritionBalanceDaysLogged,
-                      value: '${balance?.daysLogged ?? 0}/7',
+                      value: '${balance?.daysLogged ?? 0}/${dailies.length}',
                     ),
                   ),
                   Expanded(
@@ -874,11 +885,16 @@ class _WeekSequenceCard extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  for (final day in dailies)
+                  for (var index = 0; index < sequenceItems.length; index++)
                     Expanded(
                       child: _WeekDayCell(
-                        date: day.date,
-                        calories: day.calories,
+                        key: period == _BalancePeriod.month
+                            ? ValueKey('balance-month-week-${index + 1}')
+                            : null,
+                        date: sequenceItems[index].date,
+                        label: sequenceItems[index].label,
+                        isHighlighted: sequenceItems[index].isHighlighted,
+                        calories: sequenceItems[index].calories,
                         goal: goal,
                         hasGoal: hasGoal,
                       ),
@@ -908,6 +924,76 @@ class _WeekSequenceCard extends StatelessWidget {
       ),
     );
   }
+
+  List<_SequenceItem> _dailySequenceItems() {
+    final today = DateTime.now();
+    return [
+      for (final day in dailies)
+        _SequenceItem(
+          date: day.date,
+          calories: day.calories,
+          isHighlighted: _isSameDay(day.date, today),
+        ),
+    ];
+  }
+
+  List<_SequenceItem> _monthlySequenceItems(AppLocalizations loc) {
+    final groups = <DateTime, List<DailyCalorieTotal>>{};
+    for (final day in dailies) {
+      final weekStart = day.date.subtract(
+        Duration(days: day.date.weekday % DateTime.daysPerWeek),
+      );
+      final normalizedStart = DateTime(
+        weekStart.year,
+        weekStart.month,
+        weekStart.day,
+      );
+      groups.putIfAbsent(normalizedStart, () => []).add(day);
+    }
+
+    final today = DateTime.now();
+    final entries = groups.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return [
+      for (var index = 0; index < entries.length; index++)
+        _monthlyWeekItem(entries[index], index, loc, today),
+    ];
+  }
+
+  _SequenceItem _monthlyWeekItem(
+    MapEntry<DateTime, List<DailyCalorieTotal>> entry,
+    int index,
+    AppLocalizations loc,
+    DateTime today,
+  ) {
+    final loggedDays = entry.value
+        .where((day) => day.calories != null)
+        .toList();
+    final average = loggedDays.isEmpty
+        ? null
+        : loggedDays.fold<double>(0, (sum, day) => sum + day.calories!) /
+              loggedDays.length;
+    return _SequenceItem(
+      date: entry.key,
+      label: loc.nutritionBalanceWeekNumber(index + 1),
+      calories: average,
+      isHighlighted: entry.value.any((day) => _isSameDay(day.date, today)),
+    );
+  }
+}
+
+class _SequenceItem {
+  final DateTime date;
+  final String? label;
+  final double? calories;
+  final bool isHighlighted;
+
+  const _SequenceItem({
+    required this.date,
+    required this.calories,
+    required this.isHighlighted,
+    this.label,
+  });
 }
 
 /// Compact summary row for the week sequence. Renders a single line
@@ -1005,12 +1091,17 @@ class _CountChip extends StatelessWidget {
 
 class _WeekDayCell extends StatelessWidget {
   final DateTime date;
+  final String? label;
+  final bool isHighlighted;
   final double? calories;
   final double? goal;
   final bool hasGoal;
 
   const _WeekDayCell({
+    super.key,
     required this.date,
+    required this.label,
+    required this.isHighlighted,
     required this.calories,
     required this.goal,
     required this.hasGoal,
@@ -1019,8 +1110,8 @@ class _WeekDayCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final dow = DateFormat.E(Intl.defaultLocale).format(date).substring(0, 1);
-    final isToday = _isSameDay(date, DateTime.now());
+    final dow =
+        label ?? DateFormat.E(Intl.defaultLocale).format(date).substring(0, 1);
     final (status, color) = _resolveStatus();
 
     return Padding(
@@ -1031,7 +1122,7 @@ class _WeekDayCell extends StatelessWidget {
             dow.toUpperCase(),
             style: theme.textTheme.labelSmall?.copyWith(
               fontWeight: FontWeight.w700,
-              color: isToday
+              color: isHighlighted
                   ? theme.colorScheme.primary
                   : theme.colorScheme.onSurfaceVariant,
               letterSpacing: 0.5,
@@ -1044,7 +1135,7 @@ class _WeekDayCell extends StatelessWidget {
               decoration: BoxDecoration(
                 color: _bgColor(color, theme),
                 borderRadius: BorderRadius.circular(10),
-                border: isToday
+                border: isHighlighted
                     ? Border.all(color: theme.colorScheme.primary, width: 1.5)
                     : null,
               ),

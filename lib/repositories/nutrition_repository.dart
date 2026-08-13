@@ -1403,6 +1403,15 @@ class NutritionRepository extends BaseRepository {
       startDate: startDate,
       endDate: endDate,
     );
+    return calculateCalorieBalance(dailies: dailies, goal: goal);
+  }
+
+  /// Builds the aggregate balance from totals already loaded by a caller.
+  /// This avoids repeating the daily-totals query on analytics screens.
+  CalorieBalance calculateCalorieBalance({
+    required List<DailyCalorieTotal> dailies,
+    required double? goal,
+  }) {
     final days = dailies.length;
     var consumed = 0.0;
     var loggedDays = 0;
