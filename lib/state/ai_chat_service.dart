@@ -807,7 +807,7 @@ class AiChatService extends ChangeNotifier {
           'retrying with JSON fallback.',
         );
       }
-      return _sendManualFoodJsonFallback(
+      return await _sendManualFoodJsonFallback(
         baseUrl: baseUrl,
         token: token,
         model: model,
