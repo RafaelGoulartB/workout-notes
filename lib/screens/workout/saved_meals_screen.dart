@@ -79,6 +79,9 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
                 brandSnapshot: item.brandSnapshot,
                 quantity: item.quantity,
                 unit: item.unit,
+                servingLabel: item.servingLabel,
+                servingGramsEquivalent: item.servingGramsEquivalent,
+                servingMlEquivalent: item.servingMlEquivalent,
               ),
           ],
         ),
@@ -113,9 +116,9 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
     if (confirmed != true) return;
     await widget.repository.deleteSavedMeal(meal.meal.id);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.nutritionSavedMealDeleted)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.nutritionSavedMealDeleted)));
     await _load();
   }
 
@@ -158,7 +161,10 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
       final message = result.added == 0
           ? loc.nutritionSavedMealNothingLogged
           : (result.skipped > 0
-                ? loc.nutritionSavedMealPartialLogged(result.added, result.skipped)
+                ? loc.nutritionSavedMealPartialLogged(
+                    result.added,
+                    result.skipped,
+                  )
                 : loc.nutritionSavedMealLogged(result.added));
       ScaffoldMessenger.of(
         context,
@@ -175,9 +181,11 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
 
   static String _todayString() {
     final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day)
-        .toIso8601String()
-        .substring(0, 10);
+    return DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).toIso8601String().substring(0, 10);
   }
 
   @override
@@ -251,8 +259,7 @@ class _SavedMealCard extends StatelessWidget {
     final theme = Theme.of(context);
     final totals = meal.totals;
     final subtitle = <String>[
-      if (meal.meal.mealType != null)
-        _mealLabel(loc, meal.meal.mealType!),
+      if (meal.meal.mealType != null) _mealLabel(loc, meal.meal.mealType!),
       if (meal.meal.portions != 1)
         loc.nutritionSavedMealPortionsLabel(_format(meal.meal.portions)),
       if (totals?.calories != null)

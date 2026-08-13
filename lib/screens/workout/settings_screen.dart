@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
@@ -11,7 +10,7 @@ import '../../repositories/settings_repository.dart';
 import '../../repositories/export_import_repository.dart';
 import '../../repositories/nutrition_repository.dart';
 import '../../services/export_service.dart';
-import '../../database/test_seed_data.dart';
+import '../../dev_tools/test_data/test_data_generator.dart';
 import '../../services/notification_service.dart';
 import '../../main.dart';
 import '../../navigation/ai_coach_navigation.dart';
@@ -858,15 +857,19 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
       final generator = TestDataGenerator();
       final result = await generator.generate();
       if (mounted) {
-        final wc = result['workouts'] as int;
-        final rc = result['routines'] as int;
-        final sc = result['sleep'] ?? 0;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              AppLocalizations.of(
-                context,
-              )!.settingsGenerateSuccessDetailed(wc, rc, sc),
+              AppLocalizations.of(context)!.settingsGenerateSuccessDetailed(
+                result.workouts,
+                result.routines,
+                result.measurements,
+                result.sleepNights,
+                result.monitoredNights,
+                result.nutritionDays,
+                result.meals,
+                result.goals,
+              ),
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -954,6 +957,10 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
   }
 
   void _showAbout() {
+    if (!kDebugMode) {
+      _showAboutDialog();
+      return;
+    }
     final now = DateTime.now();
 
     // Reseta o contador se passaram mais de 15s desde o primeiro toque
@@ -976,6 +983,10 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
       }
     }
 
+    _showAboutDialog();
+  }
+
+  void _showAboutDialog() {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1427,7 +1438,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                         subtitle: loc.settingsImportBackupSubtitle,
                         onTap: _importBackup,
                       ),
-                      if (_showTestData) ...[
+                      if (kDebugMode && _showTestData) ...[
                         const SettingsCardDivider(),
                         SettingsLinkTile(
                           icon: Icons.bug_report_outlined,

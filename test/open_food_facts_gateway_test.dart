@@ -70,9 +70,20 @@ void main() {
                   'proteins_100g': 7.2,
                   'carbohydrates_100g': 77,
                   'fat_100g': 2.4,
+                  'saturated-fat_100g': 0.6,
+                  'monounsaturated-fat_100g': 0.8,
+                  'polyunsaturated-fat_100g': 0.7,
+                  'trans-fat_100g': 0.1,
                   'fiber_100g': 4,
                   'sugars_100g': 0.5,
                   'sodium_100g': 0.3,
+                  'potassium_100g': 0.42,
+                  'calcium_100g': 0.12,
+                  'iron_100g': 0.0025,
+                  'vitamin-a_100g': 0.00009,
+                  'vitamin-c_100g': 0.018,
+                  'vitamin-d_100g': 0.0000025,
+                  'vitamin-b12_100g': 0.0000006,
                 },
                 'serving_quantity_g': 50,
                 'serving_size': '1/2 xícara (50 g)',
@@ -104,10 +115,21 @@ void main() {
       expect(variant.values.proteinG, 7.2);
       expect(variant.values.carbsG, 77);
       expect(variant.values.fatG, 2.4);
+      expect(variant.values.saturatedFatG, 0.6);
+      expect(variant.values.monounsaturatedFatG, 0.8);
+      expect(variant.values.polyunsaturatedFatG, 0.7);
+      expect(variant.values.transFatG, 0.1);
       expect(variant.values.fiberG, 4);
       expect(variant.values.sugarsG, 0.5);
       // OFF reports sodium per 100 g in grams; the model stores mg.
       expect(variant.values.sodiumMg, 300);
+      expect(variant.values.potassiumMg, 420);
+      expect(variant.values.calciumMg, 120);
+      expect(variant.values.ironMg, 2.5);
+      expect(variant.values.vitaminAUg, closeTo(90, 0.001));
+      expect(variant.values.vitaminCMg, 18);
+      expect(variant.values.vitaminDUg, closeTo(2.5, 0.001));
+      expect(variant.values.vitaminB12Ug, closeTo(0.6, 0.001));
       expect(variant.isEstimated, isFalse);
       expect(row.servings, hasLength(1));
       expect(row.servings.first.gramsEquivalent, 50);

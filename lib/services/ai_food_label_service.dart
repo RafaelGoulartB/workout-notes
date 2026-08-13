@@ -17,6 +17,14 @@ class AiFoodLabelException implements Exception {
   String toString() => 'AiFoodLabelException($code): $message';
 }
 
+/// One nutrition-label image included in a vision extraction request.
+class AiFoodLabelImage {
+  final Uint8List bytes;
+  final String mimeType;
+
+  const AiFoodLabelImage({required this.bytes, this.mimeType = 'image/jpeg'});
+}
+
 /// Identifies a food from a nutrition label photo using the AI
 /// provider already configured in the AI Coach (active provider +
 /// selected model + stored token). It sends a single vision request
@@ -29,7 +37,7 @@ class AiFoodLabelService {
     : service = service ?? AiService();
 
   static const String _systemPrompt = r'''
-Você é um extrator de tabelas nutricionais. Analise a foto enviada e extraia os dados dela.
+Você é um extrator de tabelas nutricionais. Analise todas as imagens enviadas e extraia os dados delas.
 Responda APENAS com JSON válido, sem markdown, sem comentários, exatamente neste formato:
 {
   "name": "nome do produto (obrigatório; em pt-BR quando legível)",
@@ -42,15 +50,32 @@ Responda APENAS com JSON válido, sem markdown, sem comentários, exatamente nes
     "protein_g": null,
     "carbs_g": null,
     "fat_g": null,
+    "saturated_fat_g": null,
+    "monounsaturated_fat_g": null,
+    "polyunsaturated_fat_g": null,
+    "trans_fat_g": null,
     "fiber_g": null,
     "sugars_g": null,
-    "sodium_mg": null
+    "sodium_mg": null,
+    "potassium_mg": null,
+    "calcium_mg": null,
+    "iron_mg": null,
+    "magnesium_mg": null,
+    "zinc_mg": null,
+    "vitamin_a_ug": null,
+    "vitamin_c_mg": null,
+    "vitamin_d_ug": null,
+    "vitamin_b12_ug": null
   },
   "servings": []
 }
 Regras:
+- Todas as imagens pertencem ao mesmo alimento. Elas podem mostrar partes diferentes da mesma tabela, embalagem ou rótulo.
+- Combine as informações complementares das imagens em um único alimento. Não some nem duplique valores repetidos; quando o mesmo campo aparecer mais de uma vez, use a imagem mais nítida e consistente.
 - "per" contém os valores POR 100 g ou 100 ml da tabela. Se a tabela só mostrar valores "por porção", converta para 100 g/ml usando o peso da porção; se a conversão não for possível, use os valores por porção e adicione uma serving com quantity 1, unit "porção" e grams_equivalent com o peso da porção.
 - Use null para valores ilegíveis; nunca invente números.
+- Gordura total e cada subtipo são campos independentes. Não calcule um subtipo ausente por diferença e não use gordura total como gordura saturada.
+- Preserve as unidades do formato: minerais em mg, vitamina A/D/B12 em µg e vitamina C em mg. Converta quando o rótulo usar outra unidade.
 - "servings" é uma lista opcional de porções com {label, quantity, unit, grams_equivalent}.
 - Responda somente o JSON.''';
 
@@ -62,7 +87,17 @@ Regras:
   Future<AiFoodLabelDraft> analyze({
     required Uint8List imageBytes,
     String mimeType = 'image/jpeg',
+  }) => analyzeImages(
+    images: [AiFoodLabelImage(bytes: imageBytes, mimeType: mimeType)],
+  );
+
+  /// Analyzes multiple photos of different parts of the same food label.
+  Future<AiFoodLabelDraft> analyzeImages({
+    required List<AiFoodLabelImage> images,
   }) async {
+    if (images.isEmpty) {
+      throw const AiFoodLabelException('no_images', 'No images selected');
+    }
     final provider = settings.activeProvider;
     if (provider == null) {
       throw const AiFoodLabelException(
@@ -82,7 +117,17 @@ Regras:
       throw const AiFoodLabelException('missing_token', 'Missing API token');
     }
 
-    final base64 = base64Encode(imageBytes);
+    final imageParts = images
+        .map(
+          (image) => <String, dynamic>{
+            'type': 'image_url',
+            'image_url': {
+              'url':
+                  'data:${image.mimeType};base64,${base64Encode(image.bytes)}',
+            },
+          },
+        )
+        .toList(growable: false);
     final messages = <Map<String, dynamic>>[
       {'role': 'system', 'content': _systemPrompt},
       {
@@ -90,12 +135,11 @@ Regras:
         'content': [
           {
             'type': 'text',
-            'text': 'Extraia os dados desta tabela nutricional.',
+            'text': images.length == 1
+                ? 'Extraia os dados desta tabela nutricional.'
+                : 'Estas ${images.length} imagens são do mesmo alimento e mostram partes complementares do rótulo. Combine-as e extraia uma única tabela nutricional.',
           },
-          {
-            'type': 'image_url',
-            'image_url': {'url': 'data:$mimeType;base64,$base64'},
-          },
+          ...imageParts,
         ],
       },
     ];
@@ -103,8 +147,8 @@ Regras:
     if (kDebugMode) {
       debugPrint(
         'AiFoodLabelService: sending vision request '
-        '(provider=${provider.name}, model=$model, mimeType=$mimeType, '
-        'imageBytes=${imageBytes.length})',
+        '(provider=${provider.name}, model=$model, images=${images.length}, '
+        'imageBytes=${images.fold<int>(0, (sum, image) => sum + image.bytes.length)})',
       );
     }
 

@@ -8,6 +8,7 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
+import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
 import 'package:workout_notes/models/nutrition/food_serving.dart';
 import 'package:workout_notes/models/nutrition/food_search_result.dart';
 import 'package:workout_notes/models/nutrition/food_variant.dart';
@@ -17,7 +18,9 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/screens/workout/food_library_screen.dart';
 import 'package:workout_notes/screens/workout/food_quantity_sheet.dart';
 import 'package:workout_notes/screens/workout/food_search_screen.dart';
+import 'package:workout_notes/screens/workout/manual_food_screen.dart';
 import 'package:workout_notes/screens/workout/nutrition_home_screen.dart';
+import 'package:workout_notes/screens/workout/nutrition_progress_screen.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 
 Widget _app(Widget child) => MaterialApp(
@@ -55,9 +58,14 @@ Future<void> _installSchema(Database db) async {
       protein_g REAL,
       carbs_g REAL,
       fat_g REAL,
+      saturated_fat_g REAL, monounsaturated_fat_g REAL,
+      polyunsaturated_fat_g REAL, trans_fat_g REAL,
       fiber_g REAL,
       sugars_g REAL,
       sodium_mg REAL,
+      potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL,
+      zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL,
+      vitamin_d_ug REAL, vitamin_b12_ug REAL,
       extra_nutrients_json TEXT,
       is_estimated INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE CASCADE
@@ -119,9 +127,14 @@ Future<void> _installSchema(Database db) async {
       protein_g REAL,
       carbs_g REAL,
       fat_g REAL,
+      saturated_fat_g REAL, monounsaturated_fat_g REAL,
+      polyunsaturated_fat_g REAL, trans_fat_g REAL,
       fiber_g REAL,
       sugars_g REAL,
       sodium_mg REAL,
+      potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL,
+      zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL,
+      vitamin_d_ug REAL, vitamin_b12_ug REAL,
       nutrition_snapshot_json TEXT NOT NULL,
       created_at TEXT NOT NULL,
       FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE,
@@ -161,6 +174,9 @@ Future<void> _installSchema(Database db) async {
       brand_snapshot TEXT,
       quantity REAL NOT NULL,
       unit TEXT NOT NULL,
+      serving_label TEXT,
+      serving_grams_equivalent REAL,
+      serving_ml_equivalent REAL,
       order_index INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (saved_meal_id) REFERENCES saved_meals(id) ON DELETE CASCADE,
       FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL,
@@ -292,9 +308,279 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(loc.nutritionCaloriesTitle), findsNothing);
+    expect(find.byType(ExpansionTile), findsNothing);
     expect(find.text(loc.nutritionMacrosTitle), findsOneWidget);
     expect(find.text(loc.nutritionNutrientsTitle), findsOneWidget);
+    expect(find.text(loc.nutritionNutrientConsumedHeader), findsOneWidget);
+    expect(find.text(loc.nutritionNutrientGoalHeader), findsOneWidget);
+    expect(find.text(loc.nutritionNutrientRemainingHeader), findsOneWidget);
+    expect(find.byKey(const ValueKey('nutrition-stat-fiber')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nutrition-stat-sugars')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nutrition-stat-sodium')), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsWidgets);
+
+    final statisticsList = find.byType(Scrollable).last;
+    for (final title in [
+      loc.nutritionFatBreakdownTitle,
+      loc.nutritionNutrientMineralsTitle,
+      loc.nutritionNutrientVitaminsTitle,
+    ]) {
+      await tester.scrollUntilVisible(
+        find.text(title),
+        240,
+        scrollable: statisticsList,
+      );
+      expect(find.text(title), findsOneWidget);
+    }
+
+    await tester.tap(find.text(loc.nutritionDiaryTab));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(loc.nutritionDailyStatsTab));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
   });
+
+  testWidgets('nutrition statistics table fits a narrow phone viewport', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(const NutritionDayDetailScreen()));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+    await tester.tap(find.text(loc.nutritionDailyStatsTab));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('nutrition-stat-fiber')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nutrition-stat-sugars')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nutrition-stat-sodium')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('balance nutrient averages start collapsed and load on expand', (
+    tester,
+  ) async {
+    final now = DateTime.now();
+    final date = now.toIso8601String().substring(0, 10);
+    await tester.runAsync(() async {
+      await database.insert('meal_logs', {
+        'id': 'balance-meal',
+        'date': date,
+        'meal_type': 'lunch',
+        'name': 'Lunch',
+        'created_at': now.toIso8601String(),
+      });
+      await database.insert('meal_log_items', {
+        'id': 'balance-item',
+        'meal_log_id': 'balance-meal',
+        'food_name_snapshot': 'Test food',
+        'quantity': 1,
+        'unit': 'serving',
+        'calories': 400,
+        'fiber_g': 8,
+        'sugars_g': 12,
+        'sodium_mg': 500,
+        'nutrition_snapshot_json': '{}',
+        'created_at': now.toIso8601String(),
+      });
+    });
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(const NutritionProgressScreen()));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+    final title = find.text(loc.nutritionBalanceAverageNutrients);
+
+    await tester.scrollUntilVisible(
+      title,
+      350,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(title, findsOneWidget);
+    expect(find.text(loc.nutritionNutrientConsumedHeader), findsNothing);
+
+    await tester.tap(title);
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+    await tester.pumpAndSettle();
+
+    expect(find.text(loc.nutritionNutrientConsumedHeader), findsOneWidget);
+    expect(find.text(loc.nutritionProgressFiber), findsOneWidget);
+
+    await tester.tap(find.text(loc.nutritionBalanceLast30Days));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await tester.pump();
+    });
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(loc.nutritionNutrientConsumedHeader), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('seven-day balance merges summary into the week sequence', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(const NutritionProgressScreen()));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+    expect(find.text(loc.nutritionBalanceWeekSequence), findsOneWidget);
+    expect(find.text(loc.nutritionBalanceTitle), findsNothing);
+    expect(find.text(loc.nutritionBalanceThisWeek), findsOneWidget);
+    expect(find.text(loc.nutritionBalanceDaysLogged), findsOneWidget);
+    expect(find.text(loc.nutritionBalanceAverageIntake), findsOneWidget);
+    expect(find.text(loc.nutritionBalanceCurrentStreak), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('monthly balance uses the sequence card grouped by week', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(const NutritionProgressScreen()));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+    expect(find.text(loc.nutritionBalanceWeekSequence), findsOneWidget);
+
+    await tester.tap(find.text(loc.nutritionBalanceLast30Days));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await tester.pump();
+    });
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text(loc.nutritionBalanceMonthSequence), findsOneWidget);
+    expect(find.byKey(const ValueKey('balance-month-week-1')), findsOneWidget);
+    expect(find.text(loc.nutritionBalanceMonthSummary), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('balance header navigates calendar weeks and months', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(const NutritionProgressScreen()));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+    final previous = find.byKey(const ValueKey('balance-previous-period'));
+    final next = find.byKey(const ValueKey('balance-next-period'));
+
+    expect(find.text(loc.nutritionBalanceThisWeek), findsOneWidget);
+    expect(find.byIcon(Icons.chevron_right_rounded), findsOneWidget);
+
+    await tester.tap(previous);
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      await tester.pump();
+    });
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(loc.nutritionBalanceThisWeek), findsNothing);
+    expect(tester.widget<IconButton>(next).onPressed, isNotNull);
+
+    await tester.tap(next);
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      await tester.pump();
+    });
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(loc.nutritionBalanceThisWeek), findsOneWidget);
+
+    await tester.tap(find.text(loc.nutritionBalanceLast30Days));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      await tester.pump();
+    });
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text(loc.nutritionBalanceThisMonth), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'meal row opens and scrolls the diary while its plus opens food search',
+    (tester) async {
+      await tester.runAsync(() async {
+        await tester.pumpWidget(_app(const NutritionHomeScreen()));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        await tester.pump();
+      });
+      final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+      final mealRow = find.byKey(const ValueKey('nutrition-home-meal-snacks'));
+
+      await tester.scrollUntilVisible(
+        mealRow,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -180));
+      await tester.pumpAndSettle();
+      await tester.tap(mealRow);
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 150)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(NutritionDayDetailScreen), findsOneWidget);
+      expect(find.byType(FoodSearchScreen), findsNothing);
+      expect(find.text(loc.nutritionDiaryTab), findsOneWidget);
+      final diaryScrollable = find.descendant(
+        of: find.byKey(const PageStorageKey('nutrition-diary')),
+        matching: find.byType(Scrollable),
+      );
+      expect(
+        tester.state<ScrollableState>(diaryScrollable).position.pixels,
+        greaterThan(0),
+      );
+
+      Navigator.of(tester.element(find.byType(NutritionDayDetailScreen))).pop();
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pumpAndSettle();
+
+      final addButton = find.byKey(const ValueKey('nutrition-home-add-snacks'));
+      await tester.scrollUntilVisible(
+        addButton,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -180));
+      await tester.pumpAndSettle();
+      await tester.tap(addButton);
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(FoodSearchScreen), findsOneWidget);
+      expect(find.byType(NutritionDayDetailScreen), findsNothing);
+    },
+  );
 
   testWidgets(
     'Search screen renders the manual-entry fallback on gateway error',
@@ -318,11 +604,78 @@ void main() {
       expect(find.text(loc.nutritionSearchAll), findsOneWidget);
       expect(find.text(loc.nutritionSearchMyMeals), findsOneWidget);
       expect(find.text(loc.nutritionSearchFavorites), findsOneWidget);
+      expect(find.text(loc.nutritionSearchMyFoods), findsOneWidget);
+      expect(find.text(loc.nutritionSearchManual), findsNothing);
+      expect(find.text(loc.nutritionSearchDatabase), findsNothing);
       expect(find.text(loc.nutritionScanMeal), findsOneWidget);
       expect(find.text(loc.nutritionScanBarcode), findsOneWidget);
       expect(find.text(loc.nutritionAddManually), findsOneWidget);
     },
   );
+
+  testWidgets('food library filters user-created and gateway foods by source', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await repository.createManualFood(
+        name: 'Manual do usuário',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(calories: 100),
+      );
+      await repository.createManualFood(
+        name: 'Lido por imagem',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(calories: 120),
+        source: FoodSource.aiVision,
+      );
+      final gatewayFood = Food(
+        id: 'gateway-food',
+        source: FoodSource.openFoodFacts,
+        externalId: 'off-123',
+        name: 'Alimento do gateway',
+        searchName: Food.normalizeForSearch('Alimento do gateway'),
+        fetchedAt: DateTime(2026, 8, 11),
+      );
+      await repository.upsertFoodWithDetails(
+        food: gatewayFood,
+        variants: const [
+          FoodVariant(
+            id: 'gateway-variant',
+            foodId: 'gateway-food',
+            referenceAmount: 100,
+            referenceUnit: 'g',
+            values: NutritionValues(calories: 90),
+          ),
+        ],
+      );
+    });
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(FoodLibraryScreen(repository: repository)));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+    expect(find.text(loc.nutritionFoodLibraryTitle), findsOneWidget);
+    expect(find.text(loc.nutritionSearchAll), findsOneWidget);
+    expect(find.text(loc.nutritionSearchManual), findsOneWidget);
+    expect(find.text(loc.nutritionSearchDatabase), findsOneWidget);
+
+    await tester.tap(find.text(loc.nutritionSearchManual));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Manual do usuário'), findsOneWidget);
+    expect(find.text('Lido por imagem'), findsOneWidget);
+    expect(find.text('Alimento do gateway'), findsNothing);
+
+    await tester.tap(find.text(loc.nutritionSearchDatabase));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Manual do usuário'), findsNothing);
+    expect(find.text('Lido por imagem'), findsNothing);
+    expect(find.text('Alimento do gateway'), findsOneWidget);
+  });
 
   testWidgets('Food library add menu offers AI scan and manual entry', (
     tester,
@@ -339,6 +692,70 @@ void main() {
 
     expect(find.text(loc.nutritionScanMeal), findsOneWidget);
     expect(find.text(loc.nutritionAddManually), findsOneWidget);
+  });
+
+  testWidgets(
+    'manual food keeps calories and macros prominent and details collapsed',
+    (tester) async {
+      await tester.pumpWidget(_app(ManualFoodScreen(repository: repository)));
+      final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+      expect(find.text(loc.nutritionManualSectionMacros), findsOneWidget);
+      expect(find.text(loc.nutritionManualCalories), findsOneWidget);
+      expect(find.text(loc.nutritionManualProtein), findsOneWidget);
+      expect(find.text(loc.nutritionManualCarbs), findsOneWidget);
+      expect(find.text(loc.nutritionManualFat), findsOneWidget);
+      await tester.drag(find.byType(ListView), const Offset(0, -500));
+      await tester.pumpAndSettle();
+      expect(find.text(loc.nutritionFatBreakdownTitle), findsWidgets);
+      expect(find.text(loc.nutritionFatSaturated), findsNothing);
+      expect(find.text(loc.nutritionProgressPotassium), findsNothing);
+
+      await tester.tap(find.text(loc.nutritionFatBreakdownTitle).first);
+      await tester.pumpAndSettle();
+      expect(find.text(loc.nutritionFatSaturated), findsOneWidget);
+      expect(find.text(loc.nutritionFatMonounsaturated), findsOneWidget);
+      expect(find.text(loc.nutritionFatPolyunsaturated), findsOneWidget);
+      expect(find.text(loc.nutritionFatTrans), findsOneWidget);
+      expect(find.text(loc.nutritionProgressPotassium), findsNothing);
+    },
+  );
+
+  testWidgets('AI label fat details are prefilled and expanded for review', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        ManualFoodScreen(
+          repository: repository,
+          initial: const AiFoodLabelDraft(
+            name: 'Peanut butter',
+            values: NutritionValues(
+              calories: 590,
+              proteinG: 25,
+              carbsG: 20,
+              fatG: 50,
+              saturatedFatG: 8,
+              monounsaturatedFatG: 24,
+              polyunsaturatedFatG: 15,
+              transFatG: 0,
+            ),
+          ),
+        ),
+      ),
+    );
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+
+    final saturated = tester.widget<TextFormField>(
+      find.widgetWithText(TextFormField, loc.nutritionFatSaturated),
+    );
+    final mono = tester.widget<TextFormField>(
+      find.widgetWithText(TextFormField, loc.nutritionFatMonounsaturated),
+    );
+    expect(saturated.controller!.text, '8');
+    expect(mono.controller!.text, '24');
   });
 
   testWidgets('Remote search only runs after an explicit submit', (

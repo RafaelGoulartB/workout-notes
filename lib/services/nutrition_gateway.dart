@@ -248,9 +248,22 @@ class NutritionGatewayFoodPayload {
       proteinG: (map['protein_g'] as num?)?.toDouble(),
       carbsG: (map['carbs_g'] as num?)?.toDouble(),
       fatG: (map['fat_g'] as num?)?.toDouble(),
+      saturatedFatG: (map['saturated_fat_g'] as num?)?.toDouble(),
+      monounsaturatedFatG: (map['monounsaturated_fat_g'] as num?)?.toDouble(),
+      polyunsaturatedFatG: (map['polyunsaturated_fat_g'] as num?)?.toDouble(),
+      transFatG: (map['trans_fat_g'] as num?)?.toDouble(),
       fiberG: (map['fiber_g'] as num?)?.toDouble(),
       sugarsG: (map['sugars_g'] as num?)?.toDouble(),
       sodiumMg: (map['sodium_mg'] as num?)?.toDouble(),
+      potassiumMg: (map['potassium_mg'] as num?)?.toDouble(),
+      calciumMg: (map['calcium_mg'] as num?)?.toDouble(),
+      ironMg: (map['iron_mg'] as num?)?.toDouble(),
+      magnesiumMg: (map['magnesium_mg'] as num?)?.toDouble(),
+      zincMg: (map['zinc_mg'] as num?)?.toDouble(),
+      vitaminAUg: (map['vitamin_a_ug'] as num?)?.toDouble(),
+      vitaminCMg: (map['vitamin_c_mg'] as num?)?.toDouble(),
+      vitaminDUg: (map['vitamin_d_ug'] as num?)?.toDouble(),
+      vitaminB12Ug: (map['vitamin_b12_ug'] as num?)?.toDouble(),
     );
   }
 }

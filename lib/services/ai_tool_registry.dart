@@ -42,13 +42,25 @@ class AiToolRegistry {
     final selected = <String>{};
     bool hasAny(Iterable<String> terms) => terms.any(text.contains);
 
-    if (hasAny(['sono', 'sleep', 'dormi', 'insonia', 'insônia'])) {
-      selected.addAll({
-        'get_sleep_summary',
-        'analyze_sleep_performance',
-        'get_weekly_recovery_trend',
-        'list_recent_workouts',
-      });
+    final sleepIntent = hasAny([
+      'sono',
+      'sleep',
+      'dormi',
+      'insonia',
+      'insônia',
+    ]);
+    final workoutIntent = hasAny(['treino', 'workout', 'sessao', 'sessão']);
+    final sleepPerformanceIntent =
+        workoutIntent ||
+        hasAny(['desempenho', 'performance', 'volume', 'carga']);
+    if (sleepIntent) {
+      // A common sleep question only needs the sleep summary. Cross-domain
+      // tools are added only when the request actually mentions performance
+      // or training, keeping short follow-ups such as "E o sono?" precise.
+      selected.add('get_sleep_summary');
+      if (sleepPerformanceIntent) {
+        selected.add('analyze_sleep_performance');
+      }
     }
     if (hasAny([
       'nutri',
@@ -99,7 +111,7 @@ class AiToolRegistry {
         'list_exercises',
       });
     }
-    if (hasAny(['treino', 'workout', 'sessao', 'sessão'])) {
+    if (workoutIntent) {
       selected.addAll({'list_recent_workouts', 'get_workout_detail'});
     }
     if (hasAny(['exercicio', 'exercício', 'serie', 'série', 'carga'])) {
@@ -362,7 +374,8 @@ class AiToolRegistry {
     final rawDb = await db.database;
     final rows = await rawDb.rawQuery(
       '''
-      SELECT w.id, w.date, w.duration_seconds, w.feeling_rating, w.comment,
+      SELECT w.id, w.date, w.duration_seconds, w.estimated_calories,
+        w.feeling_rating, w.comment,
         COUNT(DISTINCT ee.id) AS exercise_count,
         COALESCE(SUM(CASE WHEN COALESCE(s.is_warmup, 0) = 0
           THEN COALESCE(s.weight, 0) * COALESCE(s.reps, 0) ELSE 0 END), 0)
@@ -382,6 +395,7 @@ class AiToolRegistry {
             'id': w['id'],
             'date': w['date'],
             'durationSeconds': w['duration_seconds'],
+            'estimatedCalories': (w['estimated_calories'] as num?)?.toDouble(),
             'feeling': w['feeling_rating'],
             'exerciseCount': (w['exercise_count'] as num?)?.toInt() ?? 0,
             'volumeKg': (w['volume_kg'] as num?)?.toDouble() ?? 0.0,
@@ -447,6 +461,7 @@ class AiToolRegistry {
       'id': id,
       'date': w['date'],
       'durationSeconds': w['duration_seconds'],
+      'estimatedCalories': (w['estimated_calories'] as num?)?.toDouble(),
       'feeling': w['feeling_rating'],
       'comment': w['comment'],
       'exercises': out,

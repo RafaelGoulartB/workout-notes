@@ -440,9 +440,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.nutritionFoodNoVariant,
-          ),
+          content: Text(AppLocalizations.of(context)!.nutritionFoodNoVariant),
         ),
       );
       return;
@@ -940,9 +938,11 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   static String _todayString() {
     final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day)
-        .toIso8601String()
-        .substring(0, 10);
+    return DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).toIso8601String().substring(0, 10);
   }
 }
 
@@ -1206,8 +1206,7 @@ class _SavedMealCard extends StatelessWidget {
     final theme = Theme.of(context);
     final totals = meal.totals;
     final subtitle = <String>[
-      if (meal.meal.mealType != null)
-        _mealTypeLabel(loc, meal.meal.mealType!),
+      if (meal.meal.mealType != null) _mealTypeLabel(loc, meal.meal.mealType!),
       if (meal.meal.portions != 1)
         loc.nutritionSavedMealPortionsLabel(_format(meal.meal.portions)),
       if (totals?.calories != null)

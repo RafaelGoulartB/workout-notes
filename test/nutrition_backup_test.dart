@@ -68,9 +68,14 @@ void main() {
               protein_g REAL,
               carbs_g REAL,
               fat_g REAL,
+              saturated_fat_g REAL, monounsaturated_fat_g REAL,
+              polyunsaturated_fat_g REAL, trans_fat_g REAL,
               fiber_g REAL,
               sugars_g REAL,
               sodium_mg REAL,
+              potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL,
+              zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL,
+              vitamin_d_ug REAL, vitamin_b12_ug REAL,
               extra_nutrients_json TEXT,
               is_estimated INTEGER NOT NULL DEFAULT 0,
               FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE CASCADE
@@ -113,9 +118,14 @@ void main() {
               protein_g REAL,
               carbs_g REAL,
               fat_g REAL,
+              saturated_fat_g REAL, monounsaturated_fat_g REAL,
+              polyunsaturated_fat_g REAL, trans_fat_g REAL,
               fiber_g REAL,
               sugars_g REAL,
               sodium_mg REAL,
+              potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL,
+              zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL,
+              vitamin_d_ug REAL, vitamin_b12_ug REAL,
               nutrition_snapshot_json TEXT NOT NULL,
               created_at TEXT NOT NULL,
               FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE,
@@ -155,6 +165,9 @@ void main() {
               brand_snapshot TEXT,
               quantity REAL NOT NULL,
               unit TEXT NOT NULL,
+              serving_label TEXT,
+              serving_grams_equivalent REAL,
+              serving_ml_equivalent REAL,
               order_index INTEGER NOT NULL DEFAULT 0,
               FOREIGN KEY (saved_meal_id) REFERENCES saved_meals(id) ON DELETE CASCADE,
               FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL,
@@ -466,6 +479,10 @@ void main() {
       'protein_g': 0.4,
       'carbs_g': 17,
       'fat_g': 0.2,
+      'saturated_fat_g': 0.05,
+      'monounsaturated_fat_g': 0.08,
+      'polyunsaturated_fat_g': 0.06,
+      'trans_fat_g': 0,
       'nutrition_snapshot_json': jsonEncode({
         'version': 1,
         'consumed': {
@@ -473,6 +490,10 @@ void main() {
           'protein_g': 0.4,
           'carbs_g': 17,
           'fat_g': 0.2,
+          'saturated_fat_g': 0.05,
+          'monounsaturated_fat_g': 0.08,
+          'polyunsaturated_fat_g': 0.06,
+          'trans_fat_g': 0,
         },
         'is_estimated': false,
         'has_missing_values': true,
@@ -489,6 +510,11 @@ void main() {
     final json = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
     expect(json['version'], ExportImportRepository.currentBackupVersion);
     expect(json['meal_log_items'], isNotEmpty);
+    final exportedItem = (json['meal_log_items'] as List).single as Map;
+    expect(exportedItem['saturated_fat_g'], 0.05);
+    expect(exportedItem['monounsaturated_fat_g'], 0.08);
+    expect(exportedItem['polyunsaturated_fat_g'], 0.06);
+    expect(exportedItem['trans_fat_g'], 0);
 
     // The nutrition CSV needs a localizations stub.
   });

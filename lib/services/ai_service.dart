@@ -333,7 +333,7 @@ class AiService {
       if (tools != null && tools.isNotEmpty)
         'tools': tools.map(_responsesTool).toList(),
       if (tools != null && tools.isNotEmpty)
-        'tool_choice': toolChoice ?? 'auto',
+        'tool_choice': _responsesToolChoice(toolChoice),
     };
     final res = await _client
         .post(
@@ -397,6 +397,15 @@ class AiService {
         'description': function['description'],
       'parameters': function['parameters'] ?? const <String, dynamic>{},
     };
+  }
+
+  Object _responsesToolChoice(Object? choice) {
+    if (choice is! Map) return choice ?? 'auto';
+    final function = choice['function'];
+    if (choice['type'] == 'function' && function is Map) {
+      return {'type': 'function', 'name': function['name']};
+    }
+    return choice;
   }
 
   List<AiToolCall> _extractResponsesToolCalls(Map<dynamic, dynamic> body) {

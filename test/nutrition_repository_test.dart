@@ -51,9 +51,14 @@ void main() {
               protein_g REAL,
               carbs_g REAL,
               fat_g REAL,
+              saturated_fat_g REAL, monounsaturated_fat_g REAL,
+              polyunsaturated_fat_g REAL, trans_fat_g REAL,
               fiber_g REAL,
               sugars_g REAL,
               sodium_mg REAL,
+              potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL,
+              zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL,
+              vitamin_d_ug REAL, vitamin_b12_ug REAL,
               extra_nutrients_json TEXT,
               is_estimated INTEGER NOT NULL DEFAULT 0,
               FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE CASCADE
@@ -96,9 +101,14 @@ void main() {
               protein_g REAL,
               carbs_g REAL,
               fat_g REAL,
+              saturated_fat_g REAL, monounsaturated_fat_g REAL,
+              polyunsaturated_fat_g REAL, trans_fat_g REAL,
               fiber_g REAL,
               sugars_g REAL,
               sodium_mg REAL,
+              potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL,
+              zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL,
+              vitamin_d_ug REAL, vitamin_b12_ug REAL,
               nutrition_snapshot_json TEXT NOT NULL,
               created_at TEXT NOT NULL,
               FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE,
@@ -138,6 +148,9 @@ void main() {
               brand_snapshot TEXT,
               quantity REAL NOT NULL,
               unit TEXT NOT NULL,
+              serving_label TEXT,
+              serving_grams_equivalent REAL,
+              serving_ml_equivalent REAL,
               order_index INTEGER NOT NULL DEFAULT 0,
               FOREIGN KEY (saved_meal_id) REFERENCES saved_meals(id) ON DELETE CASCADE,
               FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL,
@@ -354,6 +367,58 @@ void main() {
       expect(meals, hasLength(1));
       expect(meals.first.log.mealType, 'breakfast');
       expect(meals.first.items, hasLength(1));
+    });
+
+    test('scales, snapshots and aggregates micronutrients by day', () async {
+      final food = await repository.createManualFood(
+        name: 'Espinafre',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(
+          calories: 23,
+          fatG: 4,
+          saturatedFatG: 1,
+          monounsaturatedFatG: 1.5,
+          polyunsaturatedFatG: 1.2,
+          transFatG: 0.1,
+          potassiumMg: 558,
+          calciumMg: 99,
+          ironMg: 2.7,
+          magnesiumMg: 79,
+          zincMg: 0.53,
+          vitaminAUg: 469,
+          vitaminCMg: 28.1,
+          vitaminDUg: 0,
+          vitaminB12Ug: 0,
+        ),
+      );
+      final variant = (await repository.getFoodWithDetails(
+        food.id,
+      ))!.variants.first;
+      final item = await repository.addMealLogItem(
+        date: '2026-07-27',
+        mealType: 'lunch',
+        food: food,
+        variant: variant,
+        conversion: NutritionConversion(
+          quantity: 50,
+          unit: 'g',
+          referenceAmount: 100,
+          referenceUnit: 'g',
+        ),
+      );
+
+      expect(item.potassiumMg, closeTo(279, 0.001));
+      expect(item.saturatedFatG, closeTo(0.5, 0.001));
+      expect(item.snapshot.consumed.monounsaturatedFatG, closeTo(0.75, 0.001));
+      expect(item.snapshot.consumed.vitaminAUg, closeTo(234.5, 0.001));
+      final summary = await repository.getDailySummary('2026-07-27');
+      expect(summary.consumed.calciumMg, closeTo(49.5, 0.001));
+      expect(summary.consumed.ironMg, closeTo(1.35, 0.001));
+      expect(summary.consumed.vitaminCMg, closeTo(14.05, 0.001));
+      expect(summary.consumed.vitaminB12Ug, 0);
+      expect(summary.consumed.polyunsaturatedFatG, closeTo(0.6, 0.001));
+      expect(summary.consumed.transFatG, closeTo(0.05, 0.001));
     });
 
     test('editing an item recomputes the snapshot', () async {
@@ -711,6 +776,98 @@ void main() {
     );
   });
 
+  group('calorie balance', () {
+    test('counts the calorie goal only on days with logged food', () async {
+      final food = await repository.createManualFood(
+        name: 'Refeição do dia',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(calories: 1500),
+      );
+      final details = await repository.getFoodWithDetails(food.id);
+      final variant = details!.variants.first;
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      await repository.addMealLogItem(
+        date: today,
+        mealType: 'lunch',
+        food: food,
+        variant: variant,
+        conversion: const NutritionConversion(
+          quantity: 100,
+          unit: 'g',
+          referenceAmount: 100,
+          referenceUnit: 'g',
+        ),
+      );
+
+      for (final days in [7, 30]) {
+        final balance = await repository.getCalorieBalance(
+          days: days,
+          goal: 2000,
+        );
+        expect(balance.daysLogged, 1);
+        expect(balance.totalConsumed, 1500);
+        expect(balance.totalGoal, 2000);
+        expect(balance.balance, -500);
+      }
+    });
+
+    test('calendar range queries exclude records outside the period', () async {
+      final food = await repository.createManualFood(
+        name: 'Range food',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(calories: 500, fiberG: 5),
+      );
+      final details = await repository.getFoodWithDetails(food.id);
+      final variant = details!.variants.first;
+      const conversion = NutritionConversion(
+        quantity: 100,
+        unit: 'g',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+      );
+      for (final date in ['2026-07-31', '2026-08-02', '2026-08-09']) {
+        await repository.addMealLogItem(
+          date: date,
+          mealType: 'lunch',
+          food: food,
+          variant: variant,
+          conversion: conversion,
+        );
+      }
+
+      final start = DateTime(2026, 8, 2);
+      final end = DateTime(2026, 8, 8);
+      final dailies = await repository.getDailyCalorieTotalsForRange(
+        startDate: start,
+        endDate: end,
+      );
+      final balance = await repository.getCalorieBalanceForRange(
+        startDate: start,
+        endDate: end,
+        goal: 1000,
+      );
+      final history = await repository.getDailyNutritionHistoryForRange(
+        startDate: start,
+        endDate: end,
+      );
+      final contributors = await repository.getTopCalorieContributorsForRange(
+        startDate: start,
+        endDate: end,
+      );
+
+      expect(dailies, hasLength(7));
+      expect(dailies.where((day) => day.calories != null), hasLength(1));
+      expect(balance.days, 7);
+      expect(balance.daysLogged, 1);
+      expect(balance.totalConsumed, 500);
+      expect(history, hasLength(1));
+      expect(history.single['date'], '2026-08-02');
+      expect(contributors.single.totalCalories, 500);
+    });
+  });
+
   group('CSV export', () {
     test('returns a row per meal_log_item with the food source', () async {
       final food = await repository.createManualFood(
@@ -722,6 +879,10 @@ void main() {
           proteinG: 1.1,
           carbsG: 22.8,
           fatG: 0.3,
+          saturatedFatG: 0.1,
+          monounsaturatedFatG: 0.05,
+          polyunsaturatedFatG: 0.12,
+          transFatG: 0,
         ),
       );
       final details = await repository.getFoodWithDetails(food.id);
@@ -745,6 +906,10 @@ void main() {
       expect(rows, hasLength(1));
       expect(rows.first.food, 'Banana');
       expect(rows.first.calories, closeTo(89 * 1.2, 0.001));
+      expect(rows.first.saturatedFatG, closeTo(0.12, 0.001));
+      expect(rows.first.monounsaturatedFatG, closeTo(0.06, 0.001));
+      expect(rows.first.polyunsaturatedFatG, closeTo(0.144, 0.001));
+      expect(rows.first.transFatG, 0);
       expect(rows.first.source, 'manual');
     });
   });

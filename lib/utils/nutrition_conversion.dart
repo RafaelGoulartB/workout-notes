@@ -147,9 +147,22 @@ class NutritionConversion {
       proteinG: _scale(reference.proteinG, multiplier),
       carbsG: _scale(reference.carbsG, multiplier),
       fatG: _scale(reference.fatG, multiplier),
+      saturatedFatG: _scale(reference.saturatedFatG, multiplier),
+      monounsaturatedFatG: _scale(reference.monounsaturatedFatG, multiplier),
+      polyunsaturatedFatG: _scale(reference.polyunsaturatedFatG, multiplier),
+      transFatG: _scale(reference.transFatG, multiplier),
       fiberG: _scale(reference.fiberG, multiplier),
       sugarsG: _scale(reference.sugarsG, multiplier),
       sodiumMg: _scale(reference.sodiumMg, multiplier),
+      potassiumMg: _scale(reference.potassiumMg, multiplier),
+      calciumMg: _scale(reference.calciumMg, multiplier),
+      ironMg: _scale(reference.ironMg, multiplier),
+      magnesiumMg: _scale(reference.magnesiumMg, multiplier),
+      zincMg: _scale(reference.zincMg, multiplier),
+      vitaminAUg: _scale(reference.vitaminAUg, multiplier),
+      vitaminCMg: _scale(reference.vitaminCMg, multiplier),
+      vitaminDUg: _scale(reference.vitaminDUg, multiplier),
+      vitaminB12Ug: _scale(reference.vitaminB12Ug, multiplier),
     );
   }
 

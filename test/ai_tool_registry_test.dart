@@ -110,6 +110,12 @@ void main() {
     );
   });
 
+  test('short sleep follow-up exposes only the direct sleep summary', () {
+    final names = registry.toolNamesForQuery('E o sono?');
+
+    expect(names, {'get_sleep_summary'});
+  });
+
   test('tool routing sends no schemas for casual conversation', () {
     final names = registry.toolNamesForQuery('Olá, tudo bem?');
     expect(names, isEmpty);
@@ -197,6 +203,7 @@ void main() {
       'date': '2024-06-01',
       'start_time': now,
       'duration_seconds': 3600,
+      'estimated_calories': 367.5,
       'feeling_rating': 4,
       'is_from_routine': 0,
       'created_at': now,
@@ -236,6 +243,7 @@ void main() {
     expect(w['id'], 'w_recent');
     expect(w['volumeKg'], 60.0 * 10);
     expect(w['exerciseCount'], 1);
+    expect(w['estimatedCalories'], 367.5);
   });
 
   test('list_exercises returns exercise list', () async {
@@ -280,6 +288,7 @@ void main() {
       'id': 'w_detail',
       'date': '2024-06-01',
       'duration_seconds': 1800,
+      'estimated_calories': 210.25,
       'is_from_routine': 0,
       'created_at': now,
     });
@@ -305,6 +314,7 @@ void main() {
     expect(r.ok, isTrue);
     final data = r.data as Map;
     expect(data['id'], 'w_detail');
+    expect(data['estimatedCalories'], 210.25);
     expect(data['exercises'], isA<List>());
     final exs = data['exercises'] as List;
     expect(exs, hasLength(1));

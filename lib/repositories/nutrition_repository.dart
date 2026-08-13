@@ -152,7 +152,8 @@ class NutritionRepository extends BaseRepository {
               // the existing recency instead of wiping it (a re-fetch
               // must not make a recently logged food disappear from
               // the "recently used" list).
-              lastUsedAt: food.lastUsedAt ??
+              lastUsedAt:
+                  food.lastUsedAt ??
                   _parseIsoDate(existing.first['last_used_at'] as String?),
             );
       // UPDATE in place (never REPLACE): REPLACE deletes the row
@@ -303,7 +304,8 @@ class NutritionRepository extends BaseRepository {
     final currentVariant = details.variants.isEmpty
         ? null
         : details.variants.first;
-    final variant = currentVariant?.copyWith(
+    final variant =
+        currentVariant?.copyWith(
           referenceAmount: referenceAmount,
           referenceUnit: referenceUnit,
           values: referenceValues,
@@ -439,10 +441,7 @@ class NutritionRepository extends BaseRepository {
   /// are seeded with `name` null and resolve to localized labels.
   Future<List<MealTypeDefinition>> getMealTypes() async {
     final db = await this.db;
-    final rows = await db.query(
-      'meal_types',
-      orderBy: 'order_index ASC',
-    );
+    final rows = await db.query('meal_types', orderBy: 'order_index ASC');
     return rows.map(MealTypeDefinition.fromMap).toList();
   }
 
@@ -454,7 +453,8 @@ class NutritionRepository extends BaseRepository {
       throw const NutritionValidationException('meal_name_required');
     }
     final db = await this.db;
-    final count = Sqflite.firstIntValue(
+    final count =
+        Sqflite.firstIntValue(
           await db.rawQuery('SELECT COUNT(*) FROM meal_types'),
         ) ??
         0;
@@ -577,9 +577,14 @@ class NutritionRepository extends BaseRepository {
         name: name,
       );
       final consumed = conversion.apply(variant.values);
-      final serving = availableServings.firstWhereOrNull(
-        (s) => s.label == conversion.unit || s.unit == conversion.unit,
-      );
+      // The conversion already carries the exact serving chosen in the
+      // quantity sheet. Looking it up by the generic `serving` unit is
+      // ambiguous when a food defines more than one portion.
+      final serving =
+          conversion.serving ??
+          availableServings.firstWhereOrNull(
+            (s) => s.label == conversion.unit || s.unit == conversion.unit,
+          );
       final snapshot = NutritionSnapshot(
         version: NutritionSnapshot.currentVersion,
         source: food.source,
@@ -610,9 +615,22 @@ class NutritionRepository extends BaseRepository {
         proteinG: consumed.proteinG,
         carbsG: consumed.carbsG,
         fatG: consumed.fatG,
+        saturatedFatG: consumed.saturatedFatG,
+        monounsaturatedFatG: consumed.monounsaturatedFatG,
+        polyunsaturatedFatG: consumed.polyunsaturatedFatG,
+        transFatG: consumed.transFatG,
         fiberG: consumed.fiberG,
         sugarsG: consumed.sugarsG,
         sodiumMg: consumed.sodiumMg,
+        potassiumMg: consumed.potassiumMg,
+        calciumMg: consumed.calciumMg,
+        ironMg: consumed.ironMg,
+        magnesiumMg: consumed.magnesiumMg,
+        zincMg: consumed.zincMg,
+        vitaminAUg: consumed.vitaminAUg,
+        vitaminCMg: consumed.vitaminCMg,
+        vitaminDUg: consumed.vitaminDUg,
+        vitaminB12Ug: consumed.vitaminB12Ug,
         snapshotJson: snapshot.encode(),
         createdAt: DateTime.now(),
       );
@@ -658,9 +676,22 @@ class NutritionRepository extends BaseRepository {
       proteinG: consumed.proteinG,
       carbsG: consumed.carbsG,
       fatG: consumed.fatG,
+      saturatedFatG: consumed.saturatedFatG,
+      monounsaturatedFatG: consumed.monounsaturatedFatG,
+      polyunsaturatedFatG: consumed.polyunsaturatedFatG,
+      transFatG: consumed.transFatG,
       fiberG: consumed.fiberG,
       sugarsG: consumed.sugarsG,
       sodiumMg: consumed.sodiumMg,
+      potassiumMg: consumed.potassiumMg,
+      calciumMg: consumed.calciumMg,
+      ironMg: consumed.ironMg,
+      magnesiumMg: consumed.magnesiumMg,
+      zincMg: consumed.zincMg,
+      vitaminAUg: consumed.vitaminAUg,
+      vitaminCMg: consumed.vitaminCMg,
+      vitaminDUg: consumed.vitaminDUg,
+      vitaminB12Ug: consumed.vitaminB12Ug,
     );
     final newSnapshot = NutritionSnapshot(
       version: NutritionSnapshot.currentVersion,
@@ -693,9 +724,22 @@ class NutritionRepository extends BaseRepository {
       proteinG: updated.proteinG,
       carbsG: updated.carbsG,
       fatG: updated.fatG,
+      saturatedFatG: updated.saturatedFatG,
+      monounsaturatedFatG: updated.monounsaturatedFatG,
+      polyunsaturatedFatG: updated.polyunsaturatedFatG,
+      transFatG: updated.transFatG,
       fiberG: updated.fiberG,
       sugarsG: updated.sugarsG,
       sodiumMg: updated.sodiumMg,
+      potassiumMg: updated.potassiumMg,
+      calciumMg: updated.calciumMg,
+      ironMg: updated.ironMg,
+      magnesiumMg: updated.magnesiumMg,
+      zincMg: updated.zincMg,
+      vitaminAUg: updated.vitaminAUg,
+      vitaminCMg: updated.vitaminCMg,
+      vitaminDUg: updated.vitaminDUg,
+      vitaminB12Ug: updated.vitaminB12Ug,
       snapshotJson: newSnapshot.encode(),
       createdAt: updated.createdAt,
     );
@@ -815,9 +859,22 @@ class NutritionRepository extends BaseRepository {
           proteinG: item.proteinG,
           carbsG: item.carbsG,
           fatG: item.fatG,
+          saturatedFatG: item.saturatedFatG,
+          monounsaturatedFatG: item.monounsaturatedFatG,
+          polyunsaturatedFatG: item.polyunsaturatedFatG,
+          transFatG: item.transFatG,
           fiberG: item.fiberG,
           sugarsG: item.sugarsG,
           sodiumMg: item.sodiumMg,
+          potassiumMg: item.potassiumMg,
+          calciumMg: item.calciumMg,
+          ironMg: item.ironMg,
+          magnesiumMg: item.magnesiumMg,
+          zincMg: item.zincMg,
+          vitaminAUg: item.vitaminAUg,
+          vitaminCMg: item.vitaminCMg,
+          vitaminDUg: item.vitaminDUg,
+          vitaminB12Ug: item.vitaminB12Ug,
           snapshotJson: item.snapshotJson,
           createdAt: now,
         );
@@ -865,13 +922,11 @@ class NutritionRepository extends BaseRepository {
     }
     // Order by creation so sections appear in the order they were
     // added to the day (custom meal sections have no fixed order).
-    result.sort(
-      (a, b) {
-        final byTime = a.log.createdAt.compareTo(b.log.createdAt);
-        if (byTime != 0) return byTime;
-        return a.log.id.compareTo(b.log.id);
-      },
-    );
+    result.sort((a, b) {
+      final byTime = a.log.createdAt.compareTo(b.log.createdAt);
+      if (byTime != 0) return byTime;
+      return a.log.id.compareTo(b.log.id);
+    });
     return result;
   }
 
@@ -886,9 +941,22 @@ class NutritionRepository extends BaseRepository {
         SUM(protein_g) as protein_g,
         SUM(carbs_g) as carbs_g,
         SUM(fat_g) as fat_g,
+        SUM(saturated_fat_g) as saturated_fat_g,
+        SUM(monounsaturated_fat_g) as monounsaturated_fat_g,
+        SUM(polyunsaturated_fat_g) as polyunsaturated_fat_g,
+        SUM(trans_fat_g) as trans_fat_g,
         SUM(fiber_g) as fiber_g,
         SUM(sugars_g) as sugars_g,
-        SUM(sodium_mg) as sodium_mg
+        SUM(sodium_mg) as sodium_mg,
+        SUM(potassium_mg) as potassium_mg,
+        SUM(calcium_mg) as calcium_mg,
+        SUM(iron_mg) as iron_mg,
+        SUM(magnesium_mg) as magnesium_mg,
+        SUM(zinc_mg) as zinc_mg,
+        SUM(vitamin_a_ug) as vitamin_a_ug,
+        SUM(vitamin_c_mg) as vitamin_c_mg,
+        SUM(vitamin_d_ug) as vitamin_d_ug,
+        SUM(vitamin_b12_ug) as vitamin_b12_ug
       FROM meal_log_items mli
       JOIN meal_logs ml ON mli.meal_log_id = ml.id
       WHERE ml.date = ?
@@ -904,9 +972,22 @@ class NutritionRepository extends BaseRepository {
       proteinG: _sum(row['protein_g']),
       carbsG: _sum(row['carbs_g']),
       fatG: _sum(row['fat_g']),
+      saturatedFatG: _sum(row['saturated_fat_g']),
+      monounsaturatedFatG: _sum(row['monounsaturated_fat_g']),
+      polyunsaturatedFatG: _sum(row['polyunsaturated_fat_g']),
+      transFatG: _sum(row['trans_fat_g']),
       fiberG: _sum(row['fiber_g']),
       sugarsG: _sum(row['sugars_g']),
       sodiumMg: _sum(row['sodium_mg']),
+      potassiumMg: _sum(row['potassium_mg']),
+      calciumMg: _sum(row['calcium_mg']),
+      ironMg: _sum(row['iron_mg']),
+      magnesiumMg: _sum(row['magnesium_mg']),
+      zincMg: _sum(row['zinc_mg']),
+      vitaminAUg: _sum(row['vitamin_a_ug']),
+      vitaminCMg: _sum(row['vitamin_c_mg']),
+      vitaminDUg: _sum(row['vitamin_d_ug']),
+      vitaminB12Ug: _sum(row['vitamin_b12_ug']),
     );
     final incomplete = await db.rawQuery(
       '''
@@ -917,7 +998,11 @@ class NutritionRepository extends BaseRepository {
           mli.calories IS NULL OR mli.protein_g IS NULL OR
           mli.carbs_g IS NULL OR mli.fat_g IS NULL OR
           mli.fiber_g IS NULL OR mli.sugars_g IS NULL OR
-          mli.sodium_mg IS NULL
+          mli.sodium_mg IS NULL OR mli.potassium_mg IS NULL OR
+          mli.calcium_mg IS NULL OR mli.iron_mg IS NULL OR
+          mli.magnesium_mg IS NULL OR mli.zinc_mg IS NULL OR
+          mli.vitamin_a_ug IS NULL OR mli.vitamin_c_mg IS NULL OR
+          mli.vitamin_d_ug IS NULL OR mli.vitamin_b12_ug IS NULL
         )
       LIMIT 1
       ''',
@@ -931,15 +1016,22 @@ class NutritionRepository extends BaseRepository {
   }
 
   /// Daily consumed totals for the last [days] days (including today),
-  /// oldest first. Each row has `date` plus the seven nutrient sums;
+  /// oldest first. Each row has `date` plus all tracked nutrient sums;
   /// days without any logged item are absent.
   Future<List<Map<String, dynamic>>> getDailyNutritionHistory({
     int days = 30,
+  }) => getDailyNutritionHistoryForRange(
+    startDate: DateTime.now().subtract(Duration(days: days - 1)),
+    endDate: DateTime.now(),
+  );
+
+  Future<List<Map<String, dynamic>>> getDailyNutritionHistoryForRange({
+    required DateTime startDate,
+    required DateTime endDate,
   }) async {
     final db = await this.db;
-    final start = _dateString(
-      DateTime.now().subtract(Duration(days: days - 1)),
-    );
+    final start = _dateString(startDate);
+    final end = _dateString(endDate);
     final rows = await db.rawQuery(
       '''
       SELECT ml.date as date,
@@ -947,16 +1039,29 @@ class NutritionRepository extends BaseRepository {
         SUM(mli.protein_g) as protein_g,
         SUM(mli.carbs_g) as carbs_g,
         SUM(mli.fat_g) as fat_g,
+        SUM(mli.saturated_fat_g) as saturated_fat_g,
+        SUM(mli.monounsaturated_fat_g) as monounsaturated_fat_g,
+        SUM(mli.polyunsaturated_fat_g) as polyunsaturated_fat_g,
+        SUM(mli.trans_fat_g) as trans_fat_g,
         SUM(mli.fiber_g) as fiber_g,
         SUM(mli.sugars_g) as sugars_g,
-        SUM(mli.sodium_mg) as sodium_mg
+        SUM(mli.sodium_mg) as sodium_mg,
+        SUM(mli.potassium_mg) as potassium_mg,
+        SUM(mli.calcium_mg) as calcium_mg,
+        SUM(mli.iron_mg) as iron_mg,
+        SUM(mli.magnesium_mg) as magnesium_mg,
+        SUM(mli.zinc_mg) as zinc_mg,
+        SUM(mli.vitamin_a_ug) as vitamin_a_ug,
+        SUM(mli.vitamin_c_mg) as vitamin_c_mg,
+        SUM(mli.vitamin_d_ug) as vitamin_d_ug,
+        SUM(mli.vitamin_b12_ug) as vitamin_b12_ug
       FROM meal_log_items mli
       JOIN meal_logs ml ON mli.meal_log_id = ml.id
-      WHERE ml.date >= ?
+      WHERE ml.date BETWEEN ? AND ?
       GROUP BY ml.date
       ORDER BY ml.date ASC
       ''',
-      [start],
+      [start, end],
     );
     return rows;
   }
@@ -1108,6 +1213,9 @@ class NutritionRepository extends BaseRepository {
           'brand_snapshot': item.brandSnapshot,
           'quantity': item.quantity,
           'unit': item.unit,
+          'serving_label': item.servingLabel,
+          'serving_grams_equivalent': item.servingGramsEquivalent,
+          'serving_ml_equivalent': item.servingMlEquivalent,
           'order_index': i,
         });
       }
@@ -1189,8 +1297,13 @@ class NutritionRepository extends BaseRepository {
         orElse: () => variants.first,
       );
       final servings = details.servings[variant.id] ?? const <FoodServing>[];
-      final serving = servings.firstWhereOrNull(
-        (s) => s.label == item.unit || s.unit == item.unit,
+      final serving = _resolveSavedMealServing(
+        servings: servings,
+        variantId: variant.id,
+        unit: item.unit,
+        servingLabel: item.servingLabel,
+        gramsEquivalent: item.servingGramsEquivalent,
+        mlEquivalent: item.servingMlEquivalent,
       );
       final conversion = NutritionConversion(
         quantity: item.quantity * meal.meal.portions,
@@ -1225,39 +1338,47 @@ class NutritionRepository extends BaseRepository {
   /// Per-day totals for the [days] window, oldest first. Days with no
   /// logged items are emitted with `calories` (and the macros) null so
   /// the screen can render continuous timelines and detect missed days.
-  Future<List<DailyCalorieTotal>> getDailyCalorieTotals({required int days}) async {
+  Future<List<DailyCalorieTotal>> getDailyCalorieTotals({required int days}) =>
+      getDailyCalorieTotalsForRange(
+        startDate: DateTime.now().subtract(Duration(days: days - 1)),
+        endDate: DateTime.now(),
+      );
+
+  Future<List<DailyCalorieTotal>> getDailyCalorieTotalsForRange({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
     final db = await this.db;
-    final start = _dateString(
-      DateTime.now().subtract(Duration(days: days - 1)),
-    );
+    final start = _dateString(startDate);
+    final end = _dateString(endDate);
     final rows = await db.rawQuery(
       '''
       SELECT ml.date as date,
-        SUM(mli.calories) as calories
+        SUM(mli.calories) as calories,
+        COUNT(*) as item_count
       FROM meal_log_items mli
       JOIN meal_logs ml ON mli.meal_log_id = ml.id
-      WHERE ml.date >= ?
+      WHERE ml.date BETWEEN ? AND ?
       GROUP BY ml.date
       ORDER BY ml.date ASC
       ''',
-      [start],
+      [start, end],
     );
     final totalsByDate = <String, double>{};
     for (final row in rows) {
-      final v = _sum(row['calories']) ?? 0;
-      if (v > 0) totalsByDate[row['date'] as String] = v;
+      final itemCount = (row['item_count'] as num?)?.toInt() ?? 0;
+      if (itemCount > 0) {
+        totalsByDate[row['date'] as String] = _sum(row['calories']) ?? 0;
+      }
     }
     final result = <DailyCalorieTotal>[];
-    final startDate = DateTime.parse(start);
+    final firstDay = DateTime.parse(start);
+    final lastDay = DateTime.parse(end);
+    final days = lastDay.difference(firstDay).inDays + 1;
     for (var i = 0; i < days; i++) {
-      final d = DateTime(startDate.year, startDate.month, startDate.day + i);
+      final d = DateTime(firstDay.year, firstDay.month, firstDay.day + i);
       final key = _dateString(d);
-      result.add(
-        DailyCalorieTotal(
-          date: d,
-          calories: totalsByDate[key],
-        ),
-      );
+      result.add(DailyCalorieTotal(date: d, calories: totalsByDate[key]));
     }
     return result;
   }
@@ -1267,8 +1388,31 @@ class NutritionRepository extends BaseRepository {
   Future<CalorieBalance> getCalorieBalance({
     required int days,
     required double? goal,
+  }) => getCalorieBalanceForRange(
+    startDate: DateTime.now().subtract(Duration(days: days - 1)),
+    endDate: DateTime.now(),
+    goal: goal,
+  );
+
+  Future<CalorieBalance> getCalorieBalanceForRange({
+    required DateTime startDate,
+    required DateTime endDate,
+    required double? goal,
   }) async {
-    final dailies = await getDailyCalorieTotals(days: days);
+    final dailies = await getDailyCalorieTotalsForRange(
+      startDate: startDate,
+      endDate: endDate,
+    );
+    return calculateCalorieBalance(dailies: dailies, goal: goal);
+  }
+
+  /// Builds the aggregate balance from totals already loaded by a caller.
+  /// This avoids repeating the daily-totals query on analytics screens.
+  CalorieBalance calculateCalorieBalance({
+    required List<DailyCalorieTotal> dailies,
+    required double? goal,
+  }) {
+    final days = dailies.length;
     var consumed = 0.0;
     var loggedDays = 0;
     var inDeficit = 0;
@@ -1316,7 +1460,7 @@ class NutritionRepository extends BaseRepository {
       }
     }
     final avg = loggedDays == 0 ? 0.0 : consumed / loggedDays;
-    final totalGoal = goal == null ? null : goal * days;
+    final totalGoal = goal == null ? null : goal * loggedDays;
     return CalorieBalance(
       days: days,
       totalConsumed: consumed,
@@ -1336,11 +1480,20 @@ class NutritionRepository extends BaseRepository {
   Future<List<CalorieContributor>> getTopCalorieContributors({
     required int days,
     int limit = 10,
+  }) => getTopCalorieContributorsForRange(
+    startDate: DateTime.now().subtract(Duration(days: days - 1)),
+    endDate: DateTime.now(),
+    limit: limit,
+  );
+
+  Future<List<CalorieContributor>> getTopCalorieContributorsForRange({
+    required DateTime startDate,
+    required DateTime endDate,
+    int limit = 10,
   }) async {
     final db = await this.db;
-    final start = _dateString(
-      DateTime.now().subtract(Duration(days: days - 1)),
-    );
+    final start = _dateString(startDate);
+    final end = _dateString(endDate);
     final rows = await db.rawQuery(
       '''
       SELECT mli.food_name_snapshot as food_name,
@@ -1349,14 +1502,14 @@ class NutritionRepository extends BaseRepository {
         COUNT(*) as occurrences
       FROM meal_log_items mli
       JOIN meal_logs ml ON mli.meal_log_id = ml.id
-      WHERE ml.date >= ?
+      WHERE ml.date BETWEEN ? AND ?
         AND mli.food_name_snapshot IS NOT NULL
         AND mli.calories IS NOT NULL
       GROUP BY mli.food_name_snapshot, mli.brand_snapshot
       ORDER BY total_calories DESC
       LIMIT ?
       ''',
-      [start, limit],
+      [start, end, limit],
     );
     return rows
         .map(
@@ -1373,13 +1526,19 @@ class NutritionRepository extends BaseRepository {
   /// Calorie distribution across meal types in the [days] window.
   /// Excludes days with no logged items and meal types that never
   /// appear so the chart only renders what the user actually uses.
-  Future<List<MealTypeCalories>> getCaloriesByMealType({
-    required int days,
+  Future<List<MealTypeCalories>> getCaloriesByMealType({required int days}) =>
+      getCaloriesByMealTypeForRange(
+        startDate: DateTime.now().subtract(Duration(days: days - 1)),
+        endDate: DateTime.now(),
+      );
+
+  Future<List<MealTypeCalories>> getCaloriesByMealTypeForRange({
+    required DateTime startDate,
+    required DateTime endDate,
   }) async {
     final db = await this.db;
-    final start = _dateString(
-      DateTime.now().subtract(Duration(days: days - 1)),
-    );
+    final start = _dateString(startDate);
+    final end = _dateString(endDate);
     final rows = await db.rawQuery(
       '''
       SELECT ml.meal_type as meal_type,
@@ -1388,12 +1547,12 @@ class NutritionRepository extends BaseRepository {
         COUNT(*) as item_count
       FROM meal_log_items mli
       JOIN meal_logs ml ON mli.meal_log_id = ml.id
-      WHERE ml.date >= ?
+      WHERE ml.date BETWEEN ? AND ?
         AND mli.calories IS NOT NULL
       GROUP BY ml.meal_type, display_name
       ORDER BY total_calories DESC
       ''',
-      [start],
+      [start, end],
     );
     return rows
         .map(
@@ -1451,9 +1610,22 @@ class NutritionRepository extends BaseRepository {
         mli.protein_g as protein_g,
         mli.carbs_g as carbs_g,
         mli.fat_g as fat_g,
+        mli.saturated_fat_g as saturated_fat_g,
+        mli.monounsaturated_fat_g as monounsaturated_fat_g,
+        mli.polyunsaturated_fat_g as polyunsaturated_fat_g,
+        mli.trans_fat_g as trans_fat_g,
         mli.fiber_g as fiber_g,
         mli.sugars_g as sugars_g,
         mli.sodium_mg as sodium_mg,
+        mli.potassium_mg as potassium_mg,
+        mli.calcium_mg as calcium_mg,
+        mli.iron_mg as iron_mg,
+        mli.magnesium_mg as magnesium_mg,
+        mli.zinc_mg as zinc_mg,
+        mli.vitamin_a_ug as vitamin_a_ug,
+        mli.vitamin_c_mg as vitamin_c_mg,
+        mli.vitamin_d_ug as vitamin_d_ug,
+        mli.vitamin_b12_ug as vitamin_b12_ug,
         f.source as source,
         mli.nutrition_snapshot_json as snapshot
       FROM meal_log_items mli
@@ -1543,6 +1715,9 @@ class NutritionRepository extends BaseRepository {
           foodVariantId: item.foodVariantId,
           quantity: item.quantity,
           unit: item.unit,
+          servingLabel: item.servingLabel,
+          servingGramsEquivalent: item.servingGramsEquivalent,
+          servingMlEquivalent: item.servingMlEquivalent,
         ),
     ];
     final computed = await _computeSavedMealTotalsFromRecords(
@@ -1566,6 +1741,20 @@ class NutritionRepository extends BaseRepository {
     required List<SavedMealItemDraft> items,
     required double portions,
   }) async {
+    final preview = await previewSavedMealNutrition(
+      items: items,
+      portions: portions,
+    );
+    return preview.totals;
+  }
+
+  /// Returns both the aggregate and each ingredient's calculated values so
+  /// editor cards can mirror the nutrition shown in the final total.
+  Future<({NutritionValues? totals, List<NutritionValues?> byItem})>
+  previewSavedMealNutrition({
+    required List<SavedMealItemDraft> items,
+    required double portions,
+  }) async {
     final db = await this.db;
     final records = [
       for (final item in items)
@@ -1573,6 +1762,9 @@ class NutritionRepository extends BaseRepository {
           foodVariantId: item.foodVariantId,
           quantity: item.quantity,
           unit: item.unit,
+          servingLabel: item.servingLabel,
+          servingGramsEquivalent: item.servingGramsEquivalent,
+          servingMlEquivalent: item.servingMlEquivalent,
         ),
     ];
     final computed = await _computeSavedMealTotalsFromRecords(
@@ -1580,7 +1772,10 @@ class NutritionRepository extends BaseRepository {
       records,
       portions,
     );
-    return computed.totals;
+    return (
+      totals: computed.totals,
+      byItem: [for (var i = 0; i < records.length; i++) computed.byIndex[i]],
+    );
   }
 
   /// Inner computation shared by [_computeSavedMealTotals] (saved items)
@@ -1589,7 +1784,17 @@ class NutritionRepository extends BaseRepository {
   Future<({NutritionValues? totals, Map<int, NutritionValues> byIndex})>
   _computeSavedMealTotalsFromRecords(
     DatabaseExecutor db,
-    List<({String? foodVariantId, double quantity, String unit})> records,
+    List<
+      ({
+        String? foodVariantId,
+        double quantity,
+        String unit,
+        String? servingLabel,
+        double? servingGramsEquivalent,
+        double? servingMlEquivalent,
+      })
+    >
+    records,
     double portions,
   ) async {
     if (records.isEmpty) {
@@ -1624,9 +1829,22 @@ class NutritionRepository extends BaseRepository {
     var proteinG = 0.0;
     var carbsG = 0.0;
     var fatG = 0.0;
+    var saturatedFatG = 0.0;
+    var monounsaturatedFatG = 0.0;
+    var polyunsaturatedFatG = 0.0;
+    var transFatG = 0.0;
     var fiberG = 0.0;
     var sugarsG = 0.0;
     var sodiumMg = 0.0;
+    var potassiumMg = 0.0;
+    var calciumMg = 0.0;
+    var ironMg = 0.0;
+    var magnesiumMg = 0.0;
+    var zincMg = 0.0;
+    var vitaminAUg = 0.0;
+    var vitaminCMg = 0.0;
+    var vitaminDUg = 0.0;
+    var vitaminB12Ug = 0.0;
     var hasAny = false;
     final byIndex = <int, NutritionValues>{};
     for (var i = 0; i < records.length; i++) {
@@ -1636,8 +1854,13 @@ class NutritionRepository extends BaseRepository {
           : variants[record.foodVariantId];
       if (variant == null) continue;
       final servings = servingsByVariant[variant.id] ?? const <FoodServing>[];
-      final serving = servings.firstWhereOrNull(
-        (s) => s.label == record.unit || s.unit == record.unit,
+      final serving = _resolveSavedMealServing(
+        servings: servings,
+        variantId: variant.id,
+        unit: record.unit,
+        servingLabel: record.servingLabel,
+        gramsEquivalent: record.servingGramsEquivalent,
+        mlEquivalent: record.servingMlEquivalent,
       );
       final conversion = NutritionConversion(
         quantity: record.quantity * portions,
@@ -1658,9 +1881,22 @@ class NutritionRepository extends BaseRepository {
       proteinG += consumed.proteinG ?? 0;
       carbsG += consumed.carbsG ?? 0;
       fatG += consumed.fatG ?? 0;
+      saturatedFatG += consumed.saturatedFatG ?? 0;
+      monounsaturatedFatG += consumed.monounsaturatedFatG ?? 0;
+      polyunsaturatedFatG += consumed.polyunsaturatedFatG ?? 0;
+      transFatG += consumed.transFatG ?? 0;
       fiberG += consumed.fiberG ?? 0;
       sugarsG += consumed.sugarsG ?? 0;
       sodiumMg += consumed.sodiumMg ?? 0;
+      potassiumMg += consumed.potassiumMg ?? 0;
+      calciumMg += consumed.calciumMg ?? 0;
+      ironMg += consumed.ironMg ?? 0;
+      magnesiumMg += consumed.magnesiumMg ?? 0;
+      zincMg += consumed.zincMg ?? 0;
+      vitaminAUg += consumed.vitaminAUg ?? 0;
+      vitaminCMg += consumed.vitaminCMg ?? 0;
+      vitaminDUg += consumed.vitaminDUg ?? 0;
+      vitaminB12Ug += consumed.vitaminB12Ug ?? 0;
       hasAny = true;
     }
     if (!hasAny) return (totals: null, byIndex: byIndex);
@@ -1670,12 +1906,78 @@ class NutritionRepository extends BaseRepository {
         proteinG: proteinG,
         carbsG: carbsG,
         fatG: fatG,
+        saturatedFatG: saturatedFatG,
+        monounsaturatedFatG: monounsaturatedFatG,
+        polyunsaturatedFatG: polyunsaturatedFatG,
+        transFatG: transFatG,
         fiberG: fiberG,
         sugarsG: sugarsG,
         sodiumMg: sodiumMg,
+        potassiumMg: potassiumMg,
+        calciumMg: calciumMg,
+        ironMg: ironMg,
+        magnesiumMg: magnesiumMg,
+        zincMg: zincMg,
+        vitaminAUg: vitaminAUg,
+        vitaminCMg: vitaminCMg,
+        vitaminDUg: vitaminDUg,
+        vitaminB12Ug: vitaminB12Ug,
       ),
       byIndex: byIndex,
     );
+  }
+
+  /// Resolves the precise serving selected for a saved-meal ingredient.
+  ///
+  /// New rows carry both a label and an equivalence snapshot. The current
+  /// library serving wins when its label still exists, keeping saved-meal
+  /// totals live. The snapshot is the safe fallback when the serving was
+  /// edited or deleted. Legacy rows are used only when their old unit match
+  /// identifies exactly one serving; choosing the first of several would
+  /// silently calculate the wrong calories and macros.
+  static FoodServing? _resolveSavedMealServing({
+    required List<FoodServing> servings,
+    required String variantId,
+    required String unit,
+    String? servingLabel,
+    double? gramsEquivalent,
+    double? mlEquivalent,
+  }) {
+    final normalizedUnit = NutritionConversion.normalizeUnit(unit);
+    if (normalizedUnit != 'serving' && normalizedUnit != 'unit') return null;
+
+    if (servingLabel != null && servingLabel.isNotEmpty) {
+      final byLabel = servings.where((s) => s.label == servingLabel);
+      if (byLabel.isNotEmpty) return byLabel.first;
+    }
+
+    if (gramsEquivalent != null || mlEquivalent != null) {
+      final byEquivalence = servings.where(
+        (s) =>
+            _sameNullableDouble(s.gramsEquivalent, gramsEquivalent) &&
+            _sameNullableDouble(s.mlEquivalent, mlEquivalent),
+      );
+      if (byEquivalence.isNotEmpty) return byEquivalence.first;
+
+      return FoodServing(
+        id: 'saved-meal-snapshot',
+        foodVariantId: variantId,
+        label: servingLabel ?? unit,
+        unit: unit,
+        gramsEquivalent: gramsEquivalent,
+        mlEquivalent: mlEquivalent,
+      );
+    }
+
+    final legacyMatches = servings
+        .where((s) => s.label == unit || s.unit == unit)
+        .toList();
+    return legacyMatches.length == 1 ? legacyMatches.first : null;
+  }
+
+  static bool _sameNullableDouble(double? a, double? b) {
+    if (a == null || b == null) return a == b;
+    return (a - b).abs() < 0.000001;
   }
 
   Future<List<FoodSearchResultLite>> _hydrateResults(
@@ -1750,6 +2052,7 @@ class NutritionRepository extends BaseRepository {
     if (parsed != null && parsed.isUtc) return parsed.toLocal();
     return parsed;
   }
+
   static void _validateDate(String date) {
     if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(date)) {
       throw const NutritionValidationException('invalid_date_format');
@@ -1825,6 +2128,9 @@ class SavedMealItemDraft {
   final String? brandSnapshot;
   final double quantity;
   final String unit;
+  final String? servingLabel;
+  final double? servingGramsEquivalent;
+  final double? servingMlEquivalent;
 
   const SavedMealItemDraft({
     this.foodId,
@@ -1833,6 +2139,9 @@ class SavedMealItemDraft {
     this.brandSnapshot,
     required this.quantity,
     required this.unit,
+    this.servingLabel,
+    this.servingGramsEquivalent,
+    this.servingMlEquivalent,
   });
 
   factory SavedMealItemDraft.fromMealLogItem(MealLogItem item) {
@@ -1843,6 +2152,8 @@ class SavedMealItemDraft {
       brandSnapshot: item.brandSnapshot,
       quantity: item.quantity,
       unit: item.unit,
+      servingGramsEquivalent: item.snapshot.gramsEquivalent,
+      servingMlEquivalent: item.snapshot.mlEquivalent,
     );
   }
 }
@@ -1862,9 +2173,22 @@ class NutritionExportRow {
   final double? proteinG;
   final double? carbsG;
   final double? fatG;
+  final double? saturatedFatG;
+  final double? monounsaturatedFatG;
+  final double? polyunsaturatedFatG;
+  final double? transFatG;
   final double? fiberG;
   final double? sugarsG;
   final double? sodiumMg;
+  final double? potassiumMg;
+  final double? calciumMg;
+  final double? ironMg;
+  final double? magnesiumMg;
+  final double? zincMg;
+  final double? vitaminAUg;
+  final double? vitaminCMg;
+  final double? vitaminDUg;
+  final double? vitaminB12Ug;
   final String? source;
   final bool isEstimated;
   final bool hasMissingValues;
@@ -1881,9 +2205,22 @@ class NutritionExportRow {
     this.proteinG,
     this.carbsG,
     this.fatG,
+    this.saturatedFatG,
+    this.monounsaturatedFatG,
+    this.polyunsaturatedFatG,
+    this.transFatG,
     this.fiberG,
     this.sugarsG,
     this.sodiumMg,
+    this.potassiumMg,
+    this.calciumMg,
+    this.ironMg,
+    this.magnesiumMg,
+    this.zincMg,
+    this.vitaminAUg,
+    this.vitaminCMg,
+    this.vitaminDUg,
+    this.vitaminB12Ug,
     this.source,
     this.isEstimated = false,
     this.hasMissingValues = false,
@@ -1914,9 +2251,22 @@ class NutritionExportRow {
       proteinG: (map['protein_g'] as num?)?.toDouble(),
       carbsG: (map['carbs_g'] as num?)?.toDouble(),
       fatG: (map['fat_g'] as num?)?.toDouble(),
+      saturatedFatG: (map['saturated_fat_g'] as num?)?.toDouble(),
+      monounsaturatedFatG: (map['monounsaturated_fat_g'] as num?)?.toDouble(),
+      polyunsaturatedFatG: (map['polyunsaturated_fat_g'] as num?)?.toDouble(),
+      transFatG: (map['trans_fat_g'] as num?)?.toDouble(),
       fiberG: (map['fiber_g'] as num?)?.toDouble(),
       sugarsG: (map['sugars_g'] as num?)?.toDouble(),
       sodiumMg: (map['sodium_mg'] as num?)?.toDouble(),
+      potassiumMg: (map['potassium_mg'] as num?)?.toDouble(),
+      calciumMg: (map['calcium_mg'] as num?)?.toDouble(),
+      ironMg: (map['iron_mg'] as num?)?.toDouble(),
+      magnesiumMg: (map['magnesium_mg'] as num?)?.toDouble(),
+      zincMg: (map['zinc_mg'] as num?)?.toDouble(),
+      vitaminAUg: (map['vitamin_a_ug'] as num?)?.toDouble(),
+      vitaminCMg: (map['vitamin_c_mg'] as num?)?.toDouble(),
+      vitaminDUg: (map['vitamin_d_ug'] as num?)?.toDouble(),
+      vitaminB12Ug: (map['vitamin_b12_ug'] as num?)?.toDouble(),
       source: map['source'] as String?,
       isEstimated: isEstimated,
       hasMissingValues: hasMissing,
@@ -1951,9 +2301,9 @@ class CalorieBalance {
   final int days;
   final double totalConsumed;
 
-  /// Sum of the active goal over the whole window (or null when no
-  /// goal is configured). Combined with [totalConsumed] to produce
-  /// the net surplus / deficit.
+  /// Sum of the active goal over days with at least one logged item
+  /// (or null when no goal is configured). Combined with
+  /// [totalConsumed] to produce the net surplus / deficit.
   final double? totalGoal;
 
   /// `consumed - totalGoal`. Null when no goal is set.

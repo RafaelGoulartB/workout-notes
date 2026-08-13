@@ -57,9 +57,26 @@ class AiFoodLabelDraft {
             proteinG: _nonNegativeDouble(per['protein_g']),
             carbsG: _nonNegativeDouble(per['carbs_g']),
             fatG: _nonNegativeDouble(per['fat_g']),
+            saturatedFatG: _nonNegativeDouble(per['saturated_fat_g']),
+            monounsaturatedFatG: _nonNegativeDouble(
+              per['monounsaturated_fat_g'],
+            ),
+            polyunsaturatedFatG: _nonNegativeDouble(
+              per['polyunsaturated_fat_g'],
+            ),
+            transFatG: _nonNegativeDouble(per['trans_fat_g']),
             fiberG: _nonNegativeDouble(per['fiber_g']),
             sugarsG: _nonNegativeDouble(per['sugars_g']),
             sodiumMg: _nonNegativeDouble(per['sodium_mg']),
+            potassiumMg: _nonNegativeDouble(per['potassium_mg']),
+            calciumMg: _nonNegativeDouble(per['calcium_mg']),
+            ironMg: _nonNegativeDouble(per['iron_mg']),
+            magnesiumMg: _nonNegativeDouble(per['magnesium_mg']),
+            zincMg: _nonNegativeDouble(per['zinc_mg']),
+            vitaminAUg: _nonNegativeDouble(per['vitamin_a_ug']),
+            vitaminCMg: _nonNegativeDouble(per['vitamin_c_mg']),
+            vitaminDUg: _nonNegativeDouble(per['vitamin_d_ug']),
+            vitaminB12Ug: _nonNegativeDouble(per['vitamin_b12_ug']),
           )
         : NutritionValues.empty;
     final servings = <AiFoodLabelServingDraft>[];

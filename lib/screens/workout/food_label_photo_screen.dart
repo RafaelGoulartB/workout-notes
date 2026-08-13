@@ -34,10 +34,12 @@ class FoodLabelPhotoScreen extends StatefulWidget {
 }
 
 class _FoodLabelPhotoScreenState extends State<FoodLabelPhotoScreen> {
+  static const int _maxImages = 5;
+
   final ImagePicker _picker = ImagePicker();
   late final AiFoodLabelService _service;
-  Uint8List? _imageBytes;
-  String _imageMimeType = 'image/jpeg';
+  final List<AiFoodLabelImage> _images = [];
+  bool _isPicking = false;
   bool _isAnalyzing = false;
 
   @override
@@ -50,39 +52,67 @@ class _FoodLabelPhotoScreenState extends State<FoodLabelPhotoScreen> {
 
   Future<void> _pick(ImageSource source) async {
     final loc = AppLocalizations.of(context)!;
+    final remaining = _maxImages - _images.length;
+    if (remaining <= 0 || _isPicking) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.nutritionPhotoLimitReached)));
+      return;
+    }
+    setState(() => _isPicking = true);
     try {
-      final file = await _picker.pickImage(
-        source: source,
-        maxWidth: 1280,
-        maxHeight: 1280,
-        imageQuality: 85,
-      );
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
-      final mimeType = _supportedImageMimeType(file.mimeType, bytes);
+      final List<XFile> files;
+      if (source == ImageSource.camera) {
+        final file = await _picker.pickImage(
+          source: source,
+          maxWidth: 1280,
+          maxHeight: 1280,
+          imageQuality: 85,
+          requestFullMetadata: false,
+        );
+        files = file == null ? const [] : [file];
+      } else {
+        files = await _picker.pickMultiImage(
+          maxWidth: 1280,
+          maxHeight: 1280,
+          imageQuality: 85,
+          limit: remaining,
+          requestFullMetadata: false,
+        );
+      }
+      final selected = <AiFoodLabelImage>[];
+      for (final file in files.take(remaining)) {
+        final bytes = await file.readAsBytes();
+        selected.add(
+          AiFoodLabelImage(
+            bytes: bytes,
+            mimeType: _supportedImageMimeType(file.mimeType, bytes),
+          ),
+        );
+      }
       if (!mounted) return;
-      setState(() {
-        _imageBytes = bytes;
-        _imageMimeType = mimeType;
-      });
+      setState(() => _images.addAll(selected));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(loc.nutritionPhotoPickFailed)));
+    } finally {
+      if (mounted) setState(() => _isPicking = false);
     }
+  }
+
+  void _removeImage(int index) {
+    if (_isAnalyzing) return;
+    setState(() => _images.removeAt(index));
   }
 
   Future<void> _analyze() async {
     final loc = AppLocalizations.of(context)!;
-    final bytes = _imageBytes;
-    if (bytes == null || _isAnalyzing) return;
+    if (_images.isEmpty || _isAnalyzing) return;
     setState(() => _isAnalyzing = true);
     try {
-      final draft = await _service.analyze(
-        imageBytes: bytes,
-        mimeType: _imageMimeType,
-      );
+      final draft = await _service.analyzeImages(images: List.of(_images));
       if (!mounted) return;
       final created = await Navigator.of(context).push<Food>(
         MaterialPageRoute(
@@ -214,14 +244,11 @@ class _FoodLabelPhotoScreenState extends State<FoodLabelPhotoScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            if (_imageBytes != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.memory(
-                  _imageBytes!,
-                  height: 260,
-                  fit: BoxFit.cover,
-                ),
+            if (_images.isNotEmpty)
+              _SelectedImagesPreview(
+                images: _images,
+                onRemove: _removeImage,
+                removeTooltip: loc.nutritionPhotoRemove,
               )
             else
               Container(
@@ -237,11 +264,21 @@ class _FoodLabelPhotoScreenState extends State<FoodLabelPhotoScreen> {
                 ),
               ),
             const SizedBox(height: 16),
+            if (_images.isNotEmpty) ...[
+              Text(
+                loc.nutritionPhotoSelectedCount(_images.length, _maxImages),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             Row(
               children: [
                 Expanded(
                   child: FilledButton.tonalIcon(
-                    onPressed: _isAnalyzing
+                    onPressed: _isAnalyzing || _isPicking
                         ? null
                         : () => _pick(ImageSource.camera),
                     icon: const Icon(Icons.photo_camera_outlined),
@@ -251,7 +288,7 @@ class _FoodLabelPhotoScreenState extends State<FoodLabelPhotoScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: _isAnalyzing
+                    onPressed: _isAnalyzing || _isPicking
                         ? null
                         : () => _pick(ImageSource.gallery),
                     icon: const Icon(Icons.photo_library_outlined),
@@ -260,7 +297,7 @@ class _FoodLabelPhotoScreenState extends State<FoodLabelPhotoScreen> {
                 ),
               ],
             ),
-            if (_imageBytes != null) ...[
+            if (_images.isNotEmpty) ...[
               const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: _isAnalyzing ? null : _analyze,
@@ -279,6 +316,76 @@ class _FoodLabelPhotoScreenState extends State<FoodLabelPhotoScreen> {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectedImagesPreview extends StatelessWidget {
+  final List<AiFoodLabelImage> images;
+  final ValueChanged<int> onRemove;
+  final String removeTooltip;
+
+  const _SelectedImagesPreview({
+    required this.images,
+    required this.onRemove,
+    required this.removeTooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return LayoutBuilder(
+      builder: (context, constraints) => SizedBox(
+        height: 220,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: images.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 10),
+          itemBuilder: (context, index) => SizedBox(
+            width: images.length == 1 ? constraints.maxWidth : 180,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.memory(images[index].bytes, fit: BoxFit.cover),
+                ),
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.scrim.withAlpha(170),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${index + 1}',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: IconButton.filled(
+                    tooltip: removeTooltip,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => onRemove(index),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
