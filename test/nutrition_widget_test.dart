@@ -307,23 +307,59 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(loc.nutritionCaloriesTitle), findsNothing);
+    expect(find.byType(ExpansionTile), findsNothing);
     expect(find.text(loc.nutritionMacrosTitle), findsOneWidget);
     expect(find.text(loc.nutritionNutrientsTitle), findsOneWidget);
-    final nutrientTiles = tester
-        .widgetList<ExpansionTile>(find.byType(ExpansionTile))
-        .toList();
-    expect(nutrientTiles, hasLength(3));
-    expect(
-      nutrientTiles.map((tile) => tile.key).toSet(),
-      hasLength(nutrientTiles.length),
-    );
+    expect(find.text(loc.nutritionNutrientConsumedHeader), findsOneWidget);
+    expect(find.text(loc.nutritionNutrientGoalHeader), findsOneWidget);
+    expect(find.text(loc.nutritionNutrientRemainingHeader), findsOneWidget);
+    expect(find.byKey(const ValueKey('nutrition-stat-fiber')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nutrition-stat-sugars')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nutrition-stat-sodium')), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsWidgets);
 
-    await tester.tap(find.text(loc.nutritionFatBreakdownTitle));
-    await tester.pumpAndSettle();
+    final statisticsList = find.byType(Scrollable).last;
+    for (final title in [
+      loc.nutritionFatBreakdownTitle,
+      loc.nutritionNutrientMineralsTitle,
+      loc.nutritionNutrientVitaminsTitle,
+    ]) {
+      await tester.scrollUntilVisible(
+        find.text(title),
+        240,
+        scrollable: statisticsList,
+      );
+      expect(find.text(title), findsOneWidget);
+    }
+
     await tester.tap(find.text(loc.nutritionDiaryTab));
     await tester.pumpAndSettle();
     await tester.tap(find.text(loc.nutritionDailyStatsTab));
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('nutrition statistics table fits a narrow phone viewport', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(const NutritionDayDetailScreen()));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+    await tester.tap(find.text(loc.nutritionDailyStatsTab));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('nutrition-stat-fiber')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nutrition-stat-sugars')), findsOneWidget);
+    expect(find.byKey(const ValueKey('nutrition-stat-sodium')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
