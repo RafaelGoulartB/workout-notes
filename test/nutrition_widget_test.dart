@@ -21,7 +21,9 @@ import 'package:workout_notes/screens/workout/food_search_screen.dart';
 import 'package:workout_notes/screens/workout/manual_food_screen.dart';
 import 'package:workout_notes/screens/workout/nutrition_home_screen.dart';
 import 'package:workout_notes/screens/workout/nutrition_progress_screen.dart';
+import 'package:workout_notes/screens/workout/nutrition_replicate_day_dialog.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
+import 'package:workout_notes/utils/nutrition_conversion.dart';
 
 Widget _app(Widget child) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -341,6 +343,29 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('replicate day dialog lays out and selects multiple dates', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(NutritionReplicateDayDialog(sourceDate: DateTime(2026, 8, 14))),
+    );
+    await tester.pumpAndSettle();
+
+    final loc = AppLocalizations.of(tester.element(find.byType(AlertDialog)))!;
+    expect(find.text(loc.nutritionReplicateDayTitle), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('11'));
+    await tester.tap(find.text('18'));
+    await tester.pump();
+
+    expect(
+      find.text(loc.nutritionReplicateDaySelectedCount(2)),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('nutrition statistics table fits a narrow phone viewport', (
     tester,
   ) async {
@@ -580,6 +605,94 @@ void main() {
 
       expect(find.byType(FoodSearchScreen), findsOneWidget);
       expect(find.byType(NutritionDayDetailScreen), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'home meal shows compact foods and allows removing one from quantity sheet',
+    (tester) async {
+      late MealLogItem loggedItem;
+      await tester.runAsync(() async {
+        final food = await repository.createManualFood(
+          name: 'Banana prata',
+          referenceAmount: 100,
+          referenceUnit: 'g',
+          referenceValues: const NutritionValues(calories: 89),
+        );
+        final details = (await repository.getFoodWithDetails(food.id))!;
+        final variant = details.variants.first;
+        loggedItem = await repository.addMealLogItem(
+          date: DateTime.now().toIso8601String().substring(0, 10),
+          mealType: 'breakfast',
+          name: 'Breakfast',
+          food: food,
+          variant: variant,
+          conversion: NutritionConversion(
+            quantity: 75,
+            unit: 'g',
+            referenceAmount: variant.referenceAmount,
+            referenceUnit: variant.referenceUnit,
+          ),
+        );
+        await tester.pumpWidget(_app(const NutritionHomeScreen()));
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        await tester.pump();
+      });
+
+      final foodChip = find.byKey(
+        ValueKey('nutrition-home-food-${loggedItem.id}'),
+      );
+      await tester.scrollUntilVisible(
+        foodChip,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(foodChip, findsOneWidget);
+      expect(find.textContaining('Banana prata'), findsOneWidget);
+      expect(find.textContaining('75 g'), findsOneWidget);
+
+      await tester.runAsync(() async {
+        tester.widget<InkWell>(foodChip).onTap!();
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        await tester.pump();
+      });
+      await tester.pumpAndSettle();
+      expect(find.byType(FoodQuantitySheet), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField).last).controller!.text,
+        '75',
+      );
+
+      final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+      final removeButton = find.byKey(const ValueKey('food-quantity-remove'));
+      expect(removeButton, findsOneWidget);
+      tester.widget<TextButton>(removeButton).onPressed!();
+      await tester.pumpAndSettle();
+      expect(find.text(loc.nutritionDeleteItemConfirm), findsOneWidget);
+      await tester.runAsync(() async {
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, loc.commonDelete),
+            )
+            .onPressed!();
+        await tester.pump();
+        await Future<void>.delayed(const Duration(milliseconds: 750));
+        await tester.pump();
+      });
+      await tester.pump(const Duration(milliseconds: 400));
+
+      final meals = await tester.runAsync(
+        () => repository.getDayMeals(
+          DateTime.now().toIso8601String().substring(0, 10),
+        ),
+      );
+      expect(meals!.expand((meal) => meal.items), isEmpty);
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        await tester.pump();
+      });
+      expect(foodChip, findsNothing);
+      expect(tester.takeException(), isNull);
     },
   );
 

@@ -1420,6 +1420,19 @@
   "nutritionCopyNothingToCopy": "Nothing to copy — no meals logged the previous day.",
   "nutritionCopyTitle": "Copy meals from the previous day",
   "nutritionCopyConfirm": "Copy",
+  "nutritionReplicateDay": "Replicate day",
+  "nutritionReplicateDayTitle": "Replicate day",
+  "nutritionReplicateDayHint": "Select one or more days to repeat this diary.",
+  "nutritionReplicateDaySelectedCount": "{count, plural, =0{No days selected} =1{1 day selected} other{{count} days selected}}",
+  "@nutritionReplicateDaySelectedCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "nutritionReplicateDayNoMeals": "Nothing to replicate — no meals logged on this day.",
+  "nutritionReplicateDayConfirm": "Replicate",
+  "nutritionReplicatedDays": "{count, plural, =0{No days replicated} =1{1 day replicated} other{{count} days replicated}}",
+  "@nutritionReplicatedDays": {
+    "placeholders": { "count": { "type": "int" } }
+  },
   "nutritionCopiedItems": "{count, plural, =0{No items copied} =1{1 item copied} other{{count} items copied}}",
   "@nutritionCopiedItems": {
     "placeholders": { "count": { "type": "int" } }

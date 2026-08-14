@@ -888,6 +888,68 @@ void main() {
     });
   });
 
+  group('day replication', () {
+    test('replicates all source meals to distinct target dates', () async {
+      final food = await repository.createManualFood(
+        name: 'Replicated food',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+        referenceValues: const NutritionValues(calories: 250),
+      );
+      final details = await repository.getFoodWithDetails(food.id);
+      final variant = details!.variants.first;
+      const conversion = NutritionConversion(
+        quantity: 100,
+        unit: 'g',
+        referenceAmount: 100,
+        referenceUnit: 'g',
+      );
+      await repository.addMealLogItem(
+        date: '2026-08-10',
+        mealType: 'breakfast',
+        food: food,
+        variant: variant,
+        conversion: conversion,
+      );
+      await repository.addMealLogItem(
+        date: '2026-08-10',
+        mealType: 'dinner',
+        food: food,
+        variant: variant,
+        conversion: conversion,
+      );
+
+      final copiedDates = await repository.replicateDayToDates(
+        sourceDate: '2026-08-10',
+        targetDates: const [
+          '2026-08-11',
+          '2026-08-13',
+          '2026-08-11',
+          '2026-08-10',
+        ],
+      );
+
+      expect(copiedDates, 2);
+      for (final date in ['2026-08-11', '2026-08-13']) {
+        final meals = await repository.getDayMeals(date);
+        expect(meals.where((meal) => meal.items.isNotEmpty), hasLength(2));
+        expect(
+          meals
+              .expand((meal) => meal.items)
+              .map((item) => item.calories)
+              .toList(),
+          [250, 250],
+        );
+      }
+      expect(
+        (await repository.getDayMeals(
+          '2026-08-10',
+        )).expand((meal) => meal.items),
+        hasLength(2),
+      );
+    });
+  });
+
   group('CSV export', () {
     test('returns a row per meal_log_item with the food source', () async {
       final food = await repository.createManualFood(

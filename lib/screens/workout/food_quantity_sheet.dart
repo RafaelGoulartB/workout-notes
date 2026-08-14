@@ -18,6 +18,7 @@ Future<NutritionQuantitySelection?> showFoodQuantitySheet({
   required FoodVariant? primaryVariant,
   required List<FoodServing> servings,
   MealLogItem? existing,
+  VoidCallback? onRemove,
 }) async {
   if (primaryVariant == null) {
     return null;
@@ -32,6 +33,7 @@ Future<NutritionQuantitySelection?> showFoodQuantitySheet({
         primaryVariant: primaryVariant,
         servings: servings,
         existing: existing,
+        onRemove: onRemove,
       );
     },
   );
@@ -45,6 +47,7 @@ class FoodQuantitySheet extends StatefulWidget {
   final FoodVariant primaryVariant;
   final List<FoodServing> servings;
   final MealLogItem? existing;
+  final VoidCallback? onRemove;
 
   const FoodQuantitySheet({
     super.key,
@@ -52,6 +55,7 @@ class FoodQuantitySheet extends StatefulWidget {
     required this.primaryVariant,
     required this.servings,
     this.existing,
+    this.onRemove,
   });
 
   @override
@@ -299,6 +303,13 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
     );
   }
 
+  void _remove() {
+    final onRemove = widget.onRemove;
+    if (onRemove == null) return;
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) => onRemove());
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
@@ -348,7 +359,8 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
                 onChanged: _onQuantityChanged,
                 onIncrement: () => _adjustQuantity(1),
                 onDecrement: () => _adjustQuantity(-1),
-                canDecrement: (_parseQuantity(_quantityController.text) ?? 0) > 0,
+                canDecrement:
+                    (_parseQuantity(_quantityController.text) ?? 0) > 0,
               ),
               const SizedBox(height: 18),
               FilledButton(
@@ -361,6 +373,22 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
                 ),
                 child: Text(loc.nutritionSave),
               ),
+              if (widget.onRemove != null) ...[
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  key: const ValueKey('food-quantity-remove'),
+                  onPressed: _remove,
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.error,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  label: Text(loc.nutritionDeleteItem),
+                ),
+              ],
             ],
           ),
         ),
@@ -376,11 +404,14 @@ class _FoodQuantitySheetState extends State<FoodQuantitySheet> {
         style: TextStyle(color: Theme.of(context).colorScheme.error),
       );
     }
-    final entries = available
-        .map((value) =>
-            _SegmentUnitEntry.fromValue(value, _unitLabel(loc, value)))
-        .toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    final entries =
+        available
+            .map(
+              (value) =>
+                  _SegmentUnitEntry.fromValue(value, _unitLabel(loc, value)),
+            )
+            .toList()
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     return _UnitSegmentedControl(
       entries: entries,
       selected: _unit,
@@ -537,9 +568,7 @@ class _SegmentButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bg = selected
-        ? theme.colorScheme.surface
-        : Colors.transparent;
+    final bg = selected ? theme.colorScheme.surface : Colors.transparent;
     final fg = selected
         ? theme.colorScheme.onSurface
         : theme.colorScheme.onSurfaceVariant;
@@ -574,8 +603,7 @@ class _SegmentButton extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: fg,
-                    fontWeight:
-                        selected ? FontWeight.w600 : FontWeight.w500,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                     fontSize: 13,
                   ),
                 ),
@@ -692,11 +720,12 @@ class _ServingQuickPicks extends StatelessWidget {
                         color: isSelected
                             ? theme.colorScheme.primary
                             : (isConvertible
-                                ? theme.colorScheme.onSurface
-                                : theme.colorScheme.onSurfaceVariant
-                                    .withAlpha(140)),
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w500,
+                                  ? theme.colorScheme.onSurface
+                                  : theme.colorScheme.onSurfaceVariant
+                                        .withAlpha(140)),
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                       ),
                     ),
                     if (equivalence != null) ...[
@@ -708,8 +737,9 @@ class _ServingQuickPicks extends StatelessWidget {
                           shape: BoxShape.circle,
                           color: isSelected
                               ? theme.colorScheme.primary.withAlpha(160)
-                              : theme.colorScheme.onSurfaceVariant
-                                  .withAlpha(120),
+                              : theme.colorScheme.onSurfaceVariant.withAlpha(
+                                  120,
+                                ),
                         ),
                       ),
                       const SizedBox(width: 6),
