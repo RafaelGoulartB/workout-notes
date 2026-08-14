@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/daily_nutrition_summary.dart';
 import 'package:workout_notes/models/nutrition/meal_log.dart';
+import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
@@ -308,6 +309,93 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     }
   }
 
+  Future<void> _editItem(MealLogItem item) async {
+    final details = await _repository.getFoodWithDetails(item.foodId ?? '');
+    if (details == null) {
+      if (!mounted) return;
+      _showSnack(AppLocalizations.of(context)!.nutritionItemFoodUnavailable);
+      return;
+    }
+    final variant = details.variants.isEmpty
+        ? null
+        : details.variants.firstWhere(
+            (candidate) => candidate.id == item.foodVariantId,
+            orElse: () => details.variants.first,
+          );
+    if (variant == null || !mounted) return;
+    final selection = await showFoodQuantitySheet(
+      context: context,
+      food: details.food,
+      primaryVariant: variant,
+      servings: details.servings[variant.id] ?? const [],
+      existing: item,
+      onRemove: () => _deleteItem(item),
+    );
+    if (selection == null || !mounted) return;
+    final loc = AppLocalizations.of(context)!;
+    try {
+      await _repository.updateMealLogItem(
+        itemId: item.id,
+        conversion: selection.conversion,
+        variant: variant,
+      );
+      if (!mounted) return;
+      _showSnack(loc.nutritionItemUpdated);
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack(loc.commonError(e.toString()));
+    } finally {
+      await _load();
+    }
+  }
+
+  Future<void> _deleteItem(MealLogItem item) async {
+    if (!mounted) return;
+    final loc = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(loc.nutritionDeleteItem),
+        content: Text(loc.nutritionDeleteItemConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(loc.nutritionCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
+            child: Text(loc.commonDelete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _repository.deleteMealLogItem(item.id);
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(loc.nutritionItemDeleted),
+          action: SnackBarAction(
+            label: loc.nutritionUndo,
+            onPressed: () async {
+              await _repository.restoreMealLogItem(item);
+              await _load();
+            },
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack(loc.commonError(e.toString()));
+    }
+  }
+
   /// Renders one section per configured meal type, then any orphan
   /// sections whose type was deleted from the catalog. Mirrors the
   /// diary's _buildMealSlivers but in a compact form suitable for the
@@ -329,6 +417,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
             meal: _mealFor(type.key),
             onOpen: () => _openMealInDay(type.key),
             onAdd: () => _addToMeal(type),
+            onEditItem: _editItem,
           ).animate().fadeIn(duration: 220.ms, delay: 30.ms),
         ),
       for (final meal in orphanMeals)
@@ -337,6 +426,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
             title: meal.log.displayName(loc),
             meal: meal,
             onOpen: () => _openMealInDay(meal.log.mealType),
+            onEditItem: _editItem,
             onAdd: () => _addToMeal(
               MealTypeDefinition(
                 id: meal.log.mealType,
@@ -943,7 +1033,7 @@ class _NutritionDashboardSummaryCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     _goalLabel(loc, calories, calorieGoal),
-                    style: theme.textTheme.bodySmall?.copyWith(
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
@@ -1434,12 +1524,14 @@ class _NutritionHomeMealRow extends StatelessWidget {
   final MealLogWithItems meal;
   final VoidCallback onOpen;
   final VoidCallback onAdd;
+  final ValueChanged<MealLogItem> onEditItem;
 
   const _NutritionHomeMealRow({
     required this.title,
     required this.meal,
     required this.onOpen,
     required this.onAdd,
+    required this.onEditItem,
   });
 
   @override
@@ -1458,82 +1550,115 @@ class _NutritionHomeMealRow extends StatelessWidget {
         color: theme.colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          key: ValueKey('nutrition-home-meal-${meal.log.mealType}'),
-          onTap: onOpen,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: hasItems
-                        ? theme.colorScheme.primaryContainer.withAlpha(140)
-                        : theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    hasItems ? Icons.restaurant_rounded : Icons.add_rounded,
-                    color: hasItems
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurfaceVariant,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        title,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InkWell(
+              key: ValueKey('nutrition-home-meal-${meal.log.mealType}'),
+              onTap: onOpen,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: hasItems
+                            ? theme.colorScheme.primaryContainer.withAlpha(140)
+                            : theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        hasItems
-                            ? '${_format(kcal)} kcal · ${loc.nutritionItemCount(itemCount)}'
-                            : loc.nutritionHomeEmptyMeals,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Icon(
+                        hasItems ? Icons.restaurant_rounded : Icons.add_rounded,
+                        color: hasItems
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
+                        size: 20,
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  key: ValueKey('nutrition-home-add-${meal.log.mealType}'),
-                  tooltip: loc.nutritionAddItem,
-                  onPressed: onAdd,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 36,
-                    height: 36,
-                  ),
-                  padding: EdgeInsets.zero,
-                  style: IconButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary.withAlpha(
-                      hasItems ? 18 : 28,
                     ),
-                  ),
-                  icon: Icon(
-                    Icons.add_rounded,
-                    color: theme.colorScheme.primary,
-                    size: 20,
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            hasItems
+                                ? '${_format(kcal)} kcal · ${loc.nutritionItemCount(itemCount)}'
+                                : loc.nutritionHomeEmptyMeals,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      key: ValueKey('nutrition-home-add-${meal.log.mealType}'),
+                      tooltip: loc.nutritionAddItem,
+                      onPressed: onAdd,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 36,
+                        height: 36,
+                      ),
+                      padding: EdgeInsets.zero,
+                      style: IconButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary.withAlpha(
+                          hasItems ? 18 : 28,
+                        ),
+                      ),
+                      icon: Icon(
+                        Icons.add_rounded,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+            if (hasItems) ...[
+              Divider(
+                height: 1,
+                indent: 14,
+                endIndent: 14,
+                color: theme.colorScheme.outlineVariant.withAlpha(70),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 2, 14, 5),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final entry in meal.items.asMap().entries) ...[
+                      _NutritionHomeFoodRow(
+                        item: entry.value,
+                        onTap: () => onEditItem(entry.value),
+                      ),
+                      if (entry.key < meal.items.length - 1)
+                        Divider(
+                          height: 1,
+                          color: theme.colorScheme.outlineVariant.withAlpha(55),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -1542,6 +1667,78 @@ class _NutritionHomeMealRow extends StatelessWidget {
   static String _format(double value) {
     if (value == value.roundToDouble()) return value.toStringAsFixed(0);
     return value.toStringAsFixed(1);
+  }
+}
+
+class _NutritionHomeFoodRow extends StatelessWidget {
+  final MealLogItem item;
+  final VoidCallback onTap;
+
+  const _NutritionHomeFoodRow({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final quantity = item.quantity == item.quantity.roundToDouble()
+        ? item.quantity.toStringAsFixed(0)
+        : item.quantity.toStringAsFixed(1);
+    final unit = item.unit.trim();
+    final quantityLabel = unit.isEmpty ? quantity : '$quantity $unit';
+    final calories = item.calories;
+    return InkWell(
+      key: ValueKey('nutrition-home-food-${item.id}'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    item.foodNameSnapshot,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    quantityLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (calories != null) ...[
+              const SizedBox(width: 10),
+              Text(
+                '${_NutritionHomeMealRow._format(calories)} kcal',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+            const SizedBox(width: 3),
+            Icon(
+              Icons.more_vert_rounded,
+              size: 18,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
