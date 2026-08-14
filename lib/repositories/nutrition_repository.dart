@@ -840,61 +840,138 @@ class NutritionRepository extends BaseRepository {
     _validateDate(date);
     final db = await this.db;
     final now = DateTime.now();
-    await db.transaction((txn) async {
-      final log = await _ensureMealLogIn(
+    await db.transaction(
+      (txn) => _copyItemsToMealIn(
         txn,
         date: date,
         mealType: mealType,
         name: name,
+        items: items,
+        createdAt: now,
+      ),
+    );
+    return items.length;
+  }
+
+  /// Replicates every meal with items from [sourceDate] into each distinct
+  /// date in [targetDates]. Existing items are preserved and the copied
+  /// items are appended, matching [copyItemsToMeal]. All target dates are
+  /// handled in one transaction so a partial replication cannot be saved.
+  /// Returns the number of target dates that received the day.
+  Future<int> replicateDayToDates({
+    required String sourceDate,
+    required Iterable<String> targetDates,
+  }) async {
+    _validateDate(sourceDate);
+    final dates = <String>{};
+    for (final date in targetDates) {
+      _validateDate(date);
+      if (date != sourceDate) dates.add(date);
+    }
+    if (dates.isEmpty) return 0;
+
+    final db = await this.db;
+    return db.transaction((txn) async {
+      final sourceLogs = await txn.query(
+        'meal_logs',
+        where: 'date = ?',
+        whereArgs: [sourceDate],
+        orderBy: 'created_at ASC',
       );
-      final touchedFoods = <String>{};
-      for (final item in items) {
-        final clone = MealLogItem(
-          id: _uuid.v4(),
-          mealLogId: log.id,
-          foodId: item.foodId,
-          foodVariantId: item.foodVariantId,
-          foodNameSnapshot: item.foodNameSnapshot,
-          brandSnapshot: item.brandSnapshot,
-          quantity: item.quantity,
-          unit: item.unit,
-          calories: item.calories,
-          proteinG: item.proteinG,
-          carbsG: item.carbsG,
-          fatG: item.fatG,
-          saturatedFatG: item.saturatedFatG,
-          monounsaturatedFatG: item.monounsaturatedFatG,
-          polyunsaturatedFatG: item.polyunsaturatedFatG,
-          transFatG: item.transFatG,
-          fiberG: item.fiberG,
-          sugarsG: item.sugarsG,
-          sodiumMg: item.sodiumMg,
-          potassiumMg: item.potassiumMg,
-          calciumMg: item.calciumMg,
-          ironMg: item.ironMg,
-          magnesiumMg: item.magnesiumMg,
-          zincMg: item.zincMg,
-          vitaminAUg: item.vitaminAUg,
-          vitaminCMg: item.vitaminCMg,
-          vitaminDUg: item.vitaminDUg,
-          vitaminB12Ug: item.vitaminB12Ug,
-          snapshotJson: item.snapshotJson,
-          createdAt: now,
+      final sourceMeals = <MealLogWithItems>[];
+      for (final row in sourceLogs) {
+        final log = MealLog.fromMap(row);
+        final itemRows = await txn.query(
+          'meal_log_items',
+          where: 'meal_log_id = ?',
+          whereArgs: [log.id],
+          orderBy: 'created_at ASC',
         );
-        await txn.insert('meal_log_items', clone.toMap());
-        if (item.foodId != null) touchedFoods.add(item.foodId!);
+        final items = itemRows.map(MealLogItem.fromMap).toList();
+        if (items.isNotEmpty) {
+          sourceMeals.add(MealLogWithItems(log: log, items: items));
+        }
       }
-      for (final foodId in touchedFoods) {
-        try {
-          await txn.update(
-            'foods',
-            {'last_used_at': now.toIso8601String()},
-            where: 'id = ?',
-            whereArgs: [foodId],
+      if (sourceMeals.isEmpty) return 0;
+
+      final now = DateTime.now();
+      for (final date in dates) {
+        for (final meal in sourceMeals) {
+          await _copyItemsToMealIn(
+            txn,
+            date: date,
+            mealType: meal.log.mealType,
+            name: meal.log.name,
+            items: meal.items,
+            createdAt: now,
           );
-        } catch (_) {}
+        }
       }
+      return dates.length;
     });
+  }
+
+  Future<int> _copyItemsToMealIn(
+    DatabaseExecutor executor, {
+    required String date,
+    required String mealType,
+    required List<MealLogItem> items,
+    required DateTime createdAt,
+    String? name,
+  }) async {
+    final log = await _ensureMealLogIn(
+      executor,
+      date: date,
+      mealType: mealType,
+      name: name,
+    );
+    final touchedFoods = <String>{};
+    for (final item in items) {
+      final clone = MealLogItem(
+        id: _uuid.v4(),
+        mealLogId: log.id,
+        foodId: item.foodId,
+        foodVariantId: item.foodVariantId,
+        foodNameSnapshot: item.foodNameSnapshot,
+        brandSnapshot: item.brandSnapshot,
+        quantity: item.quantity,
+        unit: item.unit,
+        calories: item.calories,
+        proteinG: item.proteinG,
+        carbsG: item.carbsG,
+        fatG: item.fatG,
+        saturatedFatG: item.saturatedFatG,
+        monounsaturatedFatG: item.monounsaturatedFatG,
+        polyunsaturatedFatG: item.polyunsaturatedFatG,
+        transFatG: item.transFatG,
+        fiberG: item.fiberG,
+        sugarsG: item.sugarsG,
+        sodiumMg: item.sodiumMg,
+        potassiumMg: item.potassiumMg,
+        calciumMg: item.calciumMg,
+        ironMg: item.ironMg,
+        magnesiumMg: item.magnesiumMg,
+        zincMg: item.zincMg,
+        vitaminAUg: item.vitaminAUg,
+        vitaminCMg: item.vitaminCMg,
+        vitaminDUg: item.vitaminDUg,
+        vitaminB12Ug: item.vitaminB12Ug,
+        snapshotJson: item.snapshotJson,
+        createdAt: createdAt,
+      );
+      await executor.insert('meal_log_items', clone.toMap());
+      if (item.foodId != null) touchedFoods.add(item.foodId!);
+    }
+    for (final foodId in touchedFoods) {
+      try {
+        await executor.update(
+          'foods',
+          {'last_used_at': createdAt.toIso8601String()},
+          where: 'id = ?',
+          whereArgs: [foodId],
+        );
+      } catch (_) {}
+    }
     return items.length;
   }
 
