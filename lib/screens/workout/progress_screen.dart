@@ -5,6 +5,7 @@ import 'package:workout_notes/repositories/analytics_repository.dart';
 import 'package:workout_notes/repositories/exercise_repository.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/utils/pace_calculator.dart';
+import 'package:workout_notes/utils/progress_helpers.dart';
 import 'package:workout_notes/widgets/collapsible_section.dart';
 import 'package:workout_notes/widgets/goals/goals_section.dart';
 import 'package:workout_notes/widgets/progress/monthly_report_card.dart';
@@ -452,7 +453,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final stats = _overviewStats;
     final totalWorkouts = (stats?['total_workouts'] as int?) ?? 0;
     final totalSets = (stats?['total_sets'] as int?) ?? 0;
-    final totalVolume = (stats?['total_volume'] as int?) ?? 0;
+    final totalVolume = (stats?['total_volume'] as num?)?.toDouble() ?? 0.0;
     final streak = (stats?['current_streak'] as int?) ?? 0;
 
     final cardioStats = _monthlyCardioStats;
@@ -501,9 +502,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             Expanded(
               child: ProgressStatCard(
                 label: AppLocalizations.of(context)!.commonVolume,
-                value: totalVolume >= 1000
-                    ? '${(totalVolume / 1000).toStringAsFixed(1)}k'
-                    : '$totalVolume',
+                value: formatVolume(totalVolume),
                 icon: Icons.auto_graph,
                 color: Colors.teal,
               ),
