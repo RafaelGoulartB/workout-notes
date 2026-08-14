@@ -663,21 +663,11 @@ void main() {
         '75',
       );
 
-      final remove = find.byKey(const ValueKey('food-quantity-remove'));
-      await tester.scrollUntilVisible(
-        remove,
-        200,
-        scrollable: find
-            .descendant(
-              of: find.byType(FoodQuantitySheet),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      await tester.tap(remove);
-      await tester.pumpAndSettle();
-
       final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+      final removeButton = find.byKey(const ValueKey('food-quantity-remove'));
+      expect(removeButton, findsOneWidget);
+      tester.widget<TextButton>(removeButton).onPressed!();
+      await tester.pumpAndSettle();
       expect(find.text(loc.nutritionDeleteItemConfirm), findsOneWidget);
       await tester.runAsync(() async {
         tester

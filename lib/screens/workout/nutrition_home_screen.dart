@@ -1729,12 +1729,6 @@ class _NutritionHomeFoodRow extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(width: 3),
-            Icon(
-              Icons.more_vert_rounded,
-              size: 18,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
           ],
         ),
       ),
