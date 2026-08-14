@@ -311,6 +311,7 @@ void main() {
         baseUrl: 'https://x.test/v1',
         availableModels: const ['m1', 'm2'],
         selectedModel: 'm1',
+        reasoningEffortByModel: const {'m1': AiReasoningEffort.high},
         createdAt: DateTime.utc(2024, 1, 2, 3, 4, 5),
       );
       final back = AiProvider.fromMap(p.toMap());
@@ -319,6 +320,8 @@ void main() {
       expect(back.baseUrl, p.baseUrl);
       expect(back.availableModels, p.availableModels);
       expect(back.selectedModel, p.selectedModel);
+      expect(back.reasoningEffortFor(), AiReasoningEffort.high);
+      expect(back.reasoningEffortFor('m2'), AiReasoningEffort.automatic);
       expect(back.createdAt, p.createdAt);
     });
     test('copyWith preserves fields', () {
@@ -597,6 +600,44 @@ void main() {
       expect(client.payloads[0], contains('tool_choice'));
       expect(client.payloads[1], isNot(contains('tool_choice')));
       expect(client.payloads[1]['tools'], isNotEmpty);
+    });
+
+    test('sends reasoning effort and omits it when unsupported', () async {
+      final client = _SequenceHttpClient([
+        const _HttpReply(
+          400,
+          '{"error":{"message":"reasoning_effort is not supported by this model"}}',
+        ),
+        const _HttpReply(200, '{"choices":[{"message":{"content":"ok"}}]}'),
+        const _HttpReply(
+          200,
+          '{"choices":[{"message":{"content":"ok novamente"}}]}',
+        ),
+      ]);
+      final service = AiService(client: client, delay: (_) async {});
+
+      await service.sendChat(
+        baseUrl: 'https://example.test/v1',
+        token: 'token',
+        model: 'model-without-effort',
+        reasoningEffort: 'high',
+        messages: const [
+          {'role': 'user', 'content': 'analise'},
+        ],
+      );
+      await service.sendChat(
+        baseUrl: 'https://example.test/v1',
+        token: 'token',
+        model: 'model-without-effort',
+        reasoningEffort: 'high',
+        messages: const [
+          {'role': 'user', 'content': 'analise novamente'},
+        ],
+      );
+
+      expect(client.payloads[0]['reasoning_effort'], 'high');
+      expect(client.payloads[1], isNot(contains('reasoning_effort')));
+      expect(client.payloads[2], isNot(contains('reasoning_effort')));
     });
 
     test('retries transient upstream 503 failures', () async {

@@ -292,6 +292,28 @@ class AiSettingsNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setReasoningEffort(
+    String providerId,
+    String model,
+    AiReasoningEffort effort,
+  ) async {
+    final list = _settings.providers.map((provider) {
+      if (provider.id != providerId) return provider;
+      final efforts = Map<String, AiReasoningEffort>.from(
+        provider.reasoningEffortByModel,
+      );
+      if (effort == AiReasoningEffort.automatic) {
+        efforts.remove(model);
+      } else {
+        efforts[model] = effort;
+      }
+      return provider.copyWith(reasoningEffortByModel: efforts);
+    }).toList();
+    _settings = _settings.copyWith(providers: list);
+    await _persistProviders();
+    notifyListeners();
+  }
+
   Future<void> setProviderModels(String providerId, List<String> models) async {
     final list = _settings.providers
         .map(

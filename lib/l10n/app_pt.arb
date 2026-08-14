@@ -923,6 +923,26 @@
   "aiFoodProposalReject": "Descartar prévia",
   "aiProviderPickerTitle": "Provedor e modelo",
   "aiProviderPickerSearch": "Buscar modelo",
+  "aiProviderPickerSubtitle": "Escolha como o Treinador IA deve responder",
+  "aiProviderPickerProviderLabel": "Provedor",
+  "aiProviderPickerNoModelSelected": "Selecione um modelo",
+  "aiProviderPickerChangeModel": "Alterar modelo",
+  "aiProviderPickerEffortTitle": "Esforço de raciocínio",
+  "aiProviderPickerEffortAutomatic": "Automático",
+  "aiProviderPickerEffortLow": "Baixo",
+  "aiProviderPickerEffortMedium": "Médio",
+  "aiProviderPickerEffortHigh": "Alto",
+  "aiProviderPickerEffortAutomaticDescription": "O provedor decide o nível adequado. É a opção mais compatível.",
+  "aiProviderPickerEffortLowDescription": "Respostas mais rápidas, com menos raciocínio interno.",
+  "aiProviderPickerEffortMediumDescription": "Equilíbrio entre velocidade e análise.",
+  "aiProviderPickerEffortHighDescription": "Mais análise para perguntas complexas; pode ser mais lento.",
+  "aiProviderPickerModelCount": "{count, plural, =0{Nenhum modelo} =1{1 modelo} other{{count} modelos}}",
+  "@aiProviderPickerModelCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "aiProviderPickerApply": "Usar esta configuração",
 
   "aiHistoryTitle": "Histórico de conversas",
   "aiHistoryConversationCount": "{count, plural, =0{Nenhuma conversa} =1{1 conversa} other{{count} conversas}}",

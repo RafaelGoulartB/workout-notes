@@ -94,6 +94,7 @@ class AiChatService extends ChangeNotifier {
   AiImageAttachmentStore _imageStore = AiImageAttachmentStore();
   AiSettingsNotifier? _settings;
   _AiTurnDiagnostics? _activeTurnDiagnostics;
+  String? _activeReasoningEffort;
 
   AiChatState _state = const AiChatState();
 
@@ -245,6 +246,7 @@ class AiChatService extends ChangeNotifier {
     onAccepted?.call();
 
     try {
+      _activeReasoningEffort = provider.reasoningEffortFor().apiValue;
       _activeTurnDiagnostics = _AiTurnDiagnostics(
         stage: 'preparing_context',
         provider: provider.name,
@@ -269,6 +271,7 @@ class AiChatService extends ChangeNotifier {
       await _persistCurrentThread();
     } finally {
       _activeTurnDiagnostics = null;
+      _activeReasoningEffort = null;
     }
     return true;
   }
@@ -529,6 +532,7 @@ class AiChatService extends ChangeNotifier {
                     baseUrl: baseUrl,
                     token: token,
                     model: model,
+                    reasoningEffort: _activeReasoningEffort,
                     messages: wire,
                     tools: toolsSchema,
                     toolChoice: toolChoice,
@@ -537,6 +541,7 @@ class AiChatService extends ChangeNotifier {
               baseUrl: baseUrl,
               token: token,
               model: model,
+              reasoningEffort: _activeReasoningEffort,
               messages: wire,
               tools: toolsSchema,
               toolChoice: toolChoice,
@@ -745,12 +750,14 @@ class AiChatService extends ChangeNotifier {
                 baseUrl: baseUrl,
                 token: token,
                 model: model,
+                reasoningEffort: _activeReasoningEffort,
                 messages: finalWire,
               )
             : await _service.sendMultimodalChat(
                 baseUrl: baseUrl,
                 token: token,
                 model: model,
+                reasoningEffort: _activeReasoningEffort,
                 messages: finalWire,
               );
         final candidate = AiChatMessage(
@@ -833,6 +840,7 @@ class AiChatService extends ChangeNotifier {
         baseUrl: baseUrl,
         token: token,
         model: model,
+        reasoningEffort: _activeReasoningEffort,
         messages: messages,
         tools: toolsSchema,
         toolChoice: toolChoice,
@@ -877,6 +885,7 @@ class AiChatService extends ChangeNotifier {
       baseUrl: baseUrl,
       token: token,
       model: model,
+      reasoningEffort: _activeReasoningEffort,
       messages: [
         const {'role': 'system', 'content': _manualFoodJsonFallbackPrompt},
         ...messages.where((message) => message['role'] != 'system'),
@@ -963,6 +972,7 @@ class AiChatService extends ChangeNotifier {
               baseUrl: baseUrl,
               token: token,
               model: model,
+              reasoningEffort: _activeReasoningEffort,
               messages: retryWire,
               tools: toolsSchema,
               toolChoice: toolChoice,
@@ -971,6 +981,7 @@ class AiChatService extends ChangeNotifier {
               baseUrl: baseUrl,
               token: token,
               model: model,
+              reasoningEffort: _activeReasoningEffort,
               messages: retryWire,
               tools: toolsSchema,
               toolChoice: toolChoice,
@@ -1044,12 +1055,14 @@ class AiChatService extends ChangeNotifier {
                 baseUrl: baseUrl,
                 token: token,
                 model: model,
+                reasoningEffort: _activeReasoningEffort,
                 messages: wire,
               )
             : await _service.sendMultimodalChat(
                 baseUrl: baseUrl,
                 token: token,
                 model: model,
+                reasoningEffort: _activeReasoningEffort,
                 messages: wire,
               );
       } catch (_) {

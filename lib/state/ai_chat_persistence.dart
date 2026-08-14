@@ -105,6 +105,7 @@ extension _AiChatPersistence on AiChatService {
         baseUrl: provider.baseUrl,
         token: token,
         model: provider.selectedModel,
+        reasoningEffort: provider.reasoningEffortFor().apiValue,
         messages: wire,
       );
       final text = completion.text?.trim();

@@ -28,6 +28,7 @@ class _StubAiService extends AiService {
     List<Map<String, dynamic>>? tools,
     Object? toolChoice,
     double temperature = 0.3,
+    String? reasoningEffort,
   }) async {
     lastBaseUrl = baseUrl;
     lastToken = token;

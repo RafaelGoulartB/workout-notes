@@ -922,6 +922,26 @@
   "aiFoodProposalReject": "Discard preview",
   "aiProviderPickerTitle": "Provider and model",
   "aiProviderPickerSearch": "Search model",
+  "aiProviderPickerSubtitle": "Choose how the AI Coach should respond",
+  "aiProviderPickerProviderLabel": "Provider",
+  "aiProviderPickerNoModelSelected": "Select a model",
+  "aiProviderPickerChangeModel": "Change model",
+  "aiProviderPickerEffortTitle": "Reasoning effort",
+  "aiProviderPickerEffortAutomatic": "Automatic",
+  "aiProviderPickerEffortLow": "Low",
+  "aiProviderPickerEffortMedium": "Medium",
+  "aiProviderPickerEffortHigh": "High",
+  "aiProviderPickerEffortAutomaticDescription": "The provider chooses the appropriate level. This is the most compatible option.",
+  "aiProviderPickerEffortLowDescription": "Faster answers with less internal reasoning.",
+  "aiProviderPickerEffortMediumDescription": "A balance between speed and analysis.",
+  "aiProviderPickerEffortHighDescription": "More analysis for complex questions; it may be slower.",
+  "aiProviderPickerModelCount": "{count, plural, =0{No models} =1{1 model} other{{count} models}}",
+  "@aiProviderPickerModelCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "aiProviderPickerApply": "Use this configuration",
 
   "aiHistoryTitle": "Conversation history",
   "aiHistoryConversationCount": "{count, plural, =0{No conversations} =1{1 conversation} other{{count} conversations}}",

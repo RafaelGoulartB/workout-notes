@@ -116,6 +116,7 @@ class AiService {
     List<Map<String, dynamic>>? tools,
     Object? toolChoice,
     double temperature = 0.3,
+    String? reasoningEffort,
   }) async {
     final uri = Uri.parse('$baseUrl/chat/completions');
     final compatibility = _modelCompatibility.putIfAbsent(
@@ -132,6 +133,8 @@ class AiService {
         'messages': messages,
         if (!compatibility.omitTemperature)
           'temperature': compatibility.temperatureOverride ?? temperature,
+        if (reasoningEffort != null && !compatibility.omitReasoningEffort)
+          'reasoning_effort': reasoningEffort,
       };
       if (tools != null && tools.isNotEmpty) {
         payload['tools'] = tools;
@@ -289,6 +292,7 @@ class AiService {
     required List<Map<String, dynamic>> messages,
     List<Map<String, dynamic>>? tools,
     Object? toolChoice,
+    String? reasoningEffort,
   }) async {
     try {
       if (_usesResponsesApiForVision(baseUrl: baseUrl, model: model)) {
@@ -299,6 +303,7 @@ class AiService {
           messages: messages,
           tools: tools,
           toolChoice: toolChoice,
+          reasoningEffort: reasoningEffort,
         );
       }
       return await sendChat(
@@ -308,6 +313,7 @@ class AiService {
         messages: messages,
         tools: tools,
         toolChoice: toolChoice,
+        reasoningEffort: reasoningEffort,
       );
     } on AiServiceException catch (error) {
       if (error.code == 'http_error' || error.code == 'invalid_response') {
@@ -336,6 +342,7 @@ class AiService {
     required List<Map<String, dynamic>> messages,
     List<Map<String, dynamic>>? tools,
     Object? toolChoice,
+    String? reasoningEffort,
   }) async {
     final instructions = messages
         .where((message) => message['role'] == 'system')
@@ -401,6 +408,7 @@ class AiService {
         'tools': tools.map(_responsesTool).toList(),
       if (tools != null && tools.isNotEmpty)
         'tool_choice': _responsesToolChoice(toolChoice),
+      if (reasoningEffort != null) 'reasoning': {'effort': reasoningEffort},
     };
     final res = await _client
         .post(
@@ -537,6 +545,23 @@ class AiService {
     required _ModelCompatibility compatibility,
   }) {
     final error = responseBody.toLowerCase();
+    final mentionsReasoningEffort =
+        error.contains('reasoning_effort') ||
+        (error.contains('reasoning') && error.contains('effort'));
+    final reasoningEffortUnsupported =
+        mentionsReasoningEffort &&
+        (error.contains('unsupported') ||
+            error.contains('not supported') ||
+            error.contains('unknown') ||
+            error.contains('unrecognized') ||
+            error.contains('not allowed') ||
+            error.contains('extra inputs'));
+    if (reasoningEffortUnsupported &&
+        sentPayload.containsKey('reasoning_effort') &&
+        !compatibility.omitReasoningEffort) {
+      compatibility.omitReasoningEffort = true;
+      return compatibility.record('reasoning_effort omitted');
+    }
     final mentionsTemperature = error.contains('temperature');
     final temperatureMustBeOne =
         mentionsTemperature &&
@@ -670,6 +695,7 @@ class _ModelCompatibility {
   double? temperatureOverride;
   bool omitTemperature = false;
   bool omitToolChoice = false;
+  bool omitReasoningEffort = false;
   final Set<String> adjustments = {};
 
   String record(String adjustment) {

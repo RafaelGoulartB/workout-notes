@@ -2,6 +2,21 @@ import 'package:uuid/uuid.dart';
 
 const _uuid = Uuid();
 
+enum AiReasoningEffort { automatic, low, medium, high }
+
+extension AiReasoningEffortX on AiReasoningEffort {
+  String get storageKey => name;
+
+  String? get apiValue => this == AiReasoningEffort.automatic ? null : name;
+
+  static AiReasoningEffort fromStorageKey(String? value) {
+    return AiReasoningEffort.values.firstWhere(
+      (effort) => effort.storageKey == value,
+      orElse: () => AiReasoningEffort.automatic,
+    );
+  }
+}
+
 /// A single AI provider configuration (OpenAI-compatible).
 class AiProvider {
   final String id;
@@ -9,6 +24,7 @@ class AiProvider {
   final String baseUrl;
   final List<String> availableModels;
   final String selectedModel;
+  final Map<String, AiReasoningEffort> reasoningEffortByModel;
   final DateTime createdAt;
 
   const AiProvider({
@@ -17,6 +33,7 @@ class AiProvider {
     required this.baseUrl,
     required this.availableModels,
     required this.selectedModel,
+    this.reasoningEffortByModel = const {},
     required this.createdAt,
   });
 
@@ -31,6 +48,7 @@ class AiProvider {
       baseUrl: baseUrl,
       availableModels: const [],
       selectedModel: selectedModel ?? '',
+      reasoningEffortByModel: const {},
       createdAt: DateTime.now(),
     );
   }
@@ -40,6 +58,7 @@ class AiProvider {
     String? baseUrl,
     List<String>? availableModels,
     String? selectedModel,
+    Map<String, AiReasoningEffort>? reasoningEffortByModel,
   }) {
     return AiProvider(
       id: id,
@@ -47,27 +66,47 @@ class AiProvider {
       baseUrl: baseUrl ?? this.baseUrl,
       availableModels: availableModels ?? this.availableModels,
       selectedModel: selectedModel ?? this.selectedModel,
+      reasoningEffortByModel:
+          reasoningEffortByModel ?? this.reasoningEffortByModel,
       createdAt: createdAt,
     );
   }
 
+  AiReasoningEffort reasoningEffortFor([String? model]) {
+    return reasoningEffortByModel[model ?? selectedModel] ??
+        AiReasoningEffort.automatic;
+  }
+
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'name': name,
-        'baseUrl': baseUrl,
-        'availableModels': availableModels,
-        'selectedModel': selectedModel,
-        'createdAt': createdAt.toIso8601String(),
-      };
+    'id': id,
+    'name': name,
+    'baseUrl': baseUrl,
+    'availableModels': availableModels,
+    'selectedModel': selectedModel,
+    'reasoningEffortByModel': reasoningEffortByModel.map(
+      (model, effort) => MapEntry(model, effort.storageKey),
+    ),
+    'createdAt': createdAt.toIso8601String(),
+  };
 
   factory AiProvider.fromMap(Map<String, dynamic> m) {
     return AiProvider(
       id: m['id'] as String,
       name: m['name'] as String,
       baseUrl: m['baseUrl'] as String,
-      availableModels: (m['availableModels'] as List?)?.cast<String>() ?? const [],
+      availableModels:
+          (m['availableModels'] as List?)?.cast<String>() ?? const [],
       selectedModel: (m['selectedModel'] as String?) ?? '',
-      createdAt: DateTime.tryParse(m['createdAt'] as String? ?? '') ?? DateTime.now(),
+      reasoningEffortByModel:
+          (m['reasoningEffortByModel'] as Map?)?.map(
+            (model, effort) => MapEntry(
+              model.toString(),
+              AiReasoningEffortX.fromStorageKey(effort?.toString()),
+            ),
+          ) ??
+          const {},
+      createdAt:
+          DateTime.tryParse(m['createdAt'] as String? ?? '') ?? DateTime.now(),
     );
   }
 
