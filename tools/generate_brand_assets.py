@@ -261,19 +261,6 @@ def save_icons() -> None:
         scale = int(item["scale"].replace("x", ""))
         icon_canvas(round(pt_size * scale), safe=0.03, rgb=True).save(ios_dir / filename)
 
-    mac_dir = ROOT / "macos/Runner/Assets.xcassets/AppIcon.appiconset"
-    for png in mac_dir.glob("app_icon_*.png"):
-        icon_canvas(int(png.stem.split("_")[-1]), safe=0.03, rgb=True).save(png)
-
-    ico_sizes = [16, 32, 48, 64, 128, 256]
-    images = [icon_canvas(size, safe=0.08, rgb=True) for size in ico_sizes]
-    images[-1].save(
-        ROOT / "windows/runner/resources/app_icon.ico",
-        sizes=[(s, s) for s in ico_sizes],
-        append_images=images[:-1],
-    )
-
-
 def launch_image(size: int) -> Image.Image:
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     icon = icon_cutout(round(size * 0.72), safe=0.02)
