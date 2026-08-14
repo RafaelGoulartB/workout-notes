@@ -841,6 +841,8 @@ class _ExpandableFormSection extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         initiallyExpanded: initiallyExpanded,
+        shape: const Border(),
+        collapsedShape: const Border(),
         leading: Icon(icon, color: theme.colorScheme.primary),
         title: Text(
           title,

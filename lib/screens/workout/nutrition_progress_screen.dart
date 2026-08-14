@@ -1688,6 +1688,8 @@ class _TopContributorsCard extends StatelessWidget {
       child: ExpansionTile(
         key: const ValueKey('balance-top-contributors-tile'),
         initiallyExpanded: false,
+        shape: const Border(),
+        collapsedShape: const Border(),
         leading: Icon(
           Icons.local_dining_outlined,
           color: theme.colorScheme.tertiary,
@@ -2067,6 +2069,8 @@ class _AverageNutrientsCard extends StatelessWidget {
         key: const ValueKey('balance-average-nutrients-tile'),
         initiallyExpanded: expanded,
         onExpansionChanged: onExpansionChanged,
+        shape: const Border(),
+        collapsedShape: const Border(),
         leading: Icon(
           Icons.table_rows_rounded,
           color: theme.colorScheme.primary,
