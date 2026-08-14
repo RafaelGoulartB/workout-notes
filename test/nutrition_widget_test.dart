@@ -21,6 +21,7 @@ import 'package:workout_notes/screens/workout/food_search_screen.dart';
 import 'package:workout_notes/screens/workout/manual_food_screen.dart';
 import 'package:workout_notes/screens/workout/nutrition_home_screen.dart';
 import 'package:workout_notes/screens/workout/nutrition_progress_screen.dart';
+import 'package:workout_notes/screens/workout/nutrition_replicate_day_dialog.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 
 Widget _app(Widget child) => MaterialApp(
@@ -338,6 +339,29 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(loc.nutritionDailyStatsTab));
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('replicate day dialog lays out and selects multiple dates', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(NutritionReplicateDayDialog(sourceDate: DateTime(2026, 8, 14))),
+    );
+    await tester.pumpAndSettle();
+
+    final loc = AppLocalizations.of(tester.element(find.byType(AlertDialog)))!;
+    expect(find.text(loc.nutritionReplicateDayTitle), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('11'));
+    await tester.tap(find.text('18'));
+    await tester.pump();
+
+    expect(
+      find.text(loc.nutritionReplicateDaySelectedCount(2)),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 

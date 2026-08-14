@@ -16,13 +16,20 @@ import 'package:workout_notes/services/open_food_facts_gateway.dart';
 import 'food_quantity_sheet.dart';
 import 'food_search_screen.dart';
 import 'nutrition_progress_screen.dart';
+import 'nutrition_replicate_day_dialog.dart';
 import 'nutrition_settings_screen.dart';
 import 'saved_meal_editor_screen.dart';
 import 'saved_meals_screen.dart';
 
 part 'nutrition_day_detail_widgets.dart';
 
-enum _NutritionMenuAction { progress, savedMeals, copyPreviousDay, manageMeals }
+enum _NutritionMenuAction {
+  progress,
+  savedMeals,
+  copyPreviousDay,
+  replicateDay,
+  manageMeals,
+}
 
 const _proteinMacroColor = Color(0xFF2563EB);
 const _carbMacroColor = Color(0xFFD97706);
@@ -434,6 +441,49 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
     await _load();
   }
 
+  /// Replicates every meal with items from the selected day into multiple
+  /// dates chosen in the calendar. Existing target items are preserved.
+  Future<void> _replicateDay() async {
+    final loc = AppLocalizations.of(context)!;
+    final sourceDate = _dateString(_selectedDate);
+    final source = (await _repository.getDayMeals(
+      sourceDate,
+    )).where((meal) => meal.items.isNotEmpty).toList();
+    if (source.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.nutritionReplicateDayNoMeals)));
+      return;
+    }
+    if (!mounted) return;
+    final selectedDates = await showDialog<Set<DateTime>>(
+      context: context,
+      builder: (_) => NutritionReplicateDayDialog(sourceDate: _selectedDate),
+    );
+    if (selectedDates == null || selectedDates.isEmpty || !mounted) return;
+
+    setState(() => _isMutating = true);
+    try {
+      final count = await _repository.replicateDayToDates(
+        sourceDate: sourceDate,
+        targetDates: selectedDates.map(_dateString),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.nutritionReplicatedDays(count))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
+    } finally {
+      if (mounted) setState(() => _isMutating = false);
+      await _load();
+    }
+  }
+
   /// Repeats the most recent instance of [meal]'s type (before the
   /// selected day) into the selected day, keeping the section name.
   Future<void> _repeatMeal(MealLogWithItems meal) async {
@@ -520,6 +570,9 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
                 case _NutritionMenuAction.copyPreviousDay:
                   _copyPreviousDay();
                   break;
+                case _NutritionMenuAction.replicateDay:
+                  _replicateDay();
+                  break;
                 case _NutritionMenuAction.manageMeals:
                   _openSettings();
                   break;
@@ -557,6 +610,14 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.content_copy_outlined),
                   title: Text(loc.nutritionCopyPreviousDay),
+                ),
+              ),
+              PopupMenuItem(
+                value: _NutritionMenuAction.replicateDay,
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.calendar_month_outlined),
+                  title: Text(loc.nutritionReplicateDay),
                 ),
               ),
             ],
