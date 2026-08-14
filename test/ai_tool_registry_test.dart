@@ -20,9 +20,9 @@ void main() {
     await uninstallAiTestDb();
   });
 
-  test('openAiReadToolsSchema returns 29 tools with valid shape', () {
+  test('openAiReadToolsSchema returns 32 tools with valid shape', () {
     final tools = registry.openAiReadToolsSchema();
-    expect(tools.length, 29);
+    expect(tools.length, 32);
     for (final t in tools) {
       expect(t['type'], 'function');
       expect(t['function'], isA<Map>());
@@ -34,7 +34,7 @@ void main() {
 
   test('openAiChatToolsSchema includes the guarded routine proposal tool', () {
     final tools = registry.openAiChatToolsSchema();
-    expect(tools, hasLength(32));
+    expect(tools, hasLength(35));
     final proposal = tools.firstWhere(
       (tool) => (tool['function'] as Map)['name'] == 'propose_routine_change',
     );
@@ -365,6 +365,7 @@ void main() {
       'id': 'w_recent',
       'date': '2024-06-01',
       'start_time': now,
+      'end_time': now,
       'duration_seconds': 3600,
       'estimated_calories': 367.5,
       'feeling_rating': 4,

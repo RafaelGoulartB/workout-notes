@@ -7,6 +7,7 @@ import '../repositories/goal_repository.dart';
 import 'ai_nutrition_tool_service.dart';
 import 'ai_sleep_tool_service.dart';
 import 'ai_wellness_analytics_service.dart';
+import 'ai_workout_tool_service.dart';
 
 class AiToolRegistry {
   final DatabaseHelper db;
@@ -14,6 +15,7 @@ class AiToolRegistry {
   final AiWellnessAnalyticsService wellness;
   final AiNutritionToolService nutrition;
   final AiSleepToolService sleep;
+  final AiWorkoutToolService workouts;
   final Map<String, Map<String, dynamic>> _schemaCache = {};
   AiToolRegistry({
     DatabaseHelper? db,
@@ -21,11 +23,13 @@ class AiToolRegistry {
     AiWellnessAnalyticsService? wellness,
     AiNutritionToolService? nutrition,
     AiSleepToolService? sleep,
+    AiWorkoutToolService? workouts,
   }) : db = db ?? DatabaseHelper.instance,
        goalRepo = goalRepo ?? GoalRepository(),
        wellness = wellness ?? AiWellnessAnalyticsService(db: db),
        nutrition = nutrition ?? AiNutritionToolService(db: db),
-       sleep = sleep ?? AiSleepToolService(db: db);
+       sleep = sleep ?? AiSleepToolService(db: db),
+       workouts = workouts ?? AiWorkoutToolService(db: db);
 
   /// OpenAI function-calling JSON schemas for all read tools.
   List<Map<String, dynamic>> openAiReadToolsSchema({Iterable<String>? names}) {
@@ -140,7 +144,17 @@ class AiToolRegistry {
       'qualidade da gravacao',
       'qualidade da gravação',
     ]);
-    final workoutIntent = hasAny(['treino', 'workout', 'sessao', 'sessão']);
+    final workoutIntent = hasAny([
+      'treino',
+      'workout',
+      'sessao',
+      'sessão',
+      'musculacao',
+      'musculação',
+      'academia',
+      'malhei',
+      'malhar',
+    ]);
     final sleepPerformanceIntent =
         workoutIntent ||
         hasAny(['desempenho', 'performance', 'volume', 'carga']);
@@ -306,17 +320,83 @@ class AiToolRegistry {
         'list_exercises',
       });
     }
+    final workoutHistoryIntent =
+        workoutIntent &&
+        (hasAny([
+              'historico',
+              'histórico',
+              'periodo',
+              'período',
+              'ultimos treinos',
+              'últimos treinos',
+              'entre ',
+              'por dia',
+              'planejado',
+              'planejados',
+              'em andamento',
+            ]) ||
+            RegExp(r'\b\d{4}-\d{2}-\d{2}\b').hasMatch(text));
+    final trainingAnalysisIntent =
+        workoutIntent &&
+        hasAny([
+          'rpe',
+          'esforco',
+          'esforço',
+          'densidade',
+          'frequencia',
+          'frequência',
+          'consistencia',
+          'consistência',
+          'duracao',
+          'duração',
+          'volume',
+          'grupo muscular',
+          'categoria',
+          'resumo',
+          'analise',
+          'análise',
+        ]);
     if (workoutIntent) {
-      selected.addAll({'list_recent_workouts', 'get_workout_detail'});
+      if (workoutHistoryIntent) {
+        selected.addAll({'get_workout_history', 'get_workout_detail'});
+      } else {
+        selected.addAll({'list_recent_workouts', 'get_workout_detail'});
+      }
+      if (trainingAnalysisIntent) selected.add('get_training_summary');
     }
-    if (hasAny(['exercicio', 'exercício', 'serie', 'série', 'carga'])) {
-      selected.addAll({'list_exercises', 'get_exercise_history'});
+    final exerciseIntent = hasAny([
+      'exercicio',
+      'exercício',
+      'serie',
+      'série',
+      'carga',
+      'repeticao',
+      'repetição',
+      'superset',
+      'aquecimento',
+    ]);
+    if (exerciseIntent) {
+      selected.addAll({
+        'list_exercises',
+        'get_exercise_detail',
+        'get_exercise_history',
+      });
+    }
+    if (hasAny([
+      'equipamento',
+      'descanso padrao',
+      'descanso padrão',
+      'incremento de carga',
+      'nota do exercicio',
+      'nota do exercício',
+    ])) {
+      selected.addAll({'list_exercises', 'get_exercise_detail'});
     }
     if (hasAny(['recorde', 'record', 'pr ', '1rm'])) {
       selected.addAll({'list_exercises', 'get_exercise_personal_records'});
     }
     if (hasAny(['volume'])) {
-      selected.add('get_weekly_volume_breakdown');
+      selected.addAll({'get_weekly_volume_breakdown', 'get_training_summary'});
     }
     if (hasAny([
       'progresso',
@@ -364,6 +444,7 @@ class AiToolRegistry {
     for (final name in calledNames) {
       switch (name) {
         case 'list_recent_workouts':
+        case 'get_workout_history':
           next.add('get_workout_detail');
           break;
         case 'list_exercises':
@@ -371,6 +452,7 @@ class AiToolRegistry {
             next.addAll({'list_routines', 'get_routine_detail'});
           } else {
             next.addAll({
+              'get_exercise_detail',
               'get_exercise_history',
               'get_exercise_personal_records',
               'get_progress_trend',
@@ -422,16 +504,22 @@ class AiToolRegistry {
       switch (toolName) {
         case 'list_recent_workouts':
           return l10n.aiToolListRecentWorkouts;
+        case 'get_workout_history':
+          return l10n.aiToolWorkoutHistory;
         case 'get_workout_detail':
           return l10n.aiToolGetWorkoutDetail;
         case 'list_exercises':
           return l10n.aiToolListExercises;
+        case 'get_exercise_detail':
+          return l10n.aiToolExerciseDetail;
         case 'get_exercise_history':
           return l10n.aiToolGetExerciseHistory;
         case 'get_exercise_personal_records':
           return l10n.aiToolGetExerciseRecords;
         case 'get_weekly_volume_breakdown':
           return l10n.aiToolWeeklyVolume;
+        case 'get_training_summary':
+          return l10n.aiToolTrainingSummary;
         case 'get_progress_trend':
           return l10n.aiToolProgressTrend;
         case 'list_routines':
@@ -489,16 +577,22 @@ class AiToolRegistry {
     switch (toolName) {
       case 'list_recent_workouts':
         return 'Listando treinos recentes';
+      case 'get_workout_history':
+        return 'Consultando histórico de treinos';
       case 'get_workout_detail':
         return 'Detalhando treino';
       case 'list_exercises':
         return 'Buscando exercícios';
+      case 'get_exercise_detail':
+        return 'Detalhando exercício';
       case 'get_exercise_history':
         return 'Histórico do exercício';
       case 'get_exercise_personal_records':
         return 'Recordes pessoais';
       case 'get_weekly_volume_breakdown':
         return 'Volume semanal';
+      case 'get_training_summary':
+        return 'Analisando período de treinos';
       case 'get_progress_trend':
         return 'Tendência de progressão';
       case 'list_routines':
@@ -569,18 +663,80 @@ class AiToolRegistry {
           return _prepareManualFoodProposal(args);
         case 'list_recent_workouts':
           return _ok(await _listRecentWorkouts(args));
+        case 'get_workout_history':
+          return _ok(await _getWorkoutHistory(args));
         case 'get_workout_detail':
-          return _ok(await _getWorkoutDetail(args));
+          final id = _nullableString(args['workout_id'] ?? args['workoutId']);
+          if (id == null) {
+            return const AiToolResult(
+              ok: false,
+              code: 'invalid_args',
+              message: 'workout_id é obrigatório.',
+            );
+          }
+          final detail = await workouts.workoutDetail(id);
+          if (detail == null) {
+            return const AiToolResult(
+              ok: false,
+              code: 'not_found',
+              message: 'Treino não encontrado.',
+            );
+          }
+          return _ok(detail);
         case 'list_exercises':
           return _ok(await _listExercises(args));
+        case 'get_exercise_detail':
+          final id = _nullableString(args['exercise_id'] ?? args['exerciseId']);
+          if (id == null) {
+            return const AiToolResult(
+              ok: false,
+              code: 'invalid_args',
+              message: 'exercise_id é obrigatório.',
+            );
+          }
+          final detail = await workouts.exerciseDetail(id);
+          if (detail == null) {
+            return const AiToolResult(
+              ok: false,
+              code: 'not_found',
+              message: 'Exercício não encontrado.',
+            );
+          }
+          return _ok(detail);
         case 'get_exercise_history':
+          if (_nullableString(args['exercise_id'] ?? args['exerciseId']) ==
+              null) {
+            return const AiToolResult(
+              ok: false,
+              code: 'invalid_args',
+              message: 'exercise_id é obrigatório.',
+            );
+          }
           return _ok(await _getExerciseHistory(args));
         case 'get_exercise_personal_records':
+          if (_nullableString(args['exercise_id'] ?? args['exerciseId']) ==
+              null) {
+            return const AiToolResult(
+              ok: false,
+              code: 'invalid_args',
+              message: 'exercise_id é obrigatório.',
+            );
+          }
           return _ok(await _getExercisePRs(args));
         case 'get_weekly_volume_breakdown':
           return _ok(await _getWeeklyVolumeBreakdown(args));
         case 'get_progress_trend':
+          if (_nullableString(args['exercise_id'] ?? args['exerciseId']) ==
+              null) {
+            return const AiToolResult(
+              ok: false,
+              code: 'invalid_args',
+              message: 'exercise_id é obrigatório.',
+            );
+          }
           return _ok(await _getProgressTrend(args));
+        case 'get_training_summary':
+          return _ok(await _getTrainingSummary(args));
         case 'list_routines':
           return _ok(await _listRoutines(args));
         case 'get_routine_detail':
@@ -718,179 +874,76 @@ class AiToolRegistry {
   Future<Map<String, dynamic>> _listRecentWorkouts(
     Map<String, dynamic> args,
   ) async {
-    final limit = _boundedInt(args, 'limit', 8, 1, 20);
-    final rawDb = await db.database;
-    final rows = await rawDb.rawQuery(
-      '''
-      SELECT w.id, w.date, w.duration_seconds, w.estimated_calories,
-        w.feeling_rating, w.comment,
-        COUNT(DISTINCT ee.id) AS exercise_count,
-        COALESCE(SUM(CASE WHEN COALESCE(s.is_warmup, 0) = 0
-          THEN COALESCE(s.weight, 0) * COALESCE(s.reps, 0) ELSE 0 END), 0)
-          AS volume_kg
-      FROM workouts w
-      LEFT JOIN exercise_entries ee ON ee.workout_id = w.id
-      LEFT JOIN sets s ON s.exercise_entry_id = ee.id
-      GROUP BY w.id
-      ORDER BY w.date DESC, w.start_time DESC
-      LIMIT ?
-    ''',
-      [limit],
-    );
-    final out = rows
-        .map(
-          (w) => {
-            'id': w['id'],
-            'date': w['date'],
-            'durationSeconds': w['duration_seconds'],
-            'estimatedCalories': (w['estimated_calories'] as num?)?.toDouble(),
-            'feeling': w['feeling_rating'],
-            'exerciseCount': (w['exercise_count'] as num?)?.toInt() ?? 0,
-            'volumeKg': (w['volume_kg'] as num?)?.toDouble() ?? 0.0,
-            'comment': w['comment'],
-          },
-        )
-        .toList();
-    return {'workouts': out};
+    return workouts.recent(limit: _boundedInt(args, 'limit', 8, 1, 20));
   }
 
-  Future<Map<String, dynamic>> _getWorkoutDetail(
-    Map<String, dynamic> args,
-  ) async {
-    final id =
-        (args['workout_id'] as String?) ?? (args['workoutId'] as String?);
-    if (id == null) {
-      return {'error': 'workout_id é obrigatório'};
-    }
-    final w = await db.getWorkout(id);
-    if (w == null) return {'error': 'workout não encontrado'};
-    final rawDb = await db.database;
-    final rows = await rawDb.rawQuery(
-      '''
-      SELECT ee.id AS entry_id, ee.exercise_id, ee.order_index,
-        e.name AS exercise_name, s.id AS set_id, s.weight, s.reps,
-        s.distance, s.time_seconds, s.is_warmup, s.is_complete, s.rpe,
-        s.comment AS set_comment
-      FROM exercise_entries ee
-      JOIN exercises e ON e.id = ee.exercise_id
-      LEFT JOIN sets s ON s.exercise_entry_id = ee.id
-      WHERE ee.workout_id = ?
-      ORDER BY ee.order_index ASC, s.order_index ASC
-    ''',
-      [id],
-    );
-    final byEntry = <String, Map<String, dynamic>>{};
-    for (final row in rows) {
-      final entryId = row['entry_id'] as String;
-      final entry = byEntry.putIfAbsent(
-        entryId,
-        () => {
-          'exerciseId': row['exercise_id'],
-          'exerciseName': row['exercise_name'],
-          'order': row['order_index'],
-          'sets': <Map<String, dynamic>>[],
-        },
+  Future<Map<String, dynamic>> _getWorkoutHistory(Map<String, dynamic> args) =>
+      workouts.history(
+        startDate: _isoDate(args['start_date'] ?? args['startDate']),
+        endDate: _isoDate(args['end_date'] ?? args['endDate']),
+        status: _nullableString(args['status']) ?? 'all',
+        page: _boundedInt(args, 'page', 1, 1, 100000),
+        pageSize: _boundedInt(args, 'page_size', 20, 1, 50),
       );
-      if (row['set_id'] != null) {
-        (entry['sets'] as List<Map<String, dynamic>>).add({
-          'weight': row['weight'],
-          'reps': row['reps'],
-          'distance': row['distance'],
-          'timeSeconds': row['time_seconds'],
-          'isWarmup': (row['is_warmup'] as int? ?? 0) == 1,
-          'isComplete': (row['is_complete'] as int? ?? 0) == 1,
-          'rpe': row['rpe'],
-          'comment': row['set_comment'],
-        });
-      }
-    }
-    final out = byEntry.values.toList();
-    return {
-      'id': id,
-      'date': w['date'],
-      'durationSeconds': w['duration_seconds'],
-      'estimatedCalories': (w['estimated_calories'] as num?)?.toDouble(),
-      'feeling': w['feeling_rating'],
-      'comment': w['comment'],
-      'exercises': out,
-    };
-  }
 
   Future<Map<String, dynamic>> _listExercises(Map<String, dynamic> args) async {
-    final rows = await db.getExercises(
-      categoryId: args['category_id'] as String?,
-      search: args['name_contains'] as String?,
+    return workouts.listExercises(
+      categoryId: _nullableString(args['category_id'] ?? args['categoryId']),
+      search: _nullableString(args['name_contains'] ?? args['search']),
       favorites: args['is_favorite'] as bool?,
+      limit: _boundedInt(args, 'limit', 20, 1, 50),
     );
-    final limit = _boundedInt(args, 'limit', 20, 1, 50);
-    final compact = rows
-        .take(limit)
-        .map(
-          (e) => {
-            'id': e['id'],
-            'name': e['name'],
-            'categoryId': e['category_id'],
-            'type': e['type'],
-            'isFavorite': (e['is_favorite'] as int? ?? 0) == 1,
-          },
-        )
-        .toList();
-    return {'exercises': compact};
   }
 
   Future<Map<String, dynamic>> _getExerciseHistory(
     Map<String, dynamic> args,
   ) async {
-    final id =
-        (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
-    if (id == null) return {'error': 'exercise_id é obrigatório'};
-    final limit = _boundedInt(args, 'limit', 12, 1, 40);
-    final history = await db.getExerciseHistory(id, limit: limit);
-    return {
-      'exerciseId': id,
-      'topSets': history['topSets'] ?? const [],
-      'avgWeight': history['avgWeight'],
-      'avgReps': history['avgReps'],
-      'totalSets': history['totalSets'],
-      'history': history['history'] ?? const [],
-    };
+    return workouts.exerciseHistory(
+      _nullableString(args['exercise_id'] ?? args['exerciseId']) ?? '',
+      startDate: _isoDate(args['start_date'] ?? args['startDate']),
+      endDate: _isoDate(args['end_date'] ?? args['endDate']),
+      limit: _boundedInt(args, 'limit', 12, 1, 40),
+    );
   }
 
   Future<Map<String, dynamic>> _getExercisePRs(
     Map<String, dynamic> args,
   ) async {
-    final id =
-        (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
-    if (id == null) return {'error': 'exercise_id é obrigatório'};
-    final prs = await db.getPersonalRecords(limit: 50);
-    final filtered = prs.where((p) => p['exercise_id'] == id).toList();
-    return {'exerciseId': id, 'records': filtered};
+    return workouts.exerciseRecords(
+      _nullableString(args['exercise_id'] ?? args['exerciseId']) ?? '',
+    );
   }
 
   Future<Map<String, dynamic>> _getWeeklyVolumeBreakdown(
     Map<String, dynamic> args,
   ) async {
-    final weeks = _boundedInt(args, 'weeks', 8, 2, 16);
-    final byCategory = await db.getWeeklyVolumeByCategory(weeks: weeks);
-    return {'weeksBack': weeks, 'byCategory': byCategory};
+    return workouts.weeklyVolume(weeks: _boundedInt(args, 'weeks', 8, 2, 16));
   }
 
   Future<Map<String, dynamic>> _getProgressTrend(
     Map<String, dynamic> args,
   ) async {
-    final id =
-        (args['exercise_id'] as String?) ?? (args['exerciseId'] as String?);
-    if (id == null) return {'error': 'exercise_id é obrigatório'};
-    final weeks = _boundedInt(args, 'weeks', 8, 2, 16);
-    final history = await db.getExerciseHistory(
-      id,
-      limit: (weeks * 3).clamp(6, 40),
+    return workouts.progressTrend(
+      _nullableString(args['exercise_id'] ?? args['exerciseId']) ?? '',
+      weeks: _boundedInt(args, 'weeks', 8, 2, 16),
     );
-    return {
-      'exerciseId': id,
-      'weeksBack': weeks,
-      'dataPoints': history['history'] ?? const [],
-    };
+  }
+
+  Future<Map<String, dynamic>> _getTrainingSummary(Map<String, dynamic> args) {
+    final endDate = _isoDate(args['end_date'] ?? args['endDate']);
+    final explicitStart = _isoDate(args['start_date'] ?? args['startDate']);
+    final days = _boundedInt(args, 'days', 30, 1, 366);
+    final effectiveEnd = DateTime.tryParse(endDate ?? '') ?? DateTime.now();
+    final effectiveStart =
+        explicitStart ??
+        effectiveEnd
+            .subtract(Duration(days: days - 1))
+            .toIso8601String()
+            .substring(0, 10);
+    return workouts.trainingSummary(
+      startDate: effectiveStart,
+      endDate: endDate ?? effectiveEnd.toIso8601String().substring(0, 10),
+    );
   }
 
   Future<Map<String, dynamic>> _listRoutines(Map<String, dynamic> args) async {
@@ -937,11 +990,13 @@ class AiToolRegistry {
       '''
       SELECT rd.id AS day_id, rd.name AS day_name, rd.order_index AS day_order,
         rd.notes AS day_notes, re.id AS routine_exercise_id, re.exercise_id,
+        e.name AS exercise_name, e.type AS exercise_type,
         re.order_index AS exercise_order, re.rest_time_seconds,
         re.superset_group_id, ps.id AS set_id, ps.weight, ps.reps,
         ps.distance, ps.time_seconds, ps.is_warmup
       FROM routine_days rd
       LEFT JOIN routine_exercises re ON re.routine_day_id = rd.id
+      LEFT JOIN exercises e ON e.id = re.exercise_id
       LEFT JOIN predefined_sets ps ON ps.routine_exercise_id = re.id
       WHERE rd.routine_id = ?
       ORDER BY rd.order_index ASC, re.order_index ASC, ps.order_index ASC
@@ -970,6 +1025,8 @@ class AiToolRegistry {
           'routineExerciseId': exerciseId,
           'source_routine_exercise_id': exerciseId,
           'exerciseId': row['exercise_id'],
+          'exerciseName': row['exercise_name'],
+          'exerciseType': row['exercise_type'],
           'order': row['exercise_order'],
           'restTimeSeconds': row['rest_time_seconds'],
           'supersetGroupId': row['superset_group_id'],
@@ -1021,14 +1078,7 @@ class AiToolRegistry {
   Future<Map<String, dynamic>> _getCardioSummary(
     Map<String, dynamic> args,
   ) async {
-    final weeks = _boundedInt(args, 'weeks', 4, 2, 16);
-    final weekly = await db.getCardioWeeklyDistance(weeks: weeks);
-    final byModality = await db.getCardioDistanceByModality();
-    return {
-      'weeksBack': weeks,
-      'weeklyDistance': weekly,
-      'byModality': byModality,
-    };
+    return workouts.cardioSummary(weeks: _boundedInt(args, 'weeks', 4, 2, 16));
   }
 
   Future<Map<String, dynamic>> _listGoals(Map<String, dynamic> args) async {
@@ -1117,11 +1167,14 @@ class AiToolRegistry {
       names.addAll(switch (capability) {
         'workouts' => {
           'list_recent_workouts',
+          'get_workout_history',
           'get_workout_detail',
           'get_weekly_volume_breakdown',
+          'get_training_summary',
         },
         'exercises' => {
           'list_exercises',
+          'get_exercise_detail',
           'get_exercise_history',
           'get_exercise_personal_records',
           'get_progress_trend',
@@ -1245,6 +1298,41 @@ class AiToolRegistry {
             },
           },
         };
+      case 'get_workout_history':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Histórico paginado de treinos, inclusive períodos antigos. Permite filtrar por data e status; cada item distingue treino concluído, em andamento e planejado e resume somente séries concluídas sem aquecimento.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'start_date': {
+                  'type': 'string',
+                  'description': 'Primeiro dia em YYYY-MM-DD.',
+                },
+                'end_date': {
+                  'type': 'string',
+                  'description': 'Último dia em YYYY-MM-DD.',
+                },
+                'status': {
+                  'type': 'string',
+                  'enum': ['all', 'completed', 'in_progress', 'planned'],
+                  'default': 'all',
+                },
+                'page': {'type': 'integer', 'minimum': 1, 'default': 1},
+                'page_size': {
+                  'type': 'integer',
+                  'minimum': 1,
+                  'maximum': 50,
+                  'default': 20,
+                },
+              },
+              'required': const [],
+            },
+          },
+        };
       case 'get_workout_detail':
         return {
           'type': 'function',
@@ -1283,6 +1371,22 @@ class AiToolRegistry {
             },
           },
         };
+      case 'get_exercise_detail':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Perfil completo de um exercício: categoria, sistema energético, tipo, equipamento, notas, favorito, descanso padrão, incremento de carga e estatísticas de uso concluído.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'exercise_id': {'type': 'string'},
+              },
+              'required': ['exercise_id'],
+            },
+          },
+        };
       case 'get_exercise_history':
         return {
           'type': 'function',
@@ -1295,6 +1399,8 @@ class AiToolRegistry {
               'properties': {
                 'exercise_id': {'type': 'string'},
                 'limit': {'type': 'integer', 'default': 12},
+                'start_date': {'type': 'string'},
+                'end_date': {'type': 'string'},
               },
               'required': ['exercise_id'],
             },
@@ -1345,6 +1451,29 @@ class AiToolRegistry {
                 'weeks_back': {'type': 'integer', 'default': 8},
               },
               'required': ['exercise_id'],
+            },
+          },
+        };
+      case 'get_training_summary':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Analisa um período de treino: frequência e status, duração, calorias, sensação, séries, volume, repetições, distância, tempo, RPE, densidade, categorias e exercícios mais usados. Métricas de desempenho usam apenas treinos e séries concluídos, sem aquecimento.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'days': {
+                  'type': 'integer',
+                  'minimum': 1,
+                  'maximum': 366,
+                  'default': 30,
+                },
+                'start_date': {'type': 'string'},
+                'end_date': {'type': 'string'},
+              },
+              'required': const [],
             },
           },
         };
@@ -1919,6 +2048,14 @@ class AiToolRegistry {
     return (value ?? fallback).clamp(minimum, maximum);
   }
 
+  String? _isoDate(Object? value) {
+    final text = _nullableString(value);
+    if (text == null) return null;
+    final date = DateTime.tryParse(text);
+    if (date == null) return null;
+    return date.toIso8601String().substring(0, 10);
+  }
+
   AiToolResult _ok(Map<String, dynamic> data) =>
       AiToolResult(ok: true, data: data);
 
@@ -1952,8 +2089,10 @@ class AiToolRegistry {
 
   static const List<Map<String, String>> _tools = [
     {'name': 'list_recent_workouts', 'description': 'List recent workouts'},
+    {'name': 'get_workout_history', 'description': 'Paginated workout history'},
     {'name': 'get_workout_detail', 'description': 'Get workout details'},
     {'name': 'list_exercises', 'description': 'List exercises'},
+    {'name': 'get_exercise_detail', 'description': 'Exercise profile'},
     {'name': 'get_exercise_history', 'description': 'Exercise history'},
     {'name': 'get_exercise_personal_records', 'description': 'Exercise PRs'},
     {
@@ -1961,6 +2100,7 @@ class AiToolRegistry {
       'description': 'Weekly volume by category',
     },
     {'name': 'get_progress_trend', 'description': 'Exercise progress trend'},
+    {'name': 'get_training_summary', 'description': 'Training period summary'},
     {'name': 'list_routines', 'description': 'List routines'},
     {'name': 'get_routine_detail', 'description': 'Routine details'},
     {'name': 'list_body_measurements', 'description': 'List body measurements'},

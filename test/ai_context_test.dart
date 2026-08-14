@@ -63,7 +63,7 @@ void main() {
     expect(identical(a, c), isFalse);
   });
 
-  test('totals reflect DB content', () async {
+  test('totals reflect completed workout content', () async {
     await db.insert('exercises', {
       'id': 'e1',
       'name': 'A',
@@ -76,6 +76,8 @@ void main() {
     await db.insert('workouts', {
       'id': 'w_ctx',
       'date': '2024-06-01',
+      'start_time': now,
+      'end_time': now,
       'is_from_routine': 0,
       'created_at': now,
     });

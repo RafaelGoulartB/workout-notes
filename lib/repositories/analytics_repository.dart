@@ -636,7 +636,8 @@ class AnalyticsRepository extends BaseRepository {
     final today = DateTime.now().toIso8601String().substring(0, 10);
 
     final rows = await db.rawQuery(
-      'SELECT DISTINCT date FROM workouts WHERE date <= ? ORDER BY date DESC',
+      'SELECT DISTINCT date FROM workouts WHERE date <= ? '
+      'AND end_time IS NOT NULL ORDER BY date DESC',
       [today],
     );
 
@@ -662,16 +663,30 @@ class AnalyticsRepository extends BaseRepository {
     final db = await this.db;
 
     final totalWorkouts = Sqflite.firstIntValue(await db.rawQuery(
-      'SELECT COUNT(*) FROM workouts',
+      'SELECT COUNT(*) FROM workouts WHERE end_time IS NOT NULL',
     )) ?? 0;
 
     final totalSets = Sqflite.firstIntValue(await db.rawQuery(
-      'SELECT COUNT(*) FROM sets WHERE is_warmup = 0',
+      '''
+      SELECT COUNT(s.id) FROM sets s
+      JOIN exercise_entries ee ON ee.id = s.exercise_entry_id
+      JOIN workouts w ON w.id = ee.workout_id
+      WHERE w.end_time IS NOT NULL
+        AND s.is_complete = 1 AND s.is_warmup = 0
+      ''',
     )) ?? 0;
 
-    final totalVolume = Sqflite.firstIntValue(await db.rawQuery(
-      'SELECT COALESCE(SUM(weight * reps), 0) FROM sets WHERE is_warmup = 0',
-    )) ?? 0;
+    final volumeRows = await db.rawQuery('''
+      SELECT COALESCE(SUM(COALESCE(s.weight, 0) * COALESCE(s.reps, 0)), 0)
+        AS total_volume
+      FROM sets s
+      JOIN exercise_entries ee ON ee.id = s.exercise_entry_id
+      JOIN workouts w ON w.id = ee.workout_id
+      WHERE w.end_time IS NOT NULL
+        AND s.is_complete = 1 AND s.is_warmup = 0
+    ''');
+    final totalVolume =
+        (volumeRows.first['total_volume'] as num?)?.toDouble() ?? 0.0;
 
     final currentStreak = await _calculateStreak();
 
