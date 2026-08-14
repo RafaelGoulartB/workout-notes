@@ -1019,7 +1019,7 @@ void main() {
     },
   );
 
-  testWidgets('MainShell renders three tabs (Workout, Sleep, Nutrition)', (
+  testWidgets('MainShell renders Workout, Sleep, Nutrition, and Plan tabs', (
     tester,
   ) async {
     // Render a structure equivalent to MainShell: we use a stub body
@@ -1042,6 +1042,7 @@ void main() {
     expect(find.text(loc.tabWorkout), findsOneWidget);
     expect(find.text(loc.tabSleep), findsOneWidget);
     expect(find.text(loc.tabNutrition), findsOneWidget);
+    expect(find.text(loc.tabPlan), findsOneWidget);
   });
 }
 
@@ -1066,6 +1067,10 @@ class _StubMainShell extends StatelessWidget {
           NavigationDestination(
             icon: const Icon(Icons.restaurant_outlined),
             label: loc.tabNutrition,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.view_timeline_outlined),
+            label: loc.tabPlan,
           ),
         ],
       ),

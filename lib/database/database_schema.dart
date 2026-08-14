@@ -1,12 +1,14 @@
 import 'package:sqflite/sqflite.dart';
 
 import 'database_nutrition_schema.dart';
+import 'database_periodization_schema.dart';
 import 'database_seed.dart';
 import 'migrations/database_migrations_catalog_v11.dart';
 import 'migrations/database_migrations_catalog_v12.dart';
 import 'migrations/database_migrations_features.dart';
 import 'migrations/database_migrations_legacy.dart';
 import 'migrations/database_migrations_wellness.dart';
+import 'migrations/database_migrations_periodization.dart';
 
 /// Owns database creation and coordinates incremental schema upgrades.
 abstract final class DatabaseSchema {
@@ -355,6 +357,7 @@ abstract final class DatabaseSchema {
     // goals share a single helper so `_onCreate` and `_onUpgrade` use
     // the same definition.
     await DatabaseNutritionSchema.create(db);
+    await DatabasePeriodizationSchema.create(db);
 
     // Indexes
     await db.execute('CREATE INDEX idx_workouts_date ON workouts(date)');
@@ -415,5 +418,6 @@ abstract final class DatabaseSchema {
     await DatabaseCatalogV11Migrations.upgrade(db, oldVersion);
     await DatabaseFeatureMigrations.upgrade(db, oldVersion);
     await DatabaseWellnessMigrations.upgrade(db, oldVersion);
+    await DatabasePeriodizationMigrations.upgrade(db, oldVersion);
   }
 }

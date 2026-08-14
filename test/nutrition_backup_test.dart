@@ -207,7 +207,7 @@ void main() {
       );
       final backup = await repository.exportAllData();
 
-      expect(backup['version'], 11);
+      expect(backup['version'], 12);
       for (final entry in tableIds.entries) {
         expect(backup[entry.key], [
           {'id': entry.value},

@@ -8,7 +8,7 @@ import 'base_repository.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
-  static const int currentBackupVersion = 11;
+  static const int currentBackupVersion = 12;
   static const int minimumSupportedBackupVersion = 2;
 
   final Future<Database> Function()? _databaseProvider;
@@ -52,6 +52,14 @@ class ExportImportRepository extends BaseRepository {
       'saved_meal_items': await _queryIfExists(db, 'saved_meal_items'),
       'sleep_stage_epochs': await _queryIfExists(db, 'sleep_stage_epochs'),
       'traditional_alarms': await _queryIfExists(db, 'traditional_alarms'),
+      'periodization_plans': await _queryIfExists(db, 'periodization_plans'),
+      'periodization_phases': await _queryIfExists(db, 'periodization_phases'),
+      'phase_targets': await _queryIfExists(db, 'phase_targets'),
+      'phase_routine_links': await _queryIfExists(db, 'phase_routine_links'),
+      'periodization_checkins': await _queryIfExists(
+        db,
+        'periodization_checkins',
+      ),
       'settings': await db.query('app_settings'),
     };
   }
@@ -73,6 +81,17 @@ class ExportImportRepository extends BaseRepository {
 
     await db.transaction((txn) async {
       // 1. Clear all tables (order matters because of FKs)
+      for (final table in [
+        'periodization_checkins',
+        'phase_routine_links',
+        'phase_targets',
+        'periodization_phases',
+        'periodization_plans',
+      ]) {
+        if (await _tableExists(txn, table)) {
+          await txn.delete(table);
+        }
+      }
       await txn.delete('predefined_sets');
       await txn.delete('routine_exercises');
       await txn.delete('routine_days');
@@ -139,6 +158,17 @@ class ExportImportRepository extends BaseRepository {
         'predefined_sets',
         data['predefined_sets'],
       );
+      for (final table in [
+        'periodization_plans',
+        'periodization_phases',
+        'phase_targets',
+        'phase_routine_links',
+        'periodization_checkins',
+      ]) {
+        if (await _tableExists(txn, table)) {
+          totalRows += await _insertAll(txn, table, data[table]);
+        }
+      }
       totalRows += await _insertAll(
         txn,
         'body_measurements',
@@ -340,6 +370,17 @@ class ExportImportRepository extends BaseRepository {
   Future<void> deleteAllWorkoutData() async {
     final db = await this.db;
     await db.transaction((txn) async {
+      for (final table in [
+        'periodization_checkins',
+        'phase_routine_links',
+        'phase_targets',
+        'periodization_phases',
+        'periodization_plans',
+      ]) {
+        if (await _tableExists(txn, table)) {
+          await txn.delete(table);
+        }
+      }
       await txn.delete('predefined_sets');
       await txn.delete('routine_exercises');
       await txn.delete('routine_days');

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
@@ -8,7 +10,10 @@ import 'package:workout_notes/models/nutrition/meal_log.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
+import 'package:workout_notes/models/periodization_phase.dart';
+import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
@@ -44,6 +49,8 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
 
   DailyNutritionSummary _summary = DailyNutritionSummary.empty;
   NutritionGoal? _goal;
+  PeriodizationPhase? _periodizationPhase;
+  PeriodizationTarget? _phaseTarget;
   List<MealTypeDefinition> _mealTypes = const [];
   List<MealLogWithItems> _meals = const [];
   late DateTime _selectedDate;
@@ -82,17 +89,43 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
       setState(() {
         _summary = results[0] as DailyNutritionSummary;
         _goal = results[1] as NutritionGoal?;
+        _periodizationPhase = null;
+        _phaseTarget = null;
         _mealTypes = results[2] as List<MealTypeDefinition>;
         _meals = results[3] as List<MealLogWithItems>;
         _isLoading = false;
         _hasLoaded = true;
       });
+      // The plan target is an enhancement to the existing diary summary.
+      // Loading it independently keeps diary navigation responsive even when
+      // an older/test database has not reached the periodization migration.
+      unawaited(_loadPeriodizationTarget(selectedDate, generation));
     } catch (_) {
       if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _isLoading = false;
         _hasLoaded = true;
       });
+    }
+  }
+
+  Future<void> _loadPeriodizationTarget(
+    DateTime selectedDate,
+    int generation,
+  ) async {
+    try {
+      final repository = PeriodizationRepository();
+      final phase = await repository.getEffectivePhase(selectedDate);
+      final target = phase == null
+          ? null
+          : await repository.getEffectiveTarget(phase.id, date: selectedDate);
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() {
+        _periodizationPhase = phase;
+        _phaseTarget = target;
+      });
+    } catch (_) {
+      // Nutrition remains fully usable when no periodization data exists.
     }
   }
 
@@ -432,9 +465,18 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                       ),
                       SliverToBoxAdapter(
                         child:
+                            _periodizationPhase == null || _phaseTarget == null
+                            ? const SizedBox.shrink()
+                            : _NutritionPhaseBanner(
+                                phase: _periodizationPhase!,
+                                target: _phaseTarget!,
+                              ),
+                      ),
+                      SliverToBoxAdapter(
+                        child:
                             _NutritionDashboardSummaryCard(
                                   summary: _summary,
-                                  goal: _goal,
+                                  goal: _effectiveGoal,
                                   onTap: () => _openDay(),
                                   onConfigureGoal: _openSettings,
                                 )
@@ -492,6 +534,22 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     );
   }
 
+  NutritionGoal? get _effectiveGoal {
+    final phase = _phaseTarget;
+    final base = _goal;
+    if (phase == null || phase.nutritionJson.isEmpty) return base;
+    final now = DateTime.now();
+    return NutritionGoal(
+      id: 'periodization:${phase.id}',
+      calories: phase.calories ?? base?.calories,
+      proteinG: phase.proteinG ?? base?.proteinG,
+      carbsG: phase.carbsG ?? base?.carbsG,
+      fatG: phase.fatG ?? base?.fatG,
+      createdAt: phase.createdAt,
+      updatedAt: now,
+    );
+  }
+
   static String _dateString(DateTime value) => DateTime(
     value.year,
     value.month,
@@ -503,6 +561,59 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
 
   static bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
+}
+
+class _NutritionPhaseBanner extends StatelessWidget {
+  final PeriodizationPhase phase;
+  final PeriodizationTarget target;
+
+  const _NutritionPhaseBanner({required this.phase, required this.target});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final parts = <String>[];
+    if (target.calories != null) {
+      parts.add('${target.calories!.round()} kcal');
+    }
+    if (target.proteinG != null) {
+      parts.add('${target.proteinG!.round()}g ${loc.periodizationProteinG}');
+    }
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: Color(phase.color).withAlpha(30),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Color(phase.color).withAlpha(100)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.view_timeline_outlined, color: Color(phase.color)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  phase.name,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                if (parts.isNotEmpty)
+                  Text(
+                    parts.join(' · '),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+              ],
+            ),
+          ),
+          Text(loc.tabPlan, style: Theme.of(context).textTheme.labelSmall),
+        ],
+      ),
+    );
+  }
 }
 
 class _NutritionWeekSelector extends StatelessWidget {

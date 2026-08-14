@@ -1,0 +1,935 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Workout Notes — Conceitos de periodização</title>
+  <style>
+    :root {
+      --page: #f4f6f5;
+      --surface: #ffffff;
+      --surface-soft: #eaf0ed;
+      --surface-raised: #f9fbfa;
+      --ink: #17201b;
+      --muted: #657269;
+      --line: #d8e0db;
+      --brand: #00677e;
+      --brand-soft: #d8f2f8;
+      --brand-ink: #003743;
+      --cut: #2b6ee7;
+      --cut-soft: #e6eeff;
+      --deload: #e49a16;
+      --deload-soft: #fff1d5;
+      --bulk: #7b4cc7;
+      --bulk-soft: #f0e7ff;
+      --maintain: #238a5a;
+      --maintain-soft: #ddf6e8;
+      --danger: #b83a3a;
+      --shadow: 0 18px 50px rgba(28, 49, 37, .10);
+      --phone-bg: #0c1214;
+      --phone-surface: #151d20;
+      --phone-surface-2: #202a2e;
+      --phone-line: #293438;
+      --phone-text: #ecf1f2;
+      --phone-muted: #aeb9bd;
+      --phone-accent: #83d8f3;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --page: #0d1210;
+        --surface: #151c18;
+        --surface-soft: #202a24;
+        --surface-raised: #19211c;
+        --ink: #edf4ef;
+        --muted: #a7b5ac;
+        --line: #334139;
+        --brand: #72cde2;
+        --brand-soft: #153741;
+        --brand-ink: #d8f7ff;
+        --cut: #91b4ff;
+        --cut-soft: #1d315b;
+        --deload: #ffc66c;
+        --deload-soft: #453317;
+        --bulk: #c5a2ff;
+        --bulk-soft: #352750;
+        --maintain: #73d9a5;
+        --maintain-soft: #173b2a;
+        --danger: #ffaaaa;
+        --shadow: 0 18px 50px rgba(0, 0, 0, .28);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font: 15px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    a { color: inherit; }
+    .page { max-width: 1280px; margin: 0 auto; padding: 24px 24px 80px; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(28px, 6vw, 64px);
+      border: 1px solid var(--line);
+      border-radius: 30px;
+      background:
+        radial-gradient(circle at 88% 14%, color-mix(in srgb, var(--brand) 16%, transparent), transparent 30%),
+        linear-gradient(135deg, var(--surface), var(--brand-soft));
+      box-shadow: var(--shadow);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -80px;
+      bottom: -130px;
+      width: 360px;
+      height: 360px;
+      border: 42px solid color-mix(in srgb, var(--brand) 12%, transparent);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .eyebrow { color: var(--brand); font-size: 12px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+    h1 { max-width: 850px; margin: 8px 0 16px; font-size: clamp(36px, 6vw, 68px); line-height: 1.02; letter-spacing: -.05em; }
+    h2 { margin: 52px 0 10px; font-size: clamp(26px, 3.5vw, 38px); line-height: 1.15; letter-spacing: -.03em; }
+    h3 { margin: 0; font-size: 19px; line-height: 1.25; }
+    h4 { margin: 0; font-size: 15px; }
+    p { margin: 8px 0; }
+    .lede { max-width: 820px; color: var(--muted); font-size: 19px; }
+    .hero-pills, .legend, .chips, .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .hero-pills { margin-top: 22px; }
+    .pill, .chip, .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      font-weight: 750;
+    }
+    .pill { padding: 7px 11px; color: var(--brand-ink); background: var(--brand-soft); font-size: 12px; }
+    .tag { padding: 4px 9px; font-size: 11px; }
+    .tag.cut { color: var(--cut); background: var(--cut-soft); }
+    .tag.deload { color: var(--deload); background: var(--deload-soft); }
+    .tag.bulk { color: var(--bulk); background: var(--bulk-soft); }
+    .tag.maintain { color: var(--maintain); background: var(--maintain-soft); }
+    .section-intro { max-width: 780px; color: var(--muted); margin-bottom: 22px; }
+    .sticky-nav {
+      position: sticky;
+      z-index: 20;
+      top: 0;
+      display: flex;
+      gap: 8px;
+      padding: 12px 0;
+      overflow-x: auto;
+      background: color-mix(in srgb, var(--page) 88%, transparent);
+      backdrop-filter: blur(14px);
+    }
+    .sticky-nav a {
+      flex: 0 0 auto;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 750;
+    }
+    .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
+    .card {
+      grid-column: span 4;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 6%, transparent);
+    }
+    .card.half { grid-column: span 6; }
+    .card.wide { grid-column: span 8; }
+    .card.full { grid-column: 1 / -1; }
+    .card p, .card li { color: var(--muted); }
+    .card ul { margin: 12px 0 0; padding-left: 20px; }
+    .option-card { position: relative; padding-top: 52px; }
+    .option-number {
+      position: absolute;
+      left: 20px;
+      top: 18px;
+      color: var(--brand);
+      font-size: 12px;
+      font-weight: 850;
+      letter-spacing: .09em;
+    }
+    .recommend {
+      border-color: color-mix(in srgb, var(--brand) 65%, var(--line));
+      background: linear-gradient(145deg, var(--surface), var(--brand-soft));
+    }
+    .verdict {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, .65fr);
+      gap: 18px;
+      align-items: stretch;
+      margin-top: 18px;
+    }
+    .verdict-main, .verdict-side {
+      padding: 24px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .verdict-main { border-color: color-mix(in srgb, var(--brand) 65%, var(--line)); }
+    .score { color: var(--brand); font-size: 48px; font-weight: 850; letter-spacing: -.06em; }
+    .score small { color: var(--muted); font-size: 14px; letter-spacing: 0; }
+    .roadmap {
+      position: relative;
+      padding: 28px 0 6px;
+    }
+    .roadmap-line {
+      display: grid;
+      grid-template-columns: 3fr .35fr 4fr 1fr;
+      min-height: 80px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+    }
+    .roadmap-phase {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-width: 0;
+      padding: 15px;
+      border-right: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
+    }
+    .roadmap-phase:last-child { border-right: 0; }
+    .roadmap-phase strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .roadmap-phase span { font-size: 11px; opacity: .78; }
+    .roadmap-phase.cut { color: var(--cut); background: var(--cut-soft); }
+    .roadmap-phase.deload { color: var(--deload); background: var(--deload-soft); }
+    .roadmap-phase.bulk { color: var(--bulk); background: var(--bulk-soft); }
+    .roadmap-phase.maintain { color: var(--maintain); background: var(--maintain-soft); }
+    .today-marker { position: absolute; left: 21%; top: 10px; bottom: -6px; width: 2px; background: var(--ink); }
+    .today-marker::before { content: "Hoje"; position: absolute; top: -10px; left: 7px; font-size: 11px; font-weight: 800; }
+    .week-strip { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin-top: 11px; }
+    .week-strip span { height: 7px; border-radius: 99px; background: var(--line); }
+    .week-strip .done { background: var(--brand); }
+    .feature-map { display: grid; grid-template-columns: 190px 1fr; gap: 20px; align-items: start; }
+    .feature-map-nav { display: grid; gap: 7px; }
+    .feature-map-nav button, .screen-tabs button {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+      color: var(--ink);
+      padding: 11px 12px;
+      text-align: left;
+      font-weight: 750;
+    }
+    .feature-map-nav button[aria-pressed="true"], .screen-tabs button[aria-selected="true"] {
+      border-color: var(--brand);
+      background: var(--brand-soft);
+      color: var(--brand-ink);
+    }
+    .feature-panel { min-height: 215px; padding: 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+    .feature-panel ul { padding-left: 19px; color: var(--muted); }
+
+    .prototype-shell {
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background:
+        radial-gradient(circle at 15% 12%, color-mix(in srgb, var(--brand) 12%, transparent), transparent 24%),
+        var(--surface-soft);
+    }
+    .screen-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 24px; }
+    .screen-tabs button { padding: 9px 13px; text-align: center; }
+    .screen-stage { display: grid; grid-template-columns: minmax(320px, 382px) minmax(280px, 1fr); gap: 28px; align-items: center; justify-content: center; }
+    .phone {
+      width: 100%;
+      max-width: 382px;
+      min-height: 720px;
+      margin: 0 auto;
+      overflow: hidden;
+      border: 8px solid #242d30;
+      border-radius: 36px;
+      background: var(--phone-bg);
+      color: var(--phone-text);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, .26);
+    }
+    .phone-status { display: flex; justify-content: space-between; padding: 12px 19px 5px; font-size: 11px; font-weight: 750; }
+    .phone-screen { display: none; min-height: 688px; }
+    .phone-screen.active { display: flex; flex-direction: column; }
+    .appbar { display: flex; align-items: center; gap: 12px; padding: 14px 17px 12px; }
+    .appbar .back, .appbar .more { width: 30px; color: var(--phone-muted); font-size: 22px; text-align: center; }
+    .appbar-title { flex: 1; font-size: 18px; font-weight: 750; }
+    .appbar-subtitle { color: var(--phone-muted); font-size: 11px; }
+    .phone-body { flex: 1; padding: 7px 17px 16px; }
+    .phone-card {
+      padding: 15px;
+      border: 1px solid var(--phone-line);
+      border-radius: 18px;
+      background: var(--phone-surface);
+    }
+    .phone-card + .phone-card { margin-top: 11px; }
+    .phone-label { margin: 17px 2px 8px; color: var(--phone-muted); font-size: 10px; font-weight: 850; letter-spacing: .11em; text-transform: uppercase; }
+    .phone-row { display: flex; align-items: center; gap: 10px; }
+    .grow { flex: 1; min-width: 0; }
+    .muted { color: var(--phone-muted); }
+    .tiny { font-size: 10px; }
+    .small { font-size: 12px; }
+    .phone-icon {
+      display: grid;
+      place-items: center;
+      flex: 0 0 38px;
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      color: var(--phone-accent);
+      background: #063d4a;
+      font-size: 18px;
+    }
+    .primary-button {
+      width: 100%;
+      margin-top: 14px;
+      padding: 12px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--phone-accent);
+      color: #05323c;
+      font-weight: 850;
+    }
+    .ghost-button {
+      padding: 7px 11px;
+      border: 1px solid var(--phone-line);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--phone-text);
+      font-size: 11px;
+    }
+    .metric-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 13px; }
+    .metric { min-width: 0; padding: 10px 6px; border-radius: 12px; background: var(--phone-surface-2); text-align: center; }
+    .metric strong { display: block; font-size: 15px; }
+    .metric span { display: block; margin-top: 2px; color: var(--phone-muted); font-size: 9px; }
+    .progress-track { height: 7px; overflow: hidden; border-radius: 999px; background: var(--phone-surface-2); }
+    .progress-fill { height: 100%; border-radius: inherit; background: var(--phone-accent); }
+    .phase-mini-line { display: grid; grid-template-columns: 3fr .45fr 4fr 1fr; gap: 2px; margin: 12px 0 9px; }
+    .phase-mini-line span { height: 12px; border-radius: 4px; }
+    .phase-mini-line .cut { background: #4b83e9; }
+    .phase-mini-line .deload { background: #dda231; }
+    .phase-mini-line .bulk { background: #9669da; }
+    .phase-mini-line .maintain { background: #43a773; }
+    .bottom-nav { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 10px 9px 13px; border-top: 1px solid var(--phone-line); background: var(--phone-surface); }
+    .bottom-nav span { color: var(--phone-muted); font-size: 9px; text-align: center; }
+    .bottom-nav .selected { color: var(--phone-accent); }
+    .bottom-nav b { display: block; font-size: 16px; }
+    .phase-list { position: relative; padding-left: 20px; }
+    .phase-list::before { content: ""; position: absolute; left: 6px; top: 8px; bottom: 8px; width: 2px; background: var(--phone-line); }
+    .phase-item { position: relative; padding: 10px 0 12px 10px; }
+    .phase-item::before { content: ""; position: absolute; left: -19px; top: 17px; width: 10px; height: 10px; border: 3px solid var(--phone-bg); border-radius: 50%; background: var(--phase-color); }
+    .phase-item.active-phase { margin: 3px 0; padding: 12px 10px; border: 1px solid #355a65; border-radius: 13px; background: #12272d; }
+    .phase-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--phase-color); }
+    .calendar-head, .weekdays, .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .calendar-head { grid-template-columns: 32px 1fr 32px; align-items: center; margin: 5px 0 12px; text-align: center; }
+    .weekdays span { color: var(--phone-muted); font-size: 9px; text-align: center; }
+    .calendar-grid { margin-top: 6px; }
+    .day {
+      position: relative;
+      min-height: 47px;
+      padding: 6px 3px;
+      border-radius: 9px;
+      color: var(--phone-text);
+      background: var(--period-bg, transparent);
+      font-size: 10px;
+      text-align: center;
+    }
+    .day.blank { background: transparent; }
+    .day.selected { outline: 2px solid var(--phone-accent); }
+    .day .event { display: block; width: 6px; height: 6px; margin: 5px auto 0; border-radius: 50%; background: var(--phone-text); }
+    .day.cut-day { --period-bg: rgba(69, 120, 218, .26); }
+    .day.deload-day { --period-bg: rgba(220, 158, 38, .29); }
+    .day.bulk-day { --period-bg: rgba(139, 91, 206, .28); }
+    .calendar-legend { display: flex; flex-wrap: wrap; gap: 7px; margin: 11px 0 13px; color: var(--phone-muted); font-size: 9px; }
+    .calendar-legend i { display: inline-block; width: 8px; height: 8px; margin-right: 3px; border-radius: 3px; }
+    .target-row { padding: 11px 0; border-bottom: 1px solid var(--phone-line); }
+    .target-row:last-child { border-bottom: 0; }
+    .target-value { color: var(--phone-accent); font-weight: 800; }
+    .stepper { display: flex; gap: 5px; margin: 12px 0 18px; }
+    .stepper span { flex: 1; height: 5px; border-radius: 99px; background: var(--phone-line); }
+    .stepper .on { background: var(--phone-accent); }
+    .choice { padding: 12px; border: 1px solid var(--phone-line); border-radius: 13px; background: var(--phone-surface); }
+    .choice + .choice { margin-top: 9px; }
+    .choice.selected { border-color: var(--phone-accent); background: #11282f; }
+    .swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 9px; margin-top: 9px; }
+    .swatches span { height: 32px; border-radius: 10px; }
+    .annotation-panel h3 { margin-bottom: 8px; }
+    .annotation-panel p { color: var(--muted); }
+    .annotation-list { display: grid; gap: 10px; margin-top: 18px; }
+    .annotation {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 10px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .annotation:last-child { border-bottom: 0; }
+    .annotation-index { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: var(--brand-ink); background: var(--brand-soft); font-size: 12px; font-weight: 850; }
+    .annotation strong { display: block; }
+    .annotation span { color: var(--muted); font-size: 13px; }
+    .schema { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); }
+    th, td { padding: 12px 13px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: 12px; }
+    td code { padding: 2px 5px; border-radius: 5px; background: var(--surface-soft); font-size: 12px; }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      align-items: center;
+      margin-top: 18px;
+    }
+    .flow-node { min-height: 82px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+    .flow-node span { display: block; color: var(--brand); font-size: 11px; font-weight: 850; }
+    .flow-arrow { display: none; color: var(--muted); text-align: center; }
+    .scope { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .scope-column { padding: 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+    .scope-column h3 { margin-bottom: 12px; }
+    .scope-item { display: flex; gap: 9px; margin: 9px 0; color: var(--muted); }
+    .scope-mark { color: var(--brand); font-weight: 900; }
+    .question-box { padding: 26px; border-radius: 22px; background: var(--brand-soft); color: var(--brand-ink); }
+    .question-box ol { margin: 12px 0 0; padding-left: 22px; }
+    footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); }
+
+    @media (max-width: 940px) {
+      .card, .card.half, .card.wide { grid-column: span 6; }
+      .verdict, .screen-stage { grid-template-columns: 1fr; }
+      .annotation-panel { max-width: 600px; margin: 0 auto; }
+      .flow { grid-template-columns: 1fr; }
+      .flow-arrow { display: block; }
+    }
+    @media (max-width: 680px) {
+      .page { padding: 14px 13px 56px; }
+      .hero { border-radius: 22px; }
+      .card, .card.half, .card.wide { grid-column: 1 / -1; }
+      .feature-map { grid-template-columns: 1fr; }
+      .feature-map-nav { grid-template-columns: repeat(2, 1fr); }
+      .prototype-shell { padding: 18px 10px; }
+      .phone { min-height: 680px; border-radius: 30px; }
+      .phone-screen { min-height: 648px; }
+      .scope { grid-template-columns: 1fr; }
+      .roadmap-line { min-height: 105px; }
+      .roadmap-phase { padding: 9px 6px; }
+      .roadmap-phase strong { font-size: 11px; writing-mode: vertical-rl; transform: rotate(180deg); }
+      .roadmap-phase span { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="eyebrow">Workout Notes · exploração de produto</div>
+      <h1>Grandes ciclos, decisões pequenas e visíveis.</h1>
+      <p class="lede">Uma proposta para organizar cutting, deload, bulking e manutenção como um plano único que conecta treino, alimentação, sono, medidas e revisões semanais — sem transformar o app em uma planilha de atleta profissional.</p>
+      <div class="hero-pills">
+        <span class="pill">Calendário com períodos coloridos</span>
+        <span class="pill">Metas por fase</span>
+        <span class="pill">Rotinas e macros vinculados</span>
+        <span class="pill">Planejado × realizado</span>
+      </div>
+    </header>
+
+    <nav class="sticky-nav" aria-label="Navegação da proposta">
+      <a href="#conceito">Conceito</a>
+      <a href="#opcoes">4 opções</a>
+      <a href="#prototipo">Telas</a>
+      <a href="#comportamento">Regras</a>
+      <a href="#dados">Dados</a>
+      <a href="#mvp">MVP</a>
+      <a href="#decisoes">Decisões</a>
+    </nav>
+
+    <main>
+      <section id="conceito">
+        <h2>O objeto central deve ser um Plano</h2>
+        <p class="section-intro">O calendário é a principal visualização, mas sozinho ele só colore datas. O produto fica útil quando cada cor representa uma fase com intenção, metas e vínculos reais com os módulos existentes.</p>
+
+        <div class="roadmap" aria-label="Exemplo de plano anual com quatro fases">
+          <div class="today-marker" aria-hidden="true"></div>
+          <div class="roadmap-line">
+            <div class="roadmap-phase cut"><strong>Cutting</strong><span>12 semanas · −0,5%/sem</span></div>
+            <div class="roadmap-phase deload"><strong>Deload</strong><span>1 semana</span></div>
+            <div class="roadmap-phase bulk"><strong>Bulking</strong><span>16 semanas · +0,2%/sem</span></div>
+            <div class="roadmap-phase maintain"><strong>Manutenção</strong><span>4 semanas</span></div>
+          </div>
+          <div class="week-strip" aria-label="Progresso do plano: cinco de doze blocos concluídos">
+            <span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span><span class="done"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+
+        <div class="grid">
+          <article class="card">
+            <span class="tag cut">FASE</span>
+            <h3>Intenção e período</h3>
+            <p>Nome, tipo, cor, início, fim, objetivo e uma nota curta explicando por que essa fase existe.</p>
+          </article>
+          <article class="card">
+            <span class="tag maintain">ALVOS</span>
+            <h3>Treino + alimentação</h3>
+            <p>Rotina sugerida, frequência, volume ou RPE, kcal, macros, peso-alvo e ritmo de mudança.</p>
+          </article>
+          <article class="card">
+            <span class="tag bulk">REVISÃO</span>
+            <h3>Feedback semanal</h3>
+            <p>Adesão, média de peso, performance, fome, energia e sono, com decisão explícita de manter ou ajustar.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="opcoes">
+        <h2>Quatro formas de colocar isso no app</h2>
+        <p class="section-intro">As opções não são mutuamente exclusivas. Elas representam níveis diferentes de ambição e ajudam a decidir onde começar.</p>
+        <div class="grid">
+          <article class="card half option-card">
+            <span class="option-number">OPÇÃO A · ENXUTA</span>
+            <h3>Linha do tempo + calendário</h3>
+            <p>O usuário cria fases com nome, datas, cor e notas. O calendário existente ganha uma camada de fundo por período.</p>
+            <ul>
+              <li>Entrega rápida e baixa complexidade.</li>
+              <li>Ótima visão de organização.</li>
+              <li>Não conecta macros, rotinas ou resultado real.</li>
+            </ul>
+          </article>
+          <article class="card half option-card recommend">
+            <span class="option-number">OPÇÃO B · RECOMENDADA</span>
+            <h3>Plano integrado por fases</h3>
+            <p>Cada fase guarda metas de treino e nutrição e pode vincular uma rotina existente. O app mostra o alvo vigente sem alterar o histórico.</p>
+            <ul>
+              <li>Conecta tudo que o app já possui.</li>
+              <li>Continua simples de entender.</li>
+              <li>Permite evoluir para revisões e IA depois.</li>
+            </ul>
+          </article>
+          <article class="card half option-card">
+            <span class="option-number">OPÇÃO C · GUIADA</span>
+            <h3>Templates e assistente de criação</h3>
+            <p>Fluxos prontos como “cutting gradual”, “ganho controlado” e “pico de prova” sugerem duração e campos — sempre editáveis.</p>
+            <ul>
+              <li>Reduz a tela em branco e educa.</li>
+              <li>Excelente complemento da opção B.</li>
+              <li>Exige cuidado para não prescrever saúde.</li>
+            </ul>
+          </article>
+          <article class="card half option-card">
+            <span class="option-number">OPÇÃO D · ADAPTATIVA</span>
+            <h3>Revisão semanal e ajustes</h3>
+            <p>O sistema cruza adesão, peso, treino e sono para recomendar manter, estender ou alterar uma fase. Nada muda sem confirmação.</p>
+            <ul>
+              <li>Cria um ciclo de acompanhamento real.</li>
+              <li>Aproveita o AI Coach e os dados existentes.</li>
+              <li>Deve vir após dados e regras estarem maduros.</li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="verdict">
+          <div class="verdict-main">
+            <div class="eyebrow">Direção sugerida</div>
+            <h3>Construir B em duas camadas, com um pouco de C</h3>
+            <p>Primeiro, plano + fases + calendário + metas por fase. Em seguida, vínculo com rotina e check-in semanal. Templates entram desde o início apenas como preenchimento inicial, não como “receita correta”.</p>
+          </div>
+          <div class="verdict-side">
+            <div class="score">3 <small>níveis de informação</small></div>
+            <p><strong>Plano</strong> para a visão anual, <strong>fase</strong> para metas de semanas/meses e <strong>semana</strong> para execução e revisão.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="mapa">
+        <h2>Como a função conversa com o app atual</h2>
+        <p class="section-intro">Selecione uma área para ver o papel dela no plano. A periodização coordena os módulos; ela não duplica os registros.</p>
+        <div class="feature-map">
+          <div class="feature-map-nav" role="group" aria-label="Áreas integradas">
+            <button type="button" data-feature="treino" aria-pressed="true">Treino</button>
+            <button type="button" data-feature="nutricao" aria-pressed="false">Alimentação</button>
+            <button type="button" data-feature="corpo" aria-pressed="false">Corpo</button>
+            <button type="button" data-feature="sono" aria-pressed="false">Sono</button>
+            <button type="button" data-feature="coach" aria-pressed="false">AI Coach</button>
+          </div>
+          <div class="feature-panel" aria-live="polite">
+            <div class="eyebrow" id="feature-kicker">Durante a fase</div>
+            <h3 id="feature-title">Treino</h3>
+            <p id="feature-copy">A fase aponta para uma rotina e define intenção, frequência e limites de carga. Os treinos continuam sendo planejados e registrados pelas telas atuais.</p>
+            <ul id="feature-list">
+              <li>Rotina vinculada: Upper / Lower 4×</li>
+              <li>Alvo: 4 treinos e 52–60 séries por semana</li>
+              <li>Regra de deload: reduzir volume, sem apagar a rotina</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="prototipo">
+        <h2>Protótipo das telas</h2>
+        <p class="section-intro">A proposta preserva o Material 3 escuro e a linguagem visual já usada pelo Workout Notes. Troque a tela para explorar os fluxos principais.</p>
+        <div class="prototype-shell">
+          <div class="screen-tabs" role="tablist" aria-label="Telas do protótipo">
+            <button type="button" role="tab" data-screen="overview" aria-selected="true">Visão geral</button>
+            <button type="button" role="tab" data-screen="calendar" aria-selected="false">Calendário</button>
+            <button type="button" role="tab" data-screen="phase" aria-selected="false">Detalhe da fase</button>
+            <button type="button" role="tab" data-screen="create" aria-selected="false">Criar plano</button>
+            <button type="button" role="tab" data-screen="review" aria-selected="false">Revisão semanal</button>
+          </div>
+
+          <div class="screen-stage">
+            <div class="phone" aria-label="Mockup móvel do Workout Notes">
+              <div class="phone-status"><span>11:50</span><span>▮▮▮  ◉  ▰</span></div>
+
+              <section class="phone-screen active" data-phone-screen="overview">
+                <div class="appbar"><div class="appbar-title">Planejamento</div><div class="more">⋮</div></div>
+                <div class="phone-body">
+                  <div class="phone-card" style="background:linear-gradient(145deg,#0d3944,#172126);border-color:#1e5663">
+                    <div class="phone-row">
+                      <div class="grow"><div class="tiny muted">PLANO ATIVO · 2026</div><strong>Recomposição e força</strong></div>
+                      <button class="ghost-button" type="button">Editar</button>
+                    </div>
+                    <div class="phase-mini-line" aria-label="Cutting, deload, bulking e manutenção"><span class="cut"></span><span class="deload"></span><span class="bulk"></span><span class="maintain"></span></div>
+                    <div class="phone-row small"><span class="muted">Semana 7 de 33</span><span class="grow"></span><strong>21%</strong></div>
+                  </div>
+
+                  <div class="phone-label">Agora</div>
+                  <div class="phone-card">
+                    <div class="phone-row">
+                      <div class="phone-icon">↘</div>
+                      <div class="grow"><div class="tiny" style="color:#91b4ff">CUTTING · SEMANA 7/12</div><strong>Déficit gradual</strong><div class="small muted">15 jun – 6 set</div></div>
+                      <span>›</span>
+                    </div>
+                    <div class="metric-row">
+                      <div class="metric"><strong>2.250</strong><span>kcal/dia</span></div>
+                      <div class="metric"><strong>180 g</strong><span>proteína</span></div>
+                      <div class="metric"><strong>4×</strong><span>treino/sem</span></div>
+                    </div>
+                    <div class="small muted" style="margin:13px 0 5px">Progresso da fase · 58%</div>
+                    <div class="progress-track"><div class="progress-fill" style="width:58%;background:#6998ee"></div></div>
+                  </div>
+
+                  <div class="phone-label">Próximas fases</div>
+                  <div class="phase-list">
+                    <div class="phase-item" style="--phase-color:#dda231"><div class="phone-row"><div class="grow"><strong>Deload</strong><div class="small muted">7–13 set · 1 semana</div></div><span class="small">›</span></div></div>
+                    <div class="phase-item" style="--phase-color:#9669da"><div class="phone-row"><div class="grow"><strong>Bulking controlado</strong><div class="small muted">14 set – 3 jan · 16 semanas</div></div><span class="small">›</span></div></div>
+                    <div class="phase-item" style="--phase-color:#43a773"><div class="phone-row"><div class="grow"><strong>Manutenção</strong><div class="small muted">4–31 jan · 4 semanas</div></div><span class="small">›</span></div></div>
+                  </div>
+                  <button type="button" class="primary-button">＋ Adicionar fase</button>
+                </div>
+                <div class="bottom-nav"><span><b>🏋</b>Treino</span><span><b>☾</b>Sono</span><span><b>🍴</b>Nutrição</span><span class="selected"><b>◫</b>Plano</span></div>
+              </section>
+
+              <section class="phone-screen" data-phone-screen="calendar">
+                <div class="appbar"><div class="back">‹</div><div class="appbar-title">Calendário</div><div class="more">⌄</div></div>
+                <div class="phone-body">
+                  <div class="calendar-head"><span>‹</span><strong>Agosto 2026</strong><span>›</span></div>
+                  <div class="weekdays"><span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span></div>
+                  <div class="calendar-grid" aria-label="Calendário de agosto de 2026 com períodos coloridos">
+                    <span class="day blank"></span><span class="day blank"></span><span class="day blank"></span><span class="day blank"></span><span class="day blank"></span><span class="day blank"></span><span class="day cut-day">1</span>
+                    <span class="day cut-day">2</span><span class="day cut-day">3<i class="event"></i></span><span class="day cut-day">4</span><span class="day cut-day">5<i class="event"></i></span><span class="day cut-day">6</span><span class="day cut-day">7<i class="event"></i></span><span class="day cut-day">8</span>
+                    <span class="day cut-day">9</span><span class="day cut-day">10<i class="event"></i></span><span class="day cut-day">11</span><span class="day cut-day">12<i class="event"></i></span><span class="day cut-day selected">13</span><span class="day cut-day">14<i class="event"></i></span><span class="day cut-day">15</span>
+                    <span class="day cut-day">16</span><span class="day cut-day">17<i class="event"></i></span><span class="day cut-day">18</span><span class="day cut-day">19<i class="event"></i></span><span class="day cut-day">20</span><span class="day cut-day">21<i class="event"></i></span><span class="day cut-day">22</span>
+                    <span class="day cut-day">23</span><span class="day cut-day">24<i class="event"></i></span><span class="day cut-day">25</span><span class="day cut-day">26<i class="event"></i></span><span class="day cut-day">27</span><span class="day cut-day">28<i class="event"></i></span><span class="day cut-day">29</span>
+                    <span class="day cut-day">30</span><span class="day cut-day">31<i class="event"></i></span><span class="day blank"></span><span class="day blank"></span><span class="day blank"></span><span class="day blank"></span><span class="day blank"></span>
+                  </div>
+                  <div class="calendar-legend"><span><i style="background:#4b83e9"></i>Cutting</span><span><i style="background:#dda231"></i>Deload</span><span><i style="background:#9669da"></i>Bulking</span><span>● treino</span></div>
+                  <div class="phone-card">
+                    <div class="tiny muted">QUINTA, 13 DE AGOSTO · CUTTING</div>
+                    <div class="target-row"><div class="phone-row"><div class="phone-icon">◎</div><div class="grow"><strong>Alvos do dia</strong><div class="small muted">2.250 kcal · P 180 · C 238 · G 64</div></div></div></div>
+                    <div class="target-row"><div class="phone-row"><div class="phone-icon">🏋</div><div class="grow"><strong>Upper A</strong><div class="small muted">Rotina planejada · 18:30</div></div><span>›</span></div></div>
+                    <div class="target-row"><div class="phone-row"><div class="phone-icon">✓</div><div class="grow"><strong>Check-in semanal</strong><div class="small muted">Domingo · em 3 dias</div></div><span>›</span></div></div>
+                  </div>
+                </div>
+                <div class="bottom-nav"><span class="selected"><b>◫</b>Períodos</span><span><b>●</b>Treinos</span><span><b>≋</b>Todos</span><span><b>＋</b>Adicionar</span></div>
+              </section>
+
+              <section class="phone-screen" data-phone-screen="phase">
+                <div class="appbar"><div class="back">‹</div><div class="grow"><div class="appbar-title">Déficit gradual</div><div class="appbar-subtitle">Cutting · 15 jun – 6 set</div></div><div class="more">⋮</div></div>
+                <div class="phone-body">
+                  <div class="phone-card" style="background:linear-gradient(145deg,#183460,#182127);border-color:#345b98">
+                    <div class="phone-row"><div class="grow"><div class="tiny">SEMANA 7 DE 12</div><strong>Faltam 24 dias</strong></div><strong>58%</strong></div>
+                    <div class="progress-track" style="margin-top:10px"><div class="progress-fill" style="width:58%;background:#82aafa"></div></div>
+                  </div>
+                  <div class="phone-label">Alimentação</div>
+                  <div class="phone-card">
+                    <div class="target-row"><div class="phone-row"><span class="grow muted">Energia</span><span class="target-value">2.250 kcal</span></div></div>
+                    <div class="target-row"><div class="phone-row"><span class="grow muted">Macros</span><span>P 180 · C 238 · G 64</span></div></div>
+                    <div class="target-row"><div class="phone-row"><span class="grow muted">Ritmo de peso</span><span>−0,3 a −0,6% / sem</span></div></div>
+                  </div>
+                  <div class="phone-label">Treino</div>
+                  <div class="phone-card">
+                    <div class="target-row"><div class="phone-row"><span class="grow muted">Rotina vinculada</span><span class="target-value">Upper / Lower</span><span>›</span></div></div>
+                    <div class="target-row"><div class="phone-row"><span class="grow muted">Frequência</span><span>4× por semana</span></div></div>
+                    <div class="target-row"><div class="phone-row"><span class="grow muted">Intenção</span><span>Manter cargas</span></div></div>
+                  </div>
+                  <div class="phone-label">Acompanhamento</div>
+                  <div class="phone-card">
+                    <div class="phone-row"><div class="grow"><strong>Últimas 4 semanas</strong><div class="small muted">Peso −2,1 kg · treino 92% · macros 86%</div></div><span>›</span></div>
+                    <div style="height:56px;margin-top:12px;position:relative;border-bottom:1px solid var(--phone-line)">
+                      <svg viewBox="0 0 300 55" width="100%" height="55" role="img" aria-label="Tendência de peso decrescente"><polyline points="2,8 45,13 88,20 131,19 174,31 217,35 259,42 298,47" fill="none" stroke="#83d8f3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                  </div>
+                  <button type="button" class="primary-button">Fazer check-in da semana</button>
+                </div>
+              </section>
+
+              <section class="phone-screen" data-phone-screen="create">
+                <div class="appbar"><div class="back">×</div><div class="grow"><div class="appbar-title">Novo plano</div><div class="appbar-subtitle">Etapa 1 de 4 · estrutura</div></div></div>
+                <div class="phone-body">
+                  <div class="stepper"><span class="on"></span><span></span><span></span><span></span></div>
+                  <div class="phone-label">Como quer começar?</div>
+                  <div class="choice selected"><div class="phone-row"><div class="phone-icon">✦</div><div class="grow"><strong>Usar um modelo</strong><div class="small muted">Estrutura inicial editável</div></div><span>●</span></div></div>
+                  <div class="choice"><div class="phone-row"><div class="phone-icon">＋</div><div class="grow"><strong>Começar do zero</strong><div class="small muted">Monte cada fase livremente</div></div><span>○</span></div></div>
+                  <div class="phone-label">Modelo</div>
+                  <div class="choice selected"><strong>Cutting → Deload → Bulking</strong><div class="small muted">12 sem · 1 sem · 16 sem</div><div class="phase-mini-line"><span class="cut"></span><span class="deload"></span><span class="bulk"></span></div></div>
+                  <div class="choice"><strong>Ciclo de força</strong><div class="small muted">Base → Intensificação → Deload → Pico</div></div>
+                  <div class="choice"><strong>Temporada de corrida</strong><div class="small muted">Base → Construção → Polimento → Prova</div></div>
+                  <div class="phone-label">Nome do plano</div>
+                  <div class="choice"><span class="muted">Recomposição e força 2026</span></div>
+                  <button type="button" class="primary-button">Continuar</button>
+                </div>
+              </section>
+
+              <section class="phone-screen" data-phone-screen="review">
+                <div class="appbar"><div class="back">‹</div><div class="grow"><div class="appbar-title">Revisão semanal</div><div class="appbar-subtitle">3–9 de agosto · semana 7</div></div></div>
+                <div class="phone-body">
+                  <div class="phone-card">
+                    <div class="tiny muted">RESUMO AUTOMÁTICO</div>
+                    <div class="metric-row"><div class="metric"><strong>−0,4%</strong><span>peso</span></div><div class="metric"><strong>4/4</strong><span>treinos</span></div><div class="metric"><strong>86%</strong><span>kcal</span></div></div>
+                  </div>
+                  <div class="phone-label">Como foi a semana?</div>
+                  <div class="phone-card">
+                    <div class="target-row"><div class="phone-row"><span class="grow">Energia</span><span>● ● ● ● ○</span></div></div>
+                    <div class="target-row"><div class="phone-row"><span class="grow">Fome</span><span>● ● ● ○ ○</span></div></div>
+                    <div class="target-row"><div class="phone-row"><span class="grow">Recuperação</span><span>● ● ● ● ○</span></div></div>
+                    <div class="target-row"><div class="phone-row"><span class="grow">Performance</span><span class="target-value">Estável</span></div></div>
+                  </div>
+                  <div class="phone-label">Decisão</div>
+                  <div class="choice selected"><div class="phone-row"><div class="grow"><strong>Manter o plano</strong><div class="small muted">Alvos continuam iguais</div></div><span>●</span></div></div>
+                  <div class="choice"><div class="phone-row"><div class="grow"><strong>Ajustar metas</strong><div class="small muted">Revisar kcal, macros ou treino</div></div><span>○</span></div></div>
+                  <div class="choice"><div class="phone-row"><div class="grow"><strong>Encerrar fase antes</strong><div class="small muted">Escolher a próxima fase</div></div><span>○</span></div></div>
+                  <div class="phone-card" style="margin-top:13px;background:#13282f;border-color:#31515b"><div class="tiny" style="color:var(--phone-accent)">LEITURA DO COACH</div><div class="small" style="margin-top:5px">O ritmo está dentro da faixa e a performance ficou estável. Manter por mais uma semana parece coerente.</div></div>
+                  <button type="button" class="primary-button">Salvar revisão</button>
+                </div>
+              </section>
+            </div>
+
+            <aside class="annotation-panel" aria-live="polite">
+              <div class="eyebrow" id="screen-kicker">Tela principal</div>
+              <h3 id="screen-title">Visão geral do plano</h3>
+              <p id="screen-copy">Um novo destino “Plano” dá contexto transversal a treino, sono e nutrição. Se quatro abas parecerem demais, a mesma tela pode entrar como ferramenta no dashboard de Treino.</p>
+              <div class="annotation-list" id="screen-notes">
+                <div class="annotation"><span class="annotation-index">1</span><div><strong>O que está valendo agora</strong><span>A fase atual sempre lidera a tela, com os alvos que orientam o dia.</span></div></div>
+                <div class="annotation"><span class="annotation-index">2</span><div><strong>Escala de meses</strong><span>A linha do tempo evita que cutting, deload e bulking virem eventos isolados.</span></div></div>
+                <div class="annotation"><span class="annotation-index">3</span><div><strong>Próximo passo claro</strong><span>Adicionar fase ou fazer o check-in são as ações dominantes, conforme o contexto.</span></div></div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section id="comportamento">
+        <h2>Regras que evitam surpresas</h2>
+        <div class="grid">
+          <article class="card">
+            <h3>Alvo efetivo, não cópia</h3>
+            <p>A fase referencia metas e rotina. Ela não cria refeições nem treinos no histórico. Cada dia consulta qual fase está vigente.</p>
+          </article>
+          <article class="card">
+            <h3>Histórico imutável</h3>
+            <p>Editar uma fase futura muda o futuro. Dados já registrados mantêm o alvo que estava vigente, por meio de snapshot ou revisão versionada.</p>
+          </article>
+          <article class="card">
+            <h3>Sem conflito silencioso</h3>
+            <p>Fases do mesmo plano não se sobrepõem. Lacunas são permitidas e aparecem como “sem fase”. Outros planos ficam arquivados.</p>
+          </article>
+          <article class="card">
+            <h3>Tipos flexíveis</h3>
+            <p>Cutting, deload e bulking são modelos, não enums rígidos. O usuário pode criar “Base aeróbica”, “Pico” ou outro tipo.</p>
+          </article>
+          <article class="card">
+            <h3>Alteração confirmada</h3>
+            <p>Uma revisão ou sugestão do AI Coach gera proposta. O usuário vê o antes/depois e confirma; nada é aplicado automaticamente.</p>
+          </article>
+          <article class="card">
+            <h3>Planejado × realizado</h3>
+            <p>Uma fase responde duas perguntas separadas: “qual era o alvo?” e “o que realmente aconteceu?”. Não confundir as duas.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="dados">
+        <h2>Modelo de dados sugerido</h2>
+        <p class="section-intro">Estrutura deliberadamente pequena. Metas específicas podem começar em JSON versionado e virar colunas/tabelas quando as regras estabilizarem.</p>
+        <div class="schema">
+          <table>
+            <thead><tr><th>Tabela</th><th>Campos principais</th><th>Responsabilidade</th></tr></thead>
+            <tbody>
+              <tr><td><code>periodization_plans</code></td><td><code>id</code>, <code>name</code>, <code>start_date</code>, <code>end_date</code>, <code>status</code>, <code>notes</code></td><td>Contêiner do grande ciclo; apenas um plano ativo por vez.</td></tr>
+              <tr><td><code>periodization_phases</code></td><td><code>id</code>, <code>plan_id</code>, <code>name</code>, <code>template_key</code>, <code>color</code>, <code>start_date</code>, <code>end_date</code>, <code>intent</code>, <code>order_index</code></td><td>Faixa colorida e unidade principal de planejamento.</td></tr>
+              <tr><td><code>phase_targets</code></td><td><code>phase_id</code>, <code>nutrition_json</code>, <code>training_json</code>, <code>body_json</code>, <code>sleep_json</code>, <code>version</code></td><td>Alvos opcionais por domínio, sem duplicar registros diários.</td></tr>
+              <tr><td><code>phase_routine_links</code></td><td><code>phase_id</code>, <code>routine_id</code>, <code>starts_on</code>, <code>ends_on</code></td><td>Permite trocar de rotina dentro de uma fase no futuro.</td></tr>
+              <tr><td><code>periodization_checkins</code></td><td><code>id</code>, <code>phase_id</code>, <code>week_start</code>, <code>energy</code>, <code>hunger</code>, <code>recovery</code>, <code>decision</code>, <code>notes</code></td><td>Decisão semanal + snapshot dos indicadores calculados.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flow" aria-label="Fluxo dos dados do plano">
+          <div class="flow-node"><span>1 · PLANO</span>Define o horizonte</div><div class="flow-arrow">↓</div>
+          <div class="flow-node"><span>2 · FASE</span>Ativa metas por data</div><div class="flow-arrow">↓</div>
+          <div class="flow-node"><span>3 · MÓDULOS</span>Registram treino, comida, sono e peso</div><div class="flow-arrow">↓</div>
+          <div class="flow-node"><span>4 · ANÁLISE</span>Compara alvo e realizado</div><div class="flow-arrow">↓</div>
+          <div class="flow-node"><span>5 · CHECK-IN</span>Registra a decisão humana</div>
+        </div>
+      </section>
+
+      <section id="mvp">
+        <h2>Entrega em três cortes</h2>
+        <div class="scope">
+          <div class="scope-column">
+            <span class="tag cut">MVP · ORGANIZAR</span>
+            <h3>Versão 1</h3>
+            <div class="scope-item"><span class="scope-mark">✓</span><span>CRUD de plano e fases</span></div>
+            <div class="scope-item"><span class="scope-mark">✓</span><span>Linha do tempo e fase atual</span></div>
+            <div class="scope-item"><span class="scope-mark">✓</span><span>Calendário com fundo colorido</span></div>
+            <div class="scope-item"><span class="scope-mark">✓</span><span>Metas simples de kcal/macros, peso e frequência</span></div>
+            <div class="scope-item"><span class="scope-mark">✓</span><span>Modelos editáveis</span></div>
+          </div>
+          <div class="scope-column">
+            <span class="tag maintain">V2 · CONECTAR</span>
+            <h3>Versão 2</h3>
+            <div class="scope-item"><span class="scope-mark">+</span><span>Vínculo com rotina existente</span></div>
+            <div class="scope-item"><span class="scope-mark">+</span><span>Alvo vigente no dashboard de Nutrição</span></div>
+            <div class="scope-item"><span class="scope-mark">+</span><span>Planejado × realizado por fase</span></div>
+            <div class="scope-item"><span class="scope-mark">+</span><span>Check-in semanal</span></div>
+            <div class="scope-item"><span class="scope-mark">+</span><span>Notificações opcionais</span></div>
+          </div>
+          <div class="scope-column">
+            <span class="tag bulk">V3 · ADAPTAR</span>
+            <h3>Versão 3</h3>
+            <div class="scope-item"><span class="scope-mark">→</span><span>Sugestões do AI Coach</span></div>
+            <div class="scope-item"><span class="scope-mark">→</span><span>Propostas de ajuste com aprovação</span></div>
+            <div class="scope-item"><span class="scope-mark">→</span><span>Replanejamento ao arrastar datas</span></div>
+            <div class="scope-item"><span class="scope-mark">→</span><span>Relatório final de fase</span></div>
+            <div class="scope-item"><span class="scope-mark">→</span><span>Comparação entre ciclos</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="decisoes">
+        <h2>Três decisões para o próximo refinamento</h2>
+        <div class="question-box">
+          <ol>
+            <li><strong>Entrada:</strong> “Plano” vira a quarta aba principal ou uma ferramenta dentro do dashboard de Treino?</li>
+            <li><strong>Profundidade do MVP:</strong> começar só com organização visual ou já incluir metas de treino e alimentação?</li>
+            <li><strong>Automação:</strong> ao iniciar uma fase, o app apenas mostra os alvos ou também oferece aplicar a meta nutricional e a rotina vinculada?</li>
+          </ol>
+        </div>
+      </section>
+    </main>
+
+    <footer>Proposta exploratória · Workout Notes · 13 de agosto de 2026</footer>
+  </div>
+
+  <script>
+    (() => {
+      const features = {
+        treino: {
+          kicker: 'Durante a fase',
+          title: 'Treino',
+          copy: 'A fase aponta para uma rotina e define intenção, frequência e limites de carga. Os treinos continuam sendo planejados e registrados pelas telas atuais.',
+          items: ['Rotina vinculada: Upper / Lower 4×', 'Alvo: 4 treinos e 52–60 séries por semana', 'Regra de deload: reduzir volume, sem apagar a rotina']
+        },
+        nutricao: {
+          kicker: 'Alvo vigente',
+          title: 'Alimentação',
+          copy: 'Kcal e macros pertencem à fase como alvo planejado. O diário alimentar continua sendo a fonte do realizado.',
+          items: ['Mostrar alvo da fase no dashboard nutricional', 'Comparar média semanal com a faixa planejada', 'Opcionalmente aplicar a meta ativa após confirmação']
+        },
+        corpo: {
+          kicker: 'Tendência, não um dia isolado',
+          title: 'Corpo e medidas',
+          copy: 'Peso e medidas informam se a fase está produzindo o efeito esperado. O foco é a tendência semanal, não oscilações diárias.',
+          items: ['Faixa de ritmo: −0,3 a −0,6% por semana', 'Média móvel de peso dentro da fase', 'Comparação do início, agora e alvo final']
+        },
+        sono: {
+          kicker: 'Sinal de recuperação',
+          title: 'Sono',
+          copy: 'O sono entra como contexto de recuperação. Ele não muda a fase sozinho, mas ajuda a interpretar queda de performance ou fadiga.',
+          items: ['Média de duração e regularidade', 'Sinalizar duas semanas abaixo do alvo', 'Levar o resumo para o check-in semanal']
+        },
+        coach: {
+          kicker: 'Somente proposta',
+          title: 'AI Coach',
+          copy: 'O Coach lê plano, fase, metas e resultados. Ele pode explicar tendências e sugerir ajustes, mantendo a mesma filosofia de aprovação já usada em propostas.',
+          items: ['Nunca altera fase, meta ou rotina diretamente', 'Mostra evidências usadas na recomendação', 'Gera proposta com antes/depois para confirmação']
+        }
+      };
+
+      document.querySelectorAll('[data-feature]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const feature = features[button.dataset.feature];
+          document.querySelectorAll('[data-feature]').forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+          document.getElementById('feature-kicker').textContent = feature.kicker;
+          document.getElementById('feature-title').textContent = feature.title;
+          document.getElementById('feature-copy').textContent = feature.copy;
+          document.getElementById('feature-list').innerHTML = feature.items.map((item) => `<li>${item}</li>`).join('');
+        });
+      });
+
+      const screenInfo = {
+        overview: {
+          kicker: 'Tela principal',
+          title: 'Visão geral do plano',
+          copy: 'Um novo destino “Plano” dá contexto transversal a treino, sono e nutrição. Se quatro abas parecerem demais, a mesma tela pode entrar como ferramenta no dashboard de Treino.',
+          notes: [['O que está valendo agora', 'A fase atual sempre lidera a tela, com os alvos que orientam o dia.'], ['Escala de meses', 'A linha do tempo evita que cutting, deload e bulking virem eventos isolados.'], ['Próximo passo claro', 'Adicionar fase ou fazer o check-in são as ações dominantes, conforme o contexto.']]
+        },
+        calendar: {
+          kicker: 'Visão por data',
+          title: 'Calendário unificado',
+          copy: 'A cor suave no fundo comunica a fase; os pontos continuam representando treinos. Assim a nova informação não destrói a leitura do calendário existente.',
+          notes: [['Cor é camada, não evento', 'Cada dia herda a cor da fase vigente; treinos, check-ins e outras ocorrências usam marcas próprias.'], ['Modos de visualização', 'Períodos, Treinos e Todos resolvem meses visualmente carregados.'], ['Detalhe diário', 'Tocar no dia reúne alvo nutricional, rotina planejada e revisão pendente.']]
+        },
+        phase: {
+          kicker: 'Unidade de decisão',
+          title: 'Detalhe da fase',
+          copy: 'É o ponto em que intenção e dados se encontram: alvos definidos no topo e progresso real embaixo, sem misturar uma coisa com a outra.',
+          notes: [['Metas por domínio', 'Alimentação, treino, corpo e sono podem ser preenchidos de forma independente.'], ['Vínculo, não duplicação', 'A rotina existente é referenciada e pode ser aberta dali.'], ['Acompanhamento', 'A fase mostra tendências apenas do seu intervalo de datas.']]
+        },
+        create: {
+          kicker: 'Criação guiada',
+          title: 'Assistente de plano',
+          copy: 'Quatro passos: estrutura, fases, metas e revisão. Modelos reduzem esforço, mas cada valor sugerido precisa ficar claramente editável.',
+          notes: [['Modelo sem prescrição', 'O template oferece uma estrutura de exemplo e evita afirmar que uma duração serve para todos.'], ['Datas encadeadas', 'Alterar a duração de uma fase desloca as próximas, com prévia antes de salvar.'], ['Campos opcionais', 'É válido criar primeiro só as cores e datas e completar as metas depois.']]
+        },
+        review: {
+          kicker: 'Ciclo de aprendizado',
+          title: 'Revisão semanal',
+          copy: 'Uma tela curta junta métricas automáticas e percepção subjetiva. A saída é uma decisão registrada, não um “score de sucesso” inventado.',
+          notes: [['Dados + percepção', 'Peso, adesão e treino ganham contexto com energia, fome e recuperação.'], ['Decisão explícita', 'Manter, ajustar ou encerrar fica registrado no histórico da fase.'], ['Coach como apoio', 'A IA pode explicar os sinais; qualquer mudança continua dependendo do usuário.']]
+        }
+      };
+
+      const renderNotes = (notes) => notes.map((note, index) => `<div class="annotation"><span class="annotation-index">${index + 1}</span><div><strong>${note[0]}</strong><span>${note[1]}</span></div></div>`).join('');
+
+      document.querySelectorAll('[data-screen]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const target = button.dataset.screen;
+          document.querySelectorAll('[data-screen]').forEach((item) => item.setAttribute('aria-selected', String(item === button)));
+          document.querySelectorAll('[data-phone-screen]').forEach((screen) => screen.classList.toggle('active', screen.dataset.phoneScreen === target));
+          const info = screenInfo[target];
+          document.getElementById('screen-kicker').textContent = info.kicker;
+          document.getElementById('screen-title').textContent = info.title;
+          document.getElementById('screen-copy').textContent = info.copy;
+          document.getElementById('screen-notes').innerHTML = renderNotes(info.notes);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
