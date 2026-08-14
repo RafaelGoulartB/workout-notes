@@ -49,6 +49,17 @@ class AiWellnessAnalyticsService {
         'durationSamples': durations.length,
         'efficiencySamples': efficiencies.length,
         'scheduleSamples': math.min(bedtimes.length, wakeTimes.length),
+        'durationSourceCounts': {
+          'actual': rows
+              .where((row) => _effectiveSleepSource(row) == 'actual')
+              .length,
+          'estimated': rows
+              .where((row) => _effectiveSleepSource(row) == 'estimated')
+              .length,
+          'recorded': rows
+              .where((row) => _effectiveSleepSource(row) == 'recorded')
+              .length,
+        },
       },
     };
   }
@@ -69,6 +80,7 @@ class AiWellnessAnalyticsService {
         SUM(mli.polyunsaturated_fat_g) polyunsaturated_fat_g,
         SUM(mli.trans_fat_g) trans_fat_g,
         SUM(mli.fiber_g) fiber_g,
+        SUM(mli.sugars_g) sugars_g,
         SUM(mli.sodium_mg) sodium_mg,
         SUM(mli.potassium_mg) potassium_mg,
         SUM(mli.calcium_mg) calcium_mg,
@@ -82,7 +94,14 @@ class AiWellnessAnalyticsService {
         COUNT(mli.id) item_count,
         SUM(CASE WHEN mli.calories IS NULL OR mli.protein_g IS NULL OR
           mli.carbs_g IS NULL OR mli.fat_g IS NULL THEN 1 ELSE 0 END)
-          incomplete_items
+          incomplete_items,
+        SUM(CASE WHEN mli.fiber_g IS NULL OR mli.sugars_g IS NULL OR
+          mli.sodium_mg IS NULL OR mli.potassium_mg IS NULL OR
+          mli.calcium_mg IS NULL OR mli.iron_mg IS NULL OR
+          mli.magnesium_mg IS NULL OR mli.zinc_mg IS NULL OR
+          mli.vitamin_a_ug IS NULL OR mli.vitamin_c_mg IS NULL OR
+          mli.vitamin_d_ug IS NULL OR mli.vitamin_b12_ug IS NULL
+          THEN 1 ELSE 0 END) incomplete_detail_items
       FROM meal_logs ml
       JOIN meal_log_items mli ON mli.meal_log_id = ml.id
       WHERE ml.date >= ?
@@ -117,6 +136,7 @@ class AiWellnessAnalyticsService {
         'polyunsaturatedFatG': _roundOrNull(avg('polyunsaturated_fat_g')),
         'transFatG': _roundOrNull(avg('trans_fat_g')),
         'fiberG': _roundOrNull(avg('fiber_g')),
+        'sugarsG': _roundOrNull(avg('sugars_g')),
         'sodiumMg': _roundOrNull(avg('sodium_mg')),
         'potassiumMg': _roundOrNull(avg('potassium_mg')),
         'calciumMg': _roundOrNull(avg('calcium_mg')),
@@ -138,6 +158,9 @@ class AiWellnessAnalyticsService {
             },
       'daysWithIncompleteMacros': rows
           .where((row) => ((row['incomplete_items'] as num?) ?? 0) > 0)
+          .length,
+      'daysWithIncompleteDetailedNutrients': rows
+          .where((row) => ((row['incomplete_detail_items'] as num?) ?? 0) > 0)
           .length,
       'recentDays': rows.take(14).map(_compactNutritionRow).toList(),
     };
@@ -337,6 +360,11 @@ class AiWellnessAnalyticsService {
   static Map<String, dynamic> _compactSleepRow(Map<String, dynamic> row) => {
     'date': row['date'],
     'sleepMinutes': _effectiveSleep(row),
+    'recordedSleepMinutes': row['sleep_minutes'],
+    'actualSleepMinutes': row['actual_sleep_minutes'],
+    'estimatedSleepMinutes': row['estimated_sleep_minutes'],
+    'effectiveSleepSource': _effectiveSleepSource(row),
+    'timeInBedMinutes': row['time_in_bed_minutes'],
     'bedtimeMinutes': row['bedtime_minutes'],
     'wakeTimeMinutes': row['wake_time_minutes'],
     'efficiencyPct': _roundOrNull(_sleepEfficiency(row)),
@@ -359,6 +387,9 @@ class AiWellnessAnalyticsService {
       (row['polyunsaturated_fat_g'] as num?)?.toDouble(),
     ),
     'transFatG': _roundOrNull((row['trans_fat_g'] as num?)?.toDouble()),
+    'fiberG': _roundOrNull((row['fiber_g'] as num?)?.toDouble()),
+    'sugarsG': _roundOrNull((row['sugars_g'] as num?)?.toDouble()),
+    'sodiumMg': _roundOrNull((row['sodium_mg'] as num?)?.toDouble()),
     'potassiumMg': _roundOrNull((row['potassium_mg'] as num?)?.toDouble()),
     'calciumMg': _roundOrNull((row['calcium_mg'] as num?)?.toDouble()),
     'ironMg': _roundOrNull((row['iron_mg'] as num?)?.toDouble()),
@@ -376,6 +407,12 @@ class AiWellnessAnalyticsService {
                   row['sleep_minutes'])
               as num?)
           ?.toDouble();
+
+  static String _effectiveSleepSource(Map<String, dynamic> row) {
+    if (row['actual_sleep_minutes'] != null) return 'actual';
+    if (row['estimated_sleep_minutes'] != null) return 'estimated';
+    return 'recorded';
+  }
 
   static double? _sleepEfficiency(Map<String, dynamic> row) {
     final asleep = _effectiveSleep(row);

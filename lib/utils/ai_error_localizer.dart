@@ -27,8 +27,11 @@ String localizeAiError(Object? error, AppLocalizations l10n) {
     case 'empty_choices':
       return l10n.aiChatErrorInvalidResponse;
     case 'http_error':
+    case 'connection_error':
     case 'list_models_failed':
       return l10n.aiChatErrorRequest;
+    case 'provider_unavailable':
+      return l10n.aiChatErrorProviderUnavailable;
     case 'vision_not_supported':
       return l10n.aiChatErrorVisionUnsupported;
     case 'image_missing':

@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>AI Coach — Tools de alimentação</title>
+  <style>
+    :root {
+      --bg: #f4f7f4;
+      --surface: #ffffff;
+      --surface-2: #edf4ee;
+      --text: #17211a;
+      --muted: #607066;
+      --line: #d7e2d9;
+      --accent: #18784a;
+      --accent-2: #dff4e7;
+      --blue: #315bd6;
+      --blue-soft: #e9eeff;
+      --amber: #925800;
+      --amber-soft: #fff1d2;
+      --purple: #7045b3;
+      --purple-soft: #f0e8ff;
+      --red: #b42318;
+      --red-soft: #fee9e7;
+      --shadow: 0 16px 38px rgba(28, 52, 36, .08);
+      --radius: 18px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e1410;
+        --surface: #171e19;
+        --surface-2: #222c25;
+        --text: #edf4ef;
+        --muted: #aab9af;
+        --line: #344138;
+        --accent: #79d7a5;
+        --accent-2: #173a28;
+        --blue: #9eb2ff;
+        --blue-soft: #202d59;
+        --amber: #ffc86e;
+        --amber-soft: #493316;
+        --purple: #c9a9ff;
+        --purple-soft: #36264d;
+        --red: #ffaaa4;
+        --red-soft: #4a211f;
+        --shadow: 0 18px 42px rgba(0, 0, 0, .28);
+      }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.58 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: var(--accent); }
+    code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    code { padding: .12rem .34rem; border-radius: 6px; background: var(--surface-2); font-size: .9em; }
+    pre {
+      margin: 12px 0 0;
+      padding: 16px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface-2);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .layout { max-width: 1240px; margin: auto; padding: 0 24px 72px; }
+    header {
+      margin: 24px 0;
+      padding: 42px;
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      background: linear-gradient(135deg, var(--surface), var(--accent-2));
+      box-shadow: var(--shadow);
+    }
+    .eyebrow { color: var(--accent); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-size: 12px; }
+    h1 { max-width: 850px; margin: 8px 0 14px; font-size: clamp(34px, 6vw, 62px); line-height: 1.03; letter-spacing: -.045em; }
+    h2 { margin: 42px 0 14px; font-size: 28px; letter-spacing: -.02em; }
+    h3 { margin: 0; font-size: 20px; }
+    h4 { margin: 18px 0 6px; font-size: 15px; }
+    p { margin: 8px 0; }
+    .lede { max-width: 820px; color: var(--muted); font-size: 19px; }
+    .meta { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 22px; }
+    .pill, .method {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .pill { color: var(--accent); background: var(--accent-2); }
+    .method.read { color: var(--blue); background: var(--blue-soft); }
+    .method.proposal { color: var(--purple); background: var(--purple-soft); }
+    .method.guard { color: var(--amber); background: var(--amber-soft); }
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+      padding: 10px 0;
+      overflow-x: auto;
+      background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(12px);
+    }
+    nav a { flex: 0 0 auto; padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); text-decoration: none; font-size: 13px; font-weight: 700; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+    .card { grid-column: span 4; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+    .card.wide { grid-column: span 6; }
+    .card.full { grid-column: 1 / -1; }
+    .card p, .card li { color: var(--muted); }
+    .tool { scroll-margin-top: 74px; }
+    .tool-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .tool-name { overflow-wrap: anywhere; color: var(--text); font-size: 17px; }
+    dl { display: grid; grid-template-columns: 120px 1fr; gap: 7px 12px; margin: 14px 0 0; }
+    dt { font-weight: 800; }
+    dd { margin: 0; color: var(--muted); }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; background: var(--surface); }
+    th, td { padding: 11px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--surface-2); font-size: 13px; }
+    td { color: var(--muted); }
+    ul, ol { margin: 9px 0; padding-left: 22px; }
+    .call-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+    .node { padding: 10px 13px; border-radius: 10px; background: var(--surface-2); font-weight: 800; font-size: 13px; }
+    .arrow { color: var(--muted); font-weight: 900; }
+    .note, .warning { margin: 16px 0; padding: 15px 17px; border-radius: 13px; border-left: 4px solid; }
+    .note { border-color: var(--blue); background: var(--blue-soft); }
+    .warning { border-color: var(--amber); background: var(--amber-soft); }
+    .source-list a { display: inline-block; margin: 4px 10px 4px 0; }
+    footer { margin-top: 48px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--muted); }
+    @media (max-width: 900px) { .card, .card.wide { grid-column: span 6; } }
+    @media (max-width: 640px) {
+      .layout { padding: 0 14px 48px; }
+      header { padding: 28px 22px; }
+      .card, .card.wide { grid-column: 1 / -1; }
+      dl { grid-template-columns: 1fr; gap: 2px; }
+      dd { margin-bottom: 8px; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div class="eyebrow">Workout Notes · AI Coach</div>
+      <h1>Tools de alimentação</h1>
+      <p class="lede">Contrato técnico das ferramentas que dão ao treinador acesso somente-leitura ao diário alimentar, nutrientes, biblioteca de alimentos, refeições salvas, metas e tendências corporais.</p>
+      <div class="meta">
+        <span class="pill">29 tools de leitura no catálogo total</span>
+        <span class="pill">10 tools de leitura nutricionais</span>
+        <span class="pill">1 proposta protegida</span>
+        <span class="pill">Atualizado em 13/08/2026</span>
+      </div>
+    </header>
+
+    <nav aria-label="Navegação da documentação">
+      <a href="#visao-geral">Visão geral</a>
+      <a href="#nutrientes">Nutrientes</a>
+      <a href="#fluxos">Fluxos</a>
+      <a href="#tools">Catálogo</a>
+      <a href="#roteamento">Roteamento</a>
+      <a href="#qualidade">Qualidade</a>
+      <a href="#fontes">Código-fonte</a>
+    </nav>
+
+    <main>
+      <section id="visao-geral">
+        <h2>Visão geral</h2>
+        <div class="grid">
+          <article class="card">
+            <span class="method read">READ</span>
+            <h3>Dados consumidos</h3>
+            <p>Diário por dia, histórico nutricional, micronutrientes, alimentos, variantes, porções, refeições salvas, meta ativa e tipos de refeição.</p>
+          </article>
+          <article class="card">
+            <span class="method guard">REGRA</span>
+            <h3>Sem escrita direta</h3>
+            <p>As novas tools apenas consultam. Nenhuma delas adiciona, edita ou exclui refeições, alimentos, metas ou itens do diário.</p>
+          </article>
+          <article class="card">
+            <span class="method proposal">PROPOSAL</span>
+            <h3>Alimento manual</h3>
+            <p><code>propose_manual_food_creation</code> continua sendo uma prévia protegida. Aprovar abre o formulário; o usuário ainda revisa e salva.</p>
+          </article>
+        </div>
+        <div class="note"><strong>Semântica essencial:</strong> <code>null</code> significa “a fonte não informou”; <code>0</code> significa “informado como zero”. Totais e coberturas preservam essa diferença para impedir conclusões falsas.</div>
+      </section>
+
+      <section id="nutrientes">
+        <h2>Nutrientes expostos</h2>
+        <table>
+          <thead><tr><th>Grupo</th><th>Campos</th><th>Unidade</th></tr></thead>
+          <tbody>
+            <tr><td>Energia e macros</td><td><code>calories</code>, <code>proteinG</code>, <code>carbsG</code>, <code>fatG</code></td><td>kcal / g</td></tr>
+            <tr><td>Gorduras</td><td><code>saturatedFatG</code>, <code>monounsaturatedFatG</code>, <code>polyunsaturatedFatG</code>, <code>transFatG</code></td><td>g</td></tr>
+            <tr><td>Detalhes alimentares</td><td><code>fiberG</code>, <code>sugarsG</code>, <code>sodiumMg</code></td><td>g / mg</td></tr>
+            <tr><td>Minerais</td><td><code>potassiumMg</code>, <code>calciumMg</code>, <code>ironMg</code>, <code>magnesiumMg</code>, <code>zincMg</code></td><td>mg</td></tr>
+            <tr><td>Vitaminas</td><td><code>vitaminAUg</code>, <code>vitaminCMg</code>, <code>vitaminDUg</code>, <code>vitaminB12Ug</code></td><td>µg / mg</td></tr>
+            <tr><td>Não padronizados</td><td><code>extraNutrients</code> no detalhe da variante do alimento</td><td>Definida pela origem</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="fluxos">
+        <h2>Fluxos recomendados</h2>
+        <h3>Pergunta geral ou sobre um período</h3>
+        <div class="call-flow">
+          <span class="node">get_nutrition_summary</span><span class="arrow">→</span>
+          <span class="node">history / diary / micronutrients</span><span class="arrow">→</span>
+          <span class="node">resposta final</span>
+        </div>
+        <h3>Biblioteca de alimentos</h3>
+        <div class="call-flow">
+          <span class="node">search_food_library</span><span class="arrow">→</span>
+          <span class="node">get_food_detail(food_id)</span><span class="arrow">→</span>
+          <span class="node">resposta final</span>
+        </div>
+        <h3>Refeições salvas</h3>
+        <div class="call-flow">
+          <span class="node">list_saved_meals</span><span class="arrow">→</span>
+          <span class="node">get_saved_meal_detail(saved_meal_id)</span><span class="arrow">→</span>
+          <span class="node">resposta final</span>
+        </div>
+      </section>
+
+      <section id="tools">
+        <h2>Catálogo completo</h2>
+        <div class="grid">
+          <article class="card wide tool" id="get-nutrition-summary">
+            <div class="tool-head"><h3 class="tool-name"><code>get_nutrition_summary</code></h3><span class="method read">READ</span></div>
+            <p>Ponto de entrada agregado. Resume energia, macros, gorduras, fibras, açúcares e micronutrientes sem tratar dias ausentes como zero.</p>
+            <dl><dt>Argumentos</dt><dd><code>days</code>: 3–90, padrão 14.</dd><dt>Retorno</dt><dd>Cobertura, médias diárias, meta ativa, dias incompletos e até 14 dias recentes.</dd><dt>Use quando</dt><dd>A pergunta for geral: “como está minha alimentação?”</dd><dt>Continue com</dt><dd>Diário, histórico, micronutrientes ou perfil.</dd></dl>
+          </article>
+
+          <article class="card wide tool" id="get-nutrition-diary-day">
+            <div class="tool-head"><h3 class="tool-name"><code>get_nutrition_diary_day</code></h3><span class="method read">READ</span></div>
+            <p>Expõe o conteúdo completo do diário de um dia, organizado por refeição e item, incluindo snapshot nutricional e todos os 20 nutrientes padronizados.</p>
+            <dl><dt>Argumentos</dt><dd><code>date</code>: <code>YYYY-MM-DD</code>; omitido = hoje.</dd><dt>Retorno</dt><dd>Totais do dia, meta, cobertura, refeições, notas, alimentos, quantidades, origem e nutrientes.</dd><dt>Use quando</dt><dd>“O que comi hoje?”, “quanto sódio teve no almoço?”</dd><dt>Continue com</dt><dd><code>get_food_detail</code> usando um <code>foodId</code> retornado.</dd></dl>
+            <pre>{"date":"2026-08-13","mealCount":3,"totals":{"proteinG":142.5,"vitaminDUg":null},"meals":[...]}</pre>
+          </article>
+
+          <article class="card wide tool" id="get-nutrition-history">
+            <div class="tool-head"><h3 class="tool-name"><code>get_nutrition_history</code></h3><span class="method read">READ</span></div>
+            <p>Série diária completa de nutrientes. Cada dia inclui totais e cobertura por nutriente, permitindo distinguir mudança real de piora na qualidade do registro.</p>
+            <dl><dt>Argumentos</dt><dd><code>days</code>: 1–31, padrão 30; <code>end_date</code>: fim opcional da janela para paginar períodos antigos.</dd><dt>Retorno</dt><dd>Janela, dias registrados, cobertura global, totais e cobertura por nutriente em cada dia.</dd><dt>Ausências</dt><dd>Dias sem item não aparecem; nutrientes desconhecidos permanecem <code>null</code>.</dd></dl>
+          </article>
+
+          <article class="card wide tool" id="get-micronutrient-summary">
+            <div class="tool-head"><h3 class="tool-name"><code>get_micronutrient_summary</code></h3><span class="method read">READ</span></div>
+            <p>Análise específica de fibras, açúcares, sódio, minerais e vitaminas. Evita que micronutrientes fiquem escondidos dentro do resumo geral.</p>
+            <dl><dt>Argumentos</dt><dd><code>days</code>: 1–90, padrão 30.</dd><dt>Por nutriente</dt><dd>Total conhecido, média nos dias reportados, mínimo, máximo, cobertura por dia/item e três maiores alimentos-fonte.</dd><dt>Cautela</dt><dd>A média não preenche dias desconhecidos com zero.</dd></dl>
+            <pre>{"magnesiumMg":{"unit":"mg","averageOnReportedDays":312.4,"dayCoveragePct":82.1,"topFoodSources":[...]}}</pre>
+          </article>
+
+          <article class="card wide tool" id="search-food-library">
+            <div class="tool-head"><h3 class="tool-name"><code>search_food_library</code></h3><span class="method read">READ</span></div>
+            <p>Busca apenas na biblioteca local. Pode listar tudo, filtrar nome/marca, favoritos ou alimentos usados recentemente.</p>
+            <dl><dt>Argumentos</dt><dd><code>query</code>, <code>favorites_only</code>, <code>recent_only</code>, <code>limit</code> 1–30.</dd><dt>Retorno</dt><dd>ID, nome, marca, origem, favorito, último uso e variante principal.</dd><dt>Continue com</dt><dd><code>get_food_detail(food_id)</code>.</dd></dl>
+          </article>
+
+          <article class="card wide tool" id="get-food-detail">
+            <div class="tool-head"><h3 class="tool-name"><code>get_food_detail</code></h3><span class="method read">READ</span></div>
+            <p>Detalhe integral de um alimento cadastrado: metadados, todas as variantes, nutrientes, extras e porções com equivalência em gramas ou mililitros.</p>
+            <dl><dt>Argumentos</dt><dd><code>food_id</code> obrigatório.</dd><dt>Retorno</dt><dd><code>variants[].nutrients</code>, <code>extraNutrients</code> e <code>servings</code>.</dd><dt>Erro lógico</dt><dd><code>{"error":"food not found"}</code> quando o ID não existe.</dd></dl>
+          </article>
+
+          <article class="card wide tool" id="list-saved-meals">
+            <div class="tool-head"><h3 class="tool-name"><code>list_saved_meals</code></h3><span class="method read">READ</span></div>
+            <p>Lista as refeições-modelo do usuário com totais recalculados a partir da biblioteca atual.</p>
+            <dl><dt>Argumentos</dt><dd><code>limit</code>: 1–50, padrão 20.</dd><dt>Retorno</dt><dd>ID, nome, tipo, porções, quantidade de itens, totais e atualização.</dd><dt>Continue com</dt><dd><code>get_saved_meal_detail(saved_meal_id)</code>.</dd></dl>
+          </article>
+
+          <article class="card wide tool" id="get-saved-meal-detail">
+            <div class="tool-head"><h3 class="tool-name"><code>get_saved_meal_detail</code></h3><span class="method read">READ</span></div>
+            <p>Mostra a árvore completa de uma refeição salva e os nutrientes calculáveis de cada ingrediente.</p>
+            <dl><dt>Argumentos</dt><dd><code>saved_meal_id</code> obrigatório.</dd><dt>Retorno</dt><dd>Metadados, totais, ingredientes, quantidades, porção e referências para alimento/variante.</dd><dt>Limite</dt><dd>Consulta apenas; não registra a refeição no diário.</dd></dl>
+          </article>
+
+          <article class="card wide tool" id="get-nutrition-profile">
+            <div class="tool-head"><h3 class="tool-name"><code>get_nutrition_profile</code></h3><span class="method read">READ</span></div>
+            <p>Contexto estrutural da nutrição: meta diária ativa, perfil usado para sugerir metas, tipos de refeição configurados e contagens da biblioteca e do diário.</p>
+            <dl><dt>Argumentos</dt><dd>Nenhum.</dd><dt>Retorno</dt><dd><code>activeDailyGoal</code>, <code>goalHistory</code>, <code>goalSuggestionProfile</code> (idade, sexo, altura, peso, atividade e razões de macros), <code>mealTypes</code> e <code>libraryCounts</code>.</dd><dt>Use quando</dt><dd>A pergunta envolver meta de calorias/macros ou organização das refeições.</dd></dl>
+          </article>
+
+          <article class="card wide tool" id="analyze-nutrition-body-trend">
+            <div class="tool-head"><h3 class="tool-name"><code>analyze_nutrition_body_trend</code></h3><span class="method read">READ</span></div>
+            <p>Relaciona ingestão semanal de calorias/macros com medidas de peso corporal.</p>
+            <dl><dt>Argumentos</dt><dd><code>days</code>: 14–180, padrão 84.</dd><dt>Retorno</dt><dd>Cobertura, mudança de peso, pontos semanais e correlação observacional.</dd><dt>Cautela</dt><dd>Correlação não implica causalidade; hidratação e registros esparsos afetam a leitura.</dd></dl>
+          </article>
+
+          <article class="card wide tool" id="propose-manual-food-creation">
+            <div class="tool-head"><h3 class="tool-name"><code>propose_manual_food_creation</code></h3><span class="method proposal">PROPOSAL</span></div>
+            <p>Prepara um rascunho editável de novo alimento manual com nutrientes e porções. É relacionada à alimentação, mas não é uma tool de leitura.</p>
+            <dl><dt>Argumentos</dt><dd>Nome, referência, objeto <code>per</code> com nutrientes, porções e notas.</dd><dt>Retorno</dt><dd>Proposta em estado <code>awaitingApproval</code>.</dd><dt>Garantia</dt><dd>Não escreve em <code>foods</code>; aprovação abre o formulário manual para revisão.</dd></dl>
+          </article>
+        </div>
+      </section>
+
+      <section id="roteamento">
+        <h2>Roteamento e descoberta</h2>
+        <p>O primeiro turno recebe um catálogo compacto selecionado pelo significado do pedido. Depois de cada chamada, somente dependências úteis são oferecidas ao modelo.</p>
+        <table>
+          <thead><tr><th>Intenção</th><th>Tool direta</th><th>Próximas opções</th></tr></thead>
+          <tbody>
+            <tr><td>Resumo nutricional</td><td><code>get_nutrition_summary</code></td><td>diário, histórico, micros, perfil</td></tr>
+            <tr><td>Hoje / ontem / “o que comi”</td><td><code>get_nutrition_diary_day</code></td><td>detalhe do alimento</td></tr>
+            <tr><td>Vitaminas, minerais, fibra, açúcar, sódio</td><td><code>get_micronutrient_summary</code></td><td>resposta final ou diário</td></tr>
+            <tr><td>Biblioteca / favoritos / recentes</td><td><code>search_food_library</code></td><td><code>get_food_detail</code></td></tr>
+            <tr><td>Refeições salvas</td><td><code>list_saved_meals</code></td><td><code>get_saved_meal_detail</code></td></tr>
+          </tbody>
+        </table>
+        <h3>Capabilities disponíveis em <code>discover_app_capabilities</code></h3>
+        <p><code>nutrition</code>, <code>nutrition_diary</code>, <code>micronutrients</code>, <code>food_library</code>, <code>saved_meals</code> e <code>food_creation</code>.</p>
+      </section>
+
+      <section id="qualidade">
+        <h2>Qualidade, limites e privacidade</h2>
+        <div class="grid">
+          <article class="card"><h3>Cobertura explícita</h3><p>Diário e histórico retornam cobertura por nutriente. Micronutrientes retornam cobertura por dia e por item.</p></article>
+          <article class="card"><h3>Resultados limitados</h3><p>Histórico: janelas pagináveis de até 31 dias. Biblioteca: até 30 alimentos. Refeições salvas: até 50. Isso protege a janela de contexto sem bloquear dados antigos.</p></article>
+          <article class="card"><h3>Somente dados locais</h3><p>As consultas leem SQLite do app. A busca da biblioteca não consulta Open Food Facts nem outro serviço externo.</p></article>
+        </div>
+        <div class="warning"><strong>Interpretação:</strong> as tools mostram nutrientes registrados, não confirmam ingestão clínica nem adequação a recomendações médicas. Dados ausentes de rótulos podem reduzir bastante a cobertura de micronutrientes.</div>
+      </section>
+
+      <section id="fontes">
+        <h2>Implementação e testes</h2>
+        <p class="source-list">
+          <a href="../lib/services/ai_nutrition_tool_service.dart">ai_nutrition_tool_service.dart</a>
+          <a href="../lib/services/ai_tool_registry.dart">ai_tool_registry.dart</a>
+          <a href="../lib/services/ai_wellness_analytics_service.dart">ai_wellness_analytics_service.dart</a>
+          <a href="../test/ai_tool_registry_test.dart">ai_tool_registry_test.dart</a>
+        </p>
+        <p>As schemas OpenAI-compatible ficam em <code>AiToolRegistry._buildSchemaFor</code>. A execução é despachada por <code>executeRead</code>. As consultas nutricionais detalhadas ficam isoladas em <code>AiNutritionToolService</code>.</p>
+      </section>
+    </main>
+
+    <footer>Workout Notes · Documentação interna do AI Coach · Alimentação</footer>
+  </div>
+</body>
+</html>

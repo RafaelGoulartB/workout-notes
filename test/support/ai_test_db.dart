@@ -74,10 +74,25 @@ Future<Database> installAiTestDb({bool includeRoutineDayNotes = true}) async {
           'CREATE TABLE meal_log_items (id TEXT PRIMARY KEY, meal_log_id TEXT NOT NULL, food_id TEXT, food_variant_id TEXT, food_name_snapshot TEXT NOT NULL, brand_snapshot TEXT, quantity REAL NOT NULL, unit TEXT NOT NULL, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, saturated_fat_g REAL, monounsaturated_fat_g REAL, polyunsaturated_fat_g REAL, trans_fat_g REAL, fiber_g REAL, sugars_g REAL, sodium_mg REAL, potassium_mg REAL, calcium_mg REAL, iron_mg REAL, magnesium_mg REAL, zinc_mg REAL, vitamin_a_ug REAL, vitamin_c_mg REAL, vitamin_d_ug REAL, vitamin_b12_ug REAL, nutrition_snapshot_json TEXT NOT NULL, created_at TEXT NOT NULL, FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE, FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL, FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE SET NULL)',
         );
         await db.execute(
+          'CREATE TABLE meal_types (id TEXT PRIMARY KEY, key TEXT UNIQUE NOT NULL, name TEXT, order_index INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL)',
+        );
+        await db.execute(
           'CREATE TABLE nutrition_goals (id TEXT PRIMARY KEY, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, is_active INTEGER NOT NULL DEFAULT 1)',
         );
         await db.execute(
+          'CREATE TABLE saved_meals (id TEXT PRIMARY KEY, name TEXT NOT NULL, meal_type TEXT, portions REAL NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)',
+        );
+        await db.execute(
+          'CREATE TABLE saved_meal_items (id TEXT PRIMARY KEY, saved_meal_id TEXT NOT NULL, food_id TEXT, food_variant_id TEXT, food_name_snapshot TEXT NOT NULL, brand_snapshot TEXT, quantity REAL NOT NULL, unit TEXT NOT NULL, serving_label TEXT, serving_grams_equivalent REAL, serving_ml_equivalent REAL, order_index INTEGER NOT NULL DEFAULT 0, FOREIGN KEY (saved_meal_id) REFERENCES saved_meals(id) ON DELETE CASCADE, FOREIGN KEY (food_id) REFERENCES foods(id) ON DELETE SET NULL, FOREIGN KEY (food_variant_id) REFERENCES food_variants(id) ON DELETE SET NULL)',
+        );
+        await db.execute(
           "CREATE TABLE sleep_entries (id TEXT PRIMARY KEY, date TEXT NOT NULL UNIQUE, sleep_minutes INTEGER NOT NULL, actual_sleep_minutes INTEGER, bedtime_minutes INTEGER, wake_time_minutes INTEGER, comment TEXT, source TEXT NOT NULL DEFAULT 'manual', time_in_bed_minutes INTEGER, estimated_sleep_minutes INTEGER, created_at TEXT NOT NULL)",
+        );
+        await db.execute(
+          "CREATE TABLE sleep_monitor_sessions (id TEXT PRIMARY KEY, sleep_entry_id TEXT, status TEXT NOT NULL, started_at TEXT NOT NULL, ended_at TEXT, alarm_at TEXT, monitor_mode TEXT, mission_type TEXT, alarm_dismiss_method TEXT, alarm_dismissed_at TEXT, utc_offset_start_minutes INTEGER NOT NULL, utc_offset_end_minutes INTEGER, sensor_mode TEXT NOT NULL DEFAULT 'audio', algorithm_version TEXT NOT NULL, time_in_bed_minutes INTEGER, quiet_minutes INTEGER, noisy_minutes INTEGER, estimated_sleep_minutes INTEGER, noise_event_count INTEGER NOT NULL DEFAULT 0, signal_quality_score REAL, analysis_status TEXT NOT NULL DEFAULT 'legacy_unavailable', sleep_onset_at TEXT, final_wake_at TEXT, sleep_latency_minutes INTEGER, awake_minutes INTEGER, sleeping_minutes INTEGER, deep_sleep_minutes INTEGER, unknown_minutes INTEGER, awakening_count INTEGER, sleep_efficiency REAL, stage_confidence REAL, stage_algorithm_version TEXT, end_reason TEXT, created_at TEXT NOT NULL, FOREIGN KEY (sleep_entry_id) REFERENCES sleep_entries(id) ON DELETE CASCADE)",
+        );
+        await db.execute(
+          "CREATE TABLE sleep_stage_epochs (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, started_at TEXT NOT NULL, duration_seconds INTEGER NOT NULL, stage TEXT NOT NULL, confidence REAL NOT NULL, awake_probability REAL, sleeping_probability REAL, deep_probability REAL, algorithm_version TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'acoustic_model', FOREIGN KEY (session_id) REFERENCES sleep_monitor_sessions(id) ON DELETE CASCADE)",
         );
         await db.execute(
           'CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)',

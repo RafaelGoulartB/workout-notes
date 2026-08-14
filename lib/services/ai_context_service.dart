@@ -102,11 +102,20 @@ class AiContextService {
           (SELECT COUNT(DISTINCT ml.date) FROM meal_logs ml
             JOIN meal_log_items mli ON mli.meal_log_id = ml.id
             WHERE ml.date >= ?) AS nutrition_7d,
-          (SELECT COUNT(*) FROM workouts WHERE date >= ?) AS workouts_30d,
+          (SELECT COUNT(*) FROM workouts
+            WHERE date >= ? AND date <= ? AND end_time IS NOT NULL)
+            AS workouts_30d,
           (SELECT COUNT(*) FROM body_measurements
             WHERE type = ? AND date >= ?) AS weight_30d
       ''',
-        [start7, start7, start30, 'weight', start30],
+        [
+          start7,
+          start7,
+          start30,
+          now.toIso8601String().substring(0, 10),
+          'weight',
+          start30,
+        ],
       );
       final row = rows.first;
       return {

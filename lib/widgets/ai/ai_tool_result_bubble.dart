@@ -176,6 +176,9 @@ class _AiToolResultBubbleState extends State<AiToolResultBubble> {
   IconData _toolIcon(String? name) {
     switch (name) {
       case 'get_sleep_summary':
+      case 'get_sleep_night_detail':
+      case 'get_sleep_history':
+      case 'get_sleep_profile':
       case 'analyze_sleep_performance':
         return Icons.bedtime_outlined;
       case 'get_nutrition_summary':

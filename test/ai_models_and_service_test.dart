@@ -5,7 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/models/ai_provider.dart';
+import 'package:workout_notes/models/ai_chat_error_details.dart';
 import 'package:workout_notes/models/ai_chat_message.dart';
+import 'package:workout_notes/models/ai_chat_state.dart';
 import 'package:workout_notes/models/ai_image_attachment.dart';
 import 'package:workout_notes/models/ai_message_role.dart';
 import 'package:workout_notes/models/ai_settings.dart';
@@ -16,6 +18,30 @@ import 'package:workout_notes/utils/text_sanitizer.dart';
 import 'package:workout_notes/utils/token_estimator.dart';
 
 void main() {
+  test('AiChatState retains and clears technical error details atomically', () {
+    const details = AiChatErrorDetails(
+      code: 'http_error',
+      stage: 'initial_provider_request',
+      httpStatus: 400,
+      model: 'gpt-5.6-luna',
+      requestCharacters: 4200,
+      tools: ['get_nutrition_diary_day'],
+    );
+    final failed = const AiChatState().copyWith(
+      phase: AiTurnPhase.failed,
+      error: 'ai_error:http_error',
+      errorDetails: details,
+    );
+
+    expect(failed.errorDetails, same(details));
+    final recovered = failed.copyWith(
+      phase: AiTurnPhase.idle,
+      clearError: true,
+    );
+    expect(recovered.error, isNull);
+    expect(recovered.errorDetails, isNull);
+  });
+
   group('AiService vision protocol', () {
     test('uses Responses API for OpenCode GPT vision models', () async {
       late http.Request captured;
@@ -285,6 +311,7 @@ void main() {
         baseUrl: 'https://x.test/v1',
         availableModels: const ['m1', 'm2'],
         selectedModel: 'm1',
+        reasoningEffortByModel: const {'m1': AiReasoningEffort.high},
         createdAt: DateTime.utc(2024, 1, 2, 3, 4, 5),
       );
       final back = AiProvider.fromMap(p.toMap());
@@ -293,6 +320,8 @@ void main() {
       expect(back.baseUrl, p.baseUrl);
       expect(back.availableModels, p.availableModels);
       expect(back.selectedModel, p.selectedModel);
+      expect(back.reasoningEffortFor(), AiReasoningEffort.high);
+      expect(back.reasoningEffortFor('m2'), AiReasoningEffort.automatic);
       expect(back.createdAt, p.createdAt);
     });
     test('copyWith preserves fields', () {
@@ -502,6 +531,201 @@ void main() {
   });
 
   group('AiService sanitisation', () {
+    test('adapts Kimi temperature to one and caches it per model', () async {
+      final client = _SequenceHttpClient([
+        const _HttpReply(
+          400,
+          '{"error":{"type":"invalid_request_error","message":"Error from provider (Console Go): Upstream request failed: [invalid_request_error] invalid temperature: only 1 is allowed for this model"}}',
+        ),
+        const _HttpReply(200, '{"choices":[{"message":{"content":"ok"}}]}'),
+        const _HttpReply(
+          200,
+          '{"choices":[{"message":{"content":"ok novamente"}}]}',
+        ),
+      ]);
+      final service = AiService(client: client, delay: (_) async {});
+
+      final first = await service.sendChat(
+        baseUrl: 'https://opencode.ai/zen/go/v1',
+        token: 'token',
+        model: 'kimi-k3',
+        messages: const [
+          {'role': 'user', 'content': 'oi'},
+        ],
+      );
+      final second = await service.sendChat(
+        baseUrl: 'https://opencode.ai/zen/go/v1',
+        token: 'token',
+        model: 'kimi-k3',
+        messages: const [
+          {'role': 'user', 'content': 'oi de novo'},
+        ],
+      );
+
+      expect(first.text, 'ok');
+      expect(second.text, 'ok novamente');
+      expect(client.payloads[0]['temperature'], 0.3);
+      expect(client.payloads[1]['temperature'], 1);
+      expect(client.payloads[2]['temperature'], 1);
+    });
+
+    test('omits unsupported tool_choice while preserving tools', () async {
+      final client = _SequenceHttpClient([
+        const _HttpReply(
+          400,
+          '{"error":{"message":"tool_choice is unsupported by this model"}}',
+        ),
+        const _HttpReply(200, '{"choices":[{"message":{"content":"ok"}}]}'),
+      ]);
+      final service = AiService(client: client, delay: (_) async {});
+
+      await service.sendChat(
+        baseUrl: 'https://example.test/v1',
+        token: 'token',
+        model: 'limited-model',
+        messages: const [
+          {'role': 'user', 'content': 'oi'},
+        ],
+        tools: const [
+          {
+            'type': 'function',
+            'function': {
+              'name': 'get_sleep_night_detail',
+              'parameters': {'type': 'object'},
+            },
+          },
+        ],
+      );
+
+      expect(client.payloads[0], contains('tool_choice'));
+      expect(client.payloads[1], isNot(contains('tool_choice')));
+      expect(client.payloads[1]['tools'], isNotEmpty);
+    });
+
+    test('sends reasoning effort and omits it when unsupported', () async {
+      final client = _SequenceHttpClient([
+        const _HttpReply(
+          400,
+          '{"error":{"message":"reasoning_effort is not supported by this model"}}',
+        ),
+        const _HttpReply(200, '{"choices":[{"message":{"content":"ok"}}]}'),
+        const _HttpReply(
+          200,
+          '{"choices":[{"message":{"content":"ok novamente"}}]}',
+        ),
+      ]);
+      final service = AiService(client: client, delay: (_) async {});
+
+      await service.sendChat(
+        baseUrl: 'https://example.test/v1',
+        token: 'token',
+        model: 'model-without-effort',
+        reasoningEffort: 'high',
+        messages: const [
+          {'role': 'user', 'content': 'analise'},
+        ],
+      );
+      await service.sendChat(
+        baseUrl: 'https://example.test/v1',
+        token: 'token',
+        model: 'model-without-effort',
+        reasoningEffort: 'high',
+        messages: const [
+          {'role': 'user', 'content': 'analise novamente'},
+        ],
+      );
+
+      expect(client.payloads[0]['reasoning_effort'], 'high');
+      expect(client.payloads[1], isNot(contains('reasoning_effort')));
+      expect(client.payloads[2], isNot(contains('reasoning_effort')));
+    });
+
+    test('retries transient upstream 503 failures', () async {
+      final client = _SequenceHttpClient([
+        const _HttpReply(
+          503,
+          '{"error":{"type":"server_error","message":"Endpoint is unavailable."}}',
+        ),
+        const _HttpReply(
+          503,
+          '{"error":{"type":"server_error","message":"Endpoint is unavailable."}}',
+        ),
+        const _HttpReply(
+          200,
+          '{"choices":[{"message":{"content":"recuperado"}}]}',
+        ),
+      ]);
+      final service = AiService(client: client, delay: (_) async {});
+
+      final completion = await service.sendChat(
+        baseUrl: 'https://opencode.ai/zen/go/v1',
+        token: 'token',
+        model: 'grok-4.5',
+        messages: const [
+          {'role': 'user', 'content': 'oi'},
+        ],
+      );
+
+      expect(completion.text, 'recuperado');
+      expect(client.payloads, hasLength(3));
+    });
+
+    test('persistent 503 reports model unavailability and attempts', () async {
+      final service = AiService(
+        client: _StatusHttpClient(
+          statusCode: 503,
+          body:
+              '{"error":{"type":"server_error","message":"Endpoint is unavailable."}}',
+        ),
+        delay: (_) async {},
+      );
+
+      await expectLater(
+        () => service.sendChat(
+          baseUrl: 'https://opencode.ai/zen/go/v1',
+          token: 'token',
+          model: 'grok-4.5',
+          messages: const [
+            {'role': 'user', 'content': 'oi'},
+          ],
+        ),
+        throwsA(
+          isA<AiServiceException>()
+              .having((error) => error.code, 'code', 'provider_unavailable')
+              .having((error) => error.statusCode, 'statusCode', 503)
+              .having((error) => error.attemptCount, 'attemptCount', 3),
+        ),
+      );
+    });
+
+    test('HTTP failures preserve safe diagnostic metadata', () async {
+      final svc = AiService(
+        client: _StatusHttpClient(
+          statusCode: 400,
+          body: '{"error":{"message":"tool_choice is unsupported"}}',
+        ),
+        timeout: const Duration(seconds: 5),
+      );
+
+      try {
+        await svc.sendChat(
+          baseUrl: 'https://example.test/v1',
+          token: 'secret-token',
+          model: 'm',
+          messages: const [
+            {'role': 'user', 'content': 'oi'},
+          ],
+        );
+        fail('expected AiServiceException');
+      } on AiServiceException catch (error) {
+        expect(error.code, 'http_error');
+        expect(error.statusCode, 400);
+        expect(error.endpoint, 'https://example.test/v1/chat/completions');
+        expect(error.message, contains('tool_choice is unsupported'));
+        expect(error.message, isNot(contains('secret-token')));
+      }
+    });
+
     test('supplies a valid id when a compatible provider omits one', () async {
       final fakeClient = _StubHttpClient((req) {
         return r'''
@@ -636,4 +860,48 @@ class _StubHttpClient extends http.BaseClient {
       headers: {'content-type': 'application/json; charset=utf-8'},
     );
   }
+}
+
+class _StatusHttpClient extends http.BaseClient {
+  final int statusCode;
+  final String body;
+
+  _StatusHttpClient({required this.statusCode, required this.body});
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async =>
+      http.StreamedResponse(
+        Stream.value(utf8.encode(body)),
+        statusCode,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+}
+
+class _SequenceHttpClient extends http.BaseClient {
+  final List<_HttpReply> replies;
+  final List<Map<String, dynamic>> payloads = [];
+  var _index = 0;
+
+  _SequenceHttpClient(this.replies);
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    if (request is http.Request) {
+      payloads.add((jsonDecode(request.body) as Map).cast<String, dynamic>());
+    }
+    final reply = replies[_index.clamp(0, replies.length - 1)];
+    _index++;
+    return http.StreamedResponse(
+      Stream.value(utf8.encode(reply.body)),
+      reply.statusCode,
+      headers: {'content-type': 'application/json; charset=utf-8'},
+    );
+  }
+}
+
+class _HttpReply {
+  final int statusCode;
+  final String body;
+
+  const _HttpReply(this.statusCode, this.body);
 }
