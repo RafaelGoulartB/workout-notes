@@ -3,8 +3,6 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/routine_repository.dart';
-import '../../repositories/periodization_repository.dart';
-import '../../models/periodization_phase.dart';
 import 'workout_detail_screen.dart';
 import 'future_workout_planner_screen.dart';
 
@@ -18,14 +16,12 @@ class CalendarScreen extends StatefulWidget {
 class _CalendarScreenState extends State<CalendarScreen> {
   final _workoutRepo = WorkoutRepository();
   final _routineRepo = RoutineRepository();
-  final _periodizationRepo = PeriodizationRepository();
   DateTime _selectedDate = DateTime.now();
   int _currentMonth = DateTime.now().month;
   int _currentYear = DateTime.now().year;
   Map<String, List<Map<String, dynamic>>> _workoutsByDate = {};
   Map<String, List<Map<String, dynamic>>> _categoriesByDate = {};
   List<Map<String, dynamic>> _selectedDayWorkouts = [];
-  List<PeriodizationPhase> _periodizationPhases = [];
   bool _isLoading = true;
 
   @override
@@ -51,12 +47,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _currentYear,
       _currentMonth,
     );
-    final monthStart = DateTime(_currentYear, _currentMonth, 1);
-    final monthEnd = DateTime(_currentYear, _currentMonth + 1, 0);
-    final periodizationPhases = await _periodizationRepo.getPhasesInRange(
-      monthStart,
-      monthEnd,
-    );
 
     _selectedDayWorkouts =
         grouped[_selectedDate.toIso8601String().substring(0, 10)] ?? [];
@@ -65,7 +55,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
       setState(() {
         _workoutsByDate = grouped;
         _categoriesByDate = categories;
-        _periodizationPhases = periodizationPhases;
         _isLoading = false;
       });
     }
@@ -336,11 +325,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
       final hasWorkout = cats.isNotEmpty;
       final isToday = dateStr == today;
       final isSelected = dateStr == selectedStr;
-      final date = DateTime(_currentYear, _currentMonth, day);
-      final periodizationPhase = _phaseAt(date);
-      final phaseColor = periodizationPhase == null
-          ? null
-          : Color(periodizationPhase.color);
 
       cells.add(
         GestureDetector(
@@ -353,16 +337,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
           child: Container(
             margin: const EdgeInsets.all(1),
             decoration: BoxDecoration(
-              color: isSelected
-                  ? Color.alphaBlend(
-                      theme.colorScheme.primaryContainer.withAlpha(210),
-                      phaseColor?.withAlpha(55) ?? Colors.transparent,
-                    )
-                  : phaseColor?.withAlpha(42),
+              color: isSelected ? theme.colorScheme.primaryContainer : null,
               borderRadius: BorderRadius.circular(8),
-              border: periodizationPhase == null
-                  ? null
-                  : Border(bottom: BorderSide(color: phaseColor!, width: 2)),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -397,13 +373,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
       childAspectRatio: 1.0,
       children: cells,
     );
-  }
-
-  PeriodizationPhase? _phaseAt(DateTime date) {
-    for (final phase in _periodizationPhases) {
-      if (phase.contains(date)) return phase;
-    }
-    return null;
   }
 
   /// Builds up to 4 small colored dots representing exercise categories.
