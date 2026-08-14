@@ -869,6 +869,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                 result.nutritionDays,
                 result.meals,
                 result.goals,
+                result.periodizationPlans,
               ),
             ),
             behavior: SnackBarBehavior.floating,

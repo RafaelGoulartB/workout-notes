@@ -15,7 +15,7 @@ void main() {
     database = await databaseFactoryFfi.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
-        version: 36,
+        version: 37,
         singleInstance: false,
         onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: DatabaseSchema.onCreate,
@@ -44,6 +44,54 @@ void main() {
     expect(report.nutritionDays, greaterThan(65));
     expect(report.meals, greaterThan(200));
     expect(report.goals, 4);
+    expect(report.periodizationPlans, 2);
+    expect(report.periodizationPhases, 7);
+    expect(report.periodizationCheckins, greaterThan(8));
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          'SELECT COUNT(*) FROM periodization_plans WHERE id LIKE ?',
+          ['$devDataPrefix%'],
+        ),
+      ),
+      2,
+    );
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          "SELECT COUNT(*) FROM periodization_plans WHERE id LIKE ? AND status = 'active'",
+          ['$devDataPrefix%'],
+        ),
+      ),
+      1,
+    );
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          'SELECT COUNT(*) FROM periodization_phases WHERE id LIKE ?',
+          ['$devDataPrefix%'],
+        ),
+      ),
+      7,
+    );
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          'SELECT COUNT(*) FROM phase_targets WHERE id LIKE ?',
+          ['$devDataPrefix%'],
+        ),
+      ),
+      9,
+    );
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          'SELECT COUNT(*) FROM phase_routine_links WHERE id LIKE ?',
+          ['$devDataPrefix%'],
+        ),
+      ),
+      8,
+    );
     expect(
       Sqflite.firstIntValue(
         await database.rawQuery('SELECT COUNT(*) FROM saved_meals'),
@@ -64,44 +112,67 @@ void main() {
     );
   });
 
-  test(
-    'replaces only previous generated rows and preserves user data',
-    () async {
-      await database.insert('sleep_entries', {
-        'id': 'user-sleep',
-        'date': '2026-08-12',
-        'sleep_minutes': 480,
-        'source': 'manual',
-        'created_at': '2026-08-12T08:00:00.000',
-      });
-      final first = TestDataGenerator(
-        clock: () => DateTime(2026, 8, 12, 14),
-        randomSeed: 10,
-      );
-      await first.generate();
-      final secondReport = await TestDataGenerator(
-        clock: () => DateTime(2026, 8, 13, 9),
-        randomSeed: 20,
-      ).generate();
+  test('replaces only previous generated rows and preserves user data', () async {
+    await database.insert('sleep_entries', {
+      'id': 'user-sleep',
+      'date': '2026-08-12',
+      'sleep_minutes': 480,
+      'source': 'manual',
+      'created_at': '2026-08-12T08:00:00.000',
+    });
+    await database.insert('periodization_plans', {
+      'id': 'user-plan',
+      'name': 'Plano real preservado',
+      'start_date': '2026-08-01',
+      'end_date': '2026-10-31',
+      'status': 'active',
+      'created_at': '2026-08-01T08:00:00.000',
+      'updated_at': '2026-08-01T08:00:00.000',
+    });
+    final first = TestDataGenerator(
+      clock: () => DateTime(2026, 8, 12, 14),
+      randomSeed: 10,
+    );
+    await first.generate();
+    final secondReport = await TestDataGenerator(
+      clock: () => DateTime(2026, 8, 13, 9),
+      randomSeed: 20,
+    ).generate();
 
-      expect(
-        Sqflite.firstIntValue(
-          await database.rawQuery(
-            'SELECT COUNT(*) FROM workouts WHERE id LIKE ?',
-            ['$devDataPrefix%'],
-          ),
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          'SELECT COUNT(*) FROM workouts WHERE id LIKE ?',
+          ['$devDataPrefix%'],
         ),
-        secondReport.workouts,
-      );
-      expect(
-        Sqflite.firstIntValue(
-          await database.rawQuery(
-            'SELECT COUNT(*) FROM sleep_entries WHERE id = ?',
-            ['user-sleep'],
-          ),
+      ),
+      secondReport.workouts,
+    );
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          'SELECT COUNT(*) FROM sleep_entries WHERE id = ?',
+          ['user-sleep'],
         ),
-        1,
-      );
-    },
-  );
+      ),
+      1,
+    );
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          "SELECT COUNT(*) FROM periodization_plans WHERE id = 'user-plan' AND status = 'active'",
+        ),
+      ),
+      1,
+    );
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          "SELECT COUNT(*) FROM periodization_plans WHERE id LIKE ? AND status = 'draft'",
+          ['$devDataPrefix%'],
+        ),
+      ),
+      1,
+    );
+  });
 }

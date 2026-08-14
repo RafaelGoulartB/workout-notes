@@ -48,6 +48,9 @@ class TestDataReport {
   final int nutritionDays;
   final int meals;
   final int goals;
+  final int periodizationPlans;
+  final int periodizationPhases;
+  final int periodizationCheckins;
 
   const TestDataReport({
     required this.workouts,
@@ -58,5 +61,8 @@ class TestDataReport {
     required this.nutritionDays,
     required this.meals,
     required this.goals,
+    required this.periodizationPlans,
+    required this.periodizationPhases,
+    required this.periodizationCheckins,
   });
 }
