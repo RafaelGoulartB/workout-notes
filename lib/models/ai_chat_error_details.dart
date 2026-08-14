@@ -15,6 +15,8 @@ class AiChatErrorDetails {
   final int? schemaToolCount;
   final int? requestCharacters;
   final List<String> tools;
+  final int? providerAttempts;
+  final List<String> compatibilityAdjustments;
 
   const AiChatErrorDetails({
     required this.code,
@@ -28,5 +30,7 @@ class AiChatErrorDetails {
     this.schemaToolCount,
     this.requestCharacters,
     this.tools = const [],
+    this.providerAttempts,
+    this.compatibilityAdjustments = const [],
   });
 }

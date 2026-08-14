@@ -1181,6 +1181,9 @@ class AiChatService extends ChangeNotifier {
       schemaToolCount: diagnostics?.schemaToolCount,
       requestCharacters: diagnostics?.requestCharacters,
       tools: diagnostics?.tools ?? const [],
+      providerAttempts: serviceError?.attemptCount,
+      compatibilityAdjustments:
+          serviceError?.compatibilityAdjustments ?? const [],
     );
   }
 

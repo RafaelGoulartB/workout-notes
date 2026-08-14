@@ -752,6 +752,11 @@ class _AiChatScreenState extends State<AiChatScreen> {
             '${details.requestCharacters ?? 0} chars',
       if (details.tools.isNotEmpty)
         '${l10n.aiChatErrorTechnicalTools}: ${details.tools.join(', ')}',
+      if (details.providerAttempts != null)
+        '${l10n.aiChatErrorTechnicalAttempts}: ${details.providerAttempts}',
+      if (details.compatibilityAdjustments.isNotEmpty)
+        '${l10n.aiChatErrorTechnicalAdjustments}: '
+            '${details.compatibilityAdjustments.join(', ')}',
       if (details.message?.isNotEmpty ?? false)
         '${l10n.aiChatErrorTechnicalDetail}: ${details.message}',
     ];

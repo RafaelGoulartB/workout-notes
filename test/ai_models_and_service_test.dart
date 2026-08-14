@@ -528,6 +528,135 @@ void main() {
   });
 
   group('AiService sanitisation', () {
+    test('adapts Kimi temperature to one and caches it per model', () async {
+      final client = _SequenceHttpClient([
+        const _HttpReply(
+          400,
+          '{"error":{"type":"invalid_request_error","message":"Error from provider (Console Go): Upstream request failed: [invalid_request_error] invalid temperature: only 1 is allowed for this model"}}',
+        ),
+        const _HttpReply(200, '{"choices":[{"message":{"content":"ok"}}]}'),
+        const _HttpReply(
+          200,
+          '{"choices":[{"message":{"content":"ok novamente"}}]}',
+        ),
+      ]);
+      final service = AiService(client: client, delay: (_) async {});
+
+      final first = await service.sendChat(
+        baseUrl: 'https://opencode.ai/zen/go/v1',
+        token: 'token',
+        model: 'kimi-k3',
+        messages: const [
+          {'role': 'user', 'content': 'oi'},
+        ],
+      );
+      final second = await service.sendChat(
+        baseUrl: 'https://opencode.ai/zen/go/v1',
+        token: 'token',
+        model: 'kimi-k3',
+        messages: const [
+          {'role': 'user', 'content': 'oi de novo'},
+        ],
+      );
+
+      expect(first.text, 'ok');
+      expect(second.text, 'ok novamente');
+      expect(client.payloads[0]['temperature'], 0.3);
+      expect(client.payloads[1]['temperature'], 1);
+      expect(client.payloads[2]['temperature'], 1);
+    });
+
+    test('omits unsupported tool_choice while preserving tools', () async {
+      final client = _SequenceHttpClient([
+        const _HttpReply(
+          400,
+          '{"error":{"message":"tool_choice is unsupported by this model"}}',
+        ),
+        const _HttpReply(200, '{"choices":[{"message":{"content":"ok"}}]}'),
+      ]);
+      final service = AiService(client: client, delay: (_) async {});
+
+      await service.sendChat(
+        baseUrl: 'https://example.test/v1',
+        token: 'token',
+        model: 'limited-model',
+        messages: const [
+          {'role': 'user', 'content': 'oi'},
+        ],
+        tools: const [
+          {
+            'type': 'function',
+            'function': {
+              'name': 'get_sleep_night_detail',
+              'parameters': {'type': 'object'},
+            },
+          },
+        ],
+      );
+
+      expect(client.payloads[0], contains('tool_choice'));
+      expect(client.payloads[1], isNot(contains('tool_choice')));
+      expect(client.payloads[1]['tools'], isNotEmpty);
+    });
+
+    test('retries transient upstream 503 failures', () async {
+      final client = _SequenceHttpClient([
+        const _HttpReply(
+          503,
+          '{"error":{"type":"server_error","message":"Endpoint is unavailable."}}',
+        ),
+        const _HttpReply(
+          503,
+          '{"error":{"type":"server_error","message":"Endpoint is unavailable."}}',
+        ),
+        const _HttpReply(
+          200,
+          '{"choices":[{"message":{"content":"recuperado"}}]}',
+        ),
+      ]);
+      final service = AiService(client: client, delay: (_) async {});
+
+      final completion = await service.sendChat(
+        baseUrl: 'https://opencode.ai/zen/go/v1',
+        token: 'token',
+        model: 'grok-4.5',
+        messages: const [
+          {'role': 'user', 'content': 'oi'},
+        ],
+      );
+
+      expect(completion.text, 'recuperado');
+      expect(client.payloads, hasLength(3));
+    });
+
+    test('persistent 503 reports model unavailability and attempts', () async {
+      final service = AiService(
+        client: _StatusHttpClient(
+          statusCode: 503,
+          body:
+              '{"error":{"type":"server_error","message":"Endpoint is unavailable."}}',
+        ),
+        delay: (_) async {},
+      );
+
+      await expectLater(
+        () => service.sendChat(
+          baseUrl: 'https://opencode.ai/zen/go/v1',
+          token: 'token',
+          model: 'grok-4.5',
+          messages: const [
+            {'role': 'user', 'content': 'oi'},
+          ],
+        ),
+        throwsA(
+          isA<AiServiceException>()
+              .having((error) => error.code, 'code', 'provider_unavailable')
+              .having((error) => error.statusCode, 'statusCode', 503)
+              .having((error) => error.attemptCount, 'attemptCount', 3),
+        ),
+      );
+    });
+
     test('HTTP failures preserve safe diagnostic metadata', () async {
       final svc = AiService(
         client: _StatusHttpClient(
@@ -705,4 +834,33 @@ class _StatusHttpClient extends http.BaseClient {
         statusCode,
         headers: {'content-type': 'application/json; charset=utf-8'},
       );
+}
+
+class _SequenceHttpClient extends http.BaseClient {
+  final List<_HttpReply> replies;
+  final List<Map<String, dynamic>> payloads = [];
+  var _index = 0;
+
+  _SequenceHttpClient(this.replies);
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    if (request is http.Request) {
+      payloads.add((jsonDecode(request.body) as Map).cast<String, dynamic>());
+    }
+    final reply = replies[_index.clamp(0, replies.length - 1)];
+    _index++;
+    return http.StreamedResponse(
+      Stream.value(utf8.encode(reply.body)),
+      reply.statusCode,
+      headers: {'content-type': 'application/json; charset=utf-8'},
+    );
+  }
+}
+
+class _HttpReply {
+  final int statusCode;
+  final String body;
+
+  const _HttpReply(this.statusCode, this.body);
 }

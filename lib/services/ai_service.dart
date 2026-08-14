@@ -29,11 +29,15 @@ class AiServiceException implements Exception {
   final String? code;
   final int? statusCode;
   final String? endpoint;
+  final int? attemptCount;
+  final List<String> compatibilityAdjustments;
   const AiServiceException(
     this.message, {
     this.code,
     this.statusCode,
     this.endpoint,
+    this.attemptCount,
+    this.compatibilityAdjustments = const [],
   });
 
   @override
@@ -43,10 +47,16 @@ class AiServiceException implements Exception {
 /// OpenAI-compatible HTTP client. Stateless; safe to share.
 class AiService {
   final http.Client _client;
+  final Future<void> Function(Duration) _delay;
   final Duration timeout;
+  final Map<String, _ModelCompatibility> _modelCompatibility = {};
 
-  AiService({http.Client? client, this.timeout = const Duration(seconds: 90)})
-    : _client = client ?? http.Client();
+  AiService({
+    http.Client? client,
+    this.timeout = const Duration(seconds: 90),
+    Future<void> Function(Duration)? delay,
+  }) : _client = client ?? http.Client(),
+       _delay = delay ?? ((duration) => Future<void>.delayed(duration));
 
   /// Normalises a user-provided base URL to end with `/v1`.
   static String normalizeBaseUri(String input) {
@@ -108,46 +118,81 @@ class AiService {
     double temperature = 0.3,
   }) async {
     final uri = Uri.parse('$baseUrl/chat/completions');
-    final payload = <String, dynamic>{
-      'model': model,
-      'messages': messages,
-      'temperature': temperature,
-    };
-    if (tools != null && tools.isNotEmpty) {
-      payload['tools'] = tools;
-      payload['tool_choice'] = toolChoice ?? 'auto';
-    }
+    final compatibility = _modelCompatibility.putIfAbsent(
+      _compatibilityKey(baseUrl, model),
+      _ModelCompatibility.new,
+    );
+    var attempts = 0;
+    var transientRetries = 0;
+    late http.Response res;
+    while (true) {
+      attempts++;
+      final payload = <String, dynamic>{
+        'model': model,
+        'messages': messages,
+        if (!compatibility.omitTemperature)
+          'temperature': compatibility.temperatureOverride ?? temperature,
+      };
+      if (tools != null && tools.isNotEmpty) {
+        payload['tools'] = tools;
+        if (!compatibility.omitToolChoice) {
+          payload['tool_choice'] = toolChoice ?? 'auto';
+        }
+      }
 
-    final res = await _client
-        .post(
-          uri,
-          headers: _headers(token: token),
-          body: jsonEncode(payload),
-        )
-        .timeout(timeout);
+      try {
+        res = await _client
+            .post(
+              uri,
+              headers: _headers(token: token),
+              body: jsonEncode(payload),
+            )
+            .timeout(timeout);
+      } on TimeoutException catch (error) {
+        if (transientRetries < _maxTransientRetries) {
+          await _waitBeforeRetry(transientRetries++);
+          continue;
+        }
+        throw AiServiceException(
+          'Provider request timed out after $attempts attempts: $error',
+          code: 'timeout',
+          endpoint: uri.toString(),
+          attemptCount: attempts,
+          compatibilityAdjustments: compatibility.adjustments.toList(),
+        );
+      } on http.ClientException catch (error) {
+        if (transientRetries < _maxTransientRetries) {
+          await _waitBeforeRetry(transientRetries++);
+          continue;
+        }
+        throw AiServiceException(
+          'Provider connection failed after $attempts attempts: $error',
+          code: 'connection_error',
+          endpoint: uri.toString(),
+          attemptCount: attempts,
+          compatibilityAdjustments: compatibility.adjustments.toList(),
+        );
+      }
 
-    if (res.statusCode == 401) {
-      throw AiServiceException(
-        'Invalid or missing API token.',
-        code: 'invalid_token',
-        statusCode: res.statusCode,
-        endpoint: uri.toString(),
-      );
-    }
-    if (res.statusCode == 404) {
-      throw AiServiceException(
-        'Model or endpoint not found (404).',
-        code: 'not_found',
-        statusCode: res.statusCode,
-        endpoint: uri.toString(),
-      );
-    }
-    if (res.statusCode >= 400) {
-      throw AiServiceException(
-        'Request failed (${res.statusCode}): ${_truncate(res.body)}',
-        code: 'http_error',
-        statusCode: res.statusCode,
-        endpoint: uri.toString(),
+      if (res.statusCode < 400) break;
+      final adjustment = res.statusCode == 401 || res.statusCode == 404
+          ? null
+          : _applyCompatibilityAdjustment(
+              responseBody: res.body,
+              sentPayload: payload,
+              compatibility: compatibility,
+            );
+      if (adjustment != null) continue;
+      if (_isTransientStatus(res.statusCode) &&
+          transientRetries < _maxTransientRetries) {
+        await _waitBeforeRetry(transientRetries++);
+        continue;
+      }
+      throw _httpException(
+        response: res,
+        uri: uri,
+        attempts: attempts,
+        adjustments: compatibility.adjustments.toList(),
       );
     }
 
@@ -477,6 +522,112 @@ class AiService {
     return text.isEmpty ? null : text;
   }
 
+  String _compatibilityKey(String baseUrl, String model) {
+    final uri = Uri.tryParse(baseUrl);
+    final endpoint = uri == null
+        ? baseUrl.trim().toLowerCase()
+        : '${uri.scheme.toLowerCase()}://${uri.host.toLowerCase()}'
+              '${uri.hasPort ? ':${uri.port}' : ''}${uri.path}';
+    return '$endpoint|${model.trim().toLowerCase()}';
+  }
+
+  String? _applyCompatibilityAdjustment({
+    required String responseBody,
+    required Map<String, dynamic> sentPayload,
+    required _ModelCompatibility compatibility,
+  }) {
+    final error = responseBody.toLowerCase();
+    final mentionsTemperature = error.contains('temperature');
+    final temperatureMustBeOne =
+        mentionsTemperature &&
+        (RegExp(
+              r'(only|must be|has to be|required|allowed|support(?:ed|s)?)\D{0,24}1(?:\.0+)?\b',
+            ).hasMatch(error) ||
+            RegExp(r'1(?:\.0+)?\D{0,24}(only|temperature)').hasMatch(error));
+    if (temperatureMustBeOne &&
+        sentPayload['temperature'] != 1 &&
+        compatibility.temperatureOverride != 1) {
+      compatibility.temperatureOverride = 1;
+      return compatibility.record('temperature=1');
+    }
+    final temperatureUnsupported =
+        mentionsTemperature &&
+        (error.contains('unsupported') ||
+            error.contains('not supported') ||
+            error.contains('unknown parameter') ||
+            error.contains('unrecognized') ||
+            error.contains('not allowed'));
+    if (temperatureUnsupported &&
+        sentPayload.containsKey('temperature') &&
+        !compatibility.omitTemperature) {
+      compatibility.omitTemperature = true;
+      return compatibility.record('temperature omitted');
+    }
+    final toolChoiceUnsupported =
+        error.contains('tool_choice') &&
+        (error.contains('unsupported') ||
+            error.contains('not supported') ||
+            error.contains('unknown') ||
+            error.contains('unrecognized') ||
+            error.contains('not allowed'));
+    if (toolChoiceUnsupported &&
+        sentPayload.containsKey('tool_choice') &&
+        !compatibility.omitToolChoice) {
+      compatibility.omitToolChoice = true;
+      return compatibility.record('tool_choice omitted');
+    }
+    return null;
+  }
+
+  AiServiceException _httpException({
+    required http.Response response,
+    required Uri uri,
+    required int attempts,
+    required List<String> adjustments,
+  }) {
+    if (response.statusCode == 401) {
+      return AiServiceException(
+        'Invalid or missing API token.',
+        code: 'invalid_token',
+        statusCode: response.statusCode,
+        endpoint: uri.toString(),
+        attemptCount: attempts,
+        compatibilityAdjustments: adjustments,
+      );
+    }
+    if (response.statusCode == 404) {
+      return AiServiceException(
+        'Model or endpoint not found (404).',
+        code: 'not_found',
+        statusCode: response.statusCode,
+        endpoint: uri.toString(),
+        attemptCount: attempts,
+        compatibilityAdjustments: adjustments,
+      );
+    }
+    final unavailable = const {502, 503, 504}.contains(response.statusCode);
+    return AiServiceException(
+      'Request failed (${response.statusCode}) after $attempts attempt(s): '
+      '${_truncate(response.body)}',
+      code: unavailable ? 'provider_unavailable' : 'http_error',
+      statusCode: response.statusCode,
+      endpoint: uri.toString(),
+      attemptCount: attempts,
+      compatibilityAdjustments: adjustments,
+    );
+  }
+
+  bool _isTransientStatus(int statusCode) =>
+      statusCode == 408 ||
+      statusCode == 425 ||
+      statusCode == 429 ||
+      statusCode == 502 ||
+      statusCode == 503 ||
+      statusCode == 504;
+
+  Future<void> _waitBeforeRetry(int retryIndex) =>
+      _delay(Duration(milliseconds: retryIndex == 0 ? 350 : 900));
+
   Map<String, String> _headers({required String token}) => {
     // Local providers (e.g. Ollama) have no token; sending an empty
     // Bearer header can make some servers reject the request.
@@ -511,4 +662,18 @@ class AiService {
       TextSanitizer.stripReasoning(input);
 
   String _truncate(String s) => s.length > 200 ? '${s.substring(0, 200)}…' : s;
+
+  static const int _maxTransientRetries = 2;
+}
+
+class _ModelCompatibility {
+  double? temperatureOverride;
+  bool omitTemperature = false;
+  bool omitToolChoice = false;
+  final Set<String> adjustments = {};
+
+  String record(String adjustment) {
+    adjustments.add(adjustment);
+    return adjustment;
+  }
 }
