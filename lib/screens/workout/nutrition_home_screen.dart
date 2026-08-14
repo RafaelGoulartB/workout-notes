@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
@@ -44,6 +46,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
 
   DailyNutritionSummary _summary = DailyNutritionSummary.empty;
   NutritionGoal? _goal;
+  Map<String, double> _weeklyCalories = const {};
   List<MealTypeDefinition> _mealTypes = const [];
   List<MealLogWithItems> _meals = const [];
   late DateTime _selectedDate;
@@ -69,6 +72,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
     if (!mounted) return;
     final generation = ++_loadGeneration;
     final selectedDate = _selectedDate;
+    final weekStart = _weekStart(selectedDate);
     setState(() => _isLoading = true);
     try {
       final date = _dateString(selectedDate);
@@ -77,11 +81,23 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         _repository.getActiveGoal(),
         _repository.getMealTypes(),
         _repository.getDayMeals(date),
+        _repository.getDailyNutritionHistoryForRange(
+          startDate: weekStart,
+          endDate: weekStart.add(const Duration(days: 6)),
+        ),
       ]);
       if (!mounted || generation != _loadGeneration) return;
+      final weeklyCalories = <String, double>{};
+      for (final row in results[4] as List<Map<String, dynamic>>) {
+        final rowDate = row['date'];
+        if (rowDate is String) {
+          weeklyCalories[rowDate] = (row['calories'] as num?)?.toDouble() ?? 0;
+        }
+      }
       setState(() {
         _summary = results[0] as DailyNutritionSummary;
         _goal = results[1] as NutritionGoal?;
+        _weeklyCalories = weeklyCalories;
         _mealTypes = results[2] as List<MealTypeDefinition>;
         _meals = results[3] as List<MealLogWithItems>;
         _isLoading = false;
@@ -92,6 +108,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
       setState(() {
         _isLoading = false;
         _hasLoaded = true;
+        _weeklyCalories = const {};
       });
     }
   }
@@ -411,6 +428,8 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                   selectedDate: _selectedDate,
                   onSelected: _selectDate,
                   collapseProgress: 0,
+                  weeklyCalories: _weeklyCalories,
+                  calorieGoal: _goal?.calories,
                 ),
                 const Expanded(child: _NutritionHomeSkeleton()),
               ],
@@ -428,6 +447,8 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                         delegate: _NutritionWeekHeaderDelegate(
                           selectedDate: _selectedDate,
                           onSelected: _selectDate,
+                          weeklyCalories: _weeklyCalories,
+                          calorieGoal: _goal?.calories,
                         ),
                       ),
                       SliverToBoxAdapter(
@@ -501,6 +522,9 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   static DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
 
+  static DateTime _weekStart(DateTime value) =>
+      value.subtract(Duration(days: value.weekday % DateTime.daysPerWeek));
+
   static bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 }
@@ -509,11 +533,15 @@ class _NutritionWeekSelector extends StatelessWidget {
   final DateTime selectedDate;
   final ValueChanged<DateTime> onSelected;
   final double collapseProgress;
+  final Map<String, double> weeklyCalories;
+  final double? calorieGoal;
 
   const _NutritionWeekSelector({
     required this.selectedDate,
     required this.onSelected,
     required this.collapseProgress,
+    required this.weeklyCalories,
+    required this.calorieGoal,
   });
 
   @override
@@ -521,9 +549,7 @@ class _NutritionWeekSelector extends StatelessWidget {
     final theme = Theme.of(context);
     final locale = Localizations.localeOf(context).toLanguageTag();
     final today = DateTime.now();
-    final weekStart = selectedDate.subtract(
-      Duration(days: selectedDate.weekday % DateTime.daysPerWeek),
-    );
+    final weekStart = _weekStart(selectedDate);
 
     return Container(
       padding: EdgeInsets.fromLTRB(12, 4, 12, 10 - (collapseProgress * 4)),
@@ -551,6 +577,16 @@ class _NutritionWeekSelector extends StatelessWidget {
                   weekStart.add(Duration(days: index)),
                   today,
                 ),
+                calorieProgress: _calorieProgress(
+                  weeklyCalories[_dateString(
+                    weekStart.add(Duration(days: index)),
+                  )],
+                ),
+                isOverCalorieGoal: _isOverCalorieGoal(
+                  weeklyCalories[_dateString(
+                    weekStart.add(Duration(days: index)),
+                  )],
+                ),
                 onTap: onSelected,
               ),
             ),
@@ -561,15 +597,36 @@ class _NutritionWeekSelector extends StatelessWidget {
 
   static bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
+
+  double? _calorieProgress(double? calories) {
+    if (calorieGoal == null || calorieGoal! <= 0) return null;
+    return ((calories ?? 0) / calorieGoal!).clamp(0.0, 1.0).toDouble();
+  }
+
+  bool _isOverCalorieGoal(double? calories) =>
+      calorieGoal != null && calorieGoal! > 0 && (calories ?? 0) > calorieGoal!;
+
+  static String _dateString(DateTime value) => DateTime(
+    value.year,
+    value.month,
+    value.day,
+  ).toIso8601String().substring(0, 10);
+
+  static DateTime _weekStart(DateTime value) =>
+      value.subtract(Duration(days: value.weekday % DateTime.daysPerWeek));
 }
 
 class _NutritionWeekHeaderDelegate extends SliverPersistentHeaderDelegate {
   final DateTime selectedDate;
   final ValueChanged<DateTime> onSelected;
+  final Map<String, double> weeklyCalories;
+  final double? calorieGoal;
 
   const _NutritionWeekHeaderDelegate({
     required this.selectedDate,
     required this.onSelected,
+    required this.weeklyCalories,
+    required this.calorieGoal,
   });
 
   @override
@@ -597,6 +654,8 @@ class _NutritionWeekHeaderDelegate extends SliverPersistentHeaderDelegate {
           selectedDate: selectedDate,
           onSelected: onSelected,
           collapseProgress: progress,
+          weeklyCalories: weeklyCalories,
+          calorieGoal: calorieGoal,
         ),
       ),
     );
@@ -605,7 +664,9 @@ class _NutritionWeekHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _NutritionWeekHeaderDelegate oldDelegate) =>
       oldDelegate.selectedDate != selectedDate ||
-      oldDelegate.onSelected != onSelected;
+      oldDelegate.onSelected != onSelected ||
+      oldDelegate.weeklyCalories != weeklyCalories ||
+      oldDelegate.calorieGoal != calorieGoal;
 }
 
 class _NutritionDayButton extends StatelessWidget {
@@ -614,6 +675,8 @@ class _NutritionDayButton extends StatelessWidget {
   final double collapseProgress;
   final bool isSelected;
   final bool isToday;
+  final double? calorieProgress;
+  final bool isOverCalorieGoal;
   final ValueChanged<DateTime> onTap;
 
   const _NutritionDayButton({
@@ -622,6 +685,8 @@ class _NutritionDayButton extends StatelessWidget {
     required this.collapseProgress,
     required this.isSelected,
     required this.isToday,
+    required this.calorieProgress,
+    required this.isOverCalorieGoal,
     required this.onTap,
   });
 
@@ -631,6 +696,8 @@ class _NutritionDayButton extends StatelessWidget {
     final colors = theme.colorScheme;
     final weekday = DateFormat.E(locale).format(date).characters.first;
     final fullDate = DateFormat.yMMMMEEEEd(locale).format(date);
+    const dayCircleSize = 36.0;
+    final verticalPadding = 2 * (1 - collapseProgress);
 
     return Semantics(
       button: true,
@@ -642,7 +709,7 @@ class _NutritionDayButton extends StatelessWidget {
         containedInkWell: true,
         highlightShape: BoxShape.circle,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
+          padding: EdgeInsets.symmetric(vertical: verticalPadding),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -666,31 +733,48 @@ class _NutritionDayButton extends StatelessWidget {
                 ),
               ),
               SizedBox(height: 5 * (1 - collapseProgress)),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOut,
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isSelected ? colors.primary : Colors.transparent,
-                  border: Border.all(
-                    width: isSelected || isToday ? 2 : 1.5,
-                    color: isSelected
-                        ? colors.primary
-                        : isToday
-                        ? colors.primary
-                        : colors.outlineVariant,
-                  ),
-                ),
-                child: Text(
-                  '${date.day}',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: isSelected ? colors.onPrimary : colors.onSurface,
-                    fontWeight: isSelected || isToday
-                        ? FontWeight.w800
-                        : FontWeight.w600,
+              SizedBox(
+                width: dayCircleSize,
+                height: dayCircleSize,
+                child: CustomPaint(
+                  foregroundPainter: calorieProgress == null
+                      ? null
+                      : _NutritionDayProgressPainter(
+                          progress: calorieProgress!,
+                          trackColor: colors.outlineVariant.withAlpha(80),
+                          progressColor: isOverCalorieGoal
+                              ? colors.error
+                              : colors.primary,
+                        ),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    width: dayCircleSize,
+                    height: dayCircleSize,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isSelected ? colors.primary : Colors.transparent,
+                      border: calorieProgress == null
+                          ? Border.all(
+                              width: isSelected || isToday ? 2 : 1.5,
+                              color: isSelected
+                                  ? colors.primary
+                                  : isToday
+                                  ? colors.primary
+                                  : colors.outlineVariant,
+                            )
+                          : null,
+                    ),
+                    child: Text(
+                      '${date.day}',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: isSelected ? colors.onPrimary : colors.onSurface,
+                        fontWeight: isSelected || isToday
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -700,6 +784,53 @@ class _NutritionDayButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _NutritionDayProgressPainter extends CustomPainter {
+  final double progress;
+  final Color trackColor;
+  final Color progressColor;
+
+  const _NutritionDayProgressPainter({
+    required this.progress,
+    required this.trackColor,
+    required this.progressColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const strokeWidth = 2.0;
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.shortestSide - strokeWidth) / 2;
+    final bounds = Rect.fromCircle(center: center, radius: radius);
+
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+    canvas.drawCircle(center, radius, trackPaint);
+
+    if (progress <= 0) return;
+
+    final progressPaint = Paint()
+      ..color = progressColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+      bounds,
+      -math.pi / 2,
+      2 * math.pi * progress,
+      false,
+      progressPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _NutritionDayProgressPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.trackColor != trackColor ||
+      oldDelegate.progressColor != progressColor;
 }
 
 class _NutritionDashboardSummaryCard extends StatelessWidget {
