@@ -12,7 +12,6 @@ import 'package:workout_notes/models/nutrition/meal_log_item.dart';
 import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
-import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
@@ -51,7 +50,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
 
   DailyNutritionSummary _summary = DailyNutritionSummary.empty;
   NutritionGoal? _goal;
-  PeriodizationPhase? _periodizationPhase;
   PeriodizationTarget? _phaseTarget;
   Map<String, double> _weeklyCalories = const {};
   List<MealTypeDefinition> _mealTypes = const [];
@@ -104,7 +102,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
       setState(() {
         _summary = results[0] as DailyNutritionSummary;
         _goal = results[1] as NutritionGoal?;
-        _periodizationPhase = null;
         _phaseTarget = null;
         _weeklyCalories = weeklyCalories;
         _mealTypes = results[2] as List<MealTypeDefinition>;
@@ -138,7 +135,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
           : await repository.getEffectiveTarget(phase.id, date: selectedDate);
       if (!mounted || generation != _loadGeneration) return;
       setState(() {
-        _periodizationPhase = phase;
         _phaseTarget = target;
       });
     } catch (_) {
@@ -575,15 +571,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                       ),
                       SliverToBoxAdapter(
                         child:
-                            _periodizationPhase == null || _phaseTarget == null
-                            ? const SizedBox.shrink()
-                            : _NutritionPhaseBanner(
-                                phase: _periodizationPhase!,
-                                target: _phaseTarget!,
-                              ),
-                      ),
-                      SliverToBoxAdapter(
-                        child:
                             _NutritionDashboardSummaryCard(
                                   summary: _summary,
                                   goal: _effectiveGoal,
@@ -594,18 +581,15 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                                 .fadeIn(duration: 300.ms, delay: 60.ms)
                                 .slideY(begin: 0.05),
                       ),
-                      SliverToBoxAdapter(
-                        child: _NutritionSectionHeader(
-                          text: loc.nutritionHomeSectionTools,
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                        sliver: SliverToBoxAdapter(
+                          child: _NutritionToolsGrid(
+                            onProgress: _openProgress,
+                            onSavedMeals: _openSavedMeals,
+                            onFoods: _openFoodLibrary,
+                          ).animate().fadeIn(duration: 350.ms, delay: 120.ms),
                         ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: _NutritionToolsGrid(
-                          onProgress: _openProgress,
-                          onSavedMeals: _openSavedMeals,
-                          onFoods: _openFoodLibrary,
-                          onSettings: _openSettings,
-                        ).animate().fadeIn(duration: 350.ms, delay: 120.ms),
                       ),
                       SliverToBoxAdapter(
                         child: _CollapsibleSectionHeader(
@@ -674,59 +658,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
 
   static bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
-}
-
-class _NutritionPhaseBanner extends StatelessWidget {
-  final PeriodizationPhase phase;
-  final PeriodizationTarget target;
-
-  const _NutritionPhaseBanner({required this.phase, required this.target});
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final parts = <String>[];
-    if (target.calories != null) {
-      parts.add('${target.calories!.round()} kcal');
-    }
-    if (target.proteinG != null) {
-      parts.add('${target.proteinG!.round()}g ${loc.periodizationProteinG}');
-    }
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: BoxDecoration(
-        color: Color(phase.color).withAlpha(30),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Color(phase.color).withAlpha(100)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.view_timeline_outlined, color: Color(phase.color)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  phase.name,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                if (parts.isNotEmpty)
-                  Text(
-                    parts.join(' · '),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-              ],
-            ),
-          ),
-          Text(loc.tabPlan, style: Theme.of(context).textTheme.labelSmall),
-        ],
-      ),
-    );
-  }
 }
 
 class _NutritionWeekSelector extends StatelessWidget {
@@ -1356,41 +1287,16 @@ class _NutritionMacroStat extends StatelessWidget {
   }
 }
 
-class _NutritionSectionHeader extends StatelessWidget {
-  final String text;
-
-  const _NutritionSectionHeader({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
-      child: Text(
-        text,
-        style: theme.textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.5,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
-
-/// 2x2 tools grid (4 cells), matching the workout home's
-/// _buildNavGrid so the bottom of both tabs feels identical.
+/// Compact row of the three most-used nutrition destinations.
 class _NutritionToolsGrid extends StatelessWidget {
   final VoidCallback onProgress;
   final VoidCallback onSavedMeals;
   final VoidCallback onFoods;
-  final VoidCallback onSettings;
 
   const _NutritionToolsGrid({
     required this.onProgress,
     required this.onSavedMeals,
     required this.onFoods,
-    required this.onSettings,
   });
 
   @override
@@ -1412,49 +1318,20 @@ class _NutritionToolsGrid extends StatelessWidget {
         loc.nutritionHomeToolBalance,
         onProgress,
       ),
-      _NutritionToolItemData(
-        Icons.tune_rounded,
-        loc.nutritionSettingsTitle,
-        onSettings,
-      ),
     ];
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80),
+    return Row(
+      children: [
+        for (var index = 0; index < items.length; index++) ...[
+          if (index > 0) const SizedBox(width: 8),
+          Expanded(
+            child: _NutritionToolTile(
+              icon: items[index].icon,
+              label: items[index].label,
+              onTap: items[index].onTap,
+            ),
           ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          shrinkWrap: true,
-          padding: EdgeInsets.zero,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 1.7,
-            mainAxisSpacing: 0,
-            crossAxisSpacing: 0,
-          ),
-          itemCount: items.length,
-          itemBuilder: (ctx, i) {
-            final item = items[i];
-            final isLeft = i % 2 == 0;
-            final isTop = i < 2;
-            return _NutritionToolTile(
-              icon: item.icon,
-              label: item.label,
-              onTap: item.onTap,
-              showLeftBorder: !isLeft,
-              showTopBorder: !isTop,
-            );
-          },
-        ),
-      ),
+        ],
+      ],
     );
   }
 }
@@ -1470,62 +1347,36 @@ class _NutritionToolTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final bool showLeftBorder;
-  final bool showTopBorder;
 
   const _NutritionToolTile({
     required this.icon,
     required this.label,
     required this.onTap,
-    required this.showLeftBorder,
-    required this.showTopBorder,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final borderColor = theme.colorScheme.outlineVariant.withAlpha(80);
     return Material(
-      color: Colors.transparent,
+      color: theme.colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(15),
       child: InkWell(
         onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(
-              left: showLeftBorder
-                  ? BorderSide(color: borderColor)
-                  : BorderSide.none,
-              top: showTopBorder
-                  ? BorderSide(color: borderColor)
-                  : BorderSide.none,
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          child: Column(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withAlpha(120),
-                  borderRadius: BorderRadius.circular(10),
+              Icon(icon, size: 21, color: theme.colorScheme.primary),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
-                child: Icon(icon, size: 20, color: theme.colorScheme.primary),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
               ),
             ],
           ),

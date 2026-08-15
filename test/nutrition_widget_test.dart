@@ -288,6 +288,7 @@ void main() {
     expect(find.text(loc.nutritionHomeToolBalance), findsOneWidget);
     expect(find.text(loc.nutritionHomeToolMeals), findsOneWidget);
     expect(find.text(loc.nutritionFoodLibraryTitle), findsOneWidget);
+    expect(find.text(loc.nutritionSettingsTitle), findsNothing);
     expect(find.text(loc.nutritionMealBreakfast), findsNothing);
 
     await tester.runAsync(() async {
@@ -340,6 +341,28 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(loc.nutritionDailyStatsTab));
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('nutrition tools render as three compact items at 320px', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(const NutritionHomeScreen()));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+    expect(find.text(loc.nutritionFoodLibraryTitle), findsOneWidget);
+    expect(find.text(loc.nutritionHomeToolMeals), findsOneWidget);
+    expect(find.text(loc.nutritionHomeToolBalance), findsOneWidget);
+    expect(find.text(loc.nutritionSettingsTitle), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
