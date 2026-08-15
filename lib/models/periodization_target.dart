@@ -20,6 +20,10 @@ class PeriodizationTarget {
   final int? maxSetsPerWeek;
   final double? minRpe;
   final double? maxRpe;
+
+  /// Routine linked to the week this target applies to. Serialized inside
+  /// [trainingJson]; each phase week may carry its own routine.
+  final String? routineId;
   final double? targetWeightKg;
   final double? weeklyWeightChangePercent;
   final double? sleepHours;
@@ -42,6 +46,7 @@ class PeriodizationTarget {
     this.maxSetsPerWeek,
     this.minRpe,
     this.maxRpe,
+    this.routineId,
     this.targetWeightKg,
     this.weeklyWeightChangePercent,
     this.sleepHours,
@@ -58,6 +63,7 @@ class PeriodizationTarget {
       maxSetsPerWeek == null &&
       minRpe == null &&
       maxRpe == null &&
+      routineId == null &&
       targetWeightKg == null &&
       weeklyWeightChangePercent == null &&
       sleepHours == null;
@@ -78,6 +84,7 @@ class PeriodizationTarget {
     if (maxSetsPerWeek != null) 'max_sets_per_week': maxSetsPerWeek,
     if (minRpe != null) 'min_rpe': minRpe,
     if (maxRpe != null) 'max_rpe': maxRpe,
+    if (routineId != null) 'routine_id': routineId,
   };
 
   Map<String, dynamic> get bodyJson => {
@@ -107,6 +114,7 @@ class PeriodizationTarget {
     int? maxSetsPerWeek,
     double? minRpe,
     double? maxRpe,
+    String? routineId,
     double? targetWeightKg,
     double? weeklyWeightChangePercent,
     double? sleepHours,
@@ -128,6 +136,7 @@ class PeriodizationTarget {
     maxSetsPerWeek: maxSetsPerWeek ?? this.maxSetsPerWeek,
     minRpe: minRpe ?? this.minRpe,
     maxRpe: maxRpe ?? this.maxRpe,
+    routineId: routineId ?? this.routineId,
     targetWeightKg: targetWeightKg ?? this.targetWeightKg,
     weeklyWeightChangePercent:
         weeklyWeightChangePercent ?? this.weeklyWeightChangePercent,
@@ -178,6 +187,7 @@ class PeriodizationTarget {
       maxSetsPerWeek: (training['max_sets_per_week'] as num?)?.toInt(),
       minRpe: _double(training['min_rpe']),
       maxRpe: _double(training['max_rpe']),
+      routineId: training['routine_id'] as String?,
       targetWeightKg: _double(body['target_weight_kg']),
       weeklyWeightChangePercent: _double(body['weekly_weight_change_percent']),
       sleepHours: _double(sleep['hours']),

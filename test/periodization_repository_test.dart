@@ -71,6 +71,7 @@ void main() {
     int workouts = 4,
     double? targetWeight,
     double? weeklyWeightChange,
+    String? routineId,
   }) => PeriodizationTarget(
     id: '',
     phaseId: '',
@@ -81,6 +82,7 @@ void main() {
     workoutsPerWeek: workouts,
     minSetsPerWeek: 40,
     maxSetsPerWeek: 55,
+    routineId: routineId,
     targetWeightKg: targetWeight,
     weeklyWeightChangePercent: weeklyWeightChange,
     sleepHours: 8,
@@ -102,8 +104,7 @@ void main() {
           color: 0xFF4F8EF7,
           startDate: DateTime(2026, 1, 1),
           endDate: DateTime(2026, 2, 28),
-          target: target(),
-          routineId: 'routine-1',
+          target: target(routineId: 'routine-1'),
         ),
         PeriodizationPhaseDraft(
           name: 'Deload',
@@ -121,7 +122,10 @@ void main() {
       (await repository.getEffectiveTarget(phases.first.id))?.calories,
       2200,
     );
-    expect(await repository.getRoutineLinks(phases.first.id), hasLength(1));
+    expect(
+      (await repository.getEffectiveTarget(phases.first.id))?.routineId,
+      'routine-1',
+    );
 
     await expectLater(
       repository.addPhase(
@@ -395,15 +399,20 @@ void main() {
     );
 
     await expectLater(
-      repository.updatePhaseWithTargetAndRoutine(
+      repository.updatePhaseWithTargets(
         updated,
         shiftFollowingPhases: false,
-        targetChanged: false,
-        target: target(),
-        routineId: 'missing-routine',
-        routineLinkId: null,
+        targetChanged: true,
+        weeklyTargets: [target(routineId: 'missing-routine')],
+        weeklyReplaceFrom: phase.startDate,
       ),
-      throwsA(isA<DatabaseException>()),
+      throwsA(
+        isA<PeriodizationValidationException>().having(
+          (error) => error.code,
+          'code',
+          'routine_not_found',
+        ),
+      ),
     );
     expect((await repository.getPhase(phase.id))?.name, 'Original');
     expect(await repository.getTargetHistory(phase.id), hasLength(1));
@@ -558,7 +567,14 @@ void main() {
             color: 1,
             startDate: start,
             endDate: end,
-            routineId: 'linked-routine',
+            target: PeriodizationTarget(
+              id: '',
+              phaseId: '',
+              version: 0,
+              validFrom: start,
+              routineId: 'linked-routine',
+              createdAt: today,
+            ),
           ),
         ],
       );
@@ -795,7 +811,7 @@ void main() {
     );
   });
 
-  test('updatePhaseWithTargetAndRoutine accepts weekly targets', () async {
+  test('updatePhaseWithTargets accepts weekly targets', () async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final start = today.subtract(const Duration(days: 7));
@@ -814,7 +830,7 @@ void main() {
       target: target(calories: 2200),
     );
 
-    await repository.updatePhaseWithTargetAndRoutine(
+    await repository.updatePhaseWithTargets(
       PeriodizationPhase(
         id: phase.id,
         planId: phase.planId,
@@ -830,8 +846,6 @@ void main() {
       targetChanged: true,
       weeklyTargets: [target(calories: 2100), target(calories: 2100)],
       weeklyReplaceFrom: today,
-      routineId: null,
-      routineLinkId: null,
     );
 
     expect((await repository.getPhase(phase.id))?.name, 'Edited');

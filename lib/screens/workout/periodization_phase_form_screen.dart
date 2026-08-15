@@ -20,7 +20,8 @@ import 'nutrition_goal_suggest_sheet.dart';
 /// Data exchanged between the plan wizard and the phase editor in draft
 /// mode: the wizard seeds the editor with an existing draft phase and the
 /// editor returns the edited phase (never persisted — the wizard saves the
-/// whole plan at once). [weeklyTargets] holds one effective target per week.
+/// whole plan at once). [weeklyTargets] holds one effective target per week;
+/// the linked routine is part of each weekly target (`routineId`).
 class PeriodizationPhaseDraftData {
   final String name;
   final String? intent;
@@ -29,7 +30,6 @@ class PeriodizationPhaseDraftData {
   final DateTime startDate;
   final DateTime endDate;
   final List<PeriodizationTarget> weeklyTargets;
-  final String? routineId;
 
   const PeriodizationPhaseDraftData({
     required this.name,
@@ -39,7 +39,6 @@ class PeriodizationPhaseDraftData {
     required this.startDate,
     required this.endDate,
     this.weeklyTargets = const [],
-    this.routineId,
   });
 }
 
@@ -82,7 +81,6 @@ class _PeriodizationPhaseFormScreenState
   bool _saving = false;
   bool _loading = true;
   String? _routineId;
-  String? _routineLinkId;
   List<Map<String, dynamic>> _routines = const [];
   double? _latestWeight;
   List<PeriodizationTarget> _history = const [];
@@ -110,7 +108,6 @@ class _PeriodizationPhaseFormScreenState
     _endDate =
         phase?.endDate ?? seed?.endDate ?? _startDate.add(const Duration(days: 27));
     _color = phase?.color ?? seed?.color ?? _color;
-    _routineId = seed?.routineId;
     _weekStarts = _computeWeekStarts(_startDate, _endDate);
     _weekOverrides = List<PeriodizationTarget?>.filled(
       _weekStarts.length,
@@ -157,18 +154,12 @@ class _PeriodizationPhaseFormScreenState
     final results = await Future.wait([
       RoutineRepository().getRoutines(),
       if (_editing) _repository.getTargetHistory(widget.phase!.id),
-      if (_editing) _repository.getRoutineLinks(widget.phase!.id),
     ]);
     if (!mounted) return;
     _routines = results[0] as List<Map<String, dynamic>>;
     if (_editing) {
       _history = results[1] as List<PeriodizationTarget>;
       _reconstructOverrides();
-      final links = results[2] as List<Map<String, dynamic>>;
-      if (links.isNotEmpty) {
-        _routineId = links.first['routine_id'] as String?;
-        _routineLinkId = links.first['id'] as String?;
-      }
       final editableFrom = _editableFromIndex();
       _selectedWeek = (editableFrom < _weekStarts.length
               ? editableFrom
@@ -363,6 +354,7 @@ class _PeriodizationPhaseFormScreenState
       maxSetsPerWeek: _int('maxSets'),
       minRpe: _double('minRpe'),
       maxRpe: _double('maxRpe'),
+      routineId: _routineId,
       targetWeightKg: _double('weight'),
       weeklyWeightChangePercent: _double('change'),
       sleepHours: _double('sleep'),
@@ -463,6 +455,7 @@ class _PeriodizationPhaseFormScreenState
     for (final entry in values.entries) {
       _targetControllers[entry.key]!.text = entry.value ?? '';
     }
+    _routineId = target?.routineId;
   }
 
   double? _deriveRatio(double? grams, double? weight) {
@@ -661,7 +654,6 @@ class _PeriodizationPhaseFormScreenState
             for (var i = 0; i < _weekStarts.length; i++)
               _effectiveTarget(i) ?? _emptyTarget(_weekStarts[i]),
           ],
-          routineId: _routineId,
         ),
       );
       return;
@@ -701,14 +693,12 @@ class _PeriodizationPhaseFormScreenState
           createdAt: old.createdAt,
           updatedAt: DateTime.now(),
         );
-        await _repository.updatePhaseWithTargetAndRoutine(
+        await _repository.updatePhaseWithTargets(
           updated,
           shiftFollowingPhases: _shiftFollowing,
           targetChanged: targetChanged,
           weeklyTargets: targetChanged ? weeklyTargets : null,
           weeklyReplaceFrom: targetChanged ? weeklyReplaceFrom : null,
-          routineId: _routineId,
-          routineLinkId: _routineLinkId,
         );
       } else {
         await _repository.addPhase(
@@ -720,7 +710,6 @@ class _PeriodizationPhaseFormScreenState
           intent: _intent.text,
           templateKey: _type.text.trim().isEmpty ? null : _type.text.trim(),
           weeklyTargets: weeklyTargets,
-          routineId: _routineId,
         );
       }
       if (mounted) Navigator.pop(context, true);
@@ -1087,37 +1076,79 @@ class _PeriodizationPhaseFormScreenState
                           'maxRpe',
                         ],
                       ),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final width = constraints.maxWidth >= 560
-                              ? (constraints.maxWidth - 10) / 2
-                              : constraints.maxWidth;
-                          Widget field(
-                            String key,
-                            String label, {
-                            bool integer = false,
-                            bool signed = false,
-                            String? unit,
-                          }) => SizedBox(
-                            width: width,
-                            child: _field(key, label,
-                                integer: integer, signed: signed, unit: unit),
-                          );
-                          return Wrap(
-                            spacing: 10,
-                            runSpacing: 12,
-                            children: [
-                              field('workouts', loc.periodizationWorkoutsPerWeek,
-                                  integer: true, unit: loc.periodizationPerWeekUnit),
-                              field('minSets', loc.periodizationMinSets,
-                                  integer: true, unit: loc.periodizationPerWeekUnit),
-                              field('maxSets', loc.periodizationMaxSets,
-                                  integer: true, unit: loc.periodizationPerWeekUnit),
-                              field('minRpe', loc.periodizationMinRpe),
-                              field('maxRpe', loc.periodizationMaxRpe),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final width = constraints.maxWidth >= 560
+                                  ? (constraints.maxWidth - 10) / 2
+                                  : constraints.maxWidth;
+                              Widget field(
+                                String key,
+                                String label, {
+                                bool integer = false,
+                                bool signed = false,
+                                String? unit,
+                              }) => SizedBox(
+                                width: width,
+                                child: _field(key, label,
+                                    integer: integer, signed: signed, unit: unit),
+                              );
+                              return Wrap(
+                                spacing: 10,
+                                runSpacing: 12,
+                                children: [
+                                  field('workouts', loc.periodizationWorkoutsPerWeek,
+                                      integer: true, unit: loc.periodizationPerWeekUnit),
+                                  field('minSets', loc.periodizationMinSets,
+                                      integer: true, unit: loc.periodizationPerWeekUnit),
+                                  field('maxSets', loc.periodizationMaxSets,
+                                      integer: true, unit: loc.periodizationPerWeekUnit),
+                                  field('minRpe', loc.periodizationMinRpe),
+                                  field('maxRpe', loc.periodizationMaxRpe),
+                                ],
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 14),
+                          DropdownButtonFormField<String?>(
+                            initialValue: _routineId,
+                            isExpanded: true,
+                            decoration: InputDecoration(
+                              labelText: loc.periodizationLinkedRoutine,
+                              prefixIcon: const Icon(
+                                Icons.fitness_center_outlined,
+                              ),
+                              helperText:
+                                  loc.periodizationLinkedRoutineWeeklyHelp,
+                            ),
+                            items: [
+                              DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text(
+                                  loc.periodizationNoRoutine,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              ..._routines.map(
+                                (routine) => DropdownMenuItem<String?>(
+                                  value: routine['id'] as String,
+                                  child: Text(
+                                    routine['name'] as String,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
                             ],
-                          );
-                        },
+                            onChanged: weekLocked
+                                ? null
+                                : (value) => setState(() {
+                                    _routineId = value;
+                                    _commitSelectedWeek();
+                                  }),
+                          ),
+                        ],
                       ),
                     ),
                     _targetCard(
@@ -1158,39 +1189,6 @@ class _PeriodizationPhaseFormScreenState
                     ),
                   ] else
                     _readOnlyCards(effective, weekLocked),
-                  const SizedBox(height: 8),
-                  PeriodizationSectionHeader(
-                    title: loc.periodizationLinkedRoutine,
-                    icon: Icons.repeat_rounded,
-                  ),
-                  DropdownButtonFormField<String?>(
-                    initialValue: _routineId,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: loc.periodizationLinkedRoutine,
-                      prefixIcon: const Icon(Icons.fitness_center_outlined),
-                      border: const OutlineInputBorder(),
-                    ),
-                    items: [
-                      DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text(
-                          loc.periodizationNoRoutine,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      ..._routines.map(
-                        (routine) => DropdownMenuItem<String?>(
-                          value: routine['id'] as String,
-                          child: Text(
-                            routine['name'] as String,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) => setState(() => _routineId = value),
-                  ),
                   if (_editing) ...[
                     const SizedBox(height: 12),
                     Container(
@@ -1325,6 +1323,15 @@ class _PeriodizationPhaseFormScreenState
       if (target.fatG != null) (loc.nutritionProgressFat, '${target.fatG!.round()} g'),
     ];
     final trainingRows = <(String, String)>[
+      if (target.routineId != null)
+        (
+          loc.periodizationLinkedRoutine,
+          _routines
+                  .where((routine) => routine['id'] == target.routineId)
+                  .map((routine) => routine['name'] as String)
+                  .firstOrNull ??
+              loc.periodizationNoRoutine,
+        ),
       if (target.workoutsPerWeek != null)
         (loc.periodizationWorkoutsPerWeek, '${target.workoutsPerWeek}${loc.periodizationPerWeekUnit}'),
       if (target.minSetsPerWeek != null || target.maxSetsPerWeek != null)

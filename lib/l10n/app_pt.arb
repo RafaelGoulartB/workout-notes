@@ -1747,6 +1747,7 @@
   "periodizationWeeklyWeightChange": "Mudança semanal (%)",
   "periodizationSleepHours": "Sono por noite (h)",
   "periodizationLinkedRoutine": "Rotina vinculada",
+  "periodizationLinkedRoutineWeeklyHelp": "Cada semana da fase pode ter sua própria rotina de treino",
   "periodizationNoRoutine": "Nenhuma rotina",
   "periodizationShiftFollowing": "Deslocar as fases seguintes",
   "periodizationShiftFollowingHelp": "Mantém a sequência ao mudar a duração desta fase. Você verá a confirmação antes de salvar.",

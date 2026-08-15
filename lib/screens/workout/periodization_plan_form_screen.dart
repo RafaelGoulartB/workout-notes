@@ -301,7 +301,6 @@ class _PeriodizationPlanFormScreenState
             startDate: _phaseStart(index),
             endDate: _phaseEnd(index),
             weeklyTargets: phase.weeklyTargets,
-            routineId: phase.routineId,
           ),
         ),
       ),
@@ -312,7 +311,6 @@ class _PeriodizationPlanFormScreenState
       phase.intent = result.intent ?? '';
       phase.templateKey = result.templateKey;
       phase.color = result.color;
-      phase.routineId = result.routineId;
       final weeks = ((result.endDate.difference(result.startDate).inDays + 1) /
               7)
           .ceil()
@@ -347,7 +345,6 @@ class _PeriodizationPlanFormScreenState
             color: phase.color,
             startDate: _phaseStart(i),
             endDate: _phaseEnd(i),
-            routineId: phase.routineId,
             weeklyTargets: phase.weeklyTargets.any((target) => !target.isEmpty)
                 ? phase.weeklyTargets
                 : null,
@@ -1026,12 +1023,12 @@ class _PeriodizationPlanFormScreenState
         values.add('${target.targetWeightKg} kg');
       }
       if (target.sleepHours != null) values.add('${target.sleepHours}h');
-    }
-    if (phase.routineId != null) {
-      final match = _routines.where(
-        (routine) => routine['id'] == phase.routineId,
-      );
-      if (match.isNotEmpty) values.add(match.first['name'] as String);
+      if (target.routineId case final routineId?) {
+        final match = _routines.where(
+          (routine) => routine['id'] == routineId,
+        );
+        if (match.isNotEmpty) values.add(match.first['name'] as String);
+      }
     }
     return values.isEmpty
         ? AppLocalizations.of(context)!.periodizationNoTargetsSet
@@ -1078,10 +1075,10 @@ class _EditablePhase {
   String? templateKey;
   int weeks;
   int color;
-  String? routineId;
 
   /// One effective target per week (index 0 = first week). Entries may be
-  /// empty targets when the week is undefined.
+  /// empty targets when the week is undefined. The linked routine lives in
+  /// each week's target (`PeriodizationTarget.routineId`).
   List<PeriodizationTarget> weeklyTargets;
 
   _EditablePhase({

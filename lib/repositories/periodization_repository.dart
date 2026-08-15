@@ -160,6 +160,7 @@ class PeriodizationRepository extends BaseRepository {
             weeks: draft.weeklyTargets!,
           );
         } else if (draft.target case final target? when !target.isEmpty) {
+          await _validateRoutineReferences(txn, [target]);
           await txn.insert(
             'phase_targets',
             _targetMap(
@@ -169,16 +170,6 @@ class PeriodizationRepository extends BaseRepository {
               validFrom: phase.startDate,
             ),
           );
-        }
-        if (draft.routineId case final routineId?) {
-          await txn.insert('phase_routine_links', {
-            'id': _uuid.v4(),
-            'phase_id': phaseId,
-            'routine_id': routineId,
-            'starts_on': _date(phase.startDate),
-            'ends_on': _date(phase.endDate),
-            'created_at': now.toIso8601String(),
-          });
         }
       }
     });
@@ -316,7 +307,6 @@ class PeriodizationRepository extends BaseRepository {
     String? templateKey,
     PeriodizationTarget? target,
     List<PeriodizationTarget>? weeklyTargets,
-    String? routineId,
   }) async {
     _validateNameAndDates(name, startDate, endDate);
     if (target != null && !target.isEmpty) _validateTarget(target);
@@ -357,6 +347,7 @@ class PeriodizationRepository extends BaseRepository {
           weeks: weeklyTargets,
         );
       } else if (target != null && !target.isEmpty) {
+        await _validateRoutineReferences(txn, [target]);
         await txn.insert(
           'phase_targets',
           _targetMap(
@@ -366,16 +357,6 @@ class PeriodizationRepository extends BaseRepository {
             validFrom: phase.startDate,
           ),
         );
-      }
-      if (routineId != null) {
-        await txn.insert('phase_routine_links', {
-          'id': _uuid.v4(),
-          'phase_id': phase.id,
-          'routine_id': routineId,
-          'starts_on': _date(phase.startDate),
-          'ends_on': _date(phase.endDate),
-          'created_at': now.toIso8601String(),
-        });
       }
       await _normalizePhaseOrder(txn, planId);
     });
@@ -387,15 +368,13 @@ class PeriodizationRepository extends BaseRepository {
     bool shiftFollowingPhases = false,
   }) => _updatePhase(phase, shiftFollowingPhases: shiftFollowingPhases);
 
-  Future<void> updatePhaseWithTargetAndRoutine(
+  Future<void> updatePhaseWithTargets(
     PeriodizationPhase phase, {
     required bool shiftFollowingPhases,
     required bool targetChanged,
     PeriodizationTarget? target,
     List<PeriodizationTarget>? weeklyTargets,
     DateTime? weeklyReplaceFrom,
-    required String? routineId,
-    required String? routineLinkId,
   }) => _updatePhase(
     phase,
     shiftFollowingPhases: shiftFollowingPhases,
@@ -403,9 +382,6 @@ class PeriodizationRepository extends BaseRepository {
     target: target,
     weeklyTargets: weeklyTargets,
     weeklyReplaceFrom: weeklyReplaceFrom,
-    replaceRoutine: true,
-    routineId: routineId,
-    routineLinkId: routineLinkId,
   );
 
   Future<void> _updatePhase(
@@ -415,9 +391,6 @@ class PeriodizationRepository extends BaseRepository {
     PeriodizationTarget? target,
     List<PeriodizationTarget>? weeklyTargets,
     DateTime? weeklyReplaceFrom,
-    bool replaceRoutine = false,
-    String? routineId,
-    String? routineLinkId,
   }) async {
     _validateNameAndDates(phase.name, phase.startDate, phase.endDate);
     if (targetChanged) {
@@ -482,14 +455,6 @@ class PeriodizationRepository extends BaseRepository {
       throw const PeriodizationValidationException('phase_outside_plan');
     }
     final database = await db;
-    final linkedRows = await database.rawQuery(
-      '''
-      SELECT link.* FROM phase_routine_links link
-      JOIN periodization_phases phase ON phase.id = link.phase_id
-      WHERE phase.plan_id = ?
-      ''',
-      [plan.id],
-    );
     final targetRows = await database.rawQuery(
       '''
       SELECT target.id, target.phase_id, target.valid_from, target.version
@@ -555,31 +520,6 @@ class PeriodizationRepository extends BaseRepository {
           );
         }
       }
-      for (final link in linkedRows.where(
-        (row) =>
-            row['phase_id'] == item.id &&
-            !(replaceRoutine && row['id'] == routineLinkId),
-      )) {
-        var projectedStart = DateTime.parse(link['starts_on'] as String);
-        var projectedEnd = DateTime.parse(link['ends_on'] as String);
-        final original = all.firstWhere((candidate) => candidate.id == item.id);
-        final coveredWholeOriginal =
-            projectedStart == original.startDate &&
-            projectedEnd == original.endDate;
-        if (item.id == phase.id && coveredWholeOriginal) {
-          projectedStart = item.startDate;
-          projectedEnd = item.endDate;
-        } else {
-          projectedStart = projectedStart.add(Duration(days: dateShift));
-          projectedEnd = projectedEnd.add(Duration(days: dateShift));
-        }
-        if (projectedStart.isBefore(item.startDate) ||
-            projectedEnd.isAfter(item.endDate)) {
-          throw const PeriodizationValidationException(
-            'replan_excludes_routine_links',
-          );
-        }
-      }
     }
 
     final nextTargetVersion =
@@ -598,14 +538,6 @@ class PeriodizationRepository extends BaseRepository {
       throw const PeriodizationValidationException('target_outside_phase');
     }
 
-    if (replaceRoutine && routineId != null) {
-      final overlap = linkedRows.any(
-        (row) => row['phase_id'] == phase.id && row['id'] != routineLinkId,
-      );
-      if (overlap) {
-        throw const PeriodizationValidationException('routine_link_overlap');
-      }
-    }
     await database.transaction((txn) async {
       for (var index = 0; index < shifted.length; index++) {
         final item = shifted[index];
@@ -630,29 +562,6 @@ class PeriodizationRepository extends BaseRepository {
         );
         if (wasShifted) {
           final dateShift = dateShiftFor(item);
-          for (final link in linkedRows.where(
-            (row) =>
-                row['phase_id'] == item.id &&
-                !(replaceRoutine && row['id'] == routineLinkId),
-          )) {
-            var startsOn = DateTime.parse(link['starts_on'] as String);
-            var endsOn = DateTime.parse(link['ends_on'] as String);
-            final coveredWholeOriginal =
-                startsOn == original.startDate && endsOn == original.endDate;
-            if (item.id == phase.id && coveredWholeOriginal) {
-              startsOn = item.startDate;
-              endsOn = item.endDate;
-            } else {
-              startsOn = startsOn.add(Duration(days: dateShift));
-              endsOn = endsOn.add(Duration(days: dateShift));
-            }
-            await txn.update(
-              'phase_routine_links',
-              {'starts_on': _date(startsOn), 'ends_on': _date(endsOn)},
-              where: 'id = ?',
-              whereArgs: [link['id']],
-            );
-          }
           for (final target in targetRows.where(
             (row) => row['phase_id'] == item.id,
           )) {
@@ -678,34 +587,16 @@ class PeriodizationRepository extends BaseRepository {
             weeks: weeklyTargets,
           );
         } else {
+          await _validateRoutineReferences(txn, [target!]);
           await txn.insert(
             'phase_targets',
             _targetMap(
-              target!,
+              target,
               phaseId: phase.id,
               version: nextTargetVersion,
               validFrom: newTargetValidFrom,
             ),
           );
-        }
-      }
-      if (replaceRoutine) {
-        if (routineLinkId != null) {
-          await txn.delete(
-            'phase_routine_links',
-            where: 'id = ?',
-            whereArgs: [routineLinkId],
-          );
-        }
-        if (routineId != null) {
-          await txn.insert('phase_routine_links', {
-            'id': _uuid.v4(),
-            'phase_id': phase.id,
-            'routine_id': routineId,
-            'starts_on': _date(phase.startDate),
-            'ends_on': _date(phase.endDate),
-            'created_at': DateTime.now().toIso8601String(),
-          });
         }
       }
       if (shiftFollowingPhases && newPlanEnd != plan.endDate) {
@@ -882,20 +773,12 @@ class PeriodizationRepository extends BaseRepository {
     });
   }
 
-  Future<List<Map<String, dynamic>>> getRoutineLinks(String phaseId) async {
-    final database = await db;
-    return database.rawQuery(
-      '''
-      SELECT link.*, routine.name AS routine_name
-      FROM phase_routine_links link
-      JOIN routines routine ON routine.id = link.routine_id
-      WHERE link.phase_id = ?
-      ORDER BY link.starts_on ASC
-    ''',
-      [phaseId],
-    );
-  }
-
+  /// Resolves the routine linked to the active phase on [date].
+  ///
+  /// The routine comes from the effective weekly target (`routineId` inside
+  /// `training_json`) — each phase week may carry its own routine. Falls back
+  /// to legacy `phase_routine_links` rows for phases created before the
+  /// weekly-routine model.
   Future<PeriodizationRoutineSuggestion?> getRoutineSuggestion(
     DateTime date,
   ) async {
@@ -903,6 +786,50 @@ class PeriodizationRepository extends BaseRepository {
     final phase = await getEffectivePhase(day);
     if (phase == null) return null;
     final database = await db;
+    final target = await getEffectiveTarget(phase.id, date: day);
+    final routineId = target?.routineId;
+    if (routineId != null) {
+      final routineRows = await database.query(
+        'routines',
+        where: 'id = ?',
+        whereArgs: [routineId],
+        limit: 1,
+      );
+      if (routineRows.isEmpty) return null;
+      final routineDays = await database.query(
+        'routine_days',
+        where: 'routine_id = ?',
+        whereArgs: [routineId],
+        orderBy: 'order_index ASC',
+      );
+      if (routineDays.isEmpty) return null;
+      final completed =
+          Sqflite.firstIntValue(
+            await database.rawQuery(
+              '''
+              SELECT COUNT(*) FROM workouts
+              WHERE routine_id = ? AND end_time IS NOT NULL
+                AND date BETWEEN ? AND ?
+              ''',
+              [routineId, _date(_weekStart(day)), _date(day)],
+            ),
+          ) ??
+          0;
+      final index = completed % routineDays.length;
+      final nextDay = routineDays[index];
+      return PeriodizationRoutineSuggestion(
+        phaseId: phase.id,
+        linkId: '',
+        routineId: routineId,
+        routineName: routineRows.first['name'] as String,
+        routineDayId: nextDay['id'] as String,
+        routineDayName: nextDay['name'] as String? ?? '',
+        routineDayIndex: index,
+        routineDayCount: routineDays.length,
+        completedWorkouts: completed,
+      );
+    }
+    // Legacy phases linked before the weekly-routine model.
     final links = await database.rawQuery(
       '''
       SELECT link.*, routine.name AS routine_name
@@ -916,11 +843,10 @@ class PeriodizationRepository extends BaseRepository {
     );
     if (links.isEmpty) return null;
     final link = links.first;
-    final routineId = link['routine_id'] as String;
     final routineDays = await database.query(
       'routine_days',
       where: 'routine_id = ?',
-      whereArgs: [routineId],
+      whereArgs: [link['routine_id']],
       orderBy: 'order_index ASC',
     );
     if (routineDays.isEmpty) return null;
@@ -932,7 +858,7 @@ class PeriodizationRepository extends BaseRepository {
             WHERE routine_id = ? AND end_time IS NOT NULL
               AND date BETWEEN ? AND ?
             ''',
-            [routineId, link['starts_on'], _date(day)],
+            [link['routine_id'], link['starts_on'], _date(day)],
           ),
         ) ??
         0;
@@ -941,67 +867,13 @@ class PeriodizationRepository extends BaseRepository {
     return PeriodizationRoutineSuggestion(
       phaseId: phase.id,
       linkId: link['id'] as String,
-      routineId: routineId,
+      routineId: link['routine_id'] as String,
       routineName: link['routine_name'] as String,
       routineDayId: nextDay['id'] as String,
       routineDayName: nextDay['name'] as String? ?? '',
       routineDayIndex: index,
       routineDayCount: routineDays.length,
       completedWorkouts: completed,
-    );
-  }
-
-  Future<String> saveRoutineLink({
-    String? id,
-    required String phaseId,
-    required String routineId,
-    required DateTime startsOn,
-    required DateTime endsOn,
-  }) async {
-    final phase = await getPhase(phaseId);
-    if (phase == null) {
-      throw const PeriodizationValidationException('phase_not_found');
-    }
-    if (startsOn.isBefore(phase.startDate) ||
-        endsOn.isAfter(phase.endDate) ||
-        endsOn.isBefore(startsOn)) {
-      throw const PeriodizationValidationException(
-        'routine_link_outside_phase',
-      );
-    }
-    final database = await db;
-    final overlap =
-        Sqflite.firstIntValue(
-          await database.rawQuery(
-            '''
-      SELECT COUNT(*) FROM phase_routine_links
-      WHERE phase_id = ? AND id != ? AND starts_on <= ? AND ends_on >= ?
-    ''',
-            [phaseId, id ?? '', _date(endsOn), _date(startsOn)],
-          ),
-        ) ??
-        0;
-    if (overlap > 0) {
-      throw const PeriodizationValidationException('routine_link_overlap');
-    }
-    final linkId = id ?? _uuid.v4();
-    await database.insert('phase_routine_links', {
-      'id': linkId,
-      'phase_id': phaseId,
-      'routine_id': routineId,
-      'starts_on': _date(startsOn),
-      'ends_on': _date(endsOn),
-      'created_at': DateTime.now().toIso8601String(),
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
-    return linkId;
-  }
-
-  Future<void> deleteRoutineLink(String id) async {
-    final database = await db;
-    await database.delete(
-      'phase_routine_links',
-      where: 'id = ?',
-      whereArgs: [id],
     );
   }
 
@@ -1721,6 +1593,7 @@ class PeriodizationRepository extends BaseRepository {
       maxSetsPerWeek: target.maxSetsPerWeek,
       minRpe: target.minRpe,
       maxRpe: target.maxRpe,
+      routineId: target.routineId,
       targetWeightKg: target.targetWeightKg,
       weeklyWeightChangePercent: target.weeklyWeightChangePercent,
       sleepHours: target.sleepHours,
@@ -1824,6 +1697,7 @@ class PeriodizationRepository extends BaseRepository {
     required int firstVersion,
     PeriodizationTarget? baseline,
   }) async {
+    await _validateRoutineReferences(txn, weeks);
     // A null baseline (no retained history) behaves like an empty target so
     // leading empty weeks never create versions.
     var previous = baseline ??
@@ -1858,6 +1732,29 @@ class PeriodizationRepository extends BaseRepository {
       a.trainingJson.toString() == b.trainingJson.toString() &&
       a.bodyJson.toString() == b.bodyJson.toString() &&
       a.sleepJson.toString() == b.sleepJson.toString();
+
+  /// Rejects targets that reference a routine that no longer exists in the
+  /// library (the weekly targets store only the routine id, with no FK).
+  static Future<void> _validateRoutineReferences(
+    DatabaseExecutor txn,
+    Iterable<PeriodizationTarget> targets,
+  ) async {
+    final routineIds = targets
+        .map((target) => target.routineId)
+        .whereType<String>()
+        .toSet();
+    if (routineIds.isEmpty) return;
+    final rows = await txn.query(
+      'routines',
+      columns: ['id'],
+      where: 'id IN (${List.filled(routineIds.length, '?').join(', ')})',
+      whereArgs: routineIds.toList(),
+    );
+    final found = rows.map((row) => row['id']).toSet();
+    if (routineIds.difference(found).isNotEmpty) {
+      throw const PeriodizationValidationException('routine_not_found');
+    }
+  }
 
   static double _adherenceScore(
     double? actual,

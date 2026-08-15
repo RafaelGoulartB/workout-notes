@@ -9,6 +9,7 @@ import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_projection.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 
 import 'periodization_checkin_flow.dart';
@@ -39,7 +40,11 @@ class _PeriodizationPhaseDetailScreenState
   PeriodizationProjection? _projection;
   List<PeriodizationTarget> _targetHistory = const [];
   List<PeriodizationCheckin> _checkins = const [];
-  List<Map<String, dynamic>> _routineLinks = const [];
+
+  /// Per-week routine schedule resolved from the target history:
+  /// (routine name, week start, week end) entries ordered by date.
+  List<({String routineName, DateTime startsOn, DateTime endsOn})>
+  _routineSchedule = const [];
   bool _loading = true;
 
   @override
@@ -61,7 +66,7 @@ class _PeriodizationPhaseDetailScreenState
       _repository.getPhaseMetrics(_phase),
       _repository.getTargetHistory(_phase.id),
       _repository.getCheckins(_phase.id),
-      _repository.getRoutineLinks(_phase.id),
+      RoutineRepository().getRoutines(),
     ]);
     final metrics = results[1] as PeriodizationMetrics;
     final projection = await _repository.getPhaseProjection(
@@ -69,15 +74,51 @@ class _PeriodizationPhaseDetailScreenState
       phaseMetrics: metrics,
     );
     if (!mounted) return;
+    final history = results[2] as List<PeriodizationTarget>;
+    final routineById = {
+      for (final routine in results[4] as List<Map<String, dynamic>>)
+        routine['id'] as String: routine['name'] as String,
+    };
     setState(() {
       _target = results[0] as PeriodizationTarget?;
       _metrics = metrics;
-      _targetHistory = results[2] as List<PeriodizationTarget>;
+      _targetHistory = history;
       _checkins = results[3] as List<PeriodizationCheckin>;
-      _routineLinks = results[4] as List<Map<String, dynamic>>;
+      _routineSchedule = _buildRoutineSchedule(history, routineById);
       _projection = projection;
       _loading = false;
     });
+  }
+
+  List<({String routineName, DateTime startsOn, DateTime endsOn})>
+  _buildRoutineSchedule(
+    List<PeriodizationTarget> history,
+    Map<String, String> routineById,
+  ) {
+    final ordered = [...history]
+      ..sort((a, b) => a.validFrom.compareTo(b.validFrom));
+    final schedule = <
+      ({String routineName, DateTime startsOn, DateTime endsOn})
+    >[];
+    DateTime dayOnly(DateTime value) =>
+        DateTime(value.year, value.month, value.day);
+    for (var i = 0; i < ordered.length; i++) {
+      final target = ordered[i];
+      final routineId = target.routineId;
+      if (routineId == null) continue;
+      final routineName = routineById[routineId];
+      if (routineName == null) continue;
+      final startsOn = dayOnly(target.validFrom);
+      final endsOn = i + 1 < ordered.length
+          ? dayOnly(ordered[i + 1].validFrom).subtract(const Duration(days: 1))
+          : dayOnly(_phase.endDate);
+      schedule.add((
+        routineName: routineName,
+        startsOn: startsOn,
+        endsOn: endsOn,
+      ));
+    }
+    return schedule;
   }
 
   Future<void> _edit() async {
@@ -293,7 +334,7 @@ class _PeriodizationPhaseDetailScreenState
                     title: loc.periodizationRoutineSchedule,
                     icon: Icons.repeat_rounded,
                   ),
-                  if (_routineLinks.isEmpty)
+                  if (_routineSchedule.isEmpty)
                     PeriodizationSurface(
                       child: Row(
                         children: [
@@ -304,16 +345,18 @@ class _PeriodizationPhaseDetailScreenState
                       ),
                     )
                   else
-                    ..._routineLinks.map(
-                      (link) => Padding(
+                    ..._routineSchedule.map(
+                      (entry) => Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: PeriodizationSurface(
                           child: ListTile(
                             contentPadding: EdgeInsets.zero,
                             leading: const Icon(Icons.repeat),
-                            title: Text(link['routine_name'] as String),
+                            title: Text(entry.routineName),
                             subtitle: Text(
-                              '${link['starts_on']} – ${link['ends_on']}',
+                              '${DateFormat.MMMd(Intl.defaultLocale).format(entry.startsOn)}'
+                              ' – '
+                              '${DateFormat.MMMd(Intl.defaultLocale).format(entry.endsOn)}',
                             ),
                           ),
                         ),

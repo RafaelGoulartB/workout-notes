@@ -1767,6 +1767,7 @@
   "periodizationWeeklyWeightChange": "Weekly change (%)",
   "periodizationSleepHours": "Sleep per night (h)",
   "periodizationLinkedRoutine": "Linked routine",
+  "periodizationLinkedRoutineWeeklyHelp": "Each week of the phase can have its own workout routine",
   "periodizationNoRoutine": "No routine",
   "periodizationShiftFollowing": "Shift following phases",
   "periodizationShiftFollowingHelp": "Keeps the sequence when this phase duration changes. You will confirm before saving.",
