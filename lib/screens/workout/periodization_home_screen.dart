@@ -8,6 +8,7 @@ import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_routine_suggestion.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 
 import 'periodization_calendar_screen.dart';
@@ -18,6 +19,7 @@ import 'periodization_phase_detail_screen.dart';
 import 'periodization_phase_form_screen.dart';
 import 'periodization_plan_form_screen.dart';
 import 'periodization_plans_screen.dart';
+import 'settings_screen.dart';
 
 class PeriodizationHomeScreen extends StatefulWidget {
   const PeriodizationHomeScreen({super.key});
@@ -95,6 +97,14 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
       MaterialPageRoute(builder: (_) => const PeriodizationPlansScreen()),
     );
     await _load();
+  }
+
+  Future<void> _openAppSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
+    );
+    if (mounted) await _load();
   }
 
   Future<void> _openComparison() async {
@@ -180,15 +190,16 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
         centerTitle: false,
         automaticallyImplyLeading: false,
         actions: [
+          const AiCoachHeaderButton(),
           IconButton(
             tooltip: loc.periodizationCalendar,
             onPressed: _plan == null ? null : _openCalendar,
             icon: const Icon(Icons.calendar_month_outlined),
           ),
           IconButton(
-            tooltip: loc.periodizationHistory,
-            onPressed: _openPlans,
-            icon: const Icon(Icons.folder_open_outlined),
+            tooltip: loc.settingsTitle,
+            onPressed: _openAppSettings,
+            icon: const Icon(Icons.settings_outlined),
           ),
         ],
       ),
