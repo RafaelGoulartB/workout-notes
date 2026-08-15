@@ -363,6 +363,9 @@ void main() {
     expect(find.text(loc.nutritionHomeToolMeals), findsOneWidget);
     expect(find.text(loc.nutritionHomeToolBalance), findsOneWidget);
     expect(find.text(loc.nutritionSettingsTitle), findsNothing);
+    expect(find.byIcon(Icons.today_outlined), findsNothing);
+    expect(find.byIcon(Icons.expand_less), findsNothing);
+    expect(find.byIcon(Icons.expand_more), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

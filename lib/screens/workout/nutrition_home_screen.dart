@@ -57,7 +57,6 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   late DateTime _selectedDate;
   bool _isLoading = true;
   bool _hasLoaded = false;
-  bool _showMeals = true;
   int _loadGeneration = 0;
 
   @override
@@ -592,10 +591,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                         ),
                       ),
                       SliverToBoxAdapter(
-                        child: _CollapsibleSectionHeader(
-                          icon: Icons.today_outlined,
-                          iconBg: theme.colorScheme.primaryContainer,
-                          iconFg: theme.colorScheme.onPrimaryContainer,
+                        child: _NutritionTodayHeader(
                           title: _isSameDay(_selectedDate, DateTime.now())
                               ? loc.nutritionHomeSectionToday
                               : DateFormat(
@@ -607,11 +603,9 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                             _summary.consumed.calories,
                           ),
                           count: _totalItemsForSelectedDay,
-                          expanded: _showMeals,
-                          onTap: () => setState(() => _showMeals = !_showMeals),
                         ),
                       ),
-                      if (_showMeals) ..._buildMealSlivers(loc, theme),
+                      ..._buildMealSlivers(loc, theme),
                       const SliverToBoxAdapter(child: SizedBox(height: 100)),
                     ],
                   ),
@@ -1386,92 +1380,61 @@ class _NutritionToolTile extends StatelessWidget {
   }
 }
 
-/// Collapsible header used by the "Today" section. Renders a
-/// small icon chip, a section title, an optional value (e.g. the
-/// day's total calories), a count pill and an expand/collapse caret.
-/// Matches the workout home's _CollapsibleSectionHeader visually.
-class _CollapsibleSectionHeader extends StatelessWidget {
-  final IconData icon;
-  final Color iconBg;
-  final Color iconFg;
+/// Collapsible header used by the "Today" section.
+class _NutritionTodayHeader extends StatelessWidget {
   final String title;
   final int count;
-  final bool expanded;
   final String? value;
-  final VoidCallback onTap;
 
-  const _CollapsibleSectionHeader({
-    required this.icon,
-    required this.iconBg,
-    required this.iconFg,
+  const _NutritionTodayHeader({
     required this.title,
     required this.count,
-    required this.expanded,
-    required this.onTap,
     this.value,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(icon, size: 18, color: iconFg),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 30, 20, 4),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.5,
+              color: theme.colorScheme.onSurface,
             ),
-            const SizedBox(width: 8),
+          ),
+          const Spacer(),
+          if (value != null) ...[
             Text(
-              title,
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.5,
+              value!,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
                 color: theme.colorScheme.onSurface,
               ),
             ),
-            const Spacer(),
-            if (value != null) ...[
-              Text(
-                value!,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: theme.colorScheme.onSurface,
+            const SizedBox(width: 10),
+          ],
+          if (count > 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$count',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(width: 10),
-            ],
-            if (count > 0) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '$count',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-            ],
-            Icon(
-              expanded ? Icons.expand_less : Icons.expand_more,
-              color: theme.colorScheme.onSurfaceVariant,
             ),
           ],
-        ),
+        ],
       ),
     );
   }
