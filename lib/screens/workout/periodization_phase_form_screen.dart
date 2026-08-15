@@ -563,18 +563,26 @@ class _PeriodizationPhaseFormScreenState
     _loadIntoControllers(_effectiveTarget(_selectedWeek));
   }
 
-  Future<void> _askCustomWeeks() async {
-    final controller = TextEditingController();
+  Future<void> _pickWeeks() async {
+    final controller = TextEditingController(
+      text: _weekStarts.length.toString(),
+    );
     final loc = AppLocalizations.of(context)!;
     final result = await showDialog<int>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(loc.periodizationCustomWeeks),
+        title: Text(loc.periodizationPickWeeksTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onSubmitted: (value) {
+            final parsed = int.tryParse(value.trim());
+            if (parsed != null && parsed >= 1 && parsed <= 104) {
+              Navigator.pop(context, parsed);
+            }
+          },
           decoration: InputDecoration(
             suffixText: 'sem',
             helperText: '1 – 104',
@@ -597,7 +605,8 @@ class _PeriodizationPhaseFormScreenState
         ],
       ),
     );
-    if (result != null) _setWeeks(result);
+    if (result == null || !mounted) return;
+    _setWeeks(result);
   }
 
   // =====================================================================
@@ -930,24 +939,25 @@ class _PeriodizationPhaseFormScreenState
                           ],
                         ),
                         const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final count in const [1, 2, 3, 4, 6, 8, 12])
-                              ChoiceChip(
-                                label: Text(loc.periodizationDurationWeeks(count)),
-                                selected: weeksCount == count,
-                                onSelected: (_) => _setWeeks(count),
+                        InkWell(
+                          onTap: _pickWeeks,
+                          borderRadius: BorderRadius.circular(12),
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: loc.periodizationWeeks,
+                              prefixIcon: const Icon(Icons.timelapse_rounded),
+                              suffixIcon: const Icon(
+                                Icons.chevron_right_rounded,
                               ),
-                            ChoiceChip(
-                              avatar: const Icon(Icons.tune_rounded, size: 16),
-                              label: Text('$weeksCount sem'),
-                              selected: !const [1, 2, 3, 4, 6, 8, 12]
-                                  .contains(weeksCount),
-                              onSelected: (_) => _askCustomWeeks(),
                             ),
-                          ],
+                            child: Text(
+                              loc.periodizationDurationWeeks(weeksCount),
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),

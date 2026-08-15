@@ -188,7 +188,12 @@ void main() {
     expect(tester.takeException(), isNull);
 
     for (var i = 0; i < 3; i++) {
-      await tester.drag(find.byType(ListView), const Offset(0, -500));
+      await tester.drag(
+        find.byWidgetPredicate(
+          (widget) => widget is ListView && widget.scrollDirection == Axis.vertical,
+        ),
+        const Offset(0, -500),
+      );
       await tester.pumpAndSettle();
     }
     expect(tester.takeException(), isNull);
@@ -652,6 +657,56 @@ void main() {
     expect(history.single.carbsG, 300);
     expect(history.single.proteinGPerKg, 2.2);
     expect(history.single.weightKgUsed, 75);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('phase duration input opens the weeks modal and applies the pick', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    final plan = PeriodizationPlan(
+      id: 'weeks-picker-plan',
+      name: 'Plano semanas',
+      startDate: now,
+      endDate: now.add(const Duration(days: 180)),
+      status: PeriodizationPlanStatus.draft,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        _appWith(PeriodizationPhaseFormScreen(plan: plan)),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+
+    // Default phase duration is 4 weeks (start + 27 days).
+    expect(find.text('4 semanas'), findsOneWidget);
+
+    await tester.tap(find.text('4 semanas'));
+    await tester.pumpAndSettle();
+    expect(find.text('Número de semanas'), findsOneWidget);
+
+    final field = find.widgetWithText(TextField, '4');
+    expect(field, findsOneWidget);
+    await tester.enterText(field, '8');
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Salvar'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('8 semanas'), findsOneWidget);
+    expect(find.text('Número de semanas'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

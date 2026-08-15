@@ -1772,7 +1772,7 @@
   "@periodizationWeeksCustomizedCount": { "placeholders": { "count": { "type": "int" } } },
   "periodizationDurationWeeks": "{weeks, plural, =1{1 semana} other{{weeks} semanas}}",
   "@periodizationDurationWeeks": { "placeholders": { "weeks": { "type": "int" } } },
-  "periodizationCustomWeeks": "Semanas",
+  "periodizationPickWeeksTitle": "Número de semanas",
   "periodizationProteinPerKg": "Proteína (g/kg)",
   "periodizationFatPerKg": "Gordura (g/kg)",
   "periodizationCarbsRemainder": "Carboidrato (restante)",
