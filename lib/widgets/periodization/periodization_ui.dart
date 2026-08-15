@@ -106,17 +106,16 @@ class PeriodizationSurface extends StatelessWidget {
       ),
       child: Padding(padding: padding, child: child),
     );
+    if (onTap == null) return content;
     return Material(
       color: Colors.transparent,
       clipBehavior: Clip.antiAlias,
       borderRadius: BorderRadius.circular(18),
-      child: onTap == null
-          ? content
-          : InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(18),
-              child: content,
-            ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: content,
+      ),
     );
   }
 }

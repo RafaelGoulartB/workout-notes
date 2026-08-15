@@ -1243,7 +1243,7 @@ class _PeriodizationPhaseFormScreenState
         child: ExpansionTile(
           initiallyExpanded: initiallyExpanded,
           tilePadding: const EdgeInsets.fromLTRB(14, 5, 12, 5),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
           shape: const Border(),
           collapsedShape: const Border(),
           leading: Container(
