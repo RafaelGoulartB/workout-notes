@@ -7,7 +7,14 @@ import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
 
 typedef NutritionGoalApplyCallback =
-    void Function(double calories, double proteinG, double carbsG, double fatG);
+    void Function(
+      double calories,
+      double proteinG,
+      double carbsG,
+      double fatG, {
+      double? proteinPerKg,
+      double? fatPerKg,
+    });
 
 /// Bottom sheet that estimates daily calories and macros from the body
 /// profile using the Mifflin-St Jeor equation. The profile is persisted
@@ -247,11 +254,14 @@ class _NutritionGoalSuggestSheetState extends State<NutritionGoalSuggestSheet> {
       );
     }
     if (!mounted) return;
+    final appliedRatios = _ratiosFor(_objective)!;
     widget.onApply(
       suggestion.calories,
       suggestion.proteinG,
       suggestion.carbsG,
       suggestion.fatG,
+      proteinPerKg: appliedRatios.proteinPerKg,
+      fatPerKg: appliedRatios.fatPerKg,
     );
     Navigator.of(context).pop();
     ScaffoldMessenger.of(

@@ -1,3 +1,5 @@
+import 'package:workout_notes/utils/macro_calculator.dart';
+
 /// User body-weight objective used by [suggestNutritionGoal].
 enum NutritionObjective { cut, maintenance, bulk }
 
@@ -102,15 +104,18 @@ NutritionGoalSuggestion suggestNutritionGoal({
   if (ratios.proteinPerKg <= 0 || ratios.fatPerKg <= 0) {
     throw ArgumentError('macro ratios must be positive');
   }
-  final protein = ratios.proteinPerKg * weightKg;
-  final fat = ratios.fatPerKg * weightKg;
-  final carbs = (calories - protein * 4 - fat * 9) / 4;
+  final macros = computeMacros(
+    calories: calories,
+    proteinPerKg: ratios.proteinPerKg,
+    fatPerKg: ratios.fatPerKg,
+    weightKg: weightKg,
+  );
   return NutritionGoalSuggestion(
     bmr: bmr.roundToDouble(),
     tdee: tdee.roundToDouble(),
     calories: calories.roundToDouble(),
-    proteinG: protein.roundToDouble(),
-    carbsG: carbs < 0 ? 0 : carbs.roundToDouble(),
-    fatG: fat.roundToDouble(),
+    proteinG: macros.proteinG,
+    carbsG: macros.carbsG,
+    fatG: macros.fatG,
   );
 }

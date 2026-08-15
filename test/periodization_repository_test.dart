@@ -650,6 +650,255 @@ void main() {
     expect(projection.estimatedGoalDate, isNotNull);
     expect(projection.estimatedGoalDate!.isAfter(today), isTrue);
   });
+
+  test('weekly targets collapse identical weeks into versioned blocks', () async {
+    final plan = await repository.createPlan(
+      name: 'Weekly',
+      startDate: DateTime(2026, 1, 1),
+      endDate: DateTime(2026, 1, 31),
+    );
+    final phase = await repository.addPhase(
+      planId: plan.id,
+      name: 'Base',
+      startDate: plan.startDate,
+      endDate: plan.endDate,
+      color: 1,
+      weeklyTargets: [
+        target(calories: 2200),
+        target(calories: 2200),
+        target(calories: 2200),
+        target(calories: 2400),
+        target(calories: 2400),
+      ],
+    );
+
+    final history = await repository.getTargetHistory(phase.id);
+    expect(history, hasLength(2));
+    final ascending = [...history]..sort(
+      (a, b) => a.version.compareTo(b.version),
+    );
+    expect(ascending.first.validFrom, DateTime(2026, 1, 1));
+    expect(ascending.last.validFrom, DateTime(2026, 1, 22));
+    expect(
+      (await repository.getEffectiveTarget(
+        phase.id,
+        date: DateTime(2026, 1, 15),
+      ))?.calories,
+      2200,
+    );
+    expect(
+      (await repository.getEffectiveTarget(
+        phase.id,
+        date: DateTime(2026, 1, 25),
+      ))?.calories,
+      2400,
+    );
+  });
+
+  test('weekly targets keep g/kg metadata on the persisted version', () async {
+    final plan = await repository.createPlan(
+      name: 'Ratios',
+      startDate: DateTime(2026, 1, 1),
+      endDate: DateTime(2026, 1, 14),
+    );
+    final phase = await repository.addPhase(
+      planId: plan.id,
+      name: 'Base',
+      startDate: plan.startDate,
+      endDate: plan.endDate,
+      color: 1,
+      weeklyTargets: [
+        PeriodizationTarget(
+          id: '',
+          phaseId: '',
+          version: 0,
+          validFrom: plan.startDate,
+          calories: 2400,
+          proteinG: 165,
+          carbsG: 245,
+          fatG: 60,
+          proteinGPerKg: 2.2,
+          fatGPerKg: 0.8,
+          weightKgUsed: 75,
+          createdAt: DateTime(2026, 1, 1),
+        ),
+      ],
+    );
+
+    final saved = await repository.getEffectiveTarget(phase.id);
+    expect(saved?.proteinGPerKg, 2.2);
+    expect(saved?.fatGPerKg, 0.8);
+    expect(saved?.weightKgUsed, 75);
+    expect(saved?.carbsG, 245);
+  });
+
+  test('replaceFrom preserves locked history and rewrites later weeks', () async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = today.subtract(const Duration(days: 14));
+    final end = today.add(const Duration(days: 13));
+    final plan = await repository.createPlan(
+      name: 'Replace',
+      startDate: start,
+      endDate: end,
+    );
+    final phase = await repository.addPhase(
+      planId: plan.id,
+      name: 'Base',
+      startDate: start,
+      endDate: end,
+      color: 1,
+      weeklyTargets: List.filled(4, target(calories: 2200)),
+    );
+    expect(await repository.getTargetHistory(phase.id), hasLength(1));
+
+    await repository.saveWeeklyTargets(
+      phase.id,
+      [target(calories: 2000), target(calories: 2000)],
+      replaceFrom: today,
+    );
+    final history = await repository.getTargetHistory(phase.id);
+    expect(history, hasLength(2));
+    expect(
+      (await repository.getEffectiveTarget(
+        phase.id,
+        date: today.subtract(const Duration(days: 1)),
+      ))?.calories,
+      2200,
+    );
+    expect(
+      (await repository.getEffectiveTarget(phase.id, date: today))?.calories,
+      2000,
+    );
+    expect(
+      (await repository.getEffectiveTarget(
+        phase.id,
+        date: today.add(const Duration(days: 7)),
+      ))?.calories,
+      2000,
+    );
+
+    // Saving weeks equal to the retained baseline removes the override
+    // without touching the locked version.
+    await repository.saveWeeklyTargets(
+      phase.id,
+      [target(calories: 2200)],
+      replaceFrom: today,
+    );
+    expect(await repository.getTargetHistory(phase.id), hasLength(1));
+    expect(
+      (await repository.getEffectiveTarget(
+        phase.id,
+        date: today.add(const Duration(days: 7)),
+      ))?.calories,
+      2200,
+    );
+  });
+
+  test('updatePhaseWithTargetAndRoutine accepts weekly targets', () async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = today.subtract(const Duration(days: 7));
+    final end = today.add(const Duration(days: 20));
+    final plan = await repository.createPlan(
+      name: 'Atomic weekly',
+      startDate: start,
+      endDate: end,
+    );
+    final phase = await repository.addPhase(
+      planId: plan.id,
+      name: 'Original',
+      startDate: start,
+      endDate: end,
+      color: 1,
+      target: target(calories: 2200),
+    );
+
+    await repository.updatePhaseWithTargetAndRoutine(
+      PeriodizationPhase(
+        id: phase.id,
+        planId: phase.planId,
+        name: 'Edited',
+        color: phase.color,
+        startDate: phase.startDate,
+        endDate: phase.endDate,
+        orderIndex: phase.orderIndex,
+        createdAt: phase.createdAt,
+        updatedAt: DateTime.now(),
+      ),
+      shiftFollowingPhases: false,
+      targetChanged: true,
+      weeklyTargets: [target(calories: 2100), target(calories: 2100)],
+      weeklyReplaceFrom: today,
+      routineId: null,
+      routineLinkId: null,
+    );
+
+    expect((await repository.getPhase(phase.id))?.name, 'Edited');
+    expect(
+      (await repository.getEffectiveTarget(phase.id, date: today))?.calories,
+      2100,
+    );
+    expect(
+      (await repository.getEffectiveTarget(
+        phase.id,
+        date: today.subtract(const Duration(days: 1)),
+      ))?.calories,
+      2200,
+    );
+  });
+
+  test('weekly window beyond the phase end is rejected', () async {
+    final plan = await repository.createPlan(
+      name: 'Window',
+      startDate: DateTime(2026, 1, 1),
+      endDate: DateTime(2026, 1, 28),
+    );
+    await expectLater(
+      repository.addPhase(
+        planId: plan.id,
+        name: 'Too long',
+        startDate: plan.startDate,
+        endDate: plan.endDate,
+        color: 1,
+        weeklyTargets: List.filled(5, target()),
+      ),
+      throwsA(
+        isA<PeriodizationValidationException>().having(
+          (error) => error.code,
+          'code',
+          'target_outside_phase',
+        ),
+      ),
+    );
+  });
+
+  test('all-empty weekly targets persist no versions', () async {
+    final plan = await repository.createPlan(
+      name: 'Empty',
+      startDate: DateTime(2026, 1, 1),
+      endDate: DateTime(2026, 1, 14),
+    );
+    final phase = await repository.addPhase(
+      planId: plan.id,
+      name: 'Base',
+      startDate: plan.startDate,
+      endDate: plan.endDate,
+      color: 1,
+      weeklyTargets: List.filled(
+        2,
+        PeriodizationTarget(
+          id: '',
+          phaseId: '',
+          version: 0,
+          validFrom: plan.startDate,
+          createdAt: DateTime(2026, 1, 1),
+        ),
+      ),
+    );
+    expect(await repository.getTargetHistory(phase.id), isEmpty);
+    expect(await repository.getEffectiveTarget(phase.id), isNull);
+  });
 }
 
 String _testDate(DateTime date) => DateTime(

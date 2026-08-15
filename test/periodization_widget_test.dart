@@ -7,6 +7,8 @@ import 'package:workout_notes/database/database_periodization_schema.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
+import 'package:workout_notes/models/periodization_target.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/screens/workout/periodization_home_screen.dart';
 import 'package:workout_notes/screens/workout/periodization_phase_form_screen.dart';
 
@@ -224,6 +226,8 @@ void main() {
       350,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.ensureVisible(suggestion);
+    await tester.pumpAndSettle();
     await tester.tap(suggestion);
     await tester.pump();
     await tester.runAsync(
@@ -311,6 +315,251 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Pico'), findsOneWidget);
     expect(find.byIcon(Icons.check_rounded), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('phase editor shows weekly chips and computes macros live', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    final plan = PeriodizationPlan(
+      id: 'weekly-plan',
+      name: 'Plano semanal',
+      startDate: now,
+      endDate: now.add(const Duration(days: 180)),
+      status: PeriodizationPlanStatus.draft,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        _appWith(PeriodizationPhaseFormScreen(plan: plan)),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+
+    await tester.scrollUntilVisible(
+      find.text('S1'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('S1'), findsOneWidget);
+    expect(find.text('Semana base'), findsOneWidget);
+
+    final caloriesField = find.widgetWithText(TextField, 'kcal por dia');
+    await tester.scrollUntilVisible(
+      caloriesField,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(caloriesField, '2400');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Proteína (g/kg)'),
+      '2.2',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Gordura (g/kg)'),
+      '0.8',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Peso de referência (kg)'),
+      '75',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Macros calculados'), findsOneWidget);
+    expect(find.text('165 g'), findsOneWidget);
+    expect(find.text('60 g'), findsOneWidget);
+    expect(find.text('300 g'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('inherited weeks offer customize and revert actions', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    final plan = PeriodizationPlan(
+      id: 'inherit-plan',
+      name: 'Plano herança',
+      startDate: now,
+      endDate: now.add(const Duration(days: 180)),
+      status: PeriodizationPlanStatus.draft,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        _appWith(PeriodizationPhaseFormScreen(plan: plan)),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+
+    await tester.scrollUntilVisible(
+      find.text('S2'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('S2'));
+    await tester.pumpAndSettle();
+    expect(find.text('Herdando da semana 1'), findsOneWidget);
+
+    await tester.tap(find.text('Personalizar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Personalizada'), findsOneWidget);
+
+    await tester.tap(find.text('Herdar da anterior'));
+    await tester.pumpAndSettle();
+    expect(find.text('Herdando da semana 1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('saving a phase persists one version per customized week', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    final plan = (await tester.runAsync(
+      () => PeriodizationRepository().createPlan(
+        name: 'Plano persistente',
+        startDate: now,
+        endDate: now.add(const Duration(days: 180)),
+      ),
+    ))!;
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        _appWith(PeriodizationPhaseFormScreen(plan: plan)),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+
+    await tester.enterText(find.byType(TextFormField), 'Fase de teste');
+
+    final caloriesField = find.widgetWithText(TextField, 'kcal por dia');
+    await tester.scrollUntilVisible(
+      caloriesField,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(caloriesField, '2400');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Proteína (g/kg)'),
+      '2.2',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Gordura (g/kg)'),
+      '0.8',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Peso de referência (kg)'),
+      '75',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Salvar'));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await tester.pump();
+    });
+    await tester.pumpAndSettle();
+
+    final phases = await tester.runAsync(
+      () => PeriodizationRepository().getPhases(plan.id),
+    );
+    final history = await tester.runAsync(
+      () => PeriodizationRepository().getTargetHistory(phases!.single.id),
+    );
+    expect(history, hasLength(1));
+    expect(history!.single.calories, 2400);
+    expect(history.single.carbsG, 300);
+    expect(history.single.proteinGPerKg, 2.2);
+    expect(history.single.fatGPerKg, 0.8);
+    expect(history.single.weightKgUsed, 75);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('locked past weeks render read-only targets in edit mode', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = today.subtract(const Duration(days: 21));
+    final end = today.add(const Duration(days: 13));
+    final plan = (await tester.runAsync(
+      () => PeriodizationRepository().createPlan(
+        name: 'Plano histórico',
+        startDate: start,
+        endDate: end,
+      ),
+    ))!;
+    final phase = (await tester.runAsync(() async {
+      final repository = PeriodizationRepository();
+      return repository.addPhase(
+        planId: plan.id,
+        name: 'Fase histórica',
+        startDate: start,
+        endDate: end,
+        color: 1,
+        weeklyTargets: List.filled(
+          5,
+          PeriodizationTarget(
+            id: '',
+            phaseId: '',
+            version: 0,
+            validFrom: start,
+            calories: 2200,
+            proteinG: 180,
+            carbsG: 250,
+            fatG: 60,
+            createdAt: now,
+          ),
+        ),
+      );
+    }))!;
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        _appWith(PeriodizationPhaseFormScreen(plan: plan, phase: phase)),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+
+    await tester.scrollUntilVisible(
+      find.text('S1'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('S1'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Encerrada'), findsOneWidget);
+    expect(find.text('2200 kcal'), findsOneWidget);
+    expect(find.byIcon(Icons.lock_rounded), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 }

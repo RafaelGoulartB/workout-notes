@@ -151,7 +151,14 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
       context,
       bodyRepo: _bodyRepo,
       settingsRepo: _settingsRepo,
-      onApply: (calories, protein, carbs, fat) async {
+      onApply: (
+        calories,
+        protein,
+        carbs,
+        fat, {
+        double? proteinPerKg,
+        double? fatPerKg,
+      }) async {
         if (!mounted) return;
         await _saveGoalField(
           calories: calories,

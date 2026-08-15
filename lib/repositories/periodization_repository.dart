@@ -299,10 +299,15 @@ class PeriodizationRepository extends BaseRepository {
     String? intent,
     String? templateKey,
     PeriodizationTarget? target,
+    List<PeriodizationTarget>? weeklyTargets,
     String? routineId,
   }) async {
     _validateNameAndDates(name, startDate, endDate);
     if (target != null && !target.isEmpty) _validateTarget(target);
+    if (weeklyTargets != null) {
+      _validateWeeklyWindow(_day(startDate), _day(startDate), _day(endDate),
+          weeklyTargets);
+    }
     final plan = await getPlan(planId);
     if (plan == null) {
       throw const PeriodizationValidationException('plan_not_found');
@@ -327,7 +332,15 @@ class PeriodizationRepository extends BaseRepository {
     final database = await db;
     await database.transaction((txn) async {
       await txn.insert('periodization_phases', phase.toMap());
-      if (target != null && !target.isEmpty) {
+      if (weeklyTargets != null) {
+        await _replaceTargetsFrom(
+          txn,
+          phaseId: phase.id,
+          phaseEnd: phase.endDate,
+          boundary: phase.startDate,
+          weeks: weeklyTargets,
+        );
+      } else if (target != null && !target.isEmpty) {
         await txn.insert(
           'phase_targets',
           _targetMap(
@@ -362,7 +375,9 @@ class PeriodizationRepository extends BaseRepository {
     PeriodizationPhase phase, {
     required bool shiftFollowingPhases,
     required bool targetChanged,
-    required PeriodizationTarget target,
+    PeriodizationTarget? target,
+    List<PeriodizationTarget>? weeklyTargets,
+    DateTime? weeklyReplaceFrom,
     required String? routineId,
     required String? routineLinkId,
   }) => _updatePhase(
@@ -370,6 +385,8 @@ class PeriodizationRepository extends BaseRepository {
     shiftFollowingPhases: shiftFollowingPhases,
     targetChanged: targetChanged,
     target: target,
+    weeklyTargets: weeklyTargets,
+    weeklyReplaceFrom: weeklyReplaceFrom,
     replaceRoutine: true,
     routineId: routineId,
     routineLinkId: routineLinkId,
@@ -380,16 +397,27 @@ class PeriodizationRepository extends BaseRepository {
     required bool shiftFollowingPhases,
     bool targetChanged = false,
     PeriodizationTarget? target,
+    List<PeriodizationTarget>? weeklyTargets,
+    DateTime? weeklyReplaceFrom,
     bool replaceRoutine = false,
     String? routineId,
     String? routineLinkId,
   }) async {
     _validateNameAndDates(phase.name, phase.startDate, phase.endDate);
     if (targetChanged) {
-      if (target == null) {
-        throw const PeriodizationValidationException('invalid_target');
+      if (weeklyTargets != null) {
+        _validateWeeklyWindow(
+          _weeklyBoundary(phase, weeklyReplaceFrom),
+          phase.startDate,
+          phase.endDate,
+          weeklyTargets,
+        );
+      } else {
+        if (target == null) {
+          throw const PeriodizationValidationException('invalid_target');
+        }
+        _validateTarget(target);
       }
-      _validateTarget(target);
     }
     final existing = await getPhase(phase.id);
     if (existing == null) {
@@ -467,6 +495,9 @@ class PeriodizationRepository extends BaseRepository {
     final startDeltaDays = phase.startDate
         .difference(existing.startDate)
         .inDays;
+    final weeklyBoundary = weeklyTargets == null
+        ? null
+        : _weeklyBoundary(phase, weeklyReplaceFrom);
 
     int dateShiftFor(PeriodizationPhase item) {
       if (item.id == phase.id) return startDeltaDays;
@@ -494,8 +525,15 @@ class PeriodizationRepository extends BaseRepository {
         final projected = DateTime.parse(
           targetRow['valid_from'] as String,
         ).add(Duration(days: dateShift));
-        if (projected.isBefore(item.startDate) ||
-            projected.isAfter(item.endDate)) {
+        // Weekly replacement deletes this phase's versions on or after the
+        // boundary, so those rows may shift out of bounds harmlessly.
+        final replacedByWeekly =
+            weeklyBoundary != null &&
+            item.id == phase.id &&
+            !projected.isBefore(weeklyBoundary);
+        if (!replacedByWeekly &&
+            (projected.isBefore(item.startDate) ||
+                projected.isAfter(item.endDate))) {
           throw const PeriodizationValidationException(
             'replan_excludes_targets',
           );
@@ -538,7 +576,9 @@ class PeriodizationRepository extends BaseRepository {
     final newTargetValidFrom = _day(
       today.isAfter(phase.startDate) ? today : phase.startDate,
     );
-    if (targetChanged && newTargetValidFrom.isAfter(phase.endDate)) {
+    if (targetChanged &&
+        weeklyTargets == null &&
+        newTargetValidFrom.isAfter(phase.endDate)) {
       throw const PeriodizationValidationException('target_outside_phase');
     }
 
@@ -613,15 +653,25 @@ class PeriodizationRepository extends BaseRepository {
         }
       }
       if (targetChanged) {
-        await txn.insert(
-          'phase_targets',
-          _targetMap(
-            target!,
+        if (weeklyTargets != null && weeklyBoundary != null) {
+          await _replaceTargetsFrom(
+            txn,
             phaseId: phase.id,
-            version: nextTargetVersion,
-            validFrom: newTargetValidFrom,
-          ),
-        );
+            phaseEnd: phase.endDate,
+            boundary: weeklyBoundary,
+            weeks: weeklyTargets,
+          );
+        } else {
+          await txn.insert(
+            'phase_targets',
+            _targetMap(
+              target!,
+              phaseId: phase.id,
+              version: nextTargetVersion,
+              validFrom: newTargetValidFrom,
+            ),
+          );
+        }
       }
       if (replaceRoutine) {
         if (routineLinkId != null) {
@@ -767,6 +817,9 @@ class PeriodizationRepository extends BaseRepository {
       proteinG: target.proteinG,
       carbsG: target.carbsG,
       fatG: target.fatG,
+      proteinGPerKg: target.proteinGPerKg,
+      fatGPerKg: target.fatGPerKg,
+      weightKgUsed: target.weightKgUsed,
       workoutsPerWeek: target.workoutsPerWeek,
       minSetsPerWeek: target.minSetsPerWeek,
       maxSetsPerWeek: target.maxSetsPerWeek,
@@ -780,6 +833,37 @@ class PeriodizationRepository extends BaseRepository {
     final database = await db;
     await database.insert('phase_targets', saved.toMap());
     return saved;
+  }
+
+  /// Saves one effective target per phase week (index 0 = first week).
+  ///
+  /// Consecutive identical weeks collapse into a single `phase_targets`
+  /// version: week k starts at `phase.startDate + (k − 1) × 7` days and the
+  /// effective target only changes where the week actually differs from the
+  /// previous one. When [replaceFrom] is given, existing versions with
+  /// `valid_from` on or after that date are replaced and earlier versions
+  /// (locked history) are preserved.
+  Future<void> saveWeeklyTargets(
+    String phaseId,
+    List<PeriodizationTarget> weeks, {
+    DateTime? replaceFrom,
+  }) async {
+    final phase = await getPhase(phaseId);
+    if (phase == null) {
+      throw const PeriodizationValidationException('phase_not_found');
+    }
+    final boundary = _weeklyBoundary(phase, replaceFrom);
+    _validateWeeklyWindow(boundary, phase.startDate, phase.endDate, weeks);
+    final database = await db;
+    await database.transaction((txn) async {
+      await _replaceTargetsFrom(
+        txn,
+        phaseId: phaseId,
+        phaseEnd: phase.endDate,
+        boundary: boundary,
+        weeks: weeks,
+      );
+    });
   }
 
   Future<List<Map<String, dynamic>>> getRoutineLinks(String phaseId) async {
@@ -1613,6 +1697,9 @@ class PeriodizationRepository extends BaseRepository {
       proteinG: target.proteinG,
       carbsG: target.carbsG,
       fatG: target.fatG,
+      proteinGPerKg: target.proteinGPerKg,
+      fatGPerKg: target.fatGPerKg,
+      weightKgUsed: target.weightKgUsed,
       workoutsPerWeek: target.workoutsPerWeek,
       minSetsPerWeek: target.minSetsPerWeek,
       maxSetsPerWeek: target.maxSetsPerWeek,
@@ -1641,6 +1728,120 @@ class PeriodizationRepository extends BaseRepository {
     final oldest = [...targets]..sort((a, b) => a.version.compareTo(b.version));
     return oldest.first;
   }
+
+  static DateTime _weeklyBoundary(
+    PeriodizationPhase phase,
+    DateTime? replaceFrom,
+  ) {
+    final today = _day(DateTime.now());
+    final fallback = today.isAfter(phase.startDate)
+        ? today
+        : phase.startDate;
+    return _day(replaceFrom ?? fallback);
+  }
+
+  static void _validateWeeklyWindow(
+    DateTime boundary,
+    DateTime phaseStart,
+    DateTime phaseEnd,
+    List<PeriodizationTarget> weeks,
+  ) {
+    if (boundary.isBefore(phaseStart) || boundary.isAfter(phaseEnd)) {
+      throw const PeriodizationValidationException('target_outside_phase');
+    }
+    for (var i = 0; i < weeks.length; i++) {
+      final week = weeks[i];
+      if (!week.isEmpty) _validateTarget(week);
+      if (boundary.add(Duration(days: 7 * i)).isAfter(phaseEnd)) {
+        throw const PeriodizationValidationException('target_outside_phase');
+      }
+    }
+  }
+
+  /// Replaces every target version with `valid_from >= [boundary]` by the
+  /// collapsed representation of [weeks] (one effective target per week,
+  /// starting exactly at [boundary]). Versions before [boundary] — the
+  /// locked history — are left untouched.
+  static Future<void> _replaceTargetsFrom(
+    DatabaseExecutor txn, {
+    required String phaseId,
+    required DateTime phaseEnd,
+    required DateTime boundary,
+    required List<PeriodizationTarget> weeks,
+  }) async {
+    final rows = await txn.query(
+      'phase_targets',
+      where: 'phase_id = ?',
+      whereArgs: [phaseId],
+    );
+    final history = rows.map(PeriodizationTarget.fromMap).toList();
+    final retained = history
+        .where((target) => target.validFrom.isBefore(boundary))
+        .toList();
+    final baseline = _targetForDate(
+      retained,
+      boundary.subtract(const Duration(days: 1)),
+    );
+    final nextVersion = history.isEmpty
+        ? 1
+        : history.map((target) => target.version).reduce(math.max) + 1;
+    await txn.delete(
+      'phase_targets',
+      where: 'phase_id = ? AND valid_from >= ?',
+      whereArgs: [phaseId, _date(boundary)],
+    );
+    await _insertWeeklyTargets(
+      txn,
+      phaseId: phaseId,
+      weeks: weeks,
+      firstValidFrom: boundary,
+      firstVersion: nextVersion,
+      baseline: baseline,
+    );
+  }
+
+  static Future<void> _insertWeeklyTargets(
+    DatabaseExecutor txn, {
+    required String phaseId,
+    required List<PeriodizationTarget> weeks,
+    required DateTime firstValidFrom,
+    required int firstVersion,
+    PeriodizationTarget? baseline,
+  }) async {
+    // A null baseline (no retained history) behaves like an empty target so
+    // leading empty weeks never create versions.
+    var previous = baseline ??
+        PeriodizationTarget(
+          id: '',
+          phaseId: phaseId,
+          version: 0,
+          validFrom: firstValidFrom,
+          createdAt: DateTime.now(),
+        );
+    var version = firstVersion;
+    for (var i = 0; i < weeks.length; i++) {
+      final week = weeks[i];
+      if (!_sameTargets(week, previous)) {
+        await txn.insert(
+          'phase_targets',
+          _targetMap(
+            week,
+            phaseId: phaseId,
+            version: version,
+            validFrom: firstValidFrom.add(Duration(days: 7 * i)),
+          ),
+        );
+        version++;
+      }
+      previous = week;
+    }
+  }
+
+  static bool _sameTargets(PeriodizationTarget a, PeriodizationTarget b) =>
+      a.nutritionJson.toString() == b.nutritionJson.toString() &&
+      a.trainingJson.toString() == b.trainingJson.toString() &&
+      a.bodyJson.toString() == b.bodyJson.toString() &&
+      a.sleepJson.toString() == b.sleepJson.toString();
 
   static double _adherenceScore(
     double? actual,

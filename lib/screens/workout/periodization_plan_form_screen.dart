@@ -5,8 +5,10 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/models/periodization_template.dart';
+import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
+import 'package:workout_notes/widgets/periodization/nutrition_target_fields.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 
 class PeriodizationPlanFormScreen extends StatefulWidget {
@@ -281,11 +283,19 @@ class _PeriodizationPlanFormScreenState
 
   Future<void> _editTargets(int index) async {
     final phase = _phases[index];
+    final latestWeight = await BodyMeasurementRepository().getLatestWeightKg();
+    if (!mounted) return;
     final controllers = <String, TextEditingController>{
-      'calories': _controller(phase.calories),
-      'protein': _controller(phase.proteinG),
-      'carbs': _controller(phase.carbsG),
-      'fat': _controller(phase.fatG),
+      'calories': TextEditingController(text: _prefill(phase.calories)),
+      'proteinPerKg': TextEditingController(
+        text: _prefill(phase.proteinGPerKg ?? _ratio(phase.proteinG, latestWeight)),
+      ),
+      'fatPerKg': TextEditingController(
+        text: _prefill(phase.fatGPerKg ?? _ratio(phase.fatG, latestWeight)),
+      ),
+      'refWeight': TextEditingController(
+        text: _prefill(phase.weightKgUsed ?? latestWeight),
+      ),
       'workouts': _controller(phase.workoutsPerWeek),
       'minSets': _controller(phase.minSetsPerWeek),
       'maxSets': _controller(phase.maxSetsPerWeek),
@@ -322,21 +332,12 @@ class _PeriodizationPlanFormScreenState
                 AppLocalizations.of(context)!.periodizationNutritionTargets,
                 Icons.restaurant_outlined,
                 [
-                  _numberField(
-                    controllers['calories']!,
-                    AppLocalizations.of(context)!.periodizationCaloriesPerDay,
-                  ),
-                  _numberField(
-                    controllers['protein']!,
-                    AppLocalizations.of(context)!.periodizationProteinG,
-                  ),
-                  _numberField(
-                    controllers['carbs']!,
-                    AppLocalizations.of(context)!.periodizationCarbsG,
-                  ),
-                  _numberField(
-                    controllers['fat']!,
-                    AppLocalizations.of(context)!.periodizationFatG,
+                  NutritionTargetFields(
+                    calories: controllers['calories']!,
+                    proteinPerKg: controllers['proteinPerKg']!,
+                    fatPerKg: controllers['fatPerKg']!,
+                    referenceWeight: controllers['refWeight']!,
+                    onChanged: () => setSheetState(() {}),
                   ),
                 ],
               ),
@@ -429,7 +430,27 @@ class _PeriodizationPlanFormScreenState
               ),
               const SizedBox(height: 20),
               FilledButton(
-                onPressed: () => Navigator.pop(sheetContext, true),
+                onPressed: () {
+                  final breakdown = NutritionTargetFields.breakdownOf(
+                    calories: controllers['calories']!,
+                    proteinPerKg: controllers['proteinPerKg']!,
+                    fatPerKg: controllers['fatPerKg']!,
+                    referenceWeight: controllers['refWeight']!,
+                  );
+                  if (breakdown != null && breakdown.energyConflict) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          AppLocalizations.of(
+                            context,
+                          )!.nutritionSuggestMacroEnergyError,
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.pop(sheetContext, true);
+                },
                 child: Text(AppLocalizations.of(context)!.commonSave),
               ),
             ],
@@ -439,10 +460,21 @@ class _PeriodizationPlanFormScreenState
     );
     if (result == true && mounted) {
       setState(() {
-        phase.calories = _double(controllers['calories']);
-        phase.proteinG = _double(controllers['protein']);
-        phase.carbsG = _double(controllers['carbs']);
-        phase.fatG = _double(controllers['fat']);
+        final breakdown = NutritionTargetFields.breakdownOf(
+          calories: controllers['calories']!,
+          proteinPerKg: controllers['proteinPerKg']!,
+          fatPerKg: controllers['fatPerKg']!,
+          referenceWeight: controllers['refWeight']!,
+        );
+        if (breakdown != null) {
+          phase.calories = breakdown.calories;
+          phase.proteinG = breakdown.proteinG;
+          phase.carbsG = breakdown.carbsG;
+          phase.fatG = breakdown.fatG;
+          phase.proteinGPerKg = breakdown.proteinPerKg;
+          phase.fatGPerKg = breakdown.fatPerKg;
+          phase.weightKgUsed = breakdown.weightKg;
+        }
         phase.workoutsPerWeek = _int(controllers['workouts']);
         phase.minSetsPerWeek = _int(controllers['minSets']);
         phase.maxSetsPerWeek = _int(controllers['maxSets']);
@@ -1215,6 +1247,18 @@ class _PeriodizationPlanFormScreenState
       double.tryParse(controller?.text.trim().replaceAll(',', '.') ?? '');
   static int? _int(TextEditingController? controller) =>
       int.tryParse(controller?.text.trim() ?? '');
+  static double? _ratio(double? grams, double? weight) {
+    if (grams == null || weight == null || weight <= 0) return null;
+    return grams / weight;
+  }
+
+  static String _prefill(num? value) {
+    if (value == null) return '';
+    if (value is double && value == value.roundToDouble()) {
+      return value.toStringAsFixed(0);
+    }
+    return value.toString();
+  }
 }
 
 class _EditablePhase {
@@ -1227,6 +1271,9 @@ class _EditablePhase {
   double? proteinG;
   double? carbsG;
   double? fatG;
+  double? proteinGPerKg;
+  double? fatGPerKg;
+  double? weightKgUsed;
   int? workoutsPerWeek;
   int? minSetsPerWeek;
   int? maxSetsPerWeek;
@@ -1254,6 +1301,9 @@ class _EditablePhase {
     proteinG: proteinG,
     carbsG: carbsG,
     fatG: fatG,
+    proteinGPerKg: proteinGPerKg,
+    fatGPerKg: fatGPerKg,
+    weightKgUsed: weightKgUsed,
     workoutsPerWeek: workoutsPerWeek,
     minSetsPerWeek: minSetsPerWeek,
     maxSetsPerWeek: maxSetsPerWeek,

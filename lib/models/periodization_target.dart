@@ -9,6 +9,12 @@ class PeriodizationTarget {
   final double? proteinG;
   final double? carbsG;
   final double? fatG;
+
+  /// How the nutrition grams were defined: g/kg ratios and the reference
+  /// weight they were multiplied by. Meta only — consumers read the grams.
+  final double? proteinGPerKg;
+  final double? fatGPerKg;
+  final double? weightKgUsed;
   final int? workoutsPerWeek;
   final int? minSetsPerWeek;
   final int? maxSetsPerWeek;
@@ -28,6 +34,9 @@ class PeriodizationTarget {
     this.proteinG,
     this.carbsG,
     this.fatG,
+    this.proteinGPerKg,
+    this.fatGPerKg,
+    this.weightKgUsed,
     this.workoutsPerWeek,
     this.minSetsPerWeek,
     this.maxSetsPerWeek,
@@ -58,6 +67,9 @@ class PeriodizationTarget {
     if (proteinG != null) 'protein_g': proteinG,
     if (carbsG != null) 'carbs_g': carbsG,
     if (fatG != null) 'fat_g': fatG,
+    if (proteinGPerKg != null) 'protein_g_per_kg': proteinGPerKg,
+    if (fatGPerKg != null) 'fat_g_per_kg': fatGPerKg,
+    if (weightKgUsed != null) 'weight_kg_used': weightKgUsed,
   };
 
   Map<String, dynamic> get trainingJson => {
@@ -77,6 +89,51 @@ class PeriodizationTarget {
   Map<String, dynamic> get sleepJson => {
     if (sleepHours != null) 'hours': sleepHours,
   };
+
+  PeriodizationTarget copyWith({
+    String? id,
+    String? phaseId,
+    int? version,
+    DateTime? validFrom,
+    double? calories,
+    double? proteinG,
+    double? carbsG,
+    double? fatG,
+    double? proteinGPerKg,
+    double? fatGPerKg,
+    double? weightKgUsed,
+    int? workoutsPerWeek,
+    int? minSetsPerWeek,
+    int? maxSetsPerWeek,
+    double? minRpe,
+    double? maxRpe,
+    double? targetWeightKg,
+    double? weeklyWeightChangePercent,
+    double? sleepHours,
+    DateTime? createdAt,
+  }) => PeriodizationTarget(
+    id: id ?? this.id,
+    phaseId: phaseId ?? this.phaseId,
+    version: version ?? this.version,
+    validFrom: validFrom ?? this.validFrom,
+    calories: calories ?? this.calories,
+    proteinG: proteinG ?? this.proteinG,
+    carbsG: carbsG ?? this.carbsG,
+    fatG: fatG ?? this.fatG,
+    proteinGPerKg: proteinGPerKg ?? this.proteinGPerKg,
+    fatGPerKg: fatGPerKg ?? this.fatGPerKg,
+    weightKgUsed: weightKgUsed ?? this.weightKgUsed,
+    workoutsPerWeek: workoutsPerWeek ?? this.workoutsPerWeek,
+    minSetsPerWeek: minSetsPerWeek ?? this.minSetsPerWeek,
+    maxSetsPerWeek: maxSetsPerWeek ?? this.maxSetsPerWeek,
+    minRpe: minRpe ?? this.minRpe,
+    maxRpe: maxRpe ?? this.maxRpe,
+    targetWeightKg: targetWeightKg ?? this.targetWeightKg,
+    weeklyWeightChangePercent:
+        weeklyWeightChangePercent ?? this.weeklyWeightChangePercent,
+    sleepHours: sleepHours ?? this.sleepHours,
+    createdAt: createdAt ?? this.createdAt,
+  );
 
   Map<String, dynamic> toSnapshot() => {
     'version': version,
@@ -113,6 +170,9 @@ class PeriodizationTarget {
       proteinG: _double(nutrition['protein_g']),
       carbsG: _double(nutrition['carbs_g']),
       fatG: _double(nutrition['fat_g']),
+      proteinGPerKg: _double(nutrition['protein_g_per_kg']),
+      fatGPerKg: _double(nutrition['fat_g_per_kg']),
+      weightKgUsed: _double(nutrition['weight_kg_used']),
       workoutsPerWeek: (training['workouts_per_week'] as num?)?.toInt(),
       minSetsPerWeek: (training['min_sets_per_week'] as num?)?.toInt(),
       maxSetsPerWeek: (training['max_sets_per_week'] as num?)?.toInt(),

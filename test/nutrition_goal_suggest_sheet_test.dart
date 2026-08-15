@@ -68,7 +68,14 @@ void main() {
       _app(
         bodyRepository: _BodyRepository(),
         settingsRepository: settings,
-        onApply: (_, protein, _, _) => appliedProtein = protein,
+        onApply: (
+          _,
+          protein,
+          _,
+          _, {
+          double? proteinPerKg,
+          double? fatPerKg,
+        }) => appliedProtein = protein,
       ),
     );
 
