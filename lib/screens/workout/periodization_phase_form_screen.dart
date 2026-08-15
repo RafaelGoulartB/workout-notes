@@ -5,9 +5,13 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
+import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
-import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
+import 'package:workout_notes/repositories/settings_repository.dart';
+import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
+
+import 'nutrition_goal_suggest_sheet.dart';
 
 class PeriodizationPhaseFormScreen extends StatefulWidget {
   final PeriodizationPlan plan;
@@ -27,6 +31,8 @@ class PeriodizationPhaseFormScreen extends StatefulWidget {
 class _PeriodizationPhaseFormScreenState
     extends State<PeriodizationPhaseFormScreen> {
   final _repository = PeriodizationRepository();
+  final _bodyRepository = BodyMeasurementRepository();
+  final _settingsRepository = SettingsRepository();
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _intent;
@@ -118,6 +124,27 @@ class _PeriodizationPhaseFormScreenState
       _targetControllers[entry.key]!.text = entry.value?.toString() ?? '';
     }
   }
+
+  Future<void> _suggestNutritionTargets() async {
+    await NutritionGoalSuggestSheet.show(
+      context,
+      bodyRepo: _bodyRepository,
+      settingsRepo: _settingsRepository,
+      onApply: (calories, protein, carbs, fat) {
+        if (!mounted) return;
+        setState(() {
+          _targetControllers['calories']!.text = calories.toStringAsFixed(0);
+          _targetControllers['protein']!.text = protein.toStringAsFixed(0);
+          _targetControllers['carbs']!.text = carbs.toStringAsFixed(0);
+          _targetControllers['fat']!.text = fat.toStringAsFixed(0);
+        });
+      },
+    );
+  }
+
+  int _filledTargets(Iterable<String> keys) => keys
+      .where((key) => _targetControllers[key]!.text.trim().isNotEmpty)
+      .length;
 
   Future<void> _pickDate(bool start) async {
     final picked = await showDatePicker(
@@ -274,312 +301,448 @@ class _PeriodizationPhaseFormScreenState
               key: _formKey,
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                children:
-                    [
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Color(_color).withAlpha(44),
-                              theme.colorScheme.surfaceContainerLow,
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Column(
+                children: [
+                  PeriodizationSurface(
+                    accentColor: Color(_color),
+                    selected: true,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            TextFormField(
-                              controller: _name,
-                              decoration: InputDecoration(
-                                labelText: loc.periodizationPhaseName,
-                                prefixIcon: const Icon(Icons.flag_outlined),
-                                border: const OutlineInputBorder(),
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: Color(_color).withAlpha(35),
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                              validator: (value) =>
-                                  value == null || value.trim().isEmpty
-                                  ? loc.periodizationPhaseName
-                                  : null,
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _type,
-                              decoration: InputDecoration(
-                                labelText: loc.periodizationPhaseType,
-                                prefixIcon: const Icon(Icons.category_outlined),
-                                border: const OutlineInputBorder(),
+                              child: Icon(
+                                Icons.flag_rounded,
+                                color: Color(_color),
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _intent,
-                              maxLines: 3,
-                              decoration: InputDecoration(
-                                labelText: loc.periodizationIntent,
-                                alignLabelWithHint: true,
-                                border: const OutlineInputBorder(),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      PeriodizationSectionHeader(
-                        title: loc.periodizationPeriodAndIdentity,
-                        icon: Icons.date_range_outlined,
-                      ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _DateTile(
-                              label: loc.periodizationStartDate,
-                              date: _startDate,
-                              onTap: () => _pickDate(true),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _DateTile(
-                              label: loc.periodizationEndDate,
-                              date: _endDate,
-                              onTap: () => _pickDate(false),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      PeriodizationSurface(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              loc.periodizationColor,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 10,
-                              children: _colors
-                                  .map(
-                                    (value) => Semantics(
-                                      button: true,
-                                      selected: _color == value,
-                                      child: InkWell(
-                                        onTap: () =>
-                                            setState(() => _color = value),
-                                        borderRadius: BorderRadius.circular(24),
-                                        child: CircleAvatar(
-                                          radius: 22,
-                                          backgroundColor: Color(value),
-                                          child: _color == value
-                                              ? const Icon(
-                                                  Icons.check,
-                                                  color: Colors.white,
-                                                )
-                                              : null,
-                                        ),
-                                      ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    loc.periodizationPhaseIdentity,
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w800),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    loc.periodizationPhaseIdentityHelp,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
                                     ),
-                                  )
-                                  .toList(),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                      if (_editing) ...[
-                        const SizedBox(height: 10),
-                        PeriodizationSurface(
-                          padding: EdgeInsets.zero,
-                          child: SwitchListTile(
-                            value: _shiftFollowing,
-                            onChanged: (value) =>
-                                setState(() => _shiftFollowing = value),
-                            secondary: const Icon(Icons.low_priority_rounded),
-                            title: Text(loc.periodizationShiftFollowing),
-                            subtitle: Text(loc.periodizationShiftFollowingHelp),
+                        const SizedBox(height: 18),
+                        TextFormField(
+                          controller: _name,
+                          decoration: InputDecoration(
+                            labelText: loc.periodizationPhaseName,
+                            hintText: loc.periodizationPhaseNameHint,
+                          ),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                              ? loc.periodizationPhaseName
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _type,
+                          decoration: InputDecoration(
+                            labelText: loc.periodizationPhaseType,
+                            hintText: loc.periodizationPhaseTypeHint,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _intent,
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            labelText: loc.periodizationIntent,
+                            hintText: loc.periodizationIntentHint,
+                            alignLabelWithHint: true,
                           ),
                         ),
                       ],
-                      const SizedBox(height: 20),
-                      PeriodizationSectionHeader(
-                        title: loc.periodizationTargets,
-                        subtitle: loc.periodizationOptionalTargets,
-                        icon: Icons.track_changes_rounded,
-                      ),
-                      _targetCard(
-                        loc.periodizationNutritionTargets,
-                        Icons.restaurant_outlined,
-                        [
-                          _field('calories', loc.periodizationCaloriesPerDay),
-                          _field('protein', loc.periodizationProteinG),
-                          _field('carbs', loc.periodizationCarbsG),
-                          _field('fat', loc.periodizationFatG),
-                        ],
-                      ),
-                      _targetCard(
-                        loc.periodizationTrainingTargets,
-                        Icons.fitness_center,
-                        [
-                          _field(
-                            'workouts',
-                            loc.periodizationWorkoutsPerWeek,
-                            integer: true,
-                          ),
-                          _field(
-                            'minSets',
-                            loc.periodizationMinSets,
-                            integer: true,
-                          ),
-                          _field(
-                            'maxSets',
-                            loc.periodizationMaxSets,
-                            integer: true,
-                          ),
-                          _field('minRpe', loc.periodizationMinRpe),
-                          _field('maxRpe', loc.periodizationMaxRpe),
-                        ],
-                      ),
-                      _targetCard(
-                        loc.periodizationBodyTargets,
-                        Icons.monitor_weight_outlined,
-                        [
-                          _field('weight', loc.periodizationTargetWeight),
-                          _field(
-                            'change',
-                            loc.periodizationWeeklyWeightChange,
-                            signed: true,
-                          ),
-                        ],
-                      ),
-                      _targetCard(
-                        loc.periodizationSleepTargets,
-                        Icons.nightlight_outlined,
-                        [_field('sleep', loc.periodizationSleepHours)],
-                      ),
-                      const SizedBox(height: 8),
-                      PeriodizationSectionHeader(
-                        title: loc.periodizationLinkedRoutine,
-                        icon: Icons.repeat_rounded,
-                      ),
-                      DropdownButtonFormField<String?>(
-                        initialValue: _routineId,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: loc.periodizationLinkedRoutine,
-                          prefixIcon: const Icon(Icons.fitness_center_outlined),
-                          border: const OutlineInputBorder(),
-                        ),
-                        items: [
-                          DropdownMenuItem<String?>(
-                            value: null,
-                            child: Text(
-                              loc.periodizationNoRoutine,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          ..._routines.map(
-                            (routine) => DropdownMenuItem<String?>(
-                              value: routine['id'] as String,
-                              child: Text(
-                                routine['name'] as String,
-                                overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  PeriodizationSectionHeader(
+                    title: loc.periodizationPeriodAndIdentity,
+                    subtitle: loc.periodizationPeriodHelp,
+                    icon: Icons.date_range_outlined,
+                  ),
+                  PeriodizationSurface(
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _DateTile(
+                                label: loc.periodizationStartDate,
+                                date: _startDate,
+                                onTap: () => _pickDate(true),
                               ),
                             ),
-                          ),
-                        ],
-                        onChanged: (value) =>
-                            setState(() => _routineId = value),
-                      ),
-                      if (_editing) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.secondaryContainer
-                                .withAlpha(80),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.history_rounded, size: 19),
-                              const SizedBox(width: 9),
-                              Expanded(
-                                child: Text(
-                                  loc.periodizationVersionedTarget,
-                                  style: theme.textTheme.bodySmall,
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              child: Icon(Icons.arrow_forward_rounded),
+                            ),
+                            Expanded(
+                              child: _DateTile(
+                                label: loc.periodizationEndDate,
+                                date: _endDate,
+                                onTap: () => _pickDate(false),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.timelapse_rounded,
+                              size: 18,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                loc.periodizationPhaseDuration(
+                                  (_endDate.difference(_startDate).inDays + 1)
+                                      .clamp(1, 9999),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ],
-                      const SizedBox(height: 16),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  PeriodizationSurface(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          loc.periodizationColor,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 10,
+                          children: _colors
+                              .map(
+                                (value) => Semantics(
+                                  button: true,
+                                  selected: _color == value,
+                                  child: InkWell(
+                                    onTap: () => setState(() => _color = value),
+                                    borderRadius: BorderRadius.circular(24),
+                                    child: CircleAvatar(
+                                      radius: 22,
+                                      backgroundColor: Color(value),
+                                      child: _color == value
+                                          ? const Icon(
+                                              Icons.check,
+                                              color: Colors.white,
+                                            )
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_editing) ...[
+                    const SizedBox(height: 10),
+                    PeriodizationSurface(
+                      padding: EdgeInsets.zero,
+                      child: SwitchListTile(
+                        value: _shiftFollowing,
+                        onChanged: (value) =>
+                            setState(() => _shiftFollowing = value),
+                        secondary: const Icon(Icons.low_priority_rounded),
+                        title: Text(loc.periodizationShiftFollowing),
+                        subtitle: Text(loc.periodizationShiftFollowingHelp),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  PeriodizationSectionHeader(
+                    title: loc.periodizationTargets,
+                    subtitle: loc.periodizationOptionalTargets,
+                    icon: Icons.track_changes_rounded,
+                  ),
+                  _AutomaticTargetsCard(onTap: _suggestNutritionTargets),
+                  const SizedBox(height: 10),
+                  _targetCard(
+                    loc.periodizationNutritionTargets,
+                    Icons.restaurant_outlined,
+                    [
+                      _field(
+                        'calories',
+                        loc.periodizationCaloriesPerDay,
+                        unit: 'kcal',
+                      ),
+                      _field('protein', loc.periodizationProteinG, unit: 'g'),
+                      _field('carbs', loc.periodizationCarbsG, unit: 'g'),
+                      _field('fat', loc.periodizationFatG, unit: 'g'),
                     ],
+                    keys: const ['calories', 'protein', 'carbs', 'fat'],
+                    subtitle: loc.periodizationNutritionTargetsHelp,
+                    actionLabel: loc.periodizationSuggestTargets,
+                    onAction: _suggestNutritionTargets,
+                    initiallyExpanded: true,
+                  ),
+                  _targetCard(
+                    loc.periodizationTrainingTargets,
+                    Icons.fitness_center,
+                    [
+                      _field(
+                        'workouts',
+                        loc.periodizationWorkoutsPerWeek,
+                        integer: true,
+                        unit: loc.periodizationPerWeekUnit,
+                      ),
+                      _field(
+                        'minSets',
+                        loc.periodizationMinSets,
+                        integer: true,
+                        unit: loc.periodizationPerWeekUnit,
+                      ),
+                      _field(
+                        'maxSets',
+                        loc.periodizationMaxSets,
+                        integer: true,
+                        unit: loc.periodizationPerWeekUnit,
+                      ),
+                      _field('minRpe', loc.periodizationMinRpe),
+                      _field('maxRpe', loc.periodizationMaxRpe),
+                    ],
+                    keys: const [
+                      'workouts',
+                      'minSets',
+                      'maxSets',
+                      'minRpe',
+                      'maxRpe',
+                    ],
+                    subtitle: loc.periodizationTrainingTargetsHelp,
+                  ),
+                  _targetCard(
+                    loc.periodizationBodyTargets,
+                    Icons.monitor_weight_outlined,
+                    [
+                      _field(
+                        'weight',
+                        loc.periodizationTargetWeight,
+                        unit: 'kg',
+                      ),
+                      _field(
+                        'change',
+                        loc.periodizationWeeklyWeightChange,
+                        signed: true,
+                        unit: '%',
+                      ),
+                    ],
+                    keys: const ['weight', 'change'],
+                    subtitle: loc.periodizationBodyTargetsHelp,
+                  ),
+                  _targetCard(
+                    loc.periodizationSleepTargets,
+                    Icons.nightlight_outlined,
+                    [_field('sleep', loc.periodizationSleepHours, unit: 'h')],
+                    keys: const ['sleep'],
+                    subtitle: loc.periodizationSleepTargetsHelp,
+                  ),
+                  const SizedBox(height: 8),
+                  PeriodizationSectionHeader(
+                    title: loc.periodizationLinkedRoutine,
+                    icon: Icons.repeat_rounded,
+                  ),
+                  DropdownButtonFormField<String?>(
+                    initialValue: _routineId,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: loc.periodizationLinkedRoutine,
+                      prefixIcon: const Icon(Icons.fitness_center_outlined),
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(
+                          loc.periodizationNoRoutine,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      ..._routines.map(
+                        (routine) => DropdownMenuItem<String?>(
+                          value: routine['id'] as String,
+                          child: Text(
+                            routine['name'] as String,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (value) => setState(() => _routineId = value),
+                  ),
+                  if (_editing) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.secondaryContainer.withAlpha(
+                          80,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.history_rounded, size: 19),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Text(
+                              loc.periodizationVersionedTarget,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                ],
               ),
             ),
     );
   }
 
-  Widget _targetCard(String title, IconData icon, List<Widget> children) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: PeriodizationSurface(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    icon,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 9),
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final width = constraints.maxWidth > 500
-                      ? (constraints.maxWidth - 10) / 2
-                      : constraints.maxWidth;
-                  return Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: children
-                        .map((child) => SizedBox(width: width, child: child))
-                        .toList(),
-                  );
-                },
-              ),
-            ],
+  Widget _targetCard(
+    String title,
+    IconData icon,
+    List<Widget> children, {
+    required List<String> keys,
+    required String subtitle,
+    String? actionLabel,
+    VoidCallback? onAction,
+    bool initiallyExpanded = false,
+  }) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    final filled = _filledTargets(keys);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: PeriodizationSurface(
+        padding: EdgeInsets.zero,
+        child: ExpansionTile(
+          initiallyExpanded: initiallyExpanded,
+          tilePadding: const EdgeInsets.fromLTRB(14, 5, 12, 5),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+          shape: const Border(),
+          collapsedShape: const Border(),
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer.withAlpha(125),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: theme.colorScheme.primary),
           ),
+          title: Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          subtitle: Text(
+            filled == 0
+                ? subtitle
+                : loc.periodizationTargetsConfigured(filled, keys.length),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: filled == 0
+                  ? theme.colorScheme.onSurfaceVariant
+                  : theme.colorScheme.primary,
+              fontWeight: filled == 0 ? null : FontWeight.w700,
+            ),
+          ),
+          children: [
+            if (actionLabel != null && onAction != null) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onAction,
+                  icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                  label: Text(actionLabel),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth >= 560
+                    ? (constraints.maxWidth - 10) / 2
+                    : constraints.maxWidth;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 12,
+                  children: children
+                      .map((child) => SizedBox(width: width, child: child))
+                      .toList(),
+                );
+              },
+            ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 
   Widget _field(
     String key,
     String label, {
     bool integer = false,
     bool signed = false,
+    String? unit,
   }) => TextField(
     controller: _targetControllers[key],
+    onChanged: (_) => setState(() {}),
     keyboardType: TextInputType.numberWithOptions(
       decimal: !integer,
       signed: signed,
     ),
     decoration: InputDecoration(
       labelText: label,
-      border: const OutlineInputBorder(),
+      suffixText: unit,
+      filled: true,
+      fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
     ),
   );
 }
@@ -596,33 +759,125 @@ class _DateTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => PeriodizationSurface(
-    padding: const EdgeInsets.all(13),
+  Widget build(BuildContext context) => InkWell(
     onTap: onTap,
-    child: Row(
-      children: [
-        Icon(
-          Icons.calendar_today_outlined,
-          size: 18,
-          color: Theme.of(context).colorScheme.primary,
-        ),
-        const SizedBox(width: 9),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    borderRadius: BorderRadius.circular(12),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Row(
             children: [
-              Text(label, style: Theme.of(context).textTheme.labelSmall),
-              const SizedBox(height: 3),
-              Text(
-                DateFormat.yMMMd(Intl.defaultLocale).format(date),
-                style: const TextStyle(fontWeight: FontWeight.w700),
+              Icon(
+                Icons.calendar_today_outlined,
+                size: 17,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  DateFormat.MMMd(Intl.defaultLocale).format(date),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
               ),
             ],
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
+}
+
+class _AutomaticTargetsCard extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _AutomaticTargetsCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              theme.colorScheme.primaryContainer,
+              theme.colorScheme.tertiaryContainer.withAlpha(160),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface.withAlpha(175),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.auto_awesome_rounded,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        loc.periodizationAutomaticTargets,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        loc.periodizationAutomaticTargetsHelp,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onPrimaryContainer.withAlpha(
+                            190,
+                          ),
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 const _targetKeys = [

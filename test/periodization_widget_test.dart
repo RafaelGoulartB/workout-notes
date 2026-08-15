@@ -65,6 +65,22 @@ void main() {
               routine_id TEXT
             )
           ''');
+          await db.execute('''
+            CREATE TABLE body_measurements (
+              id TEXT PRIMARY KEY,
+              type TEXT NOT NULL,
+              value REAL NOT NULL,
+              unit TEXT NOT NULL DEFAULT 'kg',
+              date TEXT NOT NULL,
+              created_at TEXT NOT NULL
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE app_settings (
+              key TEXT PRIMARY KEY,
+              value TEXT NOT NULL
+            )
+          ''');
           await DatabasePeriodizationSchema.create(db);
         },
       ),
@@ -173,6 +189,50 @@ void main() {
       await tester.drag(find.byType(ListView), const Offset(0, -500));
       await tester.pumpAndSettle();
     }
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('phase editor opens automatic nutrition target suggestion', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    final plan = PeriodizationPlan(
+      id: 'suggestion-plan',
+      name: 'Plano com sugestões',
+      startDate: now,
+      endDate: now.add(const Duration(days: 180)),
+      status: PeriodizationPlanStatus.draft,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        _appWith(PeriodizationPhaseFormScreen(plan: plan)),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+
+    final suggestion = find.text('Sugerir metas automaticamente');
+    await tester.scrollUntilVisible(
+      suggestion,
+      350,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(suggestion);
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 150)),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Sugerir metas por perfil'), findsOneWidget);
+    expect(find.text('Seu perfil'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
