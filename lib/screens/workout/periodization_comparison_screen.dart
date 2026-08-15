@@ -634,9 +634,12 @@ class _PlanStats {
       0,
       (sum, item) => sum + item.sleepDaysLogged,
     );
-    final adherence = metrics
-        .where((item) => item.nutritionAdherencePercent != null)
-        .toList();
+    final adherenceDays = metrics.fold<int>(
+      0,
+      (sum, item) => item.nutritionAdherencePercent == null
+          ? sum
+          : sum + item.nutritionTargetDays,
+    );
     final weights = metrics
         .where((item) => item.weightChangeKg != null)
         .toList();
@@ -655,13 +658,16 @@ class _PlanStats {
                       (item.averageCalories ?? 0) * item.nutritionDaysLogged,
                 ) /
                 nutritionDays,
-      nutritionAdherence: adherence.isEmpty
+      nutritionAdherence: adherenceDays == 0
           ? null
-          : adherence.fold<double>(
+          : metrics.fold<double>(
                   0,
-                  (sum, item) => sum + item.nutritionAdherencePercent!,
+                  (sum, item) =>
+                      sum +
+                      (item.nutritionAdherencePercent ?? 0) *
+                          item.nutritionTargetDays,
                 ) /
-                adherence.length,
+                adherenceDays,
       weightChange: weights.isEmpty
           ? null
           : weights.fold<double>(0, (sum, item) => sum + item.weightChangeKg!),

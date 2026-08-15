@@ -5,12 +5,14 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
+import 'package:workout_notes/models/periodization_routine_suggestion.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 
 import 'periodization_calendar_screen.dart';
-import 'periodization_checkin_screen.dart';
+import 'active_workout_screen.dart';
+import 'periodization_checkin_flow.dart';
 import 'periodization_comparison_screen.dart';
 import 'periodization_phase_detail_screen.dart';
 import 'periodization_phase_form_screen.dart';
@@ -31,6 +33,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
   List<PeriodizationPhase> _phases = const [];
   PeriodizationPhase? _currentPhase;
   PeriodizationTarget? _currentTarget;
+  PeriodizationRoutineSuggestion? _routineSuggestion;
   bool _loading = true;
 
   @override
@@ -48,6 +51,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
         _phases = const [];
         _currentPhase = null;
         _currentTarget = null;
+        _routineSuggestion = null;
         _loading = false;
       });
       return;
@@ -60,15 +64,19 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
         break;
       }
     }
-    final target = current == null
-        ? null
-        : await _repository.getEffectiveTarget(current.id);
+    final currentResults = current == null
+        ? const <Object?>[null, null]
+        : await Future.wait<Object?>([
+            _repository.getEffectiveTarget(current.id),
+            _repository.getRoutineSuggestion(DateTime.now()),
+          ]);
     if (!mounted) return;
     setState(() {
       _plan = plan;
       _phases = phases;
       _currentPhase = current;
-      _currentTarget = target;
+      _currentTarget = currentResults[0] as PeriodizationTarget?;
+      _routineSuggestion = currentResults[1] as PeriodizationRoutineSuggestion?;
       _loading = false;
     });
   }
@@ -117,6 +125,33 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
       ),
     );
     await _load();
+  }
+
+  Future<void> _startSuggestedWorkout() async {
+    final suggestion = _routineSuggestion;
+    if (suggestion == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ActiveWorkoutScreen(
+          routineId: suggestion.routineId,
+          routineDayId: suggestion.routineDayId,
+        ),
+      ),
+    );
+    if (mounted) await _load();
+  }
+
+  Future<void> _runCheckin() async {
+    final plan = _plan;
+    final phase = _currentPhase;
+    if (plan == null || phase == null) return;
+    await PeriodizationCheckinFlow.run(
+      context: context,
+      plan: plan,
+      phase: phase,
+    );
+    if (mounted) await _load();
   }
 
   void _openCalendar() {
@@ -229,19 +264,10 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
                           : _CurrentPhaseCard(
                                   phase: _currentPhase!,
                                   target: _currentTarget,
+                                  routineSuggestion: _routineSuggestion,
                                   onTap: () => _openPhase(_currentPhase!),
-                                  onCheckin: () async {
-                                    await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            PeriodizationCheckinScreen(
-                                              phase: _currentPhase!,
-                                            ),
-                                      ),
-                                    );
-                                    await _load();
-                                  },
+                                  onStartWorkout: _startSuggestedWorkout,
+                                  onCheckin: _runCheckin,
                                 )
                                 .animate()
                                 .fadeIn(delay: 120.ms)
@@ -263,52 +289,20 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     sliver: SliverToBoxAdapter(
                       child: PeriodizationSurface(
-                        child: PeriodizationPhaseTimeline(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                        child: _VerticalPhaseTimeline(
                           phases: _phases,
                           referenceDate: DateTime.now(),
-                          selectedPhaseId: _currentPhase?.id,
                           onPhaseTap: _openPhase,
                         ),
                       ),
                     ),
                   ),
-                  if (_upcoming.isNotEmpty)
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                      sliver: SliverList.separated(
-                        itemCount: _upcoming.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final phase = _upcoming[index];
-                          return _UpcomingPhaseCard(
-                            phase: phase,
-                            onTap: () => _openPhase(phase),
-                          );
-                        },
-                      ),
-                    ),
-                  if (_upcoming.isEmpty)
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                      sliver: SliverToBoxAdapter(
-                        child: Text(
-                          loc.periodizationNoUpcoming,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ),
                   const SliverToBoxAdapter(child: SizedBox(height: 110)),
                 ],
               ),
             ),
     );
-  }
-
-  List<PeriodizationPhase> get _upcoming {
-    final today = DateTime.now();
-    return _phases.where((phase) => phase.startDate.isAfter(today)).toList();
   }
 }
 
@@ -656,13 +650,17 @@ class _QuickAction extends StatelessWidget {
 class _CurrentPhaseCard extends StatelessWidget {
   final PeriodizationPhase phase;
   final PeriodizationTarget? target;
+  final PeriodizationRoutineSuggestion? routineSuggestion;
   final VoidCallback onTap;
+  final VoidCallback onStartWorkout;
   final VoidCallback onCheckin;
 
   const _CurrentPhaseCard({
     required this.phase,
     required this.target,
+    required this.routineSuggestion,
     required this.onTap,
+    required this.onStartWorkout,
     required this.onCheckin,
   });
 
@@ -789,6 +787,50 @@ class _CurrentPhaseCard extends StatelessWidget {
               ),
             ),
           ],
+          if (routineSuggestion case final suggestion?) ...[
+            const SizedBox(height: 12),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: color.withAlpha(18),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Icon(Icons.event_available_outlined, color: color),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            suggestion.routineName,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            loc.periodizationNextRoutineDay(
+                              suggestion.routineDayName,
+                              suggestion.routineDayIndex + 1,
+                              suggestion.routineDayCount,
+                            ),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: onStartWorkout,
+                      tooltip: loc.periodizationStartPhaseWorkout,
+                      icon: const Icon(Icons.play_arrow_rounded),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           FilledButton.tonalIcon(
             onPressed: onCheckin,
@@ -801,59 +843,180 @@ class _CurrentPhaseCard extends StatelessWidget {
   }
 }
 
-class _UpcomingPhaseCard extends StatelessWidget {
-  final PeriodizationPhase phase;
-  final VoidCallback onTap;
+class _VerticalPhaseTimeline extends StatelessWidget {
+  final List<PeriodizationPhase> phases;
+  final DateTime referenceDate;
+  final ValueChanged<PeriodizationPhase> onPhaseTap;
 
-  const _UpcomingPhaseCard({required this.phase, required this.onTap});
+  const _VerticalPhaseTimeline({
+    required this.phases,
+    required this.referenceDate,
+    required this.onPhaseTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final color = Color(phase.color);
-    final range =
-        '${DateFormat.MMMd(Intl.defaultLocale).format(phase.startDate)} – ${DateFormat.MMMd(Intl.defaultLocale).format(phase.endDate)}';
-    return PeriodizationSurface(
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-      accentColor: color,
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 48,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(99),
+    return Column(
+      children: List.generate(phases.length, (index) {
+        final phase = phases[index];
+        final color = Color(phase.color);
+        final isCurrent = phase.contains(referenceDate);
+        final isPast = phase.endDate.isBefore(referenceDate);
+        final isLast = index == phases.length - 1;
+        final range =
+            '${DateFormat.MMMd(Intl.defaultLocale).format(phase.startDate)} – '
+            '${DateFormat.MMMd(Intl.defaultLocale).format(phase.endDate)}';
+        return Semantics(
+          button: true,
+          selected: isCurrent,
+          label: '${phase.name}, $range',
+          child: InkWell(
+            onTap: () => onPhaseTap(phase),
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 30,
+                    height: 78,
+                    child: Stack(
+                      alignment: Alignment.topCenter,
+                      children: [
+                        if (index > 0)
+                          Positioned(
+                            top: 0,
+                            left: 14,
+                            width: 2,
+                            height: 18,
+                            child: ColoredBox(
+                              color: isPast || isCurrent
+                                  ? color.withAlpha(115)
+                                  : theme.colorScheme.outlineVariant,
+                            ),
+                          ),
+                        if (!isLast)
+                          Positioned(
+                            top: 30,
+                            bottom: 0,
+                            left: 14,
+                            width: 2,
+                            child: ColoredBox(
+                              color: isPast
+                                  ? color.withAlpha(115)
+                                  : theme.colorScheme.outlineVariant,
+                            ),
+                          ),
+                        Positioned(
+                          top: 16,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            width: isCurrent ? 18 : 14,
+                            height: isCurrent ? 18 : 14,
+                            decoration: BoxDecoration(
+                              color: isPast || isCurrent
+                                  ? color
+                                  : theme.colorScheme.surfaceContainerLow,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: color,
+                                width: isCurrent ? 3 : 2,
+                              ),
+                              boxShadow: isCurrent
+                                  ? [
+                                      BoxShadow(
+                                        color: color.withAlpha(65),
+                                        blurRadius: 8,
+                                        spreadRadius: 2,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: isPast
+                                ? const Icon(
+                                    Icons.check_rounded,
+                                    size: 9,
+                                    color: Colors.white,
+                                  )
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 10, 4, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  phase.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: isCurrent
+                                        ? color
+                                        : theme.colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                              if (isCurrent)
+                                Text(
+                                  loc.periodizationNow,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: color,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: .8,
+                                  ),
+                                ),
+                              const SizedBox(width: 2),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 19,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '$range · ${phase.totalWeeks} '
+                            '${loc.periodizationWeeks.toLowerCase()}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          if (phase.intent?.trim().isNotEmpty == true) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              phase.intent!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  phase.name,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '$range  ·  ${phase.totalWeeks} sem.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Icon(
-            Icons.chevron_right_rounded,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ],
-      ),
+        );
+      }),
     );
   }
 }

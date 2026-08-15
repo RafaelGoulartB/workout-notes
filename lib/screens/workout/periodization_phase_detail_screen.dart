@@ -10,6 +10,7 @@ import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 
+import 'periodization_checkin_flow.dart';
 import 'periodization_checkin_screen.dart';
 import 'periodization_phase_form_screen.dart';
 
@@ -86,13 +87,12 @@ class _PeriodizationPhaseDetailScreenState
   }
 
   Future<void> _checkin() async {
-    final result = await Navigator.push<PeriodizationDecision>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PeriodizationCheckinScreen(phase: _phase),
-      ),
+    final changed = await PeriodizationCheckinFlow.run(
+      context: context,
+      plan: widget.plan,
+      phase: _phase,
     );
-    if (result != null) await _load();
+    if (changed && mounted) await _load();
   }
 
   Future<void> _delete() async {
@@ -514,10 +514,40 @@ class _MetricsGrid extends StatelessWidget {
             : '${metrics.averageCalories!.round()}',
       ),
       (
-        loc.periodizationAdherence,
+        loc.periodizationNutritionAdherence,
         metrics.nutritionAdherencePercent == null
             ? '—'
             : '${metrics.nutritionAdherencePercent!.round()}%',
+      ),
+      (
+        loc.periodizationCoverage,
+        metrics.nutritionCoveragePercent == null
+            ? '—'
+            : '${metrics.nutritionCoveragePercent!.round()}%',
+      ),
+      (
+        loc.periodizationSetAdherence,
+        metrics.setAdherencePercent == null
+            ? '—'
+            : '${metrics.setAdherencePercent!.round()}%',
+      ),
+      (
+        loc.periodizationRpeAdherence,
+        metrics.rpeAdherencePercent == null
+            ? '—'
+            : '${metrics.rpeAdherencePercent!.round()}%',
+      ),
+      (
+        loc.periodizationSleepAdherence,
+        metrics.sleepAdherencePercent == null
+            ? '—'
+            : '${metrics.sleepAdherencePercent!.round()}%',
+      ),
+      (
+        loc.periodizationWeightAdherence,
+        metrics.weightAdherencePercent == null
+            ? '—'
+            : '${metrics.weightAdherencePercent!.round()}%',
       ),
       (
         loc.periodizationWeightChange,

@@ -204,24 +204,14 @@ class _PeriodizationPhaseFormScreenState
           createdAt: old.createdAt,
           updatedAt: DateTime.now(),
         );
-        await _repository.updatePhase(
+        await _repository.updatePhaseWithTargetAndRoutine(
           updated,
           shiftFollowingPhases: _shiftFollowing,
+          targetChanged: _targetChanged(target),
+          target: target,
+          routineId: _routineId,
+          routineLinkId: _routineLinkId,
         );
-        if (_targetChanged(target)) {
-          await _repository.saveTargetVersion(old.id, target);
-        }
-        if (_routineId == null && _routineLinkId != null) {
-          await _repository.deleteRoutineLink(_routineLinkId!);
-        } else if (_routineId != null) {
-          await _repository.saveRoutineLink(
-            id: _routineLinkId,
-            phaseId: old.id,
-            routineId: _routineId!,
-            startsOn: _startDate,
-            endsOn: _endDate,
-          );
-        }
       } else {
         await _repository.addPhase(
           planId: widget.plan.id,

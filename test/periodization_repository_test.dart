@@ -29,13 +29,16 @@ void main() {
             'CREATE TABLE routines (id TEXT PRIMARY KEY, name TEXT NOT NULL, notes TEXT, created_at TEXT NOT NULL)',
           );
           await db.execute(
+            'CREATE TABLE routine_days (id TEXT PRIMARY KEY, routine_id TEXT NOT NULL, name TEXT NOT NULL, order_index INTEGER NOT NULL DEFAULT 0, FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE)',
+          );
+          await db.execute(
             'CREATE TABLE workouts (id TEXT PRIMARY KEY, date TEXT NOT NULL, start_time TEXT, end_time TEXT, duration_seconds INTEGER, estimated_calories REAL, comment TEXT, feeling_rating INTEGER, is_from_routine INTEGER DEFAULT 0, routine_id TEXT, pause_start_time TEXT, created_at TEXT NOT NULL)',
           );
           await db.execute(
             'CREATE TABLE exercise_entries (id TEXT PRIMARY KEY, workout_id TEXT NOT NULL, exercise_id TEXT NOT NULL, order_index INTEGER, FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE)',
           );
           await db.execute(
-            'CREATE TABLE sets (id TEXT PRIMARY KEY, exercise_entry_id TEXT NOT NULL, weight REAL, reps INTEGER, is_complete INTEGER DEFAULT 0, is_warmup INTEGER DEFAULT 0, order_index INTEGER, FOREIGN KEY (exercise_entry_id) REFERENCES exercise_entries(id) ON DELETE CASCADE)',
+            'CREATE TABLE sets (id TEXT PRIMARY KEY, exercise_entry_id TEXT NOT NULL, weight REAL, reps INTEGER, rpe REAL, is_complete INTEGER DEFAULT 0, is_warmup INTEGER DEFAULT 0, order_index INTEGER, FOREIGN KEY (exercise_entry_id) REFERENCES exercise_entries(id) ON DELETE CASCADE)',
           );
           await db.execute(
             'CREATE TABLE body_measurements (id TEXT PRIMARY KEY, type TEXT, value REAL, unit TEXT, date TEXT, created_at TEXT)',
@@ -47,7 +50,7 @@ void main() {
             'CREATE TABLE meal_logs (id TEXT PRIMARY KEY, date TEXT, meal_type TEXT)',
           );
           await db.execute(
-            'CREATE TABLE meal_log_items (id TEXT PRIMARY KEY, meal_log_id TEXT, calories REAL, protein_g REAL, FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE)',
+            'CREATE TABLE meal_log_items (id TEXT PRIMARY KEY, meal_log_id TEXT, calories REAL, protein_g REAL, carbs_g REAL, fat_g REAL, FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE)',
           );
           await DatabasePeriodizationSchema.create(db);
         },
@@ -317,4 +320,262 @@ void main() {
       expect(saved.single.decision, PeriodizationDecision.maintain);
     },
   );
+
+  test('validates initial targets and phases against the plan start', () async {
+    await expectLater(
+      repository.createPlanWithPhases(
+        name: 'Invalid target',
+        startDate: DateTime(2026, 1, 1),
+        phases: [
+          PeriodizationPhaseDraft(
+            name: 'Base',
+            color: 1,
+            startDate: DateTime(2026, 1, 1),
+            endDate: DateTime(2026, 1, 7),
+            target: target(workouts: 20),
+          ),
+        ],
+      ),
+      throwsA(isA<PeriodizationValidationException>()),
+    );
+    await expectLater(
+      repository.createPlanWithPhases(
+        name: 'Invalid dates',
+        startDate: DateTime(2026, 1, 8),
+        phases: [
+          PeriodizationPhaseDraft(
+            name: 'Base',
+            color: 1,
+            startDate: DateTime(2026, 1, 1),
+            endDate: DateTime(2026, 1, 14),
+          ),
+        ],
+      ),
+      throwsA(
+        isA<PeriodizationValidationException>().having(
+          (error) => error.code,
+          'code',
+          'phase_outside_plan',
+        ),
+      ),
+    );
+  });
+
+  test('phase, target and routine edit rolls back atomically', () async {
+    final plan = await repository.createPlan(
+      name: 'Atomic',
+      startDate: DateTime(2026, 1, 1),
+      endDate: DateTime(2026, 1, 31),
+    );
+    final phase = await repository.addPhase(
+      planId: plan.id,
+      name: 'Original',
+      startDate: plan.startDate,
+      endDate: plan.endDate,
+      color: 1,
+      target: target(),
+    );
+    final updated = PeriodizationPhase(
+      id: phase.id,
+      planId: phase.planId,
+      name: 'Changed',
+      color: phase.color,
+      startDate: phase.startDate,
+      endDate: phase.endDate,
+      orderIndex: phase.orderIndex,
+      createdAt: phase.createdAt,
+      updatedAt: DateTime.now(),
+    );
+
+    await expectLater(
+      repository.updatePhaseWithTargetAndRoutine(
+        updated,
+        shiftFollowingPhases: false,
+        targetChanged: false,
+        target: target(),
+        routineId: 'missing-routine',
+        routineLinkId: null,
+      ),
+      throwsA(isA<DatabaseException>()),
+    );
+    expect((await repository.getPhase(phase.id))?.name, 'Original');
+    expect(await repository.getTargetHistory(phase.id), hasLength(1));
+  });
+
+  test(
+    'replan refuses to move a phase away from historical check-ins',
+    () async {
+      final plan = await repository.createPlan(
+        name: 'History',
+        startDate: DateTime(2026, 1, 1),
+        endDate: DateTime(2026, 1, 31),
+      );
+      final phase = await repository.addPhase(
+        planId: plan.id,
+        name: 'Base',
+        startDate: DateTime(2026, 1, 1),
+        endDate: DateTime(2026, 1, 14),
+        color: 1,
+        target: target(),
+      );
+      await repository.saveCheckin(
+        PeriodizationCheckin(
+          id: 'history-checkin',
+          phaseId: phase.id,
+          weekStart: DateTime(2026, 1, 5),
+          energy: 3,
+          hunger: 3,
+          recovery: 3,
+          performance: 'stable',
+          decision: PeriodizationDecision.maintain,
+          createdAt: DateTime(2026, 1, 11),
+        ),
+      );
+
+      await expectLater(
+        repository.updatePhase(
+          PeriodizationPhase(
+            id: phase.id,
+            planId: phase.planId,
+            name: phase.name,
+            color: phase.color,
+            startDate: DateTime(2026, 1, 12),
+            endDate: DateTime(2026, 1, 25),
+            orderIndex: phase.orderIndex,
+            createdAt: phase.createdAt,
+            updatedAt: DateTime.now(),
+          ),
+        ),
+        throwsA(
+          isA<PeriodizationValidationException>().having(
+            (error) => error.code,
+            'code',
+            'replan_excludes_checkins',
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'nutrition adherence includes missing days and exposes coverage',
+    () async {
+      final plan = await repository.createPlan(
+        name: 'Adherence',
+        startDate: DateTime(2026, 1, 1),
+        endDate: DateTime(2026, 1, 7),
+      );
+      final phase = await repository.addPhase(
+        planId: plan.id,
+        name: 'Week',
+        startDate: plan.startDate,
+        endDate: plan.endDate,
+        color: 1,
+        target: target(),
+      );
+      await database.insert('meal_logs', {
+        'id': 'meal-only',
+        'date': '2026-01-01',
+        'meal_type': 'lunch',
+      });
+      await database.insert('meal_log_items', {
+        'id': 'item-only',
+        'meal_log_id': 'meal-only',
+        'calories': 2200,
+        'protein_g': 180,
+      });
+
+      final metrics = await repository.getPhaseMetrics(phase);
+      expect(metrics.nutritionTargetDays, 7);
+      expect(metrics.nutritionCoveragePercent, closeTo(100 / 7, 0.01));
+      expect(metrics.nutritionAdherencePercent, closeTo(100 / 7, 0.01));
+    },
+  );
+
+  test(
+    'planned totals respect the target version effective on each day',
+    () async {
+      final plan = await repository.createPlan(
+        name: 'Versions',
+        startDate: DateTime(2026, 1, 1),
+        endDate: DateTime(2026, 1, 14),
+      );
+      final phase = await repository.addPhase(
+        planId: plan.id,
+        name: 'Two weeks',
+        startDate: plan.startDate,
+        endDate: plan.endDate,
+        color: 1,
+        target: target(workouts: 4),
+      );
+      await repository.saveTargetVersion(
+        phase.id,
+        target(workouts: 6),
+        validFrom: DateTime(2026, 1, 8),
+      );
+
+      final metrics = await repository.getPhaseMetrics(phase);
+      expect(metrics.plannedWorkouts, 10);
+    },
+  );
+
+  test(
+    'suggests the next day of the routine linked to the active phase',
+    () async {
+      final today = DateTime.now();
+      final start = DateTime(today.year, today.month, today.day - 2);
+      final end = DateTime(today.year, today.month, today.day + 2);
+      await database.insert('routines', {
+        'id': 'linked-routine',
+        'name': 'Upper / Lower',
+        'created_at': today.toIso8601String(),
+      });
+      await database.insert('routine_days', {
+        'id': 'upper',
+        'routine_id': 'linked-routine',
+        'name': 'Upper',
+        'order_index': 0,
+      });
+      await database.insert('routine_days', {
+        'id': 'lower',
+        'routine_id': 'linked-routine',
+        'name': 'Lower',
+        'order_index': 1,
+      });
+      await repository.createPlanWithPhases(
+        name: 'Current',
+        startDate: start,
+        phases: [
+          PeriodizationPhaseDraft(
+            name: 'Current phase',
+            color: 1,
+            startDate: start,
+            endDate: end,
+            routineId: 'linked-routine',
+          ),
+        ],
+      );
+      await database.insert('workouts', {
+        'id': 'completed-routine-workout',
+        'date': _testDate(today),
+        'start_time': today
+            .subtract(const Duration(hours: 1))
+            .toIso8601String(),
+        'end_time': today.toIso8601String(),
+        'is_from_routine': 1,
+        'routine_id': 'linked-routine',
+        'created_at': today.toIso8601String(),
+      });
+
+      final suggestion = await repository.getRoutineSuggestion(today);
+      expect(suggestion?.routineDayId, 'lower');
+      expect(suggestion?.completedWorkouts, 1);
+    },
+  );
 }
+
+String _testDate(DateTime date) => DateTime(
+  date.year,
+  date.month,
+  date.day,
+).toIso8601String().substring(0, 10);

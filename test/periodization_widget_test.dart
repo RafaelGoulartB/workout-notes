@@ -47,6 +47,24 @@ void main() {
               created_at TEXT NOT NULL
             )
           ''');
+          await db.execute('''
+            CREATE TABLE routine_days (
+              id TEXT PRIMARY KEY,
+              routine_id TEXT NOT NULL,
+              name TEXT NOT NULL,
+              order_index INTEGER NOT NULL DEFAULT 0,
+              FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE workouts (
+              id TEXT PRIMARY KEY,
+              date TEXT NOT NULL,
+              start_time TEXT,
+              end_time TEXT,
+              routine_id TEXT
+            )
+          ''');
           await DatabasePeriodizationSchema.create(db);
         },
       ),
@@ -227,6 +245,12 @@ void main() {
     expect(find.text('Preparação completa para a temporada'), findsOneWidget);
     expect(find.text('Semana atual'), findsOneWidget);
     expect(find.text('Término'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -650));
+    await tester.pumpAndSettle();
+    expect(find.text('Pico'), findsOneWidget);
+    expect(find.byIcon(Icons.check_rounded), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 }

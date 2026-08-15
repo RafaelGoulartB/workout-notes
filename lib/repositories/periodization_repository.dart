@@ -8,6 +8,7 @@ import 'package:workout_notes/models/periodization_metrics.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
+import 'package:workout_notes/models/periodization_routine_suggestion.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 
 import 'base_repository.dart';
@@ -93,9 +94,15 @@ class PeriodizationRepository extends BaseRepository {
     for (var i = 0; i < sorted.length; i++) {
       final phase = sorted[i];
       _validateNameAndDates(phase.name, phase.startDate, phase.endDate);
+      if (phase.target case final target? when !target.isEmpty) {
+        _validateTarget(target);
+      }
       if (i > 0 && !phase.startDate.isAfter(sorted[i - 1].endDate)) {
         throw const PeriodizationValidationException('phase_overlap');
       }
+    }
+    if (_day(sorted.first.startDate).isBefore(_day(startDate))) {
+      throw const PeriodizationValidationException('phase_outside_plan');
     }
     final planEnd = sorted
         .map((phase) => phase.endDate)
@@ -294,6 +301,7 @@ class PeriodizationRepository extends BaseRepository {
     String? routineId,
   }) async {
     _validateNameAndDates(name, startDate, endDate);
+    if (target != null && !target.isEmpty) _validateTarget(target);
     final plan = await getPlan(planId);
     if (plan == null) {
       throw const PeriodizationValidationException('plan_not_found');
@@ -347,8 +355,41 @@ class PeriodizationRepository extends BaseRepository {
   Future<void> updatePhase(
     PeriodizationPhase phase, {
     bool shiftFollowingPhases = false,
+  }) => _updatePhase(phase, shiftFollowingPhases: shiftFollowingPhases);
+
+  Future<void> updatePhaseWithTargetAndRoutine(
+    PeriodizationPhase phase, {
+    required bool shiftFollowingPhases,
+    required bool targetChanged,
+    required PeriodizationTarget target,
+    required String? routineId,
+    required String? routineLinkId,
+  }) => _updatePhase(
+    phase,
+    shiftFollowingPhases: shiftFollowingPhases,
+    targetChanged: targetChanged,
+    target: target,
+    replaceRoutine: true,
+    routineId: routineId,
+    routineLinkId: routineLinkId,
+  );
+
+  Future<void> _updatePhase(
+    PeriodizationPhase phase, {
+    required bool shiftFollowingPhases,
+    bool targetChanged = false,
+    PeriodizationTarget? target,
+    bool replaceRoutine = false,
+    String? routineId,
+    String? routineLinkId,
   }) async {
     _validateNameAndDates(phase.name, phase.startDate, phase.endDate);
+    if (targetChanged) {
+      if (target == null) {
+        throw const PeriodizationValidationException('invalid_target');
+      }
+      _validateTarget(target);
+    }
     final existing = await getPhase(phase.id);
     if (existing == null) {
       throw const PeriodizationValidationException('phase_not_found');
@@ -396,27 +437,118 @@ class PeriodizationRepository extends BaseRepository {
       throw const PeriodizationValidationException('phase_outside_plan');
     }
     final database = await db;
-    final linkedRows = shiftFollowingPhases
-        ? await database.rawQuery(
-            '''
-            SELECT link.* FROM phase_routine_links link
-            JOIN periodization_phases phase ON phase.id = link.phase_id
-            WHERE phase.plan_id = ?
-            ''',
-            [plan.id],
-          )
-        : const <Map<String, Object?>>[];
-    final targetRows = shiftFollowingPhases
-        ? await database.rawQuery(
-            '''
-            SELECT target.id, target.phase_id, target.valid_from
-            FROM phase_targets target
-            JOIN periodization_phases phase ON phase.id = target.phase_id
-            WHERE phase.plan_id = ?
-            ''',
-            [plan.id],
-          )
-        : const <Map<String, Object?>>[];
+    final linkedRows = await database.rawQuery(
+      '''
+      SELECT link.* FROM phase_routine_links link
+      JOIN periodization_phases phase ON phase.id = link.phase_id
+      WHERE phase.plan_id = ?
+      ''',
+      [plan.id],
+    );
+    final targetRows = await database.rawQuery(
+      '''
+      SELECT target.id, target.phase_id, target.valid_from, target.version
+      FROM phase_targets target
+      JOIN periodization_phases phase ON phase.id = target.phase_id
+      WHERE phase.plan_id = ?
+      ''',
+      [plan.id],
+    );
+    final checkinRows = await database.rawQuery(
+      '''
+      SELECT checkin.phase_id, checkin.week_start
+      FROM periodization_checkins checkin
+      JOIN periodization_phases phase ON phase.id = checkin.phase_id
+      WHERE phase.plan_id = ?
+      ''',
+      [plan.id],
+    );
+    final startDeltaDays = phase.startDate
+        .difference(existing.startDate)
+        .inDays;
+
+    int dateShiftFor(PeriodizationPhase item) {
+      if (item.id == phase.id) return startDeltaDays;
+      final original = all.firstWhere((candidate) => candidate.id == item.id);
+      return item.startDate.difference(original.startDate).inDays;
+    }
+
+    for (final item in shifted) {
+      for (final checkin in checkinRows.where(
+        (row) => row['phase_id'] == item.id,
+      )) {
+        final weekStart = DateTime.parse(checkin['week_start'] as String);
+        final weekEnd = weekStart.add(const Duration(days: 6));
+        if (weekEnd.isBefore(item.startDate) ||
+            weekStart.isAfter(item.endDate)) {
+          throw const PeriodizationValidationException(
+            'replan_excludes_checkins',
+          );
+        }
+      }
+      final dateShift = dateShiftFor(item);
+      for (final targetRow in targetRows.where(
+        (row) => row['phase_id'] == item.id,
+      )) {
+        final projected = DateTime.parse(
+          targetRow['valid_from'] as String,
+        ).add(Duration(days: dateShift));
+        if (projected.isBefore(item.startDate) ||
+            projected.isAfter(item.endDate)) {
+          throw const PeriodizationValidationException(
+            'replan_excludes_targets',
+          );
+        }
+      }
+      for (final link in linkedRows.where(
+        (row) =>
+            row['phase_id'] == item.id &&
+            !(replaceRoutine && row['id'] == routineLinkId),
+      )) {
+        var projectedStart = DateTime.parse(link['starts_on'] as String);
+        var projectedEnd = DateTime.parse(link['ends_on'] as String);
+        final original = all.firstWhere((candidate) => candidate.id == item.id);
+        final coveredWholeOriginal =
+            projectedStart == original.startDate &&
+            projectedEnd == original.endDate;
+        if (item.id == phase.id && coveredWholeOriginal) {
+          projectedStart = item.startDate;
+          projectedEnd = item.endDate;
+        } else {
+          projectedStart = projectedStart.add(Duration(days: dateShift));
+          projectedEnd = projectedEnd.add(Duration(days: dateShift));
+        }
+        if (projectedStart.isBefore(item.startDate) ||
+            projectedEnd.isAfter(item.endDate)) {
+          throw const PeriodizationValidationException(
+            'replan_excludes_routine_links',
+          );
+        }
+      }
+    }
+
+    final nextTargetVersion =
+        targetRows
+            .where((row) => row['phase_id'] == phase.id)
+            .map((row) => (row['version'] as num).toInt())
+            .fold<int>(0, math.max) +
+        1;
+    final today = _day(DateTime.now());
+    final newTargetValidFrom = _day(
+      today.isAfter(phase.startDate) ? today : phase.startDate,
+    );
+    if (targetChanged && newTargetValidFrom.isAfter(phase.endDate)) {
+      throw const PeriodizationValidationException('target_outside_phase');
+    }
+
+    if (replaceRoutine && routineId != null) {
+      final overlap = linkedRows.any(
+        (row) => row['phase_id'] == phase.id && row['id'] != routineLinkId,
+      );
+      if (overlap) {
+        throw const PeriodizationValidationException('routine_link_overlap');
+      }
+    }
     await database.transaction((txn) async {
       for (var index = 0; index < shifted.length; index++) {
         final item = shifted[index];
@@ -439,30 +571,24 @@ class PeriodizationRepository extends BaseRepository {
           where: 'id = ?',
           whereArgs: [item.id],
         );
-        if (item.id == phase.id) {
-          await txn.update(
-            'phase_routine_links',
-            {
-              'starts_on': _date(item.startDate),
-              'ends_on': _date(item.endDate),
-            },
-            where: 'phase_id = ? AND starts_on = ? AND ends_on = ?',
-            whereArgs: [
-              item.id,
-              _date(existing.startDate),
-              _date(existing.endDate),
-            ],
-          );
-        } else if (wasShifted) {
+        if (wasShifted) {
+          final dateShift = dateShiftFor(item);
           for (final link in linkedRows.where(
-            (row) => row['phase_id'] == item.id,
+            (row) =>
+                row['phase_id'] == item.id &&
+                !(replaceRoutine && row['id'] == routineLinkId),
           )) {
-            final startsOn = DateTime.parse(
-              link['starts_on'] as String,
-            ).add(Duration(days: deltaDays));
-            final endsOn = DateTime.parse(
-              link['ends_on'] as String,
-            ).add(Duration(days: deltaDays));
+            var startsOn = DateTime.parse(link['starts_on'] as String);
+            var endsOn = DateTime.parse(link['ends_on'] as String);
+            final coveredWholeOriginal =
+                startsOn == original.startDate && endsOn == original.endDate;
+            if (item.id == phase.id && coveredWholeOriginal) {
+              startsOn = item.startDate;
+              endsOn = item.endDate;
+            } else {
+              startsOn = startsOn.add(Duration(days: dateShift));
+              endsOn = endsOn.add(Duration(days: dateShift));
+            }
             await txn.update(
               'phase_routine_links',
               {'starts_on': _date(startsOn), 'ends_on': _date(endsOn)},
@@ -475,7 +601,7 @@ class PeriodizationRepository extends BaseRepository {
           )) {
             final validFrom = DateTime.parse(
               target['valid_from'] as String,
-            ).add(Duration(days: deltaDays));
+            ).add(Duration(days: dateShift));
             await txn.update(
               'phase_targets',
               {'valid_from': _date(validFrom)},
@@ -483,6 +609,36 @@ class PeriodizationRepository extends BaseRepository {
               whereArgs: [target['id']],
             );
           }
+        }
+      }
+      if (targetChanged) {
+        await txn.insert(
+          'phase_targets',
+          _targetMap(
+            target!,
+            phaseId: phase.id,
+            version: nextTargetVersion,
+            validFrom: newTargetValidFrom,
+          ),
+        );
+      }
+      if (replaceRoutine) {
+        if (routineLinkId != null) {
+          await txn.delete(
+            'phase_routine_links',
+            where: 'id = ?',
+            whereArgs: [routineLinkId],
+          );
+        }
+        if (routineId != null) {
+          await txn.insert('phase_routine_links', {
+            'id': _uuid.v4(),
+            'phase_id': phase.id,
+            'routine_id': routineId,
+            'starts_on': _date(phase.startDate),
+            'ends_on': _date(phase.endDate),
+            'created_at': DateTime.now().toIso8601String(),
+          });
         }
       }
       if (shiftFollowingPhases && newPlanEnd != plan.endDate) {
@@ -511,6 +667,38 @@ class PeriodizationRepository extends BaseRepository {
       );
       await _normalizePhaseOrder(txn, phase.planId);
     });
+  }
+
+  Future<void> endPhaseEarly(
+    String phaseId,
+    DateTime endDate, {
+    required bool shiftFollowingPhases,
+  }) async {
+    final phase = await getPhase(phaseId);
+    if (phase == null) {
+      throw const PeriodizationValidationException('phase_not_found');
+    }
+    final effectiveEnd = _day(endDate);
+    if (effectiveEnd.isBefore(phase.startDate) ||
+        !effectiveEnd.isBefore(phase.endDate)) {
+      throw const PeriodizationValidationException('invalid_date_range');
+    }
+    await updatePhase(
+      PeriodizationPhase(
+        id: phase.id,
+        planId: phase.planId,
+        name: phase.name,
+        templateKey: phase.templateKey,
+        color: phase.color,
+        startDate: phase.startDate,
+        endDate: effectiveEnd,
+        intent: phase.intent,
+        orderIndex: phase.orderIndex,
+        createdAt: phase.createdAt,
+        updatedAt: DateTime.now(),
+      ),
+      shiftFollowingPhases: shiftFollowingPhases,
+    );
   }
 
   Future<List<PeriodizationTarget>> getTargetHistory(String phaseId) async {
@@ -607,6 +795,61 @@ class PeriodizationRepository extends BaseRepository {
     );
   }
 
+  Future<PeriodizationRoutineSuggestion?> getRoutineSuggestion(
+    DateTime date,
+  ) async {
+    final day = _day(date);
+    final phase = await getEffectivePhase(day);
+    if (phase == null) return null;
+    final database = await db;
+    final links = await database.rawQuery(
+      '''
+      SELECT link.*, routine.name AS routine_name
+      FROM phase_routine_links link
+      JOIN routines routine ON routine.id = link.routine_id
+      WHERE link.phase_id = ? AND link.starts_on <= ? AND link.ends_on >= ?
+      ORDER BY link.starts_on DESC
+      LIMIT 1
+      ''',
+      [phase.id, _date(day), _date(day)],
+    );
+    if (links.isEmpty) return null;
+    final link = links.first;
+    final routineId = link['routine_id'] as String;
+    final routineDays = await database.query(
+      'routine_days',
+      where: 'routine_id = ?',
+      whereArgs: [routineId],
+      orderBy: 'order_index ASC',
+    );
+    if (routineDays.isEmpty) return null;
+    final completed =
+        Sqflite.firstIntValue(
+          await database.rawQuery(
+            '''
+            SELECT COUNT(*) FROM workouts
+            WHERE routine_id = ? AND end_time IS NOT NULL
+              AND date BETWEEN ? AND ?
+            ''',
+            [routineId, link['starts_on'], _date(day)],
+          ),
+        ) ??
+        0;
+    final index = completed % routineDays.length;
+    final nextDay = routineDays[index];
+    return PeriodizationRoutineSuggestion(
+      phaseId: phase.id,
+      linkId: link['id'] as String,
+      routineId: routineId,
+      routineName: link['routine_name'] as String,
+      routineDayId: nextDay['id'] as String,
+      routineDayName: nextDay['name'] as String? ?? '',
+      routineDayIndex: index,
+      routineDayCount: routineDays.length,
+      completedWorkouts: completed,
+    );
+  }
+
   Future<String> saveRoutineLink({
     String? id,
     required String phaseId,
@@ -695,14 +938,38 @@ class PeriodizationRepository extends BaseRepository {
         checkin.recovery > 5) {
       throw const PeriodizationValidationException('checkin_rating_invalid');
     }
+    final phase = await getPhase(checkin.phaseId);
+    if (phase == null) {
+      throw const PeriodizationValidationException('phase_not_found');
+    }
+    final normalizedWeek = _weekStart(checkin.weekStart);
+    final weekEnd = normalizedWeek.add(const Duration(days: 6));
+    if (weekEnd.isBefore(phase.startDate) ||
+        normalizedWeek.isAfter(phase.endDate)) {
+      throw const PeriodizationValidationException('checkin_outside_phase');
+    }
+    final normalized = PeriodizationCheckin(
+      id: checkin.id,
+      phaseId: checkin.phaseId,
+      weekStart: normalizedWeek,
+      energy: checkin.energy,
+      hunger: checkin.hunger,
+      recovery: checkin.recovery,
+      performance: checkin.performance,
+      decision: checkin.decision,
+      notes: checkin.notes,
+      metricsSnapshot: checkin.metricsSnapshot,
+      targetsSnapshot: checkin.targetsSnapshot,
+      createdAt: checkin.createdAt,
+    );
     final database = await db;
     await database.transaction((txn) async {
       await txn.delete(
         'periodization_checkins',
         where: 'phase_id = ? AND week_start = ?',
-        whereArgs: [checkin.phaseId, _date(_weekStart(checkin.weekStart))],
+        whereArgs: [checkin.phaseId, _date(normalizedWeek)],
       );
-      await txn.insert('periodization_checkins', checkin.toMap());
+      await txn.insert('periodization_checkins', normalized.toMap());
     });
   }
 
@@ -715,7 +982,18 @@ class PeriodizationRepository extends BaseRepository {
     final start = _day(rangeStart ?? phase.startDate);
     var end = _day(rangeEnd ?? phase.endDate);
     if (end.isAfter(now)) end = now;
-    if (end.isBefore(start)) end = start;
+    if (end.isBefore(start)) {
+      return PeriodizationMetrics(
+        startDate: start,
+        endDate: end,
+        elapsedDays: 0,
+        workoutCount: 0,
+        completedSets: 0,
+        volume: 0,
+        nutritionDaysLogged: 0,
+        sleepDaysLogged: 0,
+      );
+    }
     final database = await db;
     final startText = _date(start);
     final endText = _date(end);
@@ -739,7 +1017,9 @@ class PeriodizationRepository extends BaseRepository {
       '''
       SELECT ml.date,
              SUM(COALESCE(item.calories, 0)) AS calories,
-             SUM(COALESCE(item.protein_g, 0)) AS protein_g
+             SUM(COALESCE(item.protein_g, 0)) AS protein_g,
+             SUM(COALESCE(item.carbs_g, 0)) AS carbs_g,
+             SUM(COALESCE(item.fat_g, 0)) AS fat_g
       FROM meal_logs ml
       JOIN meal_log_items item ON item.meal_log_id = ml.id
       WHERE ml.date BETWEEN ? AND ?
@@ -751,18 +1031,80 @@ class PeriodizationRepository extends BaseRepository {
     final targetHistory = await getTargetHistory(phase.id);
     double calorieSum = 0;
     double proteinSum = 0;
-    double adherenceSum = 0;
-    var adherenceDays = 0;
+    double carbsSum = 0;
+    double fatSum = 0;
+    final nutritionByDate = <String, Map<String, Object?>>{};
     for (final row in nutritionRows) {
       final calories = (row['calories'] as num?)?.toDouble() ?? 0;
       calorieSum += calories;
       proteinSum += (row['protein_g'] as num?)?.toDouble() ?? 0;
-      final date = DateTime.parse(row['date'] as String);
-      final target = _targetForDate(targetHistory, date)?.calories;
-      if (target != null && target > 0) {
-        adherenceSum += math.max(0, 1 - (calories - target).abs() / target);
-        adherenceDays++;
+      carbsSum += (row['carbs_g'] as num?)?.toDouble() ?? 0;
+      fatSum += (row['fat_g'] as num?)?.toDouble() ?? 0;
+      nutritionByDate[row['date'] as String] = row;
+    }
+
+    double plannedWorkoutSum = 0;
+    double plannedSetsMinimumSum = 0;
+    double plannedSetsMaximumSum = 0;
+    var hasPlannedWorkouts = false;
+    var hasPlannedSetsMinimum = false;
+    var hasPlannedSetsMaximum = false;
+    var nutritionTargetDays = 0;
+    var nutritionTargetDaysLogged = 0;
+    double nutritionAdherenceSum = 0;
+    var sleepTargetDays = 0;
+    for (
+      var date = start;
+      !date.isAfter(end);
+      date = date.add(const Duration(days: 1))
+    ) {
+      final target = _targetForDate(targetHistory, date);
+      if (target?.workoutsPerWeek != null) {
+        plannedWorkoutSum += target!.workoutsPerWeek! / 7;
+        hasPlannedWorkouts = true;
       }
+      if (target?.minSetsPerWeek != null) {
+        plannedSetsMinimumSum += target!.minSetsPerWeek! / 7;
+        hasPlannedSetsMinimum = true;
+      }
+      if (target?.maxSetsPerWeek != null) {
+        plannedSetsMaximumSum += target!.maxSetsPerWeek! / 7;
+        hasPlannedSetsMaximum = true;
+      }
+      final nutrientTargets = <(double?, double?)>[
+        (target?.calories, null),
+        (target?.proteinG, null),
+        (target?.carbsG, null),
+        (target?.fatG, null),
+      ];
+      if (nutrientTargets.any((item) => item.$1 != null)) {
+        nutritionTargetDays++;
+        final actual = nutritionByDate[_date(date)];
+        if (actual != null) nutritionTargetDaysLogged++;
+        final actualValues = [
+          (actual?['calories'] as num?)?.toDouble(),
+          (actual?['protein_g'] as num?)?.toDouble(),
+          (actual?['carbs_g'] as num?)?.toDouble(),
+          (actual?['fat_g'] as num?)?.toDouble(),
+        ];
+        final targetValues = [
+          target?.calories,
+          target?.proteinG,
+          target?.carbsG,
+          target?.fatG,
+        ];
+        var score = 0.0;
+        var configured = 0;
+        for (var i = 0; i < targetValues.length; i++) {
+          final expected = targetValues[i];
+          if (expected != null) {
+            configured++;
+            score += _adherenceScore(actualValues[i], expected);
+          }
+        }
+        nutritionAdherenceSum += configured == 0 ? 0 : score / configured;
+      }
+      if (target?.sleepHours != null) sleepTargetDays++;
     }
 
     final weights = await database.query(
@@ -778,50 +1120,175 @@ class PeriodizationRepository extends BaseRepository {
 
     final sleepRows = await database.rawQuery(
       '''
-      SELECT AVG(COALESCE(actual_sleep_minutes, estimated_sleep_minutes, sleep_minutes)) AS average_minutes,
-             COUNT(*) AS logged_days
-      FROM sleep_entries WHERE date BETWEEN ? AND ?
-    ''',
+      SELECT date,
+             COALESCE(actual_sleep_minutes, estimated_sleep_minutes, sleep_minutes) AS minutes
+      FROM sleep_entries
+      WHERE date BETWEEN ? AND ?
+      ORDER BY date ASC
+      ''',
       [startText, endText],
     );
+    final sleepByDate = <String, double>{};
+    for (final row in sleepRows) {
+      final minutes = (row['minutes'] as num?)?.toDouble();
+      if (minutes != null) sleepByDate[row['date'] as String] = minutes / 60;
+    }
+    final averageSleepHours = sleepByDate.isEmpty
+        ? null
+        : sleepByDate.values.fold<double>(0, (sum, value) => sum + value) /
+              sleepByDate.length;
+    double sleepAdherenceSum = 0;
+    var sleepTargetDaysLogged = 0;
+    for (
+      var date = start;
+      !date.isAfter(end);
+      date = date.add(const Duration(days: 1))
+    ) {
+      final expected = _targetForDate(targetHistory, date)?.sleepHours;
+      if (expected == null) continue;
+      final actual = sleepByDate[_date(date)];
+      if (actual != null) sleepTargetDaysLogged++;
+      sleepAdherenceSum += _adherenceScore(actual, expected);
+    }
+
+    final rpeRows = await database.rawQuery(
+      '''
+      SELECT w.date, s.rpe
+      FROM workouts w
+      JOIN exercise_entries ee ON ee.workout_id = w.id
+      JOIN sets s ON s.exercise_entry_id = ee.id
+      WHERE w.date BETWEEN ? AND ? AND w.end_time IS NOT NULL
+        AND s.is_complete = 1 AND s.is_warmup = 0
+      ''',
+      [startText, endText],
+    );
+    var rpeExpectedSets = 0;
+    var rpeSetsLogged = 0;
+    double rpeSum = 0;
+    double rpeAdherenceSum = 0;
+    for (final row in rpeRows) {
+      final date = DateTime.parse(row['date'] as String);
+      final target = _targetForDate(targetHistory, date);
+      if (target?.minRpe == null && target?.maxRpe == null) continue;
+      rpeExpectedSets++;
+      final actual = (row['rpe'] as num?)?.toDouble();
+      if (actual == null) continue;
+      rpeSetsLogged++;
+      rpeSum += actual;
+      final minimum = target?.minRpe ?? target?.maxRpe ?? actual;
+      final maximum = target?.maxRpe ?? target?.minRpe ?? actual;
+      final distance = actual < minimum
+          ? minimum - actual
+          : actual > maximum
+          ? actual - maximum
+          : 0.0;
+      rpeAdherenceSum += math.max(0, 1 - distance / 10);
+    }
     final latestTarget = _targetForDate(targetHistory, end);
     final elapsedDays = end.difference(start).inDays + 1;
+    final plannedWorkouts = hasPlannedWorkouts
+        ? plannedWorkoutSum.round()
+        : null;
+    final plannedSetsMinimum = hasPlannedSetsMinimum
+        ? plannedSetsMinimumSum.round()
+        : null;
+    final plannedSetsMaximum = hasPlannedSetsMaximum
+        ? plannedSetsMaximumSum.round()
+        : null;
+    final completedSets = (workout['set_count'] as num?)?.toInt() ?? 0;
+    double? setAdherence;
+    if (plannedSetsMinimum != null || plannedSetsMaximum != null) {
+      if (plannedSetsMinimum != null && completedSets < plannedSetsMinimum) {
+        setAdherence = plannedSetsMinimum == 0
+            ? 100
+            : completedSets / plannedSetsMinimum * 100;
+      } else if (plannedSetsMaximum != null &&
+          completedSets > plannedSetsMaximum) {
+        setAdherence = plannedSetsMaximum == 0
+            ? 0
+            : plannedSetsMaximum / completedSets * 100;
+      } else {
+        setAdherence = 100;
+      }
+    }
+    final startingWeight = normalizedWeights.isEmpty
+        ? null
+        : normalizedWeights.first;
+    final endingWeight = normalizedWeights.isEmpty
+        ? null
+        : normalizedWeights.last;
+    final weightChange = normalizedWeights.length < 2
+        ? null
+        : normalizedWeights.last - normalizedWeights.first;
     final elapsedWeeks = elapsedDays / 7;
+    final weeklyWeightChange =
+        startingWeight == null ||
+            startingWeight == 0 ||
+            weightChange == null ||
+            elapsedWeeks == 0
+        ? null
+        : weightChange / startingWeight / elapsedWeeks * 100;
+    final expectedWeeklyWeightChange = latestTarget?.weeklyWeightChangePercent;
+    final weightAdherence =
+        weeklyWeightChange == null || expectedWeeklyWeightChange == null
+        ? null
+        : _adherenceScore(
+                weeklyWeightChange,
+                expectedWeeklyWeightChange,
+                toleranceFloor: 0.1,
+              ) *
+              100;
     return PeriodizationMetrics(
       startDate: start,
       endDate: end,
       elapsedDays: elapsedDays,
       workoutCount: (workout['workout_count'] as num?)?.toInt() ?? 0,
-      completedSets: (workout['set_count'] as num?)?.toInt() ?? 0,
+      completedSets: completedSets,
       volume: (workout['volume'] as num?)?.toDouble() ?? 0,
-      plannedWorkouts: latestTarget?.workoutsPerWeek == null
-          ? null
-          : (latestTarget!.workoutsPerWeek! * elapsedWeeks).round(),
-      plannedSetsMinimum: latestTarget?.minSetsPerWeek == null
-          ? null
-          : (latestTarget!.minSetsPerWeek! * elapsedWeeks).round(),
+      plannedWorkouts: plannedWorkouts,
+      plannedSetsMinimum: plannedSetsMinimum,
+      plannedSetsMaximum: plannedSetsMaximum,
+      setAdherencePercent: setAdherence,
       nutritionDaysLogged: nutritionRows.length,
+      nutritionTargetDays: nutritionTargetDays,
       averageCalories: nutritionRows.isEmpty
           ? null
           : calorieSum / nutritionRows.length,
       averageProteinG: nutritionRows.isEmpty
           ? null
           : proteinSum / nutritionRows.length,
-      nutritionAdherencePercent: adherenceDays == 0
+      averageCarbsG: nutritionRows.isEmpty
           ? null
-          : adherenceSum / adherenceDays * 100,
-      startingWeightKg: normalizedWeights.isEmpty
+          : carbsSum / nutritionRows.length,
+      averageFatG: nutritionRows.isEmpty ? null : fatSum / nutritionRows.length,
+      nutritionAdherencePercent: nutritionTargetDays == 0
           ? null
-          : normalizedWeights.first,
-      endingWeightKg: normalizedWeights.isEmpty ? null : normalizedWeights.last,
-      weightChangeKg: normalizedWeights.length < 2
+          : nutritionAdherenceSum / nutritionTargetDays * 100,
+      nutritionCoveragePercent: nutritionTargetDays == 0
           ? null
-          : normalizedWeights.last - normalizedWeights.first,
-      averageSleepHours:
-          (sleepRows.first['average_minutes'] as num?)?.toDouble() == null
+          : nutritionTargetDaysLogged / nutritionTargetDays * 100,
+      startingWeightKg: startingWeight,
+      endingWeightKg: endingWeight,
+      weightChangeKg: weightChange,
+      weeklyWeightChangePercent: weeklyWeightChange,
+      weightAdherencePercent: weightAdherence,
+      averageSleepHours: averageSleepHours,
+      sleepDaysLogged: sleepByDate.length,
+      sleepTargetDays: sleepTargetDays,
+      sleepAdherencePercent: sleepTargetDays == 0
           ? null
-          : (sleepRows.first['average_minutes'] as num).toDouble() / 60,
-      sleepDaysLogged: (sleepRows.first['logged_days'] as num?)?.toInt() ?? 0,
+          : sleepAdherenceSum / sleepTargetDays * 100,
+      sleepCoveragePercent: sleepTargetDays == 0
+          ? null
+          : sleepTargetDaysLogged / sleepTargetDays * 100,
+      averageRpe: rpeSetsLogged == 0 ? null : rpeSum / rpeSetsLogged,
+      rpeSetsLogged: rpeSetsLogged,
+      rpeAdherencePercent: rpeExpectedSets == 0
+          ? null
+          : rpeAdherenceSum / rpeExpectedSets * 100,
+      rpeCoveragePercent: rpeExpectedSets == 0
+          ? null
+          : rpeSetsLogged / rpeExpectedSets * 100,
     );
   }
 
@@ -926,6 +1393,11 @@ class PeriodizationRepository extends BaseRepository {
         (target.workoutsPerWeek! < 1 || target.workoutsPerWeek! > 14)) {
       throw const PeriodizationValidationException('invalid_target');
     }
+    for (final value in [target.minSetsPerWeek, target.maxSetsPerWeek]) {
+      if (value != null && value < 0) {
+        throw const PeriodizationValidationException('invalid_target');
+      }
+    }
     if (target.minSetsPerWeek != null &&
         target.maxSetsPerWeek != null &&
         target.minSetsPerWeek! > target.maxSetsPerWeek!) {
@@ -935,6 +1407,15 @@ class PeriodizationRepository extends BaseRepository {
         target.maxRpe != null &&
         target.minRpe! > target.maxRpe!) {
       throw const PeriodizationValidationException('invalid_target_range');
+    }
+    for (final value in [target.minRpe, target.maxRpe]) {
+      if (value != null && (value < 1 || value > 10)) {
+        throw const PeriodizationValidationException('invalid_target');
+      }
+    }
+    if (target.sleepHours != null &&
+        (target.sleepHours! < 1 || target.sleepHours! > 16)) {
+      throw const PeriodizationValidationException('invalid_target');
     }
     if (target.weeklyWeightChangePercent != null &&
         (!target.weeklyWeightChangePercent!.isFinite ||
@@ -985,6 +1466,16 @@ class PeriodizationRepository extends BaseRepository {
     if (targets.isEmpty) return null;
     final oldest = [...targets]..sort((a, b) => a.version.compareTo(b.version));
     return oldest.first;
+  }
+
+  static double _adherenceScore(
+    double? actual,
+    double expected, {
+    double toleranceFloor = 1,
+  }) {
+    if (actual == null || !actual.isFinite || !expected.isFinite) return 0;
+    final denominator = math.max(expected.abs(), toleranceFloor);
+    return math.max(0, 1 - (actual - expected).abs() / denominator);
   }
 
   static double? _weightKg(Map<String, Object?> row) {

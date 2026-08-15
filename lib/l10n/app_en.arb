@@ -1784,5 +1784,19 @@
   "periodizationDeletePhaseTitle": "Delete this phase?",
   "periodizationOverlapError": "Phases in the same plan cannot overlap.",
   "periodizationSaveError": "Could not save: {error}",
-  "@periodizationSaveError": { "placeholders": { "error": { "type": "String" } } }
+  "@periodizationSaveError": { "placeholders": { "error": { "type": "String" } } },
+  "periodizationStartPhaseWorkout": "Start",
+  "periodizationNextRoutineDay": "Next: {day} · day {current}/{total}",
+  "@periodizationNextRoutineDay": { "placeholders": { "day": { "type": "String" }, "current": { "type": "int" }, "total": { "type": "int" } } },
+  "periodizationNextReview": "Next review is due on {date}.",
+  "@periodizationNextReview": { "placeholders": { "date": { "type": "String" } } },
+  "periodizationEndPhaseConfirmTitle": "End the phase today?",
+  "periodizationEndPhaseConfirmBody": "The check-in will be preserved. Choose whether following phases should keep their current dates or move with the new end date.",
+  "periodizationKeepFollowingDates": "Keep dates",
+  "periodizationCoverage": "Logging coverage",
+  "periodizationNutritionAdherence": "Nutrition adherence",
+  "periodizationSetAdherence": "Set adherence",
+  "periodizationRpeAdherence": "RPE adherence",
+  "periodizationSleepAdherence": "Sleep adherence",
+  "periodizationWeightAdherence": "Weight adherence"
 }

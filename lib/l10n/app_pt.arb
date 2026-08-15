@@ -1764,5 +1764,19 @@
   "periodizationDeletePhaseTitle": "Excluir esta fase?",
   "periodizationOverlapError": "As fases do mesmo plano não podem se sobrepor.",
   "periodizationSaveError": "Não foi possível salvar: {error}",
-  "@periodizationSaveError": { "placeholders": { "error": { "type": "String" } } }
+  "@periodizationSaveError": { "placeholders": { "error": { "type": "String" } } },
+  "periodizationStartPhaseWorkout": "Iniciar",
+  "periodizationNextRoutineDay": "Próximo: {day} · dia {current}/{total}",
+  "@periodizationNextRoutineDay": { "placeholders": { "day": { "type": "String" }, "current": { "type": "int" }, "total": { "type": "int" } } },
+  "periodizationNextReview": "Próxima revisão prevista para {date}.",
+  "@periodizationNextReview": { "placeholders": { "date": { "type": "String" } } },
+  "periodizationEndPhaseConfirmTitle": "Encerrar a fase hoje?",
+  "periodizationEndPhaseConfirmBody": "O check-in será preservado. Escolha se as fases seguintes devem manter as datas atuais ou acompanhar o novo término.",
+  "periodizationKeepFollowingDates": "Manter datas",
+  "periodizationCoverage": "Cobertura dos registros",
+  "periodizationNutritionAdherence": "Adesão alimentar",
+  "periodizationSetAdherence": "Adesão de séries",
+  "periodizationRpeAdherence": "Adesão de RPE",
+  "periodizationSleepAdherence": "Adesão de sono",
+  "periodizationWeightAdherence": "Adesão de peso"
 }
