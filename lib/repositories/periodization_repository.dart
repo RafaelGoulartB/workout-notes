@@ -98,6 +98,14 @@ class PeriodizationRepository extends BaseRepository {
       if (phase.target case final target? when !target.isEmpty) {
         _validateTarget(target);
       }
+      if (phase.weeklyTargets != null) {
+        _validateWeeklyWindow(
+          _day(phase.startDate),
+          _day(phase.startDate),
+          _day(phase.endDate),
+          phase.weeklyTargets!,
+        );
+      }
       if (i > 0 && !phase.startDate.isAfter(sorted[i - 1].endDate)) {
         throw const PeriodizationValidationException('phase_overlap');
       }
@@ -143,7 +151,15 @@ class PeriodizationRepository extends BaseRepository {
           updatedAt: now,
         );
         await txn.insert('periodization_phases', phase.toMap());
-        if (draft.target case final target? when !target.isEmpty) {
+        if (draft.weeklyTargets != null) {
+          await _replaceTargetsFrom(
+            txn,
+            phaseId: phaseId,
+            phaseEnd: phase.endDate,
+            boundary: phase.startDate,
+            weeks: draft.weeklyTargets!,
+          );
+        } else if (draft.target case final target? when !target.isEmpty) {
           await txn.insert(
             'phase_targets',
             _targetMap(

@@ -899,6 +899,61 @@ void main() {
     expect(await repository.getTargetHistory(phase.id), isEmpty);
     expect(await repository.getEffectiveTarget(phase.id), isNull);
   });
+
+  test('createPlanWithPhases persists weekly targets per phase', () async {
+    final plan = await repository.createPlanWithPhases(
+      name: 'Weekly wizard',
+      startDate: DateTime(2026, 1, 1),
+      phases: [
+        PeriodizationPhaseDraft(
+          name: 'Base',
+          color: 1,
+          startDate: DateTime(2026, 1, 1),
+          endDate: DateTime(2026, 1, 28),
+          weeklyTargets: [
+            target(calories: 2200),
+            target(calories: 2200),
+            target(calories: 2200),
+            target(calories: 2500),
+          ],
+        ),
+        PeriodizationPhaseDraft(
+          name: 'Second',
+          color: 2,
+          startDate: DateTime(2026, 1, 29),
+          endDate: DateTime(2026, 2, 11),
+        ),
+      ],
+    );
+
+    final phases = await repository.getPhases(plan.id);
+    expect(phases, hasLength(2));
+    final history = await repository.getTargetHistory(phases.first.id);
+    expect(history, hasLength(2));
+    final ascending = [...history]..sort(
+      (a, b) => a.version.compareTo(b.version),
+    );
+    expect(ascending.first.validFrom, DateTime(2026, 1, 1));
+    expect(ascending.last.validFrom, DateTime(2026, 1, 22));
+    expect(
+      (await repository.getEffectiveTarget(
+        phases.first.id,
+        date: DateTime(2026, 1, 10),
+      ))?.calories,
+      2200,
+    );
+    expect(
+      (await repository.getEffectiveTarget(
+        phases.first.id,
+        date: DateTime(2026, 1, 25),
+      ))?.calories,
+      2500,
+    );
+    expect(
+      await repository.getTargetHistory(phases.last.id),
+      isEmpty,
+    );
+  });
 }
 
 String _testDate(DateTime date) => DateTime(

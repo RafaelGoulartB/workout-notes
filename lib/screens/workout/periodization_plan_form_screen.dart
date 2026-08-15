@@ -3,12 +3,12 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase_draft.dart';
+import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/models/periodization_template.dart';
-import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
-import 'package:workout_notes/widgets/periodization/nutrition_target_fields.dart';
+import 'package:workout_notes/screens/workout/periodization_phase_form_screen.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 
 class PeriodizationPlanFormScreen extends StatefulWidget {
@@ -276,6 +276,10 @@ class _PeriodizationPlanFormScreenState
           source.intent = intent.text.trim();
           source.weeks = parsedWeeks.clamp(1, 104);
           source.color = color;
+          source.weeklyTargets = _fitWeeklyTargets(
+            source.weeklyTargets,
+            source.weeks,
+          );
         });
       }
     }
@@ -283,266 +287,49 @@ class _PeriodizationPlanFormScreenState
 
   Future<void> _editTargets(int index) async {
     final phase = _phases[index];
-    final latestWeight = await BodyMeasurementRepository().getLatestWeightKg();
-    if (!mounted) return;
-    final controllers = <String, TextEditingController>{
-      'calories': TextEditingController(text: _prefill(phase.calories)),
-      'proteinPerKg': TextEditingController(
-        text: _prefill(phase.proteinGPerKg ?? _ratio(phase.proteinG, latestWeight)),
-      ),
-      'fatPerKg': TextEditingController(
-        text: _prefill(phase.fatGPerKg ?? _ratio(phase.fatG, latestWeight)),
-      ),
-      'refWeight': TextEditingController(
-        text: _prefill(phase.weightKgUsed ?? latestWeight),
-      ),
-      'workouts': _controller(phase.workoutsPerWeek),
-      'minSets': _controller(phase.minSetsPerWeek),
-      'maxSets': _controller(phase.maxSetsPerWeek),
-      'minRpe': _controller(phase.minRpe),
-      'maxRpe': _controller(phase.maxRpe),
-      'weight': _controller(phase.targetWeightKg),
-      'change': _controller(phase.weeklyWeightChangePercent),
-      'sleep': _controller(phase.sleepHours),
-    };
-    var routineId = phase.routineId;
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: .9,
-          maxChildSize: .96,
-          builder: (context, scrollController) => ListView(
-            controller: scrollController,
-            padding: EdgeInsets.fromLTRB(
-              20,
-              12,
-              20,
-              MediaQuery.viewInsetsOf(context).bottom + 24,
-            ),
-            children: [
-              Text(phase.name, style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 16),
-              _targetSection(
-                context,
-                AppLocalizations.of(context)!.periodizationNutritionTargets,
-                Icons.restaurant_outlined,
-                [
-                  NutritionTargetFields(
-                    calories: controllers['calories']!,
-                    proteinPerKg: controllers['proteinPerKg']!,
-                    fatPerKg: controllers['fatPerKg']!,
-                    referenceWeight: controllers['refWeight']!,
-                    onChanged: () => setSheetState(() {}),
-                  ),
-                ],
-              ),
-              _targetSection(
-                context,
-                AppLocalizations.of(context)!.periodizationTrainingTargets,
-                Icons.fitness_center,
-                [
-                  _numberField(
-                    controllers['workouts']!,
-                    AppLocalizations.of(context)!.periodizationWorkoutsPerWeek,
-                    decimal: false,
-                  ),
-                  _numberField(
-                    controllers['minSets']!,
-                    AppLocalizations.of(context)!.periodizationMinSets,
-                    decimal: false,
-                  ),
-                  _numberField(
-                    controllers['maxSets']!,
-                    AppLocalizations.of(context)!.periodizationMaxSets,
-                    decimal: false,
-                  ),
-                  _numberField(
-                    controllers['minRpe']!,
-                    AppLocalizations.of(context)!.periodizationMinRpe,
-                  ),
-                  _numberField(
-                    controllers['maxRpe']!,
-                    AppLocalizations.of(context)!.periodizationMaxRpe,
-                  ),
-                ],
-              ),
-              _targetSection(
-                context,
-                AppLocalizations.of(context)!.periodizationBodyTargets,
-                Icons.monitor_weight_outlined,
-                [
-                  _numberField(
-                    controllers['weight']!,
-                    AppLocalizations.of(context)!.periodizationTargetWeight,
-                  ),
-                  _numberField(
-                    controllers['change']!,
-                    AppLocalizations.of(
-                      context,
-                    )!.periodizationWeeklyWeightChange,
-                  ),
-                ],
-              ),
-              _targetSection(
-                context,
-                AppLocalizations.of(context)!.periodizationSleepTargets,
-                Icons.nightlight_outlined,
-                [
-                  _numberField(
-                    controllers['sleep']!,
-                    AppLocalizations.of(context)!.periodizationSleepHours,
-                  ),
-                ],
-              ),
-              DropdownButtonFormField<String?>(
-                initialValue: routineId,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: AppLocalizations.of(
-                    context,
-                  )!.periodizationLinkedRoutine,
-                  border: const OutlineInputBorder(),
-                ),
-                items: [
-                  DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text(
-                      AppLocalizations.of(context)!.periodizationNoRoutine,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  ..._routines.map(
-                    (routine) => DropdownMenuItem<String?>(
-                      value: routine['id'] as String,
-                      child: Text(
-                        routine['name'] as String,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                ],
-                onChanged: (value) => setSheetState(() => routineId = value),
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () {
-                  final breakdown = NutritionTargetFields.breakdownOf(
-                    calories: controllers['calories']!,
-                    proteinPerKg: controllers['proteinPerKg']!,
-                    fatPerKg: controllers['fatPerKg']!,
-                    referenceWeight: controllers['refWeight']!,
-                  );
-                  if (breakdown != null && breakdown.energyConflict) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          AppLocalizations.of(
-                            context,
-                          )!.nutritionSuggestMacroEnergyError,
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-                  Navigator.pop(sheetContext, true);
-                },
-                child: Text(AppLocalizations.of(context)!.commonSave),
-              ),
-            ],
+    final result = await Navigator.push<PeriodizationPhaseDraftData>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PeriodizationPhaseFormScreen(
+          plan: _editorPlan(),
+          draftMode: true,
+          draft: PeriodizationPhaseDraftData(
+            name: phase.name,
+            intent: phase.intent.isEmpty ? null : phase.intent,
+            templateKey: phase.templateKey,
+            color: phase.color,
+            startDate: _phaseStart(index),
+            endDate: _phaseEnd(index),
+            weeklyTargets: phase.weeklyTargets,
+            routineId: phase.routineId,
           ),
         ),
       ),
     );
-    if (result == true && mounted) {
-      setState(() {
-        final breakdown = NutritionTargetFields.breakdownOf(
-          calories: controllers['calories']!,
-          proteinPerKg: controllers['proteinPerKg']!,
-          fatPerKg: controllers['fatPerKg']!,
-          referenceWeight: controllers['refWeight']!,
-        );
-        if (breakdown != null) {
-          phase.calories = breakdown.calories;
-          phase.proteinG = breakdown.proteinG;
-          phase.carbsG = breakdown.carbsG;
-          phase.fatG = breakdown.fatG;
-          phase.proteinGPerKg = breakdown.proteinPerKg;
-          phase.fatGPerKg = breakdown.fatPerKg;
-          phase.weightKgUsed = breakdown.weightKg;
-        }
-        phase.workoutsPerWeek = _int(controllers['workouts']);
-        phase.minSetsPerWeek = _int(controllers['minSets']);
-        phase.maxSetsPerWeek = _int(controllers['maxSets']);
-        phase.minRpe = _double(controllers['minRpe']);
-        phase.maxRpe = _double(controllers['maxRpe']);
-        phase.targetWeightKg = _double(controllers['weight']);
-        phase.weeklyWeightChangePercent = _double(controllers['change']);
-        phase.sleepHours = _double(controllers['sleep']);
-        phase.routineId = routineId;
-      });
-    }
-    for (final controller in controllers.values) {
-      controller.dispose();
-    }
+    if (result == null || !mounted) return;
+    setState(() {
+      phase.name = result.name;
+      phase.intent = result.intent ?? '';
+      phase.templateKey = result.templateKey;
+      phase.color = result.color;
+      phase.routineId = result.routineId;
+      final weeks = ((result.endDate.difference(result.startDate).inDays + 1) /
+              7)
+          .ceil()
+          .clamp(1, 104);
+      phase.weeks = weeks;
+      phase.weeklyTargets = _fitWeeklyTargets(result.weeklyTargets, weeks);
+    });
   }
 
-  Widget _targetSection(
-    BuildContext context,
-    String title,
-    IconData icon,
-    List<Widget> fields,
-  ) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: PeriodizationSurface(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                icon,
-                size: 19,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Wrap(spacing: 10, runSpacing: 10, children: fields),
-        ],
-      ),
-    ),
-  );
-
-  Widget _numberField(
-    TextEditingController controller,
-    String label, {
-    bool decimal = true,
-  }) => SizedBox(
-    width: 164,
-    child: TextField(
-      controller: controller,
-      keyboardType: TextInputType.numberWithOptions(
-        decimal: decimal,
-        signed: true,
-      ),
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-      ),
-    ),
+  PeriodizationPlan _editorPlan() => PeriodizationPlan(
+    id: 'draft-plan',
+    name: _nameController.text,
+    startDate: _startDate,
+    endDate: _startDate.add(const Duration(days: 3650)),
+    status: PeriodizationPlanStatus.draft,
+    createdAt: DateTime.now(),
+    updatedAt: DateTime.now(),
   );
 
   Future<void> _save() async {
@@ -561,7 +348,9 @@ class _PeriodizationPlanFormScreenState
             startDate: _phaseStart(i),
             endDate: _phaseEnd(i),
             routineId: phase.routineId,
-            target: phase.target,
+            weeklyTargets: phase.weeklyTargets.any((target) => !target.isEmpty)
+                ? phase.weeklyTargets
+                : null,
           ),
         );
       }
@@ -1205,31 +994,39 @@ class _PeriodizationPlanFormScreenState
     ],
   );
 
-  int _targetCount(_EditablePhase phase) => [
-    phase.calories,
-    phase.proteinG,
-    phase.carbsG,
-    phase.fatG,
-    phase.workoutsPerWeek,
-    phase.minSetsPerWeek,
-    phase.maxSetsPerWeek,
-    phase.minRpe,
-    phase.maxRpe,
-    phase.targetWeightKg,
-    phase.weeklyWeightChangePercent,
-    phase.sleepHours,
-    phase.routineId,
-  ].where((value) => value != null).length;
+  /// Number of distinct target blocks in the weekly list: the base target
+  /// plus each week that deviates from the previous one.
+  int _targetCount(_EditablePhase phase) {
+    if (phase.weeklyTargets.isEmpty) return 0;
+    var count = phase.weeklyTargets.first.isEmpty ? 0 : 1;
+    for (var i = 1; i < phase.weeklyTargets.length; i++) {
+      if (!_sameTarget(phase.weeklyTargets[i], phase.weeklyTargets[i - 1])) {
+        count++;
+      }
+    }
+    return count;
+  }
 
   String _targetSummary(_EditablePhase phase) {
     final values = <String>[];
-    if (phase.calories != null) values.add('${phase.calories!.round()} kcal');
-    if (phase.proteinG != null) values.add('${phase.proteinG!.round()}g P');
-    if (phase.workoutsPerWeek != null) {
-      values.add('${phase.workoutsPerWeek}×/sem.');
+    PeriodizationTarget? target;
+    for (final entry in phase.weeklyTargets) {
+      if (!entry.isEmpty) {
+        target = entry;
+        break;
+      }
     }
-    if (phase.targetWeightKg != null) values.add('${phase.targetWeightKg} kg');
-    if (phase.sleepHours != null) values.add('${phase.sleepHours}h');
+    if (target != null) {
+      if (target.calories != null) values.add('${target.calories!.round()} kcal');
+      if (target.proteinG != null) values.add('${target.proteinG!.round()}g P');
+      if (target.workoutsPerWeek != null) {
+        values.add('${target.workoutsPerWeek}×/sem.');
+      }
+      if (target.targetWeightKg != null) {
+        values.add('${target.targetWeightKg} kg');
+      }
+      if (target.sleepHours != null) values.add('${target.sleepHours}h');
+    }
     if (phase.routineId != null) {
       final match = _routines.where(
         (routine) => routine['id'] == phase.routineId,
@@ -1241,23 +1038,37 @@ class _PeriodizationPlanFormScreenState
         : values.join(' · ');
   }
 
-  static TextEditingController _controller(num? value) =>
-      TextEditingController(text: value?.toString() ?? '');
-  static double? _double(TextEditingController? controller) =>
-      double.tryParse(controller?.text.trim().replaceAll(',', '.') ?? '');
-  static int? _int(TextEditingController? controller) =>
-      int.tryParse(controller?.text.trim() ?? '');
-  static double? _ratio(double? grams, double? weight) {
-    if (grams == null || weight == null || weight <= 0) return null;
-    return grams / weight;
+  /// Truncates or extends a weekly target list to [weeks] entries. New
+  /// trailing weeks inherit the last effective target so the phase keeps its
+  /// configured values when its duration grows.
+  static List<PeriodizationTarget> _fitWeeklyTargets(
+    List<PeriodizationTarget> source,
+    int weeks,
+  ) {
+    final resized = List<PeriodizationTarget?>.filled(weeks, null);
+    PeriodizationTarget? last;
+    for (var i = 0; i < weeks; i++) {
+      final candidate = i < source.length ? source[i] : last;
+      if (candidate != null) resized[i] = candidate;
+      last = resized[i] ?? last;
+    }
+    return resized
+        .map((target) => target ?? _EditablePhase.emptyTarget())
+        .toList();
   }
 
-  static String _prefill(num? value) {
-    if (value == null) return '';
-    if (value is double && value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
-    }
-    return value.toString();
+  static bool _sameTarget(
+    PeriodizationTarget? a,
+    PeriodizationTarget? b,
+  ) {
+    final emptyA = a == null || a.isEmpty;
+    final emptyB = b == null || b.isEmpty;
+    if (emptyA && emptyB) return true;
+    if (a == null || b == null) return false;
+    return a.nutritionJson.toString() == b.nutritionJson.toString() &&
+        a.trainingJson.toString() == b.trainingJson.toString() &&
+        a.bodyJson.toString() == b.bodyJson.toString() &&
+        a.sleepJson.toString() == b.sleepJson.toString();
   }
 }
 
@@ -1267,22 +1078,11 @@ class _EditablePhase {
   String? templateKey;
   int weeks;
   int color;
-  double? calories;
-  double? proteinG;
-  double? carbsG;
-  double? fatG;
-  double? proteinGPerKg;
-  double? fatGPerKg;
-  double? weightKgUsed;
-  int? workoutsPerWeek;
-  int? minSetsPerWeek;
-  int? maxSetsPerWeek;
-  double? minRpe;
-  double? maxRpe;
-  double? targetWeightKg;
-  double? weeklyWeightChangePercent;
-  double? sleepHours;
   String? routineId;
+
+  /// One effective target per week (index 0 = first week). Entries may be
+  /// empty targets when the week is undefined.
+  List<PeriodizationTarget> weeklyTargets;
 
   _EditablePhase({
     required this.name,
@@ -1290,28 +1090,15 @@ class _EditablePhase {
     this.templateKey,
     required this.weeks,
     required this.color,
-  });
+    List<PeriodizationTarget>? weeklyTargets,
+  }) : weeklyTargets =
+           weeklyTargets ?? List.generate(weeks, (_) => emptyTarget());
 
-  PeriodizationTarget get target => PeriodizationTarget(
+  static PeriodizationTarget emptyTarget() => PeriodizationTarget(
     id: '',
     phaseId: '',
     version: 0,
     validFrom: DateTime.now(),
-    calories: calories,
-    proteinG: proteinG,
-    carbsG: carbsG,
-    fatG: fatG,
-    proteinGPerKg: proteinGPerKg,
-    fatGPerKg: fatGPerKg,
-    weightKgUsed: weightKgUsed,
-    workoutsPerWeek: workoutsPerWeek,
-    minSetsPerWeek: minSetsPerWeek,
-    maxSetsPerWeek: maxSetsPerWeek,
-    minRpe: minRpe,
-    maxRpe: maxRpe,
-    targetWeightKg: targetWeightKg,
-    weeklyWeightChangePercent: weeklyWeightChangePercent,
-    sleepHours: sleepHours,
     createdAt: DateTime.now(),
   );
 }

@@ -17,14 +17,47 @@ import 'package:workout_notes/widgets/periodization/phase_week_selector.dart';
 
 import 'nutrition_goal_suggest_sheet.dart';
 
+/// Data exchanged between the plan wizard and the phase editor in draft
+/// mode: the wizard seeds the editor with an existing draft phase and the
+/// editor returns the edited phase (never persisted — the wizard saves the
+/// whole plan at once). [weeklyTargets] holds one effective target per week.
+class PeriodizationPhaseDraftData {
+  final String name;
+  final String? intent;
+  final String? templateKey;
+  final int color;
+  final DateTime startDate;
+  final DateTime endDate;
+  final List<PeriodizationTarget> weeklyTargets;
+  final String? routineId;
+
+  const PeriodizationPhaseDraftData({
+    required this.name,
+    this.intent,
+    this.templateKey,
+    required this.color,
+    required this.startDate,
+    required this.endDate,
+    this.weeklyTargets = const [],
+    this.routineId,
+  });
+}
+
 class PeriodizationPhaseFormScreen extends StatefulWidget {
   final PeriodizationPlan plan;
   final PeriodizationPhase? phase;
+
+  /// When true the editor never touches the database: "Save" pops with a
+  /// [PeriodizationPhaseDraftData] result for the plan wizard to apply.
+  final bool draftMode;
+  final PeriodizationPhaseDraftData? draft;
 
   const PeriodizationPhaseFormScreen({
     super.key,
     required this.plan,
     this.phase,
+    this.draftMode = false,
+    this.draft,
   });
 
   @override
@@ -65,12 +98,19 @@ class _PeriodizationPhaseFormScreenState
   void initState() {
     super.initState();
     final phase = widget.phase;
-    _name = TextEditingController(text: phase?.name ?? '');
-    _intent = TextEditingController(text: phase?.intent ?? '');
-    _type = TextEditingController(text: phase?.templateKey ?? '');
-    _startDate = phase?.startDate ?? _suggestedStart();
-    _endDate = phase?.endDate ?? _startDate.add(const Duration(days: 27));
-    _color = phase?.color ?? _color;
+    final seed = widget.draft;
+    _name = TextEditingController(
+      text: phase?.name ?? seed?.name ?? '',
+    );
+    _intent = TextEditingController(text: phase?.intent ?? seed?.intent ?? '');
+    _type = TextEditingController(
+      text: phase?.templateKey ?? seed?.templateKey ?? '',
+    );
+    _startDate = phase?.startDate ?? seed?.startDate ?? _suggestedStart();
+    _endDate =
+        phase?.endDate ?? seed?.endDate ?? _startDate.add(const Duration(days: 27));
+    _color = phase?.color ?? seed?.color ?? _color;
+    _routineId = seed?.routineId;
     _weekStarts = _computeWeekStarts(_startDate, _endDate);
     _weekOverrides = List<PeriodizationTarget?>.filled(
       _weekStarts.length,
@@ -79,7 +119,20 @@ class _PeriodizationPhaseFormScreenState
     for (final key in _targetKeys) {
       _targetControllers[key] = TextEditingController();
     }
+    if (widget.draftMode && seed != null) {
+      _prefillOverridesFromDraft(seed.weeklyTargets);
+    }
     _load();
+  }
+
+  void _prefillOverridesFromDraft(List<PeriodizationTarget> weekly) {
+    for (var i = 0; i < _weekStarts.length && i < weekly.length; i++) {
+      final effective = weekly[i];
+      final previous = i == 0 ? null : weekly[i - 1];
+      if (!_targetsEquivalent(effective, previous)) {
+        _weekOverrides[i] = _copyOf(effective, _weekStarts[i]);
+      }
+    }
   }
 
   DateTime _suggestedStart() => DateTime.now().isBefore(widget.plan.startDate)
@@ -585,6 +638,25 @@ class _PeriodizationPhaseFormScreenState
       );
       return;
     }
+    if (widget.draftMode) {
+      Navigator.pop(
+        context,
+        PeriodizationPhaseDraftData(
+          name: _name.text.trim(),
+          intent: _intent.text.trim().isEmpty ? null : _intent.text.trim(),
+          templateKey: _type.text.trim().isEmpty ? null : _type.text.trim(),
+          color: _color,
+          startDate: _startDate,
+          endDate: _endDate,
+          weeklyTargets: [
+            for (var i = 0; i < _weekStarts.length; i++)
+              _effectiveTarget(i) ?? _emptyTarget(_weekStarts[i]),
+          ],
+          routineId: _routineId,
+        ),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       var targetChanged = false;
@@ -697,7 +769,9 @@ class _PeriodizationPhaseFormScreenState
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          _editing ? loc.periodizationEditPhase : loc.periodizationNewPhase,
+          widget.draftMode || _editing
+              ? loc.periodizationEditPhase
+              : loc.periodizationNewPhase,
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w700,
           ),

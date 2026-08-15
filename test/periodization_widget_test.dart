@@ -562,4 +562,96 @@ void main() {
     expect(find.byIcon(Icons.lock_rounded), findsWidgets);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('plan wizard reuses the phase editor for weekly targets', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app());
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      await tester.pump();
+      await tester.tap(find.text('Criar plano'));
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+    expect(find.text('Novo plano'), findsWidgets);
+
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+    expect(find.text('ALVOS DA FASE'), findsWidgets);
+
+    // Tapping the phase opens the shared full-screen editor (draft mode).
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Cutting').first);
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      await tester.pump();
+    });
+    expect(find.text('Editar fase'), findsOneWidget);
+
+    final caloriesField = find.widgetWithText(TextField, 'kcal por dia');
+    await tester.scrollUntilVisible(
+      caloriesField,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(caloriesField, '2400');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Proteína (g/kg)'),
+      '2.2',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Gordura (g/kg)'),
+      '0.8',
+    );
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Peso de referência (kg)'),
+      '75',
+    );
+    await tester.pumpAndSettle();
+
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Salvar'));
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await tester.pump();
+    });
+    await tester.pumpAndSettle();
+    expect(find.textContaining('2400 kcal'), findsWidgets);
+
+    await tester.tap(find.text('Continuar'));
+    await tester.pumpAndSettle();
+
+    await tester.runAsync(() async {
+      await tester.tap(find.text('Criar e ativar'));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      await tester.pump();
+    });
+    await tester.pumpAndSettle();
+
+    final plan = (await tester.runAsync(
+      () => PeriodizationRepository().getActivePlan(),
+    ))!;
+    final phases = (await tester.runAsync(
+      () => PeriodizationRepository().getPhases(plan.id),
+    ))!;
+    expect(phases, hasLength(4));
+    final history = (await tester.runAsync(
+      () => PeriodizationRepository().getTargetHistory(phases.first.id),
+    ))!;
+    expect(history, hasLength(1));
+    expect(history.single.calories, 2400);
+    expect(history.single.carbsG, 300);
+    expect(history.single.proteinGPerKg, 2.2);
+    expect(history.single.weightKgUsed, 75);
+    expect(tester.takeException(), isNull);
+  });
 }
