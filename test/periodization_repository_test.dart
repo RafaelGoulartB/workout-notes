@@ -6,6 +6,7 @@ import 'package:workout_notes/database/database_periodization_schema.dart';
 import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
+import 'package:workout_notes/models/periodization_projection.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 
@@ -65,20 +66,26 @@ void main() {
     await database.close();
   });
 
-  PeriodizationTarget target({double calories = 2200, int workouts = 4}) =>
-      PeriodizationTarget(
-        id: '',
-        phaseId: '',
-        version: 0,
-        validFrom: DateTime(2026, 1, 1),
-        calories: calories,
-        proteinG: 180,
-        workoutsPerWeek: workouts,
-        minSetsPerWeek: 40,
-        maxSetsPerWeek: 55,
-        sleepHours: 8,
-        createdAt: DateTime(2026, 1, 1),
-      );
+  PeriodizationTarget target({
+    double calories = 2200,
+    int workouts = 4,
+    double? targetWeight,
+    double? weeklyWeightChange,
+  }) => PeriodizationTarget(
+    id: '',
+    phaseId: '',
+    version: 0,
+    validFrom: DateTime(2026, 1, 1),
+    calories: calories,
+    proteinG: 180,
+    workoutsPerWeek: workouts,
+    minSetsPerWeek: 40,
+    maxSetsPerWeek: 55,
+    targetWeightKg: targetWeight,
+    weeklyWeightChangePercent: weeklyWeightChange,
+    sleepHours: 8,
+    createdAt: DateTime(2026, 1, 1),
+  );
 
   test('creates an integrated active plan and prevents overlap', () async {
     await database.insert('routines', {
@@ -572,6 +579,77 @@ void main() {
       expect(suggestion?.completedWorkouts, 1);
     },
   );
+
+  test('projects weight, phase volume and probable goal date', () async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = today.subtract(const Duration(days: 14));
+    final end = today.add(const Duration(days: 35));
+    final plan = await repository.createPlan(
+      name: 'Projection',
+      startDate: start,
+      endDate: end,
+    );
+    final phase = await repository.addPhase(
+      planId: plan.id,
+      name: 'Cut',
+      startDate: start,
+      endDate: end,
+      color: 1,
+      target: target(targetWeight: 95, weeklyWeightChange: -1),
+    );
+    await database.insert('body_measurements', {
+      'id': 'weight-start',
+      'type': 'weight',
+      'value': 102,
+      'unit': 'kg',
+      'date': _testDate(start),
+      'created_at': start.toIso8601String(),
+    });
+    await database.insert('body_measurements', {
+      'id': 'weight-now',
+      'type': 'weight',
+      'value': 100,
+      'unit': 'kg',
+      'date': _testDate(today),
+      'created_at': today.toIso8601String(),
+    });
+    await database.insert('workouts', {
+      'id': 'projection-workout',
+      'date': _testDate(today),
+      'start_time': today.subtract(const Duration(hours: 1)).toIso8601String(),
+      'end_time': today.toIso8601String(),
+      'created_at': today.toIso8601String(),
+    });
+    await database.insert('exercise_entries', {
+      'id': 'projection-entry',
+      'workout_id': 'projection-workout',
+      'exercise_id': 'exercise',
+      'order_index': 0,
+    });
+    await database.insert('sets', {
+      'id': 'projection-set',
+      'exercise_entry_id': 'projection-entry',
+      'weight': 100,
+      'reps': 10,
+      'is_complete': 1,
+      'is_warmup': 0,
+      'order_index': 0,
+    });
+
+    final projection = await repository.getPhaseProjection(phase);
+
+    expect(
+      projection.weightBasis,
+      PeriodizationWeightProjectionBasis.observedTrend,
+    );
+    expect(projection.expectedEndWeightKg, closeTo(95.2, 0.2));
+    expect(projection.plannedSets, 286);
+    expect(projection.plannedWorkouts, 29);
+    expect(projection.plannedVolume, closeTo(286000, 1));
+    expect(projection.estimatedGoalDate, isNotNull);
+    expect(projection.estimatedGoalDate!.isAfter(today), isTrue);
+  });
 }
 
 String _testDate(DateTime date) => DateTime(

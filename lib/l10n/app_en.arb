@@ -1798,5 +1798,21 @@
   "periodizationSetAdherence": "Set adherence",
   "periodizationRpeAdherence": "RPE adherence",
   "periodizationSleepAdherence": "Sleep adherence",
-  "periodizationWeightAdherence": "Weight adherence"
+  "periodizationWeightAdherence": "Weight adherence",
+  "periodizationProjections": "PROJECTIONS",
+  "periodizationExpectedEndWeight": "Expected weight at phase end",
+  "periodizationPlannedVolume": "Planned phase volume",
+  "periodizationEstimatedGoalDate": "Estimated goal date",
+  "periodizationProjectionObservedTrend": "observed trend",
+  "periodizationProjectionPlannedRate": "planned rate",
+  "periodizationProjectionWeightBasis": "Basis: {basis} of {rate} per week",
+  "@periodizationProjectionWeightBasis": { "placeholders": { "basis": { "type": "String" }, "rate": { "type": "String" } } },
+  "periodizationProjectionGoalBasis": "Estimate based on the {basis}",
+  "@periodizationProjectionGoalBasis": { "placeholders": { "basis": { "type": "String" } } },
+  "periodizationProjectionCurrentAverage": "Estimated from the current volume average",
+  "periodizationProjectionPlannedSets": "Estimated with {count} planned sets",
+  "@periodizationProjectionPlannedSets": { "placeholders": { "count": { "type": "int" } } },
+  "periodizationProjectionPlannedWorkouts": "Estimated with {count} planned workouts",
+  "@periodizationProjectionPlannedWorkouts": { "placeholders": { "count": { "type": "int" } } },
+  "periodizationProjectionDisclaimer": "Estimates are not guarantees. They change as new workouts, weigh-ins, and targets are recorded."
 }

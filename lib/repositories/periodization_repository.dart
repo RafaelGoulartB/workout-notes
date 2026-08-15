@@ -8,6 +8,7 @@ import 'package:workout_notes/models/periodization_metrics.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
+import 'package:workout_notes/models/periodization_projection.dart';
 import 'package:workout_notes/models/periodization_routine_suggestion.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 
@@ -1307,6 +1308,179 @@ class PeriodizationRepository extends BaseRepository {
         ? phase.endDate
         : _weekStart(weekStart).add(const Duration(days: 6)),
   );
+
+  Future<PeriodizationProjection> getPhaseProjection(
+    PeriodizationPhase phase, {
+    PeriodizationMetrics? phaseMetrics,
+  }) async {
+    final today = _day(DateTime.now());
+    final projectionStart = today.isBefore(phase.startDate)
+        ? phase.startDate
+        : today;
+    final phaseOngoing = !today.isAfter(phase.endDate);
+    final remainingDays = projectionStart.isAfter(phase.endDate)
+        ? 0
+        : phase.endDate.difference(projectionStart).inDays;
+    final database = await db;
+    final metrics = phaseMetrics ?? await getPhaseMetrics(phase);
+    final targets = await getTargetHistory(phase.id);
+
+    double plannedWorkoutSum = 0;
+    double plannedSetSum = 0;
+    var hasPlannedWorkouts = false;
+    var hasPlannedSets = false;
+    for (
+      var date = phase.startDate;
+      !date.isAfter(phase.endDate);
+      date = date.add(const Duration(days: 1))
+    ) {
+      final target = _targetForDate(targets, date);
+      if (target?.workoutsPerWeek != null) {
+        plannedWorkoutSum += target!.workoutsPerWeek! / 7;
+        hasPlannedWorkouts = true;
+      }
+      if (target?.minSetsPerWeek != null) {
+        plannedSetSum += target!.minSetsPerWeek! / 7;
+        hasPlannedSets = true;
+      }
+    }
+    final plannedWorkouts = hasPlannedWorkouts
+        ? plannedWorkoutSum.round()
+        : null;
+    final plannedSets = hasPlannedSets ? plannedSetSum.round() : null;
+
+    double? plannedVolume;
+    if (metrics.volume > 0 &&
+        metrics.completedSets > 0 &&
+        plannedSets != null) {
+      plannedVolume = metrics.volume / metrics.completedSets * plannedSets;
+    } else if (metrics.volume > 0 &&
+        metrics.workoutCount > 0 &&
+        plannedWorkouts != null) {
+      plannedVolume = metrics.volume / metrics.workoutCount * plannedWorkouts;
+    } else if (plannedWorkouts != null && plannedWorkouts > 0) {
+      final historyStart = today.subtract(const Duration(days: 90));
+      final history = await database.rawQuery(
+        '''
+        SELECT COUNT(DISTINCT w.id) AS workout_count,
+               SUM(CASE WHEN s.is_complete = 1 AND s.is_warmup = 0
+                        THEN COALESCE(s.weight, 0) * COALESCE(s.reps, 0)
+                        ELSE 0 END) AS volume
+        FROM workouts w
+        LEFT JOIN exercise_entries ee ON ee.workout_id = w.id
+        LEFT JOIN sets s ON s.exercise_entry_id = ee.id
+        WHERE w.date BETWEEN ? AND ? AND w.end_time IS NOT NULL
+        ''',
+        [_date(historyStart), _date(today)],
+      );
+      final workoutCount =
+          (history.first['workout_count'] as num?)?.toInt() ?? 0;
+      final volume = (history.first['volume'] as num?)?.toDouble() ?? 0;
+      if (workoutCount > 0 && volume > 0) {
+        plannedVolume = volume / workoutCount * plannedWorkouts;
+      }
+    }
+
+    final latestWeights = await database.query(
+      'body_measurements',
+      where: "type = 'weight' AND date <= ?",
+      whereArgs: [_date(today)],
+      orderBy: 'date DESC, created_at DESC',
+      limit: 1,
+    );
+    final currentWeight = latestWeights.isEmpty
+        ? null
+        : _weightKg(latestWeights.first);
+    final trendStart = today.subtract(const Duration(days: 42));
+    final trendRows = await database.query(
+      'body_measurements',
+      where: "type = 'weight' AND date BETWEEN ? AND ?",
+      whereArgs: [_date(trendStart), _date(today)],
+      orderBy: 'date ASC, created_at ASC',
+    );
+    double? observedRate;
+    if (trendRows.length >= 2) {
+      final firstRow = trendRows.first;
+      final lastRow = trendRows.last;
+      final firstWeight = _weightKg(firstRow);
+      final lastWeight = _weightKg(lastRow);
+      final spanDays = DateTime.parse(
+        lastRow['date'] as String,
+      ).difference(DateTime.parse(firstRow['date'] as String)).inDays;
+      if (firstWeight != null &&
+          firstWeight > 0 &&
+          lastWeight != null &&
+          spanDays >= 7) {
+        final rate =
+            (lastWeight - firstWeight) / firstWeight / (spanDays / 7) * 100;
+        if (rate.isFinite && rate.abs() <= 5) observedRate = rate;
+      }
+    }
+
+    final effectiveTarget = _targetForDate(targets, projectionStart);
+    final targetWeight = effectiveTarget?.targetWeightKg;
+    final plannedRate = effectiveTarget?.weeklyWeightChangePercent;
+    var selectedRate = phase.startDate.isAfter(today)
+        ? plannedRate
+        : observedRate;
+    var weightBasis = selectedRate == null
+        ? null
+        : phase.startDate.isAfter(today) || observedRate == null
+        ? PeriodizationWeightProjectionBasis.plannedRate
+        : PeriodizationWeightProjectionBasis.observedTrend;
+    if (currentWeight != null && targetWeight != null) {
+      final direction = targetWeight.compareTo(currentWeight).sign;
+      final selectedDirection = selectedRate?.compareTo(0).sign;
+      final plannedDirection = plannedRate?.compareTo(0).sign;
+      if (direction != 0 &&
+          selectedDirection != direction &&
+          plannedDirection == direction) {
+        selectedRate = plannedRate;
+        weightBasis = PeriodizationWeightProjectionBasis.plannedRate;
+      }
+    }
+
+    double? expectedEndWeight;
+    if (currentWeight != null &&
+        selectedRate != null &&
+        phaseOngoing &&
+        remainingDays >= 0 &&
+        1 + selectedRate / 100 > 0) {
+      expectedEndWeight =
+          currentWeight * math.pow(1 + selectedRate / 100, remainingDays / 7);
+    }
+
+    DateTime? estimatedGoalDate;
+    if (phaseOngoing && currentWeight != null && targetWeight != null) {
+      if ((targetWeight - currentWeight).abs() < 0.05) {
+        estimatedGoalDate = today;
+      } else if (selectedRate != null && selectedRate != 0) {
+        final growth = 1 + selectedRate / 100;
+        final movesTowardGoal =
+            (targetWeight > currentWeight && selectedRate > 0) ||
+            (targetWeight < currentWeight && selectedRate < 0);
+        if (growth > 0 && movesTowardGoal) {
+          final weeks =
+              math.log(targetWeight / currentWeight) / math.log(growth);
+          if (weeks.isFinite && weeks >= 0 && weeks <= 260) {
+            estimatedGoalDate = today.add(Duration(days: (weeks * 7).ceil()));
+          }
+        }
+      }
+    }
+
+    return PeriodizationProjection(
+      currentWeightKg: currentWeight,
+      expectedEndWeightKg: expectedEndWeight,
+      estimatedGoalDate: estimatedGoalDate,
+      plannedVolume: plannedVolume,
+      plannedWorkouts: plannedWorkouts,
+      plannedSets: plannedSets,
+      weeklyWeightRatePercent: selectedRate,
+      weightBasis: weightBasis,
+      remainingDays: remainingDays,
+    );
+  }
 
   static Future<void> _deactivateCurrent(
     DatabaseExecutor txn, {

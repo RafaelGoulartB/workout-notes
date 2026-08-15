@@ -1778,5 +1778,21 @@
   "periodizationSetAdherence": "Adesão de séries",
   "periodizationRpeAdherence": "Adesão de RPE",
   "periodizationSleepAdherence": "Adesão de sono",
-  "periodizationWeightAdherence": "Adesão de peso"
+  "periodizationWeightAdherence": "Adesão de peso",
+  "periodizationProjections": "PROJEÇÕES",
+  "periodizationExpectedEndWeight": "Peso esperado ao fim da fase",
+  "periodizationPlannedVolume": "Volume planejado da fase",
+  "periodizationEstimatedGoalDate": "Data provável da meta",
+  "periodizationProjectionObservedTrend": "ritmo observado",
+  "periodizationProjectionPlannedRate": "ritmo planejado",
+  "periodizationProjectionWeightBasis": "Base: {basis} de {rate} por semana",
+  "@periodizationProjectionWeightBasis": { "placeholders": { "basis": { "type": "String" }, "rate": { "type": "String" } } },
+  "periodizationProjectionGoalBasis": "Estimativa baseada no {basis}",
+  "@periodizationProjectionGoalBasis": { "placeholders": { "basis": { "type": "String" } } },
+  "periodizationProjectionCurrentAverage": "Estimado pela média atual de volume",
+  "periodizationProjectionPlannedSets": "Estimado com {count} séries planejadas",
+  "@periodizationProjectionPlannedSets": { "placeholders": { "count": { "type": "int" } } },
+  "periodizationProjectionPlannedWorkouts": "Estimado com {count} treinos planejados",
+  "@periodizationProjectionPlannedWorkouts": { "placeholders": { "count": { "type": "int" } } },
+  "periodizationProjectionDisclaimer": "Estimativas não são garantias. Elas mudam conforme novos treinos, pesagens e metas são registrados."
 }

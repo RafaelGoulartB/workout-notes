@@ -6,6 +6,7 @@ import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_metrics.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
+import 'package:workout_notes/models/periodization_projection.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
@@ -35,6 +36,7 @@ class _PeriodizationPhaseDetailScreenState
   late PeriodizationPhase _phase;
   PeriodizationTarget? _target;
   PeriodizationMetrics? _metrics;
+  PeriodizationProjection? _projection;
   List<PeriodizationTarget> _targetHistory = const [];
   List<PeriodizationCheckin> _checkins = const [];
   List<Map<String, dynamic>> _routineLinks = const [];
@@ -61,13 +63,19 @@ class _PeriodizationPhaseDetailScreenState
       _repository.getCheckins(_phase.id),
       _repository.getRoutineLinks(_phase.id),
     ]);
+    final metrics = results[1] as PeriodizationMetrics;
+    final projection = await _repository.getPhaseProjection(
+      _phase,
+      phaseMetrics: metrics,
+    );
     if (!mounted) return;
     setState(() {
       _target = results[0] as PeriodizationTarget?;
-      _metrics = results[1] as PeriodizationMetrics;
+      _metrics = metrics;
       _targetHistory = results[2] as List<PeriodizationTarget>;
       _checkins = results[3] as List<PeriodizationCheckin>;
       _routineLinks = results[4] as List<Map<String, dynamic>>;
+      _projection = projection;
       _loading = false;
     });
   }
@@ -266,6 +274,14 @@ class _PeriodizationPhaseDetailScreenState
                     icon: Icons.analytics_outlined,
                   ),
                   _MetricsGrid(metrics: _metrics!),
+                  if (_projection?.hasAnyEstimate == true) ...[
+                    const SizedBox(height: 22),
+                    PeriodizationSectionHeader(
+                      title: loc.periodizationProjections,
+                      icon: Icons.auto_graph_rounded,
+                    ),
+                    _ProjectionCard(projection: _projection!, phase: _phase),
+                  ],
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: _showReport,
@@ -592,6 +608,166 @@ class _MetricsGrid extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ProjectionCard extends StatelessWidget {
+  final PeriodizationProjection projection;
+  final PeriodizationPhase phase;
+
+  const _ProjectionCard({required this.projection, required this.phase});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final color = Color(phase.color);
+    final basis =
+        projection.weightBasis ==
+            PeriodizationWeightProjectionBasis.observedTrend
+        ? loc.periodizationProjectionObservedTrend
+        : loc.periodizationProjectionPlannedRate;
+    final rate = projection.weeklyWeightRatePercent;
+    final items = <Widget>[];
+
+    if (projection.expectedEndWeightKg case final weight?) {
+      items.add(
+        _ProjectionRow(
+          icon: Icons.monitor_weight_outlined,
+          color: color,
+          label: loc.periodizationExpectedEndWeight,
+          value: '${weight.toStringAsFixed(1)} kg',
+          detail: rate == null
+              ? basis
+              : loc.periodizationProjectionWeightBasis(
+                  basis,
+                  '${rate >= 0 ? '+' : ''}${rate.toStringAsFixed(2)}%',
+                ),
+        ),
+      );
+    }
+    if (projection.plannedVolume case final volume?) {
+      final count = projection.plannedSets ?? projection.plannedWorkouts;
+      items.add(
+        _ProjectionRow(
+          icon: Icons.fitness_center_rounded,
+          color: color,
+          label: loc.periodizationPlannedVolume,
+          value: '${_compact(volume)} kg',
+          detail: count == null
+              ? loc.periodizationProjectionCurrentAverage
+              : projection.plannedSets != null
+              ? loc.periodizationProjectionPlannedSets(count)
+              : loc.periodizationProjectionPlannedWorkouts(count),
+        ),
+      );
+    }
+    if (projection.estimatedGoalDate case final date?) {
+      items.add(
+        _ProjectionRow(
+          icon: Icons.flag_outlined,
+          color: color,
+          label: loc.periodizationEstimatedGoalDate,
+          value: DateFormat.yMMMd(Intl.defaultLocale).format(date),
+          detail: loc.periodizationProjectionGoalBasis(basis),
+        ),
+      );
+    }
+
+    return PeriodizationSurface(
+      accentColor: color,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var index = 0; index < items.length; index++) ...[
+            if (index > 0) const Divider(height: 24),
+            items[index],
+          ],
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 16,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  loc.periodizationProjectionDisclaimer,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _compact(double value) {
+    if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
+    if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}k';
+    return value.toStringAsFixed(0);
+  }
+}
+
+class _ProjectionRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String value;
+  final String detail;
+
+  const _ProjectionRow({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.value,
+    required this.detail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: color.withAlpha(24),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Icon(icon, color: color),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: theme.textTheme.labelMedium),
+              Text(
+                value,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                detail,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
