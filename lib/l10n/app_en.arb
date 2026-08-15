@@ -1750,8 +1750,6 @@
   "periodizationBodyTargetsHelp": "Target weight and weekly rate",
   "periodizationSleepTargets": "Sleep",
   "periodizationSleepTargetsHelp": "Average nightly recovery target",
-  "periodizationAutomaticTargets": "Suggest goals automatically",
-  "periodizationAutomaticTargetsHelp": "Use your weight, profile, activity and objective to estimate calories and macros.",
   "periodizationSuggestTargets": "Calculate from my profile",
   "periodizationTargetsConfigured": "{filled} of {total} goals set",
   "@periodizationTargetsConfigured": { "placeholders": { "filled": { "type": "int" }, "total": { "type": "int" } } },

@@ -1730,8 +1730,6 @@
   "periodizationBodyTargetsHelp": "Peso desejado e ritmo semanal",
   "periodizationSleepTargets": "Sono",
   "periodizationSleepTargetsHelp": "Meta média de recuperação por noite",
-  "periodizationAutomaticTargets": "Sugerir metas automaticamente",
-  "periodizationAutomaticTargetsHelp": "Use seu peso, perfil, atividade e objetivo para estimar calorias e macros.",
   "periodizationSuggestTargets": "Calcular pelo meu perfil",
   "periodizationTargetsConfigured": "{filled} de {total} metas definidas",
   "@periodizationTargetsConfigured": { "placeholders": { "filled": { "type": "int" }, "total": { "type": "int" } } },

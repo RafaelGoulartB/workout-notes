@@ -225,7 +225,7 @@ void main() {
       await tester.pump();
     });
 
-    final suggestion = find.text('Sugerir metas automaticamente');
+    final suggestion = find.text('Calcular pelo meu perfil');
     await tester.scrollUntilVisible(
       suggestion,
       350,

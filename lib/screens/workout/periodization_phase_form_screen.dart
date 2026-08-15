@@ -1023,8 +1023,6 @@ class _PeriodizationPhaseFormScreenState
                     subtitle: loc.periodizationWeeklyTargetsHelp,
                     icon: Icons.track_changes_rounded,
                   ),
-                  _AutomaticTargetsCard(onTap: _suggestNutritionTargets),
-                  const SizedBox(height: 10),
                   PeriodizationSurface(
                     child: PhaseWeekSelector(
                       weekCount: weeksCount,
@@ -1480,86 +1478,6 @@ class _DateTile extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _AutomaticTargetsCard extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _AutomaticTargetsCard({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(18),
-      clipBehavior: Clip.antiAlias,
-      child: Ink(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              theme.colorScheme.primaryContainer,
-              theme.colorScheme.tertiaryContainer.withAlpha(160),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface.withAlpha(175),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(
-                    Icons.auto_awesome_rounded,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(width: 13),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        loc.periodizationAutomaticTargets,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        loc.periodizationAutomaticTargetsHelp,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer.withAlpha(190),
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 const _targetKeys = [
