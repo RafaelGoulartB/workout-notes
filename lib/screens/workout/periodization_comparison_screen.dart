@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_metrics.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 
 class PeriodizationComparisonScreen extends StatefulWidget {
   const PeriodizationComparisonScreen({super.key});
@@ -73,186 +75,430 @@ class _PeriodizationComparisonScreenState
     });
   }
 
+  Future<void> _pickPlan({required bool left}) async {
+    final currentOther = left ? _right : _left;
+    final selected = await showModalBottomSheet<PeriodizationPlan>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) {
+        final loc = AppLocalizations.of(context)!;
+        return ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+              child: Text(
+                left ? loc.periodizationPlanA : loc.periodizationPlanB,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+            ..._plans.map(
+              (plan) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: PeriodizationSurface(
+                  selected: plan.id == (left ? _left?.id : _right?.id),
+                  onTap: plan.id == currentOther?.id
+                      ? null
+                      : () => Navigator.pop(context, plan),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.primaryContainer,
+                        child: const Icon(Icons.route_outlined),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              plan.name,
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                            Text(
+                              '${(plan.totalDays / 7).ceil()} sem.',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (plan.id == (left ? _left?.id : _right?.id))
+                        Icon(
+                          Icons.check_circle_rounded,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (selected == null) return;
+    setState(() {
+      if (left) {
+        _left = selected;
+      } else {
+        _right = selected;
+      }
+      _leftStats = null;
+      _rightStats = null;
+    });
+    await _compare();
+  }
+
+  void _swap() {
+    setState(() {
+      final current = _left;
+      _left = _right;
+      _right = current;
+      final stats = _leftStats;
+      _leftStats = _rightStats;
+      _rightStats = stats;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(loc.periodizationCompare)),
+      appBar: AppBar(
+        title: Text(
+          loc.periodizationCompare,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _plans.length < 2
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(28),
-                child: Text(
-                  loc.periodizationNoCompletedPlans,
-                  textAlign: TextAlign.center,
-                ),
-              ),
+          ? PeriodizationEmptyState(
+              icon: Icons.compare_arrows_rounded,
+              title: loc.periodizationCompare,
+              subtitle: loc.periodizationNoCompletedPlans,
+              primaryLabel: loc.periodizationHistory,
+              onPrimary: () => Navigator.pop(context),
             )
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 60),
-              children: [
-                Text(loc.periodizationSelectPlans),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _planPicker(
-                        _left,
-                        (plan) => setState(() => _left = plan),
+          : CustomScrollView(
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            theme.colorScheme.primaryContainer.withAlpha(180),
+                            theme.colorScheme.surfaceContainerLow,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary.withAlpha(20),
+                              borderRadius: BorderRadius.circular(15),
+                            ),
+                            child: Icon(
+                              Icons.insights_outlined,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 13),
+                          Expanded(
+                            child: Text(
+                              loc.periodizationComparisonHint,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('×'),
-                    ),
-                    Expanded(
-                      child: _planPicker(
-                        _right,
-                        (plan) => setState(() => _right = plan),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: _left?.id == _right?.id || _comparing
-                      ? null
-                      : _compare,
-                  icon: const Icon(Icons.compare_arrows),
-                  label: Text(loc.periodizationCompare),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: PeriodizationSectionHeader(
+                      title: loc.periodizationSelectPlans,
+                      icon: Icons.swap_horiz_rounded,
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        _PlanPickerCard(
+                          eyebrow: loc.periodizationPlanA,
+                          plan: _left,
+                          color: theme.colorScheme.primary,
+                          onTap: () => _pickPlan(left: true),
+                        ),
+                        SizedBox(
+                          height: 42,
+                          child: Center(
+                            child: IconButton.filledTonal(
+                              tooltip: WidgetsLocalizations.of(
+                                context,
+                              ).reorderItemDown,
+                              onPressed: _swap,
+                              icon: const Icon(Icons.swap_vert_rounded),
+                            ),
+                          ),
+                        ),
+                        _PlanPickerCard(
+                          eyebrow: loc.periodizationPlanB,
+                          plan: _right,
+                          color: theme.colorScheme.tertiary,
+                          onTap: () => _pickPlan(left: false),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 if (_comparing)
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()),
+                  const SliverPadding(
+                    padding: EdgeInsets.all(42),
+                    sliver: SliverToBoxAdapter(
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
                   )
                 else if (_leftStats != null && _rightStats != null) ...[
-                  const SizedBox(height: 24),
-                  Text(
-                    loc.periodizationPlanSummary,
-                    style: Theme.of(context).textTheme.labelLarge,
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 26, 16, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: PeriodizationSectionHeader(
+                        title: loc.periodizationPlanSummary,
+                        icon: Icons.analytics_outlined,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  _ComparisonTable(left: _leftStats!, right: _rightStats!),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 36),
+                    sliver: SliverToBoxAdapter(
+                      child: _ComparisonResults(
+                        left: _leftStats!,
+                        right: _rightStats!,
+                      ).animate().fadeIn(duration: 240.ms).slideY(begin: .025),
+                    ),
+                  ),
                 ],
               ],
             ),
     );
   }
-
-  Widget _planPicker(
-    PeriodizationPlan? value,
-    ValueChanged<PeriodizationPlan?> onChanged,
-  ) => DropdownButtonFormField<PeriodizationPlan>(
-    initialValue: value,
-    isExpanded: true,
-    decoration: const InputDecoration(border: OutlineInputBorder()),
-    items: _plans
-        .map(
-          (plan) => DropdownMenuItem(
-            value: plan,
-            child: Text(plan.name, overflow: TextOverflow.ellipsis),
-          ),
-        )
-        .toList(),
-    onChanged: onChanged,
-  );
 }
 
-class _ComparisonTable extends StatelessWidget {
-  final _PlanStats left;
-  final _PlanStats right;
+class _PlanPickerCard extends StatelessWidget {
+  final String eyebrow;
+  final PeriodizationPlan? plan;
+  final Color color;
+  final VoidCallback onTap;
 
-  const _ComparisonTable({required this.left, required this.right});
+  const _PlanPickerCard({
+    required this.eyebrow,
+    required this.plan,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final rows = <(String, String, String)>[
-      ('Fases / Phases', '${left.phaseCount}', '${right.phaseCount}'),
-      (loc.periodizationWorkouts, '${left.workouts}', '${right.workouts}'),
-      (loc.periodizationSets, '${left.sets}', '${right.sets}'),
-      (loc.commonVolume, _compact(left.volume), _compact(right.volume)),
-      (
-        loc.periodizationAverageCalories,
-        _number(left.averageCalories),
-        _number(right.averageCalories),
-      ),
-      (
-        loc.periodizationAdherence,
-        _percent(left.nutritionAdherence),
-        _percent(right.nutritionAdherence),
-      ),
-      (
-        loc.periodizationWeightChange,
-        _kg(left.weightChange),
-        _kg(right.weightChange),
-      ),
-      (
-        loc.periodizationAverageSleep,
-        _hours(left.averageSleep),
-        _hours(right.averageSleep),
-      ),
-    ];
     final theme = Theme.of(context);
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: Table(
-        columnWidths: const {
-          0: FlexColumnWidth(1.35),
-          1: FlexColumnWidth(1),
-          2: FlexColumnWidth(1),
-        },
-        border: TableBorder(
-          horizontalInside: BorderSide(color: theme.colorScheme.outlineVariant),
-        ),
+    return PeriodizationSurface(
+      accentColor: color,
+      selected: true,
+      onTap: onTap,
+      child: Row(
         children: [
-          TableRow(
+          Container(
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
+              color: color.withAlpha(25),
+              borderRadius: BorderRadius.circular(14),
             ),
-            children: [
-              const SizedBox(height: 52),
-              _cell(left.plan.name, bold: true),
-              _cell(right.plan.name, bold: true),
-            ],
+            child: Icon(Icons.route_outlined, color: color),
           ),
-          ...rows.map(
-            (row) => TableRow(
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _cell(row.$1),
-                _cell(row.$2, emphasize: _wins(row.$2, row.$3)),
-                _cell(row.$3, emphasize: _wins(row.$3, row.$2)),
+                Text(
+                  eyebrow.toUpperCase(),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  plan?.name ?? loc.periodizationChoosePlan,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (plan != null)
+                  Text(
+                    '${(plan!.totalDays / 7).ceil()} sem.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
               ],
             ),
           ),
+          const Icon(Icons.expand_more_rounded),
         ],
       ),
     );
   }
+}
 
-  Widget _cell(String text, {bool bold = false, bool emphasize = false}) =>
-      Builder(
-        builder: (context) => Padding(
-          padding: const EdgeInsets.all(12),
-          child: Text(
-            text,
-            textAlign: bold ? TextAlign.center : TextAlign.start,
-            style: TextStyle(
-              fontWeight: bold || emphasize ? FontWeight.bold : null,
-              color: emphasize ? Theme.of(context).colorScheme.primary : null,
+class _ComparisonResults extends StatelessWidget {
+  final _PlanStats left;
+  final _PlanStats right;
+
+  const _ComparisonResults({required this.left, required this.right});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final rows = <_ComparisonValue>[
+      _ComparisonValue(
+        icon: Icons.layers_outlined,
+        label: loc.periodizationPhases,
+        left: '${left.phaseCount}',
+        right: '${right.phaseCount}',
+      ),
+      _ComparisonValue(
+        icon: Icons.fitness_center_rounded,
+        label: loc.periodizationWorkouts,
+        left: '${left.workouts}',
+        right: '${right.workouts}',
+      ),
+      _ComparisonValue(
+        icon: Icons.format_list_numbered_rounded,
+        label: loc.periodizationSets,
+        left: '${left.sets}',
+        right: '${right.sets}',
+      ),
+      _ComparisonValue(
+        icon: Icons.monitor_weight_outlined,
+        label: loc.commonVolume,
+        left: _compact(left.volume),
+        right: _compact(right.volume),
+      ),
+      _ComparisonValue(
+        icon: Icons.local_fire_department_outlined,
+        label: loc.periodizationAverageCalories,
+        left: _number(left.averageCalories),
+        right: _number(right.averageCalories),
+      ),
+      _ComparisonValue(
+        icon: Icons.donut_large_rounded,
+        label: loc.periodizationAdherence,
+        left: _percent(left.nutritionAdherence),
+        right: _percent(right.nutritionAdherence),
+      ),
+      _ComparisonValue(
+        icon: Icons.scale_outlined,
+        label: loc.periodizationWeightChange,
+        left: _kg(left.weightChange),
+        right: _kg(right.weightChange),
+      ),
+      _ComparisonValue(
+        icon: Icons.bedtime_outlined,
+        label: loc.periodizationAverageSleep,
+        left: _hours(left.averageSleep),
+        right: _hours(right.averageSleep),
+      ),
+    ];
+    return PeriodizationSurface(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withAlpha(135),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 34),
+                Expanded(
+                  child: Text(
+                    left.plan.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    right.plan.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.tertiary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      );
-
-  static bool _wins(String a, String b) {
-    final left = double.tryParse(a.replaceAll(RegExp(r'[^0-9.-]'), ''));
-    final right = double.tryParse(b.replaceAll(RegExp(r'[^0-9.-]'), ''));
-    return left != null && right != null && left > right;
+          for (var index = 0; index < rows.length; index++) ...[
+            if (index > 0)
+              Divider(
+                height: 1,
+                color: theme.colorScheme.outlineVariant.withAlpha(80),
+              ),
+            _ComparisonRow(value: rows[index]),
+          ],
+        ],
+      ),
+    );
   }
 
   static String _number(double? value) =>
@@ -267,6 +513,90 @@ class _ComparisonTable extends StatelessWidget {
   static String _compact(double value) => value >= 1000
       ? '${(value / 1000).toStringAsFixed(1)}k'
       : value.round().toString();
+}
+
+class _ComparisonValue {
+  final IconData icon;
+  final String label;
+  final String left;
+  final String right;
+
+  const _ComparisonValue({
+    required this.icon,
+    required this.label,
+    required this.left,
+    required this.right,
+  });
+}
+
+class _ComparisonRow extends StatelessWidget {
+  final _ComparisonValue value;
+
+  const _ComparisonRow({required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      child: Row(
+        children: [
+          Tooltip(
+            message: value.label,
+            child: Icon(
+              value.icon,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              children: [
+                Text(
+                  value.left,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                Text(
+                  value.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              children: [
+                Text(
+                  value.right,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: theme.colorScheme.tertiary,
+                  ),
+                ),
+                Text(
+                  value.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _PlanStats {

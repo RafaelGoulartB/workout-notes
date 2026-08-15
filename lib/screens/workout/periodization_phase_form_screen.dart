@@ -6,6 +6,7 @@ import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
 
 class PeriodizationPhaseFormScreen extends StatefulWidget {
@@ -253,203 +254,327 @@ class _PeriodizationPhaseFormScreenState
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(
           _editing ? loc.periodizationEditPhase : loc.periodizationNewPhase,
-        ),
-        actions: [
-          TextButton(
-            onPressed: _saving || _loading ? null : _save,
-            child: Text(loc.commonSave),
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
           ),
-        ],
+        ),
       ),
+      bottomNavigationBar: _loading
+          ? null
+          : PeriodizationBottomBar(
+              primary: FilledButton.icon(
+                onPressed: _saving ? null : _save,
+                icon: _saving
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check_rounded),
+                label: Text(loc.commonSave),
+              ),
+            ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Form(
               key: _formKey,
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-                children: [
-                  TextFormField(
-                    controller: _name,
-                    decoration: InputDecoration(
-                      labelText: loc.periodizationPhaseName,
-                      border: const OutlineInputBorder(),
-                    ),
-                    validator: (value) => value == null || value.trim().isEmpty
-                        ? loc.periodizationPhaseName
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _type,
-                    decoration: InputDecoration(
-                      labelText: loc.periodizationPhaseType,
-                      border: const OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _intent,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      labelText: loc.periodizationIntent,
-                      border: const OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _DateTile(
-                          label: loc.periodizationStartDate,
-                          date: _startDate,
-                          onTap: () => _pickDate(true),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                children:
+                    [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(_color).withAlpha(44),
+                              theme.colorScheme.surfaceContainerLow,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _DateTile(
-                          label: loc.periodizationEndDate,
-                          date: _endDate,
-                          onTap: () => _pickDate(false),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    loc.periodizationColor,
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 12,
-                    children: _colors
-                        .map(
-                          (value) => InkWell(
-                            onTap: () => setState(() => _color = value),
-                            borderRadius: BorderRadius.circular(24),
-                            child: CircleAvatar(
-                              backgroundColor: Color(value),
-                              child: _color == value
-                                  ? const Icon(Icons.check, color: Colors.white)
+                        child: Column(
+                          children: [
+                            TextFormField(
+                              controller: _name,
+                              decoration: InputDecoration(
+                                labelText: loc.periodizationPhaseName,
+                                prefixIcon: const Icon(Icons.flag_outlined),
+                                border: const OutlineInputBorder(),
+                              ),
+                              validator: (value) =>
+                                  value == null || value.trim().isEmpty
+                                  ? loc.periodizationPhaseName
                                   : null,
                             ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                  if (_editing) ...[
-                    const SizedBox(height: 12),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      value: _shiftFollowing,
-                      onChanged: (value) =>
-                          setState(() => _shiftFollowing = value),
-                      title: Text(loc.periodizationShiftFollowing),
-                      subtitle: Text(loc.periodizationShiftFollowingHelp),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  _sectionTitle(
-                    loc.periodizationNutritionTargets,
-                    Icons.restaurant_outlined,
-                  ),
-                  _grid([
-                    _field('calories', loc.periodizationCaloriesPerDay),
-                    _field('protein', loc.periodizationProteinG),
-                    _field('carbs', loc.periodizationCarbsG),
-                    _field('fat', loc.periodizationFatG),
-                  ]),
-                  _sectionTitle(
-                    loc.periodizationTrainingTargets,
-                    Icons.fitness_center,
-                  ),
-                  _grid([
-                    _field(
-                      'workouts',
-                      loc.periodizationWorkoutsPerWeek,
-                      integer: true,
-                    ),
-                    _field('minSets', loc.periodizationMinSets, integer: true),
-                    _field('maxSets', loc.periodizationMaxSets, integer: true),
-                    _field('minRpe', loc.periodizationMinRpe),
-                    _field('maxRpe', loc.periodizationMaxRpe),
-                  ]),
-                  _sectionTitle(
-                    loc.periodizationBodyTargets,
-                    Icons.monitor_weight_outlined,
-                  ),
-                  _grid([
-                    _field('weight', loc.periodizationTargetWeight),
-                    _field(
-                      'change',
-                      loc.periodizationWeeklyWeightChange,
-                      signed: true,
-                    ),
-                  ]),
-                  _sectionTitle(
-                    loc.periodizationSleepTargets,
-                    Icons.nightlight_outlined,
-                  ),
-                  _grid([_field('sleep', loc.periodizationSleepHours)]),
-                  const SizedBox(height: 18),
-                  DropdownButtonFormField<String?>(
-                    initialValue: _routineId,
-                    decoration: InputDecoration(
-                      labelText: loc.periodizationLinkedRoutine,
-                      border: const OutlineInputBorder(),
-                    ),
-                    items: [
-                      DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text(loc.periodizationNoRoutine),
-                      ),
-                      ..._routines.map(
-                        (routine) => DropdownMenuItem<String?>(
-                          value: routine['id'] as String,
-                          child: Text(routine['name'] as String),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _type,
+                              decoration: InputDecoration(
+                                labelText: loc.periodizationPhaseType,
+                                prefixIcon: const Icon(Icons.category_outlined),
+                                border: const OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _intent,
+                              maxLines: 3,
+                              decoration: InputDecoration(
+                                labelText: loc.periodizationIntent,
+                                alignLabelWithHint: true,
+                                border: const OutlineInputBorder(),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                      const SizedBox(height: 18),
+                      PeriodizationSectionHeader(
+                        title: loc.periodizationPeriodAndIdentity,
+                        icon: Icons.date_range_outlined,
+                      ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _DateTile(
+                              label: loc.periodizationStartDate,
+                              date: _startDate,
+                              onTap: () => _pickDate(true),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _DateTile(
+                              label: loc.periodizationEndDate,
+                              date: _endDate,
+                              onTap: () => _pickDate(false),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      PeriodizationSurface(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              loc.periodizationColor,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 10,
+                              children: _colors
+                                  .map(
+                                    (value) => Semantics(
+                                      button: true,
+                                      selected: _color == value,
+                                      child: InkWell(
+                                        onTap: () =>
+                                            setState(() => _color = value),
+                                        borderRadius: BorderRadius.circular(24),
+                                        child: CircleAvatar(
+                                          radius: 22,
+                                          backgroundColor: Color(value),
+                                          child: _color == value
+                                              ? const Icon(
+                                                  Icons.check,
+                                                  color: Colors.white,
+                                                )
+                                              : null,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_editing) ...[
+                        const SizedBox(height: 10),
+                        PeriodizationSurface(
+                          padding: EdgeInsets.zero,
+                          child: SwitchListTile(
+                            value: _shiftFollowing,
+                            onChanged: (value) =>
+                                setState(() => _shiftFollowing = value),
+                            secondary: const Icon(Icons.low_priority_rounded),
+                            title: Text(loc.periodizationShiftFollowing),
+                            subtitle: Text(loc.periodizationShiftFollowingHelp),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      PeriodizationSectionHeader(
+                        title: loc.periodizationTargets,
+                        subtitle: loc.periodizationOptionalTargets,
+                        icon: Icons.track_changes_rounded,
+                      ),
+                      _targetCard(
+                        loc.periodizationNutritionTargets,
+                        Icons.restaurant_outlined,
+                        [
+                          _field('calories', loc.periodizationCaloriesPerDay),
+                          _field('protein', loc.periodizationProteinG),
+                          _field('carbs', loc.periodizationCarbsG),
+                          _field('fat', loc.periodizationFatG),
+                        ],
+                      ),
+                      _targetCard(
+                        loc.periodizationTrainingTargets,
+                        Icons.fitness_center,
+                        [
+                          _field(
+                            'workouts',
+                            loc.periodizationWorkoutsPerWeek,
+                            integer: true,
+                          ),
+                          _field(
+                            'minSets',
+                            loc.periodizationMinSets,
+                            integer: true,
+                          ),
+                          _field(
+                            'maxSets',
+                            loc.periodizationMaxSets,
+                            integer: true,
+                          ),
+                          _field('minRpe', loc.periodizationMinRpe),
+                          _field('maxRpe', loc.periodizationMaxRpe),
+                        ],
+                      ),
+                      _targetCard(
+                        loc.periodizationBodyTargets,
+                        Icons.monitor_weight_outlined,
+                        [
+                          _field('weight', loc.periodizationTargetWeight),
+                          _field(
+                            'change',
+                            loc.periodizationWeeklyWeightChange,
+                            signed: true,
+                          ),
+                        ],
+                      ),
+                      _targetCard(
+                        loc.periodizationSleepTargets,
+                        Icons.nightlight_outlined,
+                        [_field('sleep', loc.periodizationSleepHours)],
+                      ),
+                      const SizedBox(height: 8),
+                      PeriodizationSectionHeader(
+                        title: loc.periodizationLinkedRoutine,
+                        icon: Icons.repeat_rounded,
+                      ),
+                      DropdownButtonFormField<String?>(
+                        initialValue: _routineId,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: loc.periodizationLinkedRoutine,
+                          prefixIcon: const Icon(Icons.fitness_center_outlined),
+                          border: const OutlineInputBorder(),
+                        ),
+                        items: [
+                          DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text(
+                              loc.periodizationNoRoutine,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          ..._routines.map(
+                            (routine) => DropdownMenuItem<String?>(
+                              value: routine['id'] as String,
+                              child: Text(
+                                routine['name'] as String,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _routineId = value),
+                      ),
+                      if (_editing) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.secondaryContainer
+                                .withAlpha(80),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.history_rounded, size: 19),
+                              const SizedBox(width: 9),
+                              Expanded(
+                                child: Text(
+                                  loc.periodizationVersionedTarget,
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 16),
                     ],
-                    onChanged: (value) => setState(() => _routineId = value),
-                  ),
-                  if (_editing) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      loc.periodizationVersionedTarget,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ],
               ),
             ),
     );
   }
 
-  Widget _sectionTitle(String text, IconData icon) => Padding(
-    padding: const EdgeInsets.only(top: 22, bottom: 10),
-    child: Row(
-      children: [
-        Icon(icon, size: 20),
-        const SizedBox(width: 8),
-        Text(text, style: Theme.of(context).textTheme.titleMedium),
-      ],
-    ),
-  );
-
-  Widget _grid(List<Widget> children) => GridView.count(
-    crossAxisCount: 2,
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    mainAxisSpacing: 10,
-    crossAxisSpacing: 10,
-    childAspectRatio: 2.3,
-    children: children,
-  );
+  Widget _targetCard(String title, IconData icon, List<Widget> children) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: PeriodizationSurface(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    icon,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 9),
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth > 500
+                      ? (constraints.maxWidth - 10) / 2
+                      : constraints.maxWidth;
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: children
+                        .map((child) => SizedBox(width: width, child: child))
+                        .toList(),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      );
 
   Widget _field(
     String key,
@@ -481,22 +606,31 @@ class _DateTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: Theme.of(context).textTheme.labelSmall),
-            const SizedBox(height: 5),
-            Text(DateFormat.yMMMd(Intl.defaultLocale).format(date)),
-          ],
+  Widget build(BuildContext context) => PeriodizationSurface(
+    padding: const EdgeInsets.all(13),
+    onTap: onTap,
+    child: Row(
+      children: [
+        Icon(
+          Icons.calendar_today_outlined,
+          size: 18,
+          color: Theme.of(context).colorScheme.primary,
         ),
-      ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Theme.of(context).textTheme.labelSmall),
+              const SizedBox(height: 3),
+              Text(
+                DateFormat.yMMMd(Intl.defaultLocale).format(date),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 }

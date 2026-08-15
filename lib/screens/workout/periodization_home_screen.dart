@@ -7,6 +7,7 @@ import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 
 import 'periodization_calendar_screen.dart';
 import 'periodization_checkin_screen.dart';
@@ -41,15 +42,14 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
   Future<void> _load() async {
     final plan = await _repository.getActivePlan();
     if (plan == null) {
-      if (mounted) {
-        setState(() {
-          _plan = null;
-          _phases = const [];
-          _currentPhase = null;
-          _currentTarget = null;
-          _loading = false;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _plan = null;
+        _phases = const [];
+        _currentPhase = null;
+        _currentTarget = null;
+        _loading = false;
+      });
       return;
     }
     final phases = await _repository.getPhases(plan.id);
@@ -89,6 +89,13 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
     await _load();
   }
 
+  Future<void> _openComparison() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PeriodizationComparisonScreen()),
+    );
+  }
+
   Future<void> _addPhase() async {
     final plan = _plan;
     if (plan == null) return;
@@ -112,128 +119,187 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
     await _load();
   }
 
+  void _openCalendar() {
+    final plan = _plan;
+    if (plan == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PeriodizationCalendarScreen(plan: plan),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.periodizationTitle),
+        title: Text(
+          loc.periodizationTitle,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        centerTitle: false,
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
             tooltip: loc.periodizationCalendar,
-            onPressed: _plan == null
-                ? null
-                : () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => PeriodizationCalendarScreen(plan: _plan!),
-                    ),
-                  ),
+            onPressed: _plan == null ? null : _openCalendar,
             icon: const Icon(Icons.calendar_month_outlined),
           ),
-          PopupMenuButton<String>(
-            onSelected: (value) async {
-              switch (value) {
-                case 'plans':
-                  await _openPlans();
-                case 'compare':
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const PeriodizationComparisonScreen(),
-                    ),
-                  );
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'plans',
-                child: Text(loc.periodizationHistory),
-              ),
-              PopupMenuItem(
-                value: 'compare',
-                child: Text(loc.periodizationCompare),
-              ),
-            ],
+          IconButton(
+            tooltip: loc.periodizationHistory,
+            onPressed: _openPlans,
+            icon: const Icon(Icons.folder_open_outlined),
           ),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const _HomeSkeleton()
           : _plan == null
-          ? _EmptyPlan(onCreate: _createPlan, onHistory: _openPlans)
+          ? PeriodizationEmptyState(
+              icon: Icons.route_outlined,
+              title: loc.periodizationNoActiveTitle,
+              subtitle: loc.periodizationNoActiveSubtitle,
+              primaryLabel: loc.periodizationCreatePlan,
+              onPrimary: _createPlan,
+              secondaryLabel: loc.periodizationHistory,
+              onSecondary: _openPlans,
+            )
           : RefreshIndicator(
               onRefresh: _load,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                children: [
-                  _PlanHero(
-                    plan: _plan!,
-                    phases: _phases,
-                  ).animate().fadeIn(duration: 250.ms).slideY(begin: -.03),
-                  const SizedBox(height: 18),
-                  _sectionTitle(loc.periodizationNow),
-                  const SizedBox(height: 8),
-                  if (_currentPhase == null)
-                    Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.pause_circle_outline),
-                        title: Text(loc.periodizationNoPhaseToday),
-                      ),
-                    )
-                  else
-                    _CurrentPhaseCard(
-                      phase: _currentPhase!,
-                      target: _currentTarget,
-                      onTap: () => _openPhase(_currentPhase!),
-                      onCheckin: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => PeriodizationCheckinScreen(
-                              phase: _currentPhase!,
-                            ),
-                          ),
-                        );
-                        await _load();
-                      },
-                    ).animate().fadeIn(delay: 100.ms).slideY(begin: .04),
-                  const SizedBox(height: 22),
-                  _sectionTitle(loc.periodizationNextPhases),
-                  const SizedBox(height: 6),
-                  ..._upcoming.map(
-                    (phase) => Card(
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      child: ListTile(
-                        onTap: () => _openPhase(phase),
-                        leading: Container(
-                          width: 7,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: Color(phase.color),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                        ),
-                        title: Text(phase.name),
-                        subtitle: Text(
-                          '${DateFormat.MMMd(Intl.defaultLocale).format(phase.startDate)} – ${DateFormat.MMMd(Intl.defaultLocale).format(phase.endDate)} · ${phase.totalWeeks}w',
-                        ),
-                        trailing: const Icon(Icons.chevron_right),
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: _PlanHero(
+                        plan: _plan!,
+                        phases: _phases,
+                        onTap: _openPlans,
+                      ).animate().fadeIn(duration: 260.ms).slideY(begin: -.025),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: _QuickActions(
+                        onCalendar: _openCalendar,
+                        onPlans: _openPlans,
+                        onCompare: _openComparison,
+                      ).animate().fadeIn(delay: 80.ms, duration: 240.ms),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: PeriodizationSectionHeader(
+                        title: loc.periodizationNow,
+                        icon: Icons.my_location_rounded,
                       ),
                     ),
                   ),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverToBoxAdapter(
+                      child: _currentPhase == null
+                          ? PeriodizationSurface(
+                              onTap: _openPlans,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.event_busy_outlined,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      loc.periodizationNoPhaseToday,
+                                      style: theme.textTheme.bodyLarge,
+                                    ),
+                                  ),
+                                  const Icon(Icons.chevron_right_rounded),
+                                ],
+                              ),
+                            )
+                          : _CurrentPhaseCard(
+                                  phase: _currentPhase!,
+                                  target: _currentTarget,
+                                  onTap: () => _openPhase(_currentPhase!),
+                                  onCheckin: () async {
+                                    await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            PeriodizationCheckinScreen(
+                                              phase: _currentPhase!,
+                                            ),
+                                      ),
+                                    );
+                                    await _load();
+                                  },
+                                )
+                                .animate()
+                                .fadeIn(delay: 120.ms)
+                                .slideY(begin: .03),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: PeriodizationSectionHeader(
+                        title: loc.periodizationNextPhases,
+                        icon: Icons.route_outlined,
+                        actionLabel: loc.periodizationAddPhase,
+                        onAction: _addPhase,
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverToBoxAdapter(
+                      child: PeriodizationSurface(
+                        child: PeriodizationPhaseTimeline(
+                          phases: _phases,
+                          referenceDate: DateTime.now(),
+                          selectedPhaseId: _currentPhase?.id,
+                          onPhaseTap: _openPhase,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_upcoming.isNotEmpty)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                      sliver: SliverList.separated(
+                        itemCount: _upcoming.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final phase = _upcoming[index];
+                          return _UpcomingPhaseCard(
+                            phase: phase,
+                            onTap: () => _openPhase(phase),
+                          );
+                        },
+                      ),
+                    ),
                   if (_upcoming.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Text(loc.periodizationNoUpcoming),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                      sliver: SliverToBoxAdapter(
+                        child: Text(
+                          loc.periodizationNoUpcoming,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
                     ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: _addPhase,
-                    icon: const Icon(Icons.add),
-                    label: Text(loc.periodizationAddPhase),
-                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 110)),
                 ],
               ),
             ),
@@ -244,130 +310,192 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
     final today = DateTime.now();
     return _phases.where((phase) => phase.startDate.isAfter(today)).toList();
   }
-
-  Widget _sectionTitle(String text) => Text(
-    text,
-    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-      letterSpacing: 1,
-      fontWeight: FontWeight.bold,
-    ),
-  );
 }
 
-class _EmptyPlan extends StatelessWidget {
-  final VoidCallback onCreate;
-  final VoidCallback onHistory;
+class _PlanHero extends StatelessWidget {
+  final PeriodizationPlan plan;
+  final List<PeriodizationPhase> phases;
+  final VoidCallback onTap;
 
-  const _EmptyPlan({required this.onCreate, required this.onHistory});
+  const _PlanHero({
+    required this.plan,
+    required this.phases,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.view_timeline_outlined,
-              size: 76,
-              color: Theme.of(context).colorScheme.primary,
+    final theme = Theme.of(context);
+    final now = DateTime.now();
+    final totalWeeks = (plan.totalDays / 7).ceil();
+    final currentWeek = now.isBefore(plan.startDate)
+        ? 0
+        : (now.difference(plan.startDate).inDays ~/ 7 + 1).clamp(1, totalWeeks);
+    final progress = plan.progressAt(now);
+    final dateText =
+        '${DateFormat.MMMd(Intl.defaultLocale).format(plan.startDate)} – ${DateFormat.MMMd(Intl.defaultLocale).format(plan.endDate)}';
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(22),
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              theme.colorScheme.primaryContainer.withAlpha(225),
+              theme.colorScheme.secondaryContainer.withAlpha(105),
+              theme.colorScheme.surfaceContainerLow,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    PeriodizationStatusPill(
+                      label: loc.periodizationActive,
+                      icon: Icons.play_arrow_rounded,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${(progress * 100).round()}%',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  plan.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    height: 1.12,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$dateText  ·  ${loc.periodizationWeekOf(currentWeek, totalWeeks)}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                PeriodizationPhaseTimeline(
+                  phases: phases,
+                  referenceDate: now,
+                  showLabels: false,
+                ),
+              ],
             ),
-            const SizedBox(height: 22),
-            Text(
-              loc.periodizationNoActiveTitle,
-              style: Theme.of(context).textTheme.headlineSmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              loc.periodizationNoActiveSubtitle,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: onCreate,
-              icon: const Icon(Icons.add),
-              label: Text(loc.periodizationCreatePlan),
-            ),
-            TextButton(
-              onPressed: onHistory,
-              child: Text(loc.periodizationHistory),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _PlanHero extends StatelessWidget {
-  final PeriodizationPlan plan;
-  final List<PeriodizationPhase> phases;
+class _QuickActions extends StatelessWidget {
+  final VoidCallback onCalendar;
+  final VoidCallback onPlans;
+  final VoidCallback onCompare;
 
-  const _PlanHero({required this.plan, required this.phases});
+  const _QuickActions({
+    required this.onCalendar,
+    required this.onPlans,
+    required this.onCompare,
+  });
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final now = DateTime.now();
-    final totalWeeks = (plan.totalDays / 7).ceil();
-    final currentWeek = now.isBefore(plan.startDate)
-        ? 0
-        : (now.difference(plan.startDate).inDays ~/ 7 + 1).clamp(1, totalWeeks);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer.withAlpha(95),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.primary.withAlpha(80),
+    return Row(
+      children: [
+        Expanded(
+          child: _QuickAction(
+            icon: Icons.calendar_month_outlined,
+            label: loc.periodizationCalendar,
+            onTap: onCalendar,
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '${loc.periodizationActivePlan} · ${plan.startDate.year}',
-            style: Theme.of(context).textTheme.labelSmall,
+        const SizedBox(width: 8),
+        Expanded(
+          child: _QuickAction(
+            icon: Icons.folder_open_outlined,
+            label: loc.periodizationHistory,
+            onTap: onPlans,
           ),
-          const SizedBox(height: 5),
-          Text(
-            plan.name,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _QuickAction(
+            icon: Icons.compare_arrows_rounded,
+            label: loc.periodizationCompare,
+            onTap: onCompare,
           ),
-          const SizedBox(height: 14),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Row(
-              children: phases.map((phase) {
-                return Expanded(
-                  flex: phase.totalDays,
-                  child: Container(
-                    height: 11,
-                    margin: const EdgeInsets.only(right: 2),
-                    color: Color(phase.color),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(15),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          child: Column(
             children: [
-              Expanded(
-                child: Text(loc.periodizationWeekOf(currentWeek, totalWeeks)),
-              ),
+              Icon(icon, size: 21, color: theme.colorScheme.primary),
+              const SizedBox(height: 6),
               Text(
-                '${(plan.progressAt(now) * 100).round()}%',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -389,117 +517,238 @@ class _CurrentPhaseCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
     final now = DateTime.now();
-    final targetItems = <(String, String)>[];
+    final color = Color(phase.color);
+    final targetItems = <Widget>[];
     if (target?.calories != null) {
-      targetItems.add((
-        '${target!.calories!.round()}',
-        loc.periodizationCaloriesPerDay,
-      ));
+      targetItems.add(
+        PeriodizationMetricTile(
+          label: loc.periodizationCaloriesPerDay,
+          value: '${target!.calories!.round()}',
+          icon: Icons.local_fire_department_outlined,
+          color: color,
+        ),
+      );
     }
     if (target?.proteinG != null) {
-      targetItems.add((
-        '${target!.proteinG!.round()} g',
-        loc.periodizationProteinG,
-      ));
+      targetItems.add(
+        PeriodizationMetricTile(
+          label: loc.periodizationProteinG,
+          value: '${target!.proteinG!.round()} g',
+          icon: Icons.restaurant_outlined,
+          color: color,
+        ),
+      );
     }
     if (target?.workoutsPerWeek != null) {
-      targetItems.add((
-        '${target!.workoutsPerWeek}×',
-        loc.periodizationWorkoutsPerWeek,
-      ));
+      targetItems.add(
+        PeriodizationMetricTile(
+          label: loc.periodizationWorkoutsPerWeek,
+          value: '${target!.workoutsPerWeek}×',
+          icon: Icons.fitness_center_rounded,
+          color: color,
+        ),
+      );
     }
-    return Card(
-      margin: EdgeInsets.zero,
-      color: Color(phase.color).withAlpha(25),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: Color(phase.color).withAlpha(95)),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+
+    return PeriodizationSurface(
+      accentColor: color,
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(9),
-                    decoration: BoxDecoration(
-                      color: Color(phase.color).withAlpha(60),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(Icons.trending_down, color: Color(phase.color)),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${(phase.templateKey ?? phase.name).toUpperCase()} · ${loc.periodizationPhaseWeek(phase.weekAt(now), phase.totalWeeks)}',
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
-                        Text(
-                          phase.intent ?? phase.name,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right),
-                ],
-              ),
-              if (targetItems.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Row(
-                  children: targetItems
-                      .take(3)
-                      .map(
-                        (item) => Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.$1,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                item.$2,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.labelSmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                      .toList(),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withAlpha(28),
+                  borderRadius: BorderRadius.circular(15),
                 ),
-              ],
-              const SizedBox(height: 14),
-              LinearProgressIndicator(
-                value: phase.progressAt(now),
-                color: Color(phase.color),
+                child: Icon(Icons.trending_up_rounded, color: color),
               ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: onCheckin,
-                  icon: const Icon(Icons.fact_check_outlined),
-                  label: Text(loc.periodizationWeeklyCheckin),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loc.periodizationPhaseWeek(
+                        phase.weekAt(now),
+                        phase.totalWeeks,
+                      ),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      phase.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (phase.intent != null)
+                      Text(
+                        phase.intent!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
                 ),
               ),
+              const Icon(Icons.chevron_right_rounded),
             ],
           ),
-        ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: phase.progressAt(now),
+              minHeight: 7,
+              color: color,
+              backgroundColor: color.withAlpha(26),
+            ),
+          ),
+          if (targetItems.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 108,
+              child: Row(
+                children: [
+                  for (
+                    var index = 0;
+                    index < targetItems.take(3).length;
+                    index++
+                  ) ...[
+                    if (index > 0) const SizedBox(width: 8),
+                    Expanded(child: targetItems[index]),
+                  ],
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: onCheckin,
+            icon: const Icon(Icons.fact_check_outlined),
+            label: Text(loc.periodizationWeeklyCheckin),
+          ),
+        ],
       ),
     );
+  }
+}
+
+class _UpcomingPhaseCard extends StatelessWidget {
+  final PeriodizationPhase phase;
+  final VoidCallback onTap;
+
+  const _UpcomingPhaseCard({required this.phase, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = Color(phase.color);
+    final range =
+        '${DateFormat.MMMd(Intl.defaultLocale).format(phase.startDate)} – ${DateFormat.MMMd(Intl.defaultLocale).format(phase.endDate)}';
+    return PeriodizationSurface(
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      accentColor: color,
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 48,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  phase.name,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '$range  ·  ${phase.totalWeeks} sem.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeSkeleton extends StatelessWidget {
+  const _HomeSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
+    return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Container(
+              height: 190,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(22),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: List.generate(
+                3,
+                (index) => Expanded(
+                  child: Container(
+                    height: 72,
+                    margin: EdgeInsets.only(left: index == 0 ? 0 : 8),
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 40),
+            Container(
+              height: 260,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+          ],
+        )
+        .animate(onPlay: (controller) => controller.repeat(reverse: true))
+        .fade(begin: .45, end: .85, duration: 900.ms);
   }
 }

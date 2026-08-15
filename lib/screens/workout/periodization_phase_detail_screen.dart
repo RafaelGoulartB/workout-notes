@@ -8,6 +8,7 @@ import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 
 import 'periodization_checkin_screen.dart';
 import 'periodization_phase_form_screen.dart';
@@ -123,6 +124,7 @@ class _PeriodizationPhaseDetailScreenState
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      showDragHandle: true,
       builder: (context) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: .82,
@@ -159,7 +161,12 @@ class _PeriodizationPhaseDetailScreenState
     final progress = _phase.progressAt(now);
     return Scaffold(
       appBar: AppBar(
-        title: Text(_phase.name),
+        title: Text(
+          _phase.name,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         actions: [
           IconButton(onPressed: _edit, icon: const Icon(Icons.edit_outlined)),
           PopupMenuButton<String>(
@@ -195,6 +202,8 @@ class _PeriodizationPhaseDetailScreenState
                           '${(_phase.templateKey ?? _phase.name).toUpperCase()} · ${loc.periodizationPhaseWeek(_phase.weekAt(now), _phase.totalWeeks)}',
                           style: theme.textTheme.labelMedium?.copyWith(
                             color: Color(_phase.color),
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: .8,
                           ),
                         ),
                         if (_phase.intent != null) ...[
@@ -212,19 +221,50 @@ class _PeriodizationPhaseDetailScreenState
                         LinearProgressIndicator(
                           value: progress,
                           color: Color(_phase.color),
+                          minHeight: 8,
+                          borderRadius: BorderRadius.circular(99),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           '${loc.periodizationPhaseProgress} · ${(progress * 100).round()}%',
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _checkin,
+                          icon: const Icon(Icons.fact_check_outlined),
+                          label: Text(loc.periodizationWeeklyCheckin),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      IconButton.filledTonal(
+                        onPressed: _edit,
+                        tooltip: loc.periodizationEditPhase,
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 18),
-                  if (_target != null) _TargetOverview(target: _target!),
+                  if (_target != null) ...[
+                    PeriodizationSectionHeader(
+                      title: loc.periodizationTargets,
+                      icon: Icons.track_changes_rounded,
+                    ),
+                    _TargetOverview(target: _target!),
+                  ],
                   const SizedBox(height: 22),
-                  _SectionTitle(loc.periodizationPlannedActual),
-                  const SizedBox(height: 10),
+                  PeriodizationSectionHeader(
+                    title: loc.periodizationPlannedActual,
+                    icon: Icons.analytics_outlined,
+                  ),
                   _MetricsGrid(metrics: _metrics!),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
@@ -233,68 +273,116 @@ class _PeriodizationPhaseDetailScreenState
                     label: Text(loc.periodizationFinalReport),
                   ),
                   const SizedBox(height: 22),
-                  _SectionTitle(loc.periodizationRoutineSchedule),
+                  PeriodizationSectionHeader(
+                    title: loc.periodizationRoutineSchedule,
+                    icon: Icons.repeat_rounded,
+                  ),
                   if (_routineLinks.isEmpty)
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.repeat),
-                      title: Text(loc.periodizationNoRoutine),
+                    PeriodizationSurface(
+                      child: Row(
+                        children: [
+                          const Icon(Icons.link_off_rounded),
+                          const SizedBox(width: 12),
+                          Text(loc.periodizationNoRoutine),
+                        ],
+                      ),
                     )
                   else
                     ..._routineLinks.map(
-                      (link) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.repeat),
-                        title: Text(link['routine_name'] as String),
-                        subtitle: Text(
-                          '${link['starts_on']} – ${link['ends_on']}',
+                      (link) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: PeriodizationSurface(
+                          child: ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.repeat),
+                            title: Text(link['routine_name'] as String),
+                            subtitle: Text(
+                              '${link['starts_on']} – ${link['ends_on']}',
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   const SizedBox(height: 16),
-                  _SectionTitle(loc.periodizationCheckins),
-                  ..._checkins.map(
-                    (checkin) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.fact_check_outlined),
-                      title: Text(
-                        DateFormat.yMMMd(
-                          Intl.defaultLocale,
-                        ).format(checkin.weekStart),
+                  PeriodizationSectionHeader(
+                    title: loc.periodizationCheckins,
+                    icon: Icons.fact_check_outlined,
+                  ),
+                  if (_checkins.isEmpty)
+                    PeriodizationSurface(
+                      child: Row(
+                        children: [
+                          const Icon(Icons.event_note_outlined),
+                          const SizedBox(width: 12),
+                          Expanded(child: Text(loc.periodizationNoCheckins)),
+                        ],
                       ),
-                      subtitle: Text(_decisionLabel(loc, checkin.decision)),
-                      trailing: Text('${checkin.energy}/5'),
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => PeriodizationCheckinScreen(
-                              phase: _phase,
-                              weekStart: checkin.weekStart,
-                            ),
+                    ),
+                  ..._checkins.map(
+                    (checkin) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: PeriodizationSurface(
+                        padding: EdgeInsets.zero,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Color(_phase.color).withAlpha(25),
+                            foregroundColor: Color(_phase.color),
+                            child: const Icon(Icons.fact_check_outlined),
                           ),
-                        );
-                        await _load();
-                      },
+                          title: Text(
+                            DateFormat.yMMMd(
+                              Intl.defaultLocale,
+                            ).format(checkin.weekStart),
+                          ),
+                          subtitle: Text(_decisionLabel(loc, checkin.decision)),
+                          trailing: PeriodizationStatusPill(
+                            label: '${checkin.energy}/5',
+                            icon: Icons.bolt_rounded,
+                            color: Color(_phase.color),
+                          ),
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PeriodizationCheckinScreen(
+                                  phase: _phase,
+                                  weekStart: checkin.weekStart,
+                                ),
+                              ),
+                            );
+                            await _load();
+                          },
+                        ),
+                      ),
                     ),
                   ),
-                  FilledButton.icon(
+                  OutlinedButton.icon(
                     onPressed: _checkin,
                     icon: const Icon(Icons.add_task),
                     label: Text(loc.periodizationWeeklyCheckin),
                   ),
                   const SizedBox(height: 22),
-                  _SectionTitle(loc.periodizationTargetHistory),
+                  PeriodizationSectionHeader(
+                    title: loc.periodizationTargetHistory,
+                    icon: Icons.history_rounded,
+                  ),
                   ..._targetHistory.map(
-                    (target) => ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(child: Text('v${target.version}')),
-                      title: Text(
-                        DateFormat.yMMMd(
-                          Intl.defaultLocale,
-                        ).format(target.validFrom),
+                    (target) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: PeriodizationSurface(
+                        padding: EdgeInsets.zero,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            child: Text('v${target.version}'),
+                          ),
+                          title: Text(
+                            DateFormat.yMMMd(
+                              Intl.defaultLocale,
+                            ).format(target.validFrom),
+                          ),
+                          subtitle: Text(_targetSummary(target)),
+                        ),
                       ),
-                      subtitle: Text(_targetSummary(target)),
                     ),
                   ),
                 ],
@@ -320,20 +408,6 @@ class _PeriodizationPhaseDetailScreenState
     if (target.targetWeightKg != null) parts.add('${target.targetWeightKg} kg');
     return parts.isEmpty ? '—' : parts.join(' · ');
   }
-}
-
-class _SectionTitle extends StatelessWidget {
-  final String text;
-  const _SectionTitle(this.text);
-
-  @override
-  Widget build(BuildContext context) => Text(
-    text,
-    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-      fontWeight: FontWeight.bold,
-      letterSpacing: 1,
-    ),
-  );
 }
 
 class _TargetOverview extends StatelessWidget {
@@ -379,34 +453,31 @@ class _TargetOverview extends StatelessWidget {
           .map(
             (item) => SizedBox(
               width: (MediaQuery.sizeOf(context).width - 42) / 2,
-              child: Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      Icon(item.$1),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.$2,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              item.$3,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.labelSmall,
-                            ),
-                          ],
-                        ),
+              child: PeriodizationSurface(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Icon(item.$1),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.$2,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            item.$3,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -471,27 +542,24 @@ class _MetricsGrid extends StatelessWidget {
         childAspectRatio: 1.9,
       ),
       itemCount: items.length,
-      itemBuilder: (context, index) => Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                items[index].$2,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              Text(
-                items[index].$1,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelSmall,
-              ),
-            ],
-          ),
+      itemBuilder: (context, index) => PeriodizationSurface(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              items[index].$2,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            Text(
+              items[index].$1,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ],
         ),
       ),
     );

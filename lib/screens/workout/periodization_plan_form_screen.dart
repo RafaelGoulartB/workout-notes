@@ -7,6 +7,7 @@ import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/models/periodization_template.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
+import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 
 class PeriodizationPlanFormScreen extends StatefulWidget {
   const PeriodizationPlanFormScreen({super.key});
@@ -178,6 +179,7 @@ class _PeriodizationPlanFormScreenState
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      showDragHandle: true,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => Padding(
           padding: EdgeInsets.fromLTRB(
@@ -220,9 +222,10 @@ class _PeriodizationPlanFormScreenState
                 TextField(
                   controller: weeks,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Semanas / Weeks',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: AppLocalizations.of(context)!.periodizationWeeks,
+                    prefixIcon: const Icon(Icons.calendar_view_week_outlined),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -297,6 +300,7 @@ class _PeriodizationPlanFormScreenState
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      showDragHandle: true,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setSheetState) => DraggableScrollableSheet(
           expand: false,
@@ -396,6 +400,7 @@ class _PeriodizationPlanFormScreenState
               ),
               DropdownButtonFormField<String?>(
                 initialValue: routineId,
+                isExpanded: true,
                 decoration: InputDecoration(
                   labelText: AppLocalizations.of(
                     context,
@@ -407,12 +412,16 @@ class _PeriodizationPlanFormScreenState
                     value: null,
                     child: Text(
                       AppLocalizations.of(context)!.periodizationNoRoutine,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   ..._routines.map(
                     (routine) => DropdownMenuItem<String?>(
                       value: routine['id'] as String,
-                      child: Text(routine['name'] as String),
+                      child: Text(
+                        routine['name'] as String,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                 ],
@@ -456,20 +465,32 @@ class _PeriodizationPlanFormScreenState
     IconData icon,
     List<Widget> fields,
   ) => Padding(
-    padding: const EdgeInsets.only(bottom: 18),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(icon, size: 19),
-            const SizedBox(width: 8),
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Wrap(spacing: 10, runSpacing: 10, children: fields),
-      ],
+    padding: const EdgeInsets.only(bottom: 12),
+    child: PeriodizationSurface(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icon,
+                size: 19,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(spacing: 10, runSpacing: 10, children: fields),
+        ],
+      ),
     ),
   );
 
@@ -535,150 +556,287 @@ class _PeriodizationPlanFormScreenState
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final titles = [
+      loc.periodizationStructureStep,
+      loc.periodizationNextPhases,
+      loc.periodizationTargets,
+      loc.periodizationReviewPlan,
+    ];
+    final subtitles = [
+      loc.periodizationStructureStepHelp,
+      loc.periodizationPhasesStepHelp,
+      loc.periodizationTargetsStepHelp,
+      loc.periodizationReviewStepHelp,
+    ];
     return Scaffold(
-      appBar: AppBar(title: Text(loc.periodizationNewPlan)),
+      appBar: AppBar(
+        title: Text(
+          loc.periodizationNewPlan,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
       body: Form(
         key: _formKey,
-        child: Stepper(
-          currentStep: _step,
-          onStepTapped: (value) => setState(() => _step = value),
-          onStepContinue: _step == 3 ? _save : () => setState(() => _step++),
-          onStepCancel: _step == 0 ? null : () => setState(() => _step--),
-          controlsBuilder: (context, details) => Padding(
-            padding: const EdgeInsets.only(top: 18),
-            child: Row(
-              children: [
-                FilledButton(
-                  onPressed: _saving ? null : details.onStepContinue,
-                  child: _saving
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(
-                          _step == 3
-                              ? loc.periodizationCreateAndActivate
-                              : loc.periodizationReviewPlan,
-                        ),
-                ),
-                if (_step > 0)
-                  TextButton(
-                    onPressed: details.onStepCancel,
-                    child: Text(loc.commonCancel),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                border: Border(
+                  bottom: BorderSide(
+                    color: theme.colorScheme.outlineVariant.withAlpha(80),
                   ),
-              ],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        loc.periodizationStepOf(_step + 1, 4),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${((_step + 1) / 4 * 100).round()}%',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: List.generate(
+                      4,
+                      (index) => Expanded(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          height: 5,
+                          margin: EdgeInsets.only(right: index == 3 ? 0 : 5),
+                          decoration: BoxDecoration(
+                            color: index <= _step
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    titles[_step],
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitles[_step],
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          steps: [
-            Step(
-              title: Text(loc.periodizationNewPlan),
-              subtitle: Text(loc.periodizationStartChoice),
-              isActive: _step >= 0,
-              content: _buildStructureStep(loc),
-            ),
-            Step(
-              title: Text(loc.periodizationNextPhases),
-              isActive: _step >= 1,
-              content: _buildPhasesStep(loc),
-            ),
-            Step(
-              title: Text(loc.periodizationTargets),
-              isActive: _step >= 2,
-              content: _buildTargetsStep(loc),
-            ),
-            Step(
-              title: Text(loc.periodizationReviewPlan),
-              isActive: _step >= 3,
-              content: _buildReviewStep(loc),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(.025, 0),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  key: ValueKey(_step),
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+                  child: switch (_step) {
+                    0 => _buildStructureStep(loc),
+                    1 => _buildPhasesStep(loc),
+                    2 => _buildTargetsStep(loc),
+                    _ => _buildReviewStep(loc),
+                  },
+                ),
+              ),
             ),
           ],
+        ),
+      ),
+      bottomNavigationBar: PeriodizationBottomBar(
+        secondary: _step == 0
+            ? null
+            : OutlinedButton(
+                onPressed: _saving ? null : () => setState(() => _step--),
+                child: Text(loc.periodizationBack),
+              ),
+        primary: FilledButton(
+          onPressed: _saving ? null : _continue,
+          child: _saving
+              ? const SizedBox.square(
+                  dimension: 19,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(
+                  _step == 3
+                      ? loc.periodizationCreateAndActivate
+                      : loc.periodizationContinue,
+                  textAlign: TextAlign.center,
+                ),
         ),
       ),
     );
   }
 
+  void _continue() {
+    if (_step == 0 && !_formKey.currentState!.validate()) return;
+    if (_step == 3) {
+      _save();
+      return;
+    }
+    setState(() => _step++);
+  }
+
   Widget _buildStructureStep(AppLocalizations loc) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      _ChoiceCard(
-        selected: _useTemplate,
-        icon: Icons.auto_awesome,
-        title: loc.periodizationUseTemplate,
-        subtitle: loc.periodizationUseTemplateSubtitle,
-        onTap: () => _selectMode(true),
-      ),
-      const SizedBox(height: 8),
-      _ChoiceCard(
-        selected: !_useTemplate,
-        icon: Icons.add,
-        title: loc.periodizationStartBlank,
-        subtitle: loc.periodizationStartBlankSubtitle,
-        onTap: () => _selectMode(false),
+      Row(
+        children: [
+          Expanded(
+            child: _ChoiceCard(
+              selected: _useTemplate,
+              icon: Icons.auto_awesome_rounded,
+              title: loc.periodizationUseTemplate,
+              subtitle: loc.periodizationUseTemplateSubtitle,
+              onTap: () => _selectMode(true),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _ChoiceCard(
+              selected: !_useTemplate,
+              icon: Icons.draw_outlined,
+              title: loc.periodizationStartBlank,
+              subtitle: loc.periodizationStartBlankSubtitle,
+              onTap: () => _selectMode(false),
+            ),
+          ),
+        ],
       ),
       if (_useTemplate) ...[
-        const SizedBox(height: 14),
-        RadioGroup<String>(
-          groupValue: _template?.key,
-          onChanged: (value) {
-            if (value == null) return;
-            _selectTemplate(
-              PeriodizationTemplate.all.firstWhere(
-                (template) => template.key == value,
-              ),
-            );
-          },
-          child: Column(
-            children: PeriodizationTemplate.all
-                .map(
-                  (template) => RadioListTile<String>(
-                    value: template.key,
-                    title: Text(_templateName(template)),
-                    subtitle: Text(
-                      template.phases
-                          .map((phase) => '${phase.weeks}w')
-                          .join(' · '),
-                    ),
-                  ),
-                )
-                .toList(),
+        const SizedBox(height: 20),
+        PeriodizationSectionHeader(
+          title: loc.periodizationUseTemplate,
+          icon: Icons.view_carousel_outlined,
+        ),
+        SizedBox(
+          height: 168,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: PeriodizationTemplate.all.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final template = PeriodizationTemplate.all[index];
+              return SizedBox(
+                width: 240,
+                child: _TemplateCard(
+                  template: template,
+                  name: _templateName(template),
+                  selected: _template?.key == template.key,
+                  onTap: () => _selectTemplate(template),
+                ),
+              );
+            },
           ),
         ),
       ],
-      const SizedBox(height: 14),
-      TextFormField(
-        controller: _nameController,
-        decoration: InputDecoration(
-          labelText: loc.periodizationPlanName,
-          border: const OutlineInputBorder(),
-        ),
-        validator: (value) => value == null || value.trim().isEmpty
-            ? loc.periodizationPlanName
-            : null,
+      const SizedBox(height: 22),
+      PeriodizationSectionHeader(
+        title: loc.periodizationNewPlan,
+        icon: Icons.edit_note_outlined,
       ),
-      const SizedBox(height: 12),
-      ListTile(
-        contentPadding: EdgeInsets.zero,
-        title: Text(loc.periodizationStartDate),
-        subtitle: Text(DateFormat.yMMMd(Intl.defaultLocale).format(_startDate)),
-        trailing: const Icon(Icons.calendar_month_outlined),
-        onTap: _pickStartDate,
-      ),
-      TextField(
-        controller: _notesController,
-        maxLines: 3,
-        decoration: InputDecoration(
-          labelText: loc.periodizationPlanNotes,
-          border: const OutlineInputBorder(),
+      PeriodizationSurface(
+        child: Column(
+          children: [
+            TextFormField(
+              controller: _nameController,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText: loc.periodizationPlanName,
+                prefixIcon: const Icon(Icons.route_outlined),
+                border: const OutlineInputBorder(),
+              ),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? loc.periodizationPlanName
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            _DateField(
+              label: loc.periodizationStartDate,
+              value: _startDate,
+              onTap: _pickStartDate,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _notesController,
+              minLines: 2,
+              maxLines: 4,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                labelText: loc.periodizationPlanNotes,
+                alignLabelWithHint: true,
+                prefixIcon: const Icon(Icons.notes_outlined),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
         ),
       ),
     ],
   );
 
   Widget _buildPhasesStep(AppLocalizations loc) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
+      Container(
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primaryContainer.withAlpha(90),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.drag_indicator_rounded,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(loc.periodizationReorderHelp)),
+          ],
+        ),
+      ),
+      const SizedBox(height: 14),
       ReorderableListView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
+        buildDefaultDragHandles: false,
         itemCount: _phases.length,
         onReorderItem: (oldIndex, newIndex) {
           setState(() {
@@ -687,28 +845,111 @@ class _PeriodizationPlanFormScreenState
         },
         itemBuilder: (context, index) {
           final phase = _phases[index];
-          return Card(
+          return Padding(
             key: ValueKey(phase),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Color(phase.color),
-                child: Text('${index + 1}'),
-              ),
-              title: Text(phase.name),
-              subtitle: Text(
-                '${DateFormat.MMMd(Intl.defaultLocale).format(_phaseStart(index))} – ${DateFormat.MMMd(Intl.defaultLocale).format(_phaseEnd(index))} · ${phase.weeks}w',
-              ),
+            padding: const EdgeInsets.only(bottom: 10),
+            child: PeriodizationSurface(
+              accentColor: Color(phase.color),
+              padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
               onTap: () => _editPhase(index),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: _phases.length == 1
-                    ? null
-                    : () => setState(() => _phases.removeAt(index)),
+              child: Row(
+                children: [
+                  ReorderableDragStartListener(
+                    index: index,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Icon(
+                        Icons.drag_indicator_rounded,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  CircleAvatar(
+                    radius: 21,
+                    backgroundColor: Color(phase.color).withAlpha(28),
+                    foregroundColor: Color(phase.color),
+                    child: Text(
+                      (index + 1).toString(),
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          phase.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 7,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              '${DateFormat.MMMd(Intl.defaultLocale).format(_phaseStart(index))} – ${DateFormat.MMMd(Intl.defaultLocale).format(_phaseEnd(index))}',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Color(phase.color).withAlpha(22),
+                                borderRadius: BorderRadius.circular(99),
+                              ),
+                              child: Text(
+                                '${phase.weeks} ${loc.periodizationWeeks.toLowerCase()}',
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: Color(phase.color),
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (phase.intent.trim().isNotEmpty)
+                          Text(
+                            phase.intent,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: loc.commonDelete,
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: _phases.length == 1
+                        ? null
+                        : () => setState(() => _phases.removeAt(index)),
+                  ),
+                ],
               ),
             ),
           );
         },
       ),
+      const SizedBox(height: 4),
       OutlinedButton.icon(
         onPressed: () => setState(
           () => _phases.add(
@@ -719,65 +960,241 @@ class _PeriodizationPlanFormScreenState
             ),
           ),
         ),
-        icon: const Icon(Icons.add),
+        icon: const Icon(Icons.add_rounded),
         label: Text(loc.periodizationAddPhase),
       ),
     ],
   );
 
   Widget _buildTargetsStep(AppLocalizations loc) => Column(
-    children: List.generate(_phases.length, (index) {
-      final phase = _phases[index];
-      return Card(
-        child: ListTile(
-          leading: Icon(Icons.tune, color: Color(phase.color)),
-          title: Text(phase.name),
-          subtitle: Text(
-            phase.target.isEmpty
-                ? loc.periodizationTargets
-                : _targetSummary(phase),
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => _editTargets(index),
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Container(
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.secondaryContainer.withAlpha(90),
+          borderRadius: BorderRadius.circular(14),
         ),
-      );
-    }),
+        child: Row(
+          children: [
+            Icon(
+              Icons.tune_rounded,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(loc.periodizationOptionalTargets)),
+          ],
+        ),
+      ),
+      const SizedBox(height: 14),
+      ...List.generate(_phases.length, (index) {
+        final phase = _phases[index];
+        final count = _targetCount(phase);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: PeriodizationSurface(
+            accentColor: Color(phase.color),
+            onTap: () => _editTargets(index),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Color(phase.color).withAlpha(24),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Icon(Icons.tune_rounded, color: Color(phase.color)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        phase.name,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        count == 0
+                            ? loc.periodizationNoTargetsSet
+                            : _targetSummary(phase),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (count > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(
+                      count.toString(),
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 6),
+                const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
+          ),
+        );
+      }),
+    ],
   );
 
   Widget _buildReviewStep(AppLocalizations loc) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Text(_nameController.text, style: Theme.of(context).textTheme.titleLarge),
-      const SizedBox(height: 4),
-      Text(
-        '${DateFormat.yMMMd(Intl.defaultLocale).format(_startDate)} – ${DateFormat.yMMMd(Intl.defaultLocale).format(_phaseEnd(_phases.length - 1))}',
+      Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Theme.of(context).colorScheme.primaryContainer,
+              Theme.of(context).colorScheme.tertiaryContainer.withAlpha(150),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.event_available_rounded,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _nameController.text,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${DateFormat.yMMMd(Intl.defaultLocale).format(_startDate)} – ${DateFormat.yMMMd(Intl.defaultLocale).format(_phaseEnd(_phases.length - 1))}',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(99),
+              child: Row(
+                children: [
+                  for (final phase in _phases)
+                    Expanded(
+                      flex: phase.weeks,
+                      child: Container(height: 8, color: Color(phase.color)),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-      const SizedBox(height: 16),
-      ...List.generate(_phases.length, (index) {
-        final phase = _phases[index];
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Container(
-            width: 6,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Color(phase.color),
-              borderRadius: BorderRadius.circular(4),
+      const SizedBox(height: 22),
+      Row(
+        children: [
+          Expanded(
+            child: PeriodizationSectionHeader(title: loc.periodizationPhases),
+          ),
+          Text(
+            '${_phases.fold<int>(0, (sum, phase) => sum + phase.weeks)} ${loc.periodizationWeeks.toLowerCase()}',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          title: Text(phase.name),
-          subtitle: Text('${phase.weeks}w · ${_targetSummary(phase)}'),
+        ],
+      ),
+      const SizedBox(height: 10),
+      ...List.generate(_phases.length, (index) {
+        final phase = _phases[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: PeriodizationSurface(
+            accentColor: Color(phase.color),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Color(phase.color).withAlpha(25),
+                  foregroundColor: Color(phase.color),
+                  child: Text(
+                    '${index + 1}',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        phase.name,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${phase.weeks} ${loc.periodizationWeeks.toLowerCase()} · ${_targetSummary(phase)}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       }),
     ],
   );
+
+  int _targetCount(_EditablePhase phase) => [
+    phase.calories,
+    phase.proteinG,
+    phase.carbsG,
+    phase.fatG,
+    phase.workoutsPerWeek,
+    phase.minSetsPerWeek,
+    phase.maxSetsPerWeek,
+    phase.minRpe,
+    phase.maxRpe,
+    phase.targetWeightKg,
+    phase.weeklyWeightChangePercent,
+    phase.sleepHours,
+    phase.routineId,
+  ].where((value) => value != null).length;
 
   String _targetSummary(_EditablePhase phase) {
     final values = <String>[];
     if (phase.calories != null) values.add('${phase.calories!.round()} kcal');
     if (phase.proteinG != null) values.add('${phase.proteinG!.round()}g P');
     if (phase.workoutsPerWeek != null) {
-      values.add('${phase.workoutsPerWeek}×/w');
+      values.add('${phase.workoutsPerWeek}×/sem.');
     }
     if (phase.targetWeightKg != null) values.add('${phase.targetWeightKg} kg');
     if (phase.sleepHours != null) values.add('${phase.sleepHours}h');
@@ -787,7 +1204,9 @@ class _PeriodizationPlanFormScreenState
       );
       if (match.isNotEmpty) values.add(match.first['name'] as String);
     }
-    return values.isEmpty ? '—' : values.join(' · ');
+    return values.isEmpty
+        ? AppLocalizations.of(context)!.periodizationNoTargetsSet
+        : values.join(' · ');
   }
 
   static TextEditingController _controller(num? value) =>
@@ -865,15 +1284,182 @@ class _ChoiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Card(
-      color: selected ? theme.colorScheme.primaryContainer : null,
-      child: ListTile(
+    return PeriodizationSurface(
+      selected: selected,
+      onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: theme.colorScheme.primary),
+              const Spacer(),
+              Icon(
+                selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outline,
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TemplateCard extends StatelessWidget {
+  final PeriodizationTemplate template;
+  final String name;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _TemplateCard({
+    required this.template,
+    required this.name,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: 220,
+      child: PeriodizationSurface(
+        selected: selected,
         onTap: onTap,
-        leading: Icon(icon),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle),
-        trailing: Icon(
-          selected ? Icons.radio_button_checked : Icons.radio_button_off,
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
+                const Spacer(),
+                if (selected)
+                  Icon(
+                    Icons.check_circle_rounded,
+                    size: 20,
+                    color: theme.colorScheme.primary,
+                  ),
+              ],
+            ),
+            const Spacer(),
+            Text(
+              name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 9),
+            Row(
+              children: [
+                for (var i = 0; i < template.phases.length; i++) ...[
+                  Expanded(
+                    flex: template.phases[i].weeks,
+                    child: Container(
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: Color(_phaseColors[i % _phaseColors.length]),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  if (i != template.phases.length - 1) const SizedBox(width: 3),
+                ],
+              ],
+            ),
+            const SizedBox(height: 7),
+            Text(
+              '${template.phases.length} ${AppLocalizations.of(context)!.periodizationPhases.toLowerCase()} · ${template.phases.fold<int>(0, (sum, phase) => sum + phase.weeks)} ${AppLocalizations.of(context)!.periodizationWeeks.toLowerCase()}',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DateField extends StatelessWidget {
+  final String label;
+  final DateTime value;
+  final VoidCallback onTap;
+
+  const _DateField({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Ink(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.calendar_today_outlined,
+              size: 19,
+              color: theme.colorScheme.primary,
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    DateFormat.yMMMd(Intl.defaultLocale).format(value),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.expand_more_rounded),
+          ],
         ),
       ),
     );
