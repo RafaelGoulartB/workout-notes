@@ -326,92 +326,244 @@ class _PlanHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
     final now = DateTime.now();
     final totalWeeks = (plan.totalDays / 7).ceil();
     final currentWeek = now.isBefore(plan.startDate)
         ? 0
         : (now.difference(plan.startDate).inDays ~/ 7 + 1).clamp(1, totalWeeks);
     final progress = plan.progressAt(now);
-    final dateText =
-        '${DateFormat.MMMd(Intl.defaultLocale).format(plan.startDate)} – ${DateFormat.MMMd(Intl.defaultLocale).format(plan.endDate)}';
+    PeriodizationPhase? activePhase;
+    for (final phase in phases) {
+      if (phase.contains(now)) {
+        activePhase = phase;
+        break;
+      }
+    }
+    final firstAccent = activePhase == null
+        ? const Color(0xFFF0A33B)
+        : Color(activePhase.color);
+    final endDate = DateFormat.MMMd(Intl.defaultLocale).format(plan.endDate);
 
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(22),
-      clipBehavior: Clip.antiAlias,
-      child: Ink(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              theme.colorScheme.primaryContainer.withAlpha(225),
-              theme.colorScheme.secondaryContainer.withAlpha(105),
-              theme.colorScheme.surfaceContainerLow,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(22),
-        ),
+    return Semantics(
+      button: true,
+      label:
+          '${loc.periodizationPlanOverview}: ${plan.name}, ${(progress * 100).round()}%',
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(22),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Ink(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1F272B),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: Colors.white.withAlpha(10)),
+            ),
+            child: CustomPaint(
+              painter: _PlanHeroBackgroundPainter(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 16, 17),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    PeriodizationStatusPill(
-                      label: loc.periodizationActive,
-                      icon: Icons.play_arrow_rounded,
-                      color: theme.colorScheme.primary,
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.route_rounded,
+                          size: 19,
+                          color: Color(0xFF7DD3F0),
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            loc.periodizationPlanOverview,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  color: const Color(0xFFE6EAED),
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Color(0xFFC7CDD0),
+                        ),
+                      ],
                     ),
-                    const Spacer(),
+                    const SizedBox(height: 14),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            plan.name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
+                                  color: const Color(0xFFF2F4F5),
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.06,
+                                  letterSpacing: -.4,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            '${(progress * 100).round()}%',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: const Color(0xFF7DD3F0),
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
                     Text(
-                      '${(progress * 100).round()}%',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: theme.colorScheme.primary,
+                      loc.periodizationWeekOf(currentWeek, totalWeeks),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: const Color(0xFFB9C0C4),
                       ),
                     ),
-                    const SizedBox(width: 3),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: theme.colorScheme.onSurfaceVariant,
+                    const SizedBox(height: 13),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(99),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 8,
+                        color: const Color(0xFF7DD3F0),
+                        backgroundColor: const Color(0xFF354047),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _PlanHeroMetric(
+                          value: '${phases.length}',
+                          label: loc.periodizationPhases,
+                          accent: firstAccent,
+                          fill: phases.isEmpty ? 0 : 1,
+                        ),
+                        const SizedBox(width: 14),
+                        _PlanHeroMetric(
+                          value: '$currentWeek/$totalWeeks',
+                          label: loc.periodizationCurrentWeek,
+                          accent: const Color(0xFF36B7AA),
+                          fill: totalWeeks == 0 ? 0 : currentWeek / totalWeeks,
+                        ),
+                        const SizedBox(width: 14),
+                        _PlanHeroMetric(
+                          value: endDate,
+                          label: loc.periodizationPlanEnd,
+                          accent: const Color(0xFFB25FC7),
+                          fill: progress,
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 18),
-                Text(
-                  plan.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    height: 1.12,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '$dateText  ·  ${loc.periodizationWeekOf(currentWeek, totalWeeks)}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                PeriodizationPhaseTimeline(
-                  phases: phases,
-                  referenceDate: now,
-                  showLabels: false,
-                ),
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+class _PlanHeroMetric extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color accent;
+  final double fill;
+
+  const _PlanHeroMetric({
+    required this.value,
+    required this.label,
+    required this.accent,
+    required this.fill,
+  });
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            color: const Color(0xFFE4E8EA),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: const Color(0xFFB3BABE)),
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(99),
+          child: LinearProgressIndicator(
+            value: fill.clamp(0, 1),
+            minHeight: 3,
+            color: accent,
+            backgroundColor: accent.withAlpha(28),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _PlanHeroBackgroundPainter extends CustomPainter {
+  final Color color;
+
+  const _PlanHeroBackgroundPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final faint = Paint()..color = color.withAlpha(9);
+    final softer = Paint()..color = color.withAlpha(5);
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width * .43, 0)
+        ..lineTo(size.width * .66, 0)
+        ..lineTo(size.width * .28, size.height)
+        ..lineTo(size.width * .06, size.height)
+        ..close(),
+      faint,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width * .82, 0)
+        ..lineTo(size.width, 0)
+        ..lineTo(size.width * .68, size.height)
+        ..lineTo(size.width * .48, size.height)
+        ..close(),
+      softer,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _PlanHeroBackgroundPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 class _QuickActions extends StatelessWidget {
