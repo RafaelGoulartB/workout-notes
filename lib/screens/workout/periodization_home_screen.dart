@@ -837,99 +837,59 @@ class _VerticalPhaseTimeline extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+
     return Column(
       children: List.generate(phases.length, (index) {
         final phase = phases[index];
         final color = Color(phase.color);
         final isCurrent = phase.contains(referenceDate);
         final isPast = phase.endDate.isBefore(referenceDate);
+        final isFirst = index == 0;
         final isLast = index == phases.length - 1;
+
+        final phaseProgress = isCurrent
+            ? phase.progressAt(referenceDate)
+            : (isPast ? 1.0 : 0.0);
+
         final range =
             '${DateFormat.MMMd(Intl.defaultLocale).format(phase.startDate)} – '
             '${DateFormat.MMMd(Intl.defaultLocale).format(phase.endDate)}';
+        final weeks = phase.totalWeeks;
+
         return Semantics(
           button: true,
           selected: isCurrent,
           label: '${phase.name}, $range',
           child: InkWell(
             onTap: () => onPhaseTap(phase),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
-                    width: 30,
-                    height: 78,
-                    child: Stack(
-                      alignment: Alignment.topCenter,
-                      children: [
-                        if (index > 0)
-                          Positioned(
-                            top: 0,
-                            left: 14,
-                            width: 2,
-                            height: 18,
-                            child: ColoredBox(
-                              color: isPast || isCurrent
-                                  ? color.withAlpha(115)
-                                  : theme.colorScheme.outlineVariant,
-                            ),
-                          ),
-                        if (!isLast)
-                          Positioned(
-                            top: 30,
-                            bottom: 0,
-                            left: 14,
-                            width: 2,
-                            child: ColoredBox(
-                              color: isPast
-                                  ? color.withAlpha(115)
-                                  : theme.colorScheme.outlineVariant,
-                            ),
-                          ),
-                        Positioned(
-                          top: 16,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            width: isCurrent ? 18 : 14,
-                            height: isCurrent ? 18 : 14,
-                            decoration: BoxDecoration(
-                              color: isPast || isCurrent
-                                  ? color
-                                  : theme.colorScheme.surfaceContainerLow,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: color,
-                                width: isCurrent ? 3 : 2,
-                              ),
-                              boxShadow: isCurrent
-                                  ? [
-                                      BoxShadow(
-                                        color: color.withAlpha(65),
-                                        blurRadius: 8,
-                                        spreadRadius: 2,
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: isPast
-                                ? const Icon(
-                                    Icons.check_rounded,
-                                    size: 9,
-                                    color: Colors.white,
-                                  )
-                                : null,
-                          ),
-                        ),
-                      ],
+                    width: 44,
+                    child: _TimelineRail(
+                      isFirst: isFirst,
+                      isLast: isLast,
+                      isPast: isPast,
+                      isCurrent: isCurrent,
+                      color: color,
+                      outlineColor: theme.colorScheme.outlineVariant,
+                      nodeProgress: phaseProgress,
+                      surface: theme.colorScheme.surface,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(0, 10, 4, 12),
+                      padding: EdgeInsets.fromLTRB(
+                        0,
+                        isFirst ? 8 : 12,
+                        4,
+                        isLast ? 4 : 12,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -940,24 +900,27 @@ class _VerticalPhaseTimeline extends StatelessWidget {
                                   phase.name,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w800,
+                                  style:
+                                      theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: isCurrent
+                                        ? FontWeight.w800
+                                        : FontWeight.w700,
                                     color: isCurrent
                                         ? color
-                                        : theme.colorScheme.onSurface,
+                                        : (isPast
+                                            ? theme.colorScheme.onSurface
+                                                .withAlpha(190)
+                                            : theme.colorScheme.onSurface),
                                   ),
                                 ),
                               ),
-                              if (isCurrent)
-                                Text(
-                                  loc.periodizationNow,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: color,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: .8,
-                                  ),
+                              if (isCurrent) ...[
+                                _NowBadge(
+                                  label: loc.periodizationNow,
+                                  color: color,
                                 ),
-                              const SizedBox(width: 2),
+                                const SizedBox(width: 4),
+                              ],
                               Icon(
                                 Icons.chevron_right_rounded,
                                 size: 19,
@@ -965,9 +928,9 @@ class _VerticalPhaseTimeline extends StatelessWidget {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 4),
                           Text(
-                            '$range · ${phase.totalWeeks} '
+                            '$range  ·  $weeks '
                             '${loc.periodizationWeeks.toLowerCase()}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -986,6 +949,15 @@ class _VerticalPhaseTimeline extends StatelessWidget {
                               ),
                             ),
                           ],
+                          if (isCurrent && phaseProgress > 0) ...[
+                            const SizedBox(height: 10),
+                            _PhaseProgressBar(
+                              progress: phaseProgress,
+                              color: color,
+                              backgroundColor:
+                                  theme.colorScheme.surfaceContainerHighest,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -996,6 +968,223 @@ class _VerticalPhaseTimeline extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+}
+
+class _TimelineRail extends StatelessWidget {
+  final bool isFirst;
+  final bool isLast;
+  final bool isPast;
+  final bool isCurrent;
+  final Color color;
+  final Color outlineColor;
+  final Color surface;
+  final double nodeProgress;
+
+  const _TimelineRail({
+    required this.isFirst,
+    required this.isLast,
+    required this.isPast,
+    required this.isCurrent,
+    required this.color,
+    required this.outlineColor,
+    required this.surface,
+    required this.nodeProgress,
+  });
+
+  static const double _nodeTop = 14;
+  static const double _railX = 21;
+  static const double _railWidth = 2;
+  static const double _railHeight = 80;
+
+  double get _nodeSize =>
+      isCurrent ? 28 : (isPast ? 16 : 12);
+
+  @override
+  Widget build(BuildContext context) {
+    final upperColor =
+        isPast || isCurrent ? color.withAlpha(150) : outlineColor;
+    final lowerColor = isPast ? color.withAlpha(150) : outlineColor;
+    final bottomStart = _nodeTop + _nodeSize;
+    return SizedBox(
+      width: 44,
+      height: _railHeight,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          if (!isFirst)
+            Positioned(
+              top: 0,
+              height: _nodeTop,
+              left: _railX,
+              width: _railWidth,
+              child: ColoredBox(color: upperColor),
+            ),
+          if (!isLast)
+            Positioned(
+              top: bottomStart,
+              bottom: 0,
+              left: _railX,
+              width: _railWidth,
+              child: ColoredBox(color: lowerColor),
+            ),
+          Positioned(
+            top: _nodeTop,
+            child: _TimelineNode(
+              isCurrent: isCurrent,
+              isPast: isPast,
+              color: color,
+              progress: nodeProgress,
+              surface: surface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimelineNode extends StatelessWidget {
+  final bool isCurrent;
+  final bool isPast;
+  final Color color;
+  final Color surface;
+  final double progress;
+
+  const _TimelineNode({
+    required this.isCurrent,
+    required this.isPast,
+    required this.color,
+    required this.surface,
+    required this.progress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isCurrent) {
+      return TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: progress.clamp(0, 1)),
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        builder: (context, value, _) => SizedBox(
+          width: 28,
+          height: 28,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  value: value,
+                  strokeWidth: 2.4,
+                  backgroundColor: color.withAlpha(45),
+                  valueColor: AlwaysStoppedAnimation(color),
+                ),
+              ),
+              Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withAlpha(120),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (isPast) {
+      return Container(
+        width: 16,
+        height: 16,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+        ),
+        child: const Icon(
+          Icons.check_rounded,
+          size: 10,
+          color: Colors.white,
+        ),
+      );
+    }
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        color: surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: color.withAlpha(150), width: 1.6),
+      ),
+    );
+  }
+}
+
+class _NowBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _NowBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withAlpha(36),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w900,
+          letterSpacing: .8,
+          fontSize: 10,
+          height: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
+class _PhaseProgressBar extends StatelessWidget {
+  final double progress;
+  final Color color;
+  final Color backgroundColor;
+
+  const _PhaseProgressBar({
+    required this.progress,
+    required this.color,
+    required this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: progress.clamp(0, 1)),
+      duration: const Duration(milliseconds: 380),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) => ClipRRect(
+        borderRadius: BorderRadius.circular(99),
+        child: LinearProgressIndicator(
+          value: value,
+          minHeight: 4,
+          color: color,
+          backgroundColor: backgroundColor,
+        ),
+      ),
     );
   }
 }

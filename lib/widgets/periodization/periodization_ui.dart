@@ -24,7 +24,7 @@ class PeriodizationSectionHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (icon != null) ...[
             Icon(icon, size: 18, color: theme.colorScheme.primary),
@@ -33,6 +33,7 @@ class PeriodizationSectionHeader extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   title.toUpperCase(),
@@ -59,7 +60,9 @@ class PeriodizationSectionHeader extends StatelessWidget {
               onPressed: onAction,
               style: TextButton.styleFrom(
                 visualDensity: VisualDensity.compact,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 0),
               ),
               child: Text(actionLabel!),
             ),
