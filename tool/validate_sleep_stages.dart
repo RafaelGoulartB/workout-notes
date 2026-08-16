@@ -15,9 +15,9 @@ import 'package:workout_notes/services/sleep_stage_engine.dart';
 ///   dart run tool/validate_sleep_stages.dart `diagnostic.json` `diary.json`
 ///   dart run tool/validate_sleep_stages.dart --template
 ///
-/// `diagnostic.json` is an exported sleep diagnostic (schema_version >= 4,
-/// produced by SleepDiagnosticExportService). `diary.json` records what the
-/// sleeper actually experienced:
+/// `diagnostic.json` is a sleep diagnostic exported by an older app version
+/// (schema_version >= 4, previously produced by SleepDiagnosticExportService).
+/// `diary.json` records what the sleeper actually experienced:
 /// {
 ///   "session_start": "22:00",        // wall-clock HH:MM when recording began
 ///   "bedtime": "22:00",              // optional (defaults to session_start)

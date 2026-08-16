@@ -387,28 +387,9 @@ class SleepMonitorRepository extends BaseRepository {
         sessionMap,
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
-      await txn.delete(
-        'sleep_monitor_segments',
-        where: 'session_id = ?',
-        whereArgs: [session.id],
-      );
-      for (final segment in rawSegments) {
-        await txn.insert('sleep_monitor_segments', segment.toMap());
-      }
-      if (await _tableExists(txn, 'sleep_stage_epochs')) {
-        await txn.delete(
-          'sleep_stage_epochs',
-          where: 'session_id = ?',
-          whereArgs: [session.id],
-        );
-        for (final epoch in stageEpochs) {
-          await txn.insert(
-            'sleep_stage_epochs',
-            epoch.toMap(),
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-        }
-      }
+      // Segments and stage epochs are transient calculation material. They
+      // were consumed above to produce the session aggregates and are never
+      // persisted, so the database only stores the nightly summary.
       imported = session;
     });
     return imported!;
@@ -526,137 +507,6 @@ class SleepMonitorRepository extends BaseRepository {
         }
       }
     });
-  }
-
-  /// Re-stages eligible feature nights with the current heuristic engine so
-  /// recordings analysed by an older engine version pick up the improvement,
-  /// and the persisted session aggregates match the persisted stage epochs
-  /// (fixing card-vs-dashboard discrepancies).
-  ///
-  /// Guarded to sessions that are not yet staged with the current engine
-  /// version and bounded to the most recent ones; it becomes a no-op once
-  /// everything is up to date.
-  Future<void> restageSleepStageEpochs() async {
-    final database = await db;
-    if (!await _tableExists(database, 'sleep_stage_epochs')) return;
-    const currentVersion = SleepStageEngine.algorithmVersion;
-    final sessionRows = await database.query(
-      'sleep_monitor_sessions',
-      where: 'algorithm_version = ? AND '
-          '(analysis_status IS NULL OR analysis_status != ? OR '
-          ' stage_algorithm_version IS NULL OR stage_algorithm_version != ?)',
-      whereArgs: [
-        'audio-features-v2',
-        SleepMonitorSession.analysisAvailable,
-        currentVersion,
-      ],
-      orderBy: 'started_at DESC',
-      limit: 30,
-    );
-    if (sessionRows.isEmpty) return;
-    const engine = SleepStageEngine();
-    const analysis = SleepStageAnalysisService();
-    const inferenceService = SleepInferenceService();
-
-    for (final row in sessionRows) {
-      final session = SleepMonitorSession.fromMap(row);
-      final segmentRows = await database.query(
-        'sleep_monitor_segments',
-        where: 'session_id = ?',
-        whereArgs: [session.id],
-        orderBy: 'started_at ASC',
-      );
-      final segments = segmentRows
-          .map(SleepMonitorSegment.fromMap)
-          .toList(growable: false);
-      if (segments.isEmpty) continue;
-      final diagnostics = SleepMonitorDiagnostics.fromSession(session, segments);
-      final inference = inferenceService.analyze(
-        session: session,
-        segments: segments,
-        diagnostics: diagnostics,
-      );
-      final sessionEnd = session.endedAt ?? session.startedAt;
-      final result = engine.run(
-        session: session,
-        segments: segments,
-        onset: inference.sleepOnsetAt,
-      );
-      if (!result.ran ||
-          !result.epochs.any((e) => e.stage != SleepStageType.unknown)) {
-        continue;
-      }
-      final summary = analysis.summarize(
-        sessionStart: session.startedAt,
-        sessionEnd: sessionEnd,
-        epochs: result.epochs,
-      );
-      await database.transaction((txn) async {
-        await txn.delete(
-          'sleep_stage_epochs',
-          where: 'session_id = ?',
-          whereArgs: [session.id],
-        );
-        for (final epoch in result.epochs) {
-          await txn.insert(
-            'sleep_stage_epochs',
-            epoch.toMap(),
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-        }
-        final sessionColumns = (await txn.rawQuery(
-          'PRAGMA table_info(sleep_monitor_sessions)',
-        )).map((row) => row['name'] as String).toSet();
-        final updates = <String, dynamic>{
-          'analysis_status': SleepMonitorSession.analysisAvailable,
-          'stage_algorithm_version': currentVersion,
-          if (summary != null) ...{
-            'sleep_onset_at': summary.sleepOnsetAt?.toIso8601String(),
-            'final_wake_at': summary.finalWakeAt?.toIso8601String(),
-            'sleep_latency_minutes': summary.sleepLatencyMinutes,
-            'awake_minutes': summary.awakeMinutes,
-            'sleeping_minutes': summary.sleepingMinutes,
-            'deep_sleep_minutes': summary.deepSleepMinutes,
-            'unknown_minutes': summary.unknownMinutes,
-            'awakening_count': summary.awakeningCount,
-            'sleep_efficiency': summary.sleepEfficiency,
-            'stage_confidence': summary.stageConfidence,
-            'estimated_sleep_minutes': summary.estimatedSleepMinutes,
-          },
-        };
-        updates.removeWhere((key, _) => !sessionColumns.contains(key));
-        if (updates.isNotEmpty) {
-          await txn.update(
-            'sleep_monitor_sessions',
-            updates,
-            where: 'id = ?',
-            whereArgs: [session.id],
-          );
-        }
-        if (summary != null && session.sleepEntryId != null) {
-          final entryRows = await txn.query(
-            'sleep_entries',
-            where: 'id = ?',
-            whereArgs: [session.sleepEntryId],
-            limit: 1,
-          );
-          if (entryRows.isNotEmpty) {
-            final entry = SleepEntry.fromMap(entryRows.first);
-            if (entry.source == 'monitored') {
-              await txn.update(
-                'sleep_entries',
-                {
-                  'sleep_minutes': summary.estimatedSleepMinutes,
-                  'estimated_sleep_minutes': summary.estimatedSleepMinutes,
-                },
-                where: 'id = ?',
-                whereArgs: [entry.id],
-              );
-            }
-          }
-        }
-      });
-    }
   }
 
   static int _sessionDuration(SleepMonitorSession session) {

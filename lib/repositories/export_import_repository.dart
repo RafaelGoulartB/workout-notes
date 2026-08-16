@@ -8,7 +8,7 @@ import 'base_repository.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
-  static const int currentBackupVersion = 12;
+  static const int currentBackupVersion = 13;
   static const int minimumSupportedBackupVersion = 2;
 
   final Future<Database> Function()? _databaseProvider;
@@ -41,7 +41,6 @@ class ExportImportRepository extends BaseRepository {
       'user_goals': await _queryIfExists(db, 'user_goals'),
       'sleep_entries': await db.query('sleep_entries'),
       'sleep_monitor_sessions': await db.query('sleep_monitor_sessions'),
-      'sleep_monitor_segments': await db.query('sleep_monitor_segments'),
       'foods': await _queryIfExists(db, 'foods'),
       'food_variants': await _queryIfExists(db, 'food_variants'),
       'food_servings': await _queryIfExists(db, 'food_servings'),
@@ -50,7 +49,6 @@ class ExportImportRepository extends BaseRepository {
       'nutrition_goals': await _queryIfExists(db, 'nutrition_goals'),
       'saved_meals': await _queryIfExists(db, 'saved_meals'),
       'saved_meal_items': await _queryIfExists(db, 'saved_meal_items'),
-      'sleep_stage_epochs': await _queryIfExists(db, 'sleep_stage_epochs'),
       'traditional_alarms': await _queryIfExists(db, 'traditional_alarms'),
       'periodization_plans': await _queryIfExists(db, 'periodization_plans'),
       'periodization_phases': await _queryIfExists(db, 'periodization_phases'),
@@ -186,11 +184,6 @@ class ExportImportRepository extends BaseRepository {
         txn,
         data['sleep_monitor_sessions'],
       );
-      totalRows += await _insertAll(
-        txn,
-        'sleep_monitor_segments',
-        data['sleep_monitor_segments'],
-      );
       for (final table in [
         'foods',
         'food_variants',
@@ -204,13 +197,6 @@ class ExportImportRepository extends BaseRepository {
         if (await _tableExists(txn, table)) {
           totalRows += await _insertAll(txn, table, data[table]);
         }
-      }
-      if (await _tableExists(txn, 'sleep_stage_epochs')) {
-        totalRows += await _insertAll(
-          txn,
-          'sleep_stage_epochs',
-          data['sleep_stage_epochs'],
-        );
       }
       if (await _tableExists(txn, 'traditional_alarms')) {
         totalRows += await _insertAll(

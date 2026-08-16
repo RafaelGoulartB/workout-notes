@@ -345,5 +345,21 @@ abstract final class DatabaseWellnessMigrations {
         } catch (_) {}
       }
     }
+    if (oldVersion < 39) {
+      // v39: sleep_monitor_segments and sleep_stage_epochs are transient
+      // calculation material. They were only consumed during import to
+      // produce the session aggregates (now the only persisted sleep data)
+      // and are no longer written or exported. Existing rows are dropped
+      // once; a best-effort VACUUM reclaims the file space.
+      try {
+        await db.execute('DELETE FROM sleep_monitor_segments');
+      } catch (_) {}
+      try {
+        await db.execute('DELETE FROM sleep_stage_epochs');
+      } catch (_) {}
+      try {
+        await db.execute('VACUUM');
+      } catch (_) {}
+    }
   }
 }

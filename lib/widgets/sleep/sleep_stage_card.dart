@@ -29,6 +29,15 @@ class _SleepStageCardState extends State<SleepStageCard> {
   bool get _hasStages =>
       widget.stages.any((stage) => stage.stage != SleepStageType.unknown);
 
+  /// The persisted per-night stage aggregates are the only durable stage
+  /// data since raw epochs are no longer stored; they are shown instead of
+  /// the interactive timeline.
+  bool get _hasStageAggregates =>
+      widget.session.analysisStatus == SleepMonitorSession.analysisAvailable &&
+      (widget.session.awakeMinutes != null ||
+          widget.session.sleepingMinutes != null ||
+          widget.session.deepSleepMinutes != null);
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
@@ -52,7 +61,8 @@ class _SleepStageCardState extends State<SleepStageCard> {
                     ),
                   ),
                 ),
-                if (_hasStages && widget.session.stageConfidence != null)
+                if ((_hasStages || _hasStageAggregates) &&
+                    widget.session.stageConfidence != null)
                   Chip(
                     visualDensity: VisualDensity.compact,
                     label: Text(
@@ -62,33 +72,35 @@ class _SleepStageCardState extends State<SleepStageCard> {
               ],
             ),
             const SizedBox(height: 14),
-            if (!_hasStages)
+            if (!_hasStages && !_hasStageAggregates)
               _UnavailableState(session: widget.session)
             else ...[
-              Semantics(
-                label: loc.sleepStageTimelineSemantics,
-                child: LayoutBuilder(
-                  builder: (context, constraints) => GestureDetector(
-                    onTapDown: (details) =>
-                        _selectStage(details, constraints.maxWidth),
-                    child: SizedBox(
-                      height: widget.compact ? 70 : 112,
-                      width: double.infinity,
-                      child: CustomPaint(
-                        painter: _HypnogramPainter(
-                          stages: widget.stages,
-                          session: widget.session,
-                          selected: _selected,
-                          colorScheme: theme.colorScheme,
+              if (_hasStages) ...[
+                Semantics(
+                  label: loc.sleepStageTimelineSemantics,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => GestureDetector(
+                      onTapDown: (details) =>
+                          _selectStage(details, constraints.maxWidth),
+                      child: SizedBox(
+                        height: widget.compact ? 70 : 112,
+                        width: double.infinity,
+                        child: CustomPaint(
+                          painter: _HypnogramPainter(
+                            stages: widget.stages,
+                            session: widget.session,
+                            selected: _selected,
+                            colorScheme: theme.colorScheme,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              _StageLegend(selected: _selected, session: widget.session),
-              const SizedBox(height: 14),
+                const SizedBox(height: 10),
+                _StageLegend(selected: _selected, session: widget.session),
+                const SizedBox(height: 14),
+              ],
               _Breakdown(session: widget.session),
               if (!widget.compact) ...[
                 const SizedBox(height: 14),

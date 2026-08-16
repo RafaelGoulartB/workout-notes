@@ -193,8 +193,6 @@ void main() {
         'user_goals': 'goal-1',
         'sleep_entries': 'sleep-1',
         'sleep_monitor_sessions': 'session-1',
-        'sleep_monitor_segments': 'segment-1',
-        'sleep_stage_epochs': 'epoch-1',
         'traditional_alarms': 'alarm-1',
       };
 
@@ -207,7 +205,7 @@ void main() {
       );
       final backup = await repository.exportAllData();
 
-      expect(backup['version'], 12);
+      expect(backup['version'], ExportImportRepository.currentBackupVersion);
       for (final entry in tableIds.entries) {
         expect(backup[entry.key], [
           {'id': entry.value},

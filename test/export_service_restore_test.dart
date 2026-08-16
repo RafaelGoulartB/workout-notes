@@ -102,7 +102,9 @@ void main() {
         {'key': 'current', 'value': 'unchanged'},
       ]);
       expect(data['sleep_monitor_sessions'], isEmpty);
-      expect(data['sleep_monitor_segments'], isEmpty);
+      // Transient calculation material is never exported.
+      expect(data, isNot(contains('sleep_monitor_segments')));
+      expect(data, isNot(contains('sleep_stage_epochs')));
     },
   );
 
