@@ -1,3 +1,5 @@
+import 'package:workout_notes/utils/periodization_palette.dart';
+
 import 'periodization_template_phase.dart';
 
 class PeriodizationTemplate {
@@ -20,28 +22,28 @@ class PeriodizationTemplate {
         intentKey: 'gradualDeficit',
         templateKey: 'cutting',
         weeks: 12,
-        color: 0xFF4F8EF7,
+        color: kPhaseColorBlue,
       ),
       PeriodizationTemplatePhase(
         nameKey: 'deload',
         intentKey: 'recover',
         templateKey: 'deload',
         weeks: 1,
-        color: 0xFFF5B942,
+        color: kPhaseColorAmber,
       ),
       PeriodizationTemplatePhase(
         nameKey: 'bulking',
         intentKey: 'controlledGain',
         templateKey: 'bulking',
         weeks: 16,
-        color: 0xFF9B6BE8,
+        color: kPhaseColorPurple,
       ),
       PeriodizationTemplatePhase(
         nameKey: 'maintenance',
         intentKey: 'stabilize',
         templateKey: 'maintenance',
         weeks: 4,
-        color: 0xFF43B581,
+        color: kPhaseColorGreen,
       ),
     ],
   );
@@ -55,28 +57,28 @@ class PeriodizationTemplate {
         intentKey: 'buildCapacity',
         templateKey: 'base',
         weeks: 6,
-        color: 0xFF4F8EF7,
+        color: kPhaseColorBlue,
       ),
       PeriodizationTemplatePhase(
         nameKey: 'intensification',
         intentKey: 'raiseIntensity',
         templateKey: 'intensification',
         weeks: 4,
-        color: 0xFF9B6BE8,
+        color: kPhaseColorPurple,
       ),
       PeriodizationTemplatePhase(
         nameKey: 'deload',
         intentKey: 'recover',
         templateKey: 'deload',
         weeks: 1,
-        color: 0xFFF5B942,
+        color: kPhaseColorAmber,
       ),
       PeriodizationTemplatePhase(
         nameKey: 'peak',
         intentKey: 'expressPerformance',
         templateKey: 'peak',
         weeks: 2,
-        color: 0xFFE85858,
+        color: kPhaseColorRed,
       ),
     ],
   );
@@ -90,28 +92,28 @@ class PeriodizationTemplate {
         intentKey: 'buildAerobicBase',
         templateKey: 'aerobic_base',
         weeks: 8,
-        color: 0xFF4F8EF7,
+        color: kPhaseColorBlue,
       ),
       PeriodizationTemplatePhase(
         nameKey: 'build',
         intentKey: 'increaseSpecificLoad',
         templateKey: 'build',
         weeks: 6,
-        color: 0xFF9B6BE8,
+        color: kPhaseColorPurple,
       ),
       PeriodizationTemplatePhase(
         nameKey: 'taper',
         intentKey: 'reduceFatigue',
         templateKey: 'taper',
         weeks: 2,
-        color: 0xFFF5B942,
+        color: kPhaseColorAmber,
       ),
       PeriodizationTemplatePhase(
         nameKey: 'event',
         intentKey: 'eventWeek',
         templateKey: 'event',
         weeks: 1,
-        color: 0xFFE85858,
+        color: kPhaseColorRed,
       ),
     ],
   );

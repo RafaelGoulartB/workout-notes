@@ -6,41 +6,15 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
-import 'package:workout_notes/repositories/body_measurement_repository.dart';
+import 'package:workout_notes/periodization/periodization_phase_form_controller.dart';
+import 'package:workout_notes/periodization/phase_draft_data.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
-import 'package:workout_notes/repositories/routine_repository.dart';
-import 'package:workout_notes/repositories/settings_repository.dart';
-import 'package:workout_notes/utils/macro_calculator.dart';
+import 'package:workout_notes/utils/periodization_palette.dart';
 import 'package:workout_notes/widgets/periodization/nutrition_target_fields.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 import 'package:workout_notes/widgets/periodization/phase_week_selector.dart';
 
 import 'nutrition_goal_suggest_sheet.dart';
-
-/// Data exchanged between the plan wizard and the phase editor in draft
-/// mode: the wizard seeds the editor with an existing draft phase and the
-/// editor returns the edited phase (never persisted — the wizard saves the
-/// whole plan at once). [weeklyTargets] holds one effective target per week;
-/// the linked routine is part of each weekly target (`routineId`).
-class PeriodizationPhaseDraftData {
-  final String name;
-  final String? intent;
-  final String? templateKey;
-  final int color;
-  final DateTime startDate;
-  final DateTime endDate;
-  final List<PeriodizationTarget> weeklyTargets;
-
-  const PeriodizationPhaseDraftData({
-    required this.name,
-    this.intent,
-    this.templateKey,
-    required this.color,
-    required this.startDate,
-    required this.endDate,
-    this.weeklyTargets = const [],
-  });
-}
 
 class PeriodizationPhaseFormScreen extends StatefulWidget {
   final PeriodizationPlan plan;
@@ -51,12 +25,18 @@ class PeriodizationPhaseFormScreen extends StatefulWidget {
   final bool draftMode;
   final PeriodizationPhaseDraftData? draft;
 
+  /// Optional externally-owned controller (e.g. from the plan wizard). When
+  /// provided the screen uses it as-is and never disposes it; the caller is
+  /// responsible for [PeriodizationPhaseFormController.load] and dispose.
+  final PeriodizationPhaseFormController? controller;
+
   const PeriodizationPhaseFormScreen({
     super.key,
     required this.plan,
     this.phase,
     this.draftMode = false,
     this.draft,
+    this.controller,
   });
 
   @override
@@ -66,501 +46,92 @@ class PeriodizationPhaseFormScreen extends StatefulWidget {
 
 class _PeriodizationPhaseFormScreenState
     extends State<PeriodizationPhaseFormScreen> {
-  final _repository = PeriodizationRepository();
-  final _bodyRepository = BodyMeasurementRepository();
-  final _settingsRepository = SettingsRepository();
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _name;
-  late final TextEditingController _intent;
-  late final TextEditingController _type;
-  final Map<String, TextEditingController> _targetControllers = {};
-  late DateTime _startDate;
-  late DateTime _endDate;
-  int _color = 0xFF4F8EF7;
-  bool _shiftFollowing = true;
-  bool _saving = false;
-  bool _loading = true;
-  String? _routineId;
-  List<Map<String, dynamic>> _routines = const [];
-  double? _latestWeight;
-  List<PeriodizationTarget> _history = const [];
-
-  late List<DateTime> _weekStarts;
-  late List<PeriodizationTarget?> _weekOverrides;
-  int _selectedWeek = 0;
-  final Set<int> _conflictWeeks = {};
-
-  bool get _editing => widget.phase != null;
+  late final PeriodizationPhaseFormController _controller;
+  late final bool _ownsController;
 
   @override
   void initState() {
     super.initState();
-    final phase = widget.phase;
-    final seed = widget.draft;
-    _name = TextEditingController(
-      text: phase?.name ?? seed?.name ?? '',
-    );
-    _intent = TextEditingController(text: phase?.intent ?? seed?.intent ?? '');
-    _type = TextEditingController(
-      text: phase?.templateKey ?? seed?.templateKey ?? '',
-    );
-    _startDate = phase?.startDate ?? seed?.startDate ?? _suggestedStart();
-    _endDate =
-        phase?.endDate ?? seed?.endDate ?? _startDate.add(const Duration(days: 27));
-    _color = phase?.color ?? seed?.color ?? _color;
-    _weekStarts = _computeWeekStarts(_startDate, _endDate);
-    _weekOverrides = List<PeriodizationTarget?>.filled(
-      _weekStarts.length,
-      null,
-    );
-    for (final key in _targetKeys) {
-      _targetControllers[key] = TextEditingController();
-    }
-    if (widget.draftMode && seed != null) {
-      _prefillOverridesFromDraft(seed.weeklyTargets);
-    }
-    _load();
+    _ownsController = widget.controller == null;
+    _controller =
+        widget.controller ??
+        PeriodizationPhaseFormController(
+          plan: widget.plan,
+          phase: widget.phase,
+          draftMode: widget.draftMode,
+          draft: widget.draft,
+        );
+    _controller.addListener(_onControllerChanged);
+    if (_ownsController) _controller.load();
   }
 
-  void _prefillOverridesFromDraft(List<PeriodizationTarget> weekly) {
-    for (var i = 0; i < _weekStarts.length && i < weekly.length; i++) {
-      final effective = weekly[i];
-      final previous = i == 0 ? null : weekly[i - 1];
-      if (!_targetsEquivalent(effective, previous)) {
-        _weekOverrides[i] = _copyOf(effective, _weekStarts[i]);
-      }
-    }
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
   }
-
-  DateTime _suggestedStart() => DateTime.now().isBefore(widget.plan.startDate)
-      ? widget.plan.startDate
-      : DateTime.now().isAfter(widget.plan.endDate)
-      ? widget.plan.startDate
-      : DateTime.now();
 
   @override
   void dispose() {
-    _name.dispose();
-    _intent.dispose();
-    _type.dispose();
-    for (final controller in _targetControllers.values) {
-      controller.dispose();
-    }
+    _controller.removeListener(_onControllerChanged);
+    if (_ownsController) _controller.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
-    final weightFuture = _bodyRepository.getLatestWeightKg();
-    final results = await Future.wait([
-      RoutineRepository().getRoutines(),
-      if (_editing) _repository.getTargetHistory(widget.phase!.id),
-    ]);
-    if (!mounted) return;
-    _routines = results[0] as List<Map<String, dynamic>>;
-    if (_editing) {
-      _history = results[1] as List<PeriodizationTarget>;
-      _reconstructOverrides();
-      final editableFrom = _editableFromIndex();
-      _selectedWeek = (editableFrom < _weekStarts.length
-              ? editableFrom
-              : _weekStarts.length - 1)
-          .clamp(0, _weekStarts.length - 1);
-    }
-    _latestWeight = await weightFuture;
-    if (!mounted) return;
-    _loadIntoControllers(_effectiveTarget(_selectedWeek));
-    setState(() => _loading = false);
-  }
-
-  // =====================================================================
-  // Week model: `_weekOverrides[i]` holds week i's own target or null when
-  // it inherits from the nearest previous override (week 0 is the base).
-  // =====================================================================
-
-  List<DateTime> _computeWeekStarts(DateTime start, DateTime end) {
-    final days = end.difference(start).inDays + 1;
-    final count = (days / 7).ceil().clamp(1, 200);
-    return [
-      for (var i = 0; i < count; i++)
-        _day(start).add(Duration(days: 7 * i)),
-    ];
-  }
-
-  DateTime _weekEnd(int index) {
-    final nominal = _weekStarts[index].add(const Duration(days: 6));
-    final last = index == _weekStarts.length - 1;
-    return last && nominal.isAfter(_endDate) ? _endDate : nominal;
-  }
-
-  PeriodizationTarget? _effectiveTarget(int index) {
-    for (var i = index; i >= 0; i--) {
-      if (_weekOverrides[i] != null) return _weekOverrides[i];
-    }
-    return null;
-  }
-
-  void _reconstructOverrides() {
-    for (var i = 0; i < _weekStarts.length; i++) {
-      final effective = _targetForDate(_history, _weekStarts[i]);
-      final previous = i == 0
-          ? null
-          : _targetForDate(_history, _weekStarts[i - 1]);
-      if (effective != null && !_targetsEquivalent(effective, previous)) {
-        _weekOverrides[i] = _copyOf(effective, _weekStarts[i]);
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    final loc = AppLocalizations.of(context)!;
+    try {
+      final status = await _controller.save();
+      if (!mounted) return;
+      if (status == PhaseFormSaveStatus.overlap) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.periodizationOverlapError)),
+        );
+        return;
       }
-    }
-  }
-
-  PeriodizationTarget? _targetForDate(
-    List<PeriodizationTarget> targets,
-    DateTime date,
-  ) {
-    final eligible =
-        targets.where((target) => !target.validFrom.isAfter(date)).toList()
-          ..sort((a, b) {
-            final byDate = b.validFrom.compareTo(a.validFrom);
-            return byDate == 0 ? b.version.compareTo(a.version) : byDate;
-          });
-    if (eligible.isNotEmpty) return eligible.first;
-    if (targets.isEmpty) return null;
-    final oldest = [...targets]..sort((a, b) => a.version.compareTo(b.version));
-    return oldest.first;
-  }
-
-  PeriodizationTarget _copyOf(PeriodizationTarget source, DateTime validFrom) =>
-      source.copyWith(id: '', version: 0, validFrom: validFrom);
-
-  static bool _targetsEquivalent(
-    PeriodizationTarget? a,
-    PeriodizationTarget? b,
-  ) {
-    final emptyA = a == null || a.isEmpty;
-    final emptyB = b == null || b.isEmpty;
-    if (emptyA && emptyB) return true;
-    if (a == null || b == null) return false;
-    return a.nutritionJson.toString() == b.nutritionJson.toString() &&
-        a.trainingJson.toString() == b.trainingJson.toString() &&
-        a.bodyJson.toString() == b.bodyJson.toString() &&
-        a.sleepJson.toString() == b.sleepJson.toString();
-  }
-
-  Set<int> _lockedWeeks() {
-    if (!_editing) return const {};
-    final today = _dayOnly(DateTime.now());
-    return {
-      for (var i = 0; i < _weekStarts.length; i++)
-        if (_weekEnd(i).isBefore(today)) i,
-    };
-  }
-
-  int _editableFromIndex() {
-    if (!_editing) return 0;
-    final today = _dayOnly(DateTime.now());
-    for (var i = 0; i < _weekStarts.length; i++) {
-      if (!_weekEnd(i).isBefore(today)) return i;
-    }
-    return _weekStarts.length;
-  }
-
-  int? _currentWeekIndex() {
-    final today = _dayOnly(DateTime.now());
-    for (var i = 0; i < _weekStarts.length; i++) {
-      if (!_weekStarts[i].isAfter(today) && !_weekEnd(i).isBefore(today)) {
-        return i;
+      if (status == PhaseFormSaveStatus.macroConflict) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.nutritionSuggestMacroEnergyError)),
+        );
+        return;
       }
-    }
-    return null;
-  }
-
-  // =====================================================================
-  // Week editing (commit-on-switch model)
-  // =====================================================================
-
-  void _selectWeek(int index) {
-    if (index == _selectedWeek) return;
-    _commitSelectedWeek();
-    setState(() {
-      _selectedWeek = index;
-      _loadIntoControllers(_effectiveTarget(index));
-    });
-  }
-
-  void _commitSelectedWeek() {
-    if (_weekStarts.isEmpty || _lockedWeeks().contains(_selectedWeek)) return;
-    final target = _buildTargetForWeek(_selectedWeek);
-    _weekOverrides[_selectedWeek] = target;
-    _updateConflict(_selectedWeek);
-  }
-
-  PeriodizationTarget _buildTargetForWeek(int index) {
-    final previous = _effectiveTarget(index);
-    final validFrom = _weekStarts[index];
-    final hasNutritionInput = ['calories', 'proteinPerKg', 'fatPerKg', 'refWeight']
-        .any((key) => _targetControllers[key]!.text.trim().isNotEmpty);
-    double? calories;
-    double? proteinG;
-    double? carbsG;
-    double? fatG;
-    double? proteinGPerKg;
-    double? fatGPerKg;
-    double? weightKgUsed;
-    final kcal = NutritionTargetFields.parseField(_targetControllers['calories']!);
-    final protein = NutritionTargetFields.parseField(
-      _targetControllers['proteinPerKg']!,
-    );
-    final fat = NutritionTargetFields.parseField(_targetControllers['fatPerKg']!);
-    final weight = NutritionTargetFields.parseField(
-      _targetControllers['refWeight']!,
-    );
-    if (hasNutritionInput && kcal != null && protein != null && fat != null && weight != null) {
-      final breakdown = computeMacros(
-        calories: kcal,
-        proteinPerKg: protein,
-        fatPerKg: fat,
-        weightKg: weight,
+      Navigator.pop(
+        context,
+        widget.draftMode && _ownsController ? _controller.draftData : true,
       );
-      calories = breakdown.calories;
-      proteinG = breakdown.proteinG;
-      fatG = breakdown.fatG;
-      carbsG = breakdown.carbsG;
-      proteinGPerKg = protein;
-      fatGPerKg = fat;
-      weightKgUsed = weight;
-    } else {
-      // Partial nutrition input keeps the previous values (legacy absolute
-      // grams survive until the user completes the g/kg fields).
-      calories = previous?.calories;
-      proteinG = previous?.proteinG;
-      carbsG = previous?.carbsG;
-      fatG = previous?.fatG;
-      proteinGPerKg = previous?.proteinGPerKg;
-      fatGPerKg = previous?.fatGPerKg;
-      weightKgUsed = previous?.weightKgUsed;
-    }
-    return PeriodizationTarget(
-      id: '',
-      phaseId: widget.phase?.id ?? '',
-      version: 0,
-      validFrom: validFrom,
-      calories: calories,
-      proteinG: proteinG,
-      carbsG: carbsG,
-      fatG: fatG,
-      proteinGPerKg: proteinGPerKg,
-      fatGPerKg: fatGPerKg,
-      weightKgUsed: weightKgUsed,
-      workoutsPerWeek: _int('workouts'),
-      minSetsPerWeek: _int('minSets'),
-      maxSetsPerWeek: _int('maxSets'),
-      minRpe: _double('minRpe'),
-      maxRpe: _double('maxRpe'),
-      routineId: _routineId,
-      targetWeightKg: _double('weight'),
-      weeklyWeightChangePercent: _double('change'),
-      sleepHours: _double('sleep'),
-      createdAt: DateTime.now(),
-    );
-  }
-
-  void _updateConflict(int index) {
-    final kcal = NutritionTargetFields.parseField(_targetControllers['calories']!);
-    final protein = NutritionTargetFields.parseField(
-      _targetControllers['proteinPerKg']!,
-    );
-    final fat = NutritionTargetFields.parseField(_targetControllers['fatPerKg']!);
-    final weight = NutritionTargetFields.parseField(
-      _targetControllers['refWeight']!,
-    );
-    final hasInput = ['calories', 'proteinPerKg', 'fatPerKg', 'refWeight']
-        .any((key) => _targetControllers[key]!.text.trim().isNotEmpty);
-    if (hasInput &&
-        kcal != null &&
-        protein != null &&
-        fat != null &&
-        weight != null) {
-      final breakdown = computeMacros(
-        calories: kcal,
-        proteinPerKg: protein,
-        fatPerKg: fat,
-        weightKg: weight,
-      );
-      breakdown.energyConflict
-          ? _conflictWeeks.add(index)
-          : _conflictWeeks.remove(index);
-    } else {
-      _conflictWeeks.remove(index);
+    } catch (error) {
+      if (!mounted) return;
+      final message =
+          error is PeriodizationValidationException &&
+              error.code == 'phase_overlap'
+          ? loc.periodizationOverlapError
+          : loc.periodizationSaveError('$error');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
-
-  void _onTargetChanged() {
-    if (_lockedWeeks().contains(_selectedWeek)) return;
-    setState(() => _commitSelectedWeek());
-  }
-
-  void _customizeSelectedWeek() {
-    _commitSelectedWeek();
-    if (_weekOverrides[_selectedWeek] == null) {
-      final effective = _effectiveTarget(_selectedWeek);
-      _weekOverrides[_selectedWeek] = effective == null
-          ? _buildTargetForWeek(_selectedWeek)
-          : _copyOf(effective, _weekStarts[_selectedWeek]);
-    }
-    setState(() {});
-  }
-
-  void _useInheritance() {
-    setState(() {
-      _weekOverrides[_selectedWeek] = null;
-      _conflictWeeks.remove(_selectedWeek);
-      _loadIntoControllers(_effectiveTarget(_selectedWeek));
-    });
-  }
-
-  void _applyToFollowingWeeks() {
-    _commitSelectedWeek();
-    final source = _effectiveTarget(_selectedWeek);
-    setState(() {
-      for (var j = _selectedWeek + 1; j < _weekStarts.length; j++) {
-        final current = _effectiveTarget(j);
-        if (!_targetsEquivalent(current, source)) {
-          _weekOverrides[j] = source == null
-              ? null
-              : _copyOf(source, _weekStarts[j]);
-          _conflictWeeks.remove(j);
-        }
-      }
-    });
-  }
-
-  void _loadIntoControllers(PeriodizationTarget? target) {
-    final weight = target?.weightKgUsed ?? _latestWeight;
-    final values = <String, String?>{
-      'calories': target?.calories?.round().toString(),
-      'proteinPerKg': _formatRatio(
-        target?.proteinGPerKg ?? _deriveRatio(target?.proteinG, weight),
-      ),
-      'fatPerKg': _formatRatio(
-        target?.fatGPerKg ?? _deriveRatio(target?.fatG, weight),
-      ),
-      'refWeight': _formatRatio(weight),
-      'workouts': target?.workoutsPerWeek?.toString(),
-      'minSets': target?.minSetsPerWeek?.toString(),
-      'maxSets': target?.maxSetsPerWeek?.toString(),
-      'minRpe': _formatRatio(target?.minRpe),
-      'maxRpe': _formatRatio(target?.maxRpe),
-      'weight': _formatRatio(target?.targetWeightKg),
-      'change': _formatRatio(target?.weeklyWeightChangePercent),
-      'sleep': _formatRatio(target?.sleepHours),
-    };
-    for (final entry in values.entries) {
-      _targetControllers[entry.key]!.text = entry.value ?? '';
-    }
-    _routineId = target?.routineId;
-  }
-
-  double? _deriveRatio(double? grams, double? weight) {
-    if (grams == null || weight == null || weight <= 0) return null;
-    return grams / weight;
-  }
-
-  String _formatRatio(double? value) {
-    if (value == null || !value.isFinite) return '';
-    return value == value.roundToDouble()
-        ? value.toStringAsFixed(0)
-        : value.toStringAsFixed(1);
-  }
-
-  Future<void> _suggestNutritionTargets() async {
-    await NutritionGoalSuggestSheet.show(
-      context,
-      bodyRepo: _bodyRepository,
-      settingsRepo: _settingsRepository,
-      onApply: (
-        calories,
-        protein,
-        carbs,
-        fat, {
-        double? proteinPerKg,
-        double? fatPerKg,
-      }) {
-        if (!mounted) return;
-        setState(() {
-          _targetControllers['calories']!.text = calories.round().toString();
-          final weight = _latestWeight;
-          _targetControllers['proteinPerKg']!.text = _formatRatio(
-            proteinPerKg ?? _deriveRatio(protein, weight),
-          );
-          _targetControllers['fatPerKg']!.text = _formatRatio(
-            fatPerKg ?? _deriveRatio(fat, weight),
-          );
-          if (weight != null) {
-            _targetControllers['refWeight']!.text = _formatRatio(weight);
-          }
-          _commitSelectedWeek();
-        });
-      },
-    );
-  }
-
-  // =====================================================================
-  // Dates / duration
-  // =====================================================================
-
-  DateTime _lastAllowedEnd() => widget.plan.endDate.add(
-    Duration(days: _editing && _shiftFollowing ? 3650 : 0),
-  );
 
   Future<void> _pickDate(bool start) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: start ? _startDate : _endDate,
+      initialDate: start ? _controller.startDate : _controller.endDate,
       firstDate: widget.plan.startDate,
-      lastDate: _lastAllowedEnd(),
+      lastDate: _controller.lastAllowedEnd,
     );
     if (picked == null || !mounted) return;
-    setState(() {
-      if (start) {
-        final duration = _endDate.difference(_startDate);
-        _startDate = picked;
-        _endDate = picked.add(duration);
-      } else {
-        _endDate = picked;
-      }
-      _rebuildWeeks();
-    });
-  }
-
-  void _setWeeks(int weeks) {
-    var end = _startDate.add(Duration(days: weeks * 7 - 1));
-    final lastAllowed = _lastAllowedEnd();
-    if (end.isAfter(lastAllowed)) end = lastAllowed;
-    setState(() {
-      _endDate = end;
-      _rebuildWeeks();
-    });
-  }
-
-  void _rebuildWeeks() {
-    final newStarts = _computeWeekStarts(_startDate, _endDate);
-    final newOverrides = List<PeriodizationTarget?>.filled(
-      newStarts.length,
-      null,
-    );
-    for (var i = 0; i < newStarts.length && i < _weekOverrides.length; i++) {
-      newOverrides[i] = _weekOverrides[i];
+    if (start) {
+      _controller.setStartDate(picked);
+    } else {
+      _controller.setEndDate(picked);
     }
-    _weekStarts = newStarts;
-    _weekOverrides = newOverrides;
-    _selectedWeek = _selectedWeek.clamp(0, _weekStarts.length - 1);
-    _conflictWeeks.removeWhere((index) => index >= _weekStarts.length);
-    _loadIntoControllers(_effectiveTarget(_selectedWeek));
   }
 
   Future<void> _pickWeeks() async {
-    final controller = TextEditingController(
-      text: _weekStarts.length.toString(),
-    );
     final loc = AppLocalizations.of(context)!;
+    final controller = TextEditingController(
+      text: _controller.weeksCount.toString(),
+    );
     final result = await showDialog<int>(
       context: context,
       builder: (context) => AlertDialog(
@@ -599,175 +170,51 @@ class _PeriodizationPhaseFormScreenState
       ),
     );
     if (result == null || !mounted) return;
-    _setWeeks(result);
+    _controller.setWeeks(result);
   }
 
-  // =====================================================================
-  // Save
-  // =====================================================================
-
-  bool _weeklyDiffersFromStored(List<PeriodizationTarget> weeks, int from) {
-    if (_history.isEmpty) return weeks.any((target) => !target.isEmpty);
-    for (var k = 0; k < weeks.length; k++) {
-      final stored = _targetForDate(_history, _weekStarts[from + k]);
-      if (!_targetsEquivalent(weeks[k], stored)) return true;
-    }
-    return false;
+  Future<void> _suggestNutritionTargets() async {
+    await NutritionGoalSuggestSheet.show(
+      context,
+      bodyRepo: _controller.bodyRepository,
+      settingsRepo: _controller.settingsRepository,
+      onApply: (
+        calories,
+        protein,
+        carbs,
+        fat, {
+        double? proteinPerKg,
+        double? fatPerKg,
+      }) {
+        if (!mounted) return;
+        _controller.applyNutritionSuggestion(
+          calories,
+          protein,
+          carbs,
+          fat,
+          proteinPerKg: proteinPerKg,
+          fatPerKg: fatPerKg,
+        );
+      },
+    );
   }
-
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_endDate.isBefore(_startDate)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context)!.periodizationOverlapError),
-        ),
-      );
-      return;
-    }
-    _commitSelectedWeek();
-    final locked = _lockedWeeks();
-    final editableFrom = _editableFromIndex();
-    if (_conflictWeeks.any(
-      (index) => index >= editableFrom && !locked.contains(index),
-    )) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.nutritionSuggestMacroEnergyError,
-          ),
-        ),
-      );
-      return;
-    }
-    if (widget.draftMode) {
-      Navigator.pop(
-        context,
-        PeriodizationPhaseDraftData(
-          name: _name.text.trim(),
-          intent: _intent.text.trim().isEmpty ? null : _intent.text.trim(),
-          templateKey: _type.text.trim().isEmpty ? null : _type.text.trim(),
-          color: _color,
-          startDate: _startDate,
-          endDate: _endDate,
-          weeklyTargets: [
-            for (var i = 0; i < _weekStarts.length; i++)
-              _effectiveTarget(i) ?? _emptyTarget(_weekStarts[i]),
-          ],
-        ),
-      );
-      return;
-    }
-    setState(() => _saving = true);
-    try {
-      var targetChanged = false;
-      List<PeriodizationTarget>? weeklyTargets;
-      DateTime? weeklyReplaceFrom;
-      if (editableFrom < _weekStarts.length) {
-        final weeks = [
-          for (var i = editableFrom; i < _weekStarts.length; i++)
-            _effectiveTarget(i) ?? _emptyTarget(_weekStarts[i]),
-        ];
-        if (!_editing) {
-          weeklyTargets = weeks.any((target) => !target.isEmpty)
-              ? weeks
-              : null;
-        } else if (_weeklyDiffersFromStored(weeks, editableFrom)) {
-          targetChanged = true;
-          weeklyTargets = weeks;
-          weeklyReplaceFrom = _weekStarts[editableFrom];
-        }
-      }
-      if (_editing) {
-        final old = widget.phase!;
-        final updated = PeriodizationPhase(
-          id: old.id,
-          planId: old.planId,
-          name: _name.text.trim(),
-          templateKey: _type.text.trim().isEmpty ? null : _type.text.trim(),
-          color: _color,
-          startDate: _startDate,
-          endDate: _endDate,
-          intent: _intent.text.trim().isEmpty ? null : _intent.text.trim(),
-          orderIndex: old.orderIndex,
-          createdAt: old.createdAt,
-          updatedAt: DateTime.now(),
-        );
-        await _repository.updatePhaseWithTargets(
-          updated,
-          shiftFollowingPhases: _shiftFollowing,
-          targetChanged: targetChanged,
-          weeklyTargets: targetChanged ? weeklyTargets : null,
-          weeklyReplaceFrom: targetChanged ? weeklyReplaceFrom : null,
-        );
-      } else {
-        await _repository.addPhase(
-          planId: widget.plan.id,
-          name: _name.text,
-          startDate: _startDate,
-          endDate: _endDate,
-          color: _color,
-          intent: _intent.text,
-          templateKey: _type.text.trim().isEmpty ? null : _type.text.trim(),
-          weeklyTargets: weeklyTargets,
-        );
-      }
-      if (mounted) Navigator.pop(context, true);
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      final loc = AppLocalizations.of(context)!;
-      final message =
-          error is PeriodizationValidationException &&
-              error.code == 'phase_overlap'
-          ? loc.periodizationOverlapError
-          : loc.periodizationSaveError('$error');
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
-    }
-  }
-
-  PeriodizationTarget _emptyTarget(DateTime validFrom) => PeriodizationTarget(
-    id: '',
-    phaseId: widget.phase?.id ?? '',
-    version: 0,
-    validFrom: validFrom,
-    createdAt: DateTime.now(),
-  );
-
-  // =====================================================================
-  // Build
-  // =====================================================================
-
-  int _filledTargets(Iterable<String> keys) => keys
-      .where((key) => _targetControllers[key]!.text.trim().isNotEmpty)
-      .length;
-
-  double? _double(String key) => double.tryParse(
-    _targetControllers[key]!.text.trim().replaceAll(',', '.'),
-  );
-  int? _int(String key) => int.tryParse(_targetControllers[key]!.text.trim());
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final locked = _lockedWeeks();
-    final effective = _effectiveTarget(_selectedWeek);
-    final weekLocked = locked.contains(_selectedWeek);
-    final weekCustomized = _weekOverrides[_selectedWeek] != null;
-    final showEditableFields =
-        !weekLocked && (_selectedWeek == 0 || weekCustomized || effective == null);
-    final weeksCount = _weekStarts.length;
-    final durationDays = (_endDate.difference(_startDate).inDays + 1).clamp(
-      1,
-      9999,
-    );
+    final c = _controller;
+    final locked = c.lockedWeeks;
+    final effective = c.effective;
+    final weekLocked = c.weekLocked;
+    final weekCustomized = c.weekCustomized;
+    final showEditableFields = c.showEditableFields;
+    final weeksCount = c.weeksCount;
+    final durationDays = c.durationDays;
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          widget.draftMode || _editing
+          widget.draftMode || c.editing
               ? loc.periodizationEditPhase
               : loc.periodizationNewPhase,
           style: theme.textTheme.titleLarge?.copyWith(
@@ -775,12 +222,12 @@ class _PeriodizationPhaseFormScreenState
           ),
         ),
       ),
-      bottomNavigationBar: _loading
+      bottomNavigationBar: c.loading
           ? null
           : PeriodizationBottomBar(
               primary: FilledButton.icon(
-                onPressed: _saving ? null : _save,
-                icon: _saving
+                onPressed: c.saving ? null : _save,
+                icon: c.saving
                     ? const SizedBox.square(
                         dimension: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
@@ -789,7 +236,7 @@ class _PeriodizationPhaseFormScreenState
                 label: Text(loc.commonSave),
               ),
             ),
-      body: _loading
+      body: c.loading
           ? const Center(child: CircularProgressIndicator())
           : Form(
               key: _formKey,
@@ -797,7 +244,7 @@ class _PeriodizationPhaseFormScreenState
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 children: [
                   PeriodizationSurface(
-                    accentColor: Color(_color),
+                    accentColor: Color(c.color),
                     selected: true,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -808,40 +255,35 @@ class _PeriodizationPhaseFormScreenState
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: Color(_color).withAlpha(35),
+                                color: Color(c.color).withAlpha(35),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Icon(
                                 Icons.flag_rounded,
-                                color: Color(_color),
+                                color: Color(c.color),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    loc.periodizationPhaseIdentity,
-                                    style: theme.textTheme.titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w800),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    loc.periodizationPhaseIdentityHelp,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color:
-                                          theme.colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
+                              child: Text(
+                                loc.periodizationPhaseIdentity,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
                           ],
                         ),
+                        const SizedBox(height: 6),
+                        Text(
+                          loc.periodizationPhaseIdentityHelp,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
                         const SizedBox(height: 18),
                         TextFormField(
-                          controller: _name,
+                          controller: c.name,
                           decoration: InputDecoration(
                             labelText: loc.periodizationPhaseName,
                             hintText: loc.periodizationPhaseNameHint,
@@ -853,7 +295,7 @@ class _PeriodizationPhaseFormScreenState
                         ),
                         const SizedBox(height: 12),
                         TextField(
-                          controller: _type,
+                          controller: c.type,
                           decoration: InputDecoration(
                             labelText: loc.periodizationPhaseType,
                             hintText: loc.periodizationPhaseTypeHint,
@@ -861,13 +303,59 @@ class _PeriodizationPhaseFormScreenState
                         ),
                         const SizedBox(height: 12),
                         TextField(
-                          controller: _intent,
+                          controller: c.intent,
                           maxLines: 3,
                           decoration: InputDecoration(
                             labelText: loc.periodizationIntent,
                             hintText: loc.periodizationIntentHint,
                             alignLabelWithHint: true,
                           ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          loc.periodizationColor,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: kPeriodizationColors
+                              .map(
+                                (value) => Semantics(
+                                  button: true,
+                                  selected: c.color == value,
+                                  child: InkWell(
+                                    onTap: () => c.setColor(value),
+                                    borderRadius: BorderRadius.circular(24),
+                                    child: Container(
+                                      width: 38,
+                                      height: 38,
+                                      decoration: BoxDecoration(
+                                        color: Color(value),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: c.color == value
+                                              ? theme.colorScheme.onSurface
+                                              : Colors.transparent,
+                                          width: 2.5,
+                                        ),
+                                      ),
+                                      child: c.color == value
+                                          ? const Icon(
+                                              Icons.check_rounded,
+                                              color: Colors.white,
+                                              size: 20,
+                                            )
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
                         ),
                       ],
                     ),
@@ -886,7 +374,7 @@ class _PeriodizationPhaseFormScreenState
                             Expanded(
                               child: _DateTile(
                                 label: loc.periodizationStartDate,
-                                date: _startDate,
+                                date: c.startDate,
                                 onTap: () => _pickDate(true),
                               ),
                             ),
@@ -897,7 +385,7 @@ class _PeriodizationPhaseFormScreenState
                             Expanded(
                               child: _DateTile(
                                 label: loc.periodizationEndDate,
-                                date: _endDate,
+                                date: c.endDate,
                                 onTap: () => _pickDate(false),
                               ),
                             ),
@@ -951,55 +439,13 @@ class _PeriodizationPhaseFormScreenState
                       ],
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  PeriodizationSurface(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          loc.periodizationColor,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 10,
-                          children: _colors
-                              .map(
-                                (value) => Semantics(
-                                  button: true,
-                                  selected: _color == value,
-                                  child: InkWell(
-                                    onTap: () => setState(() => _color = value),
-                                    borderRadius: BorderRadius.circular(24),
-                                    child: CircleAvatar(
-                                      radius: 22,
-                                      backgroundColor: Color(value),
-                                      child: _color == value
-                                          ? const Icon(
-                                              Icons.check,
-                                              color: Colors.white,
-                                            )
-                                          : null,
-                                    ),
-                                  ),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_editing) ...[
+                  if (c.editing) ...[
                     const SizedBox(height: 10),
                     PeriodizationSurface(
                       padding: EdgeInsets.zero,
                       child: SwitchListTile(
-                        value: _shiftFollowing,
-                        onChanged: (value) =>
-                            setState(() => _shiftFollowing = value),
+                        value: c.shiftFollowing,
+                        onChanged: c.setShiftFollowing,
                         secondary: const Icon(Icons.low_priority_rounded),
                         title: Text(loc.periodizationShiftFollowing),
                         subtitle: Text(loc.periodizationShiftFollowingHelp),
@@ -1015,31 +461,31 @@ class _PeriodizationPhaseFormScreenState
                   PeriodizationSurface(
                     child: PhaseWeekSelector(
                       weekCount: weeksCount,
-                      selected: _selectedWeek,
-                      firstWeekStart: _weekStarts.first,
-                      phaseEnd: _endDate,
+                      selected: c.selectedWeek,
+                      firstWeekStart: c.weekStarts.first,
+                      phaseEnd: c.endDate,
                       customizedWeeks: {
-                        for (var i = 0; i < _weekOverrides.length; i++)
-                          if (_weekOverrides[i] != null) i,
+                        for (var i = 0; i < c.weekOverrides.length; i++)
+                          if (c.weekOverrides[i] != null) i,
                       },
                       lockedWeeks: locked,
-                      currentWeek: _currentWeekIndex(),
-                      onSelect: _selectWeek,
+                      currentWeek: c.currentWeekIndex,
+                      onSelect: c.selectWeek,
                       onCustomize: !weekLocked &&
-                              _selectedWeek > 0 &&
+                              c.selectedWeek > 0 &&
                               !weekCustomized
-                          ? _customizeSelectedWeek
+                          ? c.customizeSelectedWeek
                           : null,
                       onUseInheritance: !weekLocked &&
-                              _selectedWeek > 0 &&
+                              c.selectedWeek > 0 &&
                               weekCustomized
-                          ? _useInheritance
+                          ? c.useInheritance
                           : null,
                       onApplyToFollowing: !weekLocked &&
                               weeksCount > 1 &&
-                              _selectedWeek < weeksCount - 1 &&
-                              (_selectedWeek == 0 || weekCustomized)
-                          ? _applyToFollowingWeeks
+                              c.selectedWeek < weeksCount - 1 &&
+                              (c.selectedWeek == 0 || weekCustomized)
+                          ? c.applyToFollowingWeeks
                           : null,
                     ),
                   ),
@@ -1056,11 +502,11 @@ class _PeriodizationPhaseFormScreenState
                       onAction: _suggestNutritionTargets,
                       initiallyExpanded: true,
                       child: NutritionTargetFields(
-                        calories: _targetControllers['calories']!,
-                        proteinPerKg: _targetControllers['proteinPerKg']!,
-                        fatPerKg: _targetControllers['fatPerKg']!,
-                        referenceWeight: _targetControllers['refWeight']!,
-                        onChanged: _onTargetChanged,
+                        calories: c.targetControllers['calories']!,
+                        proteinPerKg: c.targetControllers['proteinPerKg']!,
+                        fatPerKg: c.targetControllers['fatPerKg']!,
+                        referenceWeight: c.targetControllers['refWeight']!,
+                        onChanged: c.onTargetChanged,
                       ),
                     ),
                     _targetCard(
@@ -1113,7 +559,7 @@ class _PeriodizationPhaseFormScreenState
                           ),
                           const SizedBox(height: 14),
                           DropdownButtonFormField<String?>(
-                            initialValue: _routineId,
+                            initialValue: c.routineId,
                             isExpanded: true,
                             decoration: InputDecoration(
                               labelText: loc.periodizationLinkedRoutine,
@@ -1131,7 +577,7 @@ class _PeriodizationPhaseFormScreenState
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              ..._routines.map(
+                              ...c.routines.map(
                                 (routine) => DropdownMenuItem<String?>(
                                   value: routine['id'] as String,
                                   child: Text(
@@ -1141,12 +587,7 @@ class _PeriodizationPhaseFormScreenState
                                 ),
                               ),
                             ],
-                            onChanged: weekLocked
-                                ? null
-                                : (value) => setState(() {
-                                    _routineId = value;
-                                    _commitSelectedWeek();
-                                  }),
+                            onChanged: weekLocked ? null : c.setRoutine,
                           ),
                         ],
                       ),
@@ -1189,7 +630,7 @@ class _PeriodizationPhaseFormScreenState
                     ),
                   ] else
                     _readOnlyCards(effective, weekLocked),
-                  if (_editing) ...[
+                  if (c.editing) ...[
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -1220,7 +661,7 @@ class _PeriodizationPhaseFormScreenState
 
   String _targetCardSubtitle(String help, List<String> keys) {
     final loc = AppLocalizations.of(context)!;
-    final filled = _filledTargets(keys);
+    final filled = _controller.filledTargets(keys);
     return filled == 0
         ? help
         : loc.periodizationTargetsConfigured(filled, keys.length);
@@ -1291,7 +732,9 @@ class _PeriodizationPhaseFormScreenState
   Widget _readOnlyCards(PeriodizationTarget? effective, bool weekLocked) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    final target = effective ?? _emptyTarget(_weekStarts[_selectedWeek]);
+    final c = _controller;
+    final target =
+        effective ?? c.emptyTarget(c.weekStarts[c.selectedWeek]);
     List<Widget> rows(List<(String, String)> values) => [
       for (final entry in values)
         Padding(
@@ -1326,7 +769,7 @@ class _PeriodizationPhaseFormScreenState
       if (target.routineId != null)
         (
           loc.periodizationLinkedRoutine,
-          _routines
+          c.routines
                   .where((routine) => routine['id'] == target.routineId)
                   .map((routine) => routine['name'] as String)
                   .firstOrNull ??
@@ -1421,8 +864,8 @@ class _PeriodizationPhaseFormScreenState
     bool signed = false,
     String? unit,
   }) => TextField(
-    controller: _targetControllers[key],
-    onChanged: (_) => _onTargetChanged(),
+    controller: _controller.targetControllers[key],
+    onChanged: (_) => _controller.onTargetChanged(),
     keyboardType: TextInputType.numberWithOptions(
       decimal: !integer,
       signed: signed,
@@ -1486,30 +929,3 @@ class _DateTile extends StatelessWidget {
     ),
   );
 }
-
-const _targetKeys = [
-  'calories',
-  'proteinPerKg',
-  'fatPerKg',
-  'refWeight',
-  'workouts',
-  'minSets',
-  'maxSets',
-  'minRpe',
-  'maxRpe',
-  'weight',
-  'change',
-  'sleep',
-];
-
-const _colors = <int>[
-  0xFF4F8EF7,
-  0xFFF5B942,
-  0xFF9B6BE8,
-  0xFF43B581,
-  0xFFE85858,
-  0xFF26A6A1,
-];
-
-DateTime _dayOnly(DateTime date) => DateTime(date.year, date.month, date.day);
-DateTime _day(DateTime date) => DateTime(date.year, date.month, date.day);

@@ -6,9 +6,12 @@ import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/models/periodization_template.dart';
+import 'package:workout_notes/periodization/periodization_phase_form_controller.dart';
+import 'package:workout_notes/periodization/phase_draft_data.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/screens/workout/periodization_phase_form_screen.dart';
+import 'package:workout_notes/utils/periodization_palette.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 
 class PeriodizationPlanFormScreen extends StatefulWidget {
@@ -128,7 +131,7 @@ class _PeriodizationPlanFormScreenState
               ? 'Primeira fase'
               : 'First phase',
           weeks: 4,
-          color: 0xFF4F8EF7,
+          color: kDefaultPhaseColor,
         ),
       );
     }
@@ -233,7 +236,7 @@ class _PeriodizationPlanFormScreenState
                 const SizedBox(height: 14),
                 Wrap(
                   spacing: 10,
-                  children: _phaseColors.map((value) {
+                  children: kPeriodizationColors.map((value) {
                     final selected = color == value;
                     return InkWell(
                       onTap: () => setSheetState(() => color = value),
@@ -287,25 +290,40 @@ class _PeriodizationPlanFormScreenState
 
   Future<void> _editTargets(int index) async {
     final phase = _phases[index];
-    final result = await Navigator.push<PeriodizationPhaseDraftData>(
+    final controller = PeriodizationPhaseFormController(
+      plan: _editorPlan(),
+      draftMode: true,
+      draft: PeriodizationPhaseDraftData(
+        name: phase.name,
+        intent: phase.intent.isEmpty ? null : phase.intent,
+        templateKey: phase.templateKey,
+        color: phase.color,
+        startDate: _phaseStart(index),
+        endDate: _phaseEnd(index),
+        weeklyTargets: phase.weeklyTargets,
+      ),
+    );
+    await controller.load();
+    if (!mounted) {
+      controller.dispose();
+      return;
+    }
+    final saved = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => PeriodizationPhaseFormScreen(
           plan: _editorPlan(),
           draftMode: true,
-          draft: PeriodizationPhaseDraftData(
-            name: phase.name,
-            intent: phase.intent.isEmpty ? null : phase.intent,
-            templateKey: phase.templateKey,
-            color: phase.color,
-            startDate: _phaseStart(index),
-            endDate: _phaseEnd(index),
-            weeklyTargets: phase.weeklyTargets,
-          ),
+          controller: controller,
         ),
       ),
     );
-    if (result == null || !mounted) return;
+    if (saved != true || !mounted) {
+      controller.dispose();
+      return;
+    }
+    final result = controller.draftData;
+    controller.dispose();
     setState(() {
       phase.name = result.name;
       phase.intent = result.intent ?? '';
@@ -774,7 +792,7 @@ class _PeriodizationPlanFormScreenState
             _EditablePhase(
               name: loc.periodizationNewPhase,
               weeks: 4,
-              color: _phaseColors[_phases.length % _phaseColors.length],
+              color: kPeriodizationColors[_phases.length % kPeriodizationColors.length],
             ),
           ),
         ),
@@ -1218,7 +1236,7 @@ class _TemplateCard extends StatelessWidget {
                     child: Container(
                       height: 6,
                       decoration: BoxDecoration(
-                        color: Color(_phaseColors[i % _phaseColors.length]),
+                        color: Color(kPeriodizationColors[i % kPeriodizationColors.length]),
                         borderRadius: BorderRadius.circular(99),
                       ),
                     ),
@@ -1300,11 +1318,4 @@ class _DateField extends StatelessWidget {
   }
 }
 
-const _phaseColors = <int>[
-  0xFF4F8EF7,
-  0xFFF5B942,
-  0xFF9B6BE8,
-  0xFF43B581,
-  0xFFE85858,
-  0xFF26A6A1,
-];
+

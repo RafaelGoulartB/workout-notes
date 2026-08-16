@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/periodization/nutrition_target_input.dart';
 import 'package:workout_notes/utils/macro_calculator.dart';
 
 /// Shared nutrition target inputs: total calories, protein and fat in g/kg
@@ -30,36 +31,19 @@ class NutritionTargetFields extends StatelessWidget {
   });
 
   static double? parseField(TextEditingController controller) =>
-      _parse(controller.text);
-
-  static double? _parse(String raw) {
-    final cleaned = raw.trim().replaceAll(',', '.');
-    if (cleaned.isEmpty) return null;
-    final value = double.tryParse(cleaned);
-    if (value == null || !value.isFinite || value <= 0) return null;
-    return value;
-  }
+      NutritionTargetInput.parse(controller.text);
 
   static MacroBreakdown? breakdownOf({
     required TextEditingController calories,
     required TextEditingController proteinPerKg,
     required TextEditingController fatPerKg,
     required TextEditingController referenceWeight,
-  }) {
-    final kcal = parseField(calories);
-    final protein = parseField(proteinPerKg);
-    final fat = parseField(fatPerKg);
-    final weight = parseField(referenceWeight);
-    if (kcal == null || protein == null || fat == null || weight == null) {
-      return null;
-    }
-    return computeMacros(
-      calories: kcal,
-      proteinPerKg: protein,
-      fatPerKg: fat,
-      weightKg: weight,
-    );
-  }
+  }) => NutritionTargetInput.fromControllers({
+    'calories': calories,
+    'proteinPerKg': proteinPerKg,
+    'fatPerKg': fatPerKg,
+    'refWeight': referenceWeight,
+  }).resolve();
 
   MacroBreakdown? get _breakdown {
     if (!enabled) return null;
