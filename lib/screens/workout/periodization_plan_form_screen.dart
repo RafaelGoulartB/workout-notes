@@ -308,22 +308,27 @@ class _PeriodizationPlanFormScreenState
       controller.dispose();
       return;
     }
-    final saved = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PeriodizationPhaseFormScreen(
-          plan: _editorPlan(),
-          draftMode: true,
-          controller: controller,
-        ),
+    final route = MaterialPageRoute<bool>(
+      builder: (_) => PeriodizationPhaseFormScreen(
+        plan: _editorPlan(),
+        draftMode: true,
+        controller: controller,
       ),
     );
+    final saved = await Navigator.push<bool>(context, route);
+    // The editor's widgets stay attached while the pop animation runs and
+    // keep listening to the controller, so its disposal must outlive the
+    // route transition.
+    void disposeAfterExit() => Future<void>.delayed(
+      route.transitionDuration + const Duration(milliseconds: 100),
+      controller.dispose,
+    );
     if (saved != true || !mounted) {
-      controller.dispose();
+      disposeAfterExit();
       return;
     }
     final result = controller.draftData;
-    controller.dispose();
+    disposeAfterExit();
     setState(() {
       phase.name = result.name;
       phase.intent = result.intent ?? '';

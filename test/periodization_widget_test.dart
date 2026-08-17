@@ -240,7 +240,7 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.text('Sugerir metas por perfil'), findsOneWidget);
+    expect(find.text('Estimar gasto diário'), findsOneWidget);
     expect(find.text('Seu perfil'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -377,7 +377,10 @@ void main() {
       find.widgetWithText(TextField, 'Peso de referência (kg)'),
       '75',
     );
+    // The controller commits target edits on a 300ms debounce, so the
+    // preview only rebuilds after the fake clock passes it.
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 350));
 
     expect(find.text('Macros calculados'), findsOneWidget);
     expect(find.text('165 g'), findsOneWidget);
@@ -600,6 +603,10 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 120));
       await tester.pump();
     });
+    // The editor route is pushed once the controller's async load()
+    // completes, which can land after the last in-block pump.
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
     expect(find.text('Editar fase'), findsOneWidget);
 
     final caloriesField = find.widgetWithText(TextField, 'kcal por dia');
@@ -622,7 +629,9 @@ void main() {
       find.widgetWithText(TextField, 'Peso de referência (kg)'),
       '75',
     );
+    // Let the 300ms target debounce commit before saving.
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 350));
 
     await tester.runAsync(() async {
       await tester.tap(find.text('Salvar'));

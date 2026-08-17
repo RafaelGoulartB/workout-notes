@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../database/database_helper.dart';
+import 'effective_nutrition_goal_service.dart';
 
 /// Read-only, compact wellness analytics used by the AI Coach tools.
 ///
@@ -110,13 +111,11 @@ class AiWellnessAnalyticsService {
       ''',
       [start],
     );
-    final goalRows = await database.query(
-      'nutrition_goals',
-      where: 'is_active = 1',
-      orderBy: 'updated_at DESC',
-      limit: 1,
+    // An active plan's current week overrides the settings goal.
+    final effective = await EffectiveNutritionGoalService.resolve(
+      date: _now(),
     );
-    final goal = goalRows.isEmpty ? null : goalRows.first;
+    final goal = effective.goal;
 
     double? avg(String key) => _average(
       rows.map((row) => (row[key] as num?)?.toDouble()).whereType<double>(),
@@ -151,10 +150,14 @@ class AiWellnessAnalyticsService {
       'activeDailyGoal': goal == null
           ? null
           : {
-              'calories': goal['calories'],
-              'proteinG': goal['protein_g'],
-              'carbsG': goal['carbs_g'],
-              'fatG': goal['fat_g'],
+              'calories': goal.calories,
+              'proteinG': goal.proteinG,
+              'carbsG': goal.carbsG,
+              'fatG': goal.fatG,
+              if (effective.fromPlan)
+                'source': 'plan'
+              else
+                'source': 'settings',
             },
       'daysWithIncompleteMacros': rows
           .where((row) => ((row['incomplete_items'] as num?) ?? 0) > 0)

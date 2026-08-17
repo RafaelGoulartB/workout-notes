@@ -127,7 +127,7 @@ Future<Database> _openFreshDb(String dir, String name) {
   return databaseFactoryFfi.openDatabase(
     p.join(dir, name),
     options: OpenDatabaseOptions(
-      version: 37,
+      version: 39,
       onCreate: DatabaseSchema.onCreate,
     ),
   );
@@ -392,10 +392,14 @@ class _Generator {
   }
 
   // -- sleep ----------------------------------------------------------------
+  //
+  // Since v39 the app only persists the nightly summary: segments and stage
+  // epochs are transient calculation material consumed during import, so the
+  // generator writes only sleep_entries + sleep_monitor_sessions (with the
+  // aggregates the analysis used to produce).
 
   Future<void> _generateSleep() async {
     final w = _TxnWriter(db, chunkSize: 600);
-    final epochW = _TxnWriter(db, chunkSize: 600);
     final days = DateTime(endDate.year, endDate.month, endDate.day)
         .difference(DateTime(startDate.year, startDate.month, startDate.day))
         .inDays;
@@ -425,10 +429,6 @@ class _Generator {
       if (random.nextDouble() >= s.monitorShare) continue;
 
       final sessionId = _uuid.v4();
-      // UTC on purpose: local-time arithmetic across a DST fallback (e.g.
-      // Brazil 2017-02-19, clocks back 1h) repeats wall-clock values, which
-      // violates the UNIQUE(session_id, started_at) index on epochs. The
-      // strings are opaque identifiers to the app, so UTC keeps them unique.
       final startedAt = DateTime.utc(
         date.year,
         date.month,
@@ -438,7 +438,6 @@ class _Generator {
       );
       final totalMinutes =
           s.monitorAvgMinutes + (random.nextDouble() * 60 - 30).round();
-      final nEpochs = (totalMinutes * 60 / 30).round();
       await w.insert('sleep_monitor_sessions', {
         'id': sessionId,
         'sleep_entry_id': entryId,
@@ -476,62 +475,8 @@ class _Generator {
         'end_reason': 'alarm',
         'created_at': _iso(startedAt),
       });
-
-      // Build the whole monitored night synchronously (no awaits inside the
-      // epoch loop): an await in the middle of a hot loop makes the Dart VM
-      // restore stale local values on this Flutter/Windows combo, which
-      // duplicated the first ~120 epochs of some nights.
-      final segRows = <Map<String, Object?>>[];
-      final epochRows = <Map<String, Object?>>[];
-      var t = startedAt;
-      const stages = ['awake', 'sleeping', 'deep'];
-      for (var e = 0; e < nEpochs; e++) {
-        segRows.add({
-          'id': _uuid.v4(),
-          'session_id': sessionId,
-          'started_at': _iso(t),
-          'duration_seconds': 30,
-          'audio_rms_dbfs': _round2(-45 + random.nextDouble() * 15),
-          'audio_peak_dbfs': _round2(-35 + random.nextDouble() * 20),
-          'noise_score': _round2(random.nextDouble()),
-          'classification': random.nextDouble() < 0.9 ? 'quiet' : 'noise',
-          'valid_fraction': _round2(0.85 + random.nextDouble() * 0.15),
-          'noise_burst_count': random.nextInt(3),
-          'spectral_band_energy_0': _round2(random.nextDouble() * 0.5),
-          'spectral_band_energy_1': _round2(random.nextDouble() * 0.4),
-          'spectral_band_energy_2': _round2(random.nextDouble() * 0.3),
-          'spectral_band_energy_3': _round2(random.nextDouble() * 0.2),
-          'spectral_band_energy_4': _round2(random.nextDouble() * 0.1),
-          'spectral_flatness': _round2(random.nextDouble()),
-          'spectral_centroid_hz': _round2(300 + random.nextDouble() * 800),
-          'breathing_regularity': _round2(0.5 + random.nextDouble() * 0.5),
-          'breathing_rate_hz': _round2(0.15 + random.nextDouble() * 0.15),
-          'motion_active_seconds': _round2(random.nextDouble() * 30),
-          'motion_mean_deviation_g':
-              _round2(0.01 + random.nextDouble() * 0.05),
-          'motion_max_deviation_g':
-              _round2(0.02 + random.nextDouble() * 0.1),
-        });
-        epochRows.add({
-          'id': _uuid.v4(),
-          'session_id': sessionId,
-          'started_at': _iso(t),
-          'duration_seconds': 30,
-          'stage': stages[random.nextInt(stages.length)],
-          'confidence': _round2(0.6 + random.nextDouble() * 0.4),
-          'awake_probability': _round2(random.nextDouble() * 0.3),
-          'sleeping_probability': _round2(random.nextDouble() * 0.6 + 0.3),
-          'deep_probability': _round2(random.nextDouble() * 0.3),
-          'algorithm_version': '3.1.0',
-          'source': 'acoustic_model',
-        });
-        t = t.add(const Duration(seconds: 30));
-      }
-      await epochW.insertAll('sleep_monitor_segments', segRows);
-      await epochW.insertAll('sleep_stage_epochs', epochRows);
     }
     await w.flush();
-    await epochW.flush();
   }
 
   // -- nutrition ------------------------------------------------------------
@@ -1040,16 +985,6 @@ Future<String?> _recentWorkout(Database db) async {
   return rows.isEmpty ? null : rows.first['id'] as String?;
 }
 
-Future<String?> _monitoredSession(Database db) async {
-  final rows = await db.query(
-    'sleep_monitor_sessions',
-    columns: ['id'],
-    orderBy: 'started_at DESC',
-    limit: 1,
-  );
-  return rows.isEmpty ? null : rows.first['id'] as String?;
-}
-
 Future<String?> _biggestThread(Database db) async {
   final rows = await db.rawQuery('''
     SELECT thread_id, COUNT(*) c FROM ai_chat_messages
@@ -1179,7 +1114,6 @@ void main() {
 
         final mostUsedExercise = await _mostUsedExercise(db);
         final recentWorkout = await _recentWorkout(db);
-        final monitoredSession = await _monitoredSession(db);
         final biggestThread = await _biggestThread(db);
         final recentDay = _dateStr(now);
 
@@ -1247,30 +1181,14 @@ void main() {
         queryTimes['dashboard sono (30d)'] = await _timed(() async {
           await sleepRepo.getDashboardStats();
         });
-        if (monitoredSession != null) {
-          queryTimes['noite monitorada (segments+epochs)'] = await _timed(
-            () async {
-              await db.query(
-                'sleep_monitor_segments',
-                where: 'session_id = ?',
-                whereArgs: [monitoredSession],
-              );
-              await db.query(
-                'sleep_stage_epochs',
-                where: 'session_id = ?',
-                whereArgs: [monitoredSession],
-              );
-            },
+        queryTimes['sessoes monitoradas recentes (20)'] = await _timed(() async {
+          await db.query(
+            'sleep_monitor_sessions',
+            where: "status = 'completed'",
+            orderBy: 'started_at DESC',
+            limit: 20,
           );
-          queryTimes['sessoes recentes (20)'] = await _timed(() async {
-            await db.query(
-              'sleep_monitor_sessions',
-              where: "status = 'completed'",
-              orderBy: 'started_at DESC',
-              limit: 20,
-            );
-          });
-        }
+        });
         queryTimes['nutricao: diario completo'] = await _timed(() async {
           final logs = await db.query(
             'meal_logs',

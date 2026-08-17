@@ -4,6 +4,8 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/nutrition/food.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 
 /// Read-only nutrition queries exposed to the AI Coach.
 ///
@@ -13,14 +15,18 @@ import 'package:workout_notes/repositories/nutrition_repository.dart';
 class AiNutritionToolService {
   final DatabaseHelper db;
   final NutritionRepository nutritionRepository;
+  final PeriodizationRepository periodizationRepository;
   final DateTime Function() _now;
 
   AiNutritionToolService({
     DatabaseHelper? db,
     NutritionRepository? nutritionRepository,
+    PeriodizationRepository? periodizationRepository,
     DateTime Function()? now,
   }) : db = db ?? DatabaseHelper.instance,
        nutritionRepository = nutritionRepository ?? NutritionRepository(),
+       periodizationRepository =
+           periodizationRepository ?? PeriodizationRepository(),
        _now = now ?? DateTime.now;
 
   Future<Map<String, dynamic>> diaryDay({String? date}) async {
@@ -53,18 +59,19 @@ class AiNutritionToolService {
         'items': items,
       });
     }
-    final goalRows = await database.query(
-      'nutrition_goals',
-      where: 'is_active = 1',
-      orderBy: 'updated_at DESC',
-      limit: 1,
+    // An active periodization plan's current week overrides the settings
+    // goal, so the coach compares intake against the effective goal.
+    final effective = await EffectiveNutritionGoalService.resolve(
+      nutritionRepository: nutritionRepository,
+      periodizationRepository: periodizationRepository,
+      date: DateTime.parse(resolvedDate),
     );
     return {
       'date': resolvedDate,
       'mealCount': meals.length,
       'itemCount': allItems.length,
       'totals': _sumNutrients(allItems),
-      'activeDailyGoal': goalRows.isEmpty ? null : _goalMap(goalRows.first),
+      'activeDailyGoal': _effectiveGoalMap(effective),
       'dataCoverage': _coverage(allItems),
       'meals': meals,
       'nullSemantics':
@@ -374,10 +381,18 @@ class AiNutritionToolService {
         (SELECT COUNT(DISTINCT date) FROM meal_logs) diary_day_count
       ''');
     final count = counts.first;
+    // The effective goal honours an active plan override; the configured
+    // goal plus history document what the user set in the settings.
+    final effective = await EffectiveNutritionGoalService.resolve(
+      nutritionRepository: nutritionRepository,
+      periodizationRepository: periodizationRepository,
+      date: _now(),
+    );
     return {
       'activeDailyGoal': goals.where((row) => row['is_active'] == 1).isEmpty
           ? null
           : _goalMap(goals.firstWhere((row) => row['is_active'] == 1)),
+      'effectiveDailyGoal': _effectiveGoalMap(effective),
       'goalHistory': goals
           .map((row) => {..._goalMap(row), 'isActive': row['is_active'] == 1})
           .toList(),
@@ -388,15 +403,16 @@ class AiNutritionToolService {
         'weightKg': _doubleOrNull(settings['nutrition_profile_weight_kg']),
         'activityLevel': settings['nutrition_profile_activity'],
         'macroRatiosGPerKg': {
-          for (final objective in const ['cut', 'maintenance', 'bulk'])
-            objective: {
-              'protein': _doubleOrNull(
-                settings['nutrition_profile_macro_${objective}_protein_g_kg'],
+          'protein':
+              _doubleOrNull(settings['nutrition_profile_macro_protein_g_kg']) ??
+              _doubleOrNull(
+                settings['nutrition_profile_macro_maintenance_protein_g_kg'],
               ),
-              'fat': _doubleOrNull(
-                settings['nutrition_profile_macro_${objective}_fat_g_kg'],
+          'fat':
+              _doubleOrNull(settings['nutrition_profile_macro_fat_g_kg']) ??
+              _doubleOrNull(
+                settings['nutrition_profile_macro_maintenance_fat_g_kg'],
               ),
-            },
         },
       },
       'mealTypes': mealTypes
@@ -473,9 +489,35 @@ class AiNutritionToolService {
     'proteinG': row['protein_g'],
     'carbsG': row['carbs_g'],
     'fatG': row['fat_g'],
+    'tdee': row['tdee'],
+    'adjustmentKind': row['adjustment_kind'],
+    'adjustmentPercent': row['adjustment_percent'],
     'createdAt': row['created_at'],
     'updatedAt': row['updated_at'],
   };
+
+  /// Serializes the plan-aware goal, tagging where it comes from so the
+  /// coach can explain why the target differs from the settings.
+  static Map<String, dynamic>? _effectiveGoalMap(
+    EffectiveNutritionGoal effective,
+  ) {
+    final goal = effective.goal;
+    if (goal == null) return null;
+    return {
+      'id': goal.id,
+      'calories': goal.calories,
+      'proteinG': goal.proteinG,
+      'carbsG': goal.carbsG,
+      'fatG': goal.fatG,
+      'source': effective.fromPlan ? 'plan' : 'settings',
+      if (effective.fromPlan)
+        'planPhase': {
+          'name': effective.phase?.name,
+          'week': effective.weekNumber,
+          'totalWeeks': effective.totalWeeks,
+        },
+    };
+  }
 
   static Map<String, dynamic> _sumNutrients(
     Iterable<Map<String, dynamic>> rows,

@@ -123,6 +123,9 @@ void main() {
               protein_g REAL,
               carbs_g REAL,
               fat_g REAL,
+              tdee REAL,
+              adjustment_kind TEXT,
+              adjustment_percent REAL,
               created_at TEXT NOT NULL,
               updated_at TEXT NOT NULL,
               is_active INTEGER NOT NULL DEFAULT 1
@@ -706,6 +709,43 @@ void main() {
       final rows = await database.query('nutrition_goals');
       expect(rows, hasLength(1));
       expect(rows.first['is_active'], 0);
+    });
+
+    test('a TDEE-driven deficit goal derives its calories and saves', () async {
+      // Regression: the generic non-negative validation used to reject
+      // the negative adjustment percent that a cut requires.
+      final goal = await repository.saveGoal(
+        tdee: 2500,
+        adjustmentKind: 'cut',
+        adjustmentPercent: -20,
+        proteinG: 160,
+        fatG: 64,
+      );
+      expect(goal.calories, 2000);
+      expect(goal.tdee, 2500);
+      expect(goal.adjustmentPercent, -20);
+      final active = await repository.getActiveGoal();
+      expect(active!.calories, 2000);
+    });
+
+    test('a TDEE-driven surplus goal derives its calories', () async {
+      final goal = await repository.saveGoal(
+        tdee: 2500,
+        adjustmentKind: 'bulk',
+        adjustmentPercent: 10,
+      );
+      expect(goal.calories, 2750);
+    });
+
+    test('adjustment percent outside (-100, 100) is rejected', () async {
+      expect(
+        () => repository.saveGoal(tdee: 2500, adjustmentPercent: -100),
+        throwsA(isA<NutritionValidationException>()),
+      );
+      expect(
+        () => repository.saveGoal(tdee: 2500, adjustmentPercent: 100),
+        throwsA(isA<NutritionValidationException>()),
+      );
     });
   });
 

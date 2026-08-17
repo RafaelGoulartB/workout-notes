@@ -368,23 +368,21 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   }
 
   /// Applies a suggestion sheet result to the nutrition controllers and
-  /// re-commits the selected week.
+  /// re-commits the selected week. The protein/fat g/kg ratios are
+  /// derived from the macros and the latest measured weight so the
+  /// editor stays in sync with the user's profile.
   void applyNutritionSuggestion(
     double calories,
     double protein,
     double carbs,
-    double fat, {
-    double? proteinPerKg,
-    double? fatPerKg,
-  }) {
+    double fat,
+  ) {
     targetControllers['calories']!.text = calories.round().toString();
     final weight = latestWeight;
     targetControllers['proteinPerKg']!.text = formatRatio(
-      proteinPerKg ?? deriveRatio(protein, weight),
+      deriveRatio(protein, weight),
     );
-    targetControllers['fatPerKg']!.text = formatRatio(
-      fatPerKg ?? deriveRatio(fat, weight),
-    );
+    targetControllers['fatPerKg']!.text = formatRatio(deriveRatio(fat, weight));
     if (weight != null) {
       targetControllers['refWeight']!.text = formatRatio(weight);
     }

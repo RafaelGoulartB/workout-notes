@@ -68,44 +68,74 @@ void main() {
       _app(
         bodyRepository: _BodyRepository(),
         settingsRepository: settings,
-        onApply: (
-          _,
-          protein,
-          _,
-          _, {
-          double? proteinPerKg,
-          double? fatPerKg,
-        }) => appliedProtein = protein,
+        onApply: (suggestion) => appliedProtein = suggestion.proteinG,
       ),
     );
 
     await tester.tap(find.text('Abrir'));
     await tester.pumpAndSettle();
+    // The headline reports the maintenance expenditure (BMR × activity).
     expect(find.text('2487 kcal'), findsOneWidget);
 
-    expect(find.text('Déficit'), findsOneWidget);
-    expect(find.text('Distribuição de macros · Manutenção'), findsOneWidget);
+    // The objective selector is gone: the sheet only estimates maintenance.
+    expect(find.text('Déficit'), findsNothing);
+    expect(find.text('Superávit'), findsNothing);
+    expect(find.text('Objetivo'), findsNothing);
+    expect(find.text('Distribuição de macros'), findsOneWidget);
     expect(
       find.text('Carboidratos usam as calorias restantes.'),
       findsOneWidget,
     );
 
-    // Profile fields are first; selected-objective protein is the fourth.
-    final maintenanceProtein = find.byType(TextField).at(3);
-    await tester.enterText(maintenanceProtein, '2,0');
+    // Profile fields come first (age, height, weight); protein is fourth.
+    final proteinField = find.byType(TextField).at(3);
+    await tester.enterText(proteinField, '2,0');
     await tester.pump();
     expect(find.text('160 g'), findsOneWidget);
 
-    final applyButton = find.widgetWithText(FilledButton, 'Aplicar metas');
+    final applyButton = find.widgetWithText(
+      FilledButton,
+      'Aplicar gasto diário',
+    );
     await tester.ensureVisible(applyButton);
     await tester.tap(applyButton);
     await tester.pumpAndSettle();
 
     expect(appliedProtein, 160);
+    expect(settings.values['nutrition_profile_macro_protein_g_kg'], '2.0');
+    expect(settings.values['nutrition_profile_macro_fat_g_kg'], '1.0');
+    // The legacy per-objective keys are no longer written.
     expect(
-      settings.values['nutrition_profile_macro_maintenance_protein_g_kg'],
-      '2.0',
+      settings.values.containsKey(
+        'nutrition_profile_macro_maintenance_protein_g_kg',
+      ),
+      isFalse,
     );
-    expect(settings.values['nutrition_profile_macro_cut_protein_g_kg'], '2.2');
+  });
+
+  testWidgets('falls back to the legacy maintenance ratio keys', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(430, 932));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final settings = _MemorySettingsRepository()
+      ..values['nutrition_profile_macro_maintenance_protein_g_kg'] = '2.4'
+      ..values['nutrition_profile_macro_maintenance_fat_g_kg'] = '0.9';
+    await tester.pumpWidget(
+      _app(
+        bodyRepository: _BodyRepository(),
+        settingsRepository: settings,
+        onApply: (_) {},
+      ),
+    );
+
+    await tester.tap(find.text('Abrir'));
+    await tester.pumpAndSettle();
+
+    // 80 kg × 2.4 g/kg = 192 g of protein in the preview.
+    expect(find.text('192 g'), findsOneWidget);
+    // 80 kg × 0.9 g/kg = 72 g of fat in the preview.
+    expect(find.text('72 g'), findsOneWidget);
   });
 }

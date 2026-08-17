@@ -93,21 +93,21 @@ class PhaseWeekSelector extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 3),
-                  Row(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
                     children: [
                       _WeekStatusPill(
                         label: statusInfo.label,
                         icon: statusInfo.icon,
                         color: statusInfo.color,
                       ),
-                      if (currentWeek == selected) ...[
-                        const SizedBox(width: 6),
+                      if (currentWeek == selected)
                         _WeekStatusPill(
                           label: loc.periodizationWeekCurrent,
                           icon: Icons.play_arrow_rounded,
                           color: theme.colorScheme.primary,
                         ),
-                      ],
                     ],
                   ),
                 ],
@@ -392,11 +392,15 @@ class _WeekActionButton extends StatelessWidget {
             children: [
               Icon(icon, size: 15, color: color),
               const SizedBox(width: 6),
-              Text(
-                label,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w800,
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],

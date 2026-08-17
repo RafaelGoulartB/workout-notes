@@ -345,6 +345,30 @@ abstract final class DatabaseWellnessMigrations {
         } catch (_) {}
       }
     }
+    if (oldVersion < 38) {
+      // Daily expenditure (TDEE) and the deficit/maintenance/surplus
+      // adjustment that derives the consumption goal. Existing rows are
+      // backfilled as `tdee = calories` and `adjustment = maintenance`,
+      // which preserves the previous goal exactly (TDEE × 1.0 = goal).
+      for (final statement in <String>[
+        'ALTER TABLE nutrition_goals ADD COLUMN tdee REAL',
+        'ALTER TABLE nutrition_goals ADD COLUMN adjustment_kind TEXT',
+        'ALTER TABLE nutrition_goals ADD COLUMN adjustment_percent REAL',
+      ]) {
+        try {
+          await db.execute(statement);
+        } catch (_) {}
+      }
+      try {
+        await db.execute('''
+          UPDATE nutrition_goals
+          SET tdee = calories,
+              adjustment_kind = 'maintenance',
+              adjustment_percent = 0
+          WHERE tdee IS NULL
+        ''');
+      } catch (_) {}
+    }
     if (oldVersion < 39) {
       // v39: sleep_monitor_segments and sleep_stage_epochs are transient
       // calculation material. They were only consumed during import to

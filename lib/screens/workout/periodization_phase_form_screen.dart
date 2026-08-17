@@ -178,22 +178,13 @@ class _PeriodizationPhaseFormScreenState
       context,
       bodyRepo: _controller.bodyRepository,
       settingsRepo: _controller.settingsRepository,
-      onApply: (
-        calories,
-        protein,
-        carbs,
-        fat, {
-        double? proteinPerKg,
-        double? fatPerKg,
-      }) {
+      onApply: (suggestion) {
         if (!mounted) return;
         _controller.applyNutritionSuggestion(
-          calories,
-          protein,
-          carbs,
-          fat,
-          proteinPerKg: proteinPerKg,
-          fatPerKg: fatPerKg,
+          suggestion.calories,
+          suggestion.proteinG,
+          suggestion.carbsG,
+          suggestion.fatG,
         );
       },
     );

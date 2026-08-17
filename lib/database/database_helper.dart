@@ -677,11 +677,17 @@ class DatabaseHelper {
     double? proteinG,
     double? carbsG,
     double? fatG,
+    double? tdee,
+    String? adjustmentKind,
+    double? adjustmentPercent,
   }) => nutritionRepo.saveGoal(
     calories: calories,
     proteinG: proteinG,
     carbsG: carbsG,
     fatG: fatG,
+    tdee: tdee,
+    adjustmentKind: adjustmentKind,
+    adjustmentPercent: adjustmentPercent,
   );
   Future<void> clearActiveNutritionGoal() => nutritionRepo.clearActiveGoal();
   Future<List<NutritionExportRow>> exportNutritionRows({
