@@ -29,7 +29,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 39;
+  static const _dbVersion = 40;
 
   static DatabaseHelper? _instance;
   static Database? _database;

@@ -345,11 +345,13 @@ abstract final class DatabaseWellnessMigrations {
         } catch (_) {}
       }
     }
-    if (oldVersion < 38) {
-      // Daily expenditure (TDEE) and the deficit/maintenance/surplus
+    if (oldVersion < 40) {
+      // v40: daily expenditure (TDEE) and the deficit/maintenance/surplus
       // adjustment that derives the consumption goal. Existing rows are
       // backfilled as `tdee = calories` and `adjustment = maintenance`,
       // which preserves the previous goal exactly (TDEE × 1.0 = goal).
+      // This must live in a step ABOVE v39: devices that already upgraded
+      // to the v39 sleep migration would skip any lower-numbered block.
       for (final statement in <String>[
         'ALTER TABLE nutrition_goals ADD COLUMN tdee REAL',
         'ALTER TABLE nutrition_goals ADD COLUMN adjustment_kind TEXT',
