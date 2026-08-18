@@ -318,14 +318,12 @@ class _MacroPreviewCard extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final adjustment = adjustmentKcal ?? 0;
-    final hasAdjustment = adjustment != 0;
     final breakdown = this.breakdown;
     final hasBreakdown = breakdown != null;
     final totalKcal = hasBreakdown
         ? breakdown.proteinKcal + breakdown.fatKcal + breakdown.carbsKcal
         : 0;
     final isConflict = hasBreakdown && breakdown.energyConflict;
-    final goalTextColor = theme.colorScheme.onPrimaryContainer;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
@@ -336,51 +334,31 @@ class _MacroPreviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            loc.periodizationDailyGoal(_formatKcal(goal)),
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: goalTextColor,
-            ),
-          ),
-          if (hasAdjustment) ...[
-            const SizedBox(height: 4),
-            Text(
-              loc.periodizationGoalBreakdown(
-                _formatKcal(tdee),
-                _formatSigned(loc, adjustment),
-              ),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: goalTextColor,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ] else
-            Text(
-              loc.periodizationAdjustmentKcalNotSet,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: goalTextColor,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           if (isConflict) ...[
-            const SizedBox(height: 12),
             _ConflictBanner(loc.nutritionSuggestMacroEnergyError),
           ] else if (hasBreakdown) ...[
-            const SizedBox(height: 12),
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: goalTextColor.withAlpha(35),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              loc.periodizationMacroPreview,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.1,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    loc.periodizationMacroPreview,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ),
+                if (totalKcal > 0)
+                  Text(
+                    '${_formatKcal(tdee)} ${_formatSigned(loc, adjustment)} = '
+                    '${_formatKcal(goal)} kcal',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 10),
             Row(
