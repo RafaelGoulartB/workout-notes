@@ -217,9 +217,9 @@ class PhaseWeekSelector extends StatelessWidget {
     if (box == null || overlay == null) return;
     final topLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
     final position = RelativeRect.fromLTRB(
-      overlay.size.width - topLeft.dx,
+      topLeft.dx,
       topLeft.dy + box.size.height + 4,
-      topLeft.dx + box.size.width,
+      overlay.size.width - topLeft.dx - box.size.width,
       overlay.size.height - topLeft.dy,
     );
 
