@@ -6,6 +6,7 @@ import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
+import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
@@ -33,9 +34,11 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
     PeriodizationRepository? repository,
     BodyMeasurementRepository? bodyRepository,
     SettingsRepository? settingsRepository,
+    NutritionRepository? nutritionRepository,
   }) : _repository = repository ?? PeriodizationRepository(),
        _bodyRepository = bodyRepository ?? BodyMeasurementRepository(),
-       _settingsRepository = settingsRepository ?? SettingsRepository() {
+       _settingsRepository = settingsRepository ?? SettingsRepository(),
+       _nutritionRepository = nutritionRepository ?? NutritionRepository() {
     _seed();
   }
 
@@ -47,6 +50,7 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   final PeriodizationRepository _repository;
   final BodyMeasurementRepository _bodyRepository;
   final SettingsRepository _settingsRepository;
+  final NutritionRepository _nutritionRepository;
 
   final _resolver = const WeekOverrideResolver();
 
@@ -65,6 +69,11 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   List<Map<String, dynamic>> routines = const [];
   double? latestWeight;
   List<PeriodizationTarget> history = const [];
+
+  /// Daily calorie expenditure (TDEE) from the app's nutrition goal.
+  /// Read once on [load]; the editor renders it as a read-only tile and
+  /// the weekly kcal goal is computed as `tdee + adjustment`.
+  double? tdee;
 
   late List<DateTime> weekStarts;
   late List<PeriodizationTarget?> weekOverrides;
@@ -123,6 +132,7 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
 
   Future<void> load() async {
     final weightFuture = _bodyRepository.getLatestWeightKg();
+    final tdeeFuture = _nutritionRepository.getActiveGoal();
     final results = await Future.wait([
       RoutineRepository().getRoutines(),
       if (editing) _repository.getTargetHistory(phase!.id),
@@ -142,7 +152,9 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
           .clamp(0, weekStarts.length - 1);
     }
     latestWeight = await weightFuture;
+    final goal = await tdeeFuture;
     if (_disposed) return;
+    tdee = goal?.tdee;
     loadIntoControllers(effective);
     loading = false;
     notifyListeners();
@@ -219,7 +231,10 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   PeriodizationTarget buildTargetForWeek(int index) {
     final previous = effectiveTarget(index);
     final validFrom = weekStarts[index];
-    final input = NutritionTargetInput.fromControllers(targetControllers);
+    final input = NutritionTargetInput.fromControllers({
+      ...targetControllers,
+      'tdee': _ReadOnlyTdeeController(tdee),
+    });
     final breakdown = input.resolve();
     double? calories;
     double? proteinG;
@@ -331,8 +346,12 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
 
   void loadIntoControllers(PeriodizationTarget? target) {
     final weight = target?.weightKgUsed ?? latestWeight;
+    final storedCalories = target?.calories;
+    final storedAdjustment = (storedCalories != null && tdee != null)
+        ? storedCalories - tdee!
+        : null;
     final values = <String, String?>{
-      'calories': target?.calories?.round().toString(),
+      'adjustment': formatSignedRatio(storedAdjustment),
       'proteinPerKg': formatRatio(
         target?.proteinGPerKg ?? deriveRatio(target?.proteinG, weight),
       ),
@@ -367,17 +386,27 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
         : value.toStringAsFixed(1);
   }
 
+  /// Like [formatRatio] but preserves the sign (positive values are
+  /// emitted with a leading `+`). Used for the deficit / surplus field.
+  String formatSignedRatio(double? value) {
+    if (value == null || !value.isFinite) return '';
+    final formatted = formatRatio(value.abs());
+    if (value > 0) return '+$formatted';
+    return formatted;
+  }
+
   /// Applies a suggestion sheet result to the nutrition controllers and
   /// re-commits the selected week. The protein/fat g/kg ratios are
   /// derived from the macros and the latest measured weight so the
-  /// editor stays in sync with the user's profile.
+  /// editor stays in sync with the user's profile. The kcal goal is
+  /// not touched: it is derived from the TDEE (read-only) plus the
+  /// user-managed deficit/surplus adjustment.
   void applyNutritionSuggestion(
     double calories,
     double protein,
     double carbs,
     double fat,
   ) {
-    targetControllers['calories']!.text = calories.round().toString();
     final weight = latestWeight;
     targetControllers['proteinPerKg']!.text = formatRatio(
       deriveRatio(protein, weight),
@@ -591,7 +620,7 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
 }
 
 const kPhaseTargetKeys = [
-  'calories',
+  'adjustment',
   'proteinPerKg',
   'fatPerKg',
   'refWeight',
@@ -604,3 +633,26 @@ const kPhaseTargetKeys = [
   'change',
   'sleep',
 ];
+
+/// Read-only text controller that exposes the current TDEE to
+/// [NutritionTargetInput.fromControllers] without letting the parser
+/// pick up user edits on the field.
+class _ReadOnlyTdeeController extends TextEditingController {
+  _ReadOnlyTdeeController(double? tdee) : _tdee = tdee {
+    final value = _tdee;
+    if (value != null) {
+      super.value = TextEditingValue(
+        text: value == value.roundToDouble()
+            ? value.toStringAsFixed(0)
+            : value.toStringAsFixed(1),
+      );
+    }
+  }
+
+  final double? _tdee;
+
+  @override
+  set value(TextEditingValue newValue) {
+    // The TDEE is read-only; ignore external mutations.
+  }
+}

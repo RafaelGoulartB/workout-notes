@@ -105,15 +105,18 @@ void main() {
   });
 
   group('NutritionTargetInput', () {
-    test('resolve computes the macro split from the four controllers', () {
+    test('resolve computes the macro split from TDEE + adjustment + ratios', () {
       final controllers = {
-        'calories': TextEditingController(text: '2400'),
+        'tdee': TextEditingController(text: '2200'),
+        'adjustment': TextEditingController(text: '+200'),
         'proteinPerKg': TextEditingController(text: '2,2'),
         'fatPerKg': TextEditingController(text: '0.8'),
         'refWeight': TextEditingController(text: '75'),
       };
       final input = NutritionTargetInput.fromControllers(controllers);
       expect(input.hasInput, isTrue);
+      expect(input.tdee, 2200);
+      expect(input.adjustmentKcal, 200);
       final breakdown = input.resolve();
       expect(breakdown, isNotNull);
       expect(breakdown!.calories, 2400);
@@ -121,9 +124,25 @@ void main() {
       expect(breakdown.energyConflict, isFalse);
     });
 
+    test('resolve keeps a deficit (negative adjustment) under TDEE', () {
+      final controllers = {
+        'tdee': TextEditingController(text: '2200'),
+        'adjustment': TextEditingController(text: '-300'),
+        'proteinPerKg': TextEditingController(text: '2'),
+        'fatPerKg': TextEditingController(text: '1'),
+        'refWeight': TextEditingController(text: '78'),
+      };
+      final breakdown = NutritionTargetInput.fromControllers(
+        controllers,
+      ).resolve();
+      expect(breakdown, isNotNull);
+      expect(breakdown!.calories, 1900);
+    });
+
     test('resolve returns null on partial input', () {
       final controllers = {
-        'calories': TextEditingController(text: '2400'),
+        'tdee': TextEditingController(text: '2200'),
+        'adjustment': TextEditingController(text: '+200'),
         'proteinPerKg': TextEditingController(text: ''),
         'fatPerKg': TextEditingController(text: '0.8'),
         'refWeight': TextEditingController(text: '75'),

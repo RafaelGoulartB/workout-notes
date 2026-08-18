@@ -2,71 +2,95 @@ import 'package:flutter/widgets.dart';
 
 import 'package:workout_notes/utils/macro_calculator.dart';
 
-/// Snapshot of the four nutrition target fields (calories, protein g/kg,
-/// fat g/kg and the reference weight) read from the editor's controllers.
+/// Snapshot of the nutrition target fields read from the editor's
+/// controllers. Calories are derived from the user's daily expenditure
+/// (TDEE) plus a signed deficit/surplus adjustment in kcal; the
+/// remaining fields (protein g/kg, fat g/kg, reference weight) convert
+/// the daily calories into grams.
 ///
-/// [resolve] computes the macro split only when every field is present and
-/// valid; a partial input resolves to `null` so the caller can keep the
-/// previous week's values (legacy absolute-gram inputs survive until the
-/// user completes the g/kg fields).
+/// [resolve] computes the macro split only when every field is present
+/// and valid; a partial input resolves to `null` so the caller can keep
+/// the previous week's values (legacy absolute-gram inputs survive
+/// until the user completes the g/kg fields).
 class NutritionTargetInput {
-  final double? calories;
+  /// Daily calorie expenditure from the app settings (read-only).
+  /// The week goal is always `tdee + adjustmentKcal`.
+  final double? tdee;
+
+  /// Signed kcal adjustment applied on top of [tdee]: negative for a
+  /// deficit (cut), positive for a surplus (bulk), zero for maintenance.
+  final double? adjustmentKcal;
+
   final double? proteinPerKg;
   final double? fatPerKg;
   final double? refWeight;
 
   const NutritionTargetInput({
-    this.calories,
+    this.tdee,
+    this.adjustmentKcal,
     this.proteinPerKg,
     this.fatPerKg,
     this.refWeight,
   });
 
-  /// Keys are the shared `_targetKeys` names: `calories`, `proteinPerKg`,
-  /// `fatPerKg`, `refWeight`.
+  /// Keys are the shared `_targetKeys` names: `tdee` (read-only),
+  /// `adjustment`, `proteinPerKg`, `fatPerKg`, `refWeight`.
   factory NutritionTargetInput.fromControllers(
     Map<String, TextEditingController> controllers,
   ) {
     double? read(String key) => parse(controllers[key]?.text ?? '');
     return NutritionTargetInput(
-      calories: read('calories'),
+      tdee: parse(controllers['tdee']?.text ?? ''),
+      adjustmentKcal: parse(
+        controllers['adjustment']?.text ?? '',
+        allowSigned: true,
+      ),
       proteinPerKg: read('proteinPerKg'),
       fatPerKg: read('fatPerKg'),
       refWeight: read('refWeight'),
     );
   }
 
-  /// True when at least one of the four fields holds a value.
+  /// True when at least one of the five fields holds a value.
   bool get hasInput =>
-      calories != null ||
+      tdee != null ||
+      adjustmentKcal != null ||
       proteinPerKg != null ||
       fatPerKg != null ||
       refWeight != null;
 
   bool get isComplete =>
-      calories != null &&
+      tdee != null &&
       proteinPerKg != null &&
       fatPerKg != null &&
       refWeight != null;
 
-  /// The computed macro breakdown, or null when the input is incomplete or
-  /// invalid. A non-null result may still carry `energyConflict`.
+  /// The computed macro breakdown, or null when the input is
+  /// incomplete or invalid. A non-null result may still carry
+  /// `energyConflict`.
   MacroBreakdown? resolve() {
     if (!isComplete) return null;
+    final adjustment = adjustmentKcal ?? 0;
+    final calories = tdee! + adjustment;
+    if (calories <= 0) return null;
     return computeMacros(
-      calories: calories!,
+      calories: calories,
       proteinPerKg: proteinPerKg!,
       fatPerKg: fatPerKg!,
       weightKg: refWeight!,
     );
   }
 
-  /// Parses one raw user input into a positive finite double (or null).
-  static double? parse(String raw) {
+  /// Parses one raw user input into a finite double (or null). The
+  /// adjustment field accepts signed values; the others must be
+  /// strictly positive.
+  static double? parse(String raw, {bool allowSigned = false}) {
     final cleaned = raw.trim().replaceAll(',', '.');
     if (cleaned.isEmpty) return null;
     final value = double.tryParse(cleaned);
-    if (value == null || !value.isFinite || value <= 0) return null;
+    if (value == null || !value.isFinite) return null;
+    if (!allowSigned && value <= 0) return null;
+    if (allowSigned && value == 0) return null;
     return value;
   }
 }
