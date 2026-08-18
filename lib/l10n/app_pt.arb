@@ -1851,6 +1851,8 @@
   "periodizationReviewNotes": "Notas da revisão",
   "periodizationSaveReview": "Salvar revisão",
   "periodizationCalendarNoPhase": "Sem fase",
+  "periodizationPlanWorkout": "Planejar treino nesta data",
+  "periodizationOpenWorkout": "Abrir treino planejado",
   "periodizationSelectPlans": "Selecione dois planos para comparar",
   "periodizationPlanSummary": "RESUMO DO CICLO",
   "periodizationNoCompletedPlans": "Conclua ou arquive pelo menos dois planos para comparar.",

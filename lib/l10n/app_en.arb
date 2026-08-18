@@ -1871,6 +1871,8 @@
   "periodizationReviewNotes": "Review notes",
   "periodizationSaveReview": "Save review",
   "periodizationCalendarNoPhase": "No phase",
+  "periodizationPlanWorkout": "Plan workout on this date",
+  "periodizationOpenWorkout": "Open planned workout",
   "periodizationSelectPlans": "Select two plans to compare",
   "periodizationPlanSummary": "CYCLE SUMMARY",
   "periodizationNoCompletedPlans": "Complete or archive at least two plans to compare.",

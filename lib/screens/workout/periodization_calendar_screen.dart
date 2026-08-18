@@ -5,8 +5,10 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'package:workout_notes/repositories/workout_repository.dart';
 
 import 'periodization_phase_detail_screen.dart';
+import 'future_workout_planner_screen.dart';
 
 class PeriodizationCalendarScreen extends StatefulWidget {
   final PeriodizationPlan plan;
@@ -21,9 +23,11 @@ class PeriodizationCalendarScreen extends StatefulWidget {
 class _PeriodizationCalendarScreenState
     extends State<PeriodizationCalendarScreen> {
   final _repository = PeriodizationRepository();
+  final _workoutRepository = WorkoutRepository();
   late DateTime _month;
   DateTime _selectedDate = DateTime.now();
   List<PeriodizationPhase> _phases = const [];
+  List<Map<String, dynamic>> _workouts = const [];
   bool _loading = true;
 
   @override
@@ -39,9 +43,14 @@ class _PeriodizationCalendarScreenState
 
   Future<void> _load() async {
     final phases = await _repository.getPhases(widget.plan.id);
+    final workouts = await _workoutRepository.getWorkouts(
+      startDate: DateTime(_month.year, _month.month),
+      endDate: DateTime(_month.year, _month.month + 1, 0),
+    );
     if (mounted) {
       setState(() {
         _phases = phases;
+        _workouts = workouts;
         _loading = false;
       });
     }
@@ -65,6 +74,27 @@ class _PeriodizationCalendarScreenState
       return;
     }
     setState(() => _month = next);
+    _load();
+  }
+
+  Future<void> _planWorkout() async {
+    final id = await _workoutRepository.createWorkout(date: _selectedDate);
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FutureWorkoutPlannerScreen(workoutId: id),
+      ),
+    );
+    await _load();
+  }
+
+  Map<String, dynamic>? _workoutAt(DateTime date) {
+    final key = date.toIso8601String().substring(0, 10);
+    for (final workout in _workouts) {
+      if (workout['date'] == key) return workout;
+    }
+    return null;
   }
 
   @override
@@ -124,46 +154,73 @@ class _PeriodizationCalendarScreenState
                 Padding(padding: const EdgeInsets.all(10), child: _buildGrid()),
                 const Divider(height: 1),
                 Expanded(
-                  child: selectedPhase == null
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.event_busy_outlined, size: 44),
-                              const SizedBox(height: 10),
-                              Text(loc.periodizationCalendarNoPhase),
-                            ],
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      if (selectedPhase == null)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 18),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.event_busy_outlined, size: 44),
+                                const SizedBox(height: 10),
+                                Text(loc.periodizationCalendarNoPhase),
+                              ],
+                            ),
                           ),
                         )
-                      : ListView(
-                          padding: const EdgeInsets.all(16),
-                          children: [
-                            Card(
-                              color: Color(selectedPhase.color).withAlpha(35),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Color(selectedPhase.color),
-                                ),
-                                title: Text(selectedPhase.name),
-                                subtitle: Text(selectedPhase.intent ?? ''),
-                                trailing: const Icon(Icons.chevron_right),
-                                onTap: () async {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          PeriodizationPhaseDetailScreen(
-                                            plan: widget.plan,
-                                            phase: selectedPhase,
-                                          ),
-                                    ),
-                                  );
-                                  await _load();
-                                },
-                              ),
+                      else
+                        Card(
+                          color: Color(selectedPhase.color).withAlpha(35),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Color(selectedPhase.color),
                             ),
-                          ],
+                            title: Text(selectedPhase.name),
+                            subtitle: Text(selectedPhase.intent ?? ''),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      PeriodizationPhaseDetailScreen(
+                                        plan: widget.plan,
+                                        phase: selectedPhase,
+                                      ),
+                                ),
+                              );
+                              await _load();
+                            },
+                          ),
                         ),
+                      const SizedBox(height: 12),
+                      if (_workoutAt(_selectedDate) case final workout?)
+                        FilledButton.tonalIcon(
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => FutureWorkoutPlannerScreen(
+                                  workoutId: workout['id'] as String,
+                                ),
+                              ),
+                            );
+                            await _load();
+                          },
+                          icon: const Icon(Icons.edit_calendar_outlined),
+                          label: Text(loc.periodizationOpenWorkout),
+                        )
+                      else
+                        FilledButton.icon(
+                          onPressed: _planWorkout,
+                          icon: const Icon(Icons.add_task_rounded),
+                          label: Text(loc.periodizationPlanWorkout),
+                        ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -190,6 +247,7 @@ class _PeriodizationCalendarScreenState
         if (day < 1 || day > days) return const SizedBox.shrink();
         final date = DateTime(_month.year, _month.month, day);
         final phase = _phaseAt(date);
+        final workout = _workoutAt(date);
         final selected = _sameDay(date, _selectedDate);
         final isToday = _sameDay(date, today);
         return InkWell(
@@ -211,9 +269,26 @@ class _PeriodizationCalendarScreenState
                   : null,
             ),
             alignment: Alignment.center,
-            child: Text(
-              '$day',
-              style: TextStyle(fontWeight: isToday ? FontWeight.bold : null),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '$day',
+                  style: TextStyle(
+                    fontWeight: isToday ? FontWeight.bold : null,
+                  ),
+                ),
+                if (workout != null)
+                  Container(
+                    width: 5,
+                    height: 5,
+                    margin: const EdgeInsets.only(top: 2),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+              ],
             ),
           ),
         );
