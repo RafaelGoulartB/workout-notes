@@ -385,11 +385,11 @@ void main() {
     });
 
     await tester.scrollUntilVisible(
-      find.text('Semana base'),
+      find.byKey(const Key('weekStepperNext')),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Semana base'), findsOneWidget);
+    expect(find.byKey(const Key('weekStepperNext')), findsOneWidget);
 
     final adjustmentField = find.widgetWithText(
       TextField,
@@ -429,6 +429,20 @@ void main() {
   testWidgets('inherited weeks offer customize and revert actions', (
     tester,
   ) async {
+    FlutterError.onError = (details) {
+      // ignore: avoid_print
+      debugPrint('=== FLUTTER ERROR ===');
+      // ignore: avoid_print
+      debugPrint('exception: ${details.exception}');
+      // ignore: avoid_print
+      debugPrint('context: ${details.context}');
+      if (details.informationCollector != null) {
+        for (final n in details.informationCollector!()) {
+          // ignore: avoid_print
+          debugPrint(n.toString());
+        }
+      }
+    };
     tester.view.physicalSize = const Size(412, 915);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -459,15 +473,27 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('weekStepperNext')));
     await tester.pumpAndSettle();
-    expect(find.text('Herdando da semana 1'), findsOneWidget);
+    // The week stepper should now read "Semana 2 de 4".
+    expect(find.text('Semana 2 de 4'), findsOneWidget);
 
+    // Open the 3-dot menu and pick "Personalizar" to override week 2.
+    await tester.ensureVisible(find.byKey(const Key('weekMenu')));
+    await tester.tap(find.byKey(const Key('weekMenu')));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Personalizar'));
     await tester.pumpAndSettle();
-    expect(find.text('Personalizada'), findsOneWidget);
+    // Now the menu should expose "Herdar da anterior" (week 2 is customized).
+    await tester.tap(find.byKey(const Key('weekMenu')));
+    await tester.pumpAndSettle();
+    expect(find.text('Herdar da anterior'), findsOneWidget);
 
     await tester.tap(find.text('Herdar da anterior'));
     await tester.pumpAndSettle();
-    expect(find.text('Herdando da semana 1'), findsOneWidget);
+    // Reopening the menu should now only show "Personalizar" again (week 2
+    // is inheriting from week 1, not customized).
+    await tester.tap(find.byKey(const Key('weekMenu')));
+    await tester.pumpAndSettle();
+    expect(find.text('Personalizar'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -525,7 +551,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('weekStepperNext')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Personalizar'));
+    await tester.ensureVisible(find.byKey(const Key('weekMenu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('weekMenu')));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Personalizar'));
     await tester.pumpAndSettle();
     // Switching to an inherited week replaced the editable cards with the
@@ -554,7 +583,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('weekStepperPrev')));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Copiar para…'));
+    await tester.ensureVisible(find.byKey(const Key('weekMenu')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('weekMenu')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Copiar para…'));
     await tester.pumpAndSettle();
@@ -585,7 +616,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('weekStepperNext')));
     await tester.pumpAndSettle();
-    expect(find.text('Personalizada'), findsOneWidget);
+    // A customized week exposes the "Herdar da anterior" item in the
+    // week menu.
+    await tester.tap(find.byKey(const Key('weekMenu')));
+    await tester.pumpAndSettle();
+    expect(find.text('Herdar da anterior'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -720,13 +755,14 @@ void main() {
     await tester.pumpAndSettle();
     // The single week is already locked and is selected by default.
     await tester.scrollUntilVisible(
-      find.text('Encerrada'),
+      find.byIcon(Icons.lock_rounded),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Encerrada'), findsOneWidget);
-    expect(find.text('2200 kcal'), findsOneWidget);
     expect(find.byIcon(Icons.lock_rounded), findsWidgets);
+    expect(find.text('2200 kcal'), findsOneWidget);
+    // Locked weeks expose no week actions, so the 3-dot menu must be gone.
+    expect(find.byKey(const Key('weekMenu')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

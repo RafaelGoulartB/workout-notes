@@ -1773,6 +1773,7 @@
   "periodizationWeekTargetsHeading": "Metas · Semana {number} · {start} – {end}",
   "periodizationWeekPrevious": "Semana anterior",
   "periodizationWeekNext": "Próxima semana",
+  "periodizationWeekMenu": "Ações da semana",
   "@periodizationWeekTargetsHeading": { "placeholders": { "number": { "type": "int" }, "start": { "type": "String" }, "end": { "type": "String" } } },
   "periodizationWeekBase": "Semana base",
   "periodizationWeekCustomized": "Personalizada",

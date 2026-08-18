@@ -1793,6 +1793,7 @@
   "periodizationWeekTargetsHeading": "Week {number} targets · {start} – {end}",
   "periodizationWeekPrevious": "Previous week",
   "periodizationWeekNext": "Next week",
+  "periodizationWeekMenu": "Week actions",
   "@periodizationWeekTargetsHeading": { "placeholders": { "number": { "type": "int" }, "start": { "type": "String" }, "end": { "type": "String" } } },
   "periodizationWeekBase": "Base week",
   "periodizationWeekCustomized": "Customized",

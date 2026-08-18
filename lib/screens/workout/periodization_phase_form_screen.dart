@@ -740,13 +740,13 @@ class _PeriodizationPhaseFormScreenState
     shape: const Border(),
     collapsedShape: const Border(),
     leading: Container(
-      width: 36,
-      height: 36,
+      width: 32,
+      height: 32,
       decoration: BoxDecoration(
         color: theme.colorScheme.primaryContainer.withAlpha(125),
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(10),
       ),
-      child: Icon(icon, size: 18, color: theme.colorScheme.primary),
+      child: Icon(icon, size: 16, color: theme.colorScheme.primary),
     ),
     title: Text(
       title,

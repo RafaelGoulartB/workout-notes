@@ -54,10 +54,7 @@ class PhaseWeekSelector extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final locked = lockedWeeks.contains(selected);
-    final customized = customizedWeeks.contains(selected);
     final formatter = DateFormat.MMMd(Intl.defaultLocale);
-
-    final statusInfo = _statusInfo(context, locked, customized);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -107,31 +104,12 @@ class PhaseWeekSelector extends StatelessWidget {
               semanticLabel: loc.periodizationWeekNext,
               buttonKey: const Key('weekStepperNext'),
             ),
+            if (_hasMenuActions()) ...[
+              const SizedBox(width: 2),
+              _weekMenu(context),
+            ],
           ],
         ),
-        const SizedBox(height: 10),
-        Center(
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            alignment: WrapAlignment.center,
-            children: [
-              _WeekStatusPill(
-                label: statusInfo.label,
-                icon: statusInfo.icon,
-                color: statusInfo.color,
-              ),
-              if (currentWeek == selected)
-                _WeekStatusPill(
-                  label: loc.periodizationWeekCurrent,
-                  icon: Icons.play_arrow_rounded,
-                  color: theme.colorScheme.primary,
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        _actionRow(context),
         if (locked) ...[
           const SizedBox(height: 10),
           Container(
@@ -178,6 +156,8 @@ class PhaseWeekSelector extends StatelessWidget {
       icon: Icon(icon),
       tooltip: semanticLabel,
       visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 40, height: 40),
       style: IconButton.styleFrom(
         backgroundColor: theme.colorScheme.surfaceContainerHighest.withAlpha(
           90,
@@ -187,165 +167,124 @@ class PhaseWeekSelector extends StatelessWidget {
     );
   }
 
-  _StatusInfo _statusInfo(BuildContext context, bool locked, bool customized) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    if (locked) {
-      return _StatusInfo(
-        loc.periodizationWeekLocked,
-        Icons.lock_rounded,
-        theme.colorScheme.onSurfaceVariant,
-      );
-    }
-    if (selected == 0) {
-      return _StatusInfo(
-        loc.periodizationWeekBase,
-        Icons.flag_rounded,
-        theme.colorScheme.primary,
-      );
-    }
-    if (customized) {
-      return _StatusInfo(
-        loc.periodizationWeekCustomized,
-        Icons.tune_rounded,
-        theme.colorScheme.tertiary,
-      );
-    }
-    var source = selected - 1;
-    while (source > 0 && !customizedWeeks.contains(source)) {
-      source--;
-    }
-    return _StatusInfo(
-      loc.periodizationWeekInheritedFrom(source + 1),
-      Icons.subdirectory_arrow_right_rounded,
-      theme.colorScheme.secondary,
-    );
-  }
-
-  Widget _actionRow(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
+  bool _hasMenuActions() {
     final locked = lockedWeeks.contains(selected);
     final customized = customizedWeeks.contains(selected);
-    final actions = <Widget>[
-      if (onCustomize != null && !locked && selected > 0 && !customized)
-        _WeekActionButton(
-          icon: Icons.edit_rounded,
-          label: loc.periodizationWeekCustomize,
-          onPressed: onCustomize!,
-          color: theme.colorScheme.primary,
-        ),
-      if (onUseInheritance != null && !locked && selected > 0 && customized)
-        _WeekActionButton(
-          icon: Icons.undo_rounded,
-          label: loc.periodizationWeekUseInheritance,
-          onPressed: onUseInheritance!,
-          color: theme.colorScheme.secondary,
-        ),
-      if (onCopy != null && !locked && weekCount > 1 && (selected == 0 || customized))
-        _WeekActionButton(
-          icon: Icons.copy_all_rounded,
-          label: loc.periodizationWeekCopyTo,
-          onPressed: onCopy!,
-          color: theme.colorScheme.tertiary,
-        ),
-    ];
-    if (actions.isEmpty) return const SizedBox.shrink();
-    return Wrap(spacing: 8, runSpacing: 8, children: actions);
+    final canCopy = onCopy != null && !locked && weekCount > 1 &&
+        (selected == 0 || customized);
+    final canCustomize =
+        onCustomize != null && !locked && selected > 0 && !customized;
+    final canUseInheritance =
+        onUseInheritance != null && !locked && selected > 0 && customized;
+    return canCopy || canCustomize || canUseInheritance;
   }
-}
 
-class _StatusInfo {
-  final String label;
-  final IconData icon;
-  final Color color;
-  const _StatusInfo(this.label, this.icon, this.color);
-}
-
-class _WeekStatusPill extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-
-  const _WeekStatusPill({
-    required this.label,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-    decoration: BoxDecoration(
-      color: color.withAlpha(22),
-      borderRadius: BorderRadius.circular(999),
-      border: Border.all(color: color.withAlpha(90)),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 14, color: color),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-class _WeekActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-  final Color color;
-
-  const _WeekActionButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _weekMenu(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
-    return Material(
-      color: color.withAlpha(22),
-      borderRadius: BorderRadius.circular(999),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: color.withAlpha(90)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 15, color: color),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
+    return Builder(
+      builder: (builderContext) => IconButton(
+        key: const Key('weekMenu'),
+        onPressed: () => _showMenu(builderContext),
+        icon: const Icon(Icons.more_vert_rounded),
+        tooltip: loc.periodizationWeekMenu,
+        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+        style: IconButton.styleFrom(
+          backgroundColor:
+              theme.colorScheme.surfaceContainerHighest.withAlpha(90),
         ),
       ),
     );
   }
+
+  Future<void> _showMenu(BuildContext anchorContext) async {
+    final loc = AppLocalizations.of(anchorContext)!;
+    final theme = Theme.of(anchorContext);
+    final locked = lockedWeeks.contains(selected);
+    final customized = customizedWeeks.contains(selected);
+    final canCopy = onCopy != null && !locked && weekCount > 1 &&
+        (selected == 0 || customized);
+    final canCustomize =
+        onCustomize != null && !locked && selected > 0 && !customized;
+    final canUseInheritance =
+        onUseInheritance != null && !locked && selected > 0 && customized;
+
+    final box = anchorContext.findRenderObject() as RenderBox?;
+    final overlay = Overlay.of(anchorContext).context.findRenderObject()
+        as RenderBox?;
+    if (box == null || overlay == null) return;
+    final topLeft = box.localToGlobal(Offset.zero, ancestor: overlay);
+    final position = RelativeRect.fromLTRB(
+      overlay.size.width - topLeft.dx,
+      topLeft.dy + box.size.height + 4,
+      topLeft.dx + box.size.width,
+      overlay.size.height - topLeft.dy,
+    );
+
+    final picked = await showMenu<_WeekMenuAction>(
+      context: anchorContext,
+      position: position,
+      items: [
+        if (canCustomize)
+          PopupMenuItem<_WeekMenuAction>(
+            value: _WeekMenuAction.customize,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.edit_rounded,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 10),
+                Text(loc.periodizationWeekCustomize),
+              ],
+            ),
+          ),
+        if (canUseInheritance)
+          PopupMenuItem<_WeekMenuAction>(
+            value: _WeekMenuAction.useInheritance,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.undo_rounded,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 10),
+                Text(loc.periodizationWeekUseInheritance),
+              ],
+            ),
+          ),
+        if (canCopy)
+          PopupMenuItem<_WeekMenuAction>(
+            value: _WeekMenuAction.copy,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.copy_all_rounded,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 10),
+                Text(loc.periodizationWeekCopyTo),
+              ],
+            ),
+          ),
+      ],
+    );
+
+    if (picked == null) return;
+    switch (picked) {
+      case _WeekMenuAction.copy:
+        onCopy?.call();
+      case _WeekMenuAction.customize:
+        onCustomize?.call();
+      case _WeekMenuAction.useInheritance:
+        onUseInheritance?.call();
+    }
+  }
 }
+
+enum _WeekMenuAction { customize, useInheritance, copy }

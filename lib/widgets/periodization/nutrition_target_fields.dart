@@ -179,28 +179,19 @@ class NutritionTargetFields extends StatelessWidget {
         ),
         if (resolvedGoal != null) ...[
           const SizedBox(height: 14),
-          _DailyGoalBanner(
+          _MacroPreviewCard(
             tdee: tdee!,
             adjustmentKcal: _adjustmentKcal,
             goal: resolvedGoal,
+            breakdown: breakdown,
           ),
-        ],
-        const SizedBox(height: 14),
-        if (breakdown != null) ...[
-          if (breakdown.energyConflict)
-            _ConflictBanner(loc.nutritionSuggestMacroEnergyError)
-          else
-            _MacroPreview(breakdown: breakdown),
-        ] else if (hasRatioInputs && !hasWeight)
+        ] else if (hasRatioInputs && !hasWeight) ...[
+          const SizedBox(height: 14),
           _Hint(
             icon: Icons.monitor_weight_outlined,
             text: loc.periodizationNoReferenceWeight,
-          )
-        else
-          _Hint(
-            icon: Icons.info_outline_rounded,
-            text: loc.nutritionSuggestCarbsRemainder,
           ),
+        ],
       ],
     );
   }
@@ -287,15 +278,26 @@ class _TdeeReadOnlyTile extends StatelessWidget {
 /// Banner that shows the resolved daily kcal goal together with the
 /// TDEE ± adjustment breakdown that produces it. Acts as the live
 /// preview of the phase weekly target.
-class _DailyGoalBanner extends StatelessWidget {
+/// Card that shows the resolved daily kcal goal together with the
+/// TDEE ± adjustment breakdown that produces it, and (when the inputs
+/// are sufficient) the protein/carbs/fat split underneath. Both live
+/// in the same surface so the user sees the goal + macros without
+/// bouncing between two cards.
+class _MacroPreviewCard extends StatelessWidget {
+  static const _proteinColor = Color(0xFF4F8EF7);
+  static const _carbsColor = Color(0xFFF5B942);
+  static const _fatColor = Color(0xFF9B6BE8);
+
   final double tdee;
   final double? adjustmentKcal;
   final double goal;
+  final MacroBreakdown? breakdown;
 
-  const _DailyGoalBanner({
+  const _MacroPreviewCard({
     required this.tdee,
     required this.adjustmentKcal,
     required this.goal,
+    required this.breakdown,
   });
 
   static String _formatKcal(double value) {
@@ -317,8 +319,16 @@ class _DailyGoalBanner extends StatelessWidget {
     final theme = Theme.of(context);
     final adjustment = adjustmentKcal ?? 0;
     final hasAdjustment = adjustment != 0;
+    final breakdown = this.breakdown;
+    final hasBreakdown = breakdown != null;
+    final totalKcal = hasBreakdown
+        ? breakdown.proteinKcal + breakdown.fatKcal + breakdown.carbsKcal
+        : 0;
+    final isConflict = hasBreakdown && breakdown.energyConflict;
+    final goalTextColor = theme.colorScheme.onPrimaryContainer;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
         color: theme.colorScheme.primaryContainer.withAlpha(120),
         borderRadius: BorderRadius.circular(14),
@@ -330,7 +340,7 @@ class _DailyGoalBanner extends StatelessWidget {
             loc.periodizationDailyGoal(_formatKcal(goal)),
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
-              color: theme.colorScheme.onPrimaryContainer,
+              color: goalTextColor,
             ),
           ),
           if (hasAdjustment) ...[
@@ -341,7 +351,7 @@ class _DailyGoalBanner extends StatelessWidget {
                 _formatSigned(loc, adjustment),
               ),
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onPrimaryContainer,
+                color: goalTextColor,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -349,10 +359,81 @@ class _DailyGoalBanner extends StatelessWidget {
             Text(
               loc.periodizationAdjustmentKcalNotSet,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onPrimaryContainer,
+                color: goalTextColor,
                 fontWeight: FontWeight.w600,
               ),
             ),
+          if (isConflict) ...[
+            const SizedBox(height: 12),
+            _ConflictBanner(loc.nutritionSuggestMacroEnergyError),
+          ] else if (hasBreakdown) ...[
+            const SizedBox(height: 12),
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: goalTextColor.withAlpha(35),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              loc.periodizationMacroPreview,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _MacroValue(
+                    label: loc.nutritionProgressProtein,
+                    value: '${breakdown.proteinRounded} g',
+                    color: _proteinColor,
+                  ),
+                ),
+                Expanded(
+                  child: _MacroValue(
+                    label: loc.periodizationCarbsRemainder,
+                    value: '${breakdown.carbsRounded} g',
+                    color: _carbsColor,
+                  ),
+                ),
+                Expanded(
+                  child: _MacroValue(
+                    label: loc.nutritionProgressFat,
+                    value: '${breakdown.fatRounded} g',
+                    color: _fatColor,
+                  ),
+                ),
+              ],
+            ),
+            if (totalKcal > 0) ...[
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: SizedBox(
+                  height: 8,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: breakdown.proteinKcal,
+                        child: Container(color: _proteinColor),
+                      ),
+                      Expanded(
+                        flex: breakdown.fatKcal,
+                        child: Container(color: _fatColor),
+                      ),
+                      Expanded(
+                        flex: breakdown.carbsKcal,
+                        child: Container(color: _carbsColor),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
         ],
       ),
     );
@@ -408,97 +489,6 @@ class _TextEditingControllerAdapter extends TextEditingController {
   }
 }
 
-class _MacroPreview extends StatelessWidget {
-  final MacroBreakdown breakdown;
-
-  const _MacroPreview({required this.breakdown});
-
-  static const _proteinColor = Color(0xFF4F8EF7);
-  static const _carbsColor = Color(0xFFF5B942);
-  static const _fatColor = Color(0xFF9B6BE8);
-
-  @override
-  Widget build(BuildContext context) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final totalKcal =
-        breakdown.proteinKcal + breakdown.fatKcal + breakdown.carbsKcal;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: theme.colorScheme.outlineVariant.withAlpha(90),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            loc.periodizationMacroPreview,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.1,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: _MacroValue(
-                  label: loc.nutritionProgressProtein,
-                  value: '${breakdown.proteinRounded} g',
-                  color: _proteinColor,
-                ),
-              ),
-              Expanded(
-                child: _MacroValue(
-                  label: loc.periodizationCarbsRemainder,
-                  value: '${breakdown.carbsRounded} g',
-                  color: _carbsColor,
-                ),
-              ),
-              Expanded(
-                child: _MacroValue(
-                  label: loc.nutritionProgressFat,
-                  value: '${breakdown.fatRounded} g',
-                  color: _fatColor,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (totalKcal > 0)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: SizedBox(
-                height: 8,
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: breakdown.proteinKcal,
-                      child: Container(color: _proteinColor),
-                    ),
-                    Expanded(
-                      flex: breakdown.fatKcal,
-                      child: Container(color: _fatColor),
-                    ),
-                    Expanded(
-                      flex: breakdown.carbsKcal,
-                      child: Container(color: _carbsColor),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 class _MacroValue extends StatelessWidget {
   final String label;
   final String value;
@@ -517,7 +507,6 @@ class _MacroValue extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 8,
@@ -525,7 +514,7 @@ class _MacroValue extends StatelessWidget {
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             const SizedBox(width: 5),
-            Flexible(
+            Expanded(
               child: Text(
                 label,
                 maxLines: 1,
