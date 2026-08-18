@@ -21,15 +21,15 @@ class PeriodizationTarget {
   final double? minRpe;
   final double? maxRpe;
 
-  /// Routine linked to the week this target applies to. Serialized inside
-  /// [trainingJson]; each phase week may carry its own routine.
-  final String? routineId;
+  /// Routines linked to the week this target applies to. Serialized inside
+  /// [trainingJson]; each phase week may carry its own routine sequence.
+  final List<String> routineIds;
   final double? targetWeightKg;
   final double? weeklyWeightChangePercent;
   final double? sleepHours;
   final DateTime createdAt;
 
-  const PeriodizationTarget({
+  PeriodizationTarget({
     required this.id,
     required this.phaseId,
     required this.version,
@@ -46,12 +46,20 @@ class PeriodizationTarget {
     this.maxSetsPerWeek,
     this.minRpe,
     this.maxRpe,
-    this.routineId,
+    List<String> routineIds = const [],
+    String? routineId,
     this.targetWeightKg,
     this.weeklyWeightChangePercent,
     this.sleepHours,
     required this.createdAt,
-  });
+  }) : routineIds = routineIds.isNotEmpty
+           ? List.unmodifiable(routineIds)
+           : routineId == null
+           ? const []
+           : List.unmodifiable([routineId]);
+
+  /// Backwards-compatible access to the first linked routine.
+  String? get routineId => routineIds.isEmpty ? null : routineIds.first;
 
   bool get isEmpty =>
       calories == null &&
@@ -63,7 +71,7 @@ class PeriodizationTarget {
       maxSetsPerWeek == null &&
       minRpe == null &&
       maxRpe == null &&
-      routineId == null &&
+      routineIds.isEmpty &&
       targetWeightKg == null &&
       weeklyWeightChangePercent == null &&
       sleepHours == null;
@@ -84,7 +92,8 @@ class PeriodizationTarget {
     if (maxSetsPerWeek != null) 'max_sets_per_week': maxSetsPerWeek,
     if (minRpe != null) 'min_rpe': minRpe,
     if (maxRpe != null) 'max_rpe': maxRpe,
-    if (routineId != null) 'routine_id': routineId,
+    if (routineIds.isNotEmpty) 'routine_ids': routineIds,
+    if (routineIds.isNotEmpty) 'routine_id': routineIds.first,
   };
 
   Map<String, dynamic> get bodyJson => {
@@ -115,6 +124,7 @@ class PeriodizationTarget {
     double? minRpe,
     double? maxRpe,
     String? routineId,
+    List<String>? routineIds,
     double? targetWeightKg,
     double? weeklyWeightChangePercent,
     double? sleepHours,
@@ -136,7 +146,8 @@ class PeriodizationTarget {
     maxSetsPerWeek: maxSetsPerWeek ?? this.maxSetsPerWeek,
     minRpe: minRpe ?? this.minRpe,
     maxRpe: maxRpe ?? this.maxRpe,
-    routineId: routineId ?? this.routineId,
+    routineIds:
+        routineIds ?? (routineId == null ? this.routineIds : [routineId]),
     targetWeightKg: targetWeightKg ?? this.targetWeightKg,
     weeklyWeightChangePercent:
         weeklyWeightChangePercent ?? this.weeklyWeightChangePercent,
@@ -187,7 +198,7 @@ class PeriodizationTarget {
       maxSetsPerWeek: (training['max_sets_per_week'] as num?)?.toInt(),
       minRpe: _double(training['min_rpe']),
       maxRpe: _double(training['max_rpe']),
-      routineId: training['routine_id'] as String?,
+      routineIds: _routineIds(training),
       targetWeightKg: _double(body['target_weight_kg']),
       weeklyWeightChangePercent: _double(body['weekly_weight_change_percent']),
       sleepHours: _double(sleep['hours']),
@@ -202,6 +213,17 @@ class PeriodizationTarget {
   }
 
   static double? _double(dynamic value) => (value as num?)?.toDouble();
+
+  static List<String> _routineIds(Map<String, dynamic> training) {
+    final raw = training['routine_ids'];
+    if (raw is List) {
+      final ids = raw.whereType<String>().where((id) => id.isNotEmpty).toList();
+      if (ids.isNotEmpty) return ids;
+    }
+    final legacy = training['routine_id'];
+    return legacy is String && legacy.isNotEmpty ? [legacy] : const [];
+  }
+
   static String _date(DateTime value) => DateTime(
     value.year,
     value.month,

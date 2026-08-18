@@ -97,26 +97,25 @@ class _PeriodizationPhaseDetailScreenState
   ) {
     final ordered = [...history]
       ..sort((a, b) => a.validFrom.compareTo(b.validFrom));
-    final schedule = <
-      ({String routineName, DateTime startsOn, DateTime endsOn})
-    >[];
+    final schedule =
+        <({String routineName, DateTime startsOn, DateTime endsOn})>[];
     DateTime dayOnly(DateTime value) =>
         DateTime(value.year, value.month, value.day);
     for (var i = 0; i < ordered.length; i++) {
       final target = ordered[i];
-      final routineId = target.routineId;
-      if (routineId == null) continue;
-      final routineName = routineById[routineId];
-      if (routineName == null) continue;
       final startsOn = dayOnly(target.validFrom);
       final endsOn = i + 1 < ordered.length
           ? dayOnly(ordered[i + 1].validFrom).subtract(const Duration(days: 1))
           : dayOnly(_phase.endDate);
-      schedule.add((
-        routineName: routineName,
-        startsOn: startsOn,
-        endsOn: endsOn,
-      ));
+      for (final routineId in target.routineIds) {
+        final routineName = routineById[routineId];
+        if (routineName == null) continue;
+        schedule.add((
+          routineName: routineName,
+          startsOn: startsOn,
+          endsOn: endsOn,
+        ));
+      }
     }
     return schedule;
   }
@@ -558,9 +557,9 @@ class _TargetActualGrid extends StatelessWidget {
                 '${loc.periodizationActualLabel}: ${item.$4}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
             ],
           ),

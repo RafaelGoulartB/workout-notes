@@ -334,10 +334,10 @@ class _PeriodizationPlanFormScreenState
       phase.intent = result.intent ?? '';
       phase.templateKey = result.templateKey;
       phase.color = result.color;
-      final weeks = ((result.endDate.difference(result.startDate).inDays + 1) /
-              7)
-          .ceil()
-          .clamp(1, 104);
+      final weeks =
+          ((result.endDate.difference(result.startDate).inDays + 1) / 7)
+              .ceil()
+              .clamp(1, 104);
       phase.weeks = weeks;
       phase.weeklyTargets = _fitWeeklyTargets(result.weeklyTargets, weeks);
     });
@@ -797,7 +797,9 @@ class _PeriodizationPlanFormScreenState
             _EditablePhase(
               name: loc.periodizationNewPhase,
               weeks: 4,
-              color: kPeriodizationColors[_phases.length % kPeriodizationColors.length],
+              color:
+                  kPeriodizationColors[_phases.length %
+                      kPeriodizationColors.length],
             ),
           ),
         ),
@@ -1037,7 +1039,9 @@ class _PeriodizationPlanFormScreenState
       }
     }
     if (target != null) {
-      if (target.calories != null) values.add('${target.calories!.round()} kcal');
+      if (target.calories != null) {
+        values.add('${target.calories!.round()} kcal');
+      }
       if (target.proteinG != null) values.add('${target.proteinG!.round()}g P');
       if (target.workoutsPerWeek != null) {
         values.add('${target.workoutsPerWeek}×/sem.');
@@ -1046,10 +1050,8 @@ class _PeriodizationPlanFormScreenState
         values.add('${target.targetWeightKg} kg');
       }
       if (target.sleepHours != null) values.add('${target.sleepHours}h');
-      if (target.routineId case final routineId?) {
-        final match = _routines.where(
-          (routine) => routine['id'] == routineId,
-        );
+      for (final routineId in target.routineIds) {
+        final match = _routines.where((routine) => routine['id'] == routineId);
         if (match.isNotEmpty) values.add(match.first['name'] as String);
       }
     }
@@ -1077,10 +1079,7 @@ class _PeriodizationPlanFormScreenState
         .toList();
   }
 
-  static bool _sameTarget(
-    PeriodizationTarget? a,
-    PeriodizationTarget? b,
-  ) {
+  static bool _sameTarget(PeriodizationTarget? a, PeriodizationTarget? b) {
     final emptyA = a == null || a.isEmpty;
     final emptyB = b == null || b.isEmpty;
     if (emptyA && emptyB) return true;
@@ -1101,7 +1100,7 @@ class _EditablePhase {
 
   /// One effective target per week (index 0 = first week). Entries may be
   /// empty targets when the week is undefined. The linked routine lives in
-  /// each week's target (`PeriodizationTarget.routineId`).
+  /// each week's target (`PeriodizationTarget.routineIds`).
   List<PeriodizationTarget> weeklyTargets;
 
   _EditablePhase({
@@ -1241,7 +1240,9 @@ class _TemplateCard extends StatelessWidget {
                     child: Container(
                       height: 6,
                       decoration: BoxDecoration(
-                        color: Color(kPeriodizationColors[i % kPeriodizationColors.length]),
+                        color: Color(
+                          kPeriodizationColors[i % kPeriodizationColors.length],
+                        ),
                         borderRadius: BorderRadius.circular(99),
                       ),
                     ),
@@ -1322,5 +1323,3 @@ class _DateField extends StatelessWidget {
     );
   }
 }
-
-

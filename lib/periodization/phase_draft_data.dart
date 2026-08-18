@@ -4,7 +4,7 @@ import 'package:workout_notes/models/periodization_target.dart';
 /// mode: the wizard seeds the editor with an existing draft phase and the
 /// editor returns the edited phase (never persisted — the wizard saves the
 /// whole plan at once). [weeklyTargets] holds one effective target per week;
-/// the linked routine is part of each weekly target (`routineId`).
+/// linked routines are part of each weekly target (`routineIds`).
 class PeriodizationPhaseDraftData {
   final String name;
   final String? intent;

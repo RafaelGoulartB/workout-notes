@@ -337,8 +337,12 @@ class PeriodizationRepository extends BaseRepository {
     _validateNameAndDates(name, startDate, endDate);
     if (target != null && !target.isEmpty) _validateTarget(target);
     if (weeklyTargets != null) {
-      _validateWeeklyWindow(_day(startDate), _day(startDate), _day(endDate),
-          weeklyTargets);
+      _validateWeeklyWindow(
+        _day(startDate),
+        _day(startDate),
+        _day(endDate),
+        weeklyTargets,
+      );
     }
     final plan = await getPlan(planId);
     if (plan == null) {
@@ -792,10 +796,10 @@ class PeriodizationRepository extends BaseRepository {
 
   /// Resolves the routine linked to the active phase on [date].
   ///
-  /// The routine comes from the effective weekly target (`routineId` inside
-  /// `training_json`) — each phase week may carry its own routine. Falls back
-  /// to legacy `phase_routine_links` rows for phases created before the
-  /// weekly-routine model.
+  /// The routines come from the effective weekly target (`routine_ids` inside
+  /// `training_json`) — each phase week may carry its own routine sequence.
+  /// Falls back to legacy `phase_routine_links` rows for phases created before
+  /// the weekly-routine model.
   Future<PeriodizationRoutineSuggestion?> getRoutineSuggestion(
     DateTime date,
   ) async {
@@ -804,45 +808,73 @@ class PeriodizationRepository extends BaseRepository {
     if (phase == null) return null;
     final database = await db;
     final target = await getEffectiveTarget(phase.id, date: day);
-    final routineId = target?.routineId;
-    if (routineId != null) {
-      final routineRows = await database.query(
-        'routines',
-        where: 'id = ?',
-        whereArgs: [routineId],
-        limit: 1,
-      );
-      if (routineRows.isEmpty) return null;
-      final routineDays = await database.query(
-        'routine_days',
-        where: 'routine_id = ?',
-        whereArgs: [routineId],
-        orderBy: 'order_index ASC',
-      );
-      if (routineDays.isEmpty) return null;
+    final routineIds = target?.routineIds ?? const <String>[];
+    if (routineIds.isNotEmpty) {
+      final sequence =
+          <
+            ({
+              String routineId,
+              String routineName,
+              String dayId,
+              String dayName,
+            })
+          >[];
+      for (final routineId in routineIds) {
+        final routineRows = await database.query(
+          'routines',
+          where: 'id = ?',
+          whereArgs: [routineId],
+          limit: 1,
+        );
+        if (routineRows.isEmpty) continue;
+        final routineDays = await database.query(
+          'routine_days',
+          where: 'routine_id = ?',
+          whereArgs: [routineId],
+          orderBy: 'order_index ASC',
+        );
+        for (final day in routineDays) {
+          sequence.add((
+            routineId: routineId,
+            routineName: routineRows.first['name'] as String,
+            dayId: day['id'] as String,
+            dayName: day['name'] as String? ?? '',
+          ));
+        }
+      }
+      if (sequence.isEmpty) return null;
       final completed =
           Sqflite.firstIntValue(
             await database.rawQuery(
               '''
               SELECT COUNT(*) FROM workouts
-              WHERE routine_id = ? AND end_time IS NOT NULL
+              WHERE routine_id IN (${List.filled(routineIds.length, '?').join(', ')})
+                AND end_time IS NOT NULL
                 AND date BETWEEN ? AND ?
               ''',
-              [routineId, _date(_weekStart(day)), _date(day)],
+              [
+                ...routineIds,
+                _date(
+                  _weekStart(day).isBefore(phase.startDate)
+                      ? phase.startDate
+                      : _weekStart(day),
+                ),
+                _date(day),
+              ],
             ),
           ) ??
           0;
-      final index = completed % routineDays.length;
-      final nextDay = routineDays[index];
+      final index = completed % sequence.length;
+      final nextDay = sequence[index];
       return PeriodizationRoutineSuggestion(
         phaseId: phase.id,
         linkId: '',
-        routineId: routineId,
-        routineName: routineRows.first['name'] as String,
-        routineDayId: nextDay['id'] as String,
-        routineDayName: nextDay['name'] as String? ?? '',
+        routineId: nextDay.routineId,
+        routineName: nextDay.routineName,
+        routineDayId: nextDay.dayId,
+        routineDayName: nextDay.dayName,
         routineDayIndex: index,
-        routineDayCount: routineDays.length,
+        routineDayCount: sequence.length,
         completedWorkouts: completed,
       );
     }
@@ -994,8 +1026,9 @@ class PeriodizationRepository extends BaseRepository {
       !date.isAfter(end);
       date = date.add(const Duration(days: 1))
     ) {
-      final routineId = _targetForDate(targetHistory, date)?.routineId;
-      if (routineId != null) routineIds.add(routineId);
+      routineIds.addAll(
+        _targetForDate(targetHistory, date)?.routineIds ?? const [],
+      );
     }
     final routineFilter = routineIds.isEmpty
         ? ''
@@ -1625,7 +1658,7 @@ class PeriodizationRepository extends BaseRepository {
       maxSetsPerWeek: target.maxSetsPerWeek,
       minRpe: target.minRpe,
       maxRpe: target.maxRpe,
-      routineId: target.routineId,
+      routineIds: target.routineIds,
       targetWeightKg: target.targetWeightKg,
       weeklyWeightChangePercent: target.weeklyWeightChangePercent,
       sleepHours: target.sleepHours,
@@ -1655,9 +1688,7 @@ class PeriodizationRepository extends BaseRepository {
     DateTime? replaceFrom,
   ) {
     final today = _day(DateTime.now());
-    final fallback = today.isAfter(phase.startDate)
-        ? today
-        : phase.startDate;
+    final fallback = today.isAfter(phase.startDate) ? today : phase.startDate;
     return _day(replaceFrom ?? fallback);
   }
 
@@ -1732,7 +1763,8 @@ class PeriodizationRepository extends BaseRepository {
     await _validateRoutineReferences(txn, weeks);
     // A null baseline (no retained history) behaves like an empty target so
     // leading empty weeks never create versions.
-    var previous = baseline ??
+    var previous =
+        baseline ??
         PeriodizationTarget(
           id: '',
           phaseId: phaseId,
@@ -1772,8 +1804,8 @@ class PeriodizationRepository extends BaseRepository {
     Iterable<PeriodizationTarget> targets,
   ) async {
     final routineIds = targets
-        .map((target) => target.routineId)
-        .whereType<String>()
+        .expand((target) => target.routineIds)
+        .where((id) => id.isNotEmpty)
         .toSet();
     if (routineIds.isEmpty) return;
     final rows = await txn.query(

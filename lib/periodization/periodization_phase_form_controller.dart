@@ -65,7 +65,7 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   bool shiftFollowing = true;
   bool saving = false;
   bool loading = true;
-  String? routineId;
+  List<String> routineIds = [];
   List<Map<String, dynamic>> routines = const [];
   double? latestWeight;
   List<PeriodizationTarget> history = const [];
@@ -106,13 +106,12 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
     type.text = phase?.templateKey ?? seed?.templateKey ?? '';
     startDate = phase?.startDate ?? seed?.startDate ?? _suggestedStart();
     endDate =
-        phase?.endDate ?? seed?.endDate ?? startDate.add(const Duration(days: 27));
+        phase?.endDate ??
+        seed?.endDate ??
+        startDate.add(const Duration(days: 27));
     color = phase?.color ?? seed?.color ?? color;
     weekStarts = _resolver.computeWeekStarts(startDate, endDate);
-    weekOverrides = List<PeriodizationTarget?>.filled(
-      weekStarts.length,
-      null,
-    );
+    weekOverrides = List<PeriodizationTarget?>.filled(weekStarts.length, null);
     for (final key in kPhaseTargetKeys) {
       targetControllers[key] = TextEditingController();
     }
@@ -146,10 +145,11 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
         history: history,
       );
       final editableFrom = editableFromIndex;
-      selectedWeek = (editableFrom < weekStarts.length
-              ? editableFrom
-              : weekStarts.length - 1)
-          .clamp(0, weekStarts.length - 1);
+      selectedWeek =
+          (editableFrom < weekStarts.length
+                  ? editableFrom
+                  : weekStarts.length - 1)
+              .clamp(0, weekStarts.length - 1);
     }
     latestWeight = await weightFuture;
     final goal = await tdeeFuture;
@@ -178,8 +178,7 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   bool targetsEquivalent(PeriodizationTarget? a, PeriodizationTarget? b) =>
       _resolver.targetsEquivalent(a, b);
 
-  DateTime weekEnd(int index) =>
-      _resolver.weekEnd(weekStarts, index, endDate);
+  DateTime weekEnd(int index) => _resolver.weekEnd(weekStarts, index, endDate);
 
   Set<int> get lockedWeeks {
     if (!editing) return const {};
@@ -277,7 +276,7 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
       maxSetsPerWeek: intValue('maxSets'),
       minRpe: doubleValue('minRpe'),
       maxRpe: doubleValue('maxRpe'),
-      routineId: routineId,
+      routineIds: routineIds,
       targetWeightKg: doubleValue('weight'),
       weeklyWeightChangePercent: doubleValue('change'),
       sleepHours: doubleValue('sleep'),
@@ -359,7 +358,9 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
     for (final j in eligible) {
       final current = effectiveTarget(j);
       if (!targetsEquivalent(current, source)) {
-        weekOverrides[j] = source == null ? null : copyOf(source, weekStarts[j]);
+        weekOverrides[j] = source == null
+            ? null
+            : copyOf(source, weekStarts[j]);
         conflictWeeks.remove(j);
       }
     }
@@ -398,7 +399,7 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
     for (final entry in values.entries) {
       targetControllers[entry.key]!.text = entry.value ?? '';
     }
-    routineId = target?.routineId;
+    routineIds = [...(target?.routineIds ?? const [])];
   }
 
   double? deriveRatio(double? grams, double? weight) {
@@ -450,9 +451,8 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   // Dates / duration
   // =====================================================================
 
-  DateTime get lastAllowedEnd => plan.endDate.add(
-    Duration(days: editing && shiftFollowing ? 3650 : 0),
-  );
+  DateTime get lastAllowedEnd =>
+      plan.endDate.add(Duration(days: editing && shiftFollowing ? 3650 : 0));
 
   void setStartDate(DateTime picked) {
     final duration = endDate.difference(startDate);
@@ -530,9 +530,7 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
             effectiveTarget(i) ?? emptyTarget(weekStarts[i]),
         ];
         if (!editing) {
-          weeklyTargets = weeks.any((target) => !target.isEmpty)
-              ? weeks
-              : null;
+          weeklyTargets = weeks.any((target) => !target.isEmpty) ? weeks : null;
         } else if (weeklyDiffersFromStored(weeks, editableFrom)) {
           targetChanged = true;
           weeklyTargets = weeks;
@@ -610,10 +608,10 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
       .where((key) => targetControllers[key]!.text.trim().isNotEmpty)
       .length;
 
-  double? doubleValue(String key) => double.tryParse(
-    targetControllers[key]!.text.trim().replaceAll(',', '.'),
-  );
-  int? intValue(String key) => int.tryParse(targetControllers[key]!.text.trim());
+  double? doubleValue(String key) =>
+      double.tryParse(targetControllers[key]!.text.trim().replaceAll(',', '.'));
+  int? intValue(String key) =>
+      int.tryParse(targetControllers[key]!.text.trim());
 
   void setShiftFollowing(bool value) {
     shiftFollowing = value;
@@ -625,9 +623,9 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setRoutine(String? value) {
+  void setRoutines(Iterable<String> values) {
     _targetDebounce?.cancel();
-    routineId = value;
+    routineIds = values.toSet().toList();
     commitSelectedWeek();
     notifyListeners();
   }

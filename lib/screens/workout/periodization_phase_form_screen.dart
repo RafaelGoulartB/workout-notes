@@ -85,9 +85,9 @@ class _PeriodizationPhaseFormScreenState
       final status = await _controller.save();
       if (!mounted) return;
       if (status == PhaseFormSaveStatus.overlap) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.periodizationOverlapError)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(loc.periodizationOverlapError)));
         return;
       }
       if (status == PhaseFormSaveStatus.macroConflict) {
@@ -148,10 +148,7 @@ class _PeriodizationPhaseFormScreenState
               Navigator.pop(context, parsed);
             }
           },
-          decoration: InputDecoration(
-            suffixText: 'sem',
-            helperText: '1 – 104',
-          ),
+          decoration: InputDecoration(suffixText: 'sem', helperText: '1 – 104'),
         ),
         actions: [
           TextButton(
@@ -213,6 +210,65 @@ class _PeriodizationPhaseFormScreenState
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(loc.periodizationWeekCopyApplied(applied))),
     );
+  }
+
+  Future<void> _pickRoutines() async {
+    final loc = AppLocalizations.of(context)!;
+    final selected = {..._controller.routineIds};
+    final result = await showModalBottomSheet<Set<String>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  loc.periodizationLinkedRoutine,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                Text(loc.periodizationLinkedRoutineWeeklyHelp),
+                const SizedBox(height: 10),
+                if (_controller.routines.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(loc.periodizationNoRoutine),
+                  )
+                else
+                  ..._controller.routines.map((routine) {
+                    final id = routine['id'] as String;
+                    return CheckboxListTile(
+                      value: selected.contains(id),
+                      title: Text(routine['name'] as String),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      onChanged: (value) => setSheetState(() {
+                        if (value == true) {
+                          selected.add(id);
+                        } else {
+                          selected.remove(id);
+                        }
+                      }),
+                    );
+                  }),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: () => Navigator.pop(sheetContext, selected),
+                  child: Text(loc.commonSave),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (result != null && mounted) _controller.setRoutines(result);
   }
 
   @override
@@ -493,17 +549,20 @@ class _PeriodizationPhaseFormScreenState
                             lockedWeeks: locked,
                             currentWeek: c.currentWeekIndex,
                             onSelect: c.selectWeek,
-                            onCustomize: !weekLocked &&
+                            onCustomize:
+                                !weekLocked &&
                                     c.selectedWeek > 0 &&
                                     !weekCustomized
                                 ? c.customizeSelectedWeek
                                 : null,
-                            onUseInheritance: !weekLocked &&
+                            onUseInheritance:
+                                !weekLocked &&
                                     c.selectedWeek > 0 &&
                                     weekCustomized
                                 ? c.useInheritance
                                 : null,
-                            onCopy: !weekLocked &&
+                            onCopy:
+                                !weekLocked &&
                                     weeksCount > 1 &&
                                     (c.selectedWeek == 0 || weekCustomized)
                                 ? _copyWeekTargets
@@ -528,7 +587,9 @@ class _PeriodizationPhaseFormScreenState
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.secondaryContainer.withAlpha(80),
+                        color: theme.colorScheme.secondaryContainer.withAlpha(
+                          80,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -617,19 +678,36 @@ class _PeriodizationPhaseFormScreenState
                 String? unit,
               }) => SizedBox(
                 width: width,
-                child: _field(key, label,
-                    integer: integer, signed: signed, unit: unit),
+                child: _field(
+                  key,
+                  label,
+                  integer: integer,
+                  signed: signed,
+                  unit: unit,
+                ),
               );
               return Wrap(
                 spacing: 10,
                 runSpacing: 12,
                 children: [
-                  field('workouts', loc.periodizationWorkoutsPerWeek,
-                      integer: true, unit: loc.periodizationPerWeekUnit),
-                  field('minSets', loc.periodizationMinSets,
-                      integer: true, unit: loc.periodizationPerWeekUnit),
-                  field('maxSets', loc.periodizationMaxSets,
-                      integer: true, unit: loc.periodizationPerWeekUnit),
+                  field(
+                    'workouts',
+                    loc.periodizationWorkoutsPerWeek,
+                    integer: true,
+                    unit: loc.periodizationPerWeekUnit,
+                  ),
+                  field(
+                    'minSets',
+                    loc.periodizationMinSets,
+                    integer: true,
+                    unit: loc.periodizationPerWeekUnit,
+                  ),
+                  field(
+                    'maxSets',
+                    loc.periodizationMaxSets,
+                    integer: true,
+                    unit: loc.periodizationPerWeekUnit,
+                  ),
                   field('minRpe', loc.periodizationMinRpe),
                   field('maxRpe', loc.periodizationMaxRpe),
                 ],
@@ -637,42 +715,31 @@ class _PeriodizationPhaseFormScreenState
             },
           ),
           const SizedBox(height: 14),
-          DropdownButtonFormField<String?>(
-            initialValue: c.routineId,
-            isExpanded: true,
-            decoration: InputDecoration(
-              labelText: loc.periodizationLinkedRoutine,
-              prefixIcon: const Icon(
-                Icons.fitness_center_outlined,
+          InkWell(
+            onTap: weekLocked ? null : _pickRoutines,
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: loc.periodizationLinkedRoutine,
+                prefixIcon: const Icon(Icons.fitness_center_outlined),
+                suffixIcon: const Icon(Icons.chevron_right_rounded),
+              ),
+              child: Text(
+                c.routineIds.isEmpty
+                    ? loc.periodizationNoRoutine
+                    : c.routineIds
+                          .map(
+                            (id) => c.routines
+                                .where((routine) => routine['id'] == id)
+                                .map((routine) => routine['name'] as String)
+                                .firstOrNull,
+                          )
+                          .whereType<String>()
+                          .join(', '),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            items: [
-              DropdownMenuItem<String?>(
-                value: null,
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Text(
-                    loc.periodizationNoRoutine,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                  ),
-                ),
-              ),
-              ...c.routines.map(
-                (routine) => DropdownMenuItem<String?>(
-                  value: routine['id'] as String,
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: Text(
-                      routine['name'] as String,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            onChanged: weekLocked ? null : c.setRoutine,
           ),
         ],
       ),
@@ -698,11 +765,7 @@ class _PeriodizationPhaseFormScreenState
             runSpacing: 12,
             children: [
               field('weight', loc.periodizationTargetWeight, unit: 'kg'),
-              field(
-                'change',
-                loc.periodizationWeeklyWeightChange,
-                unit: '%',
-              ),
+              field('change', loc.periodizationWeeklyWeightChange, unit: '%'),
             ],
           );
         },
@@ -757,23 +820,30 @@ class _PeriodizationPhaseFormScreenState
   ) {
     final loc = AppLocalizations.of(context)!;
     final c = _controller;
-    final target =
-        effective ?? c.emptyTarget(c.weekStarts[c.selectedWeek]);
+    final target = effective ?? c.emptyTarget(c.weekStarts[c.selectedWeek]);
     List<(String, String)> nutritionRows() => [
-      if (target.calories != null) (loc.periodizationCaloriesPerDay, '${target.calories!.round()} kcal'),
-      if (target.proteinG != null) (loc.nutritionProgressProtein, '${target.proteinG!.round()} g'),
-      if (target.carbsG != null) (loc.periodizationCarbsRemainder, '${target.carbsG!.round()} g'),
-      if (target.fatG != null) (loc.nutritionProgressFat, '${target.fatG!.round()} g'),
+      if (target.calories != null)
+        (loc.periodizationCaloriesPerDay, '${target.calories!.round()} kcal'),
+      if (target.proteinG != null)
+        (loc.nutritionProgressProtein, '${target.proteinG!.round()} g'),
+      if (target.carbsG != null)
+        (loc.periodizationCarbsRemainder, '${target.carbsG!.round()} g'),
+      if (target.fatG != null)
+        (loc.nutritionProgressFat, '${target.fatG!.round()} g'),
     ];
     List<(String, String)> trainingRows() => [
-      if (target.routineId != null)
+      if (target.routineIds.isNotEmpty)
         (
           loc.periodizationLinkedRoutine,
-          c.routines
-                  .where((routine) => routine['id'] == target.routineId)
-                  .map((routine) => routine['name'] as String)
-                  .firstOrNull ??
-              loc.periodizationNoRoutine,
+          target.routineIds
+              .map(
+                (id) => c.routines
+                    .where((routine) => routine['id'] == id)
+                    .map((routine) => routine['name'] as String)
+                    .firstOrNull,
+              )
+              .whereType<String>()
+              .join(', '),
         ),
       if (target.workoutsPerWeek != null)
         (
@@ -793,10 +863,7 @@ class _PeriodizationPhaseFormScreenState
     ];
     List<(String, String)> bodyRows() => [
       if (target.targetWeightKg != null)
-        (
-          loc.periodizationTargetWeight,
-          '${target.targetWeightKg} kg',
-        ),
+        (loc.periodizationTargetWeight, '${target.targetWeightKg} kg'),
       if (target.weeklyWeightChangePercent != null)
         (
           loc.periodizationWeeklyWeightChange,
@@ -805,10 +872,7 @@ class _PeriodizationPhaseFormScreenState
     ];
     List<(String, String)> sleepRows() => [
       if (target.sleepHours != null)
-        (
-          loc.periodizationSleepHours,
-          '${target.sleepHours} h',
-        ),
+        (loc.periodizationSleepHours, '${target.sleepHours} h'),
     ];
 
     final sections = [
@@ -817,16 +881,8 @@ class _PeriodizationPhaseFormScreenState
         Icons.restaurant_outlined,
         nutritionRows(),
       ),
-      (
-        loc.periodizationTrainingTargets,
-        Icons.fitness_center,
-        trainingRows(),
-      ),
-      (
-        loc.periodizationBodyTargets,
-        Icons.monitor_weight_outlined,
-        bodyRows(),
-      ),
+      (loc.periodizationTrainingTargets, Icons.fitness_center, trainingRows()),
+      (loc.periodizationBodyTargets, Icons.monitor_weight_outlined, bodyRows()),
       (loc.periodizationSleepTargets, Icons.nightlight_outlined, sleepRows()),
     ];
 
@@ -837,7 +893,12 @@ class _PeriodizationPhaseFormScreenState
         children: [
           for (var i = 0; i < sections.length; i++) ...[
             if (i > 0) const SizedBox(height: 14),
-            _readOnlySection(theme, sections[i].$1, sections[i].$2, sections[i].$3),
+            _readOnlySection(
+              theme,
+              sections[i].$1,
+              sections[i].$2,
+              sections[i].$3,
+            ),
           ],
         ],
       ),
