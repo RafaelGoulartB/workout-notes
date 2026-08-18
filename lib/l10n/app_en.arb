@@ -1842,6 +1842,8 @@
   "periodizationGoalSignedPlus": "+{value}",
   "@periodizationGoalSignedPlus": { "placeholders": { "value": { "type": "String" } } },
   "periodizationPlannedActual": "PLANNED × ACTUAL",
+  "periodizationTargetLabel": "Target",
+  "periodizationActualLabel": "Actual",
   "periodizationWorkouts": "Workouts",
   "periodizationSets": "Completed sets",
   "periodizationAverageCalories": "Average kcal",

@@ -302,19 +302,11 @@ class _PeriodizationPhaseDetailScreenState
                     ],
                   ),
                   const SizedBox(height: 18),
-                  if (_target != null) ...[
-                    PeriodizationSectionHeader(
-                      title: loc.periodizationTargets,
-                      icon: Icons.track_changes_rounded,
-                    ),
-                    _TargetOverview(target: _target!),
-                  ],
-                  const SizedBox(height: 22),
                   PeriodizationSectionHeader(
                     title: loc.periodizationPlannedActual,
                     icon: Icons.analytics_outlined,
                   ),
-                  _MetricsGrid(metrics: _metrics!),
+                  _TargetActualGrid(target: _target, metrics: _metrics!),
                   if (_projection?.hasAnyEstimate == true) ...[
                     const SizedBox(height: 22),
                     PeriodizationSectionHeader(
@@ -469,79 +461,111 @@ class _PeriodizationPhaseDetailScreenState
   }
 }
 
-class _TargetOverview extends StatelessWidget {
-  final PeriodizationTarget target;
-  const _TargetOverview({required this.target});
+class _TargetActualGrid extends StatelessWidget {
+  final PeriodizationTarget? target;
+  final PeriodizationMetrics metrics;
+
+  const _TargetActualGrid({required this.target, required this.metrics});
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final items = <(IconData, String, String)>[];
-    if (target.calories != null) {
-      items.add((
+    final phaseTarget = target;
+    final actualWorkoutsPerWeek = metrics.elapsedDays == 0
+        ? null
+        : metrics.workoutCount / metrics.elapsedDays * 7;
+    final items = [
+      (
         Icons.local_fire_department_outlined,
-        '${target.calories!.round()}',
         loc.periodizationCaloriesPerDay,
-      ));
-    }
-    if (target.proteinG != null) {
-      items.add((
+        phaseTarget?.calories == null
+            ? '—'
+            : '${phaseTarget!.calories!.round()} kcal',
+        metrics.averageCalories == null
+            ? '—'
+            : '${metrics.averageCalories!.round()} kcal',
+      ),
+      (
         Icons.restaurant_outlined,
-        '${target.proteinG!.round()} g',
         loc.periodizationProteinG,
-      ));
-    }
-    if (target.workoutsPerWeek != null) {
-      items.add((
+        phaseTarget?.proteinG == null
+            ? '—'
+            : '${phaseTarget!.proteinG!.round()} g',
+        metrics.averageProteinG == null
+            ? '—'
+            : '${metrics.averageProteinG!.round()} g',
+      ),
+      (
         Icons.fitness_center,
-        '${target.workoutsPerWeek}×',
         loc.periodizationWorkoutsPerWeek,
-      ));
-    }
-    if (target.sleepHours != null) {
-      items.add((
+        phaseTarget?.workoutsPerWeek == null
+            ? '—'
+            : '${phaseTarget!.workoutsPerWeek}×',
+        actualWorkoutsPerWeek == null
+            ? '—'
+            : '${actualWorkoutsPerWeek.toStringAsFixed(1)}×',
+      ),
+      (
         Icons.nightlight_outlined,
-        '${target.sleepHours} h',
         loc.periodizationSleepHours,
-      ));
-    }
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: items
-          .map(
-            (item) => SizedBox(
-              width: (MediaQuery.sizeOf(context).width - 42) / 2,
-              child: PeriodizationSurface(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Icon(item.$1),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.$2,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            item.$3,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.labelSmall,
-                          ),
-                        ],
-                      ),
+        phaseTarget?.sleepHours == null
+            ? '—'
+            : '${phaseTarget!.sleepHours!.toStringAsFixed(1)} h',
+        metrics.averageSleepHours == null
+            ? '—'
+            : '${metrics.averageSleepHours!.toStringAsFixed(1)} h',
+      ),
+    ];
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 1.55,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return PeriodizationSurface(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(item.$1, size: 19),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item.$2,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall,
                     ),
-                  ],
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Text(
+                '${loc.periodizationTargetLabel}: ${item.$3}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              Text(
+                '${loc.periodizationActualLabel}: ${item.$4}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ),
-          )
-          .toList(),
+            ],
+          ),
+        );
+      },
     );
   }
 }
