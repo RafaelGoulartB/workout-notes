@@ -487,13 +487,14 @@ class _PeriodizationPhaseFormScreenState
                       Icons.restaurant_outlined,
                       subtitle: _targetCardSubtitle(
                         loc.periodizationNutritionTargetsHelp,
-                        const ['calories', 'proteinPerKg', 'fatPerKg', 'refWeight'],
+                        const ['adjustment', 'proteinPerKg', 'fatPerKg', 'refWeight'],
                       ),
                       actionLabel: loc.periodizationSuggestTargets,
                       onAction: _suggestNutritionTargets,
                       initiallyExpanded: true,
                       child: NutritionTargetFields(
-                        calories: c.targetControllers['calories']!,
+                        tdee: c.tdee,
+                        adjustment: c.targetControllers['adjustment']!,
                         proteinPerKg: c.targetControllers['proteinPerKg']!,
                         fatPerKg: c.targetControllers['fatPerKg']!,
                         referenceWeight: c.targetControllers['refWeight']!,

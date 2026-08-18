@@ -5,15 +5,26 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/periodization/nutrition_target_input.dart';
 import 'package:workout_notes/utils/macro_calculator.dart';
 
-/// Shared nutrition target inputs: total calories, protein and fat in g/kg
-/// and the reference weight used to convert ratios into grams. Carbohydrates
-/// are computed from the remaining calories and shown as a live preview —
-/// nothing is stored until the caller saves the resolved grams.
+/// Shared nutrition target inputs for a phase week.
 ///
-/// The controllers are owned by the parent (form/wizard); call [parseField]
-/// to read them and [breakdownOf] to resolve the computed macros.
+/// * **Daily expenditure (TDEE)** is read from the app settings and is
+///   not editable here; the field is rendered as a read-only tile.
+/// * **Deficit / Surplus** is a signed kcal input applied on top of the
+///   TDEE. The day goal shown below is `TDEE ± adjustment`.
+/// * **Reference weight**, **Protein (g/kg)** and **Fat (g/kg)** are the
+///   same inputs used before; protein and fat are always side-by-side.
+///
+/// Carbohydrates are computed from the remaining calories and shown as
+/// a live preview — nothing is stored until the caller saves the
+/// resolved grams.
+///
+/// The controllers are owned by the parent (form/wizard); call
+/// [parseField] to read them and [breakdownOf] to resolve the computed
+/// macros.
 class NutritionTargetFields extends StatelessWidget {
-  final TextEditingController calories;
+  final double? tdee;
+
+  final TextEditingController adjustment;
   final TextEditingController proteinPerKg;
   final TextEditingController fatPerKg;
   final TextEditingController referenceWeight;
@@ -22,7 +33,8 @@ class NutritionTargetFields extends StatelessWidget {
 
   const NutritionTargetFields({
     super.key,
-    required this.calories,
+    required this.tdee,
+    required this.adjustment,
     required this.proteinPerKg,
     required this.fatPerKg,
     required this.referenceWeight,
@@ -33,13 +45,18 @@ class NutritionTargetFields extends StatelessWidget {
   static double? parseField(TextEditingController controller) =>
       NutritionTargetInput.parse(controller.text);
 
+  static double? parseSignedField(TextEditingController controller) =>
+      NutritionTargetInput.parse(controller.text, allowSigned: true);
+
   static MacroBreakdown? breakdownOf({
-    required TextEditingController calories,
+    required double? tdee,
+    required TextEditingController adjustment,
     required TextEditingController proteinPerKg,
     required TextEditingController fatPerKg,
     required TextEditingController referenceWeight,
   }) => NutritionTargetInput.fromControllers({
-    'calories': calories,
+    'tdee': _TextEditingControllerAdapter(tdee),
+    'adjustment': adjustment,
     'proteinPerKg': proteinPerKg,
     'fatPerKg': fatPerKg,
     'refWeight': referenceWeight,
@@ -48,11 +65,19 @@ class NutritionTargetFields extends StatelessWidget {
   MacroBreakdown? get _breakdown {
     if (!enabled) return null;
     return breakdownOf(
-      calories: calories,
+      tdee: tdee,
+      adjustment: adjustment,
       proteinPerKg: proteinPerKg,
       fatPerKg: fatPerKg,
       referenceWeight: referenceWeight,
     );
+  }
+
+  double? get _adjustmentKcal => parseSignedField(adjustment);
+  double? get _resolvedGoal {
+    if (tdee == null) return null;
+    final adjustment = _adjustmentKcal ?? 0;
+    return tdee! + adjustment;
   }
 
   @override
@@ -60,62 +85,106 @@ class NutritionTargetFields extends StatelessWidget {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final breakdown = _breakdown;
+    final resolvedGoal = _resolvedGoal;
+    final hasTdee = tdee != null;
     final hasRatioInputs =
-        calories.text.trim().isNotEmpty ||
+        adjustment.text.trim().isNotEmpty ||
         proteinPerKg.text.trim().isNotEmpty ||
         fatPerKg.text.trim().isNotEmpty;
     final hasWeight = parseField(referenceWeight) != null;
 
+    if (!hasTdee) {
+      return _TdeeMissingBanner(message: loc.periodizationTdeeMissing);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth >= 560
-                ? (constraints.maxWidth - 10) / 2
-                : constraints.maxWidth;
-            Widget field(
-              TextEditingController controller,
-              String label,
-              String unit,
-            ) => SizedBox(
-              width: width,
+        _TdeeReadOnlyTile(value: tdee!, help: loc.periodizationTdeeFromSettingsHelp),
+        const SizedBox(height: 12),
+        TextField(
+          controller: adjustment,
+          enabled: enabled,
+          onChanged: (_) => onChanged?.call(),
+          keyboardType: const TextInputType.numberWithOptions(
+            decimal: true,
+            signed: true,
+          ),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'[\d\-.,]')),
+          ],
+          decoration: InputDecoration(
+            labelText: loc.periodizationAdjustmentKcal,
+            helperText: loc.periodizationAdjustmentKcalHelp,
+            suffixText: 'kcal',
+            filled: true,
+            fillColor: theme.colorScheme.surfaceContainerLowest,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: referenceWeight,
+          enabled: enabled,
+          onChanged: (_) => onChanged?.call(),
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
+          decoration: InputDecoration(
+            labelText: loc.periodizationReferenceWeight,
+            suffixText: 'kg',
+            filled: true,
+            fillColor: theme.colorScheme.surfaceContainerLowest,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
               child: TextField(
-                controller: controller,
+                controller: proteinPerKg,
                 enabled: enabled,
                 onChanged: (_) => onChanged?.call(),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                inputFormatters: [FilteringTextInputFormatter.allow(
-                  RegExp(r'[\d.,]'),
-                )],
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+                ],
                 decoration: InputDecoration(
-                  labelText: label,
-                  suffixText: unit,
+                  labelText: loc.periodizationProteinPerKg,
+                  suffixText: 'g/kg',
                   filled: true,
-                  fillColor:
-                      theme.colorScheme.surfaceContainerLowest,
+                  fillColor: theme.colorScheme.surfaceContainerLowest,
                 ),
               ),
-            );
-
-            return Wrap(
-              spacing: 10,
-              runSpacing: 12,
-              children: [
-                field(calories, loc.periodizationCaloriesPerDay, 'kcal'),
-                field(
-                  referenceWeight,
-                  loc.periodizationReferenceWeight,
-                  'kg',
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: fatPerKg,
+                enabled: enabled,
+                onChanged: (_) => onChanged?.call(),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+                ],
+                decoration: InputDecoration(
+                  labelText: loc.periodizationFatPerKg,
+                  suffixText: 'g/kg',
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerLowest,
                 ),
-                field(proteinPerKg, loc.periodizationProteinPerKg, 'g/kg'),
-                field(fatPerKg, loc.periodizationFatPerKg, 'g/kg'),
-              ],
-            );
-          },
+              ),
+            ),
+          ],
         ),
+        if (resolvedGoal != null) ...[
+          const SizedBox(height: 14),
+          _DailyGoalBanner(
+            tdee: tdee!,
+            adjustmentKcal: _adjustmentKcal,
+            goal: resolvedGoal,
+          ),
+        ],
         const SizedBox(height: 14),
         if (breakdown != null) ...[
           if (breakdown.energyConflict)
@@ -134,6 +203,208 @@ class NutritionTargetFields extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+/// Read-only tile showing the daily expenditure pulled from the app
+/// settings. The field is intentionally non-interactive: the editor
+/// only renders the live value so the user knows where the kcal goal
+/// comes from.
+class _TdeeReadOnlyTile extends StatelessWidget {
+  final double value;
+  final String help;
+
+  const _TdeeReadOnlyTile({required this.value, required this.help});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final formatted = value == value.roundToDouble()
+        ? value.toStringAsFixed(0)
+        : value.toStringAsFixed(1);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withAlpha(120),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.local_fire_department_outlined,
+            size: 20,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  loc.periodizationTdeeFromSettings,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  help,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            formatted,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'kcal',
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Banner that shows the resolved daily kcal goal together with the
+/// TDEE ± adjustment breakdown that produces it. Acts as the live
+/// preview of the phase weekly target.
+class _DailyGoalBanner extends StatelessWidget {
+  final double tdee;
+  final double? adjustmentKcal;
+  final double goal;
+
+  const _DailyGoalBanner({
+    required this.tdee,
+    required this.adjustmentKcal,
+    required this.goal,
+  });
+
+  static String _formatKcal(double value) {
+    if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(1);
+  }
+
+  static String _formatSigned(AppLocalizations loc, double value) {
+    if (value > 0) {
+      return loc.periodizationGoalSignedPlus(_formatKcal(value));
+    }
+    if (value < 0) return _formatKcal(value);
+    return '±0';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final adjustment = adjustmentKcal ?? 0;
+    final hasAdjustment = adjustment != 0;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withAlpha(120),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            loc.periodizationDailyGoal(_formatKcal(goal)),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: theme.colorScheme.onPrimaryContainer,
+            ),
+          ),
+          if (hasAdjustment) ...[
+            const SizedBox(height: 4),
+            Text(
+              loc.periodizationGoalBreakdown(
+                _formatKcal(tdee),
+                _formatSigned(loc, adjustment),
+              ),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onPrimaryContainer,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ] else
+            Text(
+              loc.periodizationAdjustmentKcalNotSet,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onPrimaryContainer,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TdeeMissingBanner extends StatelessWidget {
+  final String message;
+  const _TdeeMissingBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer.withAlpha(140),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            size: 19,
+            color: theme.colorScheme.error,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onErrorContainer,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Adapter that lets us feed the TDEE (a non-editable value) into the
+/// [NutritionTargetInput.fromControllers] helper without spinning up a
+/// throwaway controller.
+class _TextEditingControllerAdapter extends TextEditingController {
+  _TextEditingControllerAdapter(double? value)
+      : super(text: value == null ? '' : value.toString());
+
+  @override
+  set value(TextEditingValue newValue) {
+    // The TDEE is read-only; ignore external mutations.
   }
 }
 

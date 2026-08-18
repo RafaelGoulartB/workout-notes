@@ -83,6 +83,21 @@ void main() {
               value TEXT NOT NULL
             )
           ''');
+          await db.execute('''
+            CREATE TABLE nutrition_goals (
+              id TEXT PRIMARY KEY,
+              calories REAL,
+              protein_g REAL,
+              carbs_g REAL,
+              fat_g REAL,
+              tdee REAL,
+              adjustment_kind TEXT,
+              adjustment_percent REAL,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              is_active INTEGER NOT NULL DEFAULT 1
+            )
+          ''');
           await DatabasePeriodizationSchema.create(db);
         },
       ),
@@ -94,6 +109,23 @@ void main() {
     DatabaseHelper.overrideDatabase = null;
     await database.close();
   });
+
+  Future<void> seedTdeeGoal({required double tdee}) async {
+    final now = DateTime.now().toIso8601String();
+    await database.insert('nutrition_goals', {
+      'id': 'goal-tdee',
+      'calories': tdee,
+      'protein_g': null,
+      'carbs_g': null,
+      'fat_g': null,
+      'tdee': tdee,
+      'adjustment_kind': 'maintenance',
+      'adjustment_percent': 0,
+      'created_at': now,
+      'updated_at': now,
+      'is_active': 1,
+    });
+  }
 
   testWidgets('empty plan opens the complete guided creation flow', (
     tester,
@@ -340,6 +372,9 @@ void main() {
       createdAt: now,
       updatedAt: now,
     );
+    await tester.runAsync(() async {
+      await seedTdeeGoal(tdee: 2200);
+    });
 
     await tester.runAsync(() async {
       await tester.pumpWidget(
@@ -357,14 +392,17 @@ void main() {
     expect(find.text('S1'), findsOneWidget);
     expect(find.text('Semana base'), findsOneWidget);
 
-    final caloriesField = find.widgetWithText(TextField, 'kcal por dia');
+    final adjustmentField = find.widgetWithText(
+      TextField,
+      'Déficit / Superávit (kcal)',
+    );
     await tester.scrollUntilVisible(
-      caloriesField,
+      adjustmentField,
       300,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
-    await tester.enterText(caloriesField, '2400');
+    await tester.enterText(adjustmentField, '+200');
     await tester.enterText(
       find.widgetWithText(TextField, 'Proteína (g/kg)'),
       '2.2',
@@ -443,6 +481,9 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final now = DateTime.now();
+    await tester.runAsync(() async {
+      await seedTdeeGoal(tdee: 2200);
+    });
     final plan = (await tester.runAsync(
       () => PeriodizationRepository().createPlan(
         name: 'Plano persistente',
@@ -461,14 +502,17 @@ void main() {
 
     await tester.enterText(find.byType(TextFormField), 'Fase de teste');
 
-    final caloriesField = find.widgetWithText(TextField, 'kcal por dia');
+    final adjustmentField = find.widgetWithText(
+      TextField,
+      'Déficit / Superávit (kcal)',
+    );
     await tester.scrollUntilVisible(
-      caloriesField,
+      adjustmentField,
       300,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
-    await tester.enterText(caloriesField, '2400');
+    await tester.enterText(adjustmentField, '+200');
     await tester.enterText(
       find.widgetWithText(TextField, 'Proteína (g/kg)'),
       '2.2',
@@ -578,6 +622,9 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.runAsync(() async {
+      await seedTdeeGoal(tdee: 2200);
+    });
 
     await tester.runAsync(() async {
       await tester.pumpWidget(_app());
@@ -609,14 +656,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Editar fase'), findsOneWidget);
 
-    final caloriesField = find.widgetWithText(TextField, 'kcal por dia');
+    final adjustmentField = find.widgetWithText(
+      TextField,
+      'Déficit / Superávit (kcal)',
+    );
     await tester.scrollUntilVisible(
-      caloriesField,
+      adjustmentField,
       300,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
-    await tester.enterText(caloriesField, '2400');
+    await tester.enterText(adjustmentField, '+200');
     await tester.enterText(
       find.widgetWithText(TextField, 'Proteína (g/kg)'),
       '2.2',
