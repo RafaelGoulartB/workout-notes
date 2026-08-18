@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'base_repository.dart';
@@ -42,7 +44,28 @@ class RoutineRepository extends BaseRepository {
 
   Future<void> deleteRoutine(String id) async {
     final db = await this.db;
-    await db.delete('routines', where: 'id = ?', whereArgs: [id]);
+    await db.transaction((txn) async {
+      // Weekly targets store the routine id in JSON, so clear references
+      // before the routine's FK-backed rows are cascaded.
+      final targets = await txn.query(
+        'phase_targets',
+        columns: ['id', 'training_json'],
+      );
+      for (final target in targets) {
+        final raw = target['training_json'] as String?;
+        if (raw == null) continue;
+        final training = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+        if (training['routine_id'] != id) continue;
+        training.remove('routine_id');
+        await txn.update(
+          'phase_targets',
+          {'training_json': jsonEncode(training)},
+          where: 'id = ?',
+          whereArgs: [target['id']],
+        );
+      }
+      await txn.delete('routines', where: 'id = ?', whereArgs: [id]);
+    });
   }
 
   Future<List<Map<String, dynamic>>> getRoutineDays(String routineId) async {

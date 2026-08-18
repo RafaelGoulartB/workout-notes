@@ -43,11 +43,26 @@ class PeriodizationRepository extends BaseRepository {
 
   Future<PeriodizationPlan?> getActivePlan() async {
     final database = await db;
-    final rows = await database.query(
+    var rows = await database.query(
       'periodization_plans',
       where: "status = 'active'",
       limit: 1,
     );
+    if (rows.isNotEmpty) {
+      final endDate = DateTime.parse(rows.first['end_date'] as String);
+      if (_day(endDate).isBefore(_day(DateTime.now()))) {
+        await database.update(
+          'periodization_plans',
+          {
+            'status': PeriodizationPlanStatus.completed.value,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [rows.first['id']],
+        );
+        rows = const [];
+      }
+    }
     return rows.isEmpty ? null : PeriodizationPlan.fromMap(rows.first);
   }
 
@@ -205,6 +220,17 @@ class PeriodizationRepository extends BaseRepository {
     final database = await db;
     await database.transaction((txn) async {
       if (status == PeriodizationPlanStatus.active) {
+        final phaseCount =
+            Sqflite.firstIntValue(
+              await txn.rawQuery(
+                'SELECT COUNT(*) FROM periodization_phases WHERE plan_id = ?',
+                [id],
+              ),
+            ) ??
+            0;
+        if (phaseCount == 0) {
+          throw const PeriodizationValidationException('plan_requires_phase');
+        }
         await _deactivateCurrent(txn, exceptId: id);
       }
       await txn.update(
@@ -684,16 +710,7 @@ class PeriodizationRepository extends BaseRepository {
       limit: 1,
     );
     if (rows.isNotEmpty) return PeriodizationTarget.fromMap(rows.first);
-    final fallback = await database.query(
-      'phase_targets',
-      where: 'phase_id = ?',
-      whereArgs: [phaseId],
-      orderBy: 'version ASC',
-      limit: 1,
-    );
-    return fallback.isEmpty
-        ? null
-        : PeriodizationTarget.fromMap(fallback.first);
+    return null;
   }
 
   Future<PeriodizationTarget> saveTargetVersion(
@@ -970,6 +987,20 @@ class PeriodizationRepository extends BaseRepository {
     final database = await db;
     final startText = _date(start);
     final endText = _date(end);
+    final targetHistory = await getTargetHistory(phase.id);
+    final routineIds = <String>{};
+    for (
+      var date = start;
+      !date.isAfter(end);
+      date = date.add(const Duration(days: 1))
+    ) {
+      final routineId = _targetForDate(targetHistory, date)?.routineId;
+      if (routineId != null) routineIds.add(routineId);
+    }
+    final routineFilter = routineIds.isEmpty
+        ? ''
+        : ' AND w.routine_id IN (${List.filled(routineIds.length, '?').join(', ')})';
+    final routineArgs = routineIds.toList();
 
     final workoutRows = await database.rawQuery(
       '''
@@ -980,9 +1011,10 @@ class PeriodizationRepository extends BaseRepository {
       FROM workouts w
       LEFT JOIN exercise_entries ee ON ee.workout_id = w.id
       LEFT JOIN sets s ON s.exercise_entry_id = ee.id
-      WHERE w.date BETWEEN ? AND ? AND w.end_time IS NOT NULL
-    ''',
-      [startText, endText],
+       WHERE w.date BETWEEN ? AND ? AND w.end_time IS NOT NULL
+         $routineFilter
+     ''',
+      [startText, endText, ...routineArgs],
     );
     final workout = workoutRows.first;
 
@@ -1001,7 +1033,6 @@ class PeriodizationRepository extends BaseRepository {
     ''',
       [startText, endText],
     );
-    final targetHistory = await getTargetHistory(phase.id);
     double calorieSum = 0;
     double proteinSum = 0;
     double carbsSum = 0;
@@ -1130,10 +1161,11 @@ class PeriodizationRepository extends BaseRepository {
       FROM workouts w
       JOIN exercise_entries ee ON ee.workout_id = w.id
       JOIN sets s ON s.exercise_entry_id = ee.id
-      WHERE w.date BETWEEN ? AND ? AND w.end_time IS NOT NULL
-        AND s.is_complete = 1 AND s.is_warmup = 0
+       WHERE w.date BETWEEN ? AND ? AND w.end_time IS NOT NULL
+         AND s.is_complete = 1 AND s.is_warmup = 0
+         $routineFilter
       ''',
-      [startText, endText],
+      [startText, endText, ...routineArgs],
     );
     var rpeExpectedSets = 0;
     var rpeSetsLogged = 0;
@@ -1292,7 +1324,7 @@ class PeriodizationRepository extends BaseRepository {
     final phaseOngoing = !today.isAfter(phase.endDate);
     final remainingDays = projectionStart.isAfter(phase.endDate)
         ? 0
-        : phase.endDate.difference(projectionStart).inDays;
+        : phase.endDate.difference(projectionStart).inDays + 1;
     final database = await db;
     final metrics = phaseMetrics ?? await getPhaseMetrics(phase);
     final targets = await getTargetHistory(phase.id);

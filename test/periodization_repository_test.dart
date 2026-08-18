@@ -6,6 +6,7 @@ import 'package:workout_notes/database/database_periodization_schema.dart';
 import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
+import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_projection.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
@@ -115,7 +116,9 @@ void main() {
       ],
     );
 
-    expect((await repository.getActivePlan())?.id, plan.id);
+    expect(await repository.getActivePlan(), isNull);
+    expect((await repository.getPlan(plan.id))?.status,
+        PeriodizationPlanStatus.completed);
     final phases = await repository.getPhases(plan.id);
     expect(phases, hasLength(2));
     expect(
@@ -709,6 +712,34 @@ void main() {
       ))?.calories,
       2400,
     );
+  });
+
+  test('does not activate an empty plan and expires active plans on read', () async {
+    final empty = await repository.createPlan(
+      name: 'Empty',
+      startDate: DateTime.now(),
+      endDate: DateTime.now().add(const Duration(days: 7)),
+      activate: false,
+    );
+    await expectLater(
+      repository.setPlanStatus(empty.id, PeriodizationPlanStatus.active),
+      throwsA(
+        isA<PeriodizationValidationException>().having(
+          (error) => error.code,
+          'code',
+          'plan_requires_phase',
+        ),
+      ),
+    );
+
+    final expired = await repository.createPlan(
+      name: 'Expired',
+      startDate: DateTime.now().subtract(const Duration(days: 8)),
+      endDate: DateTime.now().subtract(const Duration(days: 1)),
+    );
+    expect(await repository.getActivePlan(), isNull);
+    expect((await repository.getPlan(expired.id))?.status,
+        PeriodizationPlanStatus.completed);
   });
 
   test('weekly targets keep g/kg metadata on the persisted version', () async {
