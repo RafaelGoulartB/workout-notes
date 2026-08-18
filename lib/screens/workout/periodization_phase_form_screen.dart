@@ -645,22 +645,29 @@ class _PeriodizationPhaseFormScreenState
               prefixIcon: const Icon(
                 Icons.fitness_center_outlined,
               ),
-              helperText: loc.periodizationLinkedRoutineWeeklyHelp,
             ),
             items: [
               DropdownMenuItem<String?>(
                 value: null,
-                child: Text(
-                  loc.periodizationNoRoutine,
-                  overflow: TextOverflow.ellipsis,
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    loc.periodizationNoRoutine,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
                 ),
               ),
               ...c.routines.map(
                 (routine) => DropdownMenuItem<String?>(
                   value: routine['id'] as String,
-                  child: Text(
-                    routine['name'] as String,
-                    overflow: TextOverflow.ellipsis,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      routine['name'] as String,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
                   ),
                 ),
               ),
@@ -733,49 +740,14 @@ class _PeriodizationPhaseFormScreenState
     bool initiallyExpanded = false,
     String? actionLabel,
     VoidCallback? onAction,
-  }) => ExpansionTile(
+  }) => _TargetTile(
+    title: title,
+    icon: icon,
+    subtitle: _targetCardSubtitle(help, keys),
     initiallyExpanded: initiallyExpanded,
-    tilePadding: const EdgeInsets.fromLTRB(14, 5, 12, 5),
-    childrenPadding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
-    shape: const Border(),
-    collapsedShape: const Border(),
-    leading: Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withAlpha(125),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Icon(icon, size: 16, color: theme.colorScheme.primary),
-    ),
-    title: Text(
-      title,
-      style: theme.textTheme.titleSmall?.copyWith(
-        fontWeight: FontWeight.w800,
-      ),
-    ),
-    subtitle: Text(
-      _targetCardSubtitle(help, keys),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: theme.textTheme.bodySmall?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
-      ),
-    ),
-    children: [
-      if (actionLabel != null && onAction != null) ...[
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: onAction,
-            icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-            label: Text(actionLabel),
-          ),
-        ),
-        const SizedBox(height: 14),
-      ],
-      child,
-    ],
+    actionLabel: actionLabel,
+    onAction: onAction,
+    child: child,
   );
 
   Widget _readOnlyList(
@@ -961,6 +933,138 @@ class _PeriodizationPhaseFormScreenState
       fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
     ),
   );
+}
+
+/// Custom collapsible section used by the phase target editor.
+///
+/// We render the header and body by hand to avoid the Material
+/// [ListTile]/[ExpansionTile] internals, which reserve leading/title-gap
+/// space that can push the body beyond the card width on small phones and
+/// trigger a horizontal RenderFlex overflow while transitioning between
+/// weeks.
+class _TargetTile extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final String subtitle;
+  final bool initiallyExpanded;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final Widget child;
+
+  const _TargetTile({
+    required this.title,
+    required this.icon,
+    required this.subtitle,
+    required this.child,
+    this.initiallyExpanded = false,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  State<_TargetTile> createState() => _TargetTileState();
+}
+
+class _TargetTileState extends State<_TargetTile> {
+  late bool _expanded = widget.initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withAlpha(125),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    widget.icon,
+                    size: 16,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        widget.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                AnimatedRotation(
+                  duration: const Duration(milliseconds: 180),
+                  turns: _expanded ? 0.5 : 0,
+                  child: Icon(
+                    Icons.expand_more_rounded,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeInOut,
+          child: _expanded
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (widget.actionLabel != null &&
+                          widget.onAction != null) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: widget.onAction,
+                            icon: const Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 18,
+                            ),
+                            label: Text(widget.actionLabel!),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      widget.child,
+                    ],
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
 }
 
 class _DateTile extends StatelessWidget {
