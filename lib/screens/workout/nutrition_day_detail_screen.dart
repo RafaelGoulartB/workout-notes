@@ -10,6 +10,7 @@ import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
 
@@ -18,6 +19,7 @@ import 'food_search_screen.dart';
 import 'nutrition_progress_screen.dart';
 import 'nutrition_replicate_day_dialog.dart';
 import 'nutrition_settings_screen.dart';
+import 'periodization_home_screen.dart';
 import 'saved_meal_editor_screen.dart';
 import 'saved_meals_screen.dart';
 
@@ -61,7 +63,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
   List<MealTypeDefinition> _mealTypes = const [];
   List<MealLogWithItems> _meals = const [];
   DailyNutritionSummary _summary = DailyNutritionSummary.empty;
-  NutritionGoal? _goal;
+  EffectiveNutritionGoal _effective = const EffectiveNutritionGoal();
   bool _isLoading = true;
   bool _isMutating = false;
   late final TabController _tabController;
@@ -92,14 +94,18 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
         _repository.getMealTypes(),
         _repository.getDayMeals(date),
         _repository.getDailySummary(date),
-        _repository.getActiveGoal(),
+        // The active plan's current week overrides the settings goal.
+        EffectiveNutritionGoalService.resolve(
+          nutritionRepository: _repository,
+          date: _selectedDate,
+        ),
       ]);
       if (!mounted) return;
       setState(() {
         _mealTypes = results[0] as List<MealTypeDefinition>;
         _meals = results[1] as List<MealLogWithItems>;
         _summary = results[2] as DailyNutritionSummary;
-        _goal = results[3] as NutritionGoal?;
+        _effective = results[3] as EffectiveNutritionGoal;
         _isLoading = false;
       });
       _scheduleInitialMealScroll();
@@ -679,18 +685,36 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
                                     16,
                                     8,
                                   ),
-                                  child: _StatisticsSectionCard(
-                                    title: loc.nutritionCaloriesTitle,
-                                    icon: Icons.local_fire_department_rounded,
-                                    compact: true,
-                                    child: _CalorieEquation(
-                                      consumed: _summary.consumed.calories ?? 0,
-                                      goal: _goal?.calories,
-                                      carbsG: _summary.consumed.carbsG,
-                                      proteinG: _summary.consumed.proteinG,
-                                      fatG: _summary.consumed.fatG,
-                                      onConfigureGoal: _openSettings,
-                                    ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      if (_effective.fromPlan)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 8,
+                                          ),
+                                          child: _DayPlanGoalChip(
+                                            planInfo: _effective,
+                                          ),
+                                        ),
+                                      _StatisticsSectionCard(
+                                        title: loc.nutritionCaloriesTitle,
+                                        icon:
+                                            Icons
+                                                .local_fire_department_outlined,
+                                        compact: true,
+                                        child: _CalorieEquation(
+                                          consumed:
+                                              _summary.consumed.calories ?? 0,
+                                          goal: _effective.goal?.calories,
+                                          carbsG: _summary.consumed.carbsG,
+                                          proteinG: _summary.consumed.proteinG,
+                                          fatG: _summary.consumed.fatG,
+                                          onConfigureGoal: _openSettings,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ).animate().fadeIn(duration: 220.ms),
                               ),
@@ -706,7 +730,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
                           child: _DailyStatisticsView(
                             key: const PageStorageKey('nutrition-statistics'),
                             summary: _summary,
-                            goal: _goal,
+                            goal: _effective.goal,
                           ),
                         ),
                       ],
@@ -792,4 +816,63 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
 
   static String _dateString(DateTime value) =>
       _dateOnly(value).toIso8601String().substring(0, 10);
+}
+
+/// Small chip shown when an active plan's current week is overriding
+/// the settings goal for the viewed day. Tapping opens the
+/// periodization home.
+class _DayPlanGoalChip extends StatelessWidget {
+  final EffectiveNutritionGoal planInfo;
+
+  const _DayPlanGoalChip({required this.planInfo});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final phase = planInfo.phase!;
+    final color = Color(phase.color);
+    final label = loc.nutritionGoalPlanBadge(
+      phase.name,
+      planInfo.weekNumber ?? 1,
+      planInfo.totalWeeks ?? 1,
+    );
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Material(
+        color: color.withAlpha(38),
+        borderRadius: BorderRadius.circular(999),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const PeriodizationHomeScreen(),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.event_note_rounded, size: 14, color: color),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

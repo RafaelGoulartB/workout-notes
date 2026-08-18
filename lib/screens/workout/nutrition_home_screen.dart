@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import 'package:workout_notes/models/nutrition/meal_type.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_selection.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/services/open_food_facts_gateway.dart';
@@ -24,6 +26,7 @@ export 'nutrition_day_detail_screen.dart';
 
 import 'nutrition_progress_screen.dart';
 import 'nutrition_settings_screen.dart';
+import 'periodization_home_screen.dart';
 import 'settings_screen.dart';
 import 'saved_meals_screen.dart';
 
@@ -46,14 +49,13 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   final ScrollController _scrollController = ScrollController();
 
   DailyNutritionSummary _summary = DailyNutritionSummary.empty;
-  NutritionGoal? _goal;
+  EffectiveNutritionGoal _effective = const EffectiveNutritionGoal();
   Map<String, double> _weeklyCalories = const {};
   List<MealTypeDefinition> _mealTypes = const [];
   List<MealLogWithItems> _meals = const [];
   late DateTime _selectedDate;
   bool _isLoading = true;
   bool _hasLoaded = false;
-  bool _showMeals = true;
   int _loadGeneration = 0;
 
   @override
@@ -97,13 +99,17 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
       }
       setState(() {
         _summary = results[0] as DailyNutritionSummary;
-        _goal = results[1] as NutritionGoal?;
+        _effective = EffectiveNutritionGoal(goal: results[1] as NutritionGoal?);
         _weeklyCalories = weeklyCalories;
         _mealTypes = results[2] as List<MealTypeDefinition>;
         _meals = results[3] as List<MealLogWithItems>;
         _isLoading = false;
         _hasLoaded = true;
       });
+      // The plan target is an enhancement to the existing diary summary.
+      // Loading it independently keeps diary navigation responsive even when
+      // an older/test database has not reached the periodization migration.
+      unawaited(_loadEffectiveGoal(selectedDate, generation));
     } catch (_) {
       if (!mounted || generation != _loadGeneration) return;
       setState(() {
@@ -111,6 +117,21 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
         _hasLoaded = true;
         _weeklyCalories = const {};
       });
+    }
+  }
+
+  Future<void> _loadEffectiveGoal(DateTime selectedDate, int generation) async {
+    try {
+      final effective = await EffectiveNutritionGoalService.resolve(
+        nutritionRepository: _repository,
+        date: selectedDate,
+      );
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() {
+        _effective = effective;
+      });
+    } catch (_) {
+      // Nutrition remains fully usable when no periodization data exists.
     }
   }
 
@@ -519,7 +540,7 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                   onSelected: _selectDate,
                   collapseProgress: 0,
                   weeklyCalories: _weeklyCalories,
-                  calorieGoal: _goal?.calories,
+                  calorieGoal: _effective.goal?.calories,
                 ),
                 const Expanded(child: _NutritionHomeSkeleton()),
               ],
@@ -538,14 +559,15 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                           selectedDate: _selectedDate,
                           onSelected: _selectDate,
                           weeklyCalories: _weeklyCalories,
-                          calorieGoal: _goal?.calories,
+                          calorieGoal: _effective.goal?.calories,
                         ),
                       ),
                       SliverToBoxAdapter(
                         child:
                             _NutritionDashboardSummaryCard(
                                   summary: _summary,
-                                  goal: _goal,
+                                  goal: _effective.goal,
+                                  planInfo: _effective,
                                   onTap: () => _openDay(),
                                   onConfigureGoal: _openSettings,
                                 )
@@ -553,24 +575,18 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                                 .fadeIn(duration: 300.ms, delay: 60.ms)
                                 .slideY(begin: 0.05),
                       ),
-                      SliverToBoxAdapter(
-                        child: _NutritionSectionHeader(
-                          text: loc.nutritionHomeSectionTools,
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                        sliver: SliverToBoxAdapter(
+                          child: _NutritionToolsGrid(
+                            onProgress: _openProgress,
+                            onSavedMeals: _openSavedMeals,
+                            onFoods: _openFoodLibrary,
+                          ).animate().fadeIn(duration: 350.ms, delay: 120.ms),
                         ),
                       ),
                       SliverToBoxAdapter(
-                        child: _NutritionToolsGrid(
-                          onProgress: _openProgress,
-                          onSavedMeals: _openSavedMeals,
-                          onFoods: _openFoodLibrary,
-                          onSettings: _openSettings,
-                        ).animate().fadeIn(duration: 350.ms, delay: 120.ms),
-                      ),
-                      SliverToBoxAdapter(
-                        child: _CollapsibleSectionHeader(
-                          icon: Icons.today_outlined,
-                          iconBg: theme.colorScheme.primaryContainer,
-                          iconFg: theme.colorScheme.onPrimaryContainer,
+                        child: _NutritionTodayHeader(
                           title: _isSameDay(_selectedDate, DateTime.now())
                               ? loc.nutritionHomeSectionToday
                               : DateFormat(
@@ -582,11 +598,9 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
                             _summary.consumed.calories,
                           ),
                           count: _totalItemsForSelectedDay,
-                          expanded: _showMeals,
-                          onTap: () => setState(() => _showMeals = !_showMeals),
                         ),
                       ),
-                      if (_showMeals) ..._buildMealSlivers(loc, theme),
+                      ..._buildMealSlivers(loc, theme),
                       const SliverToBoxAdapter(child: SizedBox(height: 100)),
                     ],
                   ),
@@ -926,12 +940,14 @@ class _NutritionDayProgressPainter extends CustomPainter {
 class _NutritionDashboardSummaryCard extends StatelessWidget {
   final DailyNutritionSummary summary;
   final NutritionGoal? goal;
+  final EffectiveNutritionGoal? planInfo;
   final VoidCallback onTap;
   final VoidCallback onConfigureGoal;
 
   const _NutritionDashboardSummaryCard({
     required this.summary,
     required this.goal,
+    this.planInfo,
     required this.onTap,
     required this.onConfigureGoal,
   });
@@ -1037,6 +1053,10 @@ class _NutritionDashboardSummaryCard extends StatelessWidget {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  if (planInfo != null && planInfo!.fromPlan) ...[
+                    const SizedBox(height: 8),
+                    _PlanGoalBadge(planInfo: planInfo!),
+                  ],
                   const SizedBox(height: 12),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(999),
@@ -1153,6 +1173,64 @@ class _NutritionDashboardSummaryCard extends StatelessWidget {
   }
 }
 
+/// Small chip shown when an active plan's current week is overriding
+/// the settings goal. Tapping opens the periodization home.
+class _PlanGoalBadge extends StatelessWidget {
+  final EffectiveNutritionGoal planInfo;
+
+  const _PlanGoalBadge({required this.planInfo});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final phase = planInfo.phase!;
+    final color = Color(phase.color);
+    final label = loc.nutritionGoalPlanBadge(
+      phase.name,
+      planInfo.weekNumber ?? 1,
+      planInfo.totalWeeks ?? 1,
+    );
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Material(
+        color: color.withAlpha(38),
+        borderRadius: BorderRadius.circular(999),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const PeriodizationHomeScreen(),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.event_note_rounded, size: 14, color: color),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Color tokens shared with the diary screen so the home stats and
 /// the per-meal macros stay in lockstep.
 const Color _carbMacroColor = Color(0xFF20A39E);
@@ -1246,41 +1324,16 @@ class _NutritionMacroStat extends StatelessWidget {
   }
 }
 
-class _NutritionSectionHeader extends StatelessWidget {
-  final String text;
-
-  const _NutritionSectionHeader({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
-      child: Text(
-        text,
-        style: theme.textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.5,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
-
-/// 2x2 tools grid (4 cells), matching the workout home's
-/// _buildNavGrid so the bottom of both tabs feels identical.
+/// Compact row of the three most-used nutrition destinations.
 class _NutritionToolsGrid extends StatelessWidget {
   final VoidCallback onProgress;
   final VoidCallback onSavedMeals;
   final VoidCallback onFoods;
-  final VoidCallback onSettings;
 
   const _NutritionToolsGrid({
     required this.onProgress,
     required this.onSavedMeals,
     required this.onFoods,
-    required this.onSettings,
   });
 
   @override
@@ -1302,49 +1355,20 @@ class _NutritionToolsGrid extends StatelessWidget {
         loc.nutritionHomeToolBalance,
         onProgress,
       ),
-      _NutritionToolItemData(
-        Icons.tune_rounded,
-        loc.nutritionSettingsTitle,
-        onSettings,
-      ),
     ];
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80),
+    return Row(
+      children: [
+        for (var index = 0; index < items.length; index++) ...[
+          if (index > 0) const SizedBox(width: 8),
+          Expanded(
+            child: _NutritionToolTile(
+              icon: items[index].icon,
+              label: items[index].label,
+              onTap: items[index].onTap,
+            ),
           ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          shrinkWrap: true,
-          padding: EdgeInsets.zero,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            childAspectRatio: 1.7,
-            mainAxisSpacing: 0,
-            crossAxisSpacing: 0,
-          ),
-          itemCount: items.length,
-          itemBuilder: (ctx, i) {
-            final item = items[i];
-            final isLeft = i % 2 == 0;
-            final isTop = i < 2;
-            return _NutritionToolTile(
-              icon: item.icon,
-              label: item.label,
-              onTap: item.onTap,
-              showLeftBorder: !isLeft,
-              showTopBorder: !isTop,
-            );
-          },
-        ),
-      ),
+        ],
+      ],
     );
   }
 }
@@ -1360,62 +1384,36 @@ class _NutritionToolTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final bool showLeftBorder;
-  final bool showTopBorder;
 
   const _NutritionToolTile({
     required this.icon,
     required this.label,
     required this.onTap,
-    required this.showLeftBorder,
-    required this.showTopBorder,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final borderColor = theme.colorScheme.outlineVariant.withAlpha(80);
     return Material(
-      color: Colors.transparent,
+      color: theme.colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(15),
       child: InkWell(
         onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(
-              left: showLeftBorder
-                  ? BorderSide(color: borderColor)
-                  : BorderSide.none,
-              top: showTopBorder
-                  ? BorderSide(color: borderColor)
-                  : BorderSide.none,
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          child: Column(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withAlpha(120),
-                  borderRadius: BorderRadius.circular(10),
+              Icon(icon, size: 21, color: theme.colorScheme.primary),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
-                child: Icon(icon, size: 20, color: theme.colorScheme.primary),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
               ),
             ],
           ),
@@ -1425,92 +1423,61 @@ class _NutritionToolTile extends StatelessWidget {
   }
 }
 
-/// Collapsible header used by the "Today" section. Renders a
-/// small icon chip, a section title, an optional value (e.g. the
-/// day's total calories), a count pill and an expand/collapse caret.
-/// Matches the workout home's _CollapsibleSectionHeader visually.
-class _CollapsibleSectionHeader extends StatelessWidget {
-  final IconData icon;
-  final Color iconBg;
-  final Color iconFg;
+/// Collapsible header used by the "Today" section.
+class _NutritionTodayHeader extends StatelessWidget {
   final String title;
   final int count;
-  final bool expanded;
   final String? value;
-  final VoidCallback onTap;
 
-  const _CollapsibleSectionHeader({
-    required this.icon,
-    required this.iconBg,
-    required this.iconFg,
+  const _NutritionTodayHeader({
     required this.title,
     required this.count,
-    required this.expanded,
-    required this.onTap,
     this.value,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(icon, size: 18, color: iconFg),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 30, 20, 4),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: theme.textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.5,
+              color: theme.colorScheme.onSurface,
             ),
-            const SizedBox(width: 8),
+          ),
+          const Spacer(),
+          if (value != null) ...[
             Text(
-              title,
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.5,
+              value!,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
                 color: theme.colorScheme.onSurface,
               ),
             ),
-            const Spacer(),
-            if (value != null) ...[
-              Text(
-                value!,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: theme.colorScheme.onSurface,
+            const SizedBox(width: 10),
+          ],
+          if (count > 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$count',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(width: 10),
-            ],
-            if (count > 0) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '$count',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-            ],
-            Icon(
-              expanded ? Icons.expand_less : Icons.expand_more,
-              color: theme.colorScheme.onSurfaceVariant,
             ),
           ],
-        ),
+        ],
       ),
     );
   }

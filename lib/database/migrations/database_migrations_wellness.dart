@@ -345,5 +345,47 @@ abstract final class DatabaseWellnessMigrations {
         } catch (_) {}
       }
     }
+    if (oldVersion < 40) {
+      // v40: daily expenditure (TDEE) and the deficit/maintenance/surplus
+      // adjustment that derives the consumption goal. Existing rows are
+      // backfilled as `tdee = calories` and `adjustment = maintenance`,
+      // which preserves the previous goal exactly (TDEE × 1.0 = goal).
+      // This must live in a step ABOVE v39: devices that already upgraded
+      // to the v39 sleep migration would skip any lower-numbered block.
+      for (final statement in <String>[
+        'ALTER TABLE nutrition_goals ADD COLUMN tdee REAL',
+        'ALTER TABLE nutrition_goals ADD COLUMN adjustment_kind TEXT',
+        'ALTER TABLE nutrition_goals ADD COLUMN adjustment_percent REAL',
+      ]) {
+        try {
+          await db.execute(statement);
+        } catch (_) {}
+      }
+      try {
+        await db.execute('''
+          UPDATE nutrition_goals
+          SET tdee = calories,
+              adjustment_kind = 'maintenance',
+              adjustment_percent = 0
+          WHERE tdee IS NULL
+        ''');
+      } catch (_) {}
+    }
+    if (oldVersion < 39) {
+      // v39: sleep_monitor_segments and sleep_stage_epochs are transient
+      // calculation material. They were only consumed during import to
+      // produce the session aggregates (now the only persisted sleep data)
+      // and are no longer written or exported. Existing rows are dropped
+      // once; a best-effort VACUUM reclaims the file space.
+      try {
+        await db.execute('DELETE FROM sleep_monitor_segments');
+      } catch (_) {}
+      try {
+        await db.execute('DELETE FROM sleep_stage_epochs');
+      } catch (_) {}
+      try {
+        await db.execute('VACUUM');
+      } catch (_) {}
+    }
   }
 }

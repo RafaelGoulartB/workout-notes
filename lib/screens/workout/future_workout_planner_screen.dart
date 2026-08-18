@@ -95,7 +95,7 @@ class _FutureWorkoutPlannerScreenState
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: loc.activeWorkoutAddExercise,
-            onPressed: _exercises.isEmpty ? null : _pickExercise,
+            onPressed: _pickExercise,
           ),
           PopupMenuButton(
             itemBuilder: (ctx) => [
@@ -650,7 +650,7 @@ class _FutureWorkoutPlannerScreenState
     double? rpe = (set['rpe'] as num?)?.toDouble();
     bool isWarmup = (set['is_warmup'] as int?) == 1;
 
-    final result = await showModalBottomSheet<bool>(
+    final result = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -684,7 +684,7 @@ class _FutureWorkoutPlannerScreenState
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  ' — #',
+                  '${exercise.localizedName(loc)} · ${loc.workoutDetailSetNumber} ${setIndex + 1}',
                   style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -768,7 +768,7 @@ class _FutureWorkoutPlannerScreenState
                               ),
                               child: Center(
                                 child: Text(
-                                  i == 0 ? '-' : '',
+                                  i == 0 ? '-' : '$i',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
@@ -790,15 +790,22 @@ class _FutureWorkoutPlannerScreenState
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx, false),
+                        onPressed: () => Navigator.pop(ctx, 'cancel'),
                         child: Text(loc.commonCancel),
                       ),
                     ),
                     const SizedBox(width: 12),
+                    IconButton(
+                      tooltip: loc.commonDelete,
+                      onPressed: () => Navigator.pop(ctx, 'delete'),
+                      color: Theme.of(ctx).colorScheme.error,
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                    const SizedBox(width: 4),
                     Expanded(
                       flex: 2,
                       child: FilledButton(
-                        onPressed: () => Navigator.pop(ctx, true),
+                        onPressed: () => Navigator.pop(ctx, 'save'),
                         child: Text(loc.commonSave),
                       ),
                     ),
@@ -812,7 +819,11 @@ class _FutureWorkoutPlannerScreenState
       ),
     );
 
-    if (result == true) {
+    if (result == 'delete') {
+      await _workoutRepo.deleteSet(set['id'] as String);
+      await _load();
+      if (mounted) setState(() {});
+    } else if (result == 'save') {
       await _workoutRepo.updateSet(
         set['id'] as String,
         weight: weight,

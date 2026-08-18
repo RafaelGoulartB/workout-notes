@@ -1,12 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/models/sleep_inference.dart';
 import 'package:workout_notes/models/sleep_monitor_diagnostics.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
@@ -137,203 +135,34 @@ void main() {
     }
   });
 
-  testWidgets('result timeline renders quiet, noise and invalid segments', (
-    tester,
-  ) async {
-    final start = DateTime.utc(2026, 7, 26, 22);
-    final session = _session(start, const Duration(seconds: 90));
-    await tester.pumpWidget(
-      _localized(
-        Scaffold(
-          body: SleepMonitorTimeline(
-            session: session,
-            inference: _emptyInference(),
-            segments: [
-              SleepMonitorSegment(
-                id: '1',
-                sessionId: 's',
-                startedAt: start,
-                durationSeconds: 30,
-                audioRmsDbfs: -50,
-                audioPeakDbfs: -30,
-                noiseScore: 1,
-                classification: 'quiet',
-                validFraction: 1,
-                noiseBurstCount: 0,
-              ),
-              SleepMonitorSegment(
-                id: '2',
-                sessionId: 's',
-                startedAt: start.add(const Duration(seconds: 30)),
-                durationSeconds: 30,
-                audioRmsDbfs: -20,
-                audioPeakDbfs: -8,
-                noiseScore: 15,
-                classification: 'noise',
-                validFraction: 1,
-                noiseBurstCount: 1,
-              ),
-              SleepMonitorSegment(
-                id: '3',
-                sessionId: 's',
-                startedAt: start.add(const Duration(seconds: 60)),
-                durationSeconds: 30,
-                audioRmsDbfs: null,
-                audioPeakDbfs: null,
-                noiseScore: null,
-                classification: 'invalid',
-                validFraction: 0,
-                noiseBurstCount: 0,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-    expect(
-      find.bySemanticsLabel('Sleep monitoring timeline with 3 segments'),
-      findsOneWidget,
-    );
-  });
+  testWidgets(
+    'result screen shows the persisted aggregate breakdown without epochs',
+    (tester) async {
+      final start = DateTime.utc(2026, 7, 29, 5);
+      final session = _session(start, const Duration(hours: 4));
+      final database = (await tester.runAsync(
+        () => _resultDatabase(session),
+      ))!;
+      DatabaseHelper.overrideDatabase = database;
+      addTearDown(() async {
+        DatabaseHelper.overrideDatabase = null;
+        await database.close();
+      });
 
-  testWidgets('noise chart renders captured scores', (tester) async {
-    final start = DateTime.utc(2026, 7, 26, 22);
-    final segments = List.generate(
-      4,
-      (index) => SleepMonitorSegment(
-        id: '$index',
-        sessionId: 's',
-        startedAt: start.add(Duration(minutes: index * 30)),
-        durationSeconds: 30,
-        audioRmsDbfs: -40,
-        audioPeakDbfs: -20,
-        noiseScore: index * 4,
-        classification: index < 3 ? 'quiet' : 'noise',
-        validFraction: 1,
-        noiseBurstCount: 0,
-      ),
-    );
-    final session = _session(start, const Duration(hours: 2));
-
-    await tester.pumpWidget(
-      _localized(
-        Scaffold(
-          body: SleepNoiseChart(
-            segments: segments,
-            session: session,
-            inference: _emptyInference(),
-            emptyTitle: 'No data',
-            noiseScoreLabel: 'Noise score',
-            thresholdLabel: 'Threshold',
-          ),
-        ),
-      ),
-    );
-
-    expect(find.byType(LineChart), findsOneWidget);
-    expect(find.text('Threshold: 10'), findsOneWidget);
-  });
-
-  testWidgets('result screen shows inferred onset with low confidence', (
-    tester,
-  ) async {
-    final start = DateTime.utc(2026, 7, 29, 5);
-    final session = _session(start, const Duration(hours: 4));
-    final segments = List.generate(480, (index) {
-      final score = index < 10 ? 16.0 : 2.0;
-      return SleepMonitorSegment(
-        id: '$index',
-        sessionId: session.id,
-        startedAt: start.add(Duration(seconds: index * 30)),
-        durationSeconds: 30,
-        audioRmsDbfs: -82 + score,
-        audioPeakDbfs: -62 + score,
-        noiseScore: score,
-        classification: score >= 10 ? 'noise' : 'quiet',
-        validFraction: 1,
-        noiseBurstCount: score >= 10 ? 10 : 0,
+      await tester.pumpWidget(
+        _localized(SleepMonitorResultScreen(sessionId: session.id)),
       );
-    });
-    final database = (await tester.runAsync(
-      () => _resultDatabase(session, segments),
-    ))!;
-    DatabaseHelper.overrideDatabase = database;
-    addTearDown(() async {
-      DatabaseHelper.overrideDatabase = null;
-      await database.close();
-    });
+      await _pumpUntilLoaded(tester);
 
-    await tester.pumpWidget(
-      _localized(SleepMonitorResultScreen(sessionId: session.id)),
-    );
-    await _pumpUntilLoaded(tester);
-    await tester.scrollUntilVisible(
-      find.text('Night analysis'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pump();
-
-    expect(find.text('Night analysis'), findsOneWidget);
-    expect(find.text('Fell asleep'), findsWidgets);
-    expect(find.textContaining('low'), findsOneWidget);
-    expect(find.text('Estimated sleep'), findsOneWidget);
-  });
-
-  testWidgets('result screen explains insufficient digital-silence data', (
-    tester,
-  ) async {
-    final start = DateTime.utc(2026, 7, 29, 5);
-    final session = _session(start, const Duration(hours: 4));
-    final segments = List.generate(
-      4,
-      (index) => SleepMonitorSegment(
-        id: '$index',
-        sessionId: session.id,
-        startedAt: start.add(Duration(hours: index)),
-        durationSeconds: 3600,
-        audioRmsDbfs: -120,
-        audioPeakDbfs: -120,
-        noiseScore: 0,
-        classification: 'quiet',
-        validFraction: 1,
-        noiseBurstCount: 0,
-      ),
-    );
-    final database = (await tester.runAsync(
-      () => _resultDatabase(session, segments),
-    ))!;
-    DatabaseHelper.overrideDatabase = database;
-    addTearDown(() async {
-      DatabaseHelper.overrideDatabase = null;
-      await database.close();
-    });
-
-    await tester.pumpWidget(
-      _localized(SleepMonitorResultScreen(sessionId: session.id)),
-    );
-    await _pumpUntilLoaded(tester);
-    await tester.scrollUntilVisible(
-      find.text('Technical details'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('Technical details'));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text(
-        'More than 20% of the period contains digital microphone silence.',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.text(
-        "This night's data is not sufficient to calculate sleep onset and awakenings safely.",
-      ),
-      findsOneWidget,
-    );
-  });
+      expect(find.text('Time monitored'), findsOneWidget);
+      // The stage card renders the persisted aggregates even though no
+      // epochs are stored.
+      expect(find.text('Sleep stages'), findsOneWidget);
+      expect(find.text('Awake'), findsOneWidget);
+      expect(find.text('Sleeping'), findsOneWidget);
+      expect(find.text('Estimated deep sleep'), findsOneWidget);
+    },
+  );
 }
 
 Future<void> _pumpUntilLoaded(WidgetTester tester) async {
@@ -347,10 +176,7 @@ Future<void> _pumpUntilLoaded(WidgetTester tester) async {
   fail('Sleep result screen did not finish loading');
 }
 
-Future<Database> _resultDatabase(
-  SleepMonitorSession session,
-  List<SleepMonitorSegment> segments,
-) async {
+Future<Database> _resultDatabase(SleepMonitorSession session) async {
   final database = await databaseFactory.openDatabase(
     inMemoryDatabasePath,
     options: OpenDatabaseOptions(
@@ -374,33 +200,26 @@ Future<Database> _resultDatabase(
             estimated_sleep_minutes INTEGER,
             noise_event_count INTEGER NOT NULL,
             signal_quality_score REAL,
+            analysis_status TEXT,
+            sleep_onset_at TEXT,
+            final_wake_at TEXT,
+            sleep_latency_minutes INTEGER,
+            awake_minutes INTEGER,
+            sleeping_minutes INTEGER,
+            deep_sleep_minutes INTEGER,
+            unknown_minutes INTEGER,
+            awakening_count INTEGER,
+            sleep_efficiency REAL,
+            stage_confidence REAL,
+            stage_algorithm_version TEXT,
             end_reason TEXT,
             created_at TEXT NOT NULL
-          )
-        ''');
-        await db.execute('''
-          CREATE TABLE sleep_monitor_segments (
-            id TEXT PRIMARY KEY,
-            session_id TEXT NOT NULL,
-            started_at TEXT NOT NULL,
-            duration_seconds INTEGER NOT NULL,
-            audio_rms_dbfs REAL,
-            audio_peak_dbfs REAL,
-            noise_score REAL,
-            classification TEXT NOT NULL,
-            valid_fraction REAL NOT NULL,
-            noise_burst_count INTEGER NOT NULL
           )
         ''');
       },
     ),
   );
   await database.insert('sleep_monitor_sessions', session.toMap());
-  final batch = database.batch();
-  for (final segment in segments) {
-    batch.insert('sleep_monitor_segments', segment.toMap());
-  }
-  await batch.commit(noResult: true);
   return database;
 }
 
@@ -414,28 +233,26 @@ SleepMonitorSession _session(DateTime start, Duration duration) {
     utcOffsetStartMinutes: -180,
     utcOffsetEndMinutes: -180,
     sensorMode: 'audio',
-    algorithmVersion: 'test',
+    algorithmVersion: 'audio-features-v2',
     timeInBedMinutes: duration.inMinutes,
     quietMinutes: null,
     noisyMinutes: null,
-    estimatedSleepMinutes: null,
+    estimatedSleepMinutes: 200,
     noiseEventCount: 0,
     signalQualityScore: 1,
+    analysisStatus: SleepMonitorSession.analysisAvailable,
+    sleepOnsetAt: start.add(const Duration(minutes: 20)),
+    finalWakeAt: start.add(duration).subtract(const Duration(minutes: 10)),
+    sleepLatencyMinutes: 20,
+    awakeMinutes: 20,
+    sleepingMinutes: 150,
+    deepSleepMinutes: 30,
+    unknownMinutes: 10,
+    awakeningCount: 2,
+    sleepEfficiency: 0.83,
+    stageConfidence: 0.79,
+    stageAlgorithmVersion: 'sleep-stage-v2',
     endReason: SleepMonitorSession.endUser,
     createdAt: start,
-  );
-}
-
-SleepInferenceResult _emptyInference() {
-  return const SleepInferenceResult(
-    status: SleepInferenceStatus.available,
-    confidence: SleepInferenceConfidence.low,
-    sleepOnsetAt: null,
-    settlingStartedAt: null,
-    settlingEndedAt: null,
-    estimatedSleepSeconds: null,
-    events: [],
-    blockers: [],
-    parameters: {},
   );
 }

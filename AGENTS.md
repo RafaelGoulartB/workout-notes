@@ -64,10 +64,21 @@ lib/
 │       ├── export_screen.dart
 │       ├── quick_add_screen.dart
 │       └── rest_timer_screen.dart
+├── periodization/                      # Pure logic for the plan/periodization module
+│   ├── periodization_phase_form_controller.dart  # ChangeNotifier state for the phase editor
+│   ├── week_override_resolver.dart     # Weekly override model + diffing (no UI state)
+│   ├── nutrition_target_input.dart     # Nutrition field parsing + macro resolution
+│   └── phase_draft_data.dart           # Wizard <-> editor draft payload
+├── utils/
+│   └── periodization_palette.dart      # Shared phase/plan color palette
 └── widgets/
     ├── empty_state_placeholder.dart   # Reusable empty-state widget
     └── exercise_picker_sheet.dart     # Bottom sheet for picking exercises
 ```
+
+`lib/periodization/` holds controller/resolver code with **no** `BuildContext` or
+`setState` — widgets consume it via `ChangeNotifier`, so both the standalone
+phase editor screen and the plan wizard can reuse the same logic inline.
 
 ---
 

@@ -7,6 +7,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/nutrition/nutrition_goal.dart';
 import 'package:workout_notes/models/nutrition/nutrition_values.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
+import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
 
 /// Calorie-tracking analytics. The whole screen is purpose-built for
 /// the "am I in a surplus or a deficit?" question that drives weight
@@ -156,7 +157,12 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
     });
     try {
       final results = await Future.wait([
-        _repository.getActiveGoal(),
+        // The active plan's current week overrides the settings goal;
+        // the anchor day keeps past periods on their own plan target.
+        EffectiveNutritionGoalService.resolve(
+          nutritionRepository: _repository,
+          date: _periodAnchor,
+        ),
         _repository.getDailyCalorieTotalsForRange(
           startDate: start,
           endDate: end,
@@ -176,7 +182,7 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
         ),
       ]);
       if (!mounted || requestId != _loadRequestId) return;
-      final goal = results[0] as NutritionGoal?;
+      final goal = (results[0] as EffectiveNutritionGoal).goal;
       final dailies = results[1] as List<DailyCalorieTotal>;
       final balance = _repository.calculateCalorieBalance(
         dailies: dailies,

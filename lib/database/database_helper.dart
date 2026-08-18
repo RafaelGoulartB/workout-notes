@@ -13,6 +13,7 @@ import '../repositories/sleep_repository.dart';
 import '../repositories/sleep_monitor_repository.dart';
 import '../repositories/nutrition_repository.dart';
 import '../repositories/traditional_alarm_repository.dart';
+import '../repositories/periodization_repository.dart';
 import '../models/sleep_entry.dart';
 import '../models/sleep_monitor_segment.dart';
 import '../models/sleep_monitor_session.dart';
@@ -28,7 +29,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 36;
+  static const _dbVersion = 40;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -49,6 +50,8 @@ class DatabaseHelper {
   late final NutritionRepository nutritionRepo = NutritionRepository();
   late final TraditionalAlarmRepository traditionalAlarmRepo =
       TraditionalAlarmRepository();
+  late final PeriodizationRepository periodizationRepo =
+      PeriodizationRepository();
 
   DatabaseHelper._();
 
@@ -674,11 +677,17 @@ class DatabaseHelper {
     double? proteinG,
     double? carbsG,
     double? fatG,
+    double? tdee,
+    String? adjustmentKind,
+    double? adjustmentPercent,
   }) => nutritionRepo.saveGoal(
     calories: calories,
     proteinG: proteinG,
     carbsG: carbsG,
     fatG: fatG,
+    tdee: tdee,
+    adjustmentKind: adjustmentKind,
+    adjustmentPercent: adjustmentPercent,
   );
   Future<void> clearActiveNutritionGoal() => nutritionRepo.clearActiveGoal();
   Future<List<NutritionExportRow>> exportNutritionRows({

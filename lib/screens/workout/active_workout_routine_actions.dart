@@ -24,12 +24,21 @@ mixin _ActiveWorkoutRoutineActions
       return;
     }
 
+    final plannedRoutineIds = await _plannedRoutineIdsForToday();
+    if (!mounted) return;
+    final orderedRoutines = [...routines]
+      ..sort((a, b) {
+        final aPlanned = plannedRoutineIds.contains(a['id'] as String);
+        final bPlanned = plannedRoutineIds.contains(b['id'] as String);
+        if (aPlanned == bPlanned) return 0;
+        return aPlanned ? -1 : 1;
+      });
     final routineId = await showModalBottomSheet<String>(
       // ignore: use_build_context_synchronously
       context: ctx,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (ctx) => _buildRoutinePicker(routines),
+      builder: (ctx) => _buildRoutinePicker(orderedRoutines, plannedRoutineIds),
     );
     if (routineId == null || !mounted) return;
 
@@ -73,7 +82,22 @@ mixin _ActiveWorkoutRoutineActions
     );
   }
 
-  Widget _buildRoutinePicker(List<Map<String, dynamic>> routines) {
+  Future<Set<String>> _plannedRoutineIdsForToday() async {
+    try {
+      final repository = PeriodizationRepository();
+      final phase = await repository.getEffectivePhase(DateTime.now());
+      if (phase == null) return const {};
+      final target = await repository.getEffectiveTarget(phase.id);
+      return target?.routineIds.toSet() ?? const {};
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  Widget _buildRoutinePicker(
+    List<Map<String, dynamic>> routines,
+    Set<String> plannedRoutineIds,
+  ) {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -106,25 +130,71 @@ mixin _ActiveWorkoutRoutineActions
               separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (ctx, i) {
                 final routine = routines[i];
-                return ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.secondaryContainer,
-                      borderRadius: BorderRadius.circular(8),
+                final routineId = routine['id'] as String;
+                final isPlanned = plannedRoutineIds.contains(routineId);
+                return Container(
+                  decoration: isPlanned
+                      ? BoxDecoration(
+                          color: theme.colorScheme.primaryContainer.withAlpha(
+                            100,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: theme.colorScheme.primary.withAlpha(110),
+                          ),
+                        )
+                      : null,
+                  child: ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isPlanned
+                            ? theme.colorScheme.primaryContainer
+                            : theme.colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        isPlanned ? Icons.star_rounded : Icons.repeat,
+                        color: isPlanned
+                            ? theme.colorScheme.onPrimaryContainer
+                            : theme.colorScheme.onSecondaryContainer,
+                        size: 20,
+                      ),
                     ),
-                    child: Icon(
-                      Icons.repeat,
-                      color: theme.colorScheme.onSecondaryContainer,
-                      size: 20,
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            routine['name'] as String,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        if (isPlanned)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              AppLocalizations.of(
+                                context,
+                              )!.activeWorkoutPlanRoutine,
+                              style: TextStyle(
+                                color: theme.colorScheme.onPrimary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pop(ctx, routineId),
                   ),
-                  title: Text(
-                    routine['name'] as String,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.pop(ctx, routine['id'] as String),
                 );
               },
             ),

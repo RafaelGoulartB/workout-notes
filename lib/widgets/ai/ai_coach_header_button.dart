@@ -6,8 +6,8 @@ import 'package:workout_notes/screens/workout/ai_chat_screen.dart';
 
 /// Compact AI Coach entry point for primary dashboard app bars.
 ///
-/// This widget is intentionally added only to the workout, sleep and
-/// nutrition root screens so it never floats above content or leaks into
+/// This widget is intentionally added only to the workout, sleep, nutrition
+/// and plan root screens so it never floats above content or leaks into
 /// secondary flows.
 class AiCoachHeaderButton extends StatelessWidget {
   const AiCoachHeaderButton({super.key});

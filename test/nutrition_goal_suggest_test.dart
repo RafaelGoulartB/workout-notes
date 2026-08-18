@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/utils/nutrition_goal_suggest.dart';
 
 void main() {
-  group('suggestNutritionGoal (Mifflin-St Jeor)', () {
+  group('suggestNutritionGoal (Mifflin-St Jeor, maintenance-only)', () {
     test('BMR matches the formula for males', () {
       // 10*80 + 6.25*175 - 5*30 + 5 = 800 + 1093.75 - 150 + 5 = 1748.75
       final suggestion = suggestNutritionGoal(
@@ -12,7 +12,6 @@ void main() {
         ageYears: 30,
         isMale: true,
         activity: ActivityLevel.moderate,
-        objective: NutritionObjective.maintenance,
       );
       expect(suggestion.bmr, 1749);
     });
@@ -24,7 +23,6 @@ void main() {
         ageYears: 25,
         isMale: true,
         activity: ActivityLevel.moderate,
-        objective: NutritionObjective.maintenance,
       );
       final female = suggestNutritionGoal(
         weightKg: 60,
@@ -32,7 +30,6 @@ void main() {
         ageYears: 25,
         isMale: false,
         activity: ActivityLevel.moderate,
-        objective: NutritionObjective.maintenance,
       );
       expect(female.bmr, male.bmr - 166);
     });
@@ -45,7 +42,6 @@ void main() {
         ageYears: 30,
         isMale: true,
         activity: ActivityLevel.sedentary,
-        objective: NutritionObjective.maintenance,
       );
       final active = suggestNutritionGoal(
         weightKg: 70,
@@ -53,7 +49,6 @@ void main() {
         ageYears: 30,
         isMale: true,
         activity: ActivityLevel.active,
-        objective: NutritionObjective.maintenance,
       );
       expect(sedentary.bmr, bmrRaw.roundToDouble());
       expect(sedentary.tdee, (bmrRaw * 1.2).roundToDouble());
@@ -61,39 +56,16 @@ void main() {
       expect(active.tdee, greaterThan(sedentary.tdee));
     });
 
-    test('cut reduces and bulk increases the maintenance calories', () {
-      const weightKg = 75.0;
-      const heightCm = 180.0;
-      const ageYears = 28;
-      const isMale = true;
-      final cut = suggestNutritionGoal(
-        weightKg: weightKg,
-        heightCm: heightCm,
-        ageYears: ageYears,
-        isMale: isMale,
+    test('always returns maintenance: goal calories equal the TDEE', () {
+      final suggestion = suggestNutritionGoal(
+        weightKg: 75,
+        heightCm: 180,
+        ageYears: 28,
+        isMale: true,
         activity: ActivityLevel.moderate,
-        objective: NutritionObjective.cut,
       );
-      final maintain = suggestNutritionGoal(
-        weightKg: weightKg,
-        heightCm: heightCm,
-        ageYears: ageYears,
-        isMale: isMale,
-        activity: ActivityLevel.moderate,
-        objective: NutritionObjective.maintenance,
-      );
-      final bulk = suggestNutritionGoal(
-        weightKg: weightKg,
-        heightCm: heightCm,
-        ageYears: ageYears,
-        isMale: isMale,
-        activity: ActivityLevel.moderate,
-        objective: NutritionObjective.bulk,
-      );
-      expect(cut.calories, lessThan(maintain.calories));
-      expect(bulk.calories, greaterThan(maintain.calories));
-      expect(cut.calories, (maintain.tdee * 0.8).roundToDouble());
-      expect(bulk.calories, (maintain.tdee * 1.1).roundToDouble());
+      expect(suggestion.calories, suggestion.tdee);
+      expect(suggestion.tdee, greaterThan(suggestion.bmr));
     });
 
     test('macro split: protein and fat follow g/kg, carbs absorb the rest', () {
@@ -103,10 +75,10 @@ void main() {
         ageYears: 30,
         isMale: true,
         activity: ActivityLevel.moderate,
-        objective: NutritionObjective.cut,
       );
-      expect(suggestion.proteinG, (80 * 2.2).roundToDouble());
-      expect(suggestion.fatG, (80 * 0.8).roundToDouble());
+      // Maintenance defaults: 1.8 g/kg protein, 1.0 g/kg fat.
+      expect(suggestion.proteinG, (80 * 1.8).roundToDouble());
+      expect(suggestion.fatG, (80 * 1.0).roundToDouble());
       final expectedCarbs =
           ((suggestion.calories -
                       suggestion.proteinG * 4 -
@@ -117,14 +89,13 @@ void main() {
       expect(suggestion.carbsG, expectedCarbs);
     });
 
-    test('custom macro ratios override the defaults for the objective', () {
+    test('custom macro ratios override the defaults', () {
       final suggestion = suggestNutritionGoal(
         weightKg: 80,
         heightCm: 175,
         ageYears: 30,
         isMale: true,
         activity: ActivityLevel.moderate,
-        objective: NutritionObjective.maintenance,
         macroRatios: const NutritionMacroRatios(
           proteinPerKg: 2.1,
           fatPerKg: 0.7,
@@ -147,7 +118,6 @@ void main() {
           ageYears: 30,
           isMale: true,
           activity: ActivityLevel.moderate,
-          objective: NutritionObjective.maintenance,
           macroRatios: const NutritionMacroRatios(proteinPerKg: 0, fatPerKg: 1),
         ),
         throwsArgumentError,
@@ -161,7 +131,6 @@ void main() {
         ageYears: 60,
         isMale: false,
         activity: ActivityLevel.sedentary,
-        objective: NutritionObjective.cut,
       );
       expect(suggestion.carbsG, greaterThanOrEqualTo(0));
     });
@@ -174,7 +143,6 @@ void main() {
           ageYears: 30,
           isMale: true,
           activity: ActivityLevel.moderate,
-          objective: NutritionObjective.maintenance,
         ),
         throwsArgumentError,
       );
@@ -185,10 +153,36 @@ void main() {
           ageYears: 30,
           isMale: true,
           activity: ActivityLevel.moderate,
-          objective: NutritionObjective.maintenance,
         ),
         throwsArgumentError,
       );
+    });
+  });
+
+  group('NutritionAdjustment', () {
+    test('defaults keep the cut/maintenance/bulk presets', () {
+      expect(NutritionAdjustment.defaultsFor(NutritionObjective.cut).percent,
+          -20);
+      expect(
+        NutritionAdjustment.defaultsFor(NutritionObjective.maintenance).percent,
+        0,
+      );
+      expect(
+        NutritionAdjustment.defaultsFor(NutritionObjective.bulk).percent,
+        10,
+      );
+    });
+
+    test('kind is derived from the percent sign', () {
+      expect(
+        NutritionAdjustment.kindForPercent(-15),
+        NutritionObjective.cut,
+      );
+      expect(
+        NutritionAdjustment.kindForPercent(0),
+        NutritionObjective.maintenance,
+      );
+      expect(NutritionAdjustment.kindForPercent(12.5), NutritionObjective.bulk);
     });
   });
 }

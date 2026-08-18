@@ -1,0 +1,122 @@
+import 'package:workout_notes/utils/periodization_palette.dart';
+
+import 'periodization_template_phase.dart';
+
+class PeriodizationTemplate {
+  final String key;
+  final String nameKey;
+  final List<PeriodizationTemplatePhase> phases;
+
+  const PeriodizationTemplate({
+    required this.key,
+    required this.nameKey,
+    required this.phases,
+  });
+
+  static const cuttingBulking = PeriodizationTemplate(
+    key: 'cutting_bulking',
+    nameKey: 'cuttingBulking',
+    phases: [
+      PeriodizationTemplatePhase(
+        nameKey: 'cutting',
+        intentKey: 'gradualDeficit',
+        templateKey: 'cutting',
+        weeks: 12,
+        color: kPhaseColorBlue,
+      ),
+      PeriodizationTemplatePhase(
+        nameKey: 'deload',
+        intentKey: 'recover',
+        templateKey: 'deload',
+        weeks: 1,
+        color: kPhaseColorAmber,
+      ),
+      PeriodizationTemplatePhase(
+        nameKey: 'bulking',
+        intentKey: 'controlledGain',
+        templateKey: 'bulking',
+        weeks: 16,
+        color: kPhaseColorPurple,
+      ),
+      PeriodizationTemplatePhase(
+        nameKey: 'maintenance',
+        intentKey: 'stabilize',
+        templateKey: 'maintenance',
+        weeks: 4,
+        color: kPhaseColorGreen,
+      ),
+    ],
+  );
+
+  static const strength = PeriodizationTemplate(
+    key: 'strength_cycle',
+    nameKey: 'strength',
+    phases: [
+      PeriodizationTemplatePhase(
+        nameKey: 'base',
+        intentKey: 'buildCapacity',
+        templateKey: 'base',
+        weeks: 6,
+        color: kPhaseColorBlue,
+      ),
+      PeriodizationTemplatePhase(
+        nameKey: 'intensification',
+        intentKey: 'raiseIntensity',
+        templateKey: 'intensification',
+        weeks: 4,
+        color: kPhaseColorPurple,
+      ),
+      PeriodizationTemplatePhase(
+        nameKey: 'deload',
+        intentKey: 'recover',
+        templateKey: 'deload',
+        weeks: 1,
+        color: kPhaseColorAmber,
+      ),
+      PeriodizationTemplatePhase(
+        nameKey: 'peak',
+        intentKey: 'expressPerformance',
+        templateKey: 'peak',
+        weeks: 2,
+        color: kPhaseColorRed,
+      ),
+    ],
+  );
+
+  static const running = PeriodizationTemplate(
+    key: 'running_season',
+    nameKey: 'running',
+    phases: [
+      PeriodizationTemplatePhase(
+        nameKey: 'base',
+        intentKey: 'buildAerobicBase',
+        templateKey: 'aerobic_base',
+        weeks: 8,
+        color: kPhaseColorBlue,
+      ),
+      PeriodizationTemplatePhase(
+        nameKey: 'build',
+        intentKey: 'increaseSpecificLoad',
+        templateKey: 'build',
+        weeks: 6,
+        color: kPhaseColorPurple,
+      ),
+      PeriodizationTemplatePhase(
+        nameKey: 'taper',
+        intentKey: 'reduceFatigue',
+        templateKey: 'taper',
+        weeks: 2,
+        color: kPhaseColorAmber,
+      ),
+      PeriodizationTemplatePhase(
+        nameKey: 'event',
+        intentKey: 'eventWeek',
+        templateKey: 'event',
+        weeks: 1,
+        color: kPhaseColorRed,
+      ),
+    ],
+  );
+
+  static const all = [cuttingBulking, strength, running];
+}

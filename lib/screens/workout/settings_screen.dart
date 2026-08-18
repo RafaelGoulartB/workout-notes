@@ -17,6 +17,7 @@ import '../../navigation/ai_coach_navigation.dart';
 import 'ai_chat_screen.dart';
 import 'ai_settings_screen.dart';
 import 'nutrition_settings_screen.dart';
+import 'plan_settings_screen.dart';
 import 'sleep_settings_screen.dart';
 
 enum _SettingsCategory { general, workout, ai, data }
@@ -91,6 +92,14 @@ class AppSettingsScreen extends StatelessWidget {
                   context,
                   NutritionSettingsScreen(repository: NutritionRepository()),
                 ),
+              ),
+              const SettingsCardDivider(),
+              SettingsLinkTile(
+                icon: Icons.view_timeline_outlined,
+                iconColor: theme.colorScheme.primary,
+                title: loc.tabPlan,
+                subtitle: loc.settingsPlanSubtitle,
+                onTap: () => _open(context, const PlanSettingsScreen()),
               ),
             ],
           ),
@@ -869,6 +878,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                 result.nutritionDays,
                 result.meals,
                 result.goals,
+                result.periodizationPlans,
               ),
             ),
             behavior: SnackBarBehavior.floating,

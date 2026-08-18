@@ -3,6 +3,7 @@ import 'package:workout_notes/database/database_helper.dart';
 
 import 'test_data_context.dart';
 import 'test_data_fitness_generator.dart';
+import 'test_data_periodization_generator.dart';
 import 'test_data_wellness_generator.dart';
 
 /// Debug-only entry point for a complete, disposable usage scenario.
@@ -49,6 +50,9 @@ class TestDataGenerator {
       final wellness = TestDataWellnessGenerator(context);
       final fitnessResult = await fitness.generate();
       final wellnessResult = await wellness.generate();
+      final periodizationResult = await TestDataPeriodizationGenerator(
+        context,
+      ).generate();
 
       return TestDataReport(
         workouts: fitnessResult.workouts,
@@ -59,6 +63,9 @@ class TestDataGenerator {
         nutritionDays: wellnessResult.nutritionDays,
         meals: wellnessResult.meals,
         goals: fitnessResult.goals + wellnessResult.goals,
+        periodizationPlans: periodizationResult.plans,
+        periodizationPhases: periodizationResult.phases,
+        periodizationCheckins: periodizationResult.checkins,
       );
     });
   }
@@ -69,6 +76,7 @@ class TestDataGenerator {
     // Parent deletes cascade through workout, routine, food, sleep-monitor and
     // meal trees. Tables without a generated parent are removed explicitly.
     for (final table in <String>[
+      'periodization_plans',
       'workouts',
       'routines',
       'sleep_entries',

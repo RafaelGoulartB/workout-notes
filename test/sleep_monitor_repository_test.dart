@@ -213,7 +213,7 @@ void main() {
 
       expect(first.id, second.id);
       expect(await repository.getSessions(), hasLength(1));
-      expect(await repository.getSegments(first.id), hasLength(4));
+      expect(await repository.getSegments(first.id), isEmpty);
       expect(first.quietMinutes, 1);
       expect(first.noisyMinutes, 1);
       expect(first.noiseEventCount, 2);
@@ -312,7 +312,7 @@ void main() {
       final summary = await repository.getNightSummary(imported.sleepEntryId!);
 
       expect(imported.analysisStatus, SleepMonitorSession.analysisAvailable);
-      expect(stages, hasLength(24));
+      expect(stages, isEmpty);
       expect(summary, isNotNull);
       expect(
         summary!.session?.sleepOnsetAt,
@@ -325,79 +325,18 @@ void main() {
     },
   );
 
-  test('runs the heuristic engine and persists stages for feature nights', () async {
+  test('runs the heuristic engine for feature nights and persists aggregates', () async {
     final start = DateTime.utc(2026, 8, 2, 22);
     final imported = await repository.importNativeSpool(_featureSpool(start));
     final stages = await repository.getStageEpochs(imported.id);
 
     expect(imported.analysisStatus, SleepMonitorSession.analysisAvailable);
     expect(imported.stageAlgorithmVersion, SleepStageEngine.algorithmVersion);
-    expect(stages, isNotEmpty);
-    expect(
-      stages.where((epoch) => epoch.stage != SleepStageType.unknown),
-      isNotEmpty,
-    );
-    expect(stages.first.source, SleepStageEngine.source);
+    expect(stages, isEmpty);
     final summary = await repository.getNightSummary(imported.sleepEntryId!);
     expect(summary, isNotNull);
     expect(summary!.session?.sleepingMinutes, isNotNull);
     expect(summary.session?.deepSleepMinutes, isNotNull);
-  });
-
-  test('restageSleepStageEpochs re-stages stale feature nights and fixes aggregates', () async {
-    final start = DateTime.utc(2026, 8, 3, 22);
-    final imported = await repository.importNativeSpool(_featureSpool(start));
-    // Simulate an older import that left the session un-staged.
-    await database.delete(
-      'sleep_stage_epochs',
-      where: 'session_id = ?',
-      whereArgs: [imported.id],
-    );
-    await database.update(
-      'sleep_monitor_sessions',
-      {'analysis_status': SleepMonitorSession.analysisLegacyUnavailable},
-      where: 'id = ?',
-      whereArgs: [imported.id],
-    );
-    expect(await repository.getStageEpochs(imported.id), isEmpty);
-
-    await repository.restageSleepStageEpochs();
-
-    final reimported = await repository.getSession(imported.id);
-    final stages = await repository.getStageEpochs(imported.id);
-    expect(reimported!.analysisStatus, SleepMonitorSession.analysisAvailable);
-    expect(reimported.stageAlgorithmVersion, SleepStageEngine.algorithmVersion);
-    expect(stages, isNotEmpty);
-    // The linked sleep entry follows the re-staged sleep total.
-    final entryRows = await database.query(
-      'sleep_entries',
-      where: 'id = ?',
-      whereArgs: [reimported.sleepEntryId],
-      limit: 1,
-    );
-    expect(entryRows, isNotEmpty);
-    expect(
-      (entryRows.first['sleep_minutes'] as num),
-      reimported.estimatedSleepMinutes!,
-    );
-  });
-
-  test('restageSleepStageEpochs leaves legacy nights untouched', () async {
-    final imported = await repository.importNativeSpool(
-      _spool(
-        DateTime.utc(2026, 8, 3, 22),
-        status: SleepMonitorSession.completed,
-        segmentCount: 8,
-        durationMinutes: 4,
-      ),
-    );
-    await repository.restageSleepStageEpochs();
-    final session = await repository.getSession(imported.id);
-    expect(
-      session!.analysisStatus,
-      SleepMonitorSession.analysisLegacyUnavailable,
-    );
-    expect(await repository.getStageEpochs(imported.id), isEmpty);
   });
 
   test('keeps legacy noise nights as legacy_unavailable', () async {

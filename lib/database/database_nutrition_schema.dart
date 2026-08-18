@@ -134,6 +134,9 @@ abstract final class DatabaseNutritionSchema {
         protein_g REAL,
         carbs_g REAL,
         fat_g REAL,
+        tdee REAL,
+        adjustment_kind TEXT,
+        adjustment_percent REAL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         is_active INTEGER NOT NULL DEFAULT 1

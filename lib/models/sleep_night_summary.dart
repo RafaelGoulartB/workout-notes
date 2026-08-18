@@ -15,7 +15,11 @@ class SleepNightSummary {
   });
 
   bool get hasStages =>
-      stages.any((epoch) => epoch.stage != SleepStageType.unknown);
+      stages.any((epoch) => epoch.stage != SleepStageType.unknown) ||
+      (session != null &&
+          session!.analysisStatus == SleepMonitorSession.analysisAvailable &&
+          (session!.sleepingMinutes != null ||
+              session!.deepSleepMinutes != null));
 
   int? get effectiveSleepMinutes =>
       entry.actualSleepMinutes ??

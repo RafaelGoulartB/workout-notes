@@ -151,6 +151,9 @@ Future<void> _installSchema(Database db) async {
       protein_g REAL,
       carbs_g REAL,
       fat_g REAL,
+      tdee REAL,
+      adjustment_kind TEXT,
+      adjustment_percent REAL,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       is_active INTEGER NOT NULL DEFAULT 1
@@ -241,6 +244,25 @@ class _ControlledGateway implements NutritionGateway {
   String? get baseUrl => 'https://stub.test';
 }
 
+
+/// Real-I/O loads (sqflite FFI) only progress inside runAsync windows and
+/// can be slow on CI machines, so poll for the expected widget instead of
+/// relying on a fixed delay.
+Future<void> _waitUntilFound(
+  WidgetTester tester,
+  Finder finder, {
+  int maxMilliseconds = 5000,
+}) async {
+  var waited = 0;
+  while (finder.evaluate().isEmpty && waited < maxMilliseconds) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 200)),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    waited += 200;
+  }
+}
+
 void main() {
   late Database database;
   late NutritionRepository repository;
@@ -288,7 +310,10 @@ void main() {
     expect(find.text(loc.nutritionHomeToolBalance), findsOneWidget);
     expect(find.text(loc.nutritionHomeToolMeals), findsOneWidget);
     expect(find.text(loc.nutritionFoodLibraryTitle), findsOneWidget);
-    expect(find.text(loc.nutritionMealBreakfast), findsNothing);
+    expect(find.text(loc.nutritionSettingsTitle), findsNothing);
+    // The diary is not open yet — check a diary-only marker instead of
+    // relying on the home's meal rows staying outside the build cache.
+    expect(find.text(loc.nutritionJumpToday), findsNothing);
 
     await tester.runAsync(() async {
       await tester.tap(find.text(loc.nutritionSummaryTitle));
@@ -340,6 +365,31 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text(loc.nutritionDailyStatsTab));
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('nutrition tools render as three compact items at 320px', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app(const NutritionHomeScreen()));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+    final loc = AppLocalizations.of(tester.element(find.byType(Scaffold)))!;
+
+    expect(find.text(loc.nutritionFoodLibraryTitle), findsOneWidget);
+    expect(find.text(loc.nutritionHomeToolMeals), findsOneWidget);
+    expect(find.text(loc.nutritionHomeToolBalance), findsOneWidget);
+    expect(find.text(loc.nutritionSettingsTitle), findsNothing);
+    expect(find.byIcon(Icons.today_outlined), findsNothing);
+    expect(find.byIcon(Icons.expand_less), findsNothing);
+    expect(find.byIcon(Icons.expand_more), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -487,11 +537,7 @@ void main() {
 
     await tester.tap(find.text(loc.nutritionBalanceLast30Days));
     await tester.pump();
-    await tester.runAsync(() async {
-      await Future<void>.delayed(const Duration(milliseconds: 500));
-      await tester.pump();
-    });
-    await tester.pump(const Duration(milliseconds: 300));
+    await _waitUntilFound(tester, find.text(loc.nutritionBalanceMonthSequence));
 
     expect(find.text(loc.nutritionBalanceMonthSequence), findsOneWidget);
     expect(find.byKey(const ValueKey('balance-month-week-1')), findsOneWidget);
@@ -564,10 +610,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(mealRow);
       await tester.pump();
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 150)),
-      );
-      await tester.pumpAndSettle();
+      await _waitUntilFound(tester, find.text(loc.nutritionDiaryTab));
 
       expect(find.byType(NutritionDayDetailScreen), findsOneWidget);
       expect(find.byType(FoodSearchScreen), findsNothing);
@@ -1132,7 +1175,7 @@ void main() {
     },
   );
 
-  testWidgets('MainShell renders three tabs (Workout, Sleep, Nutrition)', (
+  testWidgets('MainShell renders Workout, Sleep, Nutrition, and Plan tabs', (
     tester,
   ) async {
     // Render a structure equivalent to MainShell: we use a stub body
@@ -1155,6 +1198,7 @@ void main() {
     expect(find.text(loc.tabWorkout), findsOneWidget);
     expect(find.text(loc.tabSleep), findsOneWidget);
     expect(find.text(loc.tabNutrition), findsOneWidget);
+    expect(find.text(loc.tabPlan), findsOneWidget);
   });
 }
 
@@ -1179,6 +1223,10 @@ class _StubMainShell extends StatelessWidget {
           NavigationDestination(
             icon: const Icon(Icons.restaurant_outlined),
             label: loc.tabNutrition,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.view_timeline_outlined),
+            label: loc.tabPlan,
           ),
         ],
       ),

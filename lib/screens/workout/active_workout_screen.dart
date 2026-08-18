@@ -10,6 +10,7 @@ import '../../repositories/workout_repository.dart';
 import '../../repositories/routine_repository.dart';
 import '../../repositories/settings_repository.dart';
 import '../../repositories/body_measurement_repository.dart';
+import '../../repositories/periodization_repository.dart';
 import '../../services/rest_timer_service.dart';
 import '../../services/notification_service.dart';
 import '../../widgets/exercise_picker_sheet.dart';
