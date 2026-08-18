@@ -13,6 +13,7 @@ import 'package:workout_notes/utils/periodization_palette.dart';
 import 'package:workout_notes/widgets/periodization/nutrition_target_fields.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 import 'package:workout_notes/widgets/periodization/phase_week_selector.dart';
+import 'package:workout_notes/widgets/periodization/week_copy_sheet.dart';
 
 import 'nutrition_goal_suggest_sheet.dart';
 
@@ -187,6 +188,30 @@ class _PeriodizationPhaseFormScreenState
           suggestion.fatG,
         );
       },
+    );
+  }
+
+  Future<void> _copyWeekTargets() async {
+    final loc = AppLocalizations.of(context)!;
+    final c = _controller;
+    final targets = await WeekCopySheet.show(
+      context,
+      weekCount: c.weeksCount,
+      selected: c.selectedWeek,
+      firstWeekStart: c.weekStarts.first,
+      phaseEnd: c.endDate,
+      customizedWeeks: {
+        for (var i = 0; i < c.weekOverrides.length; i++)
+          if (c.weekOverrides[i] != null) i,
+      },
+      lockedWeeks: c.lockedWeeks,
+      currentWeek: c.currentWeekIndex,
+    );
+    if (targets == null || targets.isEmpty || !mounted) return;
+    final applied = c.applyToWeeks(targets);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(loc.periodizationWeekCopyApplied(applied))),
     );
   }
 
@@ -450,178 +475,54 @@ class _PeriodizationPhaseFormScreenState
                     icon: Icons.track_changes_rounded,
                   ),
                   PeriodizationSurface(
-                    child: PhaseWeekSelector(
-                      weekCount: weeksCount,
-                      selected: c.selectedWeek,
-                      firstWeekStart: c.weekStarts.first,
-                      phaseEnd: c.endDate,
-                      customizedWeeks: {
-                        for (var i = 0; i < c.weekOverrides.length; i++)
-                          if (c.weekOverrides[i] != null) i,
-                      },
-                      lockedWeeks: locked,
-                      currentWeek: c.currentWeekIndex,
-                      onSelect: c.selectWeek,
-                      onCustomize: !weekLocked &&
-                              c.selectedWeek > 0 &&
-                              !weekCustomized
-                          ? c.customizeSelectedWeek
-                          : null,
-                      onUseInheritance: !weekLocked &&
-                              c.selectedWeek > 0 &&
-                              weekCustomized
-                          ? c.useInheritance
-                          : null,
-                      onApplyToFollowing: !weekLocked &&
-                              weeksCount > 1 &&
-                              c.selectedWeek < weeksCount - 1 &&
-                              (c.selectedWeek == 0 || weekCustomized)
-                          ? c.applyToFollowingWeeks
-                          : null,
+                    padding: EdgeInsets.zero,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                          child: PhaseWeekSelector(
+                            weekCount: weeksCount,
+                            selected: c.selectedWeek,
+                            firstWeekStart: c.weekStarts.first,
+                            phaseEnd: c.endDate,
+                            customizedWeeks: {
+                              for (var i = 0; i < c.weekOverrides.length; i++)
+                                if (c.weekOverrides[i] != null) i,
+                            },
+                            lockedWeeks: locked,
+                            currentWeek: c.currentWeekIndex,
+                            onSelect: c.selectWeek,
+                            onCustomize: !weekLocked &&
+                                    c.selectedWeek > 0 &&
+                                    !weekCustomized
+                                ? c.customizeSelectedWeek
+                                : null,
+                            onUseInheritance: !weekLocked &&
+                                    c.selectedWeek > 0 &&
+                                    weekCustomized
+                                ? c.useInheritance
+                                : null,
+                            onCopy: !weekLocked &&
+                                    weeksCount > 1 &&
+                                    (c.selectedWeek == 0 || weekCustomized)
+                                ? _copyWeekTargets
+                                : null,
+                          ),
+                        ),
+                        _targetsDivider(theme),
+                        if (showEditableFields)
+                          ..._editableSections(
+                            loc,
+                            c,
+                            weekLocked,
+                            _suggestNutritionTargets,
+                          )
+                        else
+                          _readOnlyList(theme, effective, weekLocked),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  if (showEditableFields) ...[
-                    _targetCard(
-                      loc.periodizationNutritionTargets,
-                      Icons.restaurant_outlined,
-                      subtitle: _targetCardSubtitle(
-                        loc.periodizationNutritionTargetsHelp,
-                        const ['adjustment', 'proteinPerKg', 'fatPerKg', 'refWeight'],
-                      ),
-                      actionLabel: loc.periodizationSuggestTargets,
-                      onAction: _suggestNutritionTargets,
-                      initiallyExpanded: true,
-                      child: NutritionTargetFields(
-                        tdee: c.tdee,
-                        adjustment: c.targetControllers['adjustment']!,
-                        proteinPerKg: c.targetControllers['proteinPerKg']!,
-                        fatPerKg: c.targetControllers['fatPerKg']!,
-                        referenceWeight: c.targetControllers['refWeight']!,
-                        onChanged: c.onTargetChanged,
-                      ),
-                    ),
-                    _targetCard(
-                      loc.periodizationTrainingTargets,
-                      Icons.fitness_center,
-                      subtitle: _targetCardSubtitle(
-                        loc.periodizationTrainingTargetsHelp,
-                        const [
-                          'workouts',
-                          'minSets',
-                          'maxSets',
-                          'minRpe',
-                          'maxRpe',
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          LayoutBuilder(
-                            builder: (context, constraints) {
-                              final width = constraints.maxWidth >= 560
-                                  ? (constraints.maxWidth - 10) / 2
-                                  : constraints.maxWidth;
-                              Widget field(
-                                String key,
-                                String label, {
-                                bool integer = false,
-                                bool signed = false,
-                                String? unit,
-                              }) => SizedBox(
-                                width: width,
-                                child: _field(key, label,
-                                    integer: integer, signed: signed, unit: unit),
-                              );
-                              return Wrap(
-                                spacing: 10,
-                                runSpacing: 12,
-                                children: [
-                                  field('workouts', loc.periodizationWorkoutsPerWeek,
-                                      integer: true, unit: loc.periodizationPerWeekUnit),
-                                  field('minSets', loc.periodizationMinSets,
-                                      integer: true, unit: loc.periodizationPerWeekUnit),
-                                  field('maxSets', loc.periodizationMaxSets,
-                                      integer: true, unit: loc.periodizationPerWeekUnit),
-                                  field('minRpe', loc.periodizationMinRpe),
-                                  field('maxRpe', loc.periodizationMaxRpe),
-                                ],
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 14),
-                          DropdownButtonFormField<String?>(
-                            initialValue: c.routineId,
-                            isExpanded: true,
-                            decoration: InputDecoration(
-                              labelText: loc.periodizationLinkedRoutine,
-                              prefixIcon: const Icon(
-                                Icons.fitness_center_outlined,
-                              ),
-                              helperText:
-                                  loc.periodizationLinkedRoutineWeeklyHelp,
-                            ),
-                            items: [
-                              DropdownMenuItem<String?>(
-                                value: null,
-                                child: Text(
-                                  loc.periodizationNoRoutine,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              ...c.routines.map(
-                                (routine) => DropdownMenuItem<String?>(
-                                  value: routine['id'] as String,
-                                  child: Text(
-                                    routine['name'] as String,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                            ],
-                            onChanged: weekLocked ? null : c.setRoutine,
-                          ),
-                        ],
-                      ),
-                    ),
-                    _targetCard(
-                      loc.periodizationBodyTargets,
-                      Icons.monitor_weight_outlined,
-                      subtitle: _targetCardSubtitle(
-                        loc.periodizationBodyTargetsHelp,
-                        const ['weight', 'change'],
-                      ),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final width = constraints.maxWidth >= 560
-                              ? (constraints.maxWidth - 10) / 2
-                              : constraints.maxWidth;
-                          Widget field(String key, String label,
-                                  {String? unit}) =>
-                              SizedBox(width: width, child: _field(key, label, unit: unit));
-                          return Wrap(
-                            spacing: 10,
-                            runSpacing: 12,
-                            children: [
-                              field('weight', loc.periodizationTargetWeight, unit: 'kg'),
-                              field('change', loc.periodizationWeeklyWeightChange,
-                                  unit: '%'),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                    _targetCard(
-                      loc.periodizationSleepTargets,
-                      Icons.nightlight_outlined,
-                      subtitle: _targetCardSubtitle(
-                        loc.periodizationSleepTargetsHelp,
-                        const ['sleep'],
-                      ),
-                      child: _field('sleep', loc.periodizationSleepHours, unit: 'h'),
-                    ),
-                  ] else
-                    _readOnlyCards(effective, weekLocked),
                   if (c.editing) ...[
                     const SizedBox(height: 12),
                     Container(
@@ -659,105 +560,240 @@ class _PeriodizationPhaseFormScreenState
         : loc.periodizationTargetsConfigured(filled, keys.length);
   }
 
-  Widget _targetCard(
-    String title,
-    IconData icon, {
-    required String subtitle,
-    required Widget child,
-    String? actionLabel,
-    VoidCallback? onAction,
-    bool initiallyExpanded = false,
-  }) {
+  Widget _targetsDivider(ThemeData theme) => Divider(
+    height: 1,
+    thickness: 1,
+    indent: 14,
+    endIndent: 14,
+    color: theme.colorScheme.outlineVariant.withAlpha(80),
+  );
+
+  List<Widget> _editableSections(
+    AppLocalizations loc,
+    PeriodizationPhaseFormController c,
+    bool weekLocked,
+    Future<void> Function() onSuggestNutrition,
+  ) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: PeriodizationSurface(
-        padding: EdgeInsets.zero,
-        child: ExpansionTile(
-          initiallyExpanded: initiallyExpanded,
-          tilePadding: const EdgeInsets.fromLTRB(14, 5, 12, 5),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
-          shape: const Border(),
-          collapsedShape: const Border(),
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withAlpha(125),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 20, color: theme.colorScheme.primary),
-          ),
-          title: Text(
-            title,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          subtitle: Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          children: [
-            if (actionLabel != null && onAction != null) ...[
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: onAction,
-                  icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-                  label: Text(actionLabel),
-                ),
-              ),
-              const SizedBox(height: 14),
-            ],
-            child,
-          ],
-        ),
+    final nutrition = _targetTile(
+      loc,
+      theme,
+      title: loc.periodizationNutritionTargets,
+      icon: Icons.restaurant_outlined,
+      keys: const ['adjustment', 'proteinPerKg', 'fatPerKg', 'refWeight'],
+      help: loc.periodizationNutritionTargetsHelp,
+      initiallyExpanded: true,
+      actionLabel: loc.periodizationSuggestTargets,
+      onAction: () => onSuggestNutrition(),
+      child: NutritionTargetFields(
+        tdee: c.tdee,
+        adjustment: c.targetControllers['adjustment']!,
+        proteinPerKg: c.targetControllers['proteinPerKg']!,
+        fatPerKg: c.targetControllers['fatPerKg']!,
+        referenceWeight: c.targetControllers['refWeight']!,
+        onChanged: c.onTargetChanged,
       ),
     );
-  }
-
-  Widget _readOnlyCards(PeriodizationTarget? effective, bool weekLocked) {
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    final c = _controller;
-    final target =
-        effective ?? c.emptyTarget(c.weekStarts[c.selectedWeek]);
-    List<Widget> rows(List<(String, String)> values) => [
-      for (final entry in values)
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              Expanded(
+    final training = _targetTile(
+      loc,
+      theme,
+      title: loc.periodizationTrainingTargets,
+      icon: Icons.fitness_center,
+      keys: const ['workouts', 'minSets', 'maxSets', 'minRpe', 'maxRpe'],
+      help: loc.periodizationTrainingTargetsHelp,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth >= 560
+                  ? (constraints.maxWidth - 10) / 2
+                  : constraints.maxWidth;
+              Widget field(
+                String key,
+                String label, {
+                bool integer = false,
+                bool signed = false,
+                String? unit,
+              }) => SizedBox(
+                width: width,
+                child: _field(key, label,
+                    integer: integer, signed: signed, unit: unit),
+              );
+              return Wrap(
+                spacing: 10,
+                runSpacing: 12,
+                children: [
+                  field('workouts', loc.periodizationWorkoutsPerWeek,
+                      integer: true, unit: loc.periodizationPerWeekUnit),
+                  field('minSets', loc.periodizationMinSets,
+                      integer: true, unit: loc.periodizationPerWeekUnit),
+                  field('maxSets', loc.periodizationMaxSets,
+                      integer: true, unit: loc.periodizationPerWeekUnit),
+                  field('minRpe', loc.periodizationMinRpe),
+                  field('maxRpe', loc.periodizationMaxRpe),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          DropdownButtonFormField<String?>(
+            initialValue: c.routineId,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: loc.periodizationLinkedRoutine,
+              prefixIcon: const Icon(
+                Icons.fitness_center_outlined,
+              ),
+              helperText: loc.periodizationLinkedRoutineWeeklyHelp,
+            ),
+            items: [
+              DropdownMenuItem<String?>(
+                value: null,
                 child: Text(
-                  entry.$1,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  loc.periodizationNoRoutine,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              ...c.routines.map(
+                (routine) => DropdownMenuItem<String?>(
+                  value: routine['id'] as String,
+                  child: Text(
+                    routine['name'] as String,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
-              Text(
-                entry.$2,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+            ],
+            onChanged: weekLocked ? null : c.setRoutine,
+          ),
+        ],
+      ),
+    );
+    final body = _targetTile(
+      loc,
+      theme,
+      title: loc.periodizationBodyTargets,
+      icon: Icons.monitor_weight_outlined,
+      keys: const ['weight', 'change'],
+      help: loc.periodizationBodyTargetsHelp,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth >= 560
+              ? (constraints.maxWidth - 10) / 2
+              : constraints.maxWidth;
+          Widget field(String key, String label, {String? unit}) => SizedBox(
+            width: width,
+            child: _field(key, label, unit: unit),
+          );
+          return Wrap(
+            spacing: 10,
+            runSpacing: 12,
+            children: [
+              field('weight', loc.periodizationTargetWeight, unit: 'kg'),
+              field(
+                'change',
+                loc.periodizationWeeklyWeightChange,
+                unit: '%',
               ),
             ],
+          );
+        },
+      ),
+    );
+    final sleep = _targetTile(
+      loc,
+      theme,
+      title: loc.periodizationSleepTargets,
+      icon: Icons.nightlight_outlined,
+      keys: const ['sleep'],
+      help: loc.periodizationSleepTargetsHelp,
+      child: _field('sleep', loc.periodizationSleepHours, unit: 'h'),
+    );
+
+    return [
+      nutrition,
+      _targetsDivider(theme),
+      training,
+      _targetsDivider(theme),
+      body,
+      _targetsDivider(theme),
+      sleep,
+    ];
+  }
+
+  Widget _targetTile(
+    AppLocalizations loc,
+    ThemeData theme, {
+    required String title,
+    required IconData icon,
+    required List<String> keys,
+    required String help,
+    required Widget child,
+    bool initiallyExpanded = false,
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) => ExpansionTile(
+    initiallyExpanded: initiallyExpanded,
+    tilePadding: const EdgeInsets.fromLTRB(14, 5, 12, 5),
+    childrenPadding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
+    shape: const Border(),
+    collapsedShape: const Border(),
+    leading: Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withAlpha(125),
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Icon(icon, size: 18, color: theme.colorScheme.primary),
+    ),
+    title: Text(
+      title,
+      style: theme.textTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.w800,
+      ),
+    ),
+    subtitle: Text(
+      _targetCardSubtitle(help, keys),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+    ),
+    children: [
+      if (actionLabel != null && onAction != null) ...[
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: onAction,
+            icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+            label: Text(actionLabel),
           ),
         ),
-    ];
-    final nutritionRows = <(String, String)>[
+        const SizedBox(height: 14),
+      ],
+      child,
+    ],
+  );
+
+  Widget _readOnlyList(
+    ThemeData theme,
+    PeriodizationTarget? effective,
+    bool weekLocked,
+  ) {
+    final loc = AppLocalizations.of(context)!;
+    final c = _controller;
+    final target =
+        effective ?? c.emptyTarget(c.weekStarts[c.selectedWeek]);
+    List<(String, String)> nutritionRows() => [
       if (target.calories != null) (loc.periodizationCaloriesPerDay, '${target.calories!.round()} kcal'),
       if (target.proteinG != null) (loc.nutritionProgressProtein, '${target.proteinG!.round()} g'),
       if (target.carbsG != null) (loc.periodizationCarbsRemainder, '${target.carbsG!.round()} g'),
       if (target.fatG != null) (loc.nutritionProgressFat, '${target.fatG!.round()} g'),
     ];
-    final trainingRows = <(String, String)>[
+    List<(String, String)> trainingRows() => [
       if (target.routineId != null)
         (
           loc.periodizationLinkedRoutine,
@@ -768,83 +804,139 @@ class _PeriodizationPhaseFormScreenState
               loc.periodizationNoRoutine,
         ),
       if (target.workoutsPerWeek != null)
-        (loc.periodizationWorkoutsPerWeek, '${target.workoutsPerWeek}${loc.periodizationPerWeekUnit}'),
+        (
+          loc.periodizationWorkoutsPerWeek,
+          '${target.workoutsPerWeek}${loc.periodizationPerWeekUnit}',
+        ),
       if (target.minSetsPerWeek != null || target.maxSetsPerWeek != null)
-        (loc.periodizationMinSets,
-            '${target.minSetsPerWeek ?? '-'}–${target.maxSetsPerWeek ?? '-'}'),
+        (
+          loc.periodizationMinSets,
+          '${target.minSetsPerWeek ?? '-'}–${target.maxSetsPerWeek ?? '-'}',
+        ),
       if (target.minRpe != null || target.maxRpe != null)
-        (loc.periodizationMinRpe,
-            '${target.minRpe ?? '-'}–${target.maxRpe ?? '-'}'),
+        (
+          loc.periodizationMinRpe,
+          '${target.minRpe ?? '-'}–${target.maxRpe ?? '-'}',
+        ),
     ];
-    final bodyRows = <(String, String)>[
+    List<(String, String)> bodyRows() => [
       if (target.targetWeightKg != null)
-        (loc.periodizationTargetWeight, '${target.targetWeightKg} kg'),
+        (
+          loc.periodizationTargetWeight,
+          '${target.targetWeightKg} kg',
+        ),
       if (target.weeklyWeightChangePercent != null)
-        (loc.periodizationWeeklyWeightChange, '${target.weeklyWeightChangePercent} %'),
+        (
+          loc.periodizationWeeklyWeightChange,
+          '${target.weeklyWeightChangePercent} %',
+        ),
     ];
-    final sleepRows = <(String, String)>[
+    List<(String, String)> sleepRows() => [
       if (target.sleepHours != null)
-        (loc.periodizationSleepHours, '${target.sleepHours} h'),
+        (
+          loc.periodizationSleepHours,
+          '${target.sleepHours} h',
+        ),
     ];
 
-    Widget card(String title, IconData icon, List<(String, String)> values) =>
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: PeriodizationSurface(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer.withAlpha(125),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(icon, size: 17, color: theme.colorScheme.primary),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      Icons.lock_rounded,
-                      size: 15,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ],
+    final sections = [
+      (
+        loc.periodizationNutritionTargets,
+        Icons.restaurant_outlined,
+        nutritionRows(),
+      ),
+      (
+        loc.periodizationTrainingTargets,
+        Icons.fitness_center,
+        trainingRows(),
+      ),
+      (
+        loc.periodizationBodyTargets,
+        Icons.monitor_weight_outlined,
+        bodyRows(),
+      ),
+      (loc.periodizationSleepTargets, Icons.nightlight_outlined, sleepRows()),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < sections.length; i++) ...[
+            if (i > 0) const SizedBox(height: 14),
+            _readOnlySection(theme, sections[i].$1, sections[i].$2, sections[i].$3),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _readOnlySection(
+    ThemeData theme,
+    String title,
+    IconData icon,
+    List<(String, String)> values,
+  ) {
+    final loc = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withAlpha(125),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 17, color: theme.colorScheme.primary),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
-                if (values.isEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    loc.periodizationOptionalTargets,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ] else ...[
-                  const SizedBox(height: 10),
-                  ...rows(values),
-                ],
-              ],
+              ),
+            ),
+          ],
+        ),
+        if (values.isEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            loc.periodizationOptionalTargets,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-        );
-
-    return Column(
-      children: [
-        card(loc.periodizationNutritionTargets, Icons.restaurant_outlined, nutritionRows),
-        card(loc.periodizationTrainingTargets, Icons.fitness_center, trainingRows),
-        card(loc.periodizationBodyTargets, Icons.monitor_weight_outlined, bodyRows),
-        card(loc.periodizationSleepTargets, Icons.nightlight_outlined, sleepRows),
+        ] else ...[
+          const SizedBox(height: 8),
+          for (final entry in values)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      entry.$1,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    entry.$2,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ],
     );
   }

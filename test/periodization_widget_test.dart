@@ -355,7 +355,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('phase editor shows weekly chips and computes macros live', (
+  testWidgets('phase editor shows week stepper and computes macros live', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(412, 915);
@@ -385,11 +385,10 @@ void main() {
     });
 
     await tester.scrollUntilVisible(
-      find.text('S1'),
+      find.text('Semana base'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('S1'), findsOneWidget);
     expect(find.text('Semana base'), findsOneWidget);
 
     final adjustmentField = find.widgetWithText(
@@ -454,12 +453,11 @@ void main() {
     });
 
     await tester.scrollUntilVisible(
-      find.text('S2'),
+      find.byKey(const Key('weekStepperNext')),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('S2'));
+    await tester.tap(find.byKey(const Key('weekStepperNext')));
     await tester.pumpAndSettle();
     expect(find.text('Herdando da semana 1'), findsOneWidget);
 
@@ -470,6 +468,124 @@ void main() {
     await tester.tap(find.text('Herdar da anterior'));
     await tester.pumpAndSettle();
     expect(find.text('Herdando da semana 1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('copy sheet applies the base week targets to picked weeks', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(412, 915);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    final plan = PeriodizationPlan(
+      id: 'copy-plan',
+      name: 'Plano cópia',
+      startDate: now,
+      endDate: now.add(const Duration(days: 180)),
+      status: PeriodizationPlanStatus.draft,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        _appWith(PeriodizationPhaseFormScreen(plan: plan)),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+    });
+
+    // Fill one base-week target so the copy has real content.
+    await tester.scrollUntilVisible(
+      find.text('Treino'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Treino'));
+    await tester.pumpAndSettle();
+    final workoutsField = find.widgetWithText(TextField, 'Treinos por semana');
+    await tester.scrollUntilVisible(
+      workoutsField,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(workoutsField, '4');
+    await tester.pumpAndSettle();
+    // The controller commits target edits on a 300ms debounce.
+    await tester.pump(const Duration(milliseconds: 350));
+
+    // Customize week 2 with a different value so the copy has something
+    // to overwrite.
+    await tester.ensureVisible(
+      find.byKey(const Key('weekStepperNext')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('weekStepperNext')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Personalizar'));
+    await tester.tap(find.text('Personalizar'));
+    await tester.pumpAndSettle();
+    // Switching to an inherited week replaced the editable cards with the
+    // read-only ones, so the training card comes back collapsed.
+    await tester.scrollUntilVisible(
+      find.text('Treino'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Treino'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      workoutsField,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(workoutsField, '6');
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 350));
+
+    // Back on the base week, open the copy sheet and pick two weeks.
+    await tester.ensureVisible(
+      find.byKey(const Key('weekStepperPrev')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('weekStepperPrev')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Copiar para…'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Copiar para…'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Copiar metas da semana 1'), findsOneWidget);
+    expect(find.text('Aplicar às semanas seguintes'), findsOneWidget);
+
+    await tester.tap(find.textContaining('S3 ·'));
+    await tester.tap(find.textContaining('S4 ·'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aplicar (2)'));
+    await tester.pumpAndSettle();
+
+    // Weeks 3 and 4 were inheriting week 2's 6/week, so both differ from
+    // the base (4/week) and get their own override.
+    expect(find.text('Metas aplicadas em 2 semanas'), findsOneWidget);
+
+    // Week 3 had no override before the copy; now it must be customized.
+    await tester.ensureVisible(
+      find.byKey(const Key('weekStepperNext')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('weekStepperNext')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('weekStepperNext')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('weekStepperNext')));
+    await tester.pumpAndSettle();
+    expect(find.text('Personalizada'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -558,8 +674,9 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final start = today.subtract(const Duration(days: 21));
-    final end = today.add(const Duration(days: 13));
+    // Single-week phase that already ended yesterday.
+    final start = today.subtract(const Duration(days: 7));
+    final end = today.subtract(const Duration(days: 1));
     final plan = (await tester.runAsync(
       () => PeriodizationRepository().createPlan(
         name: 'Plano histórico',
@@ -576,7 +693,7 @@ void main() {
         endDate: end,
         color: 1,
         weeklyTargets: List.filled(
-          5,
+          1,
           PeriodizationTarget(
             id: '',
             phaseId: '',
@@ -600,15 +717,13 @@ void main() {
       await tester.pump();
     });
 
+    await tester.pumpAndSettle();
+    // The single week is already locked and is selected by default.
     await tester.scrollUntilVisible(
-      find.text('S1'),
+      find.text('Encerrada'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('S1'));
-    await tester.pumpAndSettle();
-
     expect(find.text('Encerrada'), findsOneWidget);
     expect(find.text('2200 kcal'), findsOneWidget);
     expect(find.byIcon(Icons.lock_rounded), findsWidgets);

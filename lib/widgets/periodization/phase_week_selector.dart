@@ -3,12 +3,14 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 
-/// Weekly chip strip + heading row for the phase form target section.
+/// Week context header for the phase form target section.
 ///
-/// Weeks are 0-indexed: index 0 is the base week (always shown as such),
-/// indexes in [customizedWeeks] carry their own override and the remaining
-/// ones inherit from the nearest previous customized week. Weeks in
-/// [lockedWeeks] already ended and are view-only.
+/// This is the *parent* of every target card below it: the stepper picks
+/// which week the cards edit. Weeks are 0-indexed: index 0 is the base
+/// week (always shown as such), indexes in [customizedWeeks] carry their
+/// own override and the remaining ones inherit from the nearest previous
+/// customized week. Weeks in [lockedWeeks] already ended and are
+/// view-only.
 class PhaseWeekSelector extends StatelessWidget {
   final int weekCount;
   final int selected;
@@ -20,7 +22,7 @@ class PhaseWeekSelector extends StatelessWidget {
   final ValueChanged<int> onSelect;
   final VoidCallback? onCustomize;
   final VoidCallback? onUseInheritance;
-  final VoidCallback? onApplyToFollowing;
+  final VoidCallback? onCopy;
 
   const PhaseWeekSelector({
     super.key,
@@ -34,7 +36,7 @@ class PhaseWeekSelector extends StatelessWidget {
     required this.onSelect,
     this.onCustomize,
     this.onUseInheritance,
-    this.onApplyToFollowing,
+    this.onCopy,
   });
 
   DateTime weekStart(int index) =>
@@ -62,71 +64,73 @@ class PhaseWeekSelector extends StatelessWidget {
       children: [
         Row(
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withAlpha(125),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.calendar_view_week_rounded,
-                size: 20,
-                color: theme.colorScheme.primary,
-              ),
+            _stepperButton(
+              context,
+              icon: Icons.chevron_left_rounded,
+              onPressed: selected > 0 ? () => onSelect(selected - 1) : null,
+              semanticLabel: loc.periodizationWeekPrevious,
+              buttonKey: const Key('weekStepperPrev'),
             ),
-            const SizedBox(width: 12),
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    loc.periodizationWeekHeading(
-                      selected + 1,
-                      formatter.format(weekStart(selected)),
-                      formatter.format(weekEnd(selected)),
-                    ),
+                    loc.periodizationWeekOf(selected + 1, weekCount),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      _WeekStatusPill(
-                        label: statusInfo.label,
-                        icon: statusInfo.icon,
-                        color: statusInfo.color,
-                      ),
-                      if (currentWeek == selected)
-                        _WeekStatusPill(
-                          label: loc.periodizationWeekCurrent,
-                          icon: Icons.play_arrow_rounded,
-                          color: theme.colorScheme.primary,
-                        ),
-                    ],
+                  const SizedBox(height: 2),
+                  Text(
+                    '${formatter.format(weekStart(selected))}'
+                    ' – ${formatter.format(weekEnd(selected))}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
             ),
+            _stepperButton(
+              context,
+              icon: Icons.chevron_right_rounded,
+              onPressed: selected < weekCount - 1
+                  ? () => onSelect(selected + 1)
+                  : null,
+              semanticLabel: loc.periodizationWeekNext,
+              buttonKey: const Key('weekStepperNext'),
+            ),
           ],
         ),
-        const SizedBox(height: 14),
-        SizedBox(
-          height: 40,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: weekCount,
-            separatorBuilder: (_, _) => const SizedBox(width: 6),
-            itemBuilder: (context, index) =>
-                _weekTab(context, index, formatter, theme),
+        const SizedBox(height: 10),
+        Center(
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            alignment: WrapAlignment.center,
+            children: [
+              _WeekStatusPill(
+                label: statusInfo.label,
+                icon: statusInfo.icon,
+                color: statusInfo.color,
+              ),
+              if (currentWeek == selected)
+                _WeekStatusPill(
+                  label: loc.periodizationWeekCurrent,
+                  icon: Icons.play_arrow_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+            ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         _actionRow(context),
         if (locked) ...[
           const SizedBox(height: 10),
@@ -160,86 +164,25 @@ class PhaseWeekSelector extends StatelessWidget {
     );
   }
 
-  Widget _weekTab(
-    BuildContext context,
-    int index,
-    DateFormat formatter,
-    ThemeData theme,
-  ) {
-    final isSelected = index == selected;
-    final isLocked = lockedWeeks.contains(index);
-    final isCustomized = customizedWeeks.contains(index);
-    final isCurrent = index == currentWeek;
-    final accent = isLocked
-        ? theme.colorScheme.onSurfaceVariant
-        : theme.colorScheme.primary;
-    return Semantics(
-      button: true,
-      selected: isSelected,
-      child: InkWell(
-        onTap: () => onSelect(index),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          constraints: const BoxConstraints(minWidth: 52),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? accent.withAlpha(28)
-                : theme.colorScheme.surfaceContainerHighest.withAlpha(60),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected
-                  ? accent.withAlpha(160)
-                  : theme.colorScheme.outlineVariant.withAlpha(70),
-              width: isSelected ? 1.4 : 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'S${index + 1}',
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: isLocked
-                      ? theme.colorScheme.onSurfaceVariant
-                      : isSelected
-                      ? accent
-                      : theme.colorScheme.onSurface,
-                ),
-              ),
-              if (isCurrent) ...[
-                const SizedBox(width: 4),
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ] else if (isCustomized && !isLocked) ...[
-                const SizedBox(width: 4),
-                Container(
-                  width: 5,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.tertiary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
-              if (isLocked) ...[
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.lock_rounded,
-                  size: 12,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ],
-            ],
-          ),
+  Widget _stepperButton(
+    BuildContext context, {
+    required IconData icon,
+    required VoidCallback? onPressed,
+    String? semanticLabel,
+    Key? buttonKey,
+  }) {
+    final theme = Theme.of(context);
+    return IconButton(
+      key: buttonKey,
+      onPressed: onPressed,
+      icon: Icon(icon),
+      tooltip: semanticLabel,
+      visualDensity: VisualDensity.compact,
+      style: IconButton.styleFrom(
+        backgroundColor: theme.colorScheme.surfaceContainerHighest.withAlpha(
+          90,
         ),
+        disabledBackgroundColor: Colors.transparent,
       ),
     );
   }
@@ -299,15 +242,11 @@ class PhaseWeekSelector extends StatelessWidget {
           onPressed: onUseInheritance!,
           color: theme.colorScheme.secondary,
         ),
-      if (onApplyToFollowing != null &&
-          !locked &&
-          weekCount > 1 &&
-          selected < weekCount - 1 &&
-          (selected == 0 || customized))
+      if (onCopy != null && !locked && weekCount > 1 && (selected == 0 || customized))
         _WeekActionButton(
-          icon: Icons.content_copy_rounded,
-          label: loc.periodizationApplyToFollowing,
-          onPressed: onApplyToFollowing!,
+          icon: Icons.copy_all_rounded,
+          label: loc.periodizationWeekCopyTo,
+          onPressed: onCopy!,
           color: theme.colorScheme.tertiary,
         ),
     ];

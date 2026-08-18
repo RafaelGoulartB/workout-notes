@@ -331,17 +331,44 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   }
 
   void applyToFollowingWeeks() {
+    applyToWeeks({
+      for (var j = selectedWeek + 1; j < weekStarts.length; j++) j,
+    });
+  }
+
+  /// Copies the selected week's effective target into each week in [targets],
+  /// skipping the selected week itself and locked (ended) weeks. Returns how
+  /// many weeks ended up with a different *effective* target — weeks that
+  /// start inheriting the copied values count even when no explicit override
+  /// was written for them (the override list stays sparse).
+  int applyToWeeks(Set<int> targets) {
     _targetDebounce?.cancel();
     commitSelectedWeek();
+    final locked = lockedWeeks;
+    final eligible = [
+      for (final j in targets)
+        if (j != selectedWeek &&
+            j >= 0 &&
+            j < weekStarts.length &&
+            !locked.contains(j))
+          j,
+    ]..sort();
+    if (eligible.isEmpty) return 0;
+    final before = {for (final j in eligible) j: effectiveTarget(j)};
     final source = effectiveTarget(selectedWeek);
-    for (var j = selectedWeek + 1; j < weekStarts.length; j++) {
+    for (final j in eligible) {
       final current = effectiveTarget(j);
       if (!targetsEquivalent(current, source)) {
         weekOverrides[j] = source == null ? null : copyOf(source, weekStarts[j]);
         conflictWeeks.remove(j);
       }
     }
+    var changed = 0;
+    for (final j in eligible) {
+      if (!targetsEquivalent(before[j], effectiveTarget(j))) changed++;
+    }
     notifyListeners();
+    return changed;
   }
 
   void loadIntoControllers(PeriodizationTarget? target) {
