@@ -639,6 +639,7 @@
   "activeWorkoutNoRoutineDays": "Esta rotina não tem dias.",
   "activeWorkoutRoutineImported": "✅ Exercícios importados da rotina!",
   "activeWorkoutSelectRoutine": "Selecione a Rotina",
+  "activeWorkoutPlanRoutine": "Meta do plano",
   "activeWorkoutBack": "Voltar",
   "activeWorkoutStart": "Iniciar",
   "activeWorkoutStartTimerTooltip": "Iniciar cronômetro do treino",

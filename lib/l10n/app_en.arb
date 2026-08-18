@@ -638,6 +638,7 @@
   "activeWorkoutNoRoutineDays": "This routine has no days.",
   "activeWorkoutRoutineImported": "✅ Exercises imported from routine!",
   "activeWorkoutSelectRoutine": "Select Routine",
+  "activeWorkoutPlanRoutine": "Plan target",
   "activeWorkoutBack": "Back",
   "activeWorkoutStart": "Start",
   "activeWorkoutStartTimerTooltip": "Start workout timer",
