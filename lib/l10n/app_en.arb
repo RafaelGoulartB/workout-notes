@@ -1937,6 +1937,8 @@
   "@runRecordSplitPartial": { "placeholders": { "km": { "type": "int" } } },
   "runRecordSplitTime": "Time",
   "runRecordSplitPace": "Pace",
+  "runRecordDebugSimulate": "Simulate run (debug)",
+  "runRecordDebugSimulating": "DEBUG SIM",
   "runDetailTitle": "Run details",
   "runDetailEdit": "Edit",
   "runDetailDelete": "Delete run",

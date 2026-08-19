@@ -5,11 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'package:workout_notes/services/run_debug_simulator.dart';
 
 /// Flutter facade for the Android foreground GPS run tracker.
 ///
 /// The EventChannel is a live UI signal. Durable activities are imported from
 /// the native spool through the MethodChannel after stop / app relaunch.
+///
+/// In [kDebugMode] only, [startDebugSimulation] drives a fake GPS path so the
+/// emulator can exercise distance, pace, splits, and save without real motion.
 class RunTrackingService extends ChangeNotifier {
   static final RunTrackingService _instance = RunTrackingService._();
   static RunTrackingService get instance => _instance;
@@ -29,17 +33,27 @@ class RunTrackingService extends ChangeNotifier {
   int _recoveredCount = 0;
   final List<RunLatLng> _trail = [];
 
+  RunDebugSimulator? _debugSim;
+  Timer? _debugTimer;
+  bool _debugPaused = false;
+
   RunTrackingState get state => _state;
   bool get isSupported => _state.supported;
   bool get isActive => _state.isActive;
   int get recoveredCount => _recoveredCount;
+  bool get isDebugSimulating => _debugSim != null;
+  bool get canDebugSimulate => kDebugMode;
 
   bool get _isAndroid =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   Future<void> initialize() async {
     if (!_isAndroid) {
+      if (kDebugMode) {
+        _state = _state.copyWith(supported: true, locationGranted: true);
+      }
       _initialized = true;
+      notifyListeners();
       return;
     }
     if (!_initialized) {
@@ -47,6 +61,7 @@ class RunTrackingService extends ChangeNotifier {
       _eventSubscription = events.receiveBroadcastStream().listen(
         _onEvent,
         onError: (Object error, StackTrace stack) {
+          if (_debugSim != null) return;
           _state = _state.copyWith(
             errorCode: 'event_channel',
             errorMessage: error.toString(),
@@ -61,7 +76,12 @@ class RunTrackingService extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> getCapabilities() async {
-    if (!_isAndroid) return {'supported': false};
+    if (!_isAndroid) {
+      if (kDebugMode) {
+        return {'supported': true, 'location_granted': true, 'debug': true};
+      }
+      return {'supported': false};
+    }
     try {
       final result = await methods.invokeMapMethod<String, dynamic>(
         'getCapabilities',
@@ -75,9 +95,12 @@ class RunTrackingService extends ChangeNotifier {
       notifyListeners();
       return capabilities;
     } on MissingPluginException {
-      _state = _state.copyWith(supported: false);
+      _state = _state.copyWith(
+        supported: kDebugMode,
+        locationGranted: kDebugMode,
+      );
       notifyListeners();
-      return {'supported': false};
+      return {'supported': kDebugMode};
     } catch (error) {
       _setError('capabilities_error', error.toString());
       return {'supported': true, 'error': error.toString()};
@@ -85,6 +108,7 @@ class RunTrackingService extends ChangeNotifier {
   }
 
   Future<RunTrackingState> getState() async {
+    if (_debugSim != null) return _state;
     if (!_isAndroid) return _state;
     try {
       final result = await methods.invokeMapMethod<String, dynamic>('getState');
@@ -92,7 +116,7 @@ class RunTrackingService extends ChangeNotifier {
         _applyNativeState(result);
       }
     } on MissingPluginException {
-      _state = _state.copyWith(supported: false);
+      _state = _state.copyWith(supported: kDebugMode);
       notifyListeners();
     } catch (error) {
       _setError('state_error', error.toString());
@@ -101,6 +125,11 @@ class RunTrackingService extends ChangeNotifier {
   }
 
   Future<bool> requestPermissions() async {
+    if (kDebugMode && !_isAndroid) {
+      _state = _state.copyWith(locationGranted: true, clearError: true);
+      notifyListeners();
+      return true;
+    }
     if (!_isAndroid) return false;
     try {
       final granted =
@@ -117,8 +146,35 @@ class RunTrackingService extends ChangeNotifier {
     }
   }
 
+  /// Starts a fake GPS run. Available only when [kDebugMode] is true.
+  Future<bool> startDebugSimulation({
+    double startLat = -23.5505,
+    double startLng = -46.6333,
+  }) async {
+    if (!kDebugMode) return false;
+    if (_state.isActive) return true;
+    _stopDebugTimer();
+    _trail.clear();
+    _debugPaused = false;
+    _debugSim = RunDebugSimulator.create(
+      startLat: startLat,
+      startLng: startLng,
+    );
+    _publishDebugState();
+    _debugTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_debugPaused || _debugSim == null) return;
+      _debugSim!.tick();
+      _publishDebugState();
+    });
+    return true;
+  }
+
   Future<bool> start() async {
-    if (!_isAndroid) return false;
+    if (_debugSim != null) return true;
+    if (!_isAndroid) {
+      if (kDebugMode) return startDebugSimulation();
+      return false;
+    }
     if (_state.isActive) return true;
     if (!_state.locationGranted) {
       final granted = await requestPermissions();
@@ -141,6 +197,15 @@ class RunTrackingService extends ChangeNotifier {
   }
 
   Future<void> pause() async {
+    if (_debugSim != null) {
+      if (!_state.isRecording) return;
+      _debugPaused = true;
+      _state = _debugSim!.toPausedState(
+        locationGranted: _state.locationGranted,
+      );
+      notifyListeners();
+      return;
+    }
     if (!_isAndroid || !_state.isRecording) return;
     try {
       final result = await methods.invokeMapMethod<String, dynamic>('pause');
@@ -151,6 +216,12 @@ class RunTrackingService extends ChangeNotifier {
   }
 
   Future<void> resume() async {
+    if (_debugSim != null) {
+      if (!_state.isPaused) return;
+      _debugPaused = false;
+      _publishDebugState();
+      return;
+    }
     if (!_isAndroid || !_state.isPaused) return;
     try {
       final result = await methods.invokeMapMethod<String, dynamic>('resume');
@@ -162,6 +233,20 @@ class RunTrackingService extends ChangeNotifier {
 
   /// Stops tracking, imports the spool into SQLite, and deletes the spool.
   Future<RunActivity?> stop() async {
+    if (_debugSim != null) {
+      final sim = _debugSim!;
+      _stopDebugTimer();
+      _debugSim = null;
+      _debugPaused = false;
+      final imported = await _repository.importNativeSpool(sim.toSpoolPayload());
+      _trail.clear();
+      _state = RunTrackingState.initial(supported: true).copyWith(
+        locationGranted: true,
+      );
+      notifyListeners();
+      return imported;
+    }
+
     if (!_isAndroid) return null;
     final activityId = _state.activityId;
     try {
@@ -175,7 +260,6 @@ class RunTrackingService extends ChangeNotifier {
       imported = await _importSpool(activityId);
     } else {
       await recoverPendingSessions();
-      // Fall back: latest recovered completed activity is not tracked here.
     }
 
     _trail.clear();
@@ -187,6 +271,18 @@ class RunTrackingService extends ChangeNotifier {
   }
 
   Future<void> discard() async {
+    if (_debugSim != null) {
+      _stopDebugTimer();
+      _debugSim = null;
+      _debugPaused = false;
+      _trail.clear();
+      _state = RunTrackingState.initial(supported: true).copyWith(
+        locationGranted: true,
+      );
+      notifyListeners();
+      return;
+    }
+
     if (!_isAndroid) return;
     final activityId = _state.activityId;
     try {
@@ -207,7 +303,7 @@ class RunTrackingService extends ChangeNotifier {
   }
 
   Future<int> recoverPendingSessions() async {
-    if (!_isAndroid || _recovering) return _recoveredCount;
+    if (!_isAndroid || _recovering || _debugSim != null) return _recoveredCount;
     _recovering = true;
     var count = 0;
     try {
@@ -231,7 +327,6 @@ class RunTrackingService extends ChangeNotifier {
           await methods.invokeMethod<dynamic>('deleteSpool', id);
           continue;
         }
-        // Skip the spool still owned by a live native service.
         if (serviceAlive &&
             id == _state.activityId &&
             (status == 'recording' ||
@@ -293,13 +388,13 @@ class RunTrackingService extends ChangeNotifier {
       await methods.invokeMethod<dynamic>('deleteSpool', id);
       return imported;
     } catch (error) {
-      // Leave the spool for retry on next launch.
       _setError('import_error', error.toString());
       return null;
     }
   }
 
   void _onEvent(dynamic event) {
+    if (_debugSim != null) return;
     if (event is! Map) return;
     _applyNativeState(Map<String, dynamic>.from(event));
   }
@@ -311,7 +406,6 @@ class RunTrackingService extends ChangeNotifier {
       final last = _trail.isEmpty ? null : _trail.last;
       if (last == null || last.lat != lat || last.lng != lng) {
         _trail.add(RunLatLng(lat, lng));
-        // Cap live trail for UI memory.
         if (_trail.length > 5000) {
           _trail.removeRange(0, _trail.length - 4000);
         }
@@ -321,6 +415,23 @@ class RunTrackingService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _publishDebugState() {
+    final sim = _debugSim;
+    if (sim == null) return;
+    _trail
+      ..clear()
+      ..addAll(sim.trail);
+    _state = _debugPaused
+        ? sim.toPausedState(locationGranted: true)
+        : sim.toState(locationGranted: true);
+    notifyListeners();
+  }
+
+  void _stopDebugTimer() {
+    _debugTimer?.cancel();
+    _debugTimer = null;
+  }
+
   void _setError(String code, String message) {
     _state = _state.copyWith(errorCode: code, errorMessage: message);
     notifyListeners();
@@ -328,6 +439,7 @@ class RunTrackingService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _stopDebugTimer();
     _eventSubscription?.cancel();
     super.dispose();
   }

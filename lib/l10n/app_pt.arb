@@ -1917,6 +1917,8 @@
   "@runRecordSplitPartial": { "placeholders": { "km": { "type": "int" } } },
   "runRecordSplitTime": "Tempo",
   "runRecordSplitPace": "Pace",
+  "runRecordDebugSimulate": "Simular corrida (debug)",
+  "runRecordDebugSimulating": "DEBUG SIM",
   "runDetailTitle": "Detalhes da corrida",
   "runDetailEdit": "Editar",
   "runDetailDelete": "Excluir corrida",

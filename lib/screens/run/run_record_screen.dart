@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -39,6 +40,26 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final state = _service.state;
     if (state.lat != null && state.lng != null) {
       _mapController.move(LatLng(state.lat!, state.lng!), _mapController.camera.zoom);
+    }
+  }
+
+  Future<void> _startDebugSimulation() async {
+    setState(() => _busy = true);
+    try {
+      var startLat = -23.5505;
+      var startLng = -46.6333;
+      try {
+        startLat = _mapController.camera.center.latitude;
+        startLng = _mapController.camera.center.longitude;
+      } catch (_) {
+        // Map not ready yet — fall back to default coords.
+      }
+      await _service.startDebugSimulation(
+        startLat: startLat,
+        startLng: startLng,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -205,8 +226,29 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                     ),
                   ),
                   const Spacer(),
+                  if (_service.isDebugSimulating)
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.tertiaryContainer,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        loc.runRecordDebugSimulating,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onTertiaryContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   if (state.hasWeakGps ||
-                      (state.isRecording && state.lat == null))
+                      (state.isRecording &&
+                          state.lat == null &&
+                          !_service.isDebugSimulating))
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -240,7 +282,10 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                 scrollController: scrollController,
                 state: state,
                 busy: _busy,
+                showDebugSimulate:
+                    kDebugMode && !state.isActive && _service.canDebugSimulate,
                 onStart: _ensurePermissionAndStart,
+                onDebugSimulate: _startDebugSimulation,
                 onPause: () => _service.pause(),
                 onResume: () => _service.resume(),
                 onFinish: _finish,
@@ -257,7 +302,9 @@ class _MetricsSheet extends StatelessWidget {
   final ScrollController scrollController;
   final RunTrackingState state;
   final bool busy;
+  final bool showDebugSimulate;
   final VoidCallback onStart;
+  final VoidCallback onDebugSimulate;
   final VoidCallback onPause;
   final VoidCallback onResume;
   final VoidCallback onFinish;
@@ -266,7 +313,9 @@ class _MetricsSheet extends StatelessWidget {
     required this.scrollController,
     required this.state,
     required this.busy,
+    required this.showDebugSimulate,
     required this.onStart,
+    required this.onDebugSimulate,
     required this.onPause,
     required this.onResume,
     required this.onFinish,
@@ -344,7 +393,7 @@ class _MetricsSheet extends StatelessWidget {
           const SizedBox(height: 20),
           if (busy)
             const Center(child: CircularProgressIndicator())
-          else if (!state.isActive)
+          else if (!state.isActive) ...[
             SizedBox(
               width: double.infinity,
               height: 56,
@@ -352,8 +401,20 @@ class _MetricsSheet extends StatelessWidget {
                 onPressed: onStart,
                 child: Text(loc.runRecordStart),
               ),
-            )
-          else
+            ),
+            if (showDebugSimulate) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: OutlinedButton.icon(
+                  onPressed: onDebugSimulate,
+                  icon: const Icon(Icons.bug_report_outlined),
+                  label: Text(loc.runRecordDebugSimulate),
+                ),
+              ),
+            ],
+          ] else
             Row(
               children: [
                 Expanded(
