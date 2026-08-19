@@ -131,8 +131,7 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
       Scrollable.ensureVisible(
         targetContext,
         alignment: 0.08,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeOutCubic,
+        duration: Duration.zero,
       );
     });
   }
@@ -700,9 +699,8 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
                                         ),
                                       _StatisticsSectionCard(
                                         title: loc.nutritionCaloriesTitle,
-                                        icon:
-                                            Icons
-                                                .local_fire_department_outlined,
+                                        icon: Icons
+                                            .local_fire_department_outlined,
                                         compact: true,
                                         child: _CalorieEquation(
                                           consumed:

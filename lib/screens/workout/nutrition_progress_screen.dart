@@ -1,6 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -353,36 +352,23 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
                 children: [
-                  if (_period == _BalancePeriod.week)
-                    _WeekSequenceCard(
-                      dailies: _dailies,
-                      goal: _goal?.calories,
-                      balance: _balance,
-                      period: _BalancePeriod.week,
-                    ).animate().fadeIn(duration: 250.ms)
-                  else
-                    _WeekSequenceCard(
-                      dailies: _dailies,
-                      goal: _goal?.calories,
-                      balance: _balance,
-                      period: _BalancePeriod.month,
-                    ).animate().fadeIn(duration: 250.ms),
+                  _WeekSequenceCard(
+                    dailies: _dailies,
+                    goal: _goal?.calories,
+                    balance: _balance,
+                    period: _period,
+                  ),
                   const SizedBox(height: 12),
                   _RollingAverageCard(
                     spots: _rollingSpots(),
                     goal: _rollingGoal,
                     windowDays: _periodDays,
                     startDate: _periodStart,
-                  ).animate().fadeIn(duration: 250.ms, delay: 140.ms),
+                  ),
                   const SizedBox(height: 12),
-                  _MacroBalanceCard(
-                    summary: _macros,
-                    goal: _goal,
-                  ).animate().fadeIn(duration: 250.ms, delay: 180.ms),
+                  _MacroBalanceCard(summary: _macros, goal: _goal),
                   const SizedBox(height: 12),
-                  _MealDistributionCard(
-                    distribution: _mealDistribution,
-                  ).animate().fadeIn(duration: 250.ms, delay: 220.ms),
+                  _MealDistributionCard(distribution: _mealDistribution),
                   const SizedBox(height: 12),
                   _AverageNutrientsCard(
                     key: ValueKey(
@@ -394,12 +380,12 @@ class _NutritionProgressScreenState extends State<NutritionProgressScreen>
                     averages: _nutrientAverages,
                     goal: _goal,
                     onExpansionChanged: _toggleNutrients,
-                  ).animate().fadeIn(duration: 250.ms, delay: 250.ms),
+                  ),
                   const SizedBox(height: 12),
                   _TopContributorsCard(
                     contributors: _contributors,
                     totalConsumed: _balance?.totalConsumed ?? 0,
-                  ).animate().fadeIn(duration: 250.ms, delay: 280.ms),
+                  ),
                   const SizedBox(height: 8),
                 ],
               ),
