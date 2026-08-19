@@ -353,6 +353,41 @@ abstract final class DatabaseSchema {
       )
     ''');
 
+    // Running activities (v41) — separate from gym workouts.
+    await db.execute('''
+      CREATE TABLE run_activities (
+        id TEXT PRIMARY KEY,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        duration_seconds INTEGER NOT NULL DEFAULT 0,
+        moving_time_seconds INTEGER NOT NULL DEFAULT 0,
+        distance_meters REAL NOT NULL DEFAULT 0,
+        avg_pace_sec_per_km REAL,
+        max_pace_sec_per_km REAL,
+        calories INTEGER,
+        title TEXT,
+        notes TEXT,
+        status TEXT NOT NULL DEFAULT 'completed',
+        polyline_summary TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE run_track_points (
+        id TEXT PRIMARY KEY,
+        activity_id TEXT NOT NULL,
+        seq INTEGER NOT NULL,
+        lat REAL NOT NULL,
+        lng REAL NOT NULL,
+        altitude REAL,
+        accuracy REAL,
+        speed REAL,
+        recorded_at TEXT NOT NULL,
+        FOREIGN KEY (activity_id) REFERENCES run_activities(id) ON DELETE CASCADE
+      )
+    ''');
+
     // Nutrition module (v22). Foods, variants, servings, meal logs and
     // goals share a single helper so `_onCreate` and `_onUpgrade` use
     // the same definition.
@@ -400,6 +435,12 @@ abstract final class DatabaseSchema {
     );
     await db.execute(
       'CREATE INDEX idx_ai_routine_proposals_thread_status ON ai_routine_proposals(thread_id, status, created_at ASC)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_run_activities_started ON run_activities(started_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_run_track_points_activity_seq ON run_track_points(activity_id, seq ASC)',
     );
 
     // Seed data

@@ -9,7 +9,8 @@ import '../../repositories/workout_repository.dart';
 import '../../repositories/analytics_repository.dart';
 import '../../services/rest_timer_service.dart';
 import 'active_workout_screen.dart';
-import 'quick_add_screen.dart';
+import '../run/run_record_screen.dart';
+import '../run/run_history_screen.dart';
 import 'calendar_screen.dart';
 import 'exercise_library_screen.dart';
 import 'routines_screen.dart';
@@ -183,10 +184,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     _loadData();
   }
 
-  Future<void> _quickAdd() async {
+  Future<void> _startRun() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const QuickAddScreen()),
+      MaterialPageRoute(builder: (_) => const RunRecordScreen()),
     );
     _loadData();
   }
@@ -618,11 +619,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: _ActionCard(
-              icon: Icons.bolt,
-              label: loc.workoutHomeQuickAdd,
-              subtitle: loc.workoutHomeQuickAddSubtitle,
+              icon: Icons.directions_run,
+              label: loc.workoutHomeStartRun,
+              subtitle: loc.workoutHomeStartRunSubtitle,
               color: theme.colorScheme.secondary,
-              onTap: _quickAdd,
+              onTap: _startRun,
             ),
           ),
         ],
@@ -633,6 +634,14 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   // ===================== NAV GRID (2x2) =====================
   Widget _buildNavGrid(ThemeData theme, AppLocalizations loc) {
     final items = [
+      _NavItemData(
+        Icons.directions_run,
+        loc.workoutHomeRuns,
+        () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RunHistoryScreen()),
+        ),
+      ),
       _NavItemData(
         Icons.fitness_center,
         loc.workoutHomeExercises,
@@ -676,6 +685,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       ),
     ];
 
+    // Runs + original tools (5 tiles in a 2-column grid).
+    const crossAxisCount = 2;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
       child: Card(
@@ -692,7 +704,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           shrinkWrap: true,
           padding: EdgeInsets.zero,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
+            crossAxisCount: crossAxisCount,
             childAspectRatio: 1.6,
             mainAxisSpacing: 0,
             crossAxisSpacing: 0,
@@ -701,13 +713,13 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           itemBuilder: (ctx, i) {
             final item = items[i];
             final isLeft = i % 2 == 0;
-            final isBottom = i < 2;
+            final isTopRow = i < crossAxisCount;
             return _NavTile(
               icon: item.icon,
               label: item.label,
               onTap: item.onTap,
               showLeftBorder: !isLeft,
-              showTopBorder: !isBottom,
+              showTopBorder: !isTopRow,
             );
           },
         ),

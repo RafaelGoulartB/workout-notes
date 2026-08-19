@@ -693,7 +693,7 @@ class WorkoutRepository extends BaseRepository {
   }
 
   /// Provides a persistence-level fallback so every workout completion flow
-  /// uses the same calorie estimate, including quick add and future callers.
+  /// uses the same calorie estimate, including future callers.
   Future<double?> _estimateCaloriesForWorkout(
     Database db,
     String workoutId, {
