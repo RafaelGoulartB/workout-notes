@@ -253,8 +253,8 @@
   "settingsNutritionSubtitle": "Daily goals, macronutrients and meals",
   "settingsPlanTitle": "Plan settings",
   "settingsPlanSubtitle": "Periodization and planning",
-  "settingsPlanSectionToggle": "Tracking section",
-  "settingsPlanSectionToggleBody": "Show the Tracking section in the app navigation bar",
+  "settingsPlanSectionToggle": "Progress section",
+  "settingsPlanSectionToggleBody": "Show the Progress section in the app navigation bar",
   "settingsAiTitle": "Artificial intelligence",
   "settingsAiSubtitle": "AI Coach, provider, model and behaviour",
   "settingsDataPrivacyTitle": "Data and privacy",
@@ -1673,8 +1673,8 @@
 
   "settingsExportIncludesNutrition": "Workouts, sleep, nutrition, measurements, routines, plans and settings",
 
-  "tabPlan": "Tracking",
-  "trackingTitle": "Tracking",
+  "tabPlan": "Progress",
+  "trackingTitle": "Progress",
   "trackingBodyWeight": "Body weight",
   "trackingOpenMeasurements": "Open measurements",
   "trackingNoWeight": "No weight logged yet",

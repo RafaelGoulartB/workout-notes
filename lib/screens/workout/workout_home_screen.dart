@@ -634,11 +634,14 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   Widget _buildNavGrid(ThemeData theme, AppLocalizations loc) {
     final items = [
       _NavItemData(
-        Icons.directions_run,
-        loc.workoutHomeRuns,
+        Icons.repeat,
+        loc.workoutHomeRoutines,
         () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const RunStatsScreen()),
+          AiCoachNavigation.route(
+            kind: AiCoachRouteKind.normalWithFab,
+            builder: (_) => const RoutinesScreen(),
+          ),
         ),
       ),
       _NavItemData(
@@ -653,14 +656,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         ),
       ),
       _NavItemData(
-        Icons.repeat,
-        loc.workoutHomeRoutines,
+        Icons.directions_run,
+        loc.workoutHomeRuns,
         () => Navigator.push(
           context,
-          AiCoachNavigation.route(
-            kind: AiCoachRouteKind.normalWithFab,
-            builder: (_) => const RoutinesScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const RunStatsScreen()),
         ),
       ),
       _NavItemData(
@@ -673,7 +673,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       ),
     ];
 
-    // Runs + original tools (5 tiles in a 2-column grid).
+    // Tools grid: Routines, Exercises, Runs, Progress.
     const crossAxisCount = 2;
 
     return Padding(

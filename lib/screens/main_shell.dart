@@ -8,8 +8,8 @@ import 'package:workout_notes/screens/workout/nutrition_home_screen.dart';
 import 'package:workout_notes/screens/workout/periodization_home_screen.dart';
 
 /// Primary application navigation. Each tab keeps its own navigation state
-/// while the user switches between workout, sleep, nutrition and tracking
-/// (plan + body measurements). Optional sections (e.g. Tracking) can be
+/// while the user switches between workout, sleep, nutrition and progress
+/// (plan + body measurements). Optional sections (e.g. Progress) can be
 /// hidden from settings.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});

@@ -141,7 +141,7 @@ void main() {
       await tester.pump();
     });
 
-    expect(find.text('Acompanhamento'), findsOneWidget);
+    expect(find.text('Progresso'), findsOneWidget);
     expect(find.text('PLANEJAMENTO'), findsOneWidget);
     expect(find.text('Crie seu primeiro plano'), findsOneWidget);
     expect(tester.takeException(), isNull);

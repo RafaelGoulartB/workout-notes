@@ -1175,7 +1175,7 @@ void main() {
     },
   );
 
-  testWidgets('MainShell renders Workout, Sleep, Nutrition, and Tracking tabs', (
+  testWidgets('MainShell renders Workout, Sleep, Nutrition, and Progress tabs', (
     tester,
   ) async {
     // Render a structure equivalent to MainShell: we use a stub body
