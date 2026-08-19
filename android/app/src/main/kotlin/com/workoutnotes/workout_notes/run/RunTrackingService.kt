@@ -28,6 +28,9 @@ class RunTrackingService : Service(), LocationListener {
         const val ACTION_STOP = "com.workoutnotes.workout_notes.run.STOP"
         const val ACTION_DISCARD = "com.workoutnotes.workout_notes.run.DISCARD"
 
+        private const val WAKE_LOCK_WINDOW_MS = 6 * 60 * 60 * 1000L
+        private const val MAX_ACCURACY_METERS = 40f
+
         private var activeInstance: RunTrackingService? = null
         @Volatile private var lastState: Map<String, Any?>? = null
         @Volatile var eventSink: ((Map<String, Any?>) -> Unit)? = null
@@ -50,22 +53,22 @@ class RunTrackingService : Service(), LocationListener {
             return service.stateMap()
         }
 
-        fun stopCurrent(): Map<String, Any?> {
+        fun stopCurrent(context: Context): Map<String, Any?> {
             val service = activeInstance
             if (service != null) {
                 service.finishRun("completed")
                 return lastState ?: mapOf("status" to "completed")
             }
-            return lastState ?: mapOf("status" to "idle")
+            return finalizeOrphanActiveSpool(context, "completed")
         }
 
-        fun discardCurrent(): Map<String, Any?> {
+        fun discardCurrent(context: Context): Map<String, Any?> {
             val service = activeInstance
             if (service != null) {
                 service.finishRun("discarded")
                 return lastState ?: mapOf("status" to "discarded")
             }
-            return lastState ?: mapOf("status" to "idle")
+            return finalizeOrphanActiveSpool(context, "discarded")
         }
 
         fun idleState(context: Context): Map<String, Any?> = mapOf(
@@ -78,16 +81,96 @@ class RunTrackingService : Service(), LocationListener {
             "moving_time_seconds" to 0,
         )
 
-        fun locationGranted(context: Context): Boolean {
-            val fine = ContextCompat.checkSelfPermission(
+        /** Precise (fine) location only — coarse is not enough for distance. */
+        fun locationGranted(context: Context): Boolean =
+            ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.ACCESS_FINE_LOCATION,
             ) == PackageManager.PERMISSION_GRANTED
-            val coarse = ContextCompat.checkSelfPermission(
+
+        fun backgroundLocationGranted(context: Context): Boolean {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
+            return ContextCompat.checkSelfPermission(
                 context,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
+                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
             ) == PackageManager.PERMISSION_GRANTED
-            return fine || coarse
+        }
+
+        private fun isActiveSpoolStatus(status: String?): Boolean =
+            status == "starting" ||
+                status == "recording" ||
+                status == "paused" ||
+                status == "stopping"
+
+        /**
+         * When stop/discard races ahead of [startRun], finalize the spool on disk
+         * so Flutter can still import (or delete) a consistent activity.
+         */
+        private fun finalizeOrphanActiveSpool(
+            context: Context,
+            finalStatus: String,
+        ): Map<String, Any?> {
+            val spool = RunActivitySpool(context.applicationContext)
+            val pending = spool.listPending()
+            val orphan = pending.firstOrNull { isActiveSpoolStatus(it["status"] as? String) }
+            val id = orphan?.get("id")?.toString()
+            if (id == null) {
+                return lastState ?: idleState(context)
+            }
+            return try {
+                val data = spool.read(id)
+                @Suppress("UNCHECKED_CAST")
+                val session = (data["activity"] as Map<String, Any?>).toMutableMap()
+                val endedAt = System.currentTimeMillis()
+                val startedAt = parseMillis(session["started_at"]) ?: endedAt
+                val durationSeconds = max(
+                    (session["duration_seconds"] as? Number)?.toInt() ?: 0,
+                    ((endedAt - startedAt) / 1000L).toInt(),
+                )
+                val movingTimeSeconds = (session["moving_time_seconds"] as? Number)?.toInt()
+                    ?: durationSeconds
+                val distanceMeters = (session["distance_meters"] as? Number)?.toDouble() ?: 0.0
+                session["status"] = finalStatus
+                session["ended_at"] = Instant.ofEpochMilli(endedAt).toString()
+                session["duration_seconds"] = durationSeconds
+                session["moving_time_seconds"] = movingTimeSeconds.coerceAtMost(durationSeconds)
+                session["avg_pace_sec_per_km"] =
+                    RunGeoMath.paceSecPerKm(distanceMeters, movingTimeSeconds)
+                session["calories"] = RunGeoMath.estimateCalories(distanceMeters)
+
+                if (finalStatus == "discarded") {
+                    spool.delete(id)
+                } else {
+                    spool.updateActivity(session)
+                }
+
+                val state = mapOf(
+                    "supported" to true,
+                    "location_granted" to locationGranted(context),
+                    "status" to finalStatus,
+                    "activity_id" to id,
+                    "started_at" to session["started_at"],
+                    "updated_at" to Instant.now().toString(),
+                    "distance_meters" to distanceMeters,
+                    "duration_seconds" to durationSeconds,
+                    "moving_time_seconds" to movingTimeSeconds,
+                    "avg_pace_sec_per_km" to session["avg_pace_sec_per_km"],
+                )
+                lastState = state
+                eventSink?.invoke(state)
+                state
+            } catch (_: Throwable) {
+                lastState ?: idleState(context)
+            }
+        }
+
+        private fun parseMillis(value: Any?): Long? {
+            val text = value as? String ?: return null
+            return try {
+                Instant.parse(text).toEpochMilli()
+            } catch (_: Throwable) {
+                null
+            }
         }
     }
 
@@ -108,6 +191,7 @@ class RunTrackingService : Service(), LocationListener {
     private var currentPaceSecPerKm: Double? = null
     private var maxPaceSecPerKm: Double? = null
     private var finished = false
+    private var tickCount = 0
     private val completedSplits = mutableListOf<Map<String, Any?>>()
     private var nextSplitAtMeters = 1000.0
     private var lastSplitMovingSeconds = 0
@@ -116,6 +200,12 @@ class RunTrackingService : Service(), LocationListener {
         override fun run() {
             if (finished) return
             if (status == "recording" || status == "paused") {
+                renewWakeLockIfNeeded()
+                tickCount += 1
+                // Persist duration periodically so recovery after kill is accurate.
+                if (tickCount % 5 == 0) {
+                    persistLiveTotals()
+                }
                 publishState()
                 updateNotification()
             }
@@ -138,6 +228,12 @@ class RunTrackingService : Service(), LocationListener {
             ACTION_RESUME -> resumeRun()
             ACTION_STOP -> finishRun("completed")
             ACTION_DISCARD -> finishRun("discarded")
+            else -> {
+                // START_STICKY restart (null/unknown action): reattach live spool.
+                if (activeInstance == null || status == "idle") {
+                    restoreActiveSessionIfNeeded()
+                }
+            }
         }
         return START_STICKY
     }
@@ -150,7 +246,7 @@ class RunTrackingService : Service(), LocationListener {
         if (!locationGranted(this)) {
             lastState = idleState(this) + mapOf(
                 "error_code" to "location_denied",
-                "error_message" to "Location permission denied",
+                "error_message" to "Precise location permission denied",
             )
             eventSink?.invoke(lastState!!)
             stopSelf()
@@ -172,6 +268,7 @@ class RunTrackingService : Service(), LocationListener {
         completedSplits.clear()
         nextSplitAtMeters = 1000.0
         lastSplitMovingSeconds = 0
+        tickCount = 0
 
         val session = mutableMapOf<String, Any?>(
             "id" to id,
@@ -190,24 +287,7 @@ class RunTrackingService : Service(), LocationListener {
         activity = session
         spool.create(session)
 
-        RunTrackingNotification.ensureChannel(this)
-        val notification = RunTrackingNotification.build(
-            this,
-            startedAtMillis,
-            0.0,
-            0,
-            "recording",
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                RunTrackingNotification.NOTIFICATION_ID,
-                notification,
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
-            )
-        } else {
-            startForeground(RunTrackingNotification.NOTIFICATION_ID, notification)
-        }
-
+        promoteToForeground("recording")
         acquireWakeLock()
         status = "recording"
         session["status"] = "recording"
@@ -218,14 +298,98 @@ class RunTrackingService : Service(), LocationListener {
         publishState()
     }
 
+    /**
+     * After process death + START_STICKY, reload the in-progress spool and
+     * continue GPS (or stay paused). Next fix is treated as a fresh anchor so
+     * the kill gap does not inflate distance.
+     */
+    private fun restoreActiveSessionIfNeeded() {
+        val pending = spool.listPending()
+        val orphan = pending.firstOrNull {
+            isActiveSpoolStatus(it["status"] as? String)
+        }
+        val id = orphan?.get("id")?.toString()
+        if (id == null) {
+            stopSelf()
+            return
+        }
+        if (!locationGranted(this)) {
+            finalizeOrphanActiveSpool(this, "completed")
+            stopSelf()
+            return
+        }
+
+        val data = try {
+            spool.read(id)
+        } catch (_: Throwable) {
+            stopSelf()
+            return
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        val session = (data["activity"] as Map<String, Any?>).toMutableMap()
+        @Suppress("UNCHECKED_CAST")
+        val points = (data["points"] as? List<Map<String, Any?>>) ?: emptyList()
+
+        activeInstance = this
+        finished = false
+        activity = session
+        startedAtMillis = parseMillis(session["started_at"]) ?: System.currentTimeMillis()
+        distanceMeters = (session["distance_meters"] as? Number)?.toDouble() ?: 0.0
+        pointSeq = points.maxOfOrNull { (it["seq"] as? Number)?.toInt() ?: 0 }?.plus(1) ?: 0
+        lastLocation = null
+        currentPaceSecPerKm = null
+        maxPaceSecPerKm = (session["max_pace_sec_per_km"] as? Number)?.toDouble()
+        currentLat = points.lastOrNull()?.let { (it["lat"] as? Number)?.toDouble() }
+        currentLng = points.lastOrNull()?.let { (it["lng"] as? Number)?.toDouble() }
+
+        completedSplits.clear()
+        val rawSplits = session["splits"]
+        if (rawSplits is List<*>) {
+            for (row in rawSplits) {
+                if (row is Map<*, *>) {
+                    @Suppress("UNCHECKED_CAST")
+                    completedSplits.add(row as Map<String, Any?>)
+                }
+            }
+        }
+        nextSplitAtMeters = (completedSplits.size + 1) * 1000.0
+        val storedDuration = (session["duration_seconds"] as? Number)?.toInt() ?: 0
+        val storedMoving = (session["moving_time_seconds"] as? Number)?.toInt() ?: storedDuration
+        lastSplitMovingSeconds = storedMoving
+        totalPausedMillis = max(0L, (storedDuration - storedMoving) * 1000L)
+        pausedAtMillis = 0L
+        tickCount = 0
+
+        val restoredStatus = when (session["status"] as? String) {
+            "paused" -> "paused"
+            else -> "recording"
+        }
+        status = restoredStatus
+        session["status"] = restoredStatus
+        spool.updateActivity(session)
+
+        promoteToForeground(restoredStatus)
+        acquireWakeLock()
+        if (restoredStatus == "recording") {
+            startLocationUpdates()
+        }
+        mainHandler.removeCallbacks(tickRunnable)
+        mainHandler.post(tickRunnable)
+        publishState()
+    }
+
     private fun pauseRun() {
         if (status != "recording") return
         status = "paused"
         pausedAtMillis = System.currentTimeMillis()
+        // Drop anchor so resume does not credit distance moved while paused.
+        lastLocation = null
         activity?.let {
             it["status"] = "paused"
             spool.updateActivity(it)
         }
+        persistLiveTotals()
         stopLocationUpdates()
         updateNotification()
         publishState()
@@ -238,6 +402,7 @@ class RunTrackingService : Service(), LocationListener {
             pausedAtMillis = 0L
         }
         status = "recording"
+        lastLocation = null
         activity?.let {
             it["status"] = "recording"
             spool.updateActivity(it)
@@ -279,6 +444,7 @@ class RunTrackingService : Service(), LocationListener {
         session["avg_pace_sec_per_km"] = avgPace
         session["max_pace_sec_per_km"] = maxPaceSecPerKm
         session["calories"] = calories
+        session["splits"] = completedSplits.toList()
         spool.updateActivity(session)
 
         status = finalStatus
@@ -303,12 +469,42 @@ class RunTrackingService : Service(), LocationListener {
         stopSelf()
     }
 
+    private fun promoteToForeground(runStatus: String) {
+        RunTrackingNotification.ensureChannel(this)
+        val notification = RunTrackingNotification.build(
+            this,
+            startedAtMillis,
+            distanceMeters,
+            elapsedSeconds(),
+            runStatus,
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                RunTrackingNotification.NOTIFICATION_ID,
+                notification,
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+            )
+        } else {
+            startForeground(RunTrackingNotification.NOTIFICATION_ID, notification)
+        }
+    }
+
     private fun startLocationUpdates() {
         if (!locationGranted(this)) return
         try {
+            val criteria = android.location.Criteria().apply {
+                accuracy = android.location.Criteria.ACCURACY_FINE
+                powerRequirement = android.location.Criteria.POWER_HIGH
+                isAltitudeRequired = false
+                isBearingRequired = false
+                isSpeedRequired = false
+            }
+            val best = locationManager.getBestProvider(criteria, true)
             val provider = when {
+                // Prefer raw GPS when available — more stable distance than network.
                 locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ->
                     LocationManager.GPS_PROVIDER
+                best != null -> best
                 locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) ->
                     LocationManager.NETWORK_PROVIDER
                 else -> LocationManager.GPS_PROVIDER
@@ -320,22 +516,10 @@ class RunTrackingService : Service(), LocationListener {
                 this,
                 Looper.getMainLooper(),
             )
-            // Also listen to GPS if we started on network for better accuracy.
-            if (provider != LocationManager.GPS_PROVIDER &&
-                locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
-            ) {
-                locationManager.requestLocationUpdates(
-                    LocationManager.GPS_PROVIDER,
-                    1000L,
-                    0f,
-                    this,
-                    Looper.getMainLooper(),
-                )
-            }
         } catch (_: SecurityException) {
             lastState = stateMap() + mapOf(
                 "error_code" to "location_denied",
-                "error_message" to "Location permission denied",
+                "error_message" to "Precise location permission denied",
             )
             eventSink?.invoke(lastState!!)
         }
@@ -356,6 +540,12 @@ class RunTrackingService : Service(), LocationListener {
 
         val previous = lastLocation
         if (previous == null) {
+            // Need a usable fix before anchoring; otherwise distance stays wrong.
+            val accuracy = currentAccuracy
+            if (accuracy == null || accuracy > MAX_ACCURACY_METERS) {
+                publishState()
+                return
+            }
             acceptPoint(location, distanceDelta = 0.0)
             return
         }
@@ -366,12 +556,12 @@ class RunTrackingService : Service(), LocationListener {
             location.latitude,
             location.longitude,
         )
-        if (!RunGeoMath.shouldAcceptPoint(currentAccuracy, delta)) {
+        val timeDeltaSec = ((location.time - previous.time) / 1000.0).coerceAtLeast(0.1)
+        if (!RunGeoMath.shouldAcceptPoint(currentAccuracy, delta, timeDeltaSec)) {
             publishState()
             return
         }
 
-        val timeDeltaSec = ((location.time - previous.time) / 1000.0).coerceAtLeast(0.1)
         val instantPace = RunGeoMath.paceSecPerKm(delta, timeDeltaSec.toInt().coerceAtLeast(1))
         if (instantPace != null && instantPace in 120.0..1200.0) {
             currentPaceSecPerKm = instantPace
@@ -456,6 +646,12 @@ class RunTrackingService : Service(), LocationListener {
             recordCompletedSplits()
         }
 
+        persistLiveTotals()
+        publishState()
+    }
+
+    private fun persistLiveTotals() {
+        val session = activity ?: return
         val durationSeconds = elapsedSeconds()
         val movingTimeSeconds = movingSeconds()
         session["distance_meters"] = distanceMeters
@@ -467,7 +663,6 @@ class RunTrackingService : Service(), LocationListener {
         session["calories"] = RunGeoMath.estimateCalories(distanceMeters)
         session["splits"] = completedSplits.toList()
         spool.updateActivity(session)
-        publishState()
     }
 
     private fun elapsedSeconds(): Int {
@@ -529,14 +724,20 @@ class RunTrackingService : Service(), LocationListener {
     }
 
     private fun acquireWakeLock() {
+        releaseWakeLock()
         val power = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = power.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
             "workout_notes:run_tracking",
         ).apply {
             setReferenceCounted(false)
-            acquire(6 * 60 * 60 * 1000L)
+            acquire(WAKE_LOCK_WINDOW_MS)
         }
+    }
+
+    private fun renewWakeLockIfNeeded() {
+        if (wakeLock?.isHeld == true) return
+        acquireWakeLock()
     }
 
     private fun releaseWakeLock() {

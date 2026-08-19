@@ -20,10 +20,12 @@ class RunTrackingBridge(private val context: Context) :
     EventChannel.StreamHandler {
     companion object {
         const val PERMISSION_REQUEST_CODE = 8461
+        const val BACKGROUND_PERMISSION_REQUEST_CODE = 8462
     }
 
     private var activity: Activity? = null
     private val pendingPermission = AtomicReference<MethodChannel.Result?>(null)
+    private val pendingBackgroundPermission = AtomicReference<MethodChannel.Result?>(null)
     private val spool by lazy { RunActivitySpool(context.applicationContext) }
 
     fun attachActivity(value: Activity) {
@@ -40,6 +42,8 @@ class RunTrackingBridge(private val context: Context) :
                 mapOf(
                     "supported" to true,
                     "location_granted" to RunTrackingService.locationGranted(context),
+                    "background_location_granted" to
+                        RunTrackingService.backgroundLocationGranted(context),
                     "notifications_permission_required" to (Build.VERSION.SDK_INT >= 33),
                     "background_location_required" to (Build.VERSION.SDK_INT >= 29),
                     "android_sdk_int" to Build.VERSION.SDK_INT,
@@ -47,13 +51,14 @@ class RunTrackingBridge(private val context: Context) :
             )
             "getState" -> result.success(RunTrackingService.currentState(context))
             "requestPermissions" -> requestLocationPermission(result)
+            "requestBackgroundPermission" -> requestBackgroundLocationPermission(result)
             "start" -> start(result)
             "pause" -> result.success(RunTrackingService.pauseCurrent())
             "resume" -> result.success(RunTrackingService.resumeCurrent())
-            "stop" -> result.success(RunTrackingService.stopCurrent())
+            "stop" -> result.success(RunTrackingService.stopCurrent(context))
             "discard" -> {
                 val id = call.arguments as? String
-                val state = RunTrackingService.discardCurrent()
+                val state = RunTrackingService.discardCurrent(context)
                 if (id != null) {
                     try {
                         spool.delete(id)
@@ -86,7 +91,11 @@ class RunTrackingBridge(private val context: Context) :
 
     private fun start(result: MethodChannel.Result) {
         if (!RunTrackingService.locationGranted(context)) {
-            result.error("location_denied", "Location permission denied", null)
+            result.error(
+                "location_denied",
+                "Precise location permission denied",
+                null,
+            )
             return
         }
         val active = spool.listPending().any {
@@ -145,13 +154,59 @@ class RunTrackingBridge(private val context: Context) :
         )
     }
 
+    private fun requestBackgroundLocationPermission(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            result.success(true)
+            return
+        }
+        if (RunTrackingService.backgroundLocationGranted(context)) {
+            result.success(true)
+            return
+        }
+        if (!RunTrackingService.locationGranted(context)) {
+            result.error(
+                "location_denied",
+                "Precise location must be granted before background access",
+                null,
+            )
+            return
+        }
+        val visibleActivity = activity
+        if (visibleActivity == null) {
+            result.error("activity_unavailable", "A visible Activity is required", null)
+            return
+        }
+        if (!pendingBackgroundPermission.compareAndSet(null, result)) {
+            result.error("permission_pending", "Permission request already pending", null)
+            return
+        }
+        visibleActivity.requestPermissions(
+            arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+            BACKGROUND_PERMISSION_REQUEST_CODE,
+        )
+    }
+
     fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray): Boolean {
-        if (requestCode != PERMISSION_REQUEST_CODE) return false
-        val result = pendingPermission.getAndSet(null)
-        val granted = grantResults.isNotEmpty() &&
-            grantResults.any { it == PackageManager.PERMISSION_GRANTED }
-        result?.success(granted)
-        return true
+        when (requestCode) {
+            PERMISSION_REQUEST_CODE -> {
+                val result = pendingPermission.getAndSet(null)
+                // Fine location is required; coarse-only is treated as denied.
+                val granted = grantResults.isNotEmpty() &&
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                    ) == PackageManager.PERMISSION_GRANTED
+                result?.success(granted)
+                return true
+            }
+            BACKGROUND_PERMISSION_REQUEST_CODE -> {
+                val result = pendingBackgroundPermission.getAndSet(null)
+                val granted = RunTrackingService.backgroundLocationGranted(context)
+                result?.success(granted)
+                return true
+            }
+            else -> return false
+        }
     }
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {

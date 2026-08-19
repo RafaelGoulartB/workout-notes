@@ -6,6 +6,7 @@ import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/services/run_debug_simulator.dart';
+import 'package:workout_notes/utils/run_spool_recovery.dart';
 
 /// Flutter facade for the Android foreground GPS run tracker.
 ///
@@ -36,6 +37,7 @@ class RunTrackingService extends ChangeNotifier {
   RunDebugSimulator? _debugSim;
   Timer? _debugTimer;
   bool _debugPaused = false;
+  bool _askedBackgroundPermission = false;
 
   RunTrackingState get state => _state;
   bool get isSupported => _state.supported;
@@ -135,6 +137,12 @@ class RunTrackingService extends ChangeNotifier {
       final granted =
           await methods.invokeMethod<bool>('requestPermissions') ?? false;
       _state = _state.copyWith(locationGranted: granted, clearError: true);
+      if (!granted) {
+        _setError(
+          'location_denied',
+          'Precise location permission is required',
+        );
+      }
       notifyListeners();
       return granted;
     } on PlatformException catch (error) {
@@ -142,6 +150,24 @@ class RunTrackingService extends ChangeNotifier {
       return false;
     } catch (error) {
       _setError('location_permission', error.toString());
+      return false;
+    }
+  }
+
+  /// Android 10+: best-effort background location for screen-off tracking.
+  /// Denial does not block starting a run (foreground service still works).
+  Future<bool> requestBackgroundPermission() async {
+    if (!_isAndroid) return true;
+    try {
+      final granted =
+          await methods.invokeMethod<bool>('requestBackgroundPermission') ??
+              false;
+      return granted;
+    } on MissingPluginException {
+      return true;
+    } on PlatformException {
+      return false;
+    } catch (_) {
       return false;
     }
   }
@@ -180,11 +206,30 @@ class RunTrackingService extends ChangeNotifier {
       final granted = await requestPermissions();
       if (!granted) return false;
     }
+    // Background is optional; FGS location works with while-in-use on most OEMs.
+    // Prompt at most once per process so a denial does not spam the system dialog.
+    if (!_askedBackgroundPermission) {
+      _askedBackgroundPermission = true;
+      await requestBackgroundPermission();
+    }
     try {
       _trail.clear();
       final result = await methods.invokeMapMethod<String, dynamic>('start');
       if (result != null) {
         _applyNativeState(result);
+      }
+      final ready = await _awaitStatus(
+        {
+          RunTrackingState.recording,
+          RunTrackingState.paused,
+        },
+        timeout: const Duration(seconds: 8),
+      );
+      if (!ready) {
+        if (_state.errorCode == null) {
+          _setError('start_timeout', 'Run service did not start in time');
+        }
+        return _state.isActive;
       }
       return true;
     } on PlatformException catch (error) {
@@ -250,14 +295,25 @@ class RunTrackingService extends ChangeNotifier {
     if (!_isAndroid) return null;
     final activityId = _state.activityId;
     try {
-      await methods.invokeMapMethod<String, dynamic>('stop');
+      final result = await methods.invokeMapMethod<String, dynamic>('stop');
+      if (result != null) _applyNativeState(result);
     } catch (error) {
       _setError('stop_error', error.toString());
     }
 
+    await _awaitStatus(
+      {
+        RunTrackingState.completed,
+        RunTrackingState.idle,
+        RunTrackingState.discarded,
+      },
+      timeout: const Duration(seconds: 5),
+    );
+
+    final resolvedId = activityId ?? _state.activityId;
     RunActivity? imported;
-    if (activityId != null) {
-      imported = await _importSpool(activityId);
+    if (resolvedId != null) {
+      imported = await _importSpool(resolvedId);
     } else {
       await recoverPendingSessions();
     }
@@ -378,8 +434,14 @@ class RunTrackingService extends ChangeNotifier {
               status == 'paused' ||
               status == 'starting' ||
               status == 'stopping')) {
-        activityMap['status'] = 'completed';
-        activityMap['ended_at'] ??= DateTime.now().toIso8601String();
+        final points = (raw['points'] as List? ?? const [])
+            .whereType<Map>()
+            .map((row) => Map<String, dynamic>.from(row))
+            .toList();
+        RunSpoolRecovery.finalizeInterruptedActivity(
+          activityMap,
+          points: points,
+        );
         raw['activity'] = activityMap;
       }
       final imported = await _repository.importNativeSpool(
@@ -391,6 +453,22 @@ class RunTrackingService extends ChangeNotifier {
       _setError('import_error', error.toString());
       return null;
     }
+  }
+
+  /// Polls native state until [statuses] match or [timeout] elapses.
+  Future<bool> _awaitStatus(
+    Set<String> statuses, {
+    Duration timeout = const Duration(seconds: 5),
+    Duration interval = const Duration(milliseconds: 150),
+  }) async {
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (statuses.contains(_state.status)) return true;
+      if (_state.errorCode == 'location_denied') return false;
+      await Future<void>.delayed(interval);
+      await getState();
+    }
+    return statuses.contains(_state.status);
   }
 
   void _onEvent(dynamic event) {

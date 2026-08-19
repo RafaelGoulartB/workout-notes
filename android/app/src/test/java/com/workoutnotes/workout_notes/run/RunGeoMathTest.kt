@@ -22,8 +22,21 @@ class RunGeoMathTest {
 
     @Test
     fun shouldAcceptPoint_filtersJitterAndBadAccuracy() {
-        assertFalse(RunGeoMath.shouldAcceptPoint(50f, 10.0))
-        assertFalse(RunGeoMath.shouldAcceptPoint(10f, 1.0))
-        assertTrue(RunGeoMath.shouldAcceptPoint(10f, 5.0))
+        assertFalse(RunGeoMath.shouldAcceptPoint(50f, 10.0, timeDeltaSeconds = 2.0))
+        assertFalse(RunGeoMath.shouldAcceptPoint(10f, 1.0, timeDeltaSeconds = 2.0))
+        assertTrue(RunGeoMath.shouldAcceptPoint(10f, 5.0, timeDeltaSeconds = 2.0))
+    }
+
+    @Test
+    fun shouldAcceptPoint_rejectsNullAccuracy() {
+        assertFalse(RunGeoMath.shouldAcceptPoint(null, 10.0, timeDeltaSeconds = 2.0))
+    }
+
+    @Test
+    fun shouldAcceptPoint_rejectsTeleportSpeed() {
+        // 80 m in 1 s ≈ 288 km/h
+        assertFalse(RunGeoMath.shouldAcceptPoint(10f, 80.0, timeDeltaSeconds = 1.0))
+        // 20 m in 4 s = 5 m/s ≈ 18 km/h — plausible jogging
+        assertTrue(RunGeoMath.shouldAcceptPoint(10f, 20.0, timeDeltaSeconds = 4.0))
     }
 }

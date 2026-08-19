@@ -9,6 +9,9 @@ import kotlin.math.sqrt
 object RunGeoMath {
     private const val EARTH_RADIUS_METERS = 6_371_000.0
 
+    /** ~28.8 km/h — above typical running; rejects GPS teleports. */
+    const val DEFAULT_MAX_SPEED_MPS = 8.0
+
     fun haversineMeters(
         lat1: Double,
         lng1: Double,
@@ -36,16 +39,23 @@ object RunGeoMath {
     }
 
     /**
-     * Accept a new GPS fix when accuracy is reasonable and the point moved
-     * enough to avoid GPS jitter inflation of distance.
+     * Accept a new GPS fix when accuracy is known and reasonable, the point
+     * moved enough to avoid jitter inflation, and implied speed is plausible
+     * for running (rejects teleports after signal gaps).
      */
     fun shouldAcceptPoint(
         accuracyMeters: Float?,
         distanceFromLastMeters: Double,
+        timeDeltaSeconds: Double = 1.0,
         minDistanceMeters: Double = 3.0,
         maxAccuracyMeters: Float = 40f,
+        maxSpeedMps: Double = DEFAULT_MAX_SPEED_MPS,
     ): Boolean {
-        if (accuracyMeters != null && accuracyMeters > maxAccuracyMeters) return false
-        return distanceFromLastMeters >= minDistanceMeters
+        if (accuracyMeters == null || accuracyMeters > maxAccuracyMeters) return false
+        if (distanceFromLastMeters < minDistanceMeters) return false
+        val safeTime = timeDeltaSeconds.coerceAtLeast(0.1)
+        val speedMps = distanceFromLastMeters / safeTime
+        if (speedMps > maxSpeedMps) return false
+        return true
     }
 }
