@@ -181,35 +181,25 @@ class _HistoryOverview extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            colors.primary,
-            Color.alphaBlend(
-              colors.primaryContainer.withValues(alpha: 0.34),
-              colors.primary,
-            ),
+            colors.surfaceContainerHighest.withAlpha(200),
+            colors.surfaceContainerLow,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: colors.primary.withValues(alpha: 0.22),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.insights_outlined, color: colors.onPrimary, size: 18),
+              Icon(Icons.insights_outlined, color: colors.primary, size: 18),
               const SizedBox(width: 8),
               Text(
                 AppLocalizations.of(context)!.runStatsOverview,
                 style: theme.textTheme.labelLarge?.copyWith(
-                  color: colors.onPrimary.withValues(alpha: 0.82),
+                  color: colors.onSurfaceVariant,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -227,28 +217,28 @@ class _HistoryOverview extends StatelessWidget {
                   ),
                   label: distanceLabel,
                   prominent: true,
-                  foreground: colors.onPrimary,
-                  mutedForeground: colors.onPrimary.withValues(alpha: 0.72),
+                  foreground: colors.onSurface,
+                  mutedForeground: colors.onSurfaceVariant,
                 ),
               ),
-              _OverviewDivider(color: colors.onPrimary.withValues(alpha: 0.25)),
+              _OverviewDivider(color: colors.outlineVariant.withAlpha(80)),
               Expanded(
                 child: _OverviewMetric(
                   value: '${analytics.runCount}',
                   label: runsLabel,
-                  foreground: colors.onPrimary,
-                  mutedForeground: colors.onPrimary.withValues(alpha: 0.72),
+                  foreground: colors.onSurface,
+                  mutedForeground: colors.onSurfaceVariant,
                 ),
               ),
-              _OverviewDivider(color: colors.onPrimary.withValues(alpha: 0.25)),
+              _OverviewDivider(color: colors.outlineVariant.withAlpha(80)),
               Expanded(
                 child: _OverviewMetric(
                   value: RunFormatters.duration(
                     analytics.totalMovingTimeSeconds,
                   ),
                   label: timeLabel,
-                  foreground: colors.onPrimary,
-                  mutedForeground: colors.onPrimary.withValues(alpha: 0.72),
+                  foreground: colors.onSurface,
+                  mutedForeground: colors.onSurfaceVariant,
                 ),
               ),
             ],

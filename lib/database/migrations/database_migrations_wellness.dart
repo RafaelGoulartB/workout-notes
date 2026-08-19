@@ -436,5 +436,14 @@ abstract final class DatabaseWellnessMigrations {
         );
       } catch (_) {}
     }
+    if (oldVersion < 42) {
+      // Blood pressure stores systolic in `value` and diastolic in
+      // `secondary_value`, while preserving the generic measurement schema.
+      try {
+        await db.execute(
+          'ALTER TABLE body_measurements ADD COLUMN secondary_value REAL',
+        );
+      } catch (_) {}
+    }
   }
 }

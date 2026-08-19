@@ -8,6 +8,7 @@ class BodyMeasurementRepository extends BaseRepository {
     String type,
     double value,
     String unit, {
+    double? secondaryValue,
     DateTime? date,
     String? comment,
     String? timeOfDay,
@@ -20,6 +21,7 @@ class BodyMeasurementRepository extends BaseRepository {
       'id': const Uuid().v4(),
       'type': type,
       'value': value,
+      'secondary_value': secondaryValue,
       'unit': unit,
       'date': (date ?? DateTime.now()).toIso8601String().substring(0, 10),
       'comment': comment,
@@ -42,6 +44,7 @@ class BodyMeasurementRepository extends BaseRepository {
         'id': const Uuid().v4(),
         'type': m['type'],
         'value': m['value'],
+        'secondary_value': m['secondary_value'],
         'unit': m['unit'],
         'date': m['date'] ?? DateTime.now().toIso8601String().substring(0, 10),
         'comment': m['comment'],

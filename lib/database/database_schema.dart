@@ -151,6 +151,7 @@ abstract final class DatabaseSchema {
         id TEXT PRIMARY KEY,
         type TEXT NOT NULL,
         value REAL NOT NULL,
+        secondary_value REAL,
         unit TEXT NOT NULL DEFAULT 'kg',
         date TEXT NOT NULL,
         comment TEXT,

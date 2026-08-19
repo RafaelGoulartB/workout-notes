@@ -30,7 +30,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 41;
+  static const _dbVersion = 42;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -422,6 +422,7 @@ class DatabaseHelper {
     String type,
     double value,
     String unit, {
+    double? secondaryValue,
     DateTime? date,
     String? comment,
     String? timeOfDay,
@@ -432,6 +433,7 @@ class DatabaseHelper {
     type,
     value,
     unit,
+    secondaryValue: secondaryValue,
     date: date,
     comment: comment,
     timeOfDay: timeOfDay,

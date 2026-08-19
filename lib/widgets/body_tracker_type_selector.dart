@@ -23,20 +23,24 @@ class BodyTypeSelector extends StatelessWidget {
     this.onCustomize,
   });
 
-  MeasureType get _current =>
-      types.firstWhere((t) => t.id == selectedType);
+  MeasureType get _current => types.firstWhere((t) => t.id == selectedType);
 
-  double? _latestValue(String typeId) {
+  Map<String, dynamic>? _latestMeasurement(String typeId) {
+    return latestByType?[typeId];
+  }
+
+  String? _latestDisplayValue(String typeId) {
     final entry = latestByType?[typeId];
     if (entry == null) return null;
-    return (entry['value'] as num?)?.toDouble();
+    final type = types.firstWhere((t) => t.id == typeId);
+    return formatMeasurementValue(entry, type);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final type = _current;
-    final value = _latestValue(selectedType);
+    final latest = _latestMeasurement(selectedType);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -76,9 +80,9 @@ class BodyTypeSelector extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    if (value != null)
+                    if (latest != null)
                       Text(
-                        '${value.toStringAsFixed(1)} ${type.unit}',
+                        formatMeasurementValue(latest, type),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -92,7 +96,10 @@ class BodyTypeSelector extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: type.color.withAlpha(15),
                       borderRadius: BorderRadius.circular(8),
@@ -325,7 +332,11 @@ class BodyTypeSelector extends StatelessWidget {
     );
   }
 
-  Widget _buildGrid(BuildContext context, ThemeData theme, AppLocalizations loc) {
+  Widget _buildGrid(
+    BuildContext context,
+    ThemeData theme,
+    AppLocalizations loc,
+  ) {
     const crossAxisCount = 4;
     final rowCount = (types.length / crossAxisCount).ceil();
 
@@ -351,7 +362,9 @@ class BodyTypeSelector extends StatelessWidget {
                         child: _TypeGridItem(
                           type: types[start + col],
                           isSelected: types[start + col].id == selectedType,
-                          latestValue: _latestValue(types[start + col].id),
+                          latestDisplayValue: _latestDisplayValue(
+                            types[start + col].id,
+                          ),
                           onTap: () {
                             onSelected(types[start + col].id);
                             Navigator.pop(context);
@@ -381,13 +394,13 @@ class BodyTypeSelector extends StatelessWidget {
 class _TypeGridItem extends StatelessWidget {
   final MeasureType type;
   final bool isSelected;
-  final double? latestValue;
+  final String? latestDisplayValue;
   final VoidCallback onTap;
 
   const _TypeGridItem({
     required this.type,
     required this.isSelected,
-    required this.latestValue,
+    required this.latestDisplayValue,
     required this.onTap,
   });
 
@@ -417,7 +430,9 @@ class _TypeGridItem extends StatelessWidget {
             Icon(
               type.icon,
               size: 26,
-              color: isSelected ? type.color : theme.colorScheme.onSurfaceVariant,
+              color: isSelected
+                  ? type.color
+                  : theme.colorScheme.onSurfaceVariant,
             ),
             const SizedBox(height: 6),
             Text(
@@ -433,10 +448,10 @@ class _TypeGridItem extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            if (latestValue != null) ...[
+            if (latestDisplayValue != null) ...[
               const SizedBox(height: 1),
               Text(
-                latestValue!.toStringAsFixed(1),
+                latestDisplayValue!,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
