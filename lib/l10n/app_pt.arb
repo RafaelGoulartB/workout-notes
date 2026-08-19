@@ -1935,5 +1935,18 @@
   "runDetailTitleLabel": "Título",
   "runDetailSave": "Salvar",
   "runDetailDefaultTitle": "Corrida matinal",
-  "runDetailUntitled": "Corrida"
+  "runDetailUntitled": "Corrida",
+  "runDetailPaceSection": "Pace",
+  "runDetailSplitsSection": "Parciais",
+  "runDetailBestPace": "Melhor ritmo",
+  "runDetailPaceChartEmpty": "GPS insuficiente para mostrar o pace",
+  "runDetailSplitsEmpty": "As parciais aparecem a cada quilômetro",
+  "runDetailSplitKm": "Km",
+  "runDetailSplitPace": "Pace",
+  "runDetailSplitPartial": "{distance} km",
+  "@runDetailSplitPartial": {
+    "placeholders": {
+      "distance": { "type": "String" }
+    }
+  }
 }

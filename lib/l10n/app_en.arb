@@ -1955,5 +1955,18 @@
   "runDetailTitleLabel": "Title",
   "runDetailSave": "Save",
   "runDetailDefaultTitle": "Morning Run",
-  "runDetailUntitled": "Run"
+  "runDetailUntitled": "Run",
+  "runDetailPaceSection": "Pace",
+  "runDetailSplitsSection": "Splits",
+  "runDetailBestPace": "Fastest split",
+  "runDetailPaceChartEmpty": "Not enough GPS data to show pace",
+  "runDetailSplitsEmpty": "Splits appear every kilometer",
+  "runDetailSplitKm": "Km",
+  "runDetailSplitPace": "Pace",
+  "runDetailSplitPartial": "{distance} km",
+  "@runDetailSplitPartial": {
+    "placeholders": {
+      "distance": { "type": "String" }
+    }
+  }
 }

@@ -7,6 +7,9 @@ import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/utils/run_pace_analytics.dart';
+import 'package:workout_notes/widgets/run/run_pace_chart.dart';
+import 'package:workout_notes/widgets/run/run_splits_list.dart';
 
 class RunDetailScreen extends StatefulWidget {
   final String activityId;
@@ -21,6 +24,12 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
   final _repo = RunRepository();
   RunActivity? _activity;
   List<RunTrackPoint> _points = [];
+  RunPaceAnalytics _analytics = const RunPaceAnalytics(
+    samples: [],
+    splits: [],
+    avgPaceSecPerKm: null,
+    bestSplitPaceSecPerKm: null,
+  );
   bool _loading = true;
 
   @override
@@ -35,10 +44,22 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final points = activity == null
         ? <RunTrackPoint>[]
         : await _repo.getTrackPoints(widget.activityId);
+    final analytics = activity == null
+        ? const RunPaceAnalytics(
+            samples: [],
+            splits: [],
+            avgPaceSecPerKm: null,
+            bestSplitPaceSecPerKm: null,
+          )
+        : RunPaceAnalytics.fromTrackPoints(
+            points,
+            activityAvgPaceSecPerKm: activity.avgPaceSecPerKm,
+          );
     if (!mounted) return;
     setState(() {
       _activity = activity;
       _points = points;
+      _analytics = analytics;
       _loading = false;
     });
   }
@@ -233,6 +254,8 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final dateLabel = DateFormat.yMMMd(
       Localizations.localeOf(context).toString(),
     ).add_Hm().format(activity.startedAt.toLocal());
+    final avgPace =
+        _analytics.avgPaceSecPerKm ?? activity.avgPaceSecPerKm;
 
     return Scaffold(
       appBar: AppBar(
@@ -259,7 +282,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
             child: _buildMap(theme, trail),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
             child: Text(
               dateLabel,
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -268,28 +291,26 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _StatChip(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+            child: _MetricsGrid(
+              items: [
+                _MetricItem(
                   label: loc.runRecordDistance,
                   value: RunFormatters.distanceWithUnit(activity.distanceMeters),
                 ),
-                _StatChip(
-                  label: loc.runDetailElapsedTime,
-                  value: RunFormatters.duration(activity.durationSeconds),
+                _MetricItem(
+                  label: loc.runDetailAvgPace,
+                  value: RunFormatters.paceWithUnit(avgPace),
                 ),
-                _StatChip(
+                _MetricItem(
                   label: loc.runDetailMovingTime,
                   value: RunFormatters.duration(activity.movingTimeSeconds),
                 ),
-                _StatChip(
-                  label: loc.runDetailAvgPace,
-                  value: RunFormatters.paceWithUnit(activity.avgPaceSecPerKm),
+                _MetricItem(
+                  label: loc.runDetailElapsedTime,
+                  value: RunFormatters.duration(activity.durationSeconds),
                 ),
-                _StatChip(
+                _MetricItem(
                   label: loc.runDetailCalories,
                   value: '${activity.calories ?? 0} kcal',
                 ),
@@ -298,10 +319,60 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
           ),
           if (activity.notes?.isNotEmpty == true)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
               child: Text(activity.notes!, style: theme.textTheme.bodyLarge),
-            )
-          else
+            ),
+          if (_analytics.hasChart || _analytics.hasSplits) ...[
+            const SizedBox(height: 8),
+            Divider(
+              height: 1,
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+          ],
+          if (_analytics.hasChart) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Text(
+                loc.runDetailPaceSection,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 16, 8),
+              child: RunPaceChart(
+                samples: _analytics.samples,
+                avgPaceSecPerKm: avgPace,
+                emptyLabel: loc.runDetailPaceChartEmpty,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+              child: _PaceStatsList(
+                avgPace: avgPace,
+                movingTimeSeconds: activity.movingTimeSeconds,
+                elapsedTimeSeconds: activity.durationSeconds,
+                bestPace: _analytics.bestSplitPaceSecPerKm ??
+                    activity.maxPaceSecPerKm,
+              ),
+            ),
+          ],
+          if (_analytics.hasSplits) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Text(
+                loc.runDetailSplitsSection,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+              child: RunSplitsList(splits: _analytics.splits),
+            ),
+          ] else
             const SizedBox(height: 24),
         ],
       ),
@@ -309,40 +380,119 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
   }
 }
 
-class _StatChip extends StatelessWidget {
+class _MetricItem {
   final String label;
   final String value;
 
-  const _StatChip({required this.label, required this.value});
+  const _MetricItem({required this.label, required this.value});
+}
+
+class _MetricsGrid extends StatelessWidget {
+  final List<_MetricItem> items;
+
+  const _MetricsGrid({required this.items});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
-      width: (MediaQuery.sizeOf(context).width - 40) / 2,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(14),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final colWidth = (constraints.maxWidth - 16) / 2;
+        return Wrap(
+          spacing: 16,
+          runSpacing: 18,
+          children: [
+            for (final item in items)
+              SizedBox(
+                width: colWidth,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.label,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.value,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                        height: 1.15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _PaceStatsList extends StatelessWidget {
+  final double? avgPace;
+  final int movingTimeSeconds;
+  final int elapsedTimeSeconds;
+  final double? bestPace;
+
+  const _PaceStatsList({
+    required this.avgPace,
+    required this.movingTimeSeconds,
+    required this.elapsedTimeSeconds,
+    required this.bestPace,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    final rows = <(String, String)>[
+      (loc.runDetailAvgPace, RunFormatters.paceWithUnit(avgPace)),
+      (
+        loc.runDetailMovingTime,
+        RunFormatters.duration(movingTimeSeconds),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+      (
+        loc.runDetailElapsedTime,
+        RunFormatters.duration(elapsedTimeSeconds),
+      ),
+      (loc.runDetailBestPace, RunFormatters.paceWithUnit(bestPace)),
+    ];
+
+    return Column(
+      children: [
+        for (var i = 0; i < rows.length; i++) ...[
+          if (i > 0)
+            Divider(
+              height: 1,
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    rows[i].$1,
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                ),
+                Text(
+                  rows[i].$2,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 }
