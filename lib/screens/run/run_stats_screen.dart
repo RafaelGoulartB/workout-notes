@@ -166,54 +166,35 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      _sectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              loc.runStatsOverview,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            _MetricsGrid(
-                              items: [
-                                _MetricItem(
-                                  label: loc.runRecordDistance,
-                                  value: RunFormatters.distanceWithUnit(
-                                    analytics.totalDistanceMeters,
-                                  ),
-                                ),
-                                _MetricItem(
-                                  label: loc.runStatsRunCount,
-                                  value: '${analytics.runCount}',
-                                ),
-                                _MetricItem(
-                                  label: loc.runDetailAvgPace,
-                                  value: RunFormatters.paceWithUnit(
-                                    analytics.avgPaceSecPerKm,
-                                  ),
-                                ),
-                                _MetricItem(
-                                  label: loc.runDetailMovingTime,
-                                  value: RunFormatters.duration(
-                                    analytics.totalMovingTimeSeconds,
-                                  ),
-                                ),
-                                _MetricItem(
-                                  label: loc.runDetailCalories,
-                                  value: '${analytics.totalCalories} kcal',
-                                ),
-                                _MetricItem(
-                                  label: loc.runStatsAvgPerWeek,
-                                  value: analytics.avgRunsPerWeek
-                                      .toStringAsFixed(1),
-                                ),
-                              ],
-                            ),
-                          ],
+                      _PeriodHeroCard(
+                        title: loc.runStatsOverview,
+                        distanceKm: RunFormatters.distanceKm(
+                          analytics.totalDistanceMeters,
                         ),
+                        distanceUnit: 'km',
+                        distanceLabel: loc.runRecordDistance,
+                        durationLabel: loc.runRecordTime,
+                        durationValue: RunFormatters.duration(
+                          analytics.totalMovingTimeSeconds,
+                        ),
+                        paceLabel: loc.runRecordPace,
+                        paceValue: RunFormatters.paceWithUnit(
+                          analytics.avgPaceSecPerKm,
+                        ),
+                        footerItems: [
+                          _HeroFooterItem(
+                            label: loc.runStatsRunCount,
+                            value: '${analytics.runCount}',
+                          ),
+                          _HeroFooterItem(
+                            label: loc.runDetailCalories,
+                            value: '${analytics.totalCalories} kcal',
+                          ),
+                          _HeroFooterItem(
+                            label: loc.runStatsAvgPerWeek,
+                            value: analytics.avgRunsPerWeek.toStringAsFixed(1),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
                       _sectionCard(
@@ -484,73 +465,229 @@ class _RecentRunTile extends StatelessWidget {
   }
 }
 
-class _MetricItem {
+class _HeroFooterItem {
   final String label;
   final String value;
 
-  const _MetricItem({required this.label, required this.value});
+  const _HeroFooterItem({required this.label, required this.value});
 }
 
-class _MetricsGrid extends StatelessWidget {
-  final List<_MetricItem> items;
+class _PeriodHeroCard extends StatelessWidget {
+  final String title;
+  final String distanceKm;
+  final String distanceUnit;
+  final String distanceLabel;
+  final String durationLabel;
+  final String durationValue;
+  final String paceLabel;
+  final String paceValue;
+  final List<_HeroFooterItem> footerItems;
 
-  const _MetricsGrid({required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final colWidth = (constraints.maxWidth - 8) / 2;
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final item in items)
-              SizedBox(
-                width: colWidth,
-                child: _StatChip(label: item.label, value: item.value),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _StatChip extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _StatChip({required this.label, required this.value});
+  const _PeriodHeroCard({
+    required this.title,
+    required this.distanceKm,
+    required this.distanceUnit,
+    required this.distanceLabel,
+    required this.durationLabel,
+    required this.durationValue,
+    required this.paceLabel,
+    required this.paceValue,
+    required this.footerItems,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final divider = colors.outlineVariant.withValues(alpha: 0.55);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          colors: [
+            colors.surfaceContainerHighest.withAlpha(200),
+            colors.surfaceContainerLow,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      distanceLabel,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            distanceKm,
+                            style: theme.textTheme.displaySmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              height: 1.05,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            distanceUnit,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: colors.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 64,
+                margin: const EdgeInsets.symmetric(horizontal: 14),
+                color: divider,
+              ),
+              Expanded(
+                flex: 4,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _HeroSideMetric(
+                      label: durationLabel,
+                      value: durationValue,
+                    ),
+                    const SizedBox(height: 12),
+                    _HeroSideMetric(
+                      label: paceLabel,
+                      value: paceValue,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(height: 1, color: divider),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              for (var i = 0; i < footerItems.length; i++) ...[
+                if (i > 0)
+                  Container(
+                    width: 1,
+                    height: 34,
+                    margin: const EdgeInsets.symmetric(horizontal: 10),
+                    color: divider,
+                  ),
+                Expanded(
+                  child: _HeroFooterMetric(item: footerItems[i]),
+                ),
+              ],
+            ],
           ),
         ],
       ),
+    );
+  }
+}
+
+class _HeroSideMetric extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _HeroSideMetric({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroFooterMetric extends StatelessWidget {
+  final _HeroFooterItem item;
+
+  const _HeroFooterMetric({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          item.label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          item.value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
     );
   }
 }
