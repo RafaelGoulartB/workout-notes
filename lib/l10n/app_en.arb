@@ -714,6 +714,13 @@
   "editWorkoutEndAfterStart": "End time must be after start time",
   "editWorkoutSaved": "Workout updated",
   "editWorkoutAddExercise": "Add Exercise",
+  "editWorkoutFeedback": "Workout feedback",
+  "editWorkoutNotes": "Notes",
+  "editWorkoutNotesHint": "How was the workout?",
+  "editWorkoutRatingStar": "Rate with {count} stars",
+  "@editWorkoutRatingStar": {
+    "placeholders": { "count": { "type": "int" } }
+  },
 
   "progressGoals": "Goals",
   "progressGoalsSubtitle": "Track and beat your personal challenges",

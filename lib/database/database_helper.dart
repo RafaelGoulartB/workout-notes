@@ -218,6 +218,15 @@ class DatabaseHelper {
       workoutRepo.resetWorkoutTimer(id);
   Future<void> updateWorkoutDate(String id, DateTime newDate) =>
       workoutRepo.updateWorkoutDate(id, newDate);
+  Future<void> updateWorkoutFeedback(
+    String id, {
+    required String? comment,
+    required int? feelingRating,
+  }) => workoutRepo.updateWorkoutFeedback(
+    id,
+    comment: comment,
+    feelingRating: feelingRating,
+  );
   Future<void> resetWorkoutToInProgress(String id) =>
       workoutRepo.resetWorkoutToInProgress(id);
   Future<void> deleteWorkout(String id) => workoutRepo.deleteWorkout(id);

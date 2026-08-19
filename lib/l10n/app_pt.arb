@@ -715,6 +715,13 @@
   "editWorkoutEndAfterStart": "O horário de fim deve ser depois do início",
   "editWorkoutSaved": "Treino atualizado",
   "editWorkoutAddExercise": "Adicionar Exercício",
+  "editWorkoutFeedback": "Avaliação do treino",
+  "editWorkoutNotes": "Notas",
+  "editWorkoutNotesHint": "Como foi o treino?",
+  "editWorkoutRatingStar": "Avaliar com {count} estrelas",
+  "@editWorkoutRatingStar": {
+    "placeholders": { "count": { "type": "int" } }
+  },
 
   "progressGoals": "Metas",
   "progressGoalsSubtitle": "Acompanhe e supere seus desafios pessoais",

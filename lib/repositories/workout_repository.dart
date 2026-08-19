@@ -849,6 +849,20 @@ class WorkoutRepository extends BaseRepository {
     );
   }
 
+  Future<void> updateWorkoutFeedback(
+    String id, {
+    required String? comment,
+    required int? feelingRating,
+  }) async {
+    final db = await this.db;
+    await db.update(
+      'workouts',
+      {'comment': comment, 'feeling_rating': feelingRating},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   /// Persists user-edited start/end timestamps for a completed workout and
   /// recomputes the cached `duration_seconds`. Any in-progress pause state
   /// is cleared so the new times are not double-counted.
