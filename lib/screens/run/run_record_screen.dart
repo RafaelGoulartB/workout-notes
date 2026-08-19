@@ -20,6 +20,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   final _service = RunTrackingService.instance;
   final _mapController = MapController();
   bool _busy = false;
+  bool _sheetExpanded = false;
 
   @override
   void initState() {
@@ -271,26 +272,49 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
               ),
             ),
           ),
-          DraggableScrollableSheet(
-            initialChildSize: 0.36,
-            minChildSize: 0.36,
-            maxChildSize: 0.82,
-            snap: true,
-            snapSizes: const [0.36, 0.82],
-            builder: (context, scrollController) {
-              return _MetricsSheet(
-                scrollController: scrollController,
-                state: state,
-                busy: _busy,
-                showDebugSimulate:
-                    kDebugMode && !state.isActive && _service.canDebugSimulate,
-                onStart: _ensurePermissionAndStart,
-                onDebugSimulate: _startDebugSimulation,
-                onPause: () => _service.pause(),
-                onResume: () => _service.resume(),
-                onFinish: _finish,
-              );
+          NotificationListener<DraggableScrollableNotification>(
+            onNotification: (notification) {
+              final expanded = notification.extent >= 0.55;
+              if (expanded != _sheetExpanded && mounted) {
+                setState(() => _sheetExpanded = expanded);
+              }
+              return false;
             },
+            child: Builder(
+              builder: (context) {
+                final hasSplitSummary = state.splits.isNotEmpty;
+                final showDebug = kDebugMode &&
+                    !state.isActive &&
+                    _service.canDebugSimulate;
+                // Hug content when there are no split cards yet — avoids a
+                // tall empty sheet on the map.
+                final collapsedSize = hasSplitSummary
+                    ? 0.42
+                    : (showDebug ? 0.34 : 0.28);
+                return DraggableScrollableSheet(
+                  key: ValueKey('run-sheet-$collapsedSize'),
+                  initialChildSize: collapsedSize,
+                  minChildSize: collapsedSize,
+                  maxChildSize: 0.82,
+                  snap: true,
+                  snapSizes: [collapsedSize, 0.82],
+                  builder: (context, scrollController) {
+                    return _MetricsSheet(
+                      scrollController: scrollController,
+                      state: state,
+                      busy: _busy,
+                      expanded: _sheetExpanded,
+                      showDebugSimulate: showDebug,
+                      onStart: _ensurePermissionAndStart,
+                      onDebugSimulate: _startDebugSimulation,
+                      onPause: () => _service.pause(),
+                      onResume: () => _service.resume(),
+                      onFinish: _finish,
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -302,6 +326,7 @@ class _MetricsSheet extends StatelessWidget {
   final ScrollController scrollController;
   final RunTrackingState state;
   final bool busy;
+  final bool expanded;
   final bool showDebugSimulate;
   final VoidCallback onStart;
   final VoidCallback onDebugSimulate;
@@ -313,6 +338,7 @@ class _MetricsSheet extends StatelessWidget {
     required this.scrollController,
     required this.state,
     required this.busy,
+    required this.expanded,
     required this.showDebugSimulate,
     required this.onStart,
     required this.onDebugSimulate,
@@ -320,6 +346,23 @@ class _MetricsSheet extends StatelessWidget {
     required this.onResume,
     required this.onFinish,
   });
+
+  RunSplit? get _lastCompleted {
+    if (state.splits.isEmpty) return null;
+    return state.splits.last;
+  }
+
+  RunSplit? get _bestCompleted {
+    RunSplit? best;
+    for (final split in state.splits) {
+      final pace = split.paceSecPerKm;
+      if (pace == null || !pace.isFinite) continue;
+      if (best == null || pace < (best.paceSecPerKm ?? double.infinity)) {
+        best = split;
+      }
+    }
+    return best;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -329,9 +372,12 @@ class _MetricsSheet extends StatelessWidget {
         (state.distanceMeters > 0
             ? state.movingTimeSeconds / (state.distanceMeters / 1000.0)
             : null);
-    final splits = state.displaySplits;
+    final allSplits = state.displaySplits;
+    final last = _lastCompleted;
+    final best = _bestCompleted;
 
-    return Container(
+    final panel = Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         color: theme.colorScheme.surface.withValues(alpha: 0.97),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -343,9 +389,15 @@ class _MetricsSheet extends StatelessWidget {
           ),
         ],
       ),
-      child: ListView(
-        controller: scrollController,
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        10,
+        20,
+        16 + MediaQuery.paddingOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Center(
             child: Container(
@@ -353,7 +405,9 @@ class _MetricsSheet extends StatelessWidget {
               height: 4,
               margin: const EdgeInsets.only(bottom: 14),
               decoration: BoxDecoration(
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.35,
+                ),
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -390,7 +444,7 @@ class _MetricsSheet extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           if (busy)
             const Center(child: CircularProgressIndicator())
           else if (!state.isActive) ...[
@@ -436,55 +490,180 @@ class _MetricsSheet extends StatelessWidget {
                 ),
               ],
             ),
-          const SizedBox(height: 24),
-          Text(
-            loc.runRecordSplitsTitle,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.6,
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (splits.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Text(
-                loc.runRecordSplitsEmpty,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            )
-          else ...[
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
+          if (!expanded) ...[
+            if (last != null || best != null) ...[
+              const SizedBox(height: 14),
+              Row(
                 children: [
-                  const Expanded(flex: 2, child: SizedBox.shrink()),
                   Expanded(
-                    child: Text(
-                      loc.runRecordSplitTime,
-                      textAlign: TextAlign.end,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                    child: _SplitSummaryCard(
+                      title: loc.runRecordSplitLast,
+                      split: last,
+                      emptyLabel: '—',
                     ),
                   ),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      loc.runRecordSplitPace,
-                      textAlign: TextAlign.end,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                    child: _SplitSummaryCard(
+                      title: loc.runRecordSplitBest,
+                      split: best,
+                      emptyLabel: '—',
+                      highlight: true,
                     ),
                   ),
                 ],
               ),
+              if (state.splits.length > 1) ...[
+                const SizedBox(height: 8),
+                Text(
+                  loc.runRecordSplitsExpandHint,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ] else ...[
+            const SizedBox(height: 24),
+            Text(
+              loc.runRecordSplitsTitle,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6,
+              ),
             ),
-            ...splits.map((split) => _SplitRow(split: split)),
+            const SizedBox(height: 8),
+            if (allSplits.isEmpty)
+              Text(
+                loc.runRecordSplitsEmpty,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              )
+            else ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    const Expanded(flex: 2, child: SizedBox.shrink()),
+                    Expanded(
+                      child: Text(
+                        loc.runRecordSplitTime,
+                        textAlign: TextAlign.end,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        loc.runRecordSplitPace,
+                        textAlign: TextAlign.end,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ...allSplits.map((split) => _SplitRow(split: split)),
+            ],
           ],
-          SizedBox(height: MediaQuery.paddingOf(context).bottom),
+        ],
+      ),
+    );
+
+    // Fill the sheet viewport so DraggableScrollableSheet can drag, while
+    // keeping the painted panel flush to the bottom (no gap under the modal).
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          controller: scrollController,
+          physics: const ClampingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [panel],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SplitSummaryCard extends StatelessWidget {
+  final String title;
+  final RunSplit? split;
+  final String emptyLabel;
+  final bool highlight;
+
+  const _SplitSummaryCard({
+    required this.title,
+    required this.split,
+    required this.emptyLabel,
+    this.highlight = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    final bg = highlight
+        ? theme.colorScheme.primaryContainer.withValues(alpha: 0.55)
+        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              letterSpacing: 0.8,
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          if (split == null)
+            Text(
+              emptyLabel,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            )
+          else ...[
+            Text(
+              loc.runRecordSplitKm(split!.km),
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            Text(
+              RunFormatters.paceWithUnit(split!.paceSecPerKm),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+            Text(
+              RunFormatters.duration(split!.durationSeconds),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
         ],
       ),
     );
