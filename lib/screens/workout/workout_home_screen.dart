@@ -10,7 +10,7 @@ import '../../repositories/analytics_repository.dart';
 import '../../services/rest_timer_service.dart';
 import 'active_workout_screen.dart';
 import '../run/run_record_screen.dart';
-import '../run/run_history_screen.dart';
+import '../run/run_stats_screen.dart';
 import 'calendar_screen.dart';
 import 'exercise_library_screen.dart';
 import 'routines_screen.dart';
@@ -639,7 +639,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         loc.workoutHomeRuns,
         () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const RunHistoryScreen()),
+          MaterialPageRoute(builder: (_) => const RunStatsScreen()),
         ),
       ),
       _NavItemData(
