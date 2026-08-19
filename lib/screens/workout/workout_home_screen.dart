@@ -15,7 +15,6 @@ import 'calendar_screen.dart';
 import 'exercise_library_screen.dart';
 import 'routines_screen.dart';
 import 'progress_screen.dart';
-import 'body_tracker_screen.dart';
 import 'settings_screen.dart';
 import 'rest_timer_screen.dart';
 import 'workout_detail_screen.dart';
@@ -670,17 +669,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const ProgressScreen()),
-        ),
-      ),
-      _NavItemData(
-        Icons.monitor_weight_outlined,
-        loc.workoutHomeBodyMeasurements,
-        () => Navigator.push(
-          context,
-          AiCoachNavigation.route(
-            kind: AiCoachRouteKind.normalWithFab,
-            builder: (_) => const BodyTrackerScreen(),
-          ),
         ),
       ),
     ];

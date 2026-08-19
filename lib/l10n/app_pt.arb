@@ -253,8 +253,8 @@
   "settingsNutritionSubtitle": "Metas diárias, macronutrientes e refeições",
   "settingsPlanTitle": "Configurações do plano",
   "settingsPlanSubtitle": "Periodização e planejamento",
-  "settingsPlanSectionToggle": "Seção Plano",
-  "settingsPlanSectionToggleBody": "Mostrar a seção Plano na barra de navegação do app",
+  "settingsPlanSectionToggle": "Seção Acompanhamento",
+  "settingsPlanSectionToggleBody": "Mostrar a seção Acompanhamento na barra de navegação do app",
   "settingsAiTitle": "Inteligência artificial",
   "settingsAiSubtitle": "Treinador IA, provedor, modelo e comportamento",
   "settingsDataPrivacyTitle": "Dados e privacidade",
@@ -1653,7 +1653,11 @@
 
   "settingsExportIncludesNutrition": "Treinos, sono, alimentação, medidas, rotinas, planos e configurações",
 
-  "tabPlan": "Plano",
+  "tabPlan": "Acompanhamento",
+  "trackingTitle": "Acompanhamento",
+  "trackingBodyWeight": "Peso corporal",
+  "trackingOpenMeasurements": "Abrir medidas",
+  "trackingNoWeight": "Nenhum peso registrado",
   "periodizationTitle": "Planejamento",
   "periodizationNoActiveTitle": "Crie seu primeiro plano",
   "periodizationNoActiveSubtitle": "Organize fases, metas e revisões sem alterar automaticamente seus treinos ou sua alimentação.",

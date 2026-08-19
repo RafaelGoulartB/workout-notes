@@ -253,8 +253,8 @@
   "settingsNutritionSubtitle": "Daily goals, macronutrients and meals",
   "settingsPlanTitle": "Plan settings",
   "settingsPlanSubtitle": "Periodization and planning",
-  "settingsPlanSectionToggle": "Plan section",
-  "settingsPlanSectionToggleBody": "Show the Plan section in the app navigation bar",
+  "settingsPlanSectionToggle": "Tracking section",
+  "settingsPlanSectionToggleBody": "Show the Tracking section in the app navigation bar",
   "settingsAiTitle": "Artificial intelligence",
   "settingsAiSubtitle": "AI Coach, provider, model and behaviour",
   "settingsDataPrivacyTitle": "Data and privacy",
@@ -1673,7 +1673,11 @@
 
   "settingsExportIncludesNutrition": "Workouts, sleep, nutrition, measurements, routines, plans and settings",
 
-  "tabPlan": "Plan",
+  "tabPlan": "Tracking",
+  "trackingTitle": "Tracking",
+  "trackingBodyWeight": "Body weight",
+  "trackingOpenMeasurements": "Open measurements",
+  "trackingNoWeight": "No weight logged yet",
   "periodizationTitle": "Planning",
   "periodizationNoActiveTitle": "Create your first plan",
   "periodizationNoActiveSubtitle": "Organize phases, targets, and reviews without automatically changing workouts or nutrition.",
