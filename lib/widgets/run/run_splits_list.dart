@@ -14,10 +14,13 @@ class RunSplitsList extends StatelessWidget {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
     if (splits.isEmpty) {
-      return Text(
-        loc.runDetailSplitsEmpty,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Text(
+          loc.runDetailSplitsEmpty,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       );
     }
@@ -35,11 +38,11 @@ class RunSplitsList extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.only(bottom: 4),
           child: Row(
             children: [
               SizedBox(
-                width: 52,
+                width: 64,
                 child: Text(
                   loc.runDetailSplitKm,
                   style: theme.textTheme.labelSmall?.copyWith(
@@ -48,9 +51,20 @@ class RunSplitsList extends StatelessWidget {
                   ),
                 ),
               ),
-              Expanded(
+              SizedBox(
+                width: 56,
                 child: Text(
                   loc.runDetailSplitPace,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  loc.runRecordSplitTime,
+                  textAlign: TextAlign.end,
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
@@ -60,12 +74,18 @@ class RunSplitsList extends StatelessWidget {
             ],
           ),
         ),
-        for (final split in splits)
+        for (var i = 0; i < splits.length; i++) ...[
+          if (i > 0)
+            Divider(
+              height: 1,
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
+            ),
           _SplitRow(
-            split: split,
+            split: splits[i],
             fastest: fastest,
             slowest: slowest,
           ),
+        ],
       ],
     );
   }
@@ -87,52 +107,76 @@ class _SplitRow extends StatelessWidget {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
     final label = split.isPartial
-        ? loc.runDetailSplitPartial(RunFormatters.distanceKm(split.distanceMeters))
+        ? loc.runDetailSplitPartial(
+            RunFormatters.distanceKm(split.distanceMeters),
+          )
         : loc.runRecordSplitKm(split.km);
     final pace = split.paceSecPerKm;
     final barFraction = _barFraction(pace);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            width: 52,
-            child: Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight:
-                    split.isPartial ? FontWeight.w600 : FontWeight.w500,
+          Row(
+            children: [
+              SizedBox(
+                width: 64,
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight:
+                        split.isPartial ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
               ),
-            ),
-          ),
-          SizedBox(
-            width: 52,
-            child: Text(
-              RunFormatters.pace(pace),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                fontFeatures: const [FontFeature.tabularFigures()],
+              SizedBox(
+                width: 56,
+                child: Text(
+                  RunFormatters.pace(pace),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
               ),
-            ),
+              Expanded(
+                child: Text(
+                  RunFormatters.duration(split.durationSeconds),
+                  textAlign: TextAlign.end,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final width = constraints.maxWidth * barFraction;
-                return Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    height: 10,
-                    width: width.clamp(8.0, constraints.maxWidth),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      borderRadius: BorderRadius.circular(999),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: SizedBox(
+              height: 8,
+              child: Stack(
+                children: [
+                  Container(
+                    color: theme.colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.7),
+                  ),
+                  FractionallySizedBox(
+                    widthFactor: barFraction,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(
+                          alpha: split.isPartial ? 0.55 : 0.9,
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
                     ),
                   ),
-                );
-              },
+                ],
+              ),
             ),
           ),
         ],
@@ -147,7 +191,6 @@ class _SplitRow extends StatelessWidget {
     final slow = slowest;
     if (fast == null || slow == null) return 0.7;
     if ((slow - fast).abs() < 1) return 1.0;
-    // Invert: fastest → 1.0, slowest → ~0.28
     final t = ((slow - pace) / (slow - fast)).clamp(0.0, 1.0);
     return 0.28 + 0.72 * t;
   }

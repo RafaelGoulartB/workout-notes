@@ -230,6 +230,31 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     );
   }
 
+  Widget _sectionCard({required Widget child}) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55),
+        ),
+      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
+    );
+  }
+
+  Widget _sectionTitle(String text) {
+    final theme = Theme.of(context);
+    return Text(
+      text,
+      style: theme.textTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -254,14 +279,17 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final dateLabel = DateFormat.yMMMd(
       Localizations.localeOf(context).toString(),
     ).add_Hm().format(activity.startedAt.toLocal());
-    final avgPace =
-        _analytics.avgPaceSecPerKm ?? activity.avgPaceSecPerKm;
+    final avgPace = _analytics.avgPaceSecPerKm ?? activity.avgPaceSecPerKm;
+    final bestPace =
+        _analytics.bestSplitPaceSecPerKm ?? activity.maxPaceSecPerKm;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(activity.title?.isNotEmpty == true
-            ? activity.title!
-            : loc.runDetailUntitled),
+        title: Text(
+          activity.title?.isNotEmpty == true
+              ? activity.title!
+              : loc.runDetailUntitled,
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit_outlined),
@@ -276,104 +304,120 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
         ],
       ),
       body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
-          SizedBox(
-            height: 280,
-            child: _buildMap(theme, trail),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
-            child: Text(
-              dateLabel,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              height: 240,
+              child: _buildMap(theme, trail),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-            child: _MetricsGrid(
-              items: [
-                _MetricItem(
-                  label: loc.runRecordDistance,
-                  value: RunFormatters.distanceWithUnit(activity.distanceMeters),
+          const SizedBox(height: 12),
+          _sectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  dateLabel,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                _MetricItem(
-                  label: loc.runDetailAvgPace,
-                  value: RunFormatters.paceWithUnit(avgPace),
-                ),
-                _MetricItem(
-                  label: loc.runDetailMovingTime,
-                  value: RunFormatters.duration(activity.movingTimeSeconds),
-                ),
-                _MetricItem(
-                  label: loc.runDetailElapsedTime,
-                  value: RunFormatters.duration(activity.durationSeconds),
-                ),
-                _MetricItem(
-                  label: loc.runDetailCalories,
-                  value: '${activity.calories ?? 0} kcal',
+                if (activity.notes?.isNotEmpty == true) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    activity.notes!,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                _MetricsGrid(
+                  items: [
+                    _MetricItem(
+                      label: loc.runRecordDistance,
+                      value: RunFormatters.distanceWithUnit(
+                        activity.distanceMeters,
+                      ),
+                    ),
+                    _MetricItem(
+                      label: loc.runDetailAvgPace,
+                      value: RunFormatters.paceWithUnit(avgPace),
+                    ),
+                    _MetricItem(
+                      label: loc.runDetailMovingTime,
+                      value: RunFormatters.duration(activity.movingTimeSeconds),
+                    ),
+                    _MetricItem(
+                      label: loc.runDetailElapsedTime,
+                      value: RunFormatters.duration(activity.durationSeconds),
+                    ),
+                    _MetricItem(
+                      label: loc.runDetailCalories,
+                      value: '${activity.calories ?? 0} kcal',
+                    ),
+                    if (bestPace != null)
+                      _MetricItem(
+                        label: loc.runDetailBestPace,
+                        value: RunFormatters.paceWithUnit(bestPace),
+                      ),
+                  ],
                 ),
               ],
             ),
           ),
-          if (activity.notes?.isNotEmpty == true)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-              child: Text(activity.notes!, style: theme.textTheme.bodyLarge),
-            ),
-          if (_analytics.hasChart || _analytics.hasSplits) ...[
-            const SizedBox(height: 8),
-            Divider(
-              height: 1,
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-          ],
           if (_analytics.hasChart) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-              child: Text(
-                loc.runDetailPaceSection,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 16, 8),
-              child: RunPaceChart(
-                samples: _analytics.samples,
-                avgPaceSecPerKm: avgPace,
-                emptyLabel: loc.runDetailPaceChartEmpty,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-              child: _PaceStatsList(
-                avgPace: avgPace,
-                movingTimeSeconds: activity.movingTimeSeconds,
-                elapsedTimeSeconds: activity.durationSeconds,
-                bestPace: _analytics.bestSplitPaceSecPerKm ??
-                    activity.maxPaceSecPerKm,
+            const SizedBox(height: 12),
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _sectionTitle(loc.runDetailPaceSection),
+                  const SizedBox(height: 12),
+                  RunPaceChart(
+                    samples: _analytics.samples,
+                    avgPaceSecPerKm: avgPace,
+                    emptyLabel: loc.runDetailPaceChartEmpty,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _SummaryTile(
+                          label: loc.runDetailAvgPace,
+                          value: RunFormatters.paceWithUnit(avgPace),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _SummaryTile(
+                          label: loc.runDetailBestPace,
+                          value: RunFormatters.paceWithUnit(bestPace),
+                          highlight: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
           if (_analytics.hasSplits) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Text(
-                loc.runDetailSplitsSection,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            const SizedBox(height: 12),
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _sectionTitle(loc.runDetailSplitsSection),
+                  const SizedBox(height: 8),
+                  RunSplitsList(splits: _analytics.splits),
+                ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-              child: RunSplitsList(splits: _analytics.splits),
-            ),
-          ] else
-            const SizedBox(height: 24),
+          ],
         ],
       ),
     );
@@ -394,37 +438,17 @@ class _MetricsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final colWidth = (constraints.maxWidth - 16) / 2;
+        final colWidth = (constraints.maxWidth - 8) / 2;
         return Wrap(
-          spacing: 16,
-          runSpacing: 18,
+          spacing: 8,
+          runSpacing: 8,
           children: [
             for (final item in items)
               SizedBox(
                 width: colWidth,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.label,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      item.value,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        height: 1.15,
-                      ),
-                    ),
-                  ],
-                ),
+                child: _StatChip(label: item.label, value: item.value),
               ),
           ],
         );
@@ -433,66 +457,86 @@ class _MetricsGrid extends StatelessWidget {
   }
 }
 
-class _PaceStatsList extends StatelessWidget {
-  final double? avgPace;
-  final int movingTimeSeconds;
-  final int elapsedTimeSeconds;
-  final double? bestPace;
+class _StatChip extends StatelessWidget {
+  final String label;
+  final String value;
 
-  const _PaceStatsList({
-    required this.avgPace,
-    required this.movingTimeSeconds,
-    required this.elapsedTimeSeconds,
-    required this.bestPace,
+  const _StatChip({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool highlight;
+
+  const _SummaryTile({
+    required this.label,
+    required this.value,
+    this.highlight = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    final rows = <(String, String)>[
-      (loc.runDetailAvgPace, RunFormatters.paceWithUnit(avgPace)),
-      (
-        loc.runDetailMovingTime,
-        RunFormatters.duration(movingTimeSeconds),
+    final bg = highlight
+        ? theme.colorScheme.primaryContainer.withValues(alpha: 0.55)
+        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
       ),
-      (
-        loc.runDetailElapsedTime,
-        RunFormatters.duration(elapsedTimeSeconds),
-      ),
-      (loc.runDetailBestPace, RunFormatters.paceWithUnit(bestPace)),
-    ];
-
-    return Column(
-      children: [
-        for (var i = 0; i < rows.length; i++) ...[
-          if (i > 0)
-            Divider(
-              height: 1,
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    rows[i].$1,
-                    style: theme.textTheme.bodyLarge,
-                  ),
-                ),
-                Text(
-                  rows[i].$2,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],
-      ],
+      ),
     );
   }
 }

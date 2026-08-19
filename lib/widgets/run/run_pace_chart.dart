@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
 
-/// Strava-style pace-over-distance area chart (faster pace at the top).
+/// Pace-over-distance area chart (faster pace at the top).
 class RunPaceChart extends StatelessWidget {
   final List<RunPaceSample> samples;
   final double? avgPaceSecPerKm;
@@ -68,7 +68,7 @@ class RunPaceChart extends StatelessWidget {
         LineChartData(
           minX: 0,
           maxX: maxX <= 0 ? 1 : maxX,
-          // Faster (more negative negated? wait: y = -pace, so minY = -chartMaxPace (slow, bottom)
+          // Faster pace (lower sec/km) sits higher — plot negated Y.
           minY: -chartMaxPace,
           maxY: -chartMinPace,
           clipData: const FlClipData.all(),
