@@ -38,6 +38,7 @@ void main() {
 
     expect(report.workouts, greaterThan(40));
     expect(report.routines, 2);
+    expect(report.runs, greaterThan(20));
     expect(report.measurements, greaterThan(40));
     expect(report.sleepNights, greaterThan(100));
     expect(report.monitoredNights, greaterThan(5));
@@ -97,6 +98,25 @@ void main() {
         await database.rawQuery('SELECT COUNT(*) FROM saved_meals'),
       ),
       2,
+    );
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          'SELECT COUNT(*) FROM run_activities WHERE id LIKE ?',
+          ['$devDataPrefix%'],
+        ),
+      ),
+      report.runs,
+    );
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          'SELECT COUNT(*) FROM run_track_points WHERE activity_id IN '
+          '(SELECT id FROM run_activities WHERE id LIKE ?)',
+          ['$devDataPrefix%'],
+        ),
+      ),
+      greaterThan(0),
     );
 
     final range = await database.rawQuery(

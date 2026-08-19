@@ -4,6 +4,7 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'test_data_context.dart';
 import 'test_data_fitness_generator.dart';
 import 'test_data_periodization_generator.dart';
+import 'test_data_run_generator.dart';
 import 'test_data_wellness_generator.dart';
 
 /// Debug-only entry point for a complete, disposable usage scenario.
@@ -48,6 +49,7 @@ class TestDataGenerator {
 
       final fitness = TestDataFitnessGenerator(context);
       final wellness = TestDataWellnessGenerator(context);
+      final runResult = await TestDataRunGenerator(context).generate();
       final fitnessResult = await fitness.generate();
       final wellnessResult = await wellness.generate();
       final periodizationResult = await TestDataPeriodizationGenerator(
@@ -57,6 +59,7 @@ class TestDataGenerator {
       return TestDataReport(
         workouts: fitnessResult.workouts,
         routines: fitnessResult.routines,
+        runs: runResult.runs,
         measurements: fitnessResult.measurements,
         sleepNights: wellnessResult.sleepNights,
         monitoredNights: wellnessResult.monitoredNights,
@@ -79,6 +82,7 @@ class TestDataGenerator {
       'periodization_plans',
       'workouts',
       'routines',
+      'run_activities',
       'sleep_entries',
       'meal_logs',
       'saved_meals',

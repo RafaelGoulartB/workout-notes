@@ -870,15 +870,16 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
           SnackBar(
             content: Text(
               AppLocalizations.of(context)!.settingsGenerateSuccessDetailed(
-                result.workouts,
-                result.routines,
+                result.goals,
+                result.meals,
                 result.measurements,
-                result.sleepNights,
                 result.monitoredNights,
                 result.nutritionDays,
-                result.meals,
-                result.goals,
                 result.periodizationPlans,
+                result.routines,
+                result.runs,
+                result.sleepNights,
+                result.workouts,
               ),
             ),
             behavior: SnackBarBehavior.floating,

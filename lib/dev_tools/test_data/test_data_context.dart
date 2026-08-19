@@ -42,6 +42,7 @@ class TestDataContext {
 class TestDataReport {
   final int workouts;
   final int routines;
+  final int runs;
   final int measurements;
   final int sleepNights;
   final int monitoredNights;
@@ -55,6 +56,7 @@ class TestDataReport {
   const TestDataReport({
     required this.workouts,
     required this.routines,
+    required this.runs,
     required this.measurements,
     required this.sleepNights,
     required this.monitoredNights,
