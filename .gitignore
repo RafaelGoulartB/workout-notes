@@ -53,3 +53,8 @@ app.*.map.json
 /android/key.properties
 *.jks
 *.keystore
+
+# Unsupported desktop platforms (Flutter generates ephemeral plugin registrants)
+/linux/
+/macos/
+/windows/
