@@ -1,3 +1,5 @@
+import 'package:workout_notes/models/run_split.dart';
+
 class RunLatLng {
   final double lat;
   final double lng;
@@ -28,6 +30,8 @@ class RunTrackingState {
   final double? lng;
   final double? accuracyMeters;
   final List<RunLatLng> trail;
+  final List<RunSplit> splits;
+  final RunSplit? currentSplit;
   final String? errorCode;
   final String? errorMessage;
 
@@ -46,6 +50,8 @@ class RunTrackingState {
     required this.lng,
     required this.accuracyMeters,
     required this.trail,
+    required this.splits,
+    required this.currentSplit,
     required this.errorCode,
     required this.errorMessage,
   });
@@ -66,6 +72,8 @@ class RunTrackingState {
           lng: null,
           accuracyMeters: null,
           trail: const [],
+          splits: const [],
+          currentSplit: null,
           errorCode: null,
           errorMessage: null,
         );
@@ -80,10 +88,25 @@ class RunTrackingState {
   bool get hasWeakGps =>
       accuracyMeters != null && accuracyMeters! > 30;
 
+  /// Completed km splits plus the in-progress partial (newest last).
+  List<RunSplit> get displaySplits {
+    if (currentSplit == null) return splits;
+    return [...splits, currentSplit!];
+  }
+
   factory RunTrackingState.fromMap(
     Map<String, dynamic> map, {
     List<RunLatLng>? trail,
   }) {
+    final rawSplits = (map['splits'] as List? ?? const [])
+        .whereType<Map>()
+        .map((row) => RunSplit.fromMap(Map<String, dynamic>.from(row)))
+        .toList();
+    final rawCurrent = map['current_split'];
+    RunSplit? current;
+    if (rawCurrent is Map) {
+      current = RunSplit.fromMap(Map<String, dynamic>.from(rawCurrent));
+    }
     return RunTrackingState(
       supported: map['supported'] as bool? ?? true,
       locationGranted: map['location_granted'] as bool? ?? false,
@@ -99,6 +122,8 @@ class RunTrackingState {
       lng: (map['lng'] as num?)?.toDouble(),
       accuracyMeters: (map['accuracy_meters'] as num?)?.toDouble(),
       trail: trail ?? const [],
+      splits: rawSplits,
+      currentSplit: current,
       errorCode: map['error_code'] as String?,
       errorMessage: map['error_message'] as String?,
     );
@@ -119,6 +144,8 @@ class RunTrackingState {
     double? lng,
     double? accuracyMeters,
     List<RunLatLng>? trail,
+    List<RunSplit>? splits,
+    RunSplit? currentSplit,
     String? errorCode,
     String? errorMessage,
     bool clearError = false,
@@ -138,6 +165,8 @@ class RunTrackingState {
       lng: lng ?? this.lng,
       accuracyMeters: accuracyMeters ?? this.accuracyMeters,
       trail: trail ?? this.trail,
+      splits: splits ?? this.splits,
+      currentSplit: currentSplit ?? this.currentSplit,
       errorCode: clearError ? null : (errorCode ?? this.errorCode),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );

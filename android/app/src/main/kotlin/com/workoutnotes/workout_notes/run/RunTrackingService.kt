@@ -108,6 +108,9 @@ class RunTrackingService : Service(), LocationListener {
     private var currentPaceSecPerKm: Double? = null
     private var maxPaceSecPerKm: Double? = null
     private var finished = false
+    private val completedSplits = mutableListOf<Map<String, Any?>>()
+    private var nextSplitAtMeters = 1000.0
+    private var lastSplitMovingSeconds = 0
     private val mainHandler = Handler(Looper.getMainLooper())
     private val tickRunnable = object : Runnable {
         override fun run() {
@@ -166,6 +169,9 @@ class RunTrackingService : Service(), LocationListener {
         lastLocation = null
         currentPaceSecPerKm = null
         maxPaceSecPerKm = null
+        completedSplits.clear()
+        nextSplitAtMeters = 1000.0
+        lastSplitMovingSeconds = 0
 
         val session = mutableMapOf<String, Any?>(
             "id" to id,
@@ -386,6 +392,47 @@ class RunTrackingService : Service(), LocationListener {
 
     override fun onProviderDisabled(provider: String) {}
 
+    private fun recordCompletedSplits() {
+        val moving = movingSeconds()
+        while (distanceMeters >= nextSplitAtMeters) {
+            val splitDuration = max(0, moving - lastSplitMovingSeconds)
+            val km = (nextSplitAtMeters / 1000.0).toInt()
+            completedSplits.add(
+                mapOf(
+                    "km" to km,
+                    "distance_meters" to 1000.0,
+                    "duration_seconds" to splitDuration,
+                    "pace_sec_per_km" to splitDuration.toDouble(),
+                    "is_partial" to false,
+                ),
+            )
+            lastSplitMovingSeconds = moving
+            nextSplitAtMeters += 1000.0
+        }
+    }
+
+    private fun currentPartialSplit(): Map<String, Any?>? {
+        if (distanceMeters < 1.0 && completedSplits.isEmpty()) return null
+        val partialMeters = distanceMeters % 1000.0
+        // Exactly on a km boundary with no leftover.
+        if (partialMeters < 0.5 && distanceMeters >= 1000.0) return null
+        val moving = movingSeconds()
+        val duration = max(0, moving - lastSplitMovingSeconds)
+        val km = completedSplits.size + 1
+        val pace = if (partialMeters >= 1.0) {
+            duration / (partialMeters / 1000.0)
+        } else {
+            null
+        }
+        return mapOf(
+            "km" to km,
+            "distance_meters" to partialMeters,
+            "duration_seconds" to duration,
+            "pace_sec_per_km" to pace,
+            "is_partial" to true,
+        )
+    }
+
     private fun acceptPoint(location: Location, distanceDelta: Double) {
         lastLocation = location
         val session = activity ?: return
@@ -405,6 +452,10 @@ class RunTrackingService : Service(), LocationListener {
         pointSeq += 1
         spool.appendPoint(point)
 
+        if (distanceDelta > 0) {
+            recordCompletedSplits()
+        }
+
         val durationSeconds = elapsedSeconds()
         val movingTimeSeconds = movingSeconds()
         session["distance_meters"] = distanceMeters
@@ -414,6 +465,7 @@ class RunTrackingService : Service(), LocationListener {
             RunGeoMath.paceSecPerKm(distanceMeters, movingTimeSeconds)
         session["max_pace_sec_per_km"] = maxPaceSecPerKm
         session["calories"] = RunGeoMath.estimateCalories(distanceMeters)
+        session["splits"] = completedSplits.toList()
         spool.updateActivity(session)
         publishState()
     }
@@ -435,6 +487,8 @@ class RunTrackingService : Service(), LocationListener {
 
     private fun stateMap(): Map<String, Any?> {
         val session = activity
+        val splits = completedSplits.toList()
+        val partial = currentPartialSplit()
         return mapOf(
             "supported" to true,
             "location_granted" to locationGranted(this),
@@ -451,6 +505,8 @@ class RunTrackingService : Service(), LocationListener {
             "lng" to currentLng,
             "accuracy_meters" to currentAccuracy?.toDouble(),
             "point_count" to pointSeq,
+            "splits" to splits,
+            "current_split" to partial,
         )
     }
 

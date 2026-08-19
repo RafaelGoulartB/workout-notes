@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
@@ -228,16 +229,23 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
               ),
             ),
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: _MetricsPanel(
-              state: state,
-              busy: _busy,
-              onStart: _ensurePermissionAndStart,
-              onPause: () => _service.pause(),
-              onResume: () => _service.resume(),
-              onFinish: _finish,
-            ),
+          DraggableScrollableSheet(
+            initialChildSize: 0.36,
+            minChildSize: 0.36,
+            maxChildSize: 0.82,
+            snap: true,
+            snapSizes: const [0.36, 0.82],
+            builder: (context, scrollController) {
+              return _MetricsSheet(
+                scrollController: scrollController,
+                state: state,
+                busy: _busy,
+                onStart: _ensurePermissionAndStart,
+                onPause: () => _service.pause(),
+                onResume: () => _service.resume(),
+                onFinish: _finish,
+              );
+            },
           ),
         ],
       ),
@@ -245,7 +253,8 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   }
 }
 
-class _MetricsPanel extends StatelessWidget {
+class _MetricsSheet extends StatelessWidget {
+  final ScrollController scrollController;
   final RunTrackingState state;
   final bool busy;
   final VoidCallback onStart;
@@ -253,7 +262,8 @@ class _MetricsPanel extends StatelessWidget {
   final VoidCallback onResume;
   final VoidCallback onFinish;
 
-  const _MetricsPanel({
+  const _MetricsSheet({
+    required this.scrollController,
     required this.state,
     required this.busy,
     required this.onStart,
@@ -270,94 +280,202 @@ class _MetricsPanel extends StatelessWidget {
         (state.distanceMeters > 0
             ? state.movingTimeSeconds / (state.distanceMeters / 1000.0)
             : null);
+    final splits = state.displaySplits;
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.96),
+        color: theme.colorScheme.surface.withValues(alpha: 0.97),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
+            color: Colors.black.withValues(alpha: 0.14),
             blurRadius: 16,
             offset: const Offset(0, -4),
           ),
         ],
       ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!state.locationGranted && state.supported) ...[
-              Text(
-                loc.runRecordPermissionNeeded,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium,
+      child: ListView(
+        controller: scrollController,
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 28),
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(999),
               ),
-              const SizedBox(height: 12),
+            ),
+          ),
+          if (!state.locationGranted && state.supported) ...[
+            Text(
+              loc.runRecordPermissionNeeded,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: _Metric(
+                  label: loc.runRecordTime,
+                  value: RunFormatters.duration(state.durationSeconds),
+                ),
+              ),
+              Expanded(
+                child: _Metric(
+                  label: loc.runRecordDistance,
+                  value: RunFormatters.distanceKm(state.distanceMeters),
+                  unit: 'km',
+                ),
+              ),
+              Expanded(
+                child: _Metric(
+                  label: loc.runRecordPace,
+                  value: RunFormatters.pace(pace),
+                  unit: loc.runRecordPaceUnit,
+                ),
+              ),
             ],
+          ),
+          const SizedBox(height: 20),
+          if (busy)
+            const Center(child: CircularProgressIndicator())
+          else if (!state.isActive)
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: FilledButton(
+                onPressed: onStart,
+                child: Text(loc.runRecordStart),
+              ),
+            )
+          else
             Row(
               children: [
                 Expanded(
-                  child: _Metric(
-                    label: loc.runRecordTime,
-                    value: RunFormatters.duration(state.durationSeconds),
+                  child: OutlinedButton(
+                    onPressed: state.isPaused ? onResume : onPause,
+                    child: Text(
+                      state.isPaused
+                          ? loc.runRecordResume
+                          : loc.runRecordPause,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: _Metric(
-                    label: loc.runRecordDistance,
-                    value: RunFormatters.distanceKm(state.distanceMeters),
-                    unit: 'km',
-                  ),
-                ),
-                Expanded(
-                  child: _Metric(
-                    label: loc.runRecordPace,
-                    value: RunFormatters.pace(pace),
-                    unit: loc.runRecordPaceUnit,
+                  child: FilledButton(
+                    onPressed: onFinish,
+                    child: Text(loc.runRecordFinish),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            if (busy)
-              const CircularProgressIndicator()
-            else if (!state.isActive)
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: FilledButton(
-                  onPressed: onStart,
-                  child: Text(loc.runRecordStart),
+          const SizedBox(height: 24),
+          Text(
+            loc.runRecordSplitsTitle,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (splits.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text(
+                loc.runRecordSplitsEmpty,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
-              )
-            else
-              Row(
+              ),
+            )
+          else ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
                 children: [
+                  const Expanded(flex: 2, child: SizedBox.shrink()),
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: state.isPaused ? onResume : onPause,
-                      child: Text(
-                        state.isPaused
-                            ? loc.runRecordResume
-                            : loc.runRecordPause,
+                    child: Text(
+                      loc.runRecordSplitTime,
+                      textAlign: TextAlign.end,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
                   Expanded(
-                    child: FilledButton(
-                      onPressed: onFinish,
-                      child: Text(loc.runRecordFinish),
+                    child: Text(
+                      loc.runRecordSplitPace,
+                      textAlign: TextAlign.end,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ],
               ),
+            ),
+            ...splits.map((split) => _SplitRow(split: split)),
           ],
-        ),
+          SizedBox(height: MediaQuery.paddingOf(context).bottom),
+        ],
+      ),
+    );
+  }
+}
+
+class _SplitRow extends StatelessWidget {
+  final RunSplit split;
+
+  const _SplitRow({required this.split});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    final label = split.isPartial
+        ? loc.runRecordSplitPartial(split.km)
+        : loc.runRecordSplitKm(split.km);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontWeight: split.isPartial ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              RunFormatters.duration(split.durationSeconds),
+              textAlign: TextAlign.end,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              RunFormatters.pace(split.paceSecPerKm),
+              textAlign: TextAlign.end,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -401,3 +519,4 @@ class _Metric extends StatelessWidget {
     );
   }
 }
+
