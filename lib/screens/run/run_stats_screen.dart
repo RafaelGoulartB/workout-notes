@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_history_screen.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
+import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
+import 'package:workout_notes/widgets/run/run_achievements_section.dart';
 import 'package:workout_notes/widgets/run/run_progress_charts.dart';
 
 class RunStatsScreen extends StatefulWidget {
@@ -21,6 +24,7 @@ class RunStatsScreen extends StatefulWidget {
 class _RunStatsScreenState extends State<RunStatsScreen> {
   final _repo = RunRepository();
   List<RunActivity> _activities = [];
+  RunAchievementBoard _board = RunAchievementBoard.empty;
   bool _loading = true;
   RunStatsPeriod _period = RunStatsPeriod.weeks12;
 
@@ -32,10 +36,12 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    await _repo.backfillMissingEfforts(limit: 60);
     final rows = await _repo.listActivities(limit: 500);
     if (!mounted) return;
     setState(() {
       _activities = rows;
+      _board = RunAchievementEngine.build(rows);
       _loading = false;
     });
   }
@@ -301,6 +307,13 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
                                 ),
                             ],
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _sectionCard(
+                        child: RunAchievementsSection(
+                          board: _board,
+                          onOpenActivity: _openDetail,
                         ),
                       ),
                       const SizedBox(height: 12),

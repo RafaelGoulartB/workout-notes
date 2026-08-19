@@ -38,7 +38,15 @@ void main() {
               status TEXT NOT NULL DEFAULT 'completed',
               polyline_summary TEXT,
               created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL
+              updated_at TEXT NOT NULL,
+              best_split_pace_sec_per_km REAL,
+              best_effort_1k_sec INTEGER,
+              best_effort_3k_sec INTEGER,
+              best_effort_5k_sec INTEGER,
+              best_effort_10k_sec INTEGER,
+              best_effort_half_sec INTEGER,
+              best_effort_marathon_sec INTEGER,
+              efforts_computed INTEGER NOT NULL DEFAULT 0
             )
           ''');
           await db.execute('''

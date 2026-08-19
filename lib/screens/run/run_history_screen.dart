@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
+import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
+import 'package:workout_notes/widgets/run/run_achievements_section.dart';
+import 'package:workout_notes/widgets/run/run_medal_badge.dart';
 
 class RunHistoryScreen extends StatefulWidget {
   const RunHistoryScreen({super.key});
@@ -19,6 +23,7 @@ class RunHistoryScreen extends StatefulWidget {
 class _RunHistoryScreenState extends State<RunHistoryScreen> {
   final _repo = RunRepository();
   List<RunActivity> _activities = [];
+  RunAchievementBoard _board = RunAchievementBoard.empty;
   bool _loading = true;
 
   @override
@@ -29,10 +34,12 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    await _repo.backfillMissingEfforts(limit: 40);
     final rows = await _repo.listActivities(limit: 100);
     if (!mounted) return;
     setState(() {
       _activities = rows;
+      _board = RunAchievementEngine.build(rows);
       _loading = false;
     });
   }
@@ -136,11 +143,14 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
                     ],
                     _RunHistoryCard(
                       activity: _activities[index],
+                      medals: _board.forActivity(_activities[index].id),
                       locale: locale,
                       titleFallback: loc.runDetailUntitled,
                       paceLabel: loc.runDetailAvgPace,
                       distanceLabel: loc.runRecordDistance,
                       timeLabel: loc.runDetailMovingTime,
+                      medalLabelFor: (kind) =>
+                          runAchievementKindShortLabel(loc, kind),
                       onTap: () => _openDetail(_activities[index]),
                     ),
                     if (index < _activities.length - 1)
@@ -319,20 +329,24 @@ class _OverviewDivider extends StatelessWidget {
 
 class _RunHistoryCard extends StatelessWidget {
   final RunActivity activity;
+  final List<RunAchievementPlacement> medals;
   final String locale;
   final String titleFallback;
   final String paceLabel;
   final String distanceLabel;
   final String timeLabel;
+  final String Function(RunAchievementKind kind) medalLabelFor;
   final VoidCallback onTap;
 
   const _RunHistoryCard({
     required this.activity,
+    required this.medals,
     required this.locale,
     required this.titleFallback,
     required this.paceLabel,
     required this.distanceLabel,
     required this.timeLabel,
+    required this.medalLabelFor,
     required this.onTap,
   });
 
@@ -401,6 +415,13 @@ class _RunHistoryCard extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
+                        if (medals.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          RunMedalBadgeRow(
+                            placements: medals,
+                            labelFor: medalLabelFor,
+                          ),
+                        ],
                       ],
                     ),
                   ),

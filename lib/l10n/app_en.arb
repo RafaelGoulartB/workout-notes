@@ -2003,5 +2003,32 @@
     "placeholders": {
       "distance": { "type": "String" }
     }
-  }
+  },
+  "runAchievementSectionTitle": "Achievements",
+  "runAchievementBoardTitle": "Personal records",
+  "runAchievementRecentSubtitle": "Last 5 achievements",
+  "runAchievementEmpty": "Complete more runs to unlock gold, silver, and bronze records",
+  "runAchievementTierGold": "1st",
+  "runAchievementTierSilver": "2nd",
+  "runAchievementTierBronze": "3rd",
+  "runAchievementLongestDistance": "Longest run",
+  "runAchievementLongestDuration": "Longest duration",
+  "runAchievementBestAvgPace": "Best average pace",
+  "runAchievementBestKmSplit": "Fastest kilometer",
+  "runAchievementBestEffort1k": "Best 1K",
+  "runAchievementBestEffort3k": "Best 3K",
+  "runAchievementBestEffort5k": "Best 5K",
+  "runAchievementBestEffort10k": "Best 10K",
+  "runAchievementBestEffortHalf": "Best half marathon",
+  "runAchievementBestEffortMarathon": "Best marathon",
+  "runAchievementShortDistance": "Distance",
+  "runAchievementShortDuration": "Duration",
+  "runAchievementShortAvgPace": "Avg pace",
+  "runAchievementShortKmSplit": "1K split",
+  "runAchievementShort1k": "1K",
+  "runAchievementShort3k": "3K",
+  "runAchievementShort5k": "5K",
+  "runAchievementShort10k": "10K",
+  "runAchievementShortHalf": "Half",
+  "runAchievementShortMarathon": "Marathon"
 }

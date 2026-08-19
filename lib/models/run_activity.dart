@@ -15,6 +15,20 @@ class RunActivity {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// Fastest completed 1 km split (sec/km). Null if not computed or unavailable.
+  final double? bestSplitPaceSecPerKm;
+
+  /// Fastest contiguous effort times in seconds for fixed distances.
+  final int? bestEffort1kSec;
+  final int? bestEffort3kSec;
+  final int? bestEffort5kSec;
+  final int? bestEffort10kSec;
+  final int? bestEffortHalfSec;
+  final int? bestEffortMarathonSec;
+
+  /// 1 once GPS effort metrics have been computed (even if all null).
+  final bool effortsComputed;
+
   const RunActivity({
     required this.id,
     required this.startedAt,
@@ -31,6 +45,14 @@ class RunActivity {
     required this.polylineSummary,
     required this.createdAt,
     required this.updatedAt,
+    this.bestSplitPaceSecPerKm,
+    this.bestEffort1kSec,
+    this.bestEffort3kSec,
+    this.bestEffort5kSec,
+    this.bestEffort10kSec,
+    this.bestEffortHalfSec,
+    this.bestEffortMarathonSec,
+    this.effortsComputed = false,
   });
 
   bool get isCompleted => status == 'completed';
@@ -54,6 +76,16 @@ class RunActivity {
       polylineSummary: map['polyline_summary'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
+      bestSplitPaceSecPerKm:
+          (map['best_split_pace_sec_per_km'] as num?)?.toDouble(),
+      bestEffort1kSec: (map['best_effort_1k_sec'] as num?)?.toInt(),
+      bestEffort3kSec: (map['best_effort_3k_sec'] as num?)?.toInt(),
+      bestEffort5kSec: (map['best_effort_5k_sec'] as num?)?.toInt(),
+      bestEffort10kSec: (map['best_effort_10k_sec'] as num?)?.toInt(),
+      bestEffortHalfSec: (map['best_effort_half_sec'] as num?)?.toInt(),
+      bestEffortMarathonSec:
+          (map['best_effort_marathon_sec'] as num?)?.toInt(),
+      effortsComputed: (map['efforts_computed'] as num?)?.toInt() == 1,
     );
   }
 
@@ -73,12 +105,28 @@ class RunActivity {
         'polyline_summary': polylineSummary,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
+        'best_split_pace_sec_per_km': bestSplitPaceSecPerKm,
+        'best_effort_1k_sec': bestEffort1kSec,
+        'best_effort_3k_sec': bestEffort3kSec,
+        'best_effort_5k_sec': bestEffort5kSec,
+        'best_effort_10k_sec': bestEffort10kSec,
+        'best_effort_half_sec': bestEffortHalfSec,
+        'best_effort_marathon_sec': bestEffortMarathonSec,
+        'efforts_computed': effortsComputed ? 1 : 0,
       };
 
   RunActivity copyWith({
     String? title,
     String? notes,
     DateTime? updatedAt,
+    double? bestSplitPaceSecPerKm,
+    int? bestEffort1kSec,
+    int? bestEffort3kSec,
+    int? bestEffort5kSec,
+    int? bestEffort10kSec,
+    int? bestEffortHalfSec,
+    int? bestEffortMarathonSec,
+    bool? effortsComputed,
   }) {
     return RunActivity(
       id: id,
@@ -96,6 +144,16 @@ class RunActivity {
       polylineSummary: polylineSummary,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      bestSplitPaceSecPerKm:
+          bestSplitPaceSecPerKm ?? this.bestSplitPaceSecPerKm,
+      bestEffort1kSec: bestEffort1kSec ?? this.bestEffort1kSec,
+      bestEffort3kSec: bestEffort3kSec ?? this.bestEffort3kSec,
+      bestEffort5kSec: bestEffort5kSec ?? this.bestEffort5kSec,
+      bestEffort10kSec: bestEffort10kSec ?? this.bestEffort10kSec,
+      bestEffortHalfSec: bestEffortHalfSec ?? this.bestEffortHalfSec,
+      bestEffortMarathonSec:
+          bestEffortMarathonSec ?? this.bestEffortMarathonSec,
+      effortsComputed: effortsComputed ?? this.effortsComputed,
     );
   }
 }

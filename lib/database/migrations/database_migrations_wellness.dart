@@ -445,5 +445,22 @@ abstract final class DatabaseWellnessMigrations {
         );
       } catch (_) {}
     }
+    if (oldVersion < 43) {
+      // Cached GPS effort PRs for all-time run achievements (Strava-like).
+      for (final sql in const [
+        'ALTER TABLE run_activities ADD COLUMN best_split_pace_sec_per_km REAL',
+        'ALTER TABLE run_activities ADD COLUMN best_effort_1k_sec INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN best_effort_3k_sec INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN best_effort_5k_sec INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN best_effort_10k_sec INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN best_effort_half_sec INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN best_effort_marathon_sec INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN efforts_computed INTEGER NOT NULL DEFAULT 0',
+      ]) {
+        try {
+          await db.execute(sql);
+        } catch (_) {}
+      }
+    }
   }
 }

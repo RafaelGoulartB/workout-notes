@@ -1983,5 +1983,32 @@
     "placeholders": {
       "distance": { "type": "String" }
     }
-  }
+  },
+  "runAchievementSectionTitle": "Conquistas",
+  "runAchievementBoardTitle": "Recordes pessoais",
+  "runAchievementRecentSubtitle": "Últimas 5 conquistas",
+  "runAchievementEmpty": "Complete mais corridas para liberar recordes ouro, prata e bronze",
+  "runAchievementTierGold": "1º",
+  "runAchievementTierSilver": "2º",
+  "runAchievementTierBronze": "3º",
+  "runAchievementLongestDistance": "Corrida mais longa",
+  "runAchievementLongestDuration": "Maior duração",
+  "runAchievementBestAvgPace": "Melhor pace médio",
+  "runAchievementBestKmSplit": "Quilômetro mais rápido",
+  "runAchievementBestEffort1k": "Melhor 1K",
+  "runAchievementBestEffort3k": "Melhor 3K",
+  "runAchievementBestEffort5k": "Melhor 5K",
+  "runAchievementBestEffort10k": "Melhor 10K",
+  "runAchievementBestEffortHalf": "Melhor meia maratona",
+  "runAchievementBestEffortMarathon": "Melhor maratona",
+  "runAchievementShortDistance": "Distância",
+  "runAchievementShortDuration": "Duração",
+  "runAchievementShortAvgPace": "Pace médio",
+  "runAchievementShortKmSplit": "Split 1K",
+  "runAchievementShort1k": "1K",
+  "runAchievementShort3k": "3K",
+  "runAchievementShort5k": "5K",
+  "runAchievementShort10k": "10K",
+  "runAchievementShortHalf": "Meia",
+  "runAchievementShortMarathon": "Maratona"
 }

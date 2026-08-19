@@ -3,11 +3,14 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
+import 'package:workout_notes/widgets/run/run_achievements_section.dart';
 import 'package:workout_notes/widgets/run/run_pace_chart.dart';
 import 'package:workout_notes/widgets/run/run_splits_list.dart';
 
@@ -24,6 +27,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
   final _repo = RunRepository();
   RunActivity? _activity;
   List<RunTrackPoint> _points = [];
+  List<RunAchievementPlacement> _medals = [];
   RunPaceAnalytics _analytics = const RunPaceAnalytics(
     samples: [],
     splits: [],
@@ -40,7 +44,8 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final activity = await _repo.getActivity(widget.activityId);
+    final activity = await _repo.ensureEffortMetrics(widget.activityId) ??
+        await _repo.getActivity(widget.activityId);
     final points = activity == null
         ? <RunTrackPoint>[]
         : await _repo.getTrackPoints(widget.activityId);
@@ -55,11 +60,16 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
             points,
             activityAvgPaceSecPerKm: activity.avgPaceSecPerKm,
           );
+    final all = await _repo.listActivities(limit: 500);
+    final board = RunAchievementEngine.build(all);
     if (!mounted) return;
     setState(() {
       _activity = activity;
       _points = points;
       _analytics = analytics;
+      _medals = activity == null
+          ? const []
+          : board.forActivity(activity.id);
       _loading = false;
     });
   }
@@ -369,6 +379,12 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               ],
             ),
           ),
+          if (_medals.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _sectionCard(
+              child: RunActivityAchievementsBlock(placements: _medals),
+            ),
+          ],
           if (_analytics.hasChart) ...[
             const SizedBox(height: 12),
             _sectionCard(

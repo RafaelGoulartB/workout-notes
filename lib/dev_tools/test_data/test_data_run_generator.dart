@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:workout_notes/models/run_track_point.dart';
+import 'package:workout_notes/utils/run_effort_analytics.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
 
 import 'test_data_context.dart';
@@ -144,6 +146,21 @@ class TestDataRunGenerator {
         ? elapsedSeconds / (distanceMeters / 1000.0)
         : null;
     final endedAt = startedAt.add(Duration(seconds: elapsedSeconds));
+    final trackPoints = [
+      for (final row in points)
+        RunTrackPoint(
+          id: row['id'] as String,
+          activityId: activityId,
+          seq: row['seq'] as int,
+          lat: row['lat'] as double,
+          lng: row['lng'] as double,
+          altitude: row['altitude'] as double?,
+          accuracy: row['accuracy'] as double?,
+          speed: row['speed'] as double?,
+          recordedAt: DateTime.parse(row['recorded_at'] as String),
+        ),
+    ];
+    final efforts = RunEffortAnalytics.fromTrackPoints(trackPoints);
 
     await context.database.insert('run_activities', {
       'id': activityId,
@@ -163,6 +180,14 @@ class TestDataRunGenerator {
       'polyline_summary': _polylineSummary(points),
       'created_at': startedAt.toIso8601String(),
       'updated_at': endedAt.toIso8601String(),
+      'best_split_pace_sec_per_km': efforts.bestSplitPaceSecPerKm,
+      'best_effort_1k_sec': efforts.bestEffort1kSec,
+      'best_effort_3k_sec': efforts.bestEffort3kSec,
+      'best_effort_5k_sec': efforts.bestEffort5kSec,
+      'best_effort_10k_sec': efforts.bestEffort10kSec,
+      'best_effort_half_sec': efforts.bestEffortHalfSec,
+      'best_effort_marathon_sec': efforts.bestEffortMarathonSec,
+      'efforts_computed': 1,
     });
 
     for (final point in points) {

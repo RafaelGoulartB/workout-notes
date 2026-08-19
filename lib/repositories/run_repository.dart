@@ -2,6 +2,7 @@ import 'package:uuid/uuid.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/utils/run_effort_analytics.dart';
 
 class RunRepository extends BaseRepository {
   static const _uuid = Uuid();
@@ -65,6 +66,87 @@ class RunRepository extends BaseRepository {
     await database.delete('run_activities', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Computes and persists GPS effort metrics for [activityId] when missing.
+  /// Returns the refreshed activity (or null if not found).
+  Future<RunActivity?> ensureEffortMetrics(String activityId) async {
+    final activity = await getActivity(activityId);
+    if (activity == null) return null;
+    if (activity.effortsComputed) return activity;
+
+    final points = await getTrackPoints(activityId);
+    final metrics = RunEffortAnalytics.fromTrackPoints(points);
+    final now = DateTime.now();
+    final updated = RunActivity(
+      id: activity.id,
+      startedAt: activity.startedAt,
+      endedAt: activity.endedAt,
+      durationSeconds: activity.durationSeconds,
+      movingTimeSeconds: activity.movingTimeSeconds,
+      distanceMeters: activity.distanceMeters,
+      avgPaceSecPerKm: activity.avgPaceSecPerKm,
+      maxPaceSecPerKm: activity.maxPaceSecPerKm,
+      calories: activity.calories,
+      title: activity.title,
+      notes: activity.notes,
+      status: activity.status,
+      polylineSummary: activity.polylineSummary,
+      createdAt: activity.createdAt,
+      updatedAt: now,
+      bestSplitPaceSecPerKm: metrics.bestSplitPaceSecPerKm,
+      bestEffort1kSec: metrics.bestEffort1kSec,
+      bestEffort3kSec: metrics.bestEffort3kSec,
+      bestEffort5kSec: metrics.bestEffort5kSec,
+      bestEffort10kSec: metrics.bestEffort10kSec,
+      bestEffortHalfSec: metrics.bestEffortHalfSec,
+      bestEffortMarathonSec: metrics.bestEffortMarathonSec,
+      effortsComputed: true,
+    );
+    await _persistEffortMetrics(updated);
+    return updated;
+  }
+
+  /// Backfills effort metrics for activities that still need computation.
+  /// Returns how many rows were updated.
+  Future<int> backfillMissingEfforts({int limit = 40}) async {
+    final database = await db;
+    final rows = await database.query(
+      'run_activities',
+      columns: ['id'],
+      where: "status = ? AND IFNULL(efforts_computed, 0) = 0",
+      whereArgs: ['completed'],
+      orderBy: 'started_at DESC',
+      limit: limit,
+    );
+    var updated = 0;
+    for (final row in rows) {
+      final id = row['id'] as String?;
+      if (id == null) continue;
+      final result = await ensureEffortMetrics(id);
+      if (result != null) updated++;
+    }
+    return updated;
+  }
+
+  Future<void> _persistEffortMetrics(RunActivity activity) async {
+    final database = await db;
+    await database.update(
+      'run_activities',
+      {
+        'best_split_pace_sec_per_km': activity.bestSplitPaceSecPerKm,
+        'best_effort_1k_sec': activity.bestEffort1kSec,
+        'best_effort_3k_sec': activity.bestEffort3kSec,
+        'best_effort_5k_sec': activity.bestEffort5kSec,
+        'best_effort_10k_sec': activity.bestEffort10kSec,
+        'best_effort_half_sec': activity.bestEffortHalfSec,
+        'best_effort_marathon_sec': activity.bestEffortMarathonSec,
+        'efforts_computed': activity.effortsComputed ? 1 : 0,
+        'updated_at': activity.updatedAt.toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [activity.id],
+    );
+  }
+
   /// Imports a native JSON spool atomically. Idempotent per activity id.
   Future<RunActivity> importNativeSpool(Map<String, dynamic> spool) async {
     final rawActivity = Map<String, dynamic>.from(
@@ -103,24 +185,6 @@ class RunRepository extends BaseRepository {
     final polyline = rawActivity['polyline_summary'] as String? ??
         _buildPolylineSummary(rawPoints);
 
-    final activity = RunActivity(
-      id: id,
-      startedAt: startedAt,
-      endedAt: endedAt ?? now,
-      durationSeconds: durationSeconds,
-      movingTimeSeconds: movingTimeSeconds,
-      distanceMeters: distanceMeters,
-      avgPaceSecPerKm: avgPace ?? _avgPace(distanceMeters, movingTimeSeconds),
-      maxPaceSecPerKm: maxPace,
-      calories: calories,
-      title: title,
-      notes: notes,
-      status: 'completed',
-      polylineSummary: polyline,
-      createdAt: now,
-      updatedAt: now,
-    );
-
     final points = <RunTrackPoint>[];
     for (var i = 0; i < rawPoints.length; i++) {
       final row = rawPoints[i];
@@ -142,6 +206,34 @@ class RunRepository extends BaseRepository {
         ),
       );
     }
+
+    final efforts = RunEffortAnalytics.fromTrackPoints(points);
+
+    final activity = RunActivity(
+      id: id,
+      startedAt: startedAt,
+      endedAt: endedAt ?? now,
+      durationSeconds: durationSeconds,
+      movingTimeSeconds: movingTimeSeconds,
+      distanceMeters: distanceMeters,
+      avgPaceSecPerKm: avgPace ?? _avgPace(distanceMeters, movingTimeSeconds),
+      maxPaceSecPerKm: maxPace,
+      calories: calories,
+      title: title,
+      notes: notes,
+      status: 'completed',
+      polylineSummary: polyline,
+      createdAt: now,
+      updatedAt: now,
+      bestSplitPaceSecPerKm: efforts.bestSplitPaceSecPerKm,
+      bestEffort1kSec: efforts.bestEffort1kSec,
+      bestEffort3kSec: efforts.bestEffort3kSec,
+      bestEffort5kSec: efforts.bestEffort5kSec,
+      bestEffort10kSec: efforts.bestEffort10kSec,
+      bestEffortHalfSec: efforts.bestEffortHalfSec,
+      bestEffortMarathonSec: efforts.bestEffortMarathonSec,
+      effortsComputed: true,
+    );
 
     final database = await db;
     await database.transaction((txn) async {
