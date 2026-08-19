@@ -6,6 +6,7 @@ import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/utils/run_progress_analytics.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 
 class RunHistoryScreen extends StatefulWidget {
@@ -58,6 +59,11 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
+    final analytics = RunProgressAnalytics.fromActivities(
+      _activities,
+      period: RunStatsPeriod.all,
+    );
+    final locale = Localizations.localeOf(context).toString();
 
     return Scaffold(
       appBar: AppBar(title: Text(loc.runHistoryTitle)),
@@ -69,68 +75,478 @@ class _RunHistoryScreenState extends State<RunHistoryScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _activities.isEmpty
-              ? EmptyStatePlaceholder(
-                  icon: Icons.directions_run,
-                  title: loc.runHistoryEmptyTitle,
-                  subtitle: loc.runHistoryEmptySubtitle,
-                  actionLabel: loc.runHistoryEmptyCta,
-                  onAction: _openRecord,
-                )
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
-                    itemCount: _activities.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final activity = _activities[index];
-                      final date = DateFormat.yMMMd(
-                        Localizations.localeOf(context).toString(),
-                      ).add_Hm().format(activity.startedAt.toLocal());
-                      return Card(
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          side: BorderSide(
-                            color: theme.colorScheme.outlineVariant.withValues(
-                              alpha: 0.6,
-                            ),
-                          ),
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          leading: CircleAvatar(
-                            backgroundColor:
-                                theme.colorScheme.primaryContainer,
-                            child: Icon(
-                              Icons.directions_run,
-                              color: theme.colorScheme.onPrimaryContainer,
-                            ),
-                          ),
-                          title: Text(
-                            activity.title?.isNotEmpty == true
-                                ? activity.title!
-                                : loc.runDetailUntitled,
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Text(
-                            '$date · ${RunFormatters.distanceWithUnit(activity.distanceMeters)} · ${RunFormatters.duration(activity.movingTimeSeconds)}',
-                          ),
-                          trailing: Text(
-                            RunFormatters.pace(activity.avgPaceSecPerKm),
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          onTap: () => _openDetail(activity),
-                        ),
-                      );
-                    },
+          ? EmptyStatePlaceholder(
+              icon: Icons.directions_run,
+              title: loc.runHistoryEmptyTitle,
+              subtitle: loc.runHistoryEmptySubtitle,
+              actionLabel: loc.runHistoryEmptyCta,
+              onAction: _openRecord,
+            )
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 104),
+                children: [
+                  _HistoryOverview(
+                    analytics: analytics,
+                    distanceLabel: loc.runRecordDistance,
+                    runsLabel: loc.runStatsRunCount,
+                    timeLabel: loc.runDetailMovingTime,
                   ),
+                  const SizedBox(height: 28),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          loc.runStatsRecentRuns,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${analytics.runCount}',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  for (var index = 0; index < _activities.length; index++) ...[
+                    if (index == 0 ||
+                        _monthKey(_activities[index - 1]) !=
+                            _monthKey(_activities[index])) ...[
+                      if (index > 0) const SizedBox(height: 20),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8, left: 2),
+                        child: Text(
+                          DateFormat.yMMMM(
+                            locale,
+                          ).format(_activities[index].startedAt.toLocal()),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: theme.colorScheme.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                    _RunHistoryCard(
+                      activity: _activities[index],
+                      locale: locale,
+                      titleFallback: loc.runDetailUntitled,
+                      paceLabel: loc.runDetailAvgPace,
+                      distanceLabel: loc.runRecordDistance,
+                      timeLabel: loc.runDetailMovingTime,
+                      onTap: () => _openDetail(_activities[index]),
+                    ),
+                    if (index < _activities.length - 1)
+                      const SizedBox(height: 10),
+                  ],
+                ],
+              ),
+            ),
+    );
+  }
+
+  String _monthKey(RunActivity activity) {
+    final date = activity.startedAt.toLocal();
+    return '${date.year}-${date.month}';
+  }
+}
+
+class _HistoryOverview extends StatelessWidget {
+  final RunProgressAnalytics analytics;
+  final String distanceLabel;
+  final String runsLabel;
+  final String timeLabel;
+
+  const _HistoryOverview({
+    required this.analytics,
+    required this.distanceLabel,
+    required this.runsLabel,
+    required this.timeLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            colors.primary,
+            Color.alphaBlend(
+              colors.primaryContainer.withValues(alpha: 0.34),
+              colors.primary,
+            ),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: colors.primary.withValues(alpha: 0.22),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.insights_outlined, color: colors.onPrimary, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                AppLocalizations.of(context)!.runStatsOverview,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: colors.onPrimary.withValues(alpha: 0.82),
+                  fontWeight: FontWeight.w700,
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: _OverviewMetric(
+                  value: RunFormatters.distanceWithUnit(
+                    analytics.totalDistanceMeters,
+                  ),
+                  label: distanceLabel,
+                  prominent: true,
+                  foreground: colors.onPrimary,
+                  mutedForeground: colors.onPrimary.withValues(alpha: 0.72),
+                ),
+              ),
+              _OverviewDivider(color: colors.onPrimary.withValues(alpha: 0.25)),
+              Expanded(
+                child: _OverviewMetric(
+                  value: '${analytics.runCount}',
+                  label: runsLabel,
+                  foreground: colors.onPrimary,
+                  mutedForeground: colors.onPrimary.withValues(alpha: 0.72),
+                ),
+              ),
+              _OverviewDivider(color: colors.onPrimary.withValues(alpha: 0.25)),
+              Expanded(
+                child: _OverviewMetric(
+                  value: RunFormatters.duration(
+                    analytics.totalMovingTimeSeconds,
+                  ),
+                  label: timeLabel,
+                  foreground: colors.onPrimary,
+                  mutedForeground: colors.onPrimary.withValues(alpha: 0.72),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OverviewMetric extends StatelessWidget {
+  final String value;
+  final String label;
+  final bool prominent;
+  final Color foreground;
+  final Color mutedForeground;
+
+  const _OverviewMetric({
+    required this.value,
+    required this.label,
+    required this.foreground,
+    required this.mutedForeground,
+    this.prominent = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            style:
+                (prominent
+                        ? theme.textTheme.headlineMedium
+                        : theme.textTheme.titleLarge)
+                    ?.copyWith(
+                      color: foreground,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: mutedForeground,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OverviewDivider extends StatelessWidget {
+  final Color color;
+
+  const _OverviewDivider({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 42,
+      width: 1,
+      margin: const EdgeInsets.symmetric(horizontal: 12),
+      color: color,
+    );
+  }
+}
+
+class _RunHistoryCard extends StatelessWidget {
+  final RunActivity activity;
+  final String locale;
+  final String titleFallback;
+  final String paceLabel;
+  final String distanceLabel;
+  final String timeLabel;
+  final VoidCallback onTap;
+
+  const _RunHistoryCard({
+    required this.activity,
+    required this.locale,
+    required this.titleFallback,
+    required this.paceLabel,
+    required this.distanceLabel,
+    required this.timeLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final date = DateFormat(
+      'EEE, d MMM · HH:mm',
+      locale,
+    ).format(activity.startedAt.toLocal());
+    final title = activity.title?.isNotEmpty == true
+        ? activity.title!
+        : titleFallback;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      color: colors.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.6)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 12, 13),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: colors.primaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.directions_run_rounded,
+                      color: colors.onPrimaryContainer,
+                      size: 23,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          date,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _PaceBadge(
+                    label: paceLabel,
+                    value: RunFormatters.pace(activity.avgPaceSecPerKm),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Divider(
+                height: 1,
+                color: colors.outlineVariant.withValues(alpha: 0.45),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _RunMetric(
+                      icon: Icons.straighten_rounded,
+                      label: distanceLabel,
+                      value: RunFormatters.distanceWithUnit(
+                        activity.distanceMeters,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _RunMetric(
+                      icon: Icons.timer_outlined,
+                      label: timeLabel,
+                      value: RunFormatters.duration(activity.movingTimeSeconds),
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PaceBadge extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _PaceBadge({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: colors.onSurfaceVariant,
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 1),
+          Text(
+            '$value /km',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: colors.primary,
+              fontWeight: FontWeight.w900,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RunMetric extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _RunMetric({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Row(
+      children: [
+        Icon(icon, size: 17, color: colors.primary),
+        const SizedBox(width: 7),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                  fontSize: 10,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
