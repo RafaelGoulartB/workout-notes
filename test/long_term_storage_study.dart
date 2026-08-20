@@ -10,7 +10,7 @@
 //   - timing of the queries the app's screens actually run (calendar,
 //     progress charts, workout detail, sleep dashboard, nutrition, AI chat)
 //
-// Run with: flutter test test/long_term_storage_study_test.dart
+// Run manually with: flutter test test/long_term_storage_study.dart
 //
 // Scenarios are synthetic but the volumes are grounded in real usage
 // patterns (frequency per week, sets per workout, monitored nights, etc).
