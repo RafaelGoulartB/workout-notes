@@ -8,6 +8,7 @@ import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import '../../navigation/ai_coach_navigation.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/analytics_repository.dart';
+import '../../repositories/run_repository.dart';
 import '../../services/rest_timer_service.dart';
 import 'active_workout_screen.dart';
 import '../run/run_record_screen.dart';
@@ -32,6 +33,7 @@ class WorkoutHomeScreen extends StatefulWidget {
 class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   final _workoutRepo = WorkoutRepository();
   final _analyticsRepo = AnalyticsRepository();
+  final _runRepo = RunRepository();
   final _timerService = RestTimerService.instance;
   bool _isLoading = true;
   List<Map<String, dynamic>> _activeWorkouts = [];
@@ -100,12 +102,14 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         _workoutRepo.getMonthlySummary(now),
         _analyticsRepo.getCurrentWorkoutStreak(),
         _workoutRepo.getActiveWorkouts(),
+        _runRepo.getMonthlyRunSummary(now),
       ]);
       final allWorkouts = results[0] as List<Map<String, dynamic>>;
       final futureWorkouts = results[1] as List<Map<String, dynamic>>;
       final monthly = results[2] as Map<String, dynamic>;
       final currentStreak = results[3] as int;
       final active = results[4] as List<Map<String, dynamic>>;
+      final runMonthly = results[5] as Map<String, dynamic>;
       final completed = <Map<String, dynamic>>[];
       for (final w in allWorkouts) {
         if ((w['end_time'] as String?) != null) {
@@ -121,9 +125,16 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           _currentStreak = currentStreak;
           _monthWorkouts = (monthly['workout_count'] as num?)?.toInt() ?? 0;
           _monthVolume = (monthly['total_volume'] as num?)?.toDouble() ?? 0;
-          _monthCardioDistance =
-              (monthly['cardio_distance'] as num?)?.toDouble() ?? 0;
-          _monthCardioTime = (monthly['cardio_time'] as num?)?.toInt() ?? 0;
+          // Cardio metrics now come from corrida (run_activities), not
+          // exercise sets with distance/time.
+          final runDistanceMeters =
+              (runMonthly['total_distance_meters'] as num?)?.toDouble() ?? 0;
+          final runMovingTime =
+              (runMonthly['total_moving_time'] as num?)?.toInt() ?? 0;
+          final runDuration =
+              (runMonthly['total_duration'] as num?)?.toInt() ?? 0;
+          _monthCardioDistance = runDistanceMeters / 1000.0;
+          _monthCardioTime = runMovingTime > 0 ? runMovingTime : runDuration;
           _isLoading = false;
         });
         // Keep the elapsed time live when there is an active workout

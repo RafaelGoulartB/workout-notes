@@ -66,6 +66,30 @@ class RunRepository extends BaseRepository {
     await database.delete('run_activities', where: 'id = ?', whereArgs: [id]);
   }
 
+  /// Monthly aggregation for the home hero card — pure run data.
+  /// Returns `total_distance_meters`, `total_moving_time`, `total_duration`
+  /// and `run_count` for the calendar month of [month].
+  /// Uses `started_at` range so it matches the `run_activities` storage
+  /// format (ISO-8601 with `T` separator).
+  Future<Map<String, dynamic>> getMonthlyRunSummary(DateTime month) async {
+    final database = await db;
+    final start = DateTime(month.year, month.month, 1);
+    final end = DateTime(month.year, month.month + 1, 1);
+    final rows = await database.rawQuery(
+      '''
+      SELECT
+        COALESCE(SUM(distance_meters), 0) AS total_distance_meters,
+        COALESCE(SUM(moving_time_seconds), 0) AS total_moving_time,
+        COALESCE(SUM(duration_seconds), 0) AS total_duration,
+        COUNT(*) AS run_count
+      FROM run_activities
+      WHERE status = 'completed' AND started_at >= ? AND started_at < ?
+      ''',
+      [start.toIso8601String(), end.toIso8601String()],
+    );
+    return rows.first;
+  }
+
   /// Computes and persists GPS effort metrics for [activityId] when missing.
   /// Returns the refreshed activity (or null if not found).
   Future<RunActivity?> ensureEffortMetrics(String activityId) async {
