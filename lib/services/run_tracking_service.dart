@@ -37,6 +37,7 @@ class RunTrackingService extends ChangeNotifier {
   RunDebugSimulator? _debugSim;
   Timer? _debugTimer;
   bool _debugPaused = false;
+  bool _nativeDebugSim = false;
   bool _askedBackgroundPermission = false;
 
   RunTrackingState get state => _state;
@@ -110,7 +111,7 @@ class RunTrackingService extends ChangeNotifier {
   }
 
   Future<RunTrackingState> getState() async {
-    if (_debugSim != null) return _state;
+    if (_debugSim != null && !_nativeDebugSim) return _state;
     if (!_isAndroid) return _state;
     try {
       final result = await methods.invokeMapMethod<String, dynamic>('getState');
@@ -182,6 +183,7 @@ class RunTrackingService extends ChangeNotifier {
     _stopDebugTimer();
     _trail.clear();
     _debugPaused = false;
+    _nativeDebugSim = false;
     _debugSim = RunDebugSimulator.create(
       startLat: startLat,
       startLng: startLng,
@@ -243,6 +245,14 @@ class RunTrackingService extends ChangeNotifier {
 
   Future<void> pause() async {
     if (_debugSim != null) {
+      if (_nativeDebugSim && _isAndroid) {
+        try {
+          final result =
+              await methods.invokeMapMethod<String, dynamic>('pause');
+          if (result != null) _applyNativeState(result);
+        } catch (_) {}
+        return;
+      }
       if (!_state.isRecording) return;
       _debugPaused = true;
       _state = _debugSim!.toPausedState(
@@ -262,6 +272,14 @@ class RunTrackingService extends ChangeNotifier {
 
   Future<void> resume() async {
     if (_debugSim != null) {
+      if (_nativeDebugSim && _isAndroid) {
+        try {
+          final result =
+              await methods.invokeMapMethod<String, dynamic>('resume');
+          if (result != null) _applyNativeState(result);
+        } catch (_) {}
+        return;
+      }
       if (!_state.isPaused) return;
       _debugPaused = false;
       _publishDebugState();
@@ -278,7 +296,7 @@ class RunTrackingService extends ChangeNotifier {
 
   /// Stops tracking, imports the spool into SQLite, and deletes the spool.
   Future<RunActivity?> stop() async {
-    if (_debugSim != null) {
+    if (_debugSim != null && !_nativeDebugSim) {
       final sim = _debugSim!;
       _stopDebugTimer();
       _debugSim = null;
@@ -290,6 +308,13 @@ class RunTrackingService extends ChangeNotifier {
       );
       notifyListeners();
       return imported;
+    }
+    if (_nativeDebugSim) {
+      _stopDebugTimer();
+      _debugSim = null;
+      _debugPaused = false;
+      _nativeDebugSim = false;
+      // Fall through to native stop path below.
     }
 
     if (!_isAndroid) return null;
@@ -327,7 +352,7 @@ class RunTrackingService extends ChangeNotifier {
   }
 
   Future<void> discard() async {
-    if (_debugSim != null) {
+    if (_debugSim != null && !_nativeDebugSim) {
       _stopDebugTimer();
       _debugSim = null;
       _debugPaused = false;
@@ -337,6 +362,13 @@ class RunTrackingService extends ChangeNotifier {
       );
       notifyListeners();
       return;
+    }
+    if (_nativeDebugSim) {
+      _stopDebugTimer();
+      _debugSim = null;
+      _debugPaused = false;
+      _nativeDebugSim = false;
+      // Fall through to native discard path.
     }
 
     if (!_isAndroid) return;
@@ -359,7 +391,11 @@ class RunTrackingService extends ChangeNotifier {
   }
 
   Future<int> recoverPendingSessions() async {
-    if (!_isAndroid || _recovering || _debugSim != null) return _recoveredCount;
+    if (_isAndroid == false ||
+        _recovering ||
+        (_debugSim != null && !_nativeDebugSim)) {
+      return _recoveredCount;
+    }
     _recovering = true;
     var count = 0;
     try {
@@ -472,7 +508,7 @@ class RunTrackingService extends ChangeNotifier {
   }
 
   void _onEvent(dynamic event) {
-    if (_debugSim != null) return;
+    if (_debugSim != null && !_nativeDebugSim) return;
     if (event is! Map) return;
     _applyNativeState(Map<String, dynamic>.from(event));
   }

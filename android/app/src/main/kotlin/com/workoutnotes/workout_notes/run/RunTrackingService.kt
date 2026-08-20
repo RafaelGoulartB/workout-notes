@@ -199,6 +199,11 @@ class RunTrackingService : Service(), LocationListener {
     private val completedSplits = mutableListOf<Map<String, Any?>>()
     private var nextSplitAtMeters = 1000.0
     private var lastSplitMovingSeconds = 0
+    // Native debug simulation (emulator background survives like real GPS)
+    private var isNativeDebugSim: Boolean = false
+    private var debugTick: Int = 0
+    private var debugLat: Double = -23.5505
+    private var debugLng: Double = -46.6333
     private val mainHandler = Handler(Looper.getMainLooper())
     private val tickRunnable = object : Runnable {
         override fun run() {
@@ -206,6 +211,10 @@ class RunTrackingService : Service(), LocationListener {
             if (status == "recording" || status == "paused") {
                 renewWakeLockIfNeeded()
                 tickCount += 1
+                // Native debug sim synthesizes movement even with no GPS.
+                if (isNativeDebugSim && status == "recording") {
+                    synthesizeDebugTick()
+                }
                 // Persist duration periodically so recovery after kill is accurate.
                 if (tickCount % 5 == 0) {
                     persistLiveTotals()
@@ -215,6 +224,44 @@ class RunTrackingService : Service(), LocationListener {
             }
             mainHandler.postDelayed(this, 1000L)
         }
+    }
+
+    private fun speedForDebugTick(tick: Int): Double {
+        val slowWave = 3.5 * kotlin.math.sin(tick * 0.14)
+        val fastWave = 1.8 * kotlin.math.sin(tick * 0.37 + 0.6)
+        val surge = if (tick % 28 < 4) 2.8 else 0.0
+        val dip = if (tick % 55 > 40) -2.2 else 0.0
+        return (14.0 + slowWave + fastWave + surge + dip).coerceIn(8.0, 22.0)
+    }
+
+    private fun synthesizeDebugTick() {
+        debugTick += 1
+        val step = speedForDebugTick(debugTick)
+        val headingRad = (debugTick * 0.035) % (2 * Math.PI)
+        val dLat = (step * kotlin.math.cos(headingRad)) / 111320.0
+        val dLng = (step * kotlin.math.sin(headingRad)) / (111320.0 * kotlin.math.cos(Math.toRadians(debugLat)))
+        debugLat += dLat
+        debugLng += dLng
+        // Update map state and spool as if a real fix arrived.
+        currentLat = debugLat
+        currentLng = debugLng
+        currentAccuracy = 5f
+        val instantPace = 1000.0 / step
+        if (instantPace in 60.0..1800.0) {
+            currentPaceSecPerKm = instantPace
+            maxPaceSecPerKm = maxPaceSecPerKm?.let { minOf(it, instantPace) } ?: instantPace
+        }
+        distanceMeters += step
+        // Synthesize a Location for spool persistence
+        val loc = Location("debug").apply {
+            latitude = debugLat
+            longitude = debugLng
+            time = System.currentTimeMillis()
+            accuracy = 5f
+            speed = step.toFloat()
+        }
+        acceptPoint(loc, distanceDelta = step)
+        // acceptPoint already calls persist + publish; avoid double publish
     }
 
     override fun onCreate() {
@@ -229,6 +276,11 @@ class RunTrackingService : Service(), LocationListener {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> startRun(intent.getStringExtra(EXTRA_ACTIVITY_ID))
+            "com.workoutnotes.workout_notes.run.START_DEBUG" -> {
+                val lat = intent.getDoubleExtra("debug_start_lat", -23.5505)
+                val lng = intent.getDoubleExtra("debug_start_lng", -46.6333)
+                startNativeDebugSimulation(lat, lng)
+            }
             ACTION_PAUSE -> pauseRun()
             ACTION_RESUME -> resumeRun()
             ACTION_STOP -> finishRun("completed")
@@ -260,6 +312,8 @@ class RunTrackingService : Service(), LocationListener {
 
         activeInstance = this
         finished = false
+        isNativeDebugSim = false
+        debugTick = 0
         status = "starting"
         val id = requestedId ?: UUID.randomUUID().toString()
         startedAtMillis = System.currentTimeMillis()
@@ -311,6 +365,75 @@ class RunTrackingService : Service(), LocationListener {
         mainHandler.removeCallbacks(tickRunnable)
         mainHandler.post(tickRunnable)
         publishState()
+    }
+
+    fun startNativeDebugSimulation(startLat: Double, startLng: Double): Boolean {
+        if (activeInstance != null && status != "idle") {
+            publishState()
+            return false
+        }
+        // Debug sim does not require location permission — it's synthetic.
+        activeInstance = this
+        finished = false
+        isNativeDebugSim = true
+        debugLat = startLat
+        debugLng = startLng
+        debugTick = 0
+        status = "starting"
+        val id = UUID.randomUUID().toString()
+        startedAtMillis = System.currentTimeMillis()
+        pausedAtMillis = 0L
+        totalPausedMillis = 0L
+        distanceMeters = 0.0
+        pointSeq = 0
+        lastLocation = null
+        currentLat = startLat
+        currentLng = startLng
+        currentAccuracy = 5f
+        currentPaceSecPerKm = 1000.0 / 14.0
+        maxPaceSecPerKm = currentPaceSecPerKm
+        completedSplits.clear()
+        nextSplitAtMeters = 1000.0
+        lastSplitMovingSeconds = 0
+        tickCount = 0
+
+        val session = mutableMapOf<String, Any?>(
+            "id" to id,
+            "status" to "recording",
+            "started_at" to Instant.ofEpochMilli(startedAtMillis).toString(),
+            "ended_at" to null,
+            "duration_seconds" to 0,
+            "moving_time_seconds" to 0,
+            "distance_meters" to 0.0,
+            "avg_pace_sec_per_km" to null,
+            "max_pace_sec_per_km" to null,
+            "calories" to 0,
+            "title" to "Debug Run",
+            "notes" to "Simulated debug run (native - background capable)",
+        )
+        activity = session
+        spool.create(session)
+
+        promoteToForeground("recording")
+        acquireWakeLock()
+        status = "recording"
+        session["status"] = "recording"
+        spool.updateActivity(session)
+        try {
+            val pendingS = RunVoiceBridge.pendingSettings
+            val pendingG = RunVoiceBridge.pendingGoal
+            val pendingI = RunVoiceBridge.pendingIntervalsOn
+            val pendingB = RunVoiceBridge.pendingBypassGate
+            // For debug sim we force bypass headset gate so emulator without headset still speaks
+            voiceController.begin(pendingS, pendingG, pendingI, true)
+        } catch (_: Throwable) {
+            voiceController.begin(null, null, null, true)
+        }
+        // No real GPS — synthesized ticks drive everything
+        mainHandler.removeCallbacks(tickRunnable)
+        mainHandler.post(tickRunnable)
+        publishState()
+        return true
     }
 
     /**

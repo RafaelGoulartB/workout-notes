@@ -86,7 +86,7 @@ class RunVoiceCoach extends ChangeNotifier {
     if (_useNativeVoiceOverride != null) return _useNativeVoiceOverride;
     if (_isCustomSpeak) return false; // Tests inject fake TTS -> stay on Dart path
     if (RunTrackingService.instance.isDebugSimulating) return false;
-    if (_bypassHeadphonesGate) return false; // Debug sim bypasses headset gate and runs Dart-only
+    if (_bypassHeadphonesGate) return false; // Debug sim uses Dart TTS (emulator, no headset)
     return !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   }
 
