@@ -187,67 +187,74 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
               title: Text(loc.runIntervalPresetTitle),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _IntervalMetricEditor(
-                      label: loc.runIntervalWork,
-                      metric: draft.workMetric,
-                      value: draft.workValue,
-                      onChanged: (metric, value) {
-                        setDialogState(() {
-                          draft = draft.copyWith(
-                            workMetric: metric,
-                            workValue: value,
-                          );
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    _IntervalMetricEditor(
-                      label: loc.runIntervalRest,
-                      metric: draft.restMetric,
-                      value: draft.restValue,
-                      allowZero: true,
-                      onChanged: (metric, value) {
-                        setDialogState(() {
-                          draft = draft.copyWith(
-                            restMetric: metric,
-                            restValue: value,
-                          );
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(child: Text(loc.runIntervalRepeats)),
-                        IconButton(
-                          onPressed: draft.repeats <= 1
-                              ? null
-                              : () => setDialogState(() {
-                                    draft = draft.copyWith(
-                                      repeats: draft.repeats - 1,
-                                    );
-                                  }),
-                          icon: const Icon(Icons.remove_circle_outline),
-                        ),
-                        Text('${draft.repeats}'),
-                        IconButton(
-                          onPressed: draft.repeats >= 99
-                              ? null
-                              : () => setDialogState(() {
-                                    draft = draft.copyWith(
-                                      repeats: draft.repeats + 1,
-                                    );
-                                  }),
-                          icon: const Icon(Icons.add_circle_outline),
-                        ),
-                      ],
-                    ),
-                  ],
+              content: SizedBox(
+                width: MediaQuery.sizeOf(context).width,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _IntervalMetricEditor(
+                        label: loc.runIntervalWork,
+                        metric: draft.workMetric,
+                        value: draft.workValue,
+                        onChanged: (metric, value) {
+                          setDialogState(() {
+                            draft = draft.copyWith(
+                              workMetric: metric,
+                              workValue: value,
+                            );
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _IntervalMetricEditor(
+                        label: loc.runIntervalRest,
+                        metric: draft.restMetric,
+                        value: draft.restValue,
+                        allowZero: true,
+                        onChanged: (metric, value) {
+                          setDialogState(() {
+                            draft = draft.copyWith(
+                              restMetric: metric,
+                              restValue: value,
+                            );
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(child: Text(loc.runIntervalRepeats)),
+                          IconButton(
+                            onPressed: draft.repeats <= 1
+                                ? null
+                                : () => setDialogState(() {
+                                      draft = draft.copyWith(
+                                        repeats: draft.repeats - 1,
+                                      );
+                                    }),
+                            icon: const Icon(Icons.remove_circle_outline),
+                          ),
+                          Text('${draft.repeats}'),
+                          IconButton(
+                            onPressed: draft.repeats >= 99
+                                ? null
+                                : () => setDialogState(() {
+                                      draft = draft.copyWith(
+                                        repeats: draft.repeats + 1,
+                                      );
+                                    }),
+                            icon: const Icon(Icons.add_circle_outline),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
