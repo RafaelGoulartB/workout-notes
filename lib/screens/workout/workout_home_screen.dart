@@ -9,12 +9,12 @@ import '../../repositories/workout_repository.dart';
 import '../../repositories/analytics_repository.dart';
 import '../../services/rest_timer_service.dart';
 import 'active_workout_screen.dart';
-import 'quick_add_screen.dart';
+import '../run/run_record_screen.dart';
+import '../run/run_stats_screen.dart';
 import 'calendar_screen.dart';
 import 'exercise_library_screen.dart';
 import 'routines_screen.dart';
 import 'progress_screen.dart';
-import 'body_tracker_screen.dart';
 import 'settings_screen.dart';
 import 'rest_timer_screen.dart';
 import 'workout_detail_screen.dart';
@@ -183,10 +183,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     _loadData();
   }
 
-  Future<void> _quickAdd() async {
+  Future<void> _startRun() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const QuickAddScreen()),
+      MaterialPageRoute(builder: (_) => const RunRecordScreen()),
     );
     _loadData();
   }
@@ -618,11 +618,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: _ActionCard(
-              icon: Icons.bolt,
-              label: loc.workoutHomeQuickAdd,
-              subtitle: loc.workoutHomeQuickAddSubtitle,
+              icon: Icons.directions_run,
+              label: loc.workoutHomeStartRun,
+              subtitle: loc.workoutHomeStartRunSubtitle,
               color: theme.colorScheme.secondary,
-              onTap: _quickAdd,
+              onTap: _startRun,
             ),
           ),
         ],
@@ -633,17 +633,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   // ===================== NAV GRID (2x2) =====================
   Widget _buildNavGrid(ThemeData theme, AppLocalizations loc) {
     final items = [
-      _NavItemData(
-        Icons.fitness_center,
-        loc.workoutHomeExercises,
-        () => Navigator.push(
-          context,
-          AiCoachNavigation.route(
-            kind: AiCoachRouteKind.normalWithFab,
-            builder: (_) => const ExerciseLibraryScreen(),
-          ),
-        ),
-      ),
       _NavItemData(
         Icons.repeat,
         loc.workoutHomeRoutines,
@@ -656,6 +645,25 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         ),
       ),
       _NavItemData(
+        Icons.fitness_center,
+        loc.workoutHomeExercises,
+        () => Navigator.push(
+          context,
+          AiCoachNavigation.route(
+            kind: AiCoachRouteKind.normalWithFab,
+            builder: (_) => const ExerciseLibraryScreen(),
+          ),
+        ),
+      ),
+      _NavItemData(
+        Icons.directions_run,
+        loc.workoutHomeRuns,
+        () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RunStatsScreen()),
+        ),
+      ),
+      _NavItemData(
         Icons.bar_chart,
         loc.workoutHomeProgress,
         () => Navigator.push(
@@ -663,18 +671,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           MaterialPageRoute(builder: (_) => const ProgressScreen()),
         ),
       ),
-      _NavItemData(
-        Icons.monitor_weight_outlined,
-        loc.workoutHomeBodyMeasurements,
-        () => Navigator.push(
-          context,
-          AiCoachNavigation.route(
-            kind: AiCoachRouteKind.normalWithFab,
-            builder: (_) => const BodyTrackerScreen(),
-          ),
-        ),
-      ),
     ];
+
+    // Tools grid: Routines, Exercises, Runs, Progress.
+    const crossAxisCount = 2;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -692,7 +692,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           shrinkWrap: true,
           padding: EdgeInsets.zero,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
+            crossAxisCount: crossAxisCount,
             childAspectRatio: 1.6,
             mainAxisSpacing: 0,
             crossAxisSpacing: 0,
@@ -701,13 +701,13 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           itemBuilder: (ctx, i) {
             final item = items[i];
             final isLeft = i % 2 == 0;
-            final isBottom = i < 2;
+            final isTopRow = i < crossAxisCount;
             return _NavTile(
               icon: item.icon,
               label: item.label,
               onTap: item.onTap,
               showLeftBorder: !isLeft,
-              showTopBorder: !isBottom,
+              showTopBorder: !isTopRow,
             );
           },
         ),

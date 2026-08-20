@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/body_measurement_types.dart';
 
 /// Returns icon and label for a given time-of-day identifier.
 (IconData, String) timeOfDayData(String tod, BuildContext context) {
@@ -75,7 +76,23 @@ String typeName(String typeId, BuildContext context) {
       return loc.bodyTrackerCalf;
     case 'hip':
       return loc.bodyTrackerHip;
+    case 'bloodPressure':
+      return loc.bodyTrackerBloodPressure;
     default:
       return typeId;
   }
+}
+
+/// Formats a measurement for display, including both blood pressure values.
+String formatMeasurementValue(
+  Map<String, dynamic> measurement,
+  MeasureType type,
+) {
+  final value = (measurement['value'] as num?)?.toDouble();
+  if (value == null) return '--';
+  final secondary = (measurement['secondary_value'] as num?)?.toDouble();
+  if (type.id == 'bloodPressure' && secondary != null) {
+    return '${value.toStringAsFixed(0)}/${secondary.toStringAsFixed(0)} ${type.unit}';
+  }
+  return '${value.toStringAsFixed(1)} ${type.unit}';
 }

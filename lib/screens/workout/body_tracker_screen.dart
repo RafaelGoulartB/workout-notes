@@ -61,12 +61,15 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
     MeasureType('thigh', Icons.straighten, 'cm', Colors.deepOrange, true),
     MeasureType('calf', Icons.straighten, 'cm', Colors.brown, true),
     MeasureType('hip', Icons.straighten, 'cm', Colors.cyan, false),
+    MeasureType('bloodPressure', Icons.favorite, 'mmHg', Colors.red, false),
   ];
 
   MeasureType get _currentType {
     if (_activeTypes.isEmpty) return _allTypes.first;
-    return _activeTypes.firstWhere((t) => t.id == _selectedType,
-        orElse: () => _activeTypes.first);
+    return _activeTypes.firstWhere(
+      (t) => t.id == _selectedType,
+      orElse: () => _activeTypes.first,
+    );
   }
 
   @override
@@ -94,8 +97,10 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   }
 
   Future<void> _saveEnabledTypes() async {
-    await _settingsRepo.setSetting('body_tracker_enabled_types',
-        _enabledTypeIds.join(','));
+    await _settingsRepo.setSetting(
+      'body_tracker_enabled_types',
+      _enabledTypeIds.join(','),
+    );
   }
 
   Future<void> _load() async {
@@ -135,10 +140,8 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
 
   void _updateBilateralData(List<Map<String, dynamic>> filtered) {
     if (_currentType.isBilateral) {
-      _leftMeasurements =
-          filtered.where((m) => m['side'] == 'left').toList();
-      _rightMeasurements =
-          filtered.where((m) => m['side'] == 'right').toList();
+      _leftMeasurements = filtered.where((m) => m['side'] == 'left').toList();
+      _rightMeasurements = filtered.where((m) => m['side'] == 'right').toList();
       _selectedSide ??= 'all';
     } else {
       _leftMeasurements = [];
@@ -152,8 +155,9 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
       _selectedType = typeId;
       _selectedSide = null;
       _historyDisplayCount = 5;
-      _measurements =
-          _allMeasurements.where((m) => m['type'] == typeId).toList();
+      _measurements = _allMeasurements
+          .where((m) => m['type'] == typeId)
+          .toList();
       _updateBilateralData(_measurements);
     });
   }
@@ -298,7 +302,9 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 SpeedDialOption(
-                  label: loc.bodyTrackerAddTitle(typeName(_selectedType, context)),
+                  label: loc.bodyTrackerAddTitle(
+                    typeName(_selectedType, context),
+                  ),
                   icon: Icons.add_circle_outline,
                   color: _currentType.color,
                   onTap: () {
@@ -352,10 +358,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
     final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(loc.bodyTrackerTitle),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: Text(loc.bodyTrackerTitle), centerTitle: true),
       body: Stack(
         children: [
           _isLoading
@@ -443,6 +446,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
             delta: _delta,
             isDecreasingGood: _isDecreasingGood,
             measurements: _measurements,
+            latestMeasurement: _latestByType[_selectedType],
           ),
 
         // Quick stats (only for unilateral)
@@ -509,9 +513,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
               // ── Side tabs (bilateral only) ─────────────────────────
               if (isBilateral && _measurements.isNotEmpty) ...[
                 const SliverToBoxAdapter(child: SizedBox(height: 8)),
-                SliverToBoxAdapter(
-                  child: _buildSideTabs(theme, loc),
-                ),
+                SliverToBoxAdapter(child: _buildSideTabs(theme, loc)),
               ],
 
               // ── History header ─────────────────────────────────────
@@ -522,9 +524,11 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Row(
                       children: [
-                        Icon(Icons.history,
-                            size: 16,
-                            color: theme.colorScheme.onSurfaceVariant),
+                        Icon(
+                          Icons.history,
+                          size: 16,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -571,7 +575,11 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
   }
 
   /// Minimalistic "+ Load more" button for paginated history.
-  Widget _buildLoadMoreButton(ThemeData theme, AppLocalizations loc, List<Map<String, dynamic>> list) {
+  Widget _buildLoadMoreButton(
+    ThemeData theme,
+    AppLocalizations loc,
+    List<Map<String, dynamic>> list,
+  ) {
     final remaining = list.length - _historyDisplayCount;
     final remainingText = remaining > 5
         ? loc.bodyTrackerLoadMore(remaining)
@@ -637,13 +645,16 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: tabs.map((t) => Expanded(child: t)).toList(),
-      ),
+      child: Row(children: tabs.map((t) => Expanded(child: t)).toList()),
     );
   }
 
-  Widget _buildMeasurementCard(ThemeData theme, AppLocalizations loc, int index, List<Map<String, dynamic>> list) {
+  Widget _buildMeasurementCard(
+    ThemeData theme,
+    AppLocalizations loc,
+    int index,
+    List<Map<String, dynamic>> list,
+  ) {
     final m = list[index];
     final value = (m['value'] as num).toDouble();
     final isBilateral = _currentType.isBilateral;
@@ -689,8 +700,10 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
               ),
               TextButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: Text(loc.commonDelete,
-                    style: const TextStyle(color: Colors.red)),
+                child: Text(
+                  loc.commonDelete,
+                  style: const TextStyle(color: Colors.red),
+                ),
               ),
             ],
           ),
@@ -750,21 +763,29 @@ class _SideTab extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: isSelected ? color : theme.colorScheme.onSurfaceVariant),
+              Icon(
+                icon,
+                size: 16,
+                color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   fontSize: 13,
-                  color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
+                  color: isSelected
+                      ? color
+                      : theme.colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 4),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
-                  color: isSelected ? color.withAlpha(30) : theme.colorScheme.surfaceContainerHighest,
+                  color: isSelected
+                      ? color.withAlpha(30)
+                      : theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -772,7 +793,9 @@ class _SideTab extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
+                    color: isSelected
+                        ? color
+                        : theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),

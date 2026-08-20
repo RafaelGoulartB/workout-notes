@@ -46,6 +46,10 @@ dependencies:
   fl_chart: ^0.70.2
   flutter_animate: ^4.5.2
 
+  # Running maps
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
   # Notifications
   flutter_local_notifications: ^18.0.1
 
@@ -64,6 +68,7 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   flutter_markdown_plus: ^1.0.10
   collection: ^1.18.0
+  flutter_tts: ^4.2.5
 
 
 

@@ -28,7 +28,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Configurações do plano'), findsOneWidget);
-    expect(find.text('Seção Plano'), findsOneWidget);
+    expect(find.text('PLANO'), findsOneWidget);
+    expect(find.text('Seção Progresso'), findsOneWidget);
     expect(find.byType(Switch), findsOneWidget);
   });
 

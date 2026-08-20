@@ -11,6 +11,7 @@ class BodySummaryCard extends StatelessWidget {
   final double? delta;
   final bool isDecreasingGood;
   final List<Map<String, dynamic>> measurements;
+  final Map<String, dynamic>? latestMeasurement;
 
   const BodySummaryCard({
     super.key,
@@ -19,6 +20,7 @@ class BodySummaryCard extends StatelessWidget {
     required this.delta,
     required this.isDecreasingGood,
     required this.measurements,
+    this.latestMeasurement,
   });
 
   @override
@@ -35,10 +37,10 @@ class BodySummaryCard extends StatelessWidget {
     final deltaColor = delta == null
         ? Colors.transparent
         : (isGood
-            ? Colors.green
-            : isBad
-                ? Colors.red
-                : theme.colorScheme.onSurfaceVariant);
+              ? Colors.green
+              : isBad
+              ? Colors.red
+              : theme.colorScheme.onSurfaceVariant);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
@@ -76,20 +78,19 @@ class BodySummaryCard extends StatelessWidget {
                 if (delta != null && delta != 0)
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: deltaColor.withAlpha(18),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: deltaColor.withAlpha(60)),
+                      border: Border.all(color: deltaColor.withAlpha(60)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          delta! > 0
-                              ? Icons.trending_up
-                              : Icons.trending_down,
+                          delta! > 0 ? Icons.trending_up : Icons.trending_down,
                           size: 14,
                           color: deltaColor,
                         ),
@@ -111,7 +112,9 @@ class BodySummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  value != null ? value!.toStringAsFixed(1) : '--',
+                  latestMeasurement != null && type.id == 'bloodPressure'
+                      ? formatMeasurementValue(latestMeasurement!, type)
+                      : (value != null ? value!.toStringAsFixed(1) : '--'),
                   style: theme.textTheme.displaySmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     letterSpacing: -2,
@@ -124,7 +127,9 @@ class BodySummaryCard extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Text(
-                      type.unit,
+                      latestMeasurement != null && type.id == 'bloodPressure'
+                          ? ''
+                          : type.unit,
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
@@ -151,27 +156,23 @@ class BodySummaryCard extends StatelessWidget {
                   Icon(
                     Icons.access_time,
                     size: 12,
-                    color: theme.colorScheme.onSurfaceVariant
-                        .withAlpha(140),
+                    color: theme.colorScheme.onSurfaceVariant.withAlpha(140),
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    formatDate(
-                        measurements.first['date'] as String? ?? ''),
+                    formatDate(measurements.first['date'] as String? ?? ''),
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant
-                          .withAlpha(160),
+                      color: theme.colorScheme.onSurfaceVariant.withAlpha(160),
                       fontSize: 11,
                     ),
                   ),
-                  if ((measurements.first['time_of_day']
-                          as String?)
+                  if ((measurements.first['time_of_day'] as String?)
                           ?.isNotEmpty ==
                       true) ...[
                     const SizedBox(width: 8),
                     TimeOfDayBadge(
-                        tod: measurements.first['time_of_day']
-                            as String),
+                      tod: measurements.first['time_of_day'] as String,
+                    ),
                   ],
                   if ((measurements.first['is_fasted'] as int?) == 1) ...[
                     const SizedBox(width: 8),

@@ -644,6 +644,7 @@ void main() {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 100)),
       );
+      await _waitUntilFound(tester, find.text(loc.nutritionSearchEmpty));
       await tester.pumpAndSettle();
 
       expect(find.byType(FoodSearchScreen), findsOneWidget);
@@ -1175,7 +1176,7 @@ void main() {
     },
   );
 
-  testWidgets('MainShell renders Workout, Sleep, Nutrition, and Plan tabs', (
+  testWidgets('MainShell renders Workout, Sleep, Nutrition, and Progress tabs', (
     tester,
   ) async {
     // Render a structure equivalent to MainShell: we use a stub body

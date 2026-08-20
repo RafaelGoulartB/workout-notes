@@ -387,5 +387,80 @@ abstract final class DatabaseWellnessMigrations {
         await db.execute('VACUUM');
       } catch (_) {}
     }
+    if (oldVersion < 41) {
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS run_activities (
+            id TEXT PRIMARY KEY,
+            started_at TEXT NOT NULL,
+            ended_at TEXT,
+            duration_seconds INTEGER NOT NULL DEFAULT 0,
+            moving_time_seconds INTEGER NOT NULL DEFAULT 0,
+            distance_meters REAL NOT NULL DEFAULT 0,
+            avg_pace_sec_per_km REAL,
+            max_pace_sec_per_km REAL,
+            calories INTEGER,
+            title TEXT,
+            notes TEXT,
+            status TEXT NOT NULL DEFAULT 'completed',
+            polyline_summary TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+      } catch (_) {}
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS run_track_points (
+            id TEXT PRIMARY KEY,
+            activity_id TEXT NOT NULL,
+            seq INTEGER NOT NULL,
+            lat REAL NOT NULL,
+            lng REAL NOT NULL,
+            altitude REAL,
+            accuracy REAL,
+            speed REAL,
+            recorded_at TEXT NOT NULL,
+            FOREIGN KEY (activity_id) REFERENCES run_activities(id) ON DELETE CASCADE
+          )
+        ''');
+      } catch (_) {}
+      try {
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_run_activities_started ON run_activities(started_at DESC)',
+        );
+      } catch (_) {}
+      try {
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_run_track_points_activity_seq ON run_track_points(activity_id, seq ASC)',
+        );
+      } catch (_) {}
+    }
+    if (oldVersion < 42) {
+      // Blood pressure stores systolic in `value` and diastolic in
+      // `secondary_value`, while preserving the generic measurement schema.
+      try {
+        await db.execute(
+          'ALTER TABLE body_measurements ADD COLUMN secondary_value REAL',
+        );
+      } catch (_) {}
+    }
+    if (oldVersion < 43) {
+      // Cached GPS effort PRs for all-time run achievements (Strava-like).
+      for (final sql in const [
+        'ALTER TABLE run_activities ADD COLUMN best_split_pace_sec_per_km REAL',
+        'ALTER TABLE run_activities ADD COLUMN best_effort_1k_sec INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN best_effort_3k_sec INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN best_effort_5k_sec INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN best_effort_10k_sec INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN best_effort_half_sec INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN best_effort_marathon_sec INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN efforts_computed INTEGER NOT NULL DEFAULT 0',
+      ]) {
+        try {
+          await db.execute(sql);
+        } catch (_) {}
+      }
+    }
   }
 }

@@ -7,10 +7,14 @@ import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_routine_suggestion.dart';
 import 'package:workout_notes/models/periodization_target.dart';
+import 'package:workout_notes/navigation/ai_coach_navigation.dart';
+import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
+import 'package:workout_notes/widgets/periodization/body_measurements_teaser_card.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 
+import 'body_tracker_screen.dart';
 import 'periodization_calendar_screen.dart';
 import 'active_workout_screen.dart';
 import 'periodization_checkin_flow.dart';
@@ -31,11 +35,16 @@ class PeriodizationHomeScreen extends StatefulWidget {
 
 class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
   final _repository = PeriodizationRepository();
+  final _bodyRepo = BodyMeasurementRepository();
   PeriodizationPlan? _plan;
   List<PeriodizationPhase> _phases = const [];
   PeriodizationPhase? _currentPhase;
   PeriodizationTarget? _currentTarget;
   PeriodizationRoutineSuggestion? _routineSuggestion;
+  double? _weightKg;
+  String? _weightUnit;
+  double? _weightDelta;
+  String? _weightDate;
   bool _loading = true;
 
   @override
@@ -44,8 +53,56 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
     _load();
   }
 
+  Future<void> _loadWeightTeaser() async {
+    final rows = await _bodyRepo.getBodyMeasurements(type: 'weight', limit: 2);
+    if (rows.isEmpty) {
+      _weightKg = null;
+      _weightUnit = null;
+      _weightDelta = null;
+      _weightDate = null;
+      return;
+    }
+    final latest = rows.first;
+    final value = (latest['value'] as num?)?.toDouble();
+    _weightKg = value;
+    _weightUnit = latest['unit'] as String? ?? 'kg';
+    _weightDate = latest['date'] as String?;
+    if (rows.length >= 2 && value != null) {
+      final previous = (rows[1]['value'] as num?)?.toDouble();
+      _weightDelta = previous == null ? null : value - previous;
+    } else {
+      _weightDelta = null;
+    }
+  }
+
   Future<void> _load() async {
-    final plan = await _repository.getActivePlan();
+    final planFuture = _repository.getActivePlan();
+    final weightFuture = _bodyRepo.getBodyMeasurements(
+      type: 'weight',
+      limit: 2,
+    );
+    final plan = await planFuture;
+    final weightRows = await weightFuture;
+
+    if (weightRows.isEmpty) {
+      _weightKg = null;
+      _weightUnit = null;
+      _weightDelta = null;
+      _weightDate = null;
+    } else {
+      final latest = weightRows.first;
+      final value = (latest['value'] as num?)?.toDouble();
+      _weightKg = value;
+      _weightUnit = latest['unit'] as String? ?? 'kg';
+      _weightDate = latest['date'] as String?;
+      if (weightRows.length >= 2 && value != null) {
+        final previous = (weightRows[1]['value'] as num?)?.toDouble();
+        _weightDelta = previous == null ? null : value - previous;
+      } else {
+        _weightDelta = null;
+      }
+    }
+
     if (plan == null) {
       if (!mounted) return;
       setState(() {
@@ -81,6 +138,20 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
       _routineSuggestion = currentResults[1] as PeriodizationRoutineSuggestion?;
       _loading = false;
     });
+  }
+
+  Future<void> _openBodyTracker() async {
+    await Navigator.push(
+      context,
+      AiCoachNavigation.route(
+        kind: AiCoachRouteKind.normalWithFab,
+        builder: (_) => const BodyTrackerScreen(),
+      ),
+    );
+    if (mounted) {
+      await _loadWeightTeaser();
+      setState(() {});
+    }
   }
 
   Future<void> _createPlan() async {
@@ -175,6 +246,115 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
     );
   }
 
+
+  List<Widget> _planningSlivers(AppLocalizations loc, ThemeData theme) {
+    if (_plan == null) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: PeriodizationEmptyState(
+            icon: Icons.route_outlined,
+            title: loc.periodizationNoActiveTitle,
+            subtitle: loc.periodizationNoActiveSubtitle,
+            primaryLabel: loc.periodizationCreatePlan,
+            onPrimary: _createPlan,
+            secondaryLabel: loc.periodizationHistory,
+            onSecondary: _openPlans,
+          ),
+        ),
+      ];
+    }
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+        sliver: SliverToBoxAdapter(
+          child: _PlanHero(
+            plan: _plan!,
+            phases: _phases,
+            onTap: _openPlans,
+          ),
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+        sliver: SliverToBoxAdapter(
+          child: _QuickActions(
+            onCalendar: _openCalendar,
+            onPlans: _openPlans,
+            onCompare: _openComparison,
+          ),
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+        sliver: SliverToBoxAdapter(
+          child: PeriodizationSectionHeader(
+            title: loc.periodizationNow,
+            icon: Icons.my_location_rounded,
+          ),
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        sliver: SliverToBoxAdapter(
+          child: _currentPhase == null
+              ? PeriodizationSurface(
+                  onTap: _openPlans,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.event_busy_outlined,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          loc.periodizationNoPhaseToday,
+                          style: theme.textTheme.bodyLarge,
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded),
+                    ],
+                  ),
+                )
+              : _CurrentPhaseCard(
+                  phase: _currentPhase!,
+                  target: _currentTarget,
+                  routineSuggestion: _routineSuggestion,
+                  onTap: () => _openPhase(_currentPhase!),
+                  onStartWorkout: _startSuggestedWorkout,
+                  onCheckin: _runCheckin,
+                ),
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+        sliver: SliverToBoxAdapter(
+          child: PeriodizationSectionHeader(
+            title: loc.periodizationNextPhases,
+            icon: Icons.route_outlined,
+            actionLabel: loc.periodizationAddPhase,
+            onAction: _addPhase,
+          ),
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        sliver: SliverToBoxAdapter(
+          child: PeriodizationSurface(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+            child: _VerticalPhaseTimeline(
+              phases: _phases,
+              referenceDate: DateTime.now(),
+              onPhaseTap: _openPhase,
+            ),
+          ),
+        ),
+      ),
+      const SliverToBoxAdapter(child: SizedBox(height: 110)),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
@@ -182,7 +362,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          loc.periodizationTitle,
+          loc.trackingTitle,
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w700,
           ),
@@ -205,16 +385,6 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
       ),
       body: _loading
           ? const _HomeSkeleton()
-          : _plan == null
-          ? PeriodizationEmptyState(
-              icon: Icons.route_outlined,
-              title: loc.periodizationNoActiveTitle,
-              subtitle: loc.periodizationNoActiveSubtitle,
-              primaryLabel: loc.periodizationCreatePlan,
-              onPrimary: _createPlan,
-              secondaryLabel: loc.periodizationHistory,
-              onSecondary: _openPlans,
-            )
           : RefreshIndicator(
               onRefresh: _load,
               child: CustomScrollView(
@@ -223,93 +393,25 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                     sliver: SliverToBoxAdapter(
-                      child: _PlanHero(
-                        plan: _plan!,
-                        phases: _phases,
-                        onTap: _openPlans,
-                      ).animate().fadeIn(duration: 260.ms).slideY(begin: -.025),
-                    ),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                    sliver: SliverToBoxAdapter(
-                      child: _QuickActions(
-                        onCalendar: _openCalendar,
-                        onPlans: _openPlans,
-                        onCompare: _openComparison,
-                      ).animate().fadeIn(delay: 80.ms, duration: 240.ms),
-                    ),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
-                    sliver: SliverToBoxAdapter(
-                      child: PeriodizationSectionHeader(
-                        title: loc.periodizationNow,
-                        icon: Icons.my_location_rounded,
+                      child: BodyMeasurementsTeaserCard(
+                        weightKg: _weightKg,
+                        unit: _weightUnit,
+                        delta: _weightDelta,
+                        date: _weightDate,
+                        onOpen: _openBodyTracker,
                       ),
                     ),
                   ),
                   SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverToBoxAdapter(
-                      child: _currentPhase == null
-                          ? PeriodizationSurface(
-                              onTap: _openPlans,
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.event_busy_outlined,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      loc.periodizationNoPhaseToday,
-                                      style: theme.textTheme.bodyLarge,
-                                    ),
-                                  ),
-                                  const Icon(Icons.chevron_right_rounded),
-                                ],
-                              ),
-                            )
-                          : _CurrentPhaseCard(
-                                  phase: _currentPhase!,
-                                  target: _currentTarget,
-                                  routineSuggestion: _routineSuggestion,
-                                  onTap: () => _openPhase(_currentPhase!),
-                                  onStartWorkout: _startSuggestedWorkout,
-                                  onCheckin: _runCheckin,
-                                )
-                                .animate()
-                                .fadeIn(delay: 120.ms)
-                                .slideY(begin: .03),
-                    ),
-                  ),
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
                     sliver: SliverToBoxAdapter(
                       child: PeriodizationSectionHeader(
-                        title: loc.periodizationNextPhases,
+                        title: loc.periodizationTitle,
                         icon: Icons.route_outlined,
-                        actionLabel: loc.periodizationAddPhase,
-                        onAction: _addPhase,
                       ),
                     ),
                   ),
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverToBoxAdapter(
-                      child: PeriodizationSurface(
-                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                        child: _VerticalPhaseTimeline(
-                          phases: _phases,
-                          referenceDate: DateTime.now(),
-                          onPhaseTap: _openPhase,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 110)),
+                  ..._planningSlivers(loc, theme),
                 ],
               ),
             ),
