@@ -76,22 +76,54 @@ class TestDataGenerator {
   Future<void> _clearPreviousScenario(TestDataContext context) async {
     final db = context.database;
     final like = '$devDataPrefix%';
-    // Parent deletes cascade through workout, routine, food, sleep-monitor and
-    // meal trees. Tables without a generated parent are removed explicitly.
+    // Delete children before parents so the clear works even when
+    // foreign_keys is temporarily off or the DB is in a partially-migrated
+    // state. Parents are still deleted for cascade coverage, but every
+    // generated table is cleared explicitly to avoid PK/UNIQUE leftovers
+    // on a second generation (e.g. periodization child ids reused across runs).
     for (final table in <String>[
+      // Periodization children -> parent
+      'periodization_checkins',
+      'phase_routine_links',
+      'phase_targets',
+      'periodization_phases',
       'periodization_plans',
+      // Workout tree
+      'sets',
+      'exercise_entries',
       'workouts',
+      // Routine tree
+      'predefined_sets',
+      'routine_exercises',
+      'routine_days',
       'routines',
+      // Run tree
+      'run_track_points',
       'run_activities',
+      // Sleep monitor tree (sessions/epochs/segments cascade from sleep_entries,
+      // but delete explicitly for FK-off safety)
+      'sleep_stage_epochs',
+      'sleep_monitor_segments',
+      'sleep_monitor_sessions',
       'sleep_entries',
+      // Nutrition diary
+      'meal_log_items',
       'meal_logs',
+      'saved_meal_items',
       'saved_meals',
+      'food_servings',
+      'food_variants',
       'foods',
       'nutrition_goals',
+      // Standalone
       'user_goals',
       'body_measurements',
     ]) {
-      await db.delete(table, where: 'id LIKE ?', whereArgs: [like]);
+      try {
+        await db.delete(table, where: 'id LIKE ?', whereArgs: [like]);
+      } catch (_) {
+        // Table may not exist on older migrated DBs - ignore.
+      }
     }
   }
 }
