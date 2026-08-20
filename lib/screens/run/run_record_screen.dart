@@ -3,14 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_session_goal.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
+import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_voice_settings_screen.dart';
 import 'package:workout_notes/services/run_interval_engine.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/services/run_voice_coach.dart';
-import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 
 class RunRecordScreen extends StatefulWidget {
@@ -27,6 +28,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   bool _busy = false;
   bool _sheetExpanded = false;
   bool _intervalsOn = false;
+  RunSessionGoal _goal = const RunSessionGoal.defaults();
 
   @override
   void initState() {
@@ -81,8 +83,19 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   Future<void> _beginVoiceSession({bool debugSim = false}) async {
     await _coach.beginSession(
       intervalsOn: _intervalsOn,
+      goal: _goal,
       bypassHeadphonesGate: debugSim,
     );
+  }
+
+  void _toggleIntervals(bool value) {
+    setState(() => _intervalsOn = value);
+    _coach.setIntervalsOn(value);
+  }
+
+  void _setGoal(RunSessionGoal goal) {
+    setState(() => _goal = goal);
+    _coach.setGoal(goal);
   }
 
   Future<void> _startDebugSimulation() async {
@@ -136,11 +149,6 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  void _toggleIntervals(bool value) {
-    setState(() => _intervalsOn = value);
-    _coach.setIntervalsOn(value);
   }
 
   Future<void> _finish() async {
@@ -226,6 +234,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
         .map((p) => LatLng(p.lat, p.lng))
         .toList(growable: false);
     final interval = _coach.intervalSnapshot;
+    final goalSnap = _coach.goalSnapshotFor(state);
 
     return Scaffold(
       body: Stack(
@@ -359,15 +368,15 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                     !state.isActive &&
                     _service.canDebugSimulate;
                 final collapsedSize = hasSplitSummary
-                    ? 0.46
-                    : (showDebug ? 0.38 : 0.34);
+                    ? 0.52
+                    : (showDebug ? 0.46 : 0.42);
                 return DraggableScrollableSheet(
                   key: ValueKey('run-sheet-$collapsedSize'),
                   initialChildSize: collapsedSize,
                   minChildSize: collapsedSize,
-                  maxChildSize: 0.82,
+                  maxChildSize: 0.88,
                   snap: true,
-                  snapSizes: [collapsedSize, 0.82],
+                  snapSizes: [collapsedSize, 0.88],
                   builder: (context, scrollController) {
                     return _MetricsSheet(
                       scrollController: scrollController,
@@ -377,8 +386,11 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                       showDebugSimulate: showDebug,
                       intervalsOn: _intervalsOn,
                       intervalSnapshot: interval,
+                      goal: _goal,
+                      goalSnapshot: goalSnap,
                       onIntervalsChanged:
                           state.isActive ? null : _toggleIntervals,
+                      onGoalChanged: state.isActive ? null : _setGoal,
                       onStart: _ensurePermissionAndStart,
                       onDebugSimulate: _startDebugSimulation,
                       onPause: () => _service.pause(),
@@ -404,7 +416,10 @@ class _MetricsSheet extends StatelessWidget {
   final bool showDebugSimulate;
   final bool intervalsOn;
   final RunIntervalSnapshot intervalSnapshot;
+  final RunSessionGoal goal;
+  final RunGoalSnapshot goalSnapshot;
   final ValueChanged<bool>? onIntervalsChanged;
+  final ValueChanged<RunSessionGoal>? onGoalChanged;
   final VoidCallback onStart;
   final VoidCallback onDebugSimulate;
   final VoidCallback onPause;
@@ -419,7 +434,10 @@ class _MetricsSheet extends StatelessWidget {
     required this.showDebugSimulate,
     required this.intervalsOn,
     required this.intervalSnapshot,
+    required this.goal,
+    required this.goalSnapshot,
     required this.onIntervalsChanged,
+    required this.onGoalChanged,
     required this.onStart,
     required this.onDebugSimulate,
     required this.onPause,
@@ -524,12 +542,15 @@ class _MetricsSheet extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          _IntervalControls(
+          const SizedBox(height: 10),
+          _RunPlanCard(
+            goal: goal,
+            goalSnapshot: goalSnapshot,
             intervalsOn: intervalsOn,
-            snapshot: intervalSnapshot,
+            intervalSnapshot: intervalSnapshot,
             active: state.isActive,
-            onChanged: onIntervalsChanged,
+            onGoalChanged: onGoalChanged,
+            onIntervalsChanged: onIntervalsChanged,
           ),
           const SizedBox(height: 12),
           if (busy)
@@ -683,43 +704,237 @@ class _MetricsSheet extends StatelessWidget {
   }
 }
 
-class _IntervalControls extends StatelessWidget {
+class _RunPlanCard extends StatelessWidget {
+  final RunSessionGoal goal;
+  final RunGoalSnapshot goalSnapshot;
   final bool intervalsOn;
-  final RunIntervalSnapshot snapshot;
+  final RunIntervalSnapshot intervalSnapshot;
   final bool active;
-  final ValueChanged<bool>? onChanged;
+  final ValueChanged<RunSessionGoal>? onGoalChanged;
+  final ValueChanged<bool>? onIntervalsChanged;
 
-  const _IntervalControls({
+  const _RunPlanCard({
+    required this.goal,
+    required this.goalSnapshot,
     required this.intervalsOn,
-    required this.snapshot,
+    required this.intervalSnapshot,
     required this.active,
-    required this.onChanged,
+    required this.onGoalChanged,
+    required this.onIntervalsChanged,
   });
+
+  String _formatGoalValue(RunSessionGoal g) {
+    if (g.metric == RunIntervalMetric.time) {
+      return RunFormatters.duration(g.value);
+    }
+    if (g.value >= 1000 && g.value % 1000 == 0) {
+      return '${g.value ~/ 1000} km';
+    }
+    if (g.value >= 1000) {
+      return '${(g.value / 1000).toStringAsFixed(1)} km';
+    }
+    return '${g.value} m';
+  }
+
+  String _formatRemaining(RunGoalSnapshot snap) {
+    if (snap.goal.metric == RunIntervalMetric.time) {
+      return RunFormatters.duration(snap.remaining.round());
+    }
+    final m = snap.remaining;
+    if (m >= 1000) return '${(m / 1000).toStringAsFixed(2)} km';
+    return '${m.round()} m';
+  }
+
+  Future<void> _editGoal(BuildContext context) async {
+    if (onGoalChanged == null) return;
+    final loc = AppLocalizations.of(context)!;
+    var draft = goal.enabled
+        ? goal
+        : goal.copyWith(enabled: true, value: goal.value > 0 ? goal.value : 5000);
+
+    final result = await showDialog<RunSessionGoal>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
+              title: Text(loc.runRecordGoalPickTitle),
+              content: SizedBox(
+                width: MediaQuery.sizeOf(context).width,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SegmentedButton<RunIntervalMetric>(
+                      segments: [
+                        ButtonSegment(
+                          value: RunIntervalMetric.distance,
+                          label: Text(loc.runIntervalMetricDistance),
+                        ),
+                        ButtonSegment(
+                          value: RunIntervalMetric.time,
+                          label: Text(loc.runIntervalMetricTime),
+                        ),
+                      ],
+                      selected: {draft.metric},
+                      onSelectionChanged: (set) {
+                        final metric = set.first;
+                        setDialogState(() {
+                          draft = draft.copyWith(
+                            metric: metric,
+                            value: metric == RunIntervalMetric.distance
+                                ? 5000
+                                : 1800,
+                          );
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    if (draft.metric == RunIntervalMetric.distance)
+                      DropdownButtonFormField<int>(
+                        key: ValueKey('goal-dist-${draft.value}'),
+                        initialValue: _nearestDistance(draft.value),
+                        decoration: InputDecoration(
+                          labelText: loc.runIntervalDistance,
+                        ),
+                        items: [
+                          for (final m in const [
+                            1000,
+                            2000,
+                            3000,
+                            5000,
+                            10000,
+                            21097,
+                          ])
+                            DropdownMenuItem(
+                              value: m,
+                              child: Text(
+                                m >= 1000
+                                    ? (m % 1000 == 0
+                                        ? '${m ~/ 1000} km'
+                                        : '${(m / 1000).toStringAsFixed(1)} km')
+                                    : '$m m',
+                              ),
+                            ),
+                        ],
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setDialogState(
+                            () => draft = draft.copyWith(value: v),
+                          );
+                        },
+                      )
+                    else
+                      DropdownButtonFormField<int>(
+                        key: ValueKey('goal-time-${draft.value}'),
+                        initialValue: _nearestTime(draft.value),
+                        decoration: InputDecoration(
+                          labelText: loc.runIntervalDuration,
+                        ),
+                        items: [
+                          for (final s in const [
+                            600,
+                            900,
+                            1200,
+                            1800,
+                            2700,
+                            3600,
+                          ])
+                            DropdownMenuItem(
+                              value: s,
+                              child: Text(RunFormatters.duration(s)),
+                            ),
+                        ],
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setDialogState(
+                            () => draft = draft.copyWith(value: v),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(
+                    ctx,
+                    draft.copyWith(enabled: false),
+                  ),
+                  child: Text(loc.runRecordGoalNone),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(
+                    ctx,
+                    draft.copyWith(enabled: true),
+                  ),
+                  child: Text(loc.commonSave),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (result != null) onGoalChanged!(result);
+  }
+
+  int _nearestDistance(int value) {
+    const options = [1000, 2000, 3000, 5000, 10000, 21097];
+    return options.reduce(
+      (a, b) => (a - value).abs() <= (b - value).abs() ? a : b,
+    );
+  }
+
+  int _nearestTime(int value) {
+    const options = [600, 900, 1200, 1800, 2700, 3600];
+    return options.reduce(
+      (a, b) => (a - value).abs() <= (b - value).abs() ? a : b,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
 
-    String? phaseLabel;
+    String? intervalPhase;
     if (intervalsOn && active) {
-      switch (snapshot.phase) {
+      switch (intervalSnapshot.phase) {
         case RunIntervalPhase.work:
-          phaseLabel = loc.runRecordIntervalWork(
-            snapshot.workIndex,
-            snapshot.totalWorks,
+          intervalPhase = loc.runRecordIntervalWork(
+            intervalSnapshot.workIndex,
+            intervalSnapshot.totalWorks,
           );
         case RunIntervalPhase.rest:
-          phaseLabel = loc.runRecordIntervalRest;
+          intervalPhase = loc.runRecordIntervalRest;
         case RunIntervalPhase.done:
-          phaseLabel = loc.runRecordIntervalDone;
+          intervalPhase = loc.runRecordIntervalDone;
         case RunIntervalPhase.idle:
-          phaseLabel = null;
+          intervalPhase = null;
       }
     }
 
+    String goalSubtitle;
+    if (!goal.enabled) {
+      goalSubtitle = loc.runRecordGoalNone;
+    } else if (goalSnapshot.completed) {
+      goalSubtitle = loc.runRecordGoalDone;
+    } else if (active) {
+      goalSubtitle = loc.runRecordGoalRemaining(_formatRemaining(goalSnapshot));
+    } else {
+      goalSubtitle = _formatGoalValue(goal);
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(14),
@@ -727,6 +942,77 @@ class _IntervalControls extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text(
+            loc.runRecordPlanSection.toUpperCase(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              letterSpacing: 0.8,
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          InkWell(
+            onTap: onGoalChanged == null ? null : () => _editGoal(context),
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.flag_outlined,
+                    size: 18,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          loc.runRecordGoal,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          goalSubtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch.adaptive(
+                    value: goal.enabled,
+                    onChanged: onGoalChanged == null
+                        ? null
+                        : (v) {
+                            if (v && !goal.enabled) {
+                              _editGoal(context);
+                            } else {
+                              onGoalChanged!(goal.copyWith(enabled: v));
+                            }
+                          },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (goal.enabled && active) ...[
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: goalSnapshot.progress.clamp(0.0, 1.0),
+                minHeight: 5,
+              ),
+            ),
+          ],
+          Divider(
+            height: 16,
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
           Row(
             children: [
               Icon(
@@ -736,54 +1022,57 @@ class _IntervalControls extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  loc.runRecordIntervals,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Switch.adaptive(
-                value: intervalsOn,
-                onChanged: onChanged,
-              ),
-            ],
-          ),
-          if (phaseLabel != null) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    phaseLabel,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loc.runRecordIntervals,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
+                    if (intervalPhase != null)
+                      Text(
+                        intervalPhase,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                  ],
                 ),
-                if (snapshot.isActive)
-                  Text(
-                    snapshot.currentMetric ==
+              ),
+              if (intervalSnapshot.isActive)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Text(
+                    intervalSnapshot.currentMetric ==
                             RunIntervalMetric.distance
-                        ? '${snapshot.remaining.round()} m'
-                        : RunFormatters.duration(snapshot.remaining.round()),
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                        ? '${intervalSnapshot.remaining.round()} m'
+                        : RunFormatters.duration(
+                            intervalSnapshot.remaining.round(),
+                          ),
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
-              ],
-            ),
-            if (snapshot.isActive) ...[
-              const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(
-                  value: snapshot.progress.clamp(0.0, 1.0),
-                  minHeight: 6,
                 ),
+              Switch.adaptive(
+                value: intervalsOn,
+                onChanged: onIntervalsChanged,
               ),
             ],
+          ),
+          if (intervalsOn && intervalSnapshot.isActive) ...[
+            const SizedBox(height: 4),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: intervalSnapshot.progress.clamp(0.0, 1.0),
+                minHeight: 5,
+              ),
+            ),
           ],
         ],
       ),

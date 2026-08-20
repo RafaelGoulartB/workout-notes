@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:workout_notes/models/run_session_goal.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
@@ -146,6 +147,51 @@ void main() {
         ),
       );
       expect(spoken, isEmpty);
+    });
+
+    test('goal completion preempts other announcements in the same tick', () async {
+      final spoken = <String>[];
+      final coach = RunVoiceCoach(
+        speak: (text) async => spoken.add(text),
+        audioCaps: () async => const RunAudioCapabilities(
+          headsetConnected: true,
+          inCall: false,
+        ),
+        ensureTtsReady: () async {},
+        stopTts: () async {},
+      );
+      coach.settingsOverride = const RunVoiceSettings.defaults().copyWith(
+        headphonesOnly: false,
+        announceGpsStatus: false,
+        announceDistance: true,
+        announceSplit: true,
+      );
+      await coach.beginSession(
+        intervalsOn: false,
+        goal: const RunSessionGoal(
+          enabled: true,
+          metric: RunIntervalMetric.distance,
+          value: 1000,
+        ),
+      );
+      await coach.onTrackingUpdate(
+        _recordingState(
+          distanceMeters: 1000,
+          durationSeconds: 360,
+          movingTimeSeconds: 360,
+          splits: [
+            const RunSplit(
+              km: 1,
+              distanceMeters: 1000,
+              durationSeconds: 360,
+              paceSecPerKm: 360,
+              isPartial: false,
+            ),
+          ],
+        ),
+      );
+      expect(spoken, hasLength(1));
+      expect(spoken.single, startsWith('Goal complete'));
     });
   });
 }

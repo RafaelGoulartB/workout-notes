@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:workout_notes/models/run_session_goal.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/services/run_audio_gate_service.dart';
@@ -36,6 +37,8 @@ class RunVoiceCoach extends ChangeNotifier {
   final Future<void> Function() _stopTts;
 
   RunVoiceSettings _settings = const RunVoiceSettings.defaults();
+  RunSessionGoal _goal = const RunSessionGoal.defaults();
+  bool _goalCompleted = false;
   bool _active = false;
   bool _intervalsOn = false;
   bool _bypassHeadphonesGate = false;
@@ -51,11 +54,27 @@ class RunVoiceCoach extends ChangeNotifier {
 
   RunVoiceSettings get settings => _settings;
   bool get intervalsOn => _intervalsOn;
+  RunSessionGoal get goal => _goal;
   RunIntervalSnapshot get intervalSnapshot => _intervalEngine.snapshot;
+
+  RunGoalSnapshot goalSnapshotFor(RunTrackingState state) {
+    return RunGoalSnapshot(
+      goal: _goal,
+      completed: _goalCompleted,
+      progress: _goal.progressFor(
+        distanceMeters: state.distanceMeters,
+        movingTimeSeconds: state.movingTimeSeconds,
+      ),
+      remaining: _goal.remaining(
+        distanceMeters: state.distanceMeters,
+        movingTimeSeconds: state.movingTimeSeconds,
+      ),
+    );
+  }
+
   bool get isActive => _active;
   bool get bypassHeadphonesGate => _bypassHeadphonesGate;
 
-  /// Debug GPS sim / emulator: allow TTS without a physical headset.
   void setBypassHeadphonesGate(bool value) {
     _bypassHeadphonesGate = value;
   }
@@ -87,13 +106,24 @@ class RunVoiceCoach extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setGoal(RunSessionGoal goal) {
+    _goal = goal;
+    if (!goal.enabled) {
+      _goalCompleted = false;
+    }
+    notifyListeners();
+  }
+
   Future<void> beginSession({
     required bool intervalsOn,
+    RunSessionGoal? goal,
     bool bypassHeadphonesGate = false,
   }) async {
     await prepare();
     _active = true;
     _intervalsOn = intervalsOn;
+    _goal = goal ?? _goal;
+    _goalCompleted = false;
     _bypassHeadphonesGate = bypassHeadphonesGate;
     _lastAnnouncedKm = 0;
     _lastSplitCount = 0;
@@ -108,6 +138,7 @@ class RunVoiceCoach extends ChangeNotifier {
 
   Future<void> endSession() async {
     _active = false;
+    _goalCompleted = false;
     _intervalEngine.reset();
     await _stopTts();
     notifyListeners();
@@ -120,31 +151,55 @@ class RunVoiceCoach extends ChangeNotifier {
     try {
       final phrases = <String>[];
 
-      if (_intervalsOn &&
-          _settings.announceIntervals &&
-          state.isRecording &&
-          _intervalEngine.snapshot.phase == RunIntervalPhase.idle) {
-        final startEvents = _intervalEngine.start();
-        for (final event in startEvents) {
-          final phrase = _phraseForInterval(event);
-          if (phrase != null) phrases.add(phrase);
-        }
-      }
-
-      if (_intervalsOn && _settings.announceIntervals) {
-        final intervalEvents = _intervalEngine.tick(
-          recording: state.isRecording,
-          distanceMeters: state.distanceMeters,
-          movingTimeSeconds: state.movingTimeSeconds,
+      // Goal completion always wins over other cues in the same tick.
+      final goalJustCompleted = _checkGoalCompletion(state);
+      if (goalJustCompleted) {
+        phrases.add(
+          RunVoicePhrases.goalComplete(
+            metric: _goal.metric,
+            value: _goal.value,
+          ),
         );
-        for (final event in intervalEvents) {
-          final phrase = _phraseForInterval(event);
-          if (phrase != null) phrases.add(phrase);
+        // Keep interval + free-run counters in sync without speaking them.
+        if (_intervalsOn) {
+          if (_intervalEngine.snapshot.phase == RunIntervalPhase.idle &&
+              state.isRecording) {
+            _intervalEngine.start();
+          }
+          _intervalEngine.tick(
+            recording: state.isRecording,
+            distanceMeters: state.distanceMeters,
+            movingTimeSeconds: state.movingTimeSeconds,
+          );
         }
-      }
+        _collectFreeRunPhrases(state);
+      } else {
+        if (_intervalsOn &&
+            _settings.announceIntervals &&
+            state.isRecording &&
+            _intervalEngine.snapshot.phase == RunIntervalPhase.idle) {
+          final startEvents = _intervalEngine.start();
+          for (final event in startEvents) {
+            final phrase = _phraseForInterval(event);
+            if (phrase != null) phrases.add(phrase);
+          }
+        }
 
-      if (state.isRecording || state.isPaused) {
-        phrases.addAll(_collectFreeRunPhrases(state));
+        if (_intervalsOn && _settings.announceIntervals) {
+          final intervalEvents = _intervalEngine.tick(
+            recording: state.isRecording,
+            distanceMeters: state.distanceMeters,
+            movingTimeSeconds: state.movingTimeSeconds,
+          );
+          for (final event in intervalEvents) {
+            final phrase = _phraseForInterval(event);
+            if (phrase != null) phrases.add(phrase);
+          }
+        }
+
+        if (state.isRecording || state.isPaused) {
+          phrases.addAll(_collectFreeRunPhrases(state));
+        }
       }
 
       notifyListeners();
@@ -156,6 +211,18 @@ class RunVoiceCoach extends ChangeNotifier {
     } finally {
       _busy = false;
     }
+  }
+
+  bool _checkGoalCompletion(RunTrackingState state) {
+    if (_goalCompleted || !_goal.enabled) return false;
+    if (!state.isRecording && !state.isPaused) return false;
+    final done = _goal.isComplete(
+      distanceMeters: state.distanceMeters,
+      movingTimeSeconds: state.movingTimeSeconds,
+    );
+    if (!done) return false;
+    _goalCompleted = true;
+    return true;
   }
 
   List<String> _collectFreeRunPhrases(RunTrackingState state) {

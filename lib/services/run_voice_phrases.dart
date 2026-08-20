@@ -62,6 +62,16 @@ class RunVoicePhrases {
   static String timeRemaining(int seconds) =>
       '${_durationSpeech(seconds)} remaining.';
 
+  static String goalComplete({
+    required RunIntervalMetric metric,
+    required int value,
+  }) {
+    if (metric == RunIntervalMetric.time) {
+      return 'Goal complete. ${_durationSpeech(value)}.';
+    }
+    return 'Goal complete. ${_distanceSpeech(value)}.';
+  }
+
   static String _kilometersWord(int km) => km == 1 ? 'kilometer' : 'kilometers';
 
   static String _durationSpeech(int totalSeconds) {
