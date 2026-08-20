@@ -5,6 +5,7 @@ import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/services/run_audio_gate_service.dart';
 import 'package:workout_notes/services/run_interval_engine.dart';
 import 'package:workout_notes/services/run_native_voice_service.dart';
+import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/services/run_tts_service.dart';
 import 'package:workout_notes/services/run_voice_phrases.dart';
 import 'package:workout_notes/services/run_voice_settings_store.dart';
@@ -84,6 +85,8 @@ class RunVoiceCoach extends ChangeNotifier {
   bool get _useNativeVoice {
     if (_useNativeVoiceOverride != null) return _useNativeVoiceOverride;
     if (_isCustomSpeak) return false; // Tests inject fake TTS -> stay on Dart path
+    if (RunTrackingService.instance.isDebugSimulating) return false;
+    if (_bypassHeadphonesGate) return false; // Debug sim bypasses headset gate and runs Dart-only
     return !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   }
 
