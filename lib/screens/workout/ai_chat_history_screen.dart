@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -21,7 +23,7 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
   void initState() {
     super.initState();
     AiChatService.instance.addListener(_onChange);
-    AiChatService.instance.refreshThreads();
+    unawaited(AiChatService.instance.ensureReady());
   }
 
   @override
@@ -183,6 +185,30 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
                         _sectionHeader(theme, l10n.aiHistoryOlder),
                         for (final thread in older) _threadItem(thread, l10n),
                       ],
+                      if (AiChatService.instance.state.hasOlderThreads ||
+                          AiChatService.instance.state.isLoadingOlderThreads)
+                        Center(
+                          child: TextButton.icon(
+                            onPressed: AiChatService
+                                    .instance
+                                    .state
+                                    .isLoadingOlderThreads
+                                ? null
+                                : AiChatService.instance.loadOlderThreads,
+                            icon: AiChatService
+                                    .instance
+                                    .state
+                                    .isLoadingOlderThreads
+                                ? const SizedBox.square(
+                                    dimension: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.history, size: 18),
+                            label: Text(l10n.aiChatLoadOlder),
+                          ),
+                        ),
                     ],
                   ),
           ),

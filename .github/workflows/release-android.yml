@@ -1,4 +1,4 @@
-name: Release Android APK
+name: Release Android
 
 on:
   push:
@@ -125,30 +125,56 @@ jobs:
             echo "storeFile=$keystore_path"
           } > android/key.properties
 
-      - name: Build signed release APK
+      - name: Build signed release artifacts
         run: >-
-          flutter build apk
+          flutter build appbundle
           --release
           --build-name=${{ steps.version.outputs.version }}
           --build-number=${{ steps.version.outputs.build_number }}
+
+      - name: Build ABI-specific APKs
+        run: >-
+          flutter build apk
+          --release
+          --split-per-abi
+          --build-name=${{ steps.version.outputs.version }}
+          --build-number=${{ steps.version.outputs.build_number }}
+
+      - name: Enforce APK size budget
+        shell: bash
+        run: |
+          set -euo pipefail
+          max_bytes=$((50 * 1024 * 1024))
+          for apk in build/app/outputs/flutter-apk/*-release.apk; do
+            size="$(stat -c%s "$apk")"
+            if (( size > max_bytes )); then
+              echo "APK exceeds 50 MB budget: $apk ($size bytes)" >&2
+              exit 1
+            fi
+          done
 
       - name: Prepare release asset
         id: asset
         shell: bash
         run: |
           set -euo pipefail
-          asset="workout-notes-${{ steps.version.outputs.version }}-android.apk"
-          cp build/app/outputs/flutter-apk/app-release.apk "$asset"
-          sha256sum "$asset" > "$asset.sha256"
-          echo "path=$asset" >> "$GITHUB_OUTPUT"
+          prefix="workout-notes-${{ steps.version.outputs.version }}-android"
+          cp build/app/outputs/bundle/release/app-release.aab "$prefix.aab"
+          for apk in build/app/outputs/flutter-apk/*-release.apk; do
+            abi="$(basename "$apk" | sed -E 's/^app-(.*)-release\.apk$/\1/')"
+            cp "$apk" "$prefix-$abi.apk"
+          done
+          sha256sum "$prefix".aab "$prefix"-*.apk > "$prefix.sha256"
+          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
           gh release create "${{ steps.version.outputs.tag }}"
-          "${{ steps.asset.outputs.path }}"
-          "${{ steps.asset.outputs.path }}.sha256"
+          "${{ steps.asset.outputs.prefix }}.aab"
+          "${{ steps.asset.outputs.prefix }}"-*.apk
+          "${{ steps.asset.outputs.prefix }}.sha256"
           --target "${{ github.sha }}"
           --title "Workout Notes ${{ steps.version.outputs.version }}"
           --generate-notes

@@ -128,10 +128,13 @@ abstract final class DatabaseWellnessMigrations {
         'sleep_monitor_default_mode': 'alarm_without_mission',
       }.entries) {
         try {
-          await db.insert('app_settings', {
-            'key': entry.key,
-            'value': entry.value,
-          }, conflictAlgorithm: ConflictAlgorithm.ignore);
+          await db.insert(
+              'app_settings',
+              {
+                'key': entry.key,
+                'value': entry.value,
+              },
+              conflictAlgorithm: ConflictAlgorithm.ignore);
         } catch (_) {}
       }
     }
@@ -165,18 +168,24 @@ abstract final class DatabaseWellnessMigrations {
         );
       } catch (_) {}
       try {
-        await db.insert('app_settings', {
-          'key': 'alarm_global_max_snoozes',
-          'value': '3',
-        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        await db.insert(
+            'app_settings',
+            {
+              'key': 'alarm_global_max_snoozes',
+              'value': '3',
+            },
+            conflictAlgorithm: ConflictAlgorithm.ignore);
       } catch (_) {}
     }
     if (oldVersion < 26) {
       try {
-        await db.insert('app_settings', {
-          'key': 'alarm_global_snooze_enabled',
-          'value': 'true',
-        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+        await db.insert(
+            'app_settings',
+            {
+              'key': 'alarm_global_snooze_enabled',
+              'value': 'true',
+            },
+            conflictAlgorithm: ConflictAlgorithm.ignore);
       } catch (_) {}
     }
     if (oldVersion < 27) {
@@ -456,6 +465,17 @@ abstract final class DatabaseWellnessMigrations {
         'ALTER TABLE run_activities ADD COLUMN best_effort_half_sec INTEGER',
         'ALTER TABLE run_activities ADD COLUMN best_effort_marathon_sec INTEGER',
         'ALTER TABLE run_activities ADD COLUMN efforts_computed INTEGER NOT NULL DEFAULT 0',
+      ]) {
+        try {
+          await db.execute(sql);
+        } catch (_) {}
+      }
+    }
+    if (oldVersion < 44) {
+      for (final sql in const [
+        'CREATE INDEX IF NOT EXISTS idx_workouts_date_end ON workouts(date, end_time)',
+        'CREATE INDEX IF NOT EXISTS idx_sets_entry_state ON sets(exercise_entry_id, is_complete, is_warmup)',
+        'CREATE INDEX IF NOT EXISTS idx_measurements_type_date ON body_measurements(type, date DESC, created_at DESC)',
       ]) {
         try {
           await db.execute(sql);

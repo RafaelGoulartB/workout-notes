@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
@@ -20,7 +21,9 @@ import 'rest_timer_screen.dart';
 import 'workout_detail_screen.dart';
 
 class WorkoutHomeScreen extends StatefulWidget {
-  const WorkoutHomeScreen({super.key});
+  final ValueListenable<int>? selectedTab;
+
+  const WorkoutHomeScreen({super.key, this.selectedTab});
 
   @override
   State<WorkoutHomeScreen> createState() => _WorkoutHomeScreenState();
@@ -50,19 +53,23 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _timerService.addListener(_onTimerTick);
+    widget.selectedTab?.addListener(_onTabSelectionChanged);
     _loadData();
   }
 
   @override
   void dispose() {
-    _timerService.removeListener(_onTimerTick);
+    widget.selectedTab?.removeListener(_onTabSelectionChanged);
     _elapsedTimer?.cancel();
     super.dispose();
   }
 
-  void _onTimerTick() {
-    if (mounted) setState(() {});
+  void _onTabSelectionChanged() {
+    if (widget.selectedTab?.value == 0 && _activeWorkouts.isNotEmpty) {
+      _startElapsedTimer();
+    } else {
+      _stopElapsedTimer();
+    }
   }
 
   /// Starts a periodic timer that keeps the elapsed time on the active
@@ -87,52 +94,18 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     try {
       final now = DateTime.now();
       final tomorrow = DateTime(now.year, now.month, now.day + 1);
-      final monthStart = DateTime(now.year, now.month, 1);
-
-      final allWorkouts = await _workoutRepo.getWorkouts(limit: 50);
-      final futureWorkouts = await _workoutRepo.getWorkouts(
-        startDate: tomorrow,
-        limit: 20,
-      );
-
-      // Load stats
-      final overview = await _analyticsRepo.getWorkoutOverviewStats();
-      _currentStreak = (overview['current_streak'] as int?) ?? 0;
-
-      // Calculate month stats
-      final monthStr = monthStart.toIso8601String().substring(0, 7);
-      double monthVol = 0;
-      double monthCardioDist = 0;
-      int monthCardioTime = 0;
-      int monthCount = 0;
-      for (final w in allWorkouts) {
-        final wDate = w['date'] as String? ?? '';
-        if (wDate.startsWith(monthStr)) {
-          monthCount++;
-          // Get volume and cardio distance/time for this workout
-          final exercises = await _workoutRepo.getWorkoutExercises(
-            w['id'] as String,
-          );
-          for (final ee in exercises) {
-            final sets = await _workoutRepo.getExerciseSets(ee['id'] as String);
-            for (final s in sets) {
-              if ((s['is_warmup'] as int? ?? 0) == 0) {
-                monthVol +=
-                    ((s['weight'] as num?)?.toDouble() ?? 0) *
-                    ((s['reps'] as int?) ?? 0);
-                monthCardioDist += (s['distance'] as num?)?.toDouble() ?? 0;
-                monthCardioTime += (s['time_seconds'] as int?) ?? 0;
-              }
-            }
-          }
-        }
-      }
-      _monthWorkouts = monthCount;
-      _monthVolume = monthVol;
-      _monthCardioDistance = monthCardioDist;
-      _monthCardioTime = monthCardioTime;
-
-      final active = await _workoutRepo.getActiveWorkouts();
+      final results = await Future.wait<Object>([
+        _workoutRepo.getWorkouts(limit: 50),
+        _workoutRepo.getWorkouts(startDate: tomorrow, limit: 20),
+        _workoutRepo.getMonthlySummary(now),
+        _analyticsRepo.getCurrentWorkoutStreak(),
+        _workoutRepo.getActiveWorkouts(),
+      ]);
+      final allWorkouts = results[0] as List<Map<String, dynamic>>;
+      final futureWorkouts = results[1] as List<Map<String, dynamic>>;
+      final monthly = results[2] as Map<String, dynamic>;
+      final currentStreak = results[3] as int;
+      final active = results[4] as List<Map<String, dynamic>>;
       final completed = <Map<String, dynamic>>[];
       for (final w in allWorkouts) {
         if ((w['end_time'] as String?) != null) {
@@ -145,10 +118,16 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           _activeWorkouts = active;
           _upcomingWorkouts = futureWorkouts.take(5).toList();
           _completedWorkouts = completed.take(5).toList();
+          _currentStreak = currentStreak;
+          _monthWorkouts = (monthly['workout_count'] as num?)?.toInt() ?? 0;
+          _monthVolume = (monthly['total_volume'] as num?)?.toDouble() ?? 0;
+          _monthCardioDistance =
+              (monthly['cardio_distance'] as num?)?.toDouble() ?? 0;
+          _monthCardioTime = (monthly['cardio_time'] as num?)?.toInt() ?? 0;
           _isLoading = false;
         });
         // Keep the elapsed time live when there is an active workout
-        if (active.isNotEmpty) {
+        if (active.isNotEmpty && (widget.selectedTab?.value ?? 0) == 0) {
           _startElapsedTimer();
         } else {
           _stopElapsedTimer();
@@ -330,26 +309,28 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   List<Widget> _buildAppBarActions(ThemeData theme, AppLocalizations loc) {
     return [
       const AiCoachHeaderButton(),
-      if (_timerService.isActive)
-        _TimerPill(
-          remainingSeconds: _timerService.remainingSeconds,
-          isRunning: _timerService.isRunning,
-          isPaused: _timerService.isPaused,
-          shortTime: _timerService.shortTime,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const RestTimerScreen()),
-          ),
-        )
-      else
-        IconButton(
-          icon: const Icon(Icons.calendar_month_outlined),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const CalendarScreen()),
-          ),
-          tooltip: loc.workoutHomeHistoryTooltip,
-        ),
+      ListenableBuilder(
+        listenable: _timerService,
+        builder: (context, _) => _timerService.isActive
+            ? _TimerPill(
+                remainingSeconds: _timerService.remainingSeconds,
+                isRunning: _timerService.isRunning,
+                isPaused: _timerService.isPaused,
+                shortTime: _timerService.shortTime,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const RestTimerScreen()),
+                ),
+              )
+            : IconButton(
+                icon: const Icon(Icons.calendar_month_outlined),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const CalendarScreen()),
+                ),
+                tooltip: loc.workoutHomeHistoryTooltip,
+              ),
+      ),
       IconButton(
         icon: const Icon(Icons.settings_outlined),
         onPressed: () => Navigator.push(
@@ -537,7 +518,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                       label: loc.commonTotal,
                       value: _monthCardioDistance > 0 && _monthCardioTime > 0
                           ? (_monthCardioTime / _monthCardioDistance)
-                                .toStringAsFixed(0)
+                              .toStringAsFixed(0)
                           : '--',
                       unit: '/km',
                       icon: Icons.speed,
@@ -840,10 +821,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     final durStr = isActive
         ? AppLocalizations.of(context)!.workoutHomeOngoing
         : duration > 0
-        ? AppLocalizations.of(
-            context,
-          )!.workoutDetailDuration(duration ~/ 60, duration % 60)
-        : '--';
+            ? AppLocalizations.of(
+                context,
+              )!
+                .workoutDetailDuration(duration ~/ 60, duration % 60)
+            : '--';
     final feeling = (workout['feeling_rating'] as int?) ?? 0;
 
     return Padding(
@@ -952,10 +934,10 @@ class _LoadingSkeleton extends StatelessWidget {
     BoxDecoration box({double r = 8}) =>
         BoxDecoration(color: color, borderRadius: BorderRadius.circular(r));
     Widget line({required double h, double? w, double r = 8}) => Container(
-      height: h,
-      width: w,
-      decoration: box(r: r),
-    );
+          height: h,
+          width: w,
+          decoration: box(r: r),
+        );
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -1002,10 +984,10 @@ class _PulsingDot extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           Container(
-                width: 16,
-                height: 16,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              )
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          )
               .animate(onPlay: (c) => c.repeat(reverse: true))
               .scale(
                 begin: const Offset(0.6, 0.6),

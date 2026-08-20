@@ -22,6 +22,10 @@ class AiChatState {
   final String? phaseMessage;
   final int? phaseToolCount;
   final List<AiRoutineProposal> routineProposals;
+  final bool hasOlderMessages;
+  final bool isLoadingOlderMessages;
+  final bool hasOlderThreads;
+  final bool isLoadingOlderThreads;
 
   const AiChatState({
     this.threads = const [],
@@ -33,6 +37,10 @@ class AiChatState {
     this.phaseMessage,
     this.phaseToolCount,
     this.routineProposals = const [],
+    this.hasOlderMessages = false,
+    this.isLoadingOlderMessages = false,
+    this.hasOlderThreads = false,
+    this.isLoadingOlderThreads = false,
   });
 
   bool get isSending =>
@@ -69,23 +77,31 @@ class AiChatState {
     bool clearPhaseMessage = false,
     int? phaseToolCount,
     List<AiRoutineProposal>? routineProposals,
+    bool? hasOlderMessages,
+    bool? isLoadingOlderMessages,
+    bool? hasOlderThreads,
+    bool? isLoadingOlderThreads,
   }) {
     return AiChatState(
       threads: threads ?? this.threads,
-      activeThreadId: clearActiveThread
-          ? null
-          : (activeThreadId ?? this.activeThreadId),
+      activeThreadId:
+          clearActiveThread ? null : (activeThreadId ?? this.activeThreadId),
       messages: messages ?? this.messages,
       phase: phase ?? this.phase,
       error: clearError ? null : (error ?? this.error),
       errorDetails: clearError
           ? null
           : (errorDetails ?? (error != null ? null : this.errorDetails)),
-      phaseMessage: clearPhaseMessage
-          ? null
-          : (phaseMessage ?? this.phaseMessage),
+      phaseMessage:
+          clearPhaseMessage ? null : (phaseMessage ?? this.phaseMessage),
       phaseToolCount: phaseToolCount ?? this.phaseToolCount,
       routineProposals: routineProposals ?? this.routineProposals,
+      hasOlderMessages: hasOlderMessages ?? this.hasOlderMessages,
+      isLoadingOlderMessages:
+          isLoadingOlderMessages ?? this.isLoadingOlderMessages,
+      hasOlderThreads: hasOlderThreads ?? this.hasOlderThreads,
+      isLoadingOlderThreads:
+          isLoadingOlderThreads ?? this.isLoadingOlderThreads,
     );
   }
 }

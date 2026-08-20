@@ -406,14 +406,23 @@ abstract final class DatabaseSchema {
     // Indexes
     await db.execute('CREATE INDEX idx_workouts_date ON workouts(date)');
     await db.execute(
+      'CREATE INDEX idx_workouts_date_end ON workouts(date, end_time)',
+    );
+    await db.execute(
       'CREATE INDEX idx_exercise_entries_workout ON exercise_entries(workout_id)',
     );
     await db.execute('CREATE INDEX idx_sets_entry ON sets(exercise_entry_id)');
+    await db.execute(
+      'CREATE INDEX idx_sets_entry_state ON sets(exercise_entry_id, is_complete, is_warmup)',
+    );
     await db.execute(
       'CREATE INDEX idx_measurements_date ON body_measurements(date)',
     );
     await db.execute(
       'CREATE INDEX idx_measurements_type ON body_measurements(type)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_measurements_type_date ON body_measurements(type, date DESC, created_at DESC)',
     );
     await db.execute(
       'CREATE INDEX idx_sleep_entries_date ON sleep_entries(date DESC)',

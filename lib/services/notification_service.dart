@@ -100,10 +100,8 @@ class NotificationService {
   /// Request the POST_NOTIFICATIONS permission on Android 13+.
   /// Returns `true` if already granted or permission was granted.
   Future<bool> requestPermission() async {
-    final android = _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
     if (android == null) {
       _notificationsAllowed = true;
       return true; // not Android
@@ -126,10 +124,8 @@ class NotificationService {
   // Channel updates
 
   Future<void> _updateRestChannel() async {
-    final android = _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
     if (android == null) return;
 
     await android.createNotificationChannel(
@@ -145,10 +141,8 @@ class NotificationService {
   }
 
   Future<void> _updateWorkoutChannel() async {
-    final android = _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+    final android = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
     if (android == null) return;
 
     await android.createNotificationChannel(
@@ -183,9 +177,13 @@ class NotificationService {
           priority: Priority.high,
           ongoing: true,
           autoCancel: false,
-          onlyAlertOnce: true, // silent updates after first show
-          showWhen: false,
-          usesChronometer: false,
+          onlyAlertOnce: true,
+          showWhen: true,
+          when: DateTime.now()
+              .add(Duration(seconds: remainingSeconds))
+              .millisecondsSinceEpoch,
+          usesChronometer: true,
+          chronometerCountDown: true,
         ),
       ),
     );
