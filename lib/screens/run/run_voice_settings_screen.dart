@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/services/run_voice_settings_store.dart';
+import 'package:workout_notes/services/run_voice_coach.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
 
@@ -35,6 +36,25 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
   Future<void> _persist(RunVoiceSettings next) async {
     setState(() => _settings = next);
     await _store.save(next);
+  }
+
+  Future<void> _playTestAnnouncement() async {
+    final loc = AppLocalizations.of(context)!;
+    if (!_settings.enabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.runVoiceTestDisabled)),
+      );
+      return;
+    }
+    final coach = RunVoiceCoach();
+    coach.settingsOverride = _settings;
+    final ok = await coach.speakTestAnnouncement();
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.runVoiceTestFailed)),
+      );
+    }
   }
 
   Future<void> _pickDistanceEvery() async {
@@ -293,6 +313,13 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                       subtitle: loc.runVoiceEnabledSubtitle,
                       value: s.enabled,
                       onChanged: (v) => _persist(s.copyWith(enabled: v)),
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsLinkTile(
+                      icon: Icons.play_circle_outline,
+                      title: loc.runVoiceTestAnnouncement,
+                      subtitle: loc.runVoiceTestAnnouncementSubtitle,
+                      onTap: _playTestAnnouncement,
                     ),
                     const SettingsCardDivider(),
                     SettingsSwitchTile(

@@ -38,6 +38,7 @@ class RunVoiceCoach extends ChangeNotifier {
   RunVoiceSettings _settings = const RunVoiceSettings.defaults();
   bool _active = false;
   bool _intervalsOn = false;
+  bool _bypassHeadphonesGate = false;
   int _lastAnnouncedKm = 0;
   int _lastSplitCount = 0;
   bool? _lastWeakGps;
@@ -52,6 +53,12 @@ class RunVoiceCoach extends ChangeNotifier {
   bool get intervalsOn => _intervalsOn;
   RunIntervalSnapshot get intervalSnapshot => _intervalEngine.snapshot;
   bool get isActive => _active;
+  bool get bypassHeadphonesGate => _bypassHeadphonesGate;
+
+  /// Debug GPS sim / emulator: allow TTS without a physical headset.
+  void setBypassHeadphonesGate(bool value) {
+    _bypassHeadphonesGate = value;
+  }
 
   Future<void> prepare() async {
     _settings = settingsOverride ?? await _settingsStore.load();
@@ -80,10 +87,14 @@ class RunVoiceCoach extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> beginSession({required bool intervalsOn}) async {
+  Future<void> beginSession({
+    required bool intervalsOn,
+    bool bypassHeadphonesGate = false,
+  }) async {
     await prepare();
     _active = true;
     _intervalsOn = intervalsOn;
+    _bypassHeadphonesGate = bypassHeadphonesGate;
     _lastAnnouncedKm = 0;
     _lastSplitCount = 0;
     _lastWeakGps = null;
@@ -253,10 +264,45 @@ class RunVoiceCoach extends ChangeNotifier {
   }
 
   Future<bool> _speakIfAllowed(String phrase) async {
-    if (!_settings.enabled) return false;
+    if (!_settings.enabled) {
+      if (kDebugMode) {
+        debugPrint('RunVoiceCoach: skipped (voice disabled)');
+      }
+      return false;
+    }
     final caps = await _audioCaps();
-    if (_settings.muteDuringCall && caps.inCall) return false;
-    if (_settings.headphonesOnly && !caps.headsetConnected) return false;
+    if (_settings.muteDuringCall && caps.inCall) {
+      if (kDebugMode) {
+        debugPrint('RunVoiceCoach: skipped (in call)');
+      }
+      return false;
+    }
+    if (_settings.headphonesOnly &&
+        !caps.headsetConnected &&
+        !_bypassHeadphonesGate) {
+      if (kDebugMode) {
+        debugPrint(
+          'RunVoiceCoach: skipped (no headset; disable Headphones only or use debug sim)',
+        );
+      }
+      return false;
+    }
+    if (kDebugMode) {
+      debugPrint('RunVoiceCoach: speak "$phrase"');
+    }
+    await _speak(phrase);
+    return true;
+  }
+
+  Future<bool> speakTestAnnouncement() async {
+    await prepare();
+    if (!_settings.enabled) return false;
+    await _ensureTtsReady();
+    const phrase =
+        'Voice alerts are working. One kilometer. Pace 5 minutes 30 seconds.';
+    if (kDebugMode) {
+      debugPrint('RunVoiceCoach: test speak');
+    }
     await _speak(phrase);
     return true;
   }

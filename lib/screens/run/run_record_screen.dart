@@ -78,8 +78,11 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     }
   }
 
-  Future<void> _beginVoiceSession() async {
-    await _coach.beginSession(intervalsOn: _intervalsOn);
+  Future<void> _beginVoiceSession({bool debugSim = false}) async {
+    await _coach.beginSession(
+      intervalsOn: _intervalsOn,
+      bypassHeadphonesGate: debugSim,
+    );
   }
 
   Future<void> _startDebugSimulation() async {
@@ -98,8 +101,14 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
         startLng: startLng,
       );
       if (ok) {
-        await _beginVoiceSession();
+        await _beginVoiceSession(debugSim: true);
         await _coach.onTrackingUpdate(_service.state);
+        if (mounted) {
+          final loc = AppLocalizations.of(context)!;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.runVoiceDebugSimHint)),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _busy = false);

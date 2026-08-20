@@ -20,6 +20,10 @@ class RunTtsService {
       await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);
       await _tts.awaitSpeakCompletion(true);
+      // Prefer speaker output on emulator / without headset.
+      try {
+        await _tts.setAudioAttributesForNavigation();
+      } catch (_) {}
       _tts.setStartHandler(() => _speaking = true);
       _tts.setCompletionHandler(() => _speaking = false);
       _tts.setCancelHandler(() => _speaking = false);

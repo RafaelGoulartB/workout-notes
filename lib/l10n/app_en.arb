@@ -2090,5 +2090,10 @@
   },
   "runRecordIntervalRest": "Rest",
   "runRecordIntervalDone": "Intervals done",
-  "runRecordVoiceSettings": "Voice settings"
+  "runRecordVoiceSettings": "Voice settings",
+  "runVoiceDebugSimHint": "Debug sim: voice bypasses headphones. First km cue ~1 min; enable Intervals for faster cues (~30s).",
+  "runVoiceTestAnnouncement": "Play test announcement",
+  "runVoiceTestAnnouncementSubtitle": "Speaks a sample English cue now (ignores headphones rule)",
+  "runVoiceTestFailed": "Could not play TTS. Check emulator volume and that a Text-to-speech engine is installed.",
+  "runVoiceTestDisabled": "Enable voice alerts first"
 }
