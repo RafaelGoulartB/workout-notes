@@ -4,6 +4,7 @@ import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/services/run_audio_gate_service.dart';
 import 'package:workout_notes/services/run_interval_engine.dart';
+import 'package:workout_notes/services/run_native_voice_service.dart';
 import 'package:workout_notes/services/run_tts_service.dart';
 import 'package:workout_notes/services/run_voice_phrases.dart';
 import 'package:workout_notes/services/run_voice_settings_store.dart';
@@ -20,6 +21,7 @@ class RunVoiceCoach extends ChangeNotifier {
     RunVoiceCapsFn? audioCaps,
     Future<void> Function()? ensureTtsReady,
     Future<void> Function()? stopTts,
+    bool? useNativeVoice,
   })  : _settingsStore = settingsStore ?? RunVoiceSettingsStore.instance,
         _intervalEngine = intervalEngine ?? RunIntervalEngine(),
         _speak = speak ?? ((text) => RunTtsService.instance.speak(text)),
@@ -27,7 +29,9 @@ class RunVoiceCoach extends ChangeNotifier {
             audioCaps ?? (() => RunAudioGateService.instance.getCapabilities()),
         _ensureTtsReady =
             ensureTtsReady ?? (() => RunTtsService.instance.ensureReady()),
-        _stopTts = stopTts ?? (() => RunTtsService.instance.stop());
+        _stopTts = stopTts ?? (() => RunTtsService.instance.stop()),
+        _useNativeVoiceOverride = useNativeVoice,
+        _isCustomSpeak = speak != null || ensureTtsReady != null || stopTts != null;
 
   final RunVoiceSettingsStore _settingsStore;
   final RunIntervalEngine _intervalEngine;
@@ -35,6 +39,8 @@ class RunVoiceCoach extends ChangeNotifier {
   final RunVoiceCapsFn _audioCaps;
   final Future<void> Function() _ensureTtsReady;
   final Future<void> Function() _stopTts;
+  final bool? _useNativeVoiceOverride;
+  final bool _isCustomSpeak;
 
   RunVoiceSettings _settings = const RunVoiceSettings.defaults();
   RunSessionGoal _goal = const RunSessionGoal.defaults();
@@ -74,6 +80,12 @@ class RunVoiceCoach extends ChangeNotifier {
 
   bool get isActive => _active;
   bool get bypassHeadphonesGate => _bypassHeadphonesGate;
+
+  bool get _useNativeVoice {
+    if (_useNativeVoiceOverride != null) return _useNativeVoiceOverride;
+    if (_isCustomSpeak) return false; // Tests inject fake TTS -> stay on Dart path
+    return !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  }
 
   void setBypassHeadphonesGate(bool value) {
     _bypassHeadphonesGate = value;
@@ -132,7 +144,22 @@ class RunVoiceCoach extends ChangeNotifier {
     _lastPaceAnnounceAt = null;
     _intervalEngine.reset();
     _intervalEngine.configure(_settings.interval);
-    await _ensureTtsReady();
+    if (_useNativeVoice) {
+      await RunNativeVoiceService.instance.beginSession(
+        settings: _settings.toJson(),
+        goal: {
+          'enabled': _goal.enabled,
+          'metric': _goal.metric.name,
+          'value': _goal.value,
+        },
+        intervalsOn: _intervalsOn,
+        bypassHeadphonesGate: _bypassHeadphonesGate,
+      );
+      // Still ensure TTS for test fallback or when service not yet ready,
+      // but live announcements will be driven by native controller.
+    } else {
+      await _ensureTtsReady();
+    }
     notifyListeners();
   }
 
@@ -140,6 +167,9 @@ class RunVoiceCoach extends ChangeNotifier {
     _active = false;
     _goalCompleted = false;
     _intervalEngine.reset();
+    if (_useNativeVoice) {
+      await RunNativeVoiceService.instance.endSession();
+    }
     await _stopTts();
     notifyListeners();
   }
@@ -203,6 +233,11 @@ class RunVoiceCoach extends ChangeNotifier {
       }
 
       notifyListeners();
+
+      // On Android, the foreground service speaks natively so cues survive
+      // screen-off / Flutter engine death. Skip Dart TTS there to avoid
+      // double announcements; native controller is fed from RunTrackingService ticks.
+      if (_useNativeVoice) return;
 
       for (final phrase in phrases) {
         final spoken = await _speakIfAllowed(phrase);
@@ -364,6 +399,11 @@ class RunVoiceCoach extends ChangeNotifier {
   Future<bool> speakTestAnnouncement() async {
     await prepare();
     if (!_settings.enabled) return false;
+    if (_useNativeVoice) {
+      final ok = await RunNativeVoiceService.instance.speakTest();
+      if (ok) return true;
+      // Fallback to Dart TTS if native not available (service not bound)
+    }
     await _ensureTtsReady();
     const phrase =
         'Voice alerts are working. One kilometer. Pace 5 minutes 30 seconds.';

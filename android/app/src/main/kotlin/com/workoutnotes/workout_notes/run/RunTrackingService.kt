@@ -35,6 +35,8 @@ class RunTrackingService : Service(), LocationListener {
         @Volatile private var lastState: Map<String, Any?>? = null
         @Volatile var eventSink: ((Map<String, Any?>) -> Unit)? = null
 
+        fun activeInstanceForVoice(): RunTrackingService? = activeInstance
+
         fun currentState(context: Context): Map<String, Any?> {
             val service = activeInstance
             if (service != null) return service.stateMap()
@@ -177,6 +179,8 @@ class RunTrackingService : Service(), LocationListener {
     private lateinit var spool: RunActivitySpool
     private lateinit var locationManager: LocationManager
     private var wakeLock: PowerManager.WakeLock? = null
+    lateinit var voiceController: RunVoiceController
+        private set
     private var activity: MutableMap<String, Any?>? = null
     private var status: String = "idle"
     private var startedAtMillis: Long = 0L
@@ -217,6 +221,7 @@ class RunTrackingService : Service(), LocationListener {
         super.onCreate()
         spool = RunActivitySpool(this)
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        voiceController = RunVoiceController(this)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -292,6 +297,16 @@ class RunTrackingService : Service(), LocationListener {
         status = "recording"
         session["status"] = "recording"
         spool.updateActivity(session)
+        // Native TTS: consume pending settings from bridge or DB
+        try {
+            val pendingS = RunVoiceBridge.pendingSettings
+            val pendingG = RunVoiceBridge.pendingGoal
+            val pendingI = RunVoiceBridge.pendingIntervalsOn
+            val pendingB = RunVoiceBridge.pendingBypassGate
+            voiceController.begin(pendingS, pendingG, pendingI, pendingB)
+        } catch (_: Throwable) {
+            voiceController.begin(null, null, null, null)
+        }
         startLocationUpdates()
         mainHandler.removeCallbacks(tickRunnable)
         mainHandler.post(tickRunnable)
@@ -371,6 +386,26 @@ class RunTrackingService : Service(), LocationListener {
 
         promoteToForeground(restoredStatus)
         acquireWakeLock()
+        // Restore voice: reload settings from DB and resume active flag
+        try {
+            voiceController.loadSettingsFromDb()
+            // Resume as active if was recording/paused — next tick will drive intervals
+            @Suppress("UNCHECKED_CAST")
+            val hasIntervals = (session["voice_intervals_on"] as? Boolean) ?: voiceController.let {
+                // Fallback: check bridge pending or defaults
+                RunVoiceBridge.pendingIntervalsOn
+            }
+            // We don't have persisted goal — re-hydrate as disabled; distance cues still work.
+            voiceController.begin(
+                null,
+                null,
+                hasIntervals,
+                RunVoiceBridge.pendingBypassGate,
+            )
+            if (restoredStatus == "paused") {
+                // voice pauses naturally via tick(recording=false)
+            }
+        } catch (_: Throwable) {}
         if (restoredStatus == "recording") {
             startLocationUpdates()
         }
@@ -418,6 +453,7 @@ class RunTrackingService : Service(), LocationListener {
         status = "stopping"
         stopLocationUpdates()
         mainHandler.removeCallbacks(tickRunnable)
+        try { voiceController.end() } catch (_: Throwable) {}
 
         val session = activity
         if (session == null) {
@@ -479,10 +515,12 @@ class RunTrackingService : Service(), LocationListener {
             runStatus,
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val types = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
             startForeground(
                 RunTrackingNotification.NOTIFICATION_ID,
                 notification,
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+                types,
             )
         } else {
             startForeground(RunTrackingNotification.NOTIFICATION_ID, notification)
@@ -709,6 +747,22 @@ class RunTrackingService : Service(), LocationListener {
         val state = stateMap()
         lastState = state
         eventSink?.invoke(state)
+        // Drive native voice while screen off — no Flutter needed.
+        try {
+            voiceController.onTrackingUpdate(
+                distanceMeters = distanceMeters,
+                durationSeconds = elapsedSeconds(),
+                movingTimeSeconds = movingSeconds(),
+                currentPaceSecPerKm = currentPaceSecPerKm,
+                lat = currentLat,
+                accuracyMeters = currentAccuracy,
+                isRecording = status == "recording",
+                isPaused = status == "paused",
+                splitsCount = completedSplits.size,
+                currentSplitPace = null,
+                splits = completedSplits.toList(),
+            )
+        } catch (_: Throwable) {}
     }
 
     private fun updateNotification() {
@@ -752,6 +806,7 @@ class RunTrackingService : Service(), LocationListener {
         mainHandler.removeCallbacks(tickRunnable)
         stopLocationUpdates()
         releaseWakeLock()
+        try { voiceController.shutdown() } catch (_: Throwable) {}
         if (activeInstance === this) activeInstance = null
         super.onDestroy()
     }

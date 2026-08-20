@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 
@@ -32,10 +34,23 @@ class RunVoiceSettingsStore {
 
   Future<void> save(RunVoiceSettings settings) async {
     _cache = settings;
+    final encoded = jsonEncode(settings.toJson());
     await DatabaseHelper.instance.setSetting(
       RunVoiceSettings.storageKey,
-      jsonEncode(settings.toJson()),
+      encoded,
     );
+    // Mirror to SharedPreferences for native RunVoiceController which reads
+    // without opening SQLite (survives engine death / START_STICKY restore).
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(RunVoiceSettings.storageKey, encoded);
+      await prefs.setString(
+        'flutter.${RunVoiceSettings.storageKey}',
+        encoded,
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('RunVoiceSettingsStore mirror failed: $e');
+    }
   }
 
   void invalidateCache() {
