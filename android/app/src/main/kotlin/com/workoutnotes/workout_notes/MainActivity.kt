@@ -4,6 +4,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import com.workoutnotes.workout_notes.run.RunAudioBridge
 import com.workoutnotes.workout_notes.run.RunTrackingBridge
 import com.workoutnotes.workout_notes.sleep.SleepMonitorBridge
 import com.workoutnotes.workout_notes.sleep.TraditionalAlarmBridge
@@ -36,6 +37,10 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             "workout_notes/run_tracking/events",
         ).setStreamHandler(runBridge)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "workout_notes/run_audio/methods",
+        ).setMethodCallHandler(RunAudioBridge(this))
         val barcodeBridge = BarcodeScannerBridge()
         barcodeScannerBridge = barcodeBridge
         MethodChannel(

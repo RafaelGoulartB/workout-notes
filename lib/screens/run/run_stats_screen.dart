@@ -7,6 +7,7 @@ import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_history_screen.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
+import 'package:workout_notes/screens/run/run_voice_settings_screen.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
@@ -126,6 +127,18 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
       appBar: AppBar(
         title: Text(loc.runStatsTitle),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.record_voice_over_outlined),
+            tooltip: loc.runVoiceSettingsTitle,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RunVoiceSettingsScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: loc.runHistoryTitle,

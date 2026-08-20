@@ -6,7 +6,11 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
+import 'package:workout_notes/screens/run/run_voice_settings_screen.dart';
+import 'package:workout_notes/services/run_interval_engine.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
+import 'package:workout_notes/services/run_voice_coach.dart';
+import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 
 class RunRecordScreen extends StatefulWidget {
@@ -19,20 +23,37 @@ class RunRecordScreen extends StatefulWidget {
 class _RunRecordScreenState extends State<RunRecordScreen> {
   final _service = RunTrackingService.instance;
   final _mapController = MapController();
+  final _coach = RunVoiceCoach();
   bool _busy = false;
   bool _sheetExpanded = false;
+  bool _intervalsOn = false;
 
   @override
   void initState() {
     super.initState();
     _service.addListener(_onChanged);
+    _coach.addListener(_onCoachChanged);
     _service.initialize();
+    _prepareCoach();
+  }
+
+  Future<void> _prepareCoach() async {
+    await _coach.prepare();
+    if (!mounted) return;
+    setState(() => _intervalsOn = _coach.intervalsOn);
   }
 
   @override
   void dispose() {
     _service.removeListener(_onChanged);
+    _coach.removeListener(_onCoachChanged);
+    _coach.endSession();
     super.dispose();
+  }
+
+  void _onCoachChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   void _onChanged() {
@@ -42,6 +63,23 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     if (state.lat != null && state.lng != null) {
       _mapController.move(LatLng(state.lat!, state.lng!), _mapController.camera.zoom);
     }
+    _coach.onTrackingUpdate(state);
+  }
+
+  Future<void> _openVoiceSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RunVoiceSettingsScreen()),
+    );
+    await _coach.reloadSettings();
+    if (!mounted) return;
+    if (!_service.state.isActive) {
+      setState(() => _intervalsOn = _coach.settings.intervalsEnabledByDefault);
+    }
+  }
+
+  Future<void> _beginVoiceSession() async {
+    await _coach.beginSession(intervalsOn: _intervalsOn);
   }
 
   Future<void> _startDebugSimulation() async {
@@ -55,10 +93,14 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       } catch (_) {
         // Map not ready yet — fall back to default coords.
       }
-      await _service.startDebugSimulation(
+      final ok = await _service.startDebugSimulation(
         startLat: startLat,
         startLng: startLng,
       );
+      if (ok) {
+        await _beginVoiceSession();
+        await _coach.onTrackingUpdate(_service.state);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -78,10 +120,18 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       if (!ok && mounted) {
         final msg = _service.state.errorMessage ?? loc.runRecordPermissionNeeded;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      } else if (ok) {
+        await _beginVoiceSession();
+        await _coach.onTrackingUpdate(_service.state);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _toggleIntervals(bool value) {
+    setState(() => _intervalsOn = value);
+    _coach.setIntervalsOn(value);
   }
 
   Future<void> _finish() async {
@@ -107,6 +157,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
 
     setState(() => _busy = true);
     try {
+      await _coach.endSession();
       final activity = await _service.stop();
       if (!mounted) return;
       if (activity != null) {
@@ -146,6 +197,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
     try {
+      await _coach.endSession();
       await _service.discard();
       if (mounted) Navigator.pop(context);
     } finally {
@@ -164,6 +216,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final trail = state.trail
         .map((p) => LatLng(p.lat, p.lng))
         .toList(growable: false);
+    final interval = _coach.intervalSnapshot;
 
     return Scaffold(
       body: Stack(
@@ -227,9 +280,18 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                     ),
                   ),
                   const Spacer(),
+                  Material(
+                    color: theme.colorScheme.surface.withValues(alpha: 0.92),
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      icon: const Icon(Icons.record_voice_over_outlined),
+                      tooltip: loc.runRecordVoiceSettings,
+                      onPressed: _openVoiceSettings,
+                    ),
+                  ),
                   if (_service.isDebugSimulating)
                     Container(
-                      margin: const EdgeInsets.only(right: 8),
+                      margin: const EdgeInsets.only(left: 8),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
                         vertical: 6,
@@ -251,6 +313,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                           state.lat == null &&
                           !_service.isDebugSimulating))
                     Container(
+                      margin: const EdgeInsets.only(left: 8),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 8,
@@ -286,11 +349,9 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                 final showDebug = kDebugMode &&
                     !state.isActive &&
                     _service.canDebugSimulate;
-                // Hug content when there are no split cards yet — avoids a
-                // tall empty sheet on the map.
                 final collapsedSize = hasSplitSummary
-                    ? 0.42
-                    : (showDebug ? 0.34 : 0.28);
+                    ? 0.46
+                    : (showDebug ? 0.38 : 0.34);
                 return DraggableScrollableSheet(
                   key: ValueKey('run-sheet-$collapsedSize'),
                   initialChildSize: collapsedSize,
@@ -305,6 +366,10 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                       busy: _busy,
                       expanded: _sheetExpanded,
                       showDebugSimulate: showDebug,
+                      intervalsOn: _intervalsOn,
+                      intervalSnapshot: interval,
+                      onIntervalsChanged:
+                          state.isActive ? null : _toggleIntervals,
                       onStart: _ensurePermissionAndStart,
                       onDebugSimulate: _startDebugSimulation,
                       onPause: () => _service.pause(),
@@ -328,6 +393,9 @@ class _MetricsSheet extends StatelessWidget {
   final bool busy;
   final bool expanded;
   final bool showDebugSimulate;
+  final bool intervalsOn;
+  final RunIntervalSnapshot intervalSnapshot;
+  final ValueChanged<bool>? onIntervalsChanged;
   final VoidCallback onStart;
   final VoidCallback onDebugSimulate;
   final VoidCallback onPause;
@@ -340,6 +408,9 @@ class _MetricsSheet extends StatelessWidget {
     required this.busy,
     required this.expanded,
     required this.showDebugSimulate,
+    required this.intervalsOn,
+    required this.intervalSnapshot,
+    required this.onIntervalsChanged,
     required this.onStart,
     required this.onDebugSimulate,
     required this.onPause,
@@ -444,7 +515,14 @@ class _MetricsSheet extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+          _IntervalControls(
+            intervalsOn: intervalsOn,
+            snapshot: intervalSnapshot,
+            active: state.isActive,
+            onChanged: onIntervalsChanged,
+          ),
+          const SizedBox(height: 12),
           if (busy)
             const Center(child: CircularProgressIndicator())
           else if (!state.isActive) ...[
@@ -592,6 +670,114 @@ class _MetricsSheet extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _IntervalControls extends StatelessWidget {
+  final bool intervalsOn;
+  final RunIntervalSnapshot snapshot;
+  final bool active;
+  final ValueChanged<bool>? onChanged;
+
+  const _IntervalControls({
+    required this.intervalsOn,
+    required this.snapshot,
+    required this.active,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+
+    String? phaseLabel;
+    if (intervalsOn && active) {
+      switch (snapshot.phase) {
+        case RunIntervalPhase.work:
+          phaseLabel = loc.runRecordIntervalWork(
+            snapshot.workIndex,
+            snapshot.totalWorks,
+          );
+        case RunIntervalPhase.rest:
+          phaseLabel = loc.runRecordIntervalRest;
+        case RunIntervalPhase.done:
+          phaseLabel = loc.runRecordIntervalDone;
+        case RunIntervalPhase.idle:
+          phaseLabel = null;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.av_timer,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  loc.runRecordIntervals,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Switch.adaptive(
+                value: intervalsOn,
+                onChanged: onChanged,
+              ),
+            ],
+          ),
+          if (phaseLabel != null) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    phaseLabel,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (snapshot.isActive)
+                  Text(
+                    snapshot.currentMetric ==
+                            RunIntervalMetric.distance
+                        ? '${snapshot.remaining.round()} m'
+                        : RunFormatters.duration(snapshot.remaining.round()),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+              ],
+            ),
+            if (snapshot.isActive) ...[
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: snapshot.progress.clamp(0.0, 1.0),
+                  minHeight: 6,
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
     );
   }
 }

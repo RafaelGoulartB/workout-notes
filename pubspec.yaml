@@ -68,6 +68,7 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   flutter_markdown_plus: ^1.0.10
   collection: ^1.18.0
+  flutter_tts: ^4.2.5
 
 
 
