@@ -350,7 +350,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
           ),
           NotificationListener<DraggableScrollableNotification>(
             onNotification: (notification) {
-              final expanded = notification.extent >= 0.55;
+              final expanded = notification.extent >= 0.70;
               if (expanded != _sheetExpanded && mounted) {
                 setState(() => _sheetExpanded = expanded);
               }
@@ -362,17 +362,43 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                 final showDebug = kDebugMode &&
                     !state.isActive &&
                     _service.canDebugSimulate;
-                // Room for outdoor-friendly controls (goal + start CTA).
-                final collapsedSize = hasSplitSummary
-                    ? 0.54
-                    : (showDebug ? 0.48 : 0.44);
+                final hasIntervalStatus = state.isActive && _intervalsOn;
+                final media = MediaQuery.of(context);
+                final systemBottom = media.viewPadding.bottom;
+                final bottomPad =
+                    (systemBottom > 0 ? systemBottom : 16.0) + 16.0;
+                // Sheet height tracks only the widgets that are on screen —
+                // no reserved empty slots for hidden intervals/splits.
+                var contentH = 23.0; // handle
+                if (!state.locationGranted && state.supported) {
+                  contentH += 68;
+                }
+                contentH += 72; // metrics
+                contentH += 12;
+                contentH += 22; // section label
+                contentH += _goal.enabled && state.isActive ? 64.0 : 52.0;
+                if (hasIntervalStatus) {
+                  contentH += interval.isActive ? 64.0 : 52.0;
+                }
+                if (hasSplitSummary) {
+                  contentH += 10 + 72;
+                  if (state.splits.length > 1) contentH += 20;
+                }
+                contentH += 12 + 52; // gap + primary actions
+                if (showDebug) contentH += 38;
+                contentH += bottomPad;
+                final collapsedSize =
+                    (contentH / media.size.height).clamp(0.28, 0.72);
                 return DraggableScrollableSheet(
-                  key: ValueKey('run-sheet-$collapsedSize'),
+                  key: ValueKey(
+                    'run-sheet-${collapsedSize.toStringAsFixed(3)}-'
+                    '${state.isActive}-$hasSplitSummary-$hasIntervalStatus',
+                  ),
                   initialChildSize: collapsedSize,
                   minChildSize: collapsedSize,
-                  maxChildSize: 0.88,
+                  maxChildSize: 0.92,
                   snap: true,
-                  snapSizes: [collapsedSize, 0.88],
+                  snapSizes: [collapsedSize, 0.92],
                   builder: (context, scrollController) {
                     return _MetricsSheet(
                       scrollController: scrollController,
@@ -467,31 +493,94 @@ class _MetricsSheet extends StatelessWidget {
     final best = _bestCompleted;
 
     final actionButtonStyle = FilledButton.styleFrom(
-      minimumSize: const Size.fromHeight(58),
-      textStyle: theme.textTheme.titleMedium?.copyWith(
+      minimumSize: const Size.fromHeight(52),
+      textStyle: theme.textTheme.titleSmall?.copyWith(
         fontWeight: FontWeight.w700,
         letterSpacing: 0.2,
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     );
     final outlineActionStyle = OutlinedButton.styleFrom(
-      minimumSize: const Size.fromHeight(58),
-      textStyle: theme.textTheme.titleMedium?.copyWith(
+      minimumSize: const Size.fromHeight(52),
+      textStyle: theme.textTheme.titleSmall?.copyWith(
         fontWeight: FontWeight.w700,
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       side: BorderSide(
         color: theme.colorScheme.outline.withValues(alpha: 0.7),
         width: 1.5,
       ),
     );
 
-    // Always keep clear space above the home indicator / screen edge.
-    // Prefer viewPadding (works edge-to-edge); fall back to a firm minimum
-    // when the system reports no inset (some emulators / gesture modes).
     final systemBottom = MediaQuery.viewPaddingOf(context).bottom;
-    final bottomPad = (systemBottom > 0 ? systemBottom : 16.0) + 24.0;
-    final panel = Container(
+    final bottomPad = (systemBottom > 0 ? systemBottom : 16.0) + 16.0;
+
+    final Widget actions;
+    if (busy) {
+      actions = const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    } else if (!state.isActive) {
+      actions = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FilledButton.icon(
+            onPressed: onStart,
+            style: actionButtonStyle,
+            icon: const Icon(Icons.play_arrow_rounded, size: 26),
+            label: Text(loc.runRecordStart),
+          ),
+          if (showDebugSimulate) ...[
+            const SizedBox(height: 2),
+            TextButton.icon(
+              onPressed: onDebugSimulate,
+              style: TextButton.styleFrom(
+                foregroundColor: theme.colorScheme.onSurfaceVariant,
+                minimumSize: const Size.fromHeight(36),
+                textStyle: theme.textTheme.labelMedium,
+              ),
+              icon: const Icon(Icons.bug_report_outlined, size: 16),
+              label: Text(loc.runRecordDebugSimulate),
+            ),
+          ],
+        ],
+      );
+    } else {
+      actions = Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: state.isPaused ? onResume : onPause,
+              style: outlineActionStyle,
+              icon: Icon(
+                state.isPaused
+                    ? Icons.play_arrow_rounded
+                    : Icons.pause_rounded,
+                size: 22,
+              ),
+              label: Text(
+                state.isPaused ? loc.runRecordResume : loc.runRecordPause,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: onFinish,
+              style: actionButtonStyle,
+              icon: const Icon(Icons.stop_rounded, size: 22),
+              label: Text(loc.runRecordFinish),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Pack content tightly — no Expanded gaps. Sheet height is sized to
+    // match visible widgets; extra room only appears when user expands.
+    return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: theme.colorScheme.surface.withValues(alpha: 0.98),
@@ -504,247 +593,182 @@ class _MetricsSheet extends StatelessWidget {
           ),
         ],
       ),
-      padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: Container(
-              width: 44,
-              height: 5,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.onSurfaceVariant.withValues(
-                  alpha: 0.4,
-                ),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
-          if (!state.locationGranted && state.supported) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.errorContainer.withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Text(
-                loc.runRecordPermissionNeeded,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onErrorContainer,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: _Metric(
-                  label: loc.runRecordTime,
-                  value: RunFormatters.duration(state.durationSeconds),
-                  emphasize: state.isActive,
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 44,
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
-              ),
-              Expanded(
-                child: _Metric(
-                  label: loc.runRecordDistance,
-                  value: RunFormatters.distanceKm(state.distanceMeters),
-                  unit: 'km',
-                  emphasize: state.isActive,
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 44,
-                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
-              ),
-              Expanded(
-                child: _Metric(
-                  label: loc.runRecordPace,
-                  value: RunFormatters.pace(pace),
-                  unit: loc.runRecordPaceUnit,
-                  emphasize: state.isActive,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _RunPlanCard(
-            goal: goal,
-            goalSnapshot: goalSnapshot,
-            intervalsOn: intervalsOn,
-            intervalSnapshot: intervalSnapshot,
-            active: state.isActive,
-            onGoalChanged: onGoalChanged,
-          ),
-          const SizedBox(height: 16),
-          if (busy)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 18),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (!state.isActive) ...[
-            FilledButton.icon(
-              onPressed: onStart,
-              style: actionButtonStyle,
-              icon: const Icon(Icons.play_arrow_rounded, size: 28),
-              label: Text(loc.runRecordStart),
-            ),
-            if (showDebugSimulate) ...[
-              const SizedBox(height: 4),
-              TextButton.icon(
-                onPressed: onDebugSimulate,
-                style: TextButton.styleFrom(
-                  foregroundColor: theme.colorScheme.onSurfaceVariant,
-                  minimumSize: const Size.fromHeight(40),
-                  textStyle: theme.textTheme.labelMedium,
-                ),
-                icon: const Icon(Icons.bug_report_outlined, size: 16),
-                label: Text(loc.runRecordDebugSimulate),
-              ),
-            ],
-          ] else
-            Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final body = Padding(
+            padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: state.isPaused ? onResume : onPause,
-                    style: outlineActionStyle,
-                    icon: Icon(
-                      state.isPaused
-                          ? Icons.play_arrow_rounded
-                          : Icons.pause_rounded,
-                      size: 24,
-                    ),
-                    label: Text(
-                      state.isPaused
-                          ? loc.runRecordResume
-                          : loc.runRecordPause,
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.4,
+                      ),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: onFinish,
-                    style: actionButtonStyle,
-                    icon: const Icon(Icons.stop_rounded, size: 24),
-                    label: Text(loc.runRecordFinish),
-                  ),
-                ),
-              ],
-            ),
-          if (!expanded) ...[
-            if (last != null || best != null) ...[
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: _SplitSummaryCard(
-                      title: loc.runRecordSplitLast,
-                      split: last,
-                      emptyLabel: '—',
+                if (!state.locationGranted && state.supported) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.errorContainer.withValues(
+                        alpha: 0.7,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      loc.runRecordPermissionNeeded,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onErrorContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _SplitSummaryCard(
-                      title: loc.runRecordSplitBest,
-                      split: best,
-                      emptyLabel: '—',
-                      highlight: true,
-                    ),
-                  ),
+                  const SizedBox(height: 12),
                 ],
-              ),
-              if (state.splits.length > 1) ...[
-                const SizedBox(height: 8),
-                Text(
-                  loc.runRecordSplitsExpandHint,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ],
-          ] else ...[
-            const SizedBox(height: 24),
-            Text(
-              loc.runRecordSplitsTitle,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
-              ),
-            ),
-            const SizedBox(height: 8),
-            if (allSplits.isEmpty)
-              Text(
-                loc.runRecordSplitsEmpty,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              )
-            else ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
+                Row(
                   children: [
-                    const Expanded(flex: 2, child: SizedBox.shrink()),
                     Expanded(
-                      child: Text(
-                        loc.runRecordSplitTime,
-                        textAlign: TextAlign.end,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                      child: _Metric(
+                        label: loc.runRecordTime,
+                        value: RunFormatters.duration(state.durationSeconds),
+                        emphasize: state.isActive,
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.45,
                       ),
                     ),
                     Expanded(
-                      child: Text(
-                        loc.runRecordSplitPace,
-                        textAlign: TextAlign.end,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                      child: _Metric(
+                        label: loc.runRecordDistance,
+                        value: RunFormatters.distanceKm(state.distanceMeters),
+                        unit: 'km',
+                        emphasize: state.isActive,
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: theme.colorScheme.outlineVariant.withValues(
+                        alpha: 0.45,
+                      ),
+                    ),
+                    Expanded(
+                      child: _Metric(
+                        label: loc.runRecordPace,
+                        value: RunFormatters.pace(pace),
+                        unit: loc.runRecordPaceUnit,
+                        emphasize: state.isActive,
                       ),
                     ),
                   ],
                 ),
-              ),
-              ...allSplits.map((split) => _SplitRow(split: split)),
-            ],
-          ],
-        ],
-      ),
-    );
-
-    // Fill the sheet viewport so DraggableScrollableSheet can drag, while
-    // keeping the painted panel flush to the bottom (no gap under the modal).
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          controller: scrollController,
-          physics: const ClampingScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [panel],
+                const SizedBox(height: 12),
+                _RunPlanCard(
+                  goal: goal,
+                  goalSnapshot: goalSnapshot,
+                  intervalsOn: intervalsOn,
+                  intervalSnapshot: intervalSnapshot,
+                  active: state.isActive,
+                  onGoalChanged: onGoalChanged,
+                ),
+                if (!expanded && (last != null || best != null)) ...[
+                  const SizedBox(height: 10),
+                  _SplitSummaryList(
+                    lastTitle: loc.runRecordSplitLast,
+                    bestTitle: loc.runRecordSplitBest,
+                    last: last,
+                    best: best,
+                    emptyLabel: '—',
+                    expandHint: state.splits.length > 1
+                        ? loc.runRecordSplitsExpandHint
+                        : null,
+                  ),
+                ],
+                if (expanded) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    loc.runRecordSplitsTitle,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (allSplits.isEmpty)
+                    Text(
+                      loc.runRecordSplitsEmpty,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    )
+                  else ...[
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          const Expanded(flex: 2, child: SizedBox.shrink()),
+                          Expanded(
+                            child: Text(
+                              loc.runRecordSplitTime,
+                              textAlign: TextAlign.end,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              loc.runRecordSplitPace,
+                              textAlign: TextAlign.end,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ...allSplits.map((split) => _SplitRow(split: split)),
+                  ],
+                ],
+                const SizedBox(height: 12),
+                actions,
+              ],
             ),
-          ),
-        );
-      },
+          );
+
+          // Only stretch when expanded so the sheet can scroll long split lists.
+          // Collapsed: hug content — no empty slots between widgets.
+          return SingleChildScrollView(
+            controller: scrollController,
+            physics: const ClampingScrollPhysics(),
+            child: expanded
+                ? ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: body,
+                  )
+                : body,
+          );
+        },
+      ),
     );
   }
 }
@@ -986,77 +1010,98 @@ class _RunPlanCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          padding: const EdgeInsets.only(left: 4, bottom: 6),
           child: Text(
             loc.runRecordPlanSection.toUpperCase(),
-            style: theme.textTheme.labelMedium?.copyWith(
+            style: theme.textTheme.labelSmall?.copyWith(
               letterSpacing: 1.0,
               color: theme.colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w700,
             ),
           ),
         ),
-        _PlanOptionTile(
-          icon: Icons.flag_rounded,
-          title: loc.runRecordGoal,
-          subtitle: goalSubtitle,
-          selected: goal.enabled,
-          showChevron: onGoalChanged != null && !active,
-          onTap: onGoalChanged == null ? null : () => _editGoal(context),
-          trailing: Switch.adaptive(
-            value: goal.enabled,
-            onChanged: onGoalChanged == null
-                ? null
-                : (v) {
-                    if (v && !goal.enabled) {
-                      _editGoal(context);
-                    } else {
-                      onGoalChanged!(goal.copyWith(enabled: v));
-                    }
-                  },
+        Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.65,
+            ),
+            borderRadius: BorderRadius.circular(14),
           ),
-          footer: goal.enabled && active
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: goalSnapshot.progress.clamp(0.0, 1.0),
-                    minHeight: 6,
+          child: Column(
+            children: [
+              _PlanOptionTile(
+                icon: Icons.flag_rounded,
+                title: loc.runRecordGoal,
+                subtitle: goalSubtitle,
+                selected: goal.enabled,
+                showChevron: onGoalChanged != null && !active,
+                onTap: onGoalChanged == null ? null : () => _editGoal(context),
+                trailing: active
+                    ? const SizedBox.shrink()
+                    : Switch.adaptive(
+                        value: goal.enabled,
+                        onChanged: onGoalChanged == null
+                            ? null
+                            : (v) {
+                                if (v && !goal.enabled) {
+                                  _editGoal(context);
+                                } else {
+                                  onGoalChanged!(goal.copyWith(enabled: v));
+                                }
+                              },
+                      ),
+                footer: goal.enabled && active
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          value: goalSnapshot.progress.clamp(0.0, 1.0),
+                          minHeight: 4,
+                        ),
+                      )
+                    : null,
+              ),
+              if (showIntervalStatus) ...[
+                Divider(
+                  height: 1,
+                  indent: 12,
+                  endIndent: 12,
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.45,
                   ),
-                )
-              : null,
-        ),
-        if (showIntervalStatus) ...[
-          const SizedBox(height: 10),
-          _PlanOptionTile(
-            icon: Icons.av_timer_rounded,
-            title: loc.runRecordIntervals,
-            subtitle: intervalPhase ?? loc.runRecordIntervals,
-            selected: true,
-            trailing: intervalSnapshot.isActive
-                ? Text(
-                    intervalSnapshot.currentMetric ==
-                            RunIntervalMetric.distance
-                        ? '${intervalSnapshot.remaining.round()} m'
-                        : RunFormatters.duration(
-                            intervalSnapshot.remaining.round(),
+                ),
+                _PlanOptionTile(
+                  icon: Icons.av_timer_rounded,
+                  title: loc.runRecordIntervals,
+                  subtitle: intervalPhase ?? loc.runRecordIntervals,
+                  selected: true,
+                  trailing: intervalSnapshot.isActive
+                      ? Text(
+                          intervalSnapshot.currentMetric ==
+                                  RunIntervalMetric.distance
+                              ? '${intervalSnapshot.remaining.round()} m'
+                              : RunFormatters.duration(
+                                  intervalSnapshot.remaining.round(),
+                                ),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontFeatures: const [FontFeature.tabularFigures()],
                           ),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  )
-                : const SizedBox.shrink(),
-            footer: intervalSnapshot.isActive
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      value: intervalSnapshot.progress.clamp(0.0, 1.0),
-                      minHeight: 6,
-                    ),
-                  )
-                : null,
+                        )
+                      : const SizedBox.shrink(),
+                  footer: intervalSnapshot.isActive
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            value: intervalSnapshot.progress.clamp(0.0, 1.0),
+                            minHeight: 4,
+                          ),
+                        )
+                      : null,
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
       ],
     );
   }
@@ -1094,66 +1139,60 @@ class _PlanOptionTile extends StatelessWidget {
         : theme.colorScheme.onSurfaceVariant;
 
     return Material(
-      color: selected
-          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.35)
-          : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.65),
-      borderRadius: BorderRadius.circular(18),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+          padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: iconBg,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(9),
                     ),
-                    child: Icon(icon, size: 24, color: iconColor),
+                    child: Icon(icon, size: 18, color: iconColor),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: title,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w500,
+                          TextSpan(
+                            text: '  ·  $subtitle',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   if (showChevron)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 2),
-                      child: Icon(
-                        Icons.chevron_right_rounded,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   trailing,
                 ],
               ),
               if (footer != null) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 footer!,
               ],
             ],
@@ -1164,13 +1203,81 @@ class _PlanOptionTile extends StatelessWidget {
   }
 }
 
-class _SplitSummaryCard extends StatelessWidget {
+class _SplitSummaryList extends StatelessWidget {
+  final String lastTitle;
+  final String bestTitle;
+  final RunSplit? last;
+  final RunSplit? best;
+  final String emptyLabel;
+  final String? expandHint;
+
+  const _SplitSummaryList({
+    required this.lastTitle,
+    required this.bestTitle,
+    required this.last,
+    required this.best,
+    required this.emptyLabel,
+    this.expandHint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.65,
+            ),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            children: [
+              _SplitSummaryRow(
+                title: lastTitle,
+                split: last,
+                emptyLabel: emptyLabel,
+              ),
+              Divider(
+                height: 1,
+                indent: 12,
+                endIndent: 12,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
+              ),
+              _SplitSummaryRow(
+                title: bestTitle,
+                split: best,
+                emptyLabel: emptyLabel,
+                highlight: true,
+              ),
+            ],
+          ),
+        ),
+        if (expandHint != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            expandHint!,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SplitSummaryRow extends StatelessWidget {
   final String title;
   final RunSplit? split;
   final String emptyLabel;
   final bool highlight;
 
-  const _SplitSummaryCard({
+  const _SplitSummaryRow({
     required this.title,
     required this.split,
     required this.emptyLabel,
@@ -1181,49 +1288,48 @@ class _SplitSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
-    final bg = highlight
-        ? theme.colorScheme.primaryContainer.withValues(alpha: 0.55)
-        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55);
+    final accent = highlight ? theme.colorScheme.primary : null;
 
-    return Container(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            title.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              letterSpacing: 0.8,
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
+          Expanded(
+            flex: 3,
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: accent ?? theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
-          const SizedBox(height: 4),
           if (split == null)
             Text(
               emptyLabel,
-              style: theme.textTheme.titleMedium?.copyWith(
+              style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
             )
           else ...[
             Text(
               loc.runRecordSplitKm(split!.km),
-              style: theme.textTheme.labelMedium?.copyWith(
+              style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            const SizedBox(width: 10),
             Text(
               RunFormatters.paceWithUnit(split!.paceSecPerKm),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: accent,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
+            const SizedBox(width: 10),
             Text(
               RunFormatters.duration(split!.durationSeconds),
               style: theme.textTheme.bodySmall?.copyWith(
