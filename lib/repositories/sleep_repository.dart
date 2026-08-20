@@ -14,9 +14,17 @@ class SleepRepository extends BaseRepository {
     DateTime? from,
     DateTime? to,
     int? limit,
+    int? offset,
   }) async {
-    final rows = await _queryRange(from, to, limit: limit);
+    final rows = await _queryRange(from, to, limit: limit, offset: offset);
     return rows.map(SleepEntry.fromMap).toList();
+  }
+
+  Future<int> getEntryCount() async {
+    final result = await (await db).rawQuery(
+      'SELECT COUNT(*) AS count FROM sleep_entries',
+    );
+    return (result.first['count'] as num?)?.toInt() ?? 0;
   }
 
   Future<SleepEntry?> getLatest() async {
@@ -94,6 +102,7 @@ class SleepRepository extends BaseRepository {
     DateTime? from,
     DateTime? to, {
     int? limit,
+    int? offset,
   }) async {
     final database = await db;
     final where = <String>[];
@@ -112,6 +121,7 @@ class SleepRepository extends BaseRepository {
       whereArgs: args.isEmpty ? null : args,
       orderBy: 'date DESC, created_at DESC',
       limit: limit,
+      offset: offset,
     );
   }
 

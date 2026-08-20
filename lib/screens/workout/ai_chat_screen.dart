@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -42,6 +43,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
   String? _lastActiveThreadId;
+  String? _lastMessageId;
   late final AiSettingsNotifier _settings;
   late final AiToolRegistry _toolLabels;
   final ImagePicker _imagePicker = ImagePicker();
@@ -55,6 +57,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     _toolLabels = AiToolRegistry();
     AiChatService.instance.addListener(_onChange);
     _settings.addListener(_onChange);
+    unawaited(AiChatService.instance.ensureReady());
     // The FAB can open this screen while an existing thread is already
     // active, so no service notification is emitted to trigger the scroll.
     WidgetsBinding.instance.addPostFrameCallback(
@@ -72,13 +75,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   void _onChange() {
-    final activeThreadId = AiChatService.instance.state.activeThreadId;
+    final state = AiChatService.instance.state;
+    final activeThreadId = state.activeThreadId;
     final openedThread = activeThreadId != _lastActiveThreadId;
+    final lastMessageId = state.messages.isEmpty ? null : state.messages.last.id;
+    final shouldScroll = openedThread || lastMessageId != _lastMessageId;
     _lastActiveThreadId = activeThreadId;
+    _lastMessageId = lastMessageId;
     if (mounted) setState(() {});
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _scrollToBottomAfterLayout(animated: !openedThread),
-    );
+    if (shouldScroll) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _scrollToBottomAfterLayout(animated: !openedThread),
+      );
+    }
   }
 
   Future<void> _scrollToBottomAfterLayout({required bool animated}) async {
@@ -272,9 +281,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
           IconButton(
             tooltip: l10n.aiChatNewChat,
             icon: const Icon(Icons.add_comment_rounded),
-            onPressed: state.isSending
-                ? null
-                : () => AiChatService.instance.newChat(),
+            onPressed:
+                state.isSending ? null : () => AiChatService.instance.newChat(),
           ),
           IconButton(
             tooltip: l10n.aiChatHistory,
@@ -330,11 +338,36 @@ class _AiChatScreenState extends State<AiChatScreen> {
                           keyboardDismissBehavior:
                               ScrollViewKeyboardDismissBehavior.onDrag,
                           padding: const EdgeInsets.fromLTRB(0, 6, 0, 14),
-                          itemCount:
-                              state.messages.length +
+                          itemCount: state.messages.length +
+                              (state.hasOlderMessages ||
+                                      state.isLoadingOlderMessages
+                                  ? 1
+                                  : 0) +
                               (_showActivity(state) ? 1 : 0),
                           itemBuilder: (_, i) {
-                            if (i == state.messages.length) {
+                            final hasHistoryHeader = state.hasOlderMessages ||
+                                state.isLoadingOlderMessages;
+                            if (hasHistoryHeader && i == 0) {
+                              return Center(
+                                child: TextButton.icon(
+                                  onPressed: state.isLoadingOlderMessages
+                                      ? null
+                                      : AiChatService
+                                          .instance.loadOlderMessages,
+                                  icon: state.isLoadingOlderMessages
+                                      ? const SizedBox.square(
+                                          dimension: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(Icons.history, size: 18),
+                                  label: Text(l10n.aiChatLoadOlder),
+                                ),
+                              );
+                            }
+                            final messageIndex = i - (hasHistoryHeader ? 1 : 0);
+                            if (messageIndex == state.messages.length) {
                               return _buildActivityIndicator(
                                 theme,
                                 state,
@@ -342,8 +375,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                               );
                             }
                             return _buildMessageTile(
-                              state.messages[i],
-                              i,
+                              state.messages[messageIndex],
+                              messageIndex,
                               l10n,
                             );
                           },
@@ -413,8 +446,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   active == null
                       ? l10n.aiChatNotConfigured
                       : model.isEmpty
-                      ? active.name
-                      : model,
+                          ? active.name
+                          : model,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelSmall?.copyWith(
@@ -706,14 +739,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
               onPressed: AiChatService.instance.state.isSending
                   ? null
                   : failedProposalId != null
-                  ? () => AiChatService.instance.approveRoutineProposal(
-                      failedProposalId,
-                    )
-                  : !AiChatService.instance.state.messages.any(
-                      (message) => message.isUser,
-                    )
-                  ? null
-                  : AiChatService.instance.retryLastTurn,
+                      ? () => AiChatService.instance.approveRoutineProposal(
+                            failedProposalId,
+                          )
+                      : !AiChatService.instance.state.messages.any(
+                          (message) => message.isUser,
+                        )
+                          ? null
+                          : AiChatService.instance.retryLastTurn,
               icon: const Icon(Icons.refresh_rounded, size: 20),
             ),
           ],
@@ -812,8 +845,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     AiChatService.instance.rejectRoutineProposal(proposal.id),
                 onRetrySummary: proposal.errorCode == 'summary_pending'
                     ? () => AiChatService.instance.retryAppliedProposalSummary(
-                        proposal.id,
-                      )
+                          proposal.id,
+                        )
                     : null,
                 onViewRoutine: proposal.appliedRoutineId == null
                     ? null

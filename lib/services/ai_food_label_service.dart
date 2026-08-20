@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:workout_notes/models/nutrition/ai_food_label_draft.dart';
 import 'package:workout_notes/services/ai_service.dart';
 import 'package:workout_notes/state/ai_settings_notifier.dart';
+import 'package:workout_notes/utils/base64_encoder.dart';
 
 /// Thrown when the label extraction cannot be completed.
 class AiFoodLabelException implements Exception {
@@ -34,7 +35,7 @@ class AiFoodLabelService {
   final AiService service;
 
   AiFoodLabelService({required this.settings, AiService? service})
-    : service = service ?? AiService();
+      : service = service ?? AiService();
 
   static const String _systemPrompt = r'''
 Você é um extrator de tabelas nutricionais. Analise todas as imagens enviadas e extraia os dados delas.
@@ -87,9 +88,10 @@ Regras:
   Future<AiFoodLabelDraft> analyze({
     required Uint8List imageBytes,
     String mimeType = 'image/jpeg',
-  }) => analyzeImages(
-    images: [AiFoodLabelImage(bytes: imageBytes, mimeType: mimeType)],
-  );
+  }) =>
+      analyzeImages(
+        images: [AiFoodLabelImage(bytes: imageBytes, mimeType: mimeType)],
+      );
 
   /// Analyzes multiple photos of different parts of the same food label.
   Future<AiFoodLabelDraft> analyzeImages({
@@ -117,17 +119,19 @@ Regras:
       throw const AiFoodLabelException('missing_token', 'Missing API token');
     }
 
-    final imageParts = images
-        .map(
-          (image) => <String, dynamic>{
-            'type': 'image_url',
-            'image_url': {
-              'url':
-                  'data:${image.mimeType};base64,${base64Encode(image.bytes)}',
-            },
+    final encodedImages = await Future.wait(
+      images.map((image) => encodeBase64OffMain(image.bytes)),
+    );
+    final imageParts = <Map<String, dynamic>>[
+      for (var index = 0; index < images.length; index++)
+        <String, dynamic>{
+          'type': 'image_url',
+          'image_url': {
+            'url':
+                'data:${images[index].mimeType};base64,${encodedImages[index]}',
           },
-        )
-        .toList(growable: false);
+        },
+    ];
     final messages = <Map<String, dynamic>>[
       {'role': 'system', 'content': _systemPrompt},
       {

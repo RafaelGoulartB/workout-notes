@@ -20,6 +20,10 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
+  final ValueNotifier<int> _selectedTab = ValueNotifier<int>(0);
+  late final Map<int, Widget> _builtTabs = <int, Widget>{
+    0: WorkoutHomeScreen(selectedTab: _selectedTab),
+  };
 
   @override
   void initState() {
@@ -30,16 +34,36 @@ class _MainShellState extends State<MainShell> {
   @override
   void dispose() {
     WorkoutNotesApp.sections.removeListener(_onSectionsChanged);
+    _selectedTab.dispose();
     super.dispose();
   }
 
   void _onSectionsChanged() {
     if (!mounted) return;
+    var resetToWorkout = false;
     setState(() {
       if (!WorkoutNotesApp.sections.planEnabled && _selectedIndex == 3) {
         _selectedIndex = 0;
+        resetToWorkout = true;
       }
     });
+    if (resetToWorkout) _selectedTab.value = 0;
+  }
+
+  Widget _createTab(int index) => switch (index) {
+        0 => WorkoutHomeScreen(selectedTab: _selectedTab),
+        1 => const SleepTrackerScreen(),
+        2 => const NutritionHomeScreen(),
+        3 => const PeriodizationHomeScreen(),
+        _ => const SizedBox.shrink(),
+      };
+
+  void _selectTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+      _builtTabs.putIfAbsent(index, () => _createTab(index));
+    });
+    _selectedTab.value = index;
   }
 
   @override
@@ -49,18 +73,14 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: [
-          const WorkoutHomeScreen(),
-          const SleepTrackerScreen(),
-          const NutritionHomeScreen(),
-          if (planEnabled) const PeriodizationHomeScreen(),
-        ],
+        children: List<Widget>.generate(
+          planEnabled ? 4 : 3,
+          (index) => _builtTabs[index] ?? const SizedBox.shrink(),
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() => _selectedIndex = index);
-        },
+        onDestinationSelected: _selectTab,
         destinations: [
           NavigationDestination(
             icon: const Icon(Icons.fitness_center_outlined),

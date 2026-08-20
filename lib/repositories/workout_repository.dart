@@ -76,8 +76,7 @@ class WorkoutRepository extends BaseRepository {
   }) async {
     final db = await this.db;
     final entryId = const Uuid().v4();
-    final count =
-        Sqflite.firstIntValue(
+    final count = Sqflite.firstIntValue(
           await db.rawQuery(
             'SELECT COUNT(*) FROM exercise_entries WHERE workout_id = ?',
             [workoutId],
@@ -123,8 +122,7 @@ class WorkoutRepository extends BaseRepository {
 
     for (final re in routineExercises) {
       final entryId = const Uuid().v4();
-      final count =
-          Sqflite.firstIntValue(
+      final count = Sqflite.firstIntValue(
             await db.rawQuery(
               'SELECT COUNT(*) FROM exercise_entries WHERE workout_id = ?',
               [workoutId],
@@ -306,6 +304,37 @@ class WorkoutRepository extends BaseRepository {
     );
   }
 
+  /// Returns all headline values used by the workout home screen in one
+  /// indexed range query. This replaces the previous workout -> exercises ->
+  /// sets N+1 traversal.
+  Future<Map<String, dynamic>> getMonthlySummary(DateTime month) async {
+    final database = await db;
+    final start = DateTime(month.year, month.month, 1);
+    final end = DateTime(month.year, month.month + 1, 1);
+    final rows = await database.rawQuery(
+      '''
+      SELECT
+        COUNT(DISTINCT w.id) AS workout_count,
+        COALESCE(SUM(CASE WHEN s.is_warmup = 0
+          THEN COALESCE(s.weight, 0) * COALESCE(s.reps, 0) ELSE 0 END), 0)
+          AS total_volume,
+        COALESCE(SUM(CASE WHEN s.is_warmup = 0
+          THEN COALESCE(s.distance, 0) ELSE 0 END), 0) AS cardio_distance,
+        COALESCE(SUM(CASE WHEN s.is_warmup = 0
+          THEN COALESCE(s.time_seconds, 0) ELSE 0 END), 0) AS cardio_time
+      FROM workouts w
+      LEFT JOIN exercise_entries ee ON ee.workout_id = w.id
+      LEFT JOIN sets s ON s.exercise_entry_id = ee.id
+      WHERE w.date >= ? AND w.date < ?
+      ''',
+      [
+        start.toIso8601String().substring(0, 10),
+        end.toIso8601String().substring(0, 10),
+      ],
+    );
+    return rows.first;
+  }
+
   Future<Map<String, List<Map<String, dynamic>>>> getWorkoutCategoriesByDate(
     int year,
     int month,
@@ -432,8 +461,7 @@ class WorkoutRepository extends BaseRepository {
 
     final routineId = workout['routine_id'] as String?;
     final currentDate = workout['date'] as String? ?? '';
-    final currentMoment =
-        (workout['end_time'] as String?) ??
+    final currentMoment = (workout['end_time'] as String?) ??
         (workout['start_time'] as String?) ??
         (workout['created_at'] as String?) ??
         '';
@@ -673,8 +701,7 @@ class WorkoutRepository extends BaseRepository {
       duration = now.difference(startTime).inSeconds;
     }
 
-    final calories =
-        estimatedCalories ??
+    final calories = estimatedCalories ??
         await _estimateCaloriesForWorkout(db, id, durationSeconds: duration);
 
     await db.update(
@@ -921,8 +948,7 @@ class WorkoutRepository extends BaseRepository {
   }) async {
     final db = await this.db;
     final id = const Uuid().v4();
-    final count =
-        Sqflite.firstIntValue(
+    final count = Sqflite.firstIntValue(
           await db.rawQuery(
             'SELECT COUNT(*) FROM sets WHERE exercise_entry_id = ?',
             [exerciseEntryId],

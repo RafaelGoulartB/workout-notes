@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
@@ -20,11 +22,18 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   String _search = '';
   bool _isLoading = true;
   bool _showFavorites = false;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -37,15 +46,14 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   }
 
   List<Map<String, dynamic>> get _filtered {
+    final query = _search.toLowerCase();
     return _exercises.where((e) {
       if (_selectedCategoryId != null &&
           e['category_id'] != _selectedCategoryId) {
         return false;
       }
-      if (_search.isNotEmpty &&
-          !(e['name'] as String)
-              .toLowerCase()
-              .contains(_search.toLowerCase())) {
+      if (query.isNotEmpty &&
+          !(e['name'] as String).toLowerCase().contains(query)) {
         return false;
       }
       return true;
@@ -112,28 +120,28 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest
-                    .withAlpha(80),
+                fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                  80,
+                ),
               ),
-              onChanged: (v) => setState(() => _search = v),
+              onChanged: (value) {
+                _searchDebounce?.cancel();
+                _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+                  if (mounted) setState(() => _search = value);
+                });
+              },
             ),
           ),
           SizedBox(
             height: 44,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 4,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               children: [
                 FilterChip(
-                  label: Text(
-                    AppLocalizations.of(context)!.exerciseLibraryAll,
-                  ),
+                  label: Text(AppLocalizations.of(context)!.exerciseLibraryAll),
                   selected: _selectedCategoryId == null,
-                  onSelected: (_) =>
-                      setState(() => _selectedCategoryId = null),
+                  onSelected: (_) => setState(() => _selectedCategoryId = null),
                 ),
                 const SizedBox(width: 8),
                 ..._categories.map(
@@ -205,7 +213,10 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
               color: theme.colorScheme.primary.withAlpha(80),
             ),
             const SizedBox(height: 24),
-            Text(loc.exerciseLibraryNoResults, style: theme.textTheme.titleLarge),
+            Text(
+              loc.exerciseLibraryNoResults,
+              style: theme.textTheme.titleLarge,
+            ),
             const SizedBox(height: 8),
             Text(
               loc.exerciseLibraryNoResultsHint,
@@ -317,9 +328,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                 IconButton(
                   icon: Icon(
                     isFav ? Icons.star_rounded : Icons.star_outline_rounded,
-                    color: isFav
-                        ? Colors.amber.shade600
-                        : muted.withAlpha(120),
+                    color: isFav ? Colors.amber.shade600 : muted.withAlpha(120),
                     size: 22,
                   ),
                   onPressed: () => _toggleFavorite(ex['id'] as String),

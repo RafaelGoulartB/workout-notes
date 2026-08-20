@@ -100,12 +100,16 @@ class SleepMonitorRepository extends BaseRepository {
     return SleepNightSummary(entry: entry, session: session, stages: stages);
   }
 
-  Future<List<SleepNightSummary>> getNightSummaries({int? limit}) async {
+  Future<List<SleepNightSummary>> getNightSummaries({
+    int? limit,
+    int? offset,
+  }) async {
     final database = await db;
     final entryRows = await database.query(
       'sleep_entries',
-      orderBy: 'date DESC',
+      orderBy: 'date DESC, created_at DESC',
       limit: limit,
+      offset: offset,
     );
     final entries = entryRows.map(SleepEntry.fromMap).toList(growable: false);
     if (entries.isEmpty) return const [];

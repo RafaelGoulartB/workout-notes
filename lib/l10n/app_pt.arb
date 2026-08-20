@@ -793,6 +793,7 @@
   "aiChatUnsupportedImage": "Formato não compatível. Use JPEG, PNG, WebP ou GIF.",
   "aiChatImagePickFailed": "Não foi possível carregar a imagem.",
   "aiChatCoachName": "Treinador IA",
+  "aiChatLoadOlder": "Carregar mensagens anteriores",
   "aiChatNotConfigured": "Não configurado",
   "aiChatMoreOptions": "Mais opções",
   "aiChatSuggestionRecovery": "Analise minha recuperação desta semana",

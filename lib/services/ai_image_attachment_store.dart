@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -6,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:workout_notes/models/ai_image_attachment.dart';
+import 'package:workout_notes/utils/base64_encoder.dart';
 
 const _uuid = Uuid();
 
@@ -67,9 +67,8 @@ class AiImageAttachmentStore {
       if (!await file.exists()) {
         throw const AiImageAttachmentException('image_missing');
       }
-      urls.add(
-        'data:${attachment.mimeType};base64,${base64Encode(await file.readAsBytes())}',
-      );
+      final encoded = await encodeBase64OffMain(await file.readAsBytes());
+      urls.add('data:${attachment.mimeType};base64,$encoded');
     }
     return urls;
   }
@@ -114,9 +113,9 @@ class AiImageAttachmentStore {
   };
 
   static String _extensionFor(String mimeType) => switch (mimeType) {
-    'image/png' => 'png',
-    'image/webp' => 'webp',
-    'image/gif' => 'gif',
-    _ => 'jpg',
-  };
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+        'image/gif' => 'gif',
+        _ => 'jpg',
+      };
 }

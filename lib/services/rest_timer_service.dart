@@ -14,13 +14,15 @@ class RestTimerService extends ChangeNotifier {
   int _totalSeconds = 90;
   bool _isRunning = false;
   bool _isPaused = false;
+  DateTime? _endsAt;
 
   int get remainingSeconds => _remainingSeconds;
   int get totalSeconds => _totalSeconds;
   bool get isRunning => _isRunning;
   bool get isPaused => _isPaused;
   bool get isActive => _isRunning || _isPaused;
-  double get progress => _totalSeconds > 0 ? _remainingSeconds / _totalSeconds : 0;
+  double get progress =>
+      _totalSeconds > 0 ? _remainingSeconds / _totalSeconds : 0;
 
   String get formattedTime {
     final min = _remainingSeconds ~/ 60;
@@ -42,27 +44,39 @@ class RestTimerService extends ChangeNotifier {
     _remainingSeconds = _totalSeconds;
     _isRunning = true;
     _isPaused = false;
+    _endsAt = DateTime.now().add(Duration(seconds: _remainingSeconds));
     notifyListeners();
     _showInitialNotification();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _syncRemainingTime();
       if (_remainingSeconds <= 0) {
         timer.cancel();
         _isRunning = false;
         _isPaused = false;
+        _endsAt = null;
         notifyListeners();
         _longVibrate();
         _showCompleteNotification();
         return;
       }
-      _remainingSeconds--;
       notifyListeners();
-      _updateNotification();
     });
+  }
+
+  void _syncRemainingTime() {
+    final endsAt = _endsAt;
+    if (endsAt == null) return;
+    final milliseconds = endsAt.difference(DateTime.now()).inMilliseconds;
+    _remainingSeconds = milliseconds <= 0
+        ? 0
+        : (milliseconds / Duration.millisecondsPerSecond).ceil();
   }
 
   void pause() {
     _timer?.cancel();
+    _syncRemainingTime();
+    _endsAt = null;
     _isPaused = true;
     notifyListeners();
     NotificationService.instance.cancelRestTimer();
@@ -70,21 +84,23 @@ class RestTimerService extends ChangeNotifier {
 
   void resume() {
     _isPaused = false;
+    _isRunning = true;
+    _endsAt = DateTime.now().add(Duration(seconds: _remainingSeconds));
     notifyListeners();
     _updateNotification();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      _syncRemainingTime();
       if (_remainingSeconds <= 0) {
         timer.cancel();
         _isRunning = false;
         _isPaused = false;
+        _endsAt = null;
         notifyListeners();
         _longVibrate();
         _showCompleteNotification();
         return;
       }
-      _remainingSeconds--;
       notifyListeners();
-      _updateNotification();
     });
   }
 
@@ -94,6 +110,7 @@ class RestTimerService extends ChangeNotifier {
     _totalSeconds = 90;
     _isRunning = false;
     _isPaused = false;
+    _endsAt = null;
     notifyListeners();
     NotificationService.instance.cancelRestTimer();
   }

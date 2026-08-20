@@ -37,6 +37,8 @@ class SleepTrackerScreen extends StatefulWidget {
 }
 
 class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
+  static const int _historyPageSize = 10;
+
   final _repository = SleepRepository();
   final _monitorRepository = SleepMonitorRepository();
   final _monitorService = SleepMonitorService.instance;
@@ -47,6 +49,9 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   Map<String, SleepNightSummary> _nightSummaries = const {};
   bool _isLoading = true;
   int _historyDisplayCount = 5;
+  int _totalEntries = 0;
+  bool _hasMoreHistory = false;
+  bool _isLoadingMoreHistory = false;
   int _lastRecoveryCount = 0;
   late DateTime _weekEnd;
   bool _isChangingWeek = false;
@@ -107,20 +112,24 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     if (mounted) setState(() => _isLoading = true);
     try {
       await _monitorRepository.repairSleepEntriesFromSessions();
-      final entries = await _repository.getEntries(limit: 500);
-      final stats = await _repository.getDashboardStats(
-        referenceDate: _weekEnd,
-      );
-      final sleepGoalMinutes = await _sleepGoalService.load();
-      final nightSummaries = await _monitorRepository.getNightSummaries(
-        limit: 500,
-      );
+      final results = await Future.wait<Object>([
+        _repository.getEntries(limit: _historyPageSize + 1),
+        _repository.getDashboardStats(referenceDate: _weekEnd),
+        _sleepGoalService.load(),
+        _monitorRepository.getNightSummaries(limit: _historyPageSize),
+        _repository.getEntryCount(),
+      ]);
+      final entryPage = results[0] as List<SleepEntry>;
+      final entries = entryPage.take(_historyPageSize).toList(growable: false);
+      final stats = results[1] as SleepDashboardStats;
+      final sleepGoalMinutes = results[2] as int;
+      final nightSummaries = results[3] as List<SleepNightSummary>;
+      final totalEntries = results[4] as int;
       final summariesByEntry = {
         for (final summary in nightSummaries) summary.entry.id: summary,
       };
-      final latestNight = stats.latest == null
-          ? null
-          : summariesByEntry[stats.latest!.id];
+      final latestNight =
+          stats.latest == null ? null : summariesByEntry[stats.latest!.id];
       if (!mounted) return;
       setState(() {
         _entries = entries;
@@ -129,10 +138,53 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         _latestNight = latestNight;
         _nightSummaries = summariesByEntry;
         _historyDisplayCount = 5;
+        _totalEntries = totalEntries;
+        _hasMoreHistory = entryPage.length > _historyPageSize;
         _isLoading = false;
       });
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadMoreHistory() async {
+    if (_isLoadingMoreHistory) return;
+    if (_historyDisplayCount < _entries.length) {
+      setState(() {
+        _historyDisplayCount = math.min(
+          _historyDisplayCount + 5,
+          _entries.length,
+        );
+      });
+      return;
+    }
+    if (!_hasMoreHistory) return;
+
+    setState(() => _isLoadingMoreHistory = true);
+    try {
+      final offset = _entries.length;
+      final results = await Future.wait<Object>([
+        _repository.getEntries(limit: _historyPageSize + 1, offset: offset),
+        _monitorRepository.getNightSummaries(
+          limit: _historyPageSize,
+          offset: offset,
+        ),
+      ]);
+      final page = results[0] as List<SleepEntry>;
+      final additions = page.take(_historyPageSize).toList(growable: false);
+      final summaries = results[1] as List<SleepNightSummary>;
+      if (!mounted) return;
+      setState(() {
+        _entries = [..._entries, ...additions];
+        _nightSummaries = {
+          ..._nightSummaries,
+          for (final summary in summaries) summary.entry.id: summary,
+        };
+        _historyDisplayCount = _entries.length;
+        _hasMoreHistory = page.length > _historyPageSize;
+      });
+    } finally {
+      if (mounted) setState(() => _isLoadingMoreHistory = false);
     }
   }
 
@@ -362,9 +414,8 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         );
       }
     }
-    final maxValue = recordedSpots
-        .map((spot) => spot.y)
-        .fold<double>(8, math.max);
+    final maxValue =
+        recordedSpots.map((spot) => spot.y).fold<double>(8, math.max);
 
     return Column(
       children: [
@@ -448,7 +499,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
             Icon(Icons.history, size: 18, color: theme.colorScheme.primary),
             const SizedBox(width: 8),
             Text(
-              '${loc.sleepHistory} · ${loc.sleepEntries(_entries.length)}',
+              '${loc.sleepHistory} · ${loc.sleepEntries(_totalEntries)}',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -456,9 +507,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
           ],
         ),
         const SizedBox(height: 10),
-        ..._entries
-            .take(visibleCount)
-            .map(
+        ..._entries.take(visibleCount).map(
               (entry) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _SleepHistoryCard(
@@ -469,16 +518,17 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
                 ),
               ),
             ),
-        if (visibleCount < _entries.length)
+        if (visibleCount < _entries.length || _hasMoreHistory)
           Center(
             child: TextButton.icon(
-              onPressed: () => setState(() => _historyDisplayCount += 5),
-              icon: const Icon(Icons.add),
-              label: Text(
-                _entries.length - visibleCount > 5
-                    ? loc.sleepLoadMore(_entries.length - visibleCount)
-                    : loc.sleepLoadMoreCount(_entries.length - visibleCount),
-              ),
+              onPressed: _isLoadingMoreHistory ? null : _loadMoreHistory,
+              icon: _isLoadingMoreHistory
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add),
+              label: Text(loc.sleepLoadMoreCount(5)),
             ),
           ),
       ],

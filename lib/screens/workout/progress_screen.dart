@@ -104,18 +104,30 @@ class _ProgressScreenState extends State<ProgressScreen> {
     final now = DateTime.now();
 
     try {
+      final previousMonth = DateTime(now.year, now.month - 1, 1);
       final results = await Future.wait([
         _analytics.getWorkoutOverviewStats(),
         _analytics.getMonthlyReport(now.year, now.month),
-        _analytics.getMonthComparison(now.year, now.month),
+        _analytics.getMonthlyReport(previousMonth.year, previousMonth.month),
         _analytics.getMonthlyCardioStats(now.year, now.month),
       ]);
 
       if (!mounted) return;
 
       _overviewStats = results[0];
-      _monthReport = results[1];
-      _monthComparison = results[2];
+      final currentReport = results[1];
+      _monthReport = currentReport;
+      final previousReport = results[2];
+      _monthComparison = {
+        'current': currentReport,
+        'previous': previousReport,
+        'delta_workouts': (currentReport['workout_count'] as int) -
+            (previousReport['workout_count'] as int),
+        'delta_volume': (currentReport['total_volume'] as double) -
+            (previousReport['total_volume'] as double),
+        'delta_sets': (currentReport['total_sets'] as int) -
+            (previousReport['total_sets'] as int),
+      };
       _monthlyCardioStats = results[3];
 
       setState(() => _isLoading = false);

@@ -55,11 +55,18 @@ extension _AiChatPersistence on AiChatService {
         lastMessagePreview: preview,
         isPinned: _state.activeThread?.isPinned ?? false,
       );
-      final rows = _state.messages
+      final allRows = _state.messages
           .where((m) => m.role != AiMessageRole.system)
           .map((m) => m.toRow()..['thread_id'] = id)
           .toList();
-      await _db.replaceAiChatMessages(id, rows);
+      final rows = allRows.where((row) {
+        final messageId = row['id'] as String;
+        return _persistedMessageSignatures[messageId] != jsonEncode(row);
+      }).toList(growable: false);
+      await _db.upsertAiChatMessages(id, rows);
+      for (final row in rows) {
+        _persistedMessageSignatures[row['id'] as String] = jsonEncode(row);
+      }
       await refreshThreads();
     } catch (_) {}
   }
@@ -99,7 +106,12 @@ extension _AiChatPersistence on AiChatService {
       wire.add({
         'role': 'user',
         'content':
-            'EVENTO INTERNO DO APP: a proposta foi aplicada com sucesso. Responda agora, em português brasileiro, com um resumo breve e factual do que foi feito. Não use ferramentas e não diga que houve aprovação pendente. Dados confirmados: ${jsonEncode({'action': proposal.action.storageValue, 'routineName': proposal.routineName, 'routineId': proposal.appliedRoutineId, 'diff': proposal.diff})}',
+            'EVENTO INTERNO DO APP: a proposta foi aplicada com sucesso. Responda agora, em português brasileiro, com um resumo breve e factual do que foi feito. Não use ferramentas e não diga que houve aprovação pendente. Dados confirmados: ${jsonEncode({
+              'action': proposal.action.storageValue,
+              'routineName': proposal.routineName,
+              'routineId': proposal.appliedRoutineId,
+              'diff': proposal.diff
+            })}',
       });
       final completion = await _service.sendChat(
         baseUrl: provider.baseUrl,

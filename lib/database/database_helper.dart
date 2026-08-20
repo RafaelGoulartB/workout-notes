@@ -30,10 +30,11 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 43;
+  static const _dbVersion = 44;
 
   static DatabaseHelper? _instance;
   static Database? _database;
+  static Future<Database>? _openingDatabase;
   static Database? _overrideDatabase;
 
   /// Repository instances (lazy-loaded)
@@ -64,14 +65,25 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_overrideDatabase != null) return _overrideDatabase!;
-    _database ??= await _initDatabase();
-    return _database!;
+    final existing = _database;
+    if (existing != null) return existing;
+    final opening = _openingDatabase ??= _initDatabase();
+    try {
+      final opened = await opening;
+      _database = opened;
+      return opened;
+    } finally {
+      if (identical(_openingDatabase, opening)) {
+        _openingDatabase = null;
+      }
+    }
   }
 
   /// Test-only hook. Sets an external [Database] to be returned by
   /// [database] instead of the singleton. Pass `null` to clear.
   static set overrideDatabase(Database? db) {
     _overrideDatabase = db;
+    _openingDatabase = null;
   }
 
   Future<Database> _initDatabase() async {
@@ -117,11 +129,12 @@ class DatabaseHelper {
     String? categoryId,
     String? search,
     bool? favorites,
-  }) => exerciseRepo.getExercises(
-    categoryId: categoryId,
-    search: search,
-    favorites: favorites,
-  );
+  }) =>
+      exerciseRepo.getExercises(
+        categoryId: categoryId,
+        search: search,
+        favorites: favorites,
+      );
   Future<Map<String, dynamic>?> getExercise(String id) =>
       exerciseRepo.getExercise(id);
   Future<String> addExercise({
@@ -132,15 +145,16 @@ class DatabaseHelper {
     String? equipment,
     double? weightIncrement,
     int? defaultRestTime,
-  }) => exerciseRepo.addExercise(
-    name: name,
-    categoryId: categoryId,
-    type: type,
-    notes: notes,
-    equipment: equipment,
-    weightIncrement: weightIncrement,
-    defaultRestTime: defaultRestTime,
-  );
+  }) =>
+      exerciseRepo.addExercise(
+        name: name,
+        categoryId: categoryId,
+        type: type,
+        notes: notes,
+        equipment: equipment,
+        weightIncrement: weightIncrement,
+        defaultRestTime: defaultRestTime,
+      );
   Future<void> updateExercise(
     String id, {
     String? name,
@@ -150,16 +164,17 @@ class DatabaseHelper {
     String? equipment,
     double? weightIncrement,
     int? defaultRestTime,
-  }) => exerciseRepo.updateExercise(
-    id,
-    name: name,
-    categoryId: categoryId,
-    type: type,
-    notes: notes,
-    equipment: equipment,
-    weightIncrement: weightIncrement,
-    defaultRestTime: defaultRestTime,
-  );
+  }) =>
+      exerciseRepo.updateExercise(
+        id,
+        name: name,
+        categoryId: categoryId,
+        type: type,
+        notes: notes,
+        equipment: equipment,
+        weightIncrement: weightIncrement,
+        defaultRestTime: defaultRestTime,
+      );
   Future<void> toggleFavorite(String id) => exerciseRepo.toggleFavorite(id);
   Future<void> deleteExercise(String id) => exerciseRepo.deleteExercise(id);
 
@@ -168,15 +183,17 @@ class DatabaseHelper {
     DateTime? date,
     String? routineId,
     List<Map<String, dynamic>>? exercises,
-  }) => workoutRepo.createWorkout(
-    date: date,
-    routineId: routineId,
-    exercises: exercises,
-  );
+  }) =>
+      workoutRepo.createWorkout(
+        date: date,
+        routineId: routineId,
+        exercises: exercises,
+      );
   Future<void> importRoutineDayToWorkout(
     String workoutId,
     String routineDayId,
-  ) => workoutRepo.importRoutineDayToWorkout(workoutId, routineDayId);
+  ) =>
+      workoutRepo.importRoutineDayToWorkout(workoutId, routineDayId);
   Future<String> copyWorkoutToDate(String sourceWorkoutId, DateTime newDate) =>
       workoutRepo.copyWorkoutToDate(sourceWorkoutId, newDate);
   Future<Map<String, dynamic>?> getWorkout(String id) =>
@@ -186,18 +203,20 @@ class DatabaseHelper {
     DateTime? endDate,
     int? limit,
     int? offset,
-  }) => workoutRepo.getWorkouts(
-    startDate: startDate,
-    endDate: endDate,
-    limit: limit,
-    offset: offset,
-  );
+  }) =>
+      workoutRepo.getWorkouts(
+        startDate: startDate,
+        endDate: endDate,
+        limit: limit,
+        offset: offset,
+      );
   Future<List<Map<String, dynamic>>> getWorkoutsByMonth(int year, int month) =>
       workoutRepo.getWorkoutsByMonth(year, month);
   Future<Map<String, List<Map<String, dynamic>>>> getWorkoutCategoriesByDate(
     int year,
     int month,
-  ) => workoutRepo.getWorkoutCategoriesByDate(year, month);
+  ) =>
+      workoutRepo.getWorkoutCategoriesByDate(year, month);
   Future<List<Map<String, dynamic>>> getWorkoutExercises(String workoutId) =>
       workoutRepo.getWorkoutExercises(workoutId);
   Future<List<Map<String, dynamic>>> getExerciseSets(String exerciseEntryId) =>
@@ -207,12 +226,13 @@ class DatabaseHelper {
     String? comment,
     int? feelingRating,
     double? estimatedCalories,
-  }) => workoutRepo.finishWorkout(
-    id,
-    comment: comment,
-    feelingRating: feelingRating,
-    estimatedCalories: estimatedCalories,
-  );
+  }) =>
+      workoutRepo.finishWorkout(
+        id,
+        comment: comment,
+        feelingRating: feelingRating,
+        estimatedCalories: estimatedCalories,
+      );
   Future<void> startWorkoutTimer(String id) =>
       workoutRepo.startWorkoutTimer(id);
   Future<void> stopWorkoutTimer(String id) => workoutRepo.stopWorkoutTimer(id);
@@ -224,11 +244,12 @@ class DatabaseHelper {
     String id, {
     required String? comment,
     required int? feelingRating,
-  }) => workoutRepo.updateWorkoutFeedback(
-    id,
-    comment: comment,
-    feelingRating: feelingRating,
-  );
+  }) =>
+      workoutRepo.updateWorkoutFeedback(
+        id,
+        comment: comment,
+        feelingRating: feelingRating,
+      );
   Future<void> resetWorkoutToInProgress(String id) =>
       workoutRepo.resetWorkoutToInProgress(id);
   Future<void> deleteWorkout(String id) => workoutRepo.deleteWorkout(id);
@@ -243,16 +264,17 @@ class DatabaseHelper {
     bool isWarmup = false,
     double? rpe,
     String? comment,
-  }) => workoutRepo.addSet(
-    exerciseEntryId: exerciseEntryId,
-    weight: weight,
-    reps: reps,
-    distance: distance,
-    timeSeconds: timeSeconds,
-    isWarmup: isWarmup,
-    rpe: rpe,
-    comment: comment,
-  );
+  }) =>
+      workoutRepo.addSet(
+        exerciseEntryId: exerciseEntryId,
+        weight: weight,
+        reps: reps,
+        distance: distance,
+        timeSeconds: timeSeconds,
+        isWarmup: isWarmup,
+        rpe: rpe,
+        comment: comment,
+      );
   Future<void> updateSet(
     String setId, {
     double? weight,
@@ -263,28 +285,31 @@ class DatabaseHelper {
     bool? isWarmup,
     double? rpe,
     String? comment,
-  }) => workoutRepo.updateSet(
-    setId,
-    weight: weight,
-    reps: reps,
-    distance: distance,
-    timeSeconds: timeSeconds,
-    isComplete: isComplete,
-    isWarmup: isWarmup,
-    rpe: rpe,
-    comment: comment,
-  );
+  }) =>
+      workoutRepo.updateSet(
+        setId,
+        weight: weight,
+        reps: reps,
+        distance: distance,
+        timeSeconds: timeSeconds,
+        isComplete: isComplete,
+        isWarmup: isWarmup,
+        rpe: rpe,
+        comment: comment,
+      );
   Future<void> toggleSetComplete(String setId) =>
       workoutRepo.toggleSetComplete(setId);
   Future<void> deleteSet(String setId) => workoutRepo.deleteSet(setId);
   Future<void> removeExerciseEntryFromWorkout(
     String workoutId,
     String exerciseId,
-  ) => workoutRepo.removeExerciseEntryFromWorkout(workoutId, exerciseId);
+  ) =>
+      workoutRepo.removeExerciseEntryFromWorkout(workoutId, exerciseId);
   Future<void> reorderWorkoutExercises(
     String workoutId,
     List<String> orderedEntryIds,
-  ) => workoutRepo.reorderWorkoutExercises(workoutId, orderedEntryIds);
+  ) =>
+      workoutRepo.reorderWorkoutExercises(workoutId, orderedEntryIds);
   Future<void> deleteExerciseEntry(String entryId) =>
       workoutRepo.deleteExerciseEntry(entryId);
   Future<void> updateExerciseEntryRestTime(
@@ -295,10 +320,11 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getLastWorkoutSets(
     String exerciseId, {
     String? excludeWorkoutId,
-  }) => workoutRepo.getLastWorkoutSets(
-    exerciseId,
-    excludeWorkoutId: excludeWorkoutId,
-  );
+  }) =>
+      workoutRepo.getLastWorkoutSets(
+        exerciseId,
+        excludeWorkoutId: excludeWorkoutId,
+      );
 
   // -- ROUTINES --
   Future<String> createRoutine(String name, {String? notes}) =>
@@ -322,27 +348,31 @@ class DatabaseHelper {
     String routineDayId,
     String exerciseId, {
     int? restTimeSeconds,
-  }) => routineRepo.addRoutineExercise(
-    routineDayId,
-    exerciseId,
-    restTimeSeconds: restTimeSeconds,
-  );
+  }) =>
+      routineRepo.addRoutineExercise(
+        routineDayId,
+        exerciseId,
+        restTimeSeconds: restTimeSeconds,
+      );
   Future<void> removeRoutineExercise(String id) =>
       routineRepo.removeRoutineExercise(id);
   Future<void> reorderRoutineExercises(
     String routineDayId,
     List<String> orderedIds,
-  ) => routineRepo.reorderRoutineExercises(routineDayId, orderedIds);
+  ) =>
+      routineRepo.reorderRoutineExercises(routineDayId, orderedIds);
   Future<void> updateRoutineExerciseRestTime(
     String routineExerciseId,
     int restTimeSeconds,
-  ) => routineRepo.updateRoutineExerciseRestTime(
-    routineExerciseId,
-    restTimeSeconds,
-  );
+  ) =>
+      routineRepo.updateRoutineExerciseRestTime(
+        routineExerciseId,
+        restTimeSeconds,
+      );
   Future<List<Map<String, dynamic>>> getPredefinedSets(
     String routineExerciseId,
-  ) => routineRepo.getPredefinedSets(routineExerciseId);
+  ) =>
+      routineRepo.getPredefinedSets(routineExerciseId);
   Future<String> addPredefinedSet(
     String routineExerciseId, {
     double? weight,
@@ -350,14 +380,15 @@ class DatabaseHelper {
     double? distance,
     int? timeSeconds,
     bool isWarmup = false,
-  }) => routineRepo.addPredefinedSet(
-    routineExerciseId,
-    weight: weight,
-    reps: reps,
-    distance: distance,
-    timeSeconds: timeSeconds,
-    isWarmup: isWarmup,
-  );
+  }) =>
+      routineRepo.addPredefinedSet(
+        routineExerciseId,
+        weight: weight,
+        reps: reps,
+        distance: distance,
+        timeSeconds: timeSeconds,
+        isWarmup: isWarmup,
+      );
   Future<void> updatePredefinedSet(
     String id, {
     double? weight,
@@ -365,14 +396,15 @@ class DatabaseHelper {
     double? distance,
     int? timeSeconds,
     bool? isWarmup,
-  }) => routineRepo.updatePredefinedSet(
-    id,
-    weight: weight,
-    reps: reps,
-    distance: distance,
-    timeSeconds: timeSeconds,
-    isWarmup: isWarmup,
-  );
+  }) =>
+      routineRepo.updatePredefinedSet(
+        id,
+        weight: weight,
+        reps: reps,
+        distance: distance,
+        timeSeconds: timeSeconds,
+        isWarmup: isWarmup,
+      );
   Future<void> deletePredefinedSet(String id) =>
       routineRepo.deletePredefinedSet(id);
 
@@ -429,25 +461,28 @@ class DatabaseHelper {
     bool isFasted = false,
     List<String>? photosPaths,
     String? side,
-  }) => bodyMeasurementRepo.addBodyMeasurement(
-    type,
-    value,
-    unit,
-    secondaryValue: secondaryValue,
-    date: date,
-    comment: comment,
-    timeOfDay: timeOfDay,
-    isFasted: isFasted,
-    photosPaths: photosPaths,
-    side: side,
-  );
+  }) =>
+      bodyMeasurementRepo.addBodyMeasurement(
+        type,
+        value,
+        unit,
+        secondaryValue: secondaryValue,
+        date: date,
+        comment: comment,
+        timeOfDay: timeOfDay,
+        isFasted: isFasted,
+        photosPaths: photosPaths,
+        side: side,
+      );
   Future<void> addBodyMeasurementsBatch(
     List<Map<String, dynamic>> measurements,
-  ) => bodyMeasurementRepo.addBodyMeasurementsBatch(measurements);
+  ) =>
+      bodyMeasurementRepo.addBodyMeasurementsBatch(measurements);
   Future<List<Map<String, dynamic>>> getBodyMeasurements({
     String? type,
     int? limit,
-  }) => bodyMeasurementRepo.getBodyMeasurements(type: type, limit: limit);
+  }) =>
+      bodyMeasurementRepo.getBodyMeasurements(type: type, limit: limit);
   Future<void> deleteBodyMeasurement(String id) =>
       bodyMeasurementRepo.deleteBodyMeasurement(id);
   Future<List<Map<String, dynamic>>> getBodyMeasurementsSummary() =>
@@ -455,31 +490,36 @@ class DatabaseHelper {
   Future<Map<String, dynamic>?> getPreviousBodyMeasurement(
     String type, {
     String? beforeDate,
-  }) => bodyMeasurementRepo.getPreviousBodyMeasurement(
-    type,
-    beforeDate: beforeDate,
-  );
+  }) =>
+      bodyMeasurementRepo.getPreviousBodyMeasurement(
+        type,
+        beforeDate: beforeDate,
+      );
   Future<List<Map<String, dynamic>>> getBodyMeasurementsTrend(
     String type, {
     int months = 6,
-  }) => bodyMeasurementRepo.getBodyMeasurementsTrend(type, months: months);
+  }) =>
+      bodyMeasurementRepo.getBodyMeasurementsTrend(type, months: months);
   Future<List<Map<String, dynamic>>> getBodyMeasurementsByDate(String date) =>
       bodyMeasurementRepo.getBodyMeasurementsByDate(date);
   Future<List<Map<String, dynamic>>> getBodyCompositionTrend({
     int months = 6,
-  }) => bodyMeasurementRepo.getBodyCompositionTrend(months: months);
+  }) =>
+      bodyMeasurementRepo.getBodyCompositionTrend(months: months);
   Future<Map<String, int>> getBodyMeasurementFrequency({int months = 6}) =>
       bodyMeasurementRepo.getBodyMeasurementFrequency(months: months);
   Future<List<Map<String, dynamic>>> getBodyMeasurementsWithPhotos(
     String type, {
     int limit = 50,
-  }) => bodyMeasurementRepo.getBodyMeasurementsWithPhotos(type, limit: limit);
+  }) =>
+      bodyMeasurementRepo.getBodyMeasurementsWithPhotos(type, limit: limit);
 
   // -- ANALYTICS --
   Future<Map<String, dynamic>> getExerciseHistory(
     String exerciseId, {
     int? limit,
-  }) => analyticsRepo.getExerciseHistory(exerciseId, limit: limit);
+  }) =>
+      analyticsRepo.getExerciseHistory(exerciseId, limit: limit);
   Future<Map<String, dynamic>> getWeeklyVolume({int weeks = 4}) =>
       analyticsRepo.getWeeklyVolume(weeks: weeks);
   Future<List<Map<String, dynamic>>> getMonthlyVolume({int months = 6}) =>
@@ -492,33 +532,38 @@ class DatabaseHelper {
       analyticsRepo.getVolumeByCategory();
   Future<List<Map<String, dynamic>>> getWeeklyVolumeByCategory({
     int weeks = 12,
-  }) => analyticsRepo.getWeeklyVolumeByCategory(weeks: weeks);
+  }) =>
+      analyticsRepo.getWeeklyVolumeByCategory(weeks: weeks);
   Future<List<Map<String, dynamic>>> getTopExercisesByVolume({
     int limit = 10,
-  }) => analyticsRepo.getTopExercisesByVolume(limit: limit);
+  }) =>
+      analyticsRepo.getTopExercisesByVolume(limit: limit);
   Future<List<Map<String, dynamic>>> getEnergySystemDistribution() =>
       analyticsRepo.getEnergySystemDistribution();
   Future<List<Map<String, dynamic>>> getAnaerobicVolumeByCategory(
     DateTime start,
     DateTime end, {
     required bool bySets,
-  }) => analyticsRepo.getAnaerobicVolumeByCategory(start, end, bySets: bySets);
+  }) =>
+      analyticsRepo.getAnaerobicVolumeByCategory(start, end, bySets: bySets);
   Future<List<Map<String, dynamic>>> getAnaerobicTopExercises(
     DateTime start,
     DateTime end, {
     required bool bySets,
     int limit = 5,
-  }) => analyticsRepo.getAnaerobicTopExercises(
-    start,
-    end,
-    bySets: bySets,
-    limit: limit,
-  );
+  }) =>
+      analyticsRepo.getAnaerobicTopExercises(
+        start,
+        end,
+        bySets: bySets,
+        limit: limit,
+      );
   Future<List<Map<String, dynamic>>> getAnaerobicVolumeTrend(
     DateTime end,
     AnaerobicTrendBucket bucket, {
     required bool bySets,
-  }) => analyticsRepo.getAnaerobicVolumeTrend(end, bucket, bySets: bySets);
+  }) =>
+      analyticsRepo.getAnaerobicVolumeTrend(end, bucket, bySets: bySets);
   Future<List<Map<String, dynamic>>> getRpeTrend({int limit = 50}) =>
       analyticsRepo.getRpeTrend(limit: limit);
   Future<List<Map<String, dynamic>>> getWorkoutDensity({int limit = 50}) =>
@@ -533,7 +578,8 @@ class DatabaseHelper {
       analyticsRepo.getDurationTrend(limit: limit);
   Future<List<Map<String, dynamic>>> getBodyWeightWithVolume({
     int months = 6,
-  }) => analyticsRepo.getBodyWeightWithVolume(months: months);
+  }) =>
+      analyticsRepo.getBodyWeightWithVolume(months: months);
   Future<Map<String, dynamic>> getMonthlyReport(int year, int month) =>
       analyticsRepo.getMonthlyReport(year, month);
   Future<Map<String, dynamic>> getMonthComparison(int year, int month) =>
@@ -542,7 +588,8 @@ class DatabaseHelper {
       analyticsRepo.getWorkoutOverviewStats();
   Future<List<Map<String, dynamic>>> getCardioWeeklyDistance({
     int weeks = 12,
-  }) => analyticsRepo.getCardioWeeklyDistance(weeks: weeks);
+  }) =>
+      analyticsRepo.getCardioWeeklyDistance(weeks: weeks);
   Future<List<Map<String, dynamic>>> getCardioDistanceByModality() =>
       analyticsRepo.getCardioDistanceByModality();
 
@@ -555,11 +602,12 @@ class DatabaseHelper {
     String? exerciseId,
     DateTime? startDate,
     DateTime? endDate,
-  }) => exportImportRepo.exportWorkoutsCsvData(
-    exerciseId: exerciseId,
-    startDate: startDate,
-    endDate: endDate,
-  );
+  }) =>
+      exportImportRepo.exportWorkoutsCsvData(
+        exerciseId: exerciseId,
+        startDate: startDate,
+        endDate: endDate,
+      );
   Future<void> deleteAllWorkoutData() =>
       exportImportRepo.deleteAllWorkoutData();
 
@@ -568,7 +616,8 @@ class DatabaseHelper {
     DateTime? from,
     DateTime? to,
     int? limit,
-  }) => sleepRepo.getEntries(from: from, to: to, limit: limit);
+  }) =>
+      sleepRepo.getEntries(from: from, to: to, limit: limit);
   Future<SleepEntry?> getLatestSleepEntry() => sleepRepo.getLatest();
   Future<SleepEntry?> getSleepEntryByDate(DateTime date) =>
       sleepRepo.getByDate(date);
@@ -576,7 +625,8 @@ class DatabaseHelper {
   Future<SleepEntry?> getSleepEntryById(String id) => sleepRepo.getById(id);
   Future<SleepDashboardStats> getSleepDashboardStats({
     DateTime? referenceDate,
-  }) => sleepRepo.getDashboardStats(referenceDate: referenceDate);
+  }) =>
+      sleepRepo.getDashboardStats(referenceDate: referenceDate);
 
   // -- SLEEP MONITOR --
   Future<List<SleepMonitorSession>> getSleepMonitorSessions({int? limit}) =>
@@ -591,22 +641,25 @@ class DatabaseHelper {
   Future<List<FoodSearchResultLite>> searchLocalFoods(
     String query, {
     int limit = 30,
-  }) => nutritionRepo.searchLocalFoods(query, limit: limit);
+  }) =>
+      nutritionRepo.searchLocalFoods(query, limit: limit);
   Future<FoodWithDetails?> getFoodWithDetails(String id) =>
       nutritionRepo.getFoodWithDetails(id);
   Future<FoodWithDetails?> getFoodBySource({
     required String source,
     required String externalId,
-  }) => nutritionRepo.getFoodBySource(source: source, externalId: externalId);
+  }) =>
+      nutritionRepo.getFoodBySource(source: source, externalId: externalId);
   Future<Food> upsertFoodWithDetails({
     required Food food,
     required List<FoodVariant> variants,
     Map<String, List<FoodServing>>? servings,
-  }) => nutritionRepo.upsertFoodWithDetails(
-    food: food,
-    variants: variants,
-    servings: servings,
-  );
+  }) =>
+      nutritionRepo.upsertFoodWithDetails(
+        food: food,
+        variants: variants,
+        servings: servings,
+      );
   Future<Food> createManualFood({
     required String name,
     String? brand,
@@ -616,16 +669,17 @@ class DatabaseHelper {
     required NutritionValues referenceValues,
     bool isEstimated = false,
     List<ManualServingInput> servings = const [],
-  }) => nutritionRepo.createManualFood(
-    name: name,
-    brand: brand,
-    barcode: barcode,
-    referenceAmount: referenceAmount,
-    referenceUnit: referenceUnit,
-    referenceValues: referenceValues,
-    isEstimated: isEstimated,
-    servings: servings,
-  );
+  }) =>
+      nutritionRepo.createManualFood(
+        name: name,
+        brand: brand,
+        barcode: barcode,
+        referenceAmount: referenceAmount,
+        referenceUnit: referenceUnit,
+        referenceValues: referenceValues,
+        isEstimated: isEstimated,
+        servings: servings,
+      );
   Future<Food> updateManualFood({
     required String foodId,
     required String name,
@@ -636,23 +690,25 @@ class DatabaseHelper {
     required NutritionValues referenceValues,
     bool isEstimated = false,
     List<ManualServingInput> servings = const [],
-  }) => nutritionRepo.updateManualFood(
-    foodId: foodId,
-    name: name,
-    brand: brand,
-    barcode: barcode,
-    referenceAmount: referenceAmount,
-    referenceUnit: referenceUnit,
-    referenceValues: referenceValues,
-    isEstimated: isEstimated,
-    servings: servings,
-  );
+  }) =>
+      nutritionRepo.updateManualFood(
+        foodId: foodId,
+        name: name,
+        brand: brand,
+        barcode: barcode,
+        referenceAmount: referenceAmount,
+        referenceUnit: referenceUnit,
+        referenceValues: referenceValues,
+        isEstimated: isEstimated,
+        servings: servings,
+      );
   Future<void> deleteManualFood(String foodId) =>
       nutritionRepo.deleteManualFood(foodId);
   Future<MealLog> ensureMealLog({
     required String date,
     required String mealType,
-  }) => nutritionRepo.ensureMealLog(date: date, mealType: mealType);
+  }) =>
+      nutritionRepo.ensureMealLog(date: date, mealType: mealType);
   Future<MealLogItem> addMealLogItem({
     required String date,
     required String mealType,
@@ -660,23 +716,25 @@ class DatabaseHelper {
     required FoodVariant variant,
     required NutritionConversion conversion,
     List<FoodServing> availableServings = const [],
-  }) => nutritionRepo.addMealLogItem(
-    date: date,
-    mealType: mealType,
-    food: food,
-    variant: variant,
-    conversion: conversion,
-    availableServings: availableServings,
-  );
+  }) =>
+      nutritionRepo.addMealLogItem(
+        date: date,
+        mealType: mealType,
+        food: food,
+        variant: variant,
+        conversion: conversion,
+        availableServings: availableServings,
+      );
   Future<MealLogItem> updateMealLogItem({
     required String itemId,
     required NutritionConversion conversion,
     required FoodVariant variant,
-  }) => nutritionRepo.updateMealLogItem(
-    itemId: itemId,
-    conversion: conversion,
-    variant: variant,
-  );
+  }) =>
+      nutritionRepo.updateMealLogItem(
+        itemId: itemId,
+        conversion: conversion,
+        variant: variant,
+      );
   Future<void> deleteMealLogItem(String id) =>
       nutritionRepo.deleteMealLogItem(id);
   Future<List<MealLogWithItems>> getDayMeals(String date) =>
@@ -693,20 +751,22 @@ class DatabaseHelper {
     double? tdee,
     String? adjustmentKind,
     double? adjustmentPercent,
-  }) => nutritionRepo.saveGoal(
-    calories: calories,
-    proteinG: proteinG,
-    carbsG: carbsG,
-    fatG: fatG,
-    tdee: tdee,
-    adjustmentKind: adjustmentKind,
-    adjustmentPercent: adjustmentPercent,
-  );
+  }) =>
+      nutritionRepo.saveGoal(
+        calories: calories,
+        proteinG: proteinG,
+        carbsG: carbsG,
+        fatG: fatG,
+        tdee: tdee,
+        adjustmentKind: adjustmentKind,
+        adjustmentPercent: adjustmentPercent,
+      );
   Future<void> clearActiveNutritionGoal() => nutritionRepo.clearActiveGoal();
   Future<List<NutritionExportRow>> exportNutritionRows({
     DateTime? startDate,
     DateTime? endDate,
-  }) => nutritionRepo.exportRows(startDate: startDate, endDate: endDate);
+  }) =>
+      nutritionRepo.exportRows(startDate: startDate, endDate: endDate);
 
   // -- AI CHAT --
   Future<String> upsertAiChatThread({
@@ -758,12 +818,45 @@ class DatabaseHelper {
     });
   }
 
+  Future<void> upsertAiChatMessages(
+    String threadId,
+    List<Map<String, dynamic>> messages,
+  ) async {
+    if (messages.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    for (final message in messages) {
+      batch.insert(
+          'ai_chat_messages',
+          {
+            ...message,
+            'thread_id': threadId,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await batch.commit(noResult: true);
+  }
+
   Future<List<Map<String, dynamic>>> getAiChatThreads() async {
     final db = await database;
     return db.query(
       'ai_chat_threads',
       where: 'archived = 0',
       orderBy: 'is_pinned DESC, updated_at DESC',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getAiChatThreadsPage({
+    required int limit,
+    int offset = 0,
+  }) async {
+    final db = await database;
+    return db.query(
+      'ai_chat_threads',
+      where: 'archived = 0',
+      orderBy: 'is_pinned DESC, updated_at DESC',
+      limit: limit,
+      offset: offset,
     );
   }
 
@@ -777,6 +870,23 @@ class DatabaseHelper {
       whereArgs: [threadId],
       orderBy: 'created_at ASC',
     );
+  }
+
+  Future<List<Map<String, dynamic>>> getAiChatMessagesThreadPage(
+    String threadId, {
+    required int limit,
+    int offset = 0,
+  }) async {
+    final db = await database;
+    final rows = await db.query(
+      'ai_chat_messages',
+      where: 'thread_id = ?',
+      whereArgs: [threadId],
+      orderBy: 'created_at DESC',
+      limit: limit,
+      offset: offset,
+    );
+    return rows.reversed.toList(growable: false);
   }
 
   Future<void> renameAiChatThread(String threadId, String title) async {

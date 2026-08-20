@@ -792,6 +792,7 @@
   "aiChatUnsupportedImage": "Unsupported format. Use JPEG, PNG, WebP, or GIF.",
   "aiChatImagePickFailed": "The image could not be loaded.",
   "aiChatCoachName": "AI Coach",
+  "aiChatLoadOlder": "Load older messages",
   "aiChatNotConfigured": "Not configured",
   "aiChatMoreOptions": "More options",
   "aiChatSuggestionRecovery": "Analyze my recovery this week",

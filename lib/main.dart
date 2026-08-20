@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -76,11 +78,6 @@ class LocaleNotifier extends ChangeNotifier {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize notification service
-  final notif = NotificationService.instance;
-  await notif.init();
-  await notif.loadSettings();
-
   // Load saved settings
   final prefs = await SharedPreferences.getInstance();
   final savedColor =
@@ -110,11 +107,6 @@ void main() async {
 
   // Initialize AI Coach (settings + chat service).
   WorkoutNotesApp.aiSettings = AiSettingsNotifier(prefs: prefs);
-  await WorkoutNotesApp.aiSettings.load();
-  await AiChatService.bootstrap(settings: WorkoutNotesApp.aiSettings);
-  await SleepMonitorService.instance.initialize();
-  await TraditionalAlarmService.instance.initialize();
-  await RunTrackingService.instance.initialize();
 
   runApp(
     WorkoutNotesApp(
@@ -123,6 +115,39 @@ void main() async {
       initialLocale: initialLocale,
     ),
   );
+
+  // None of these services is required to paint the first frame. Deferring
+  // their platform-channel and database work keeps cold start responsive.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(_initializeDeferredServices());
+  });
+}
+
+Future<void> _initializeDeferredServices() async {
+  final notificationService = NotificationService.instance;
+  try {
+    await notificationService.init();
+    await notificationService.loadSettings();
+  } catch (_) {
+    // Individual features surface their own errors when opened.
+  }
+
+  try {
+    await WorkoutNotesApp.aiSettings.load();
+    await AiChatService.bootstrap(settings: WorkoutNotesApp.aiSettings);
+  } catch (_) {}
+
+  // Keep recovery ordering deterministic. All three can touch SQLite or
+  // platform channels while reconciling state left by a killed process.
+  try {
+    await SleepMonitorService.instance.initialize();
+  } catch (_) {}
+  try {
+    await TraditionalAlarmService.instance.initialize();
+  } catch (_) {}
+  try {
+    await RunTrackingService.instance.initialize();
+  } catch (_) {}
 }
 
 Locale _parseLocale(String value) {

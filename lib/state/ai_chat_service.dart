@@ -95,6 +95,9 @@ class AiChatService extends ChangeNotifier {
   AiRoutineMutationService _routineMutations = AiRoutineMutationService();
   AiImageAttachmentStore _imageStore = AiImageAttachmentStore();
   AiSettingsNotifier? _settings;
+  bool _isReady = false;
+  Future<void>? _readyFuture;
+  final Map<String, String> _persistedMessageSignatures = {};
   _AiTurnDiagnostics? _activeTurnDiagnostics;
   String? _activeReasoningEffort;
 
@@ -127,9 +130,26 @@ class AiChatService extends ChangeNotifier {
   }) async {
     final svc = AiChatService.instance;
     svc._settings = settings;
-    await svc.refreshThreads();
-    await svc._cleanupOrphanedImages();
     return svc;
+  }
+
+  Future<void> ensureReady() async {
+    if (_isReady) return;
+    final pending = _readyFuture;
+    if (pending != null) return pending;
+    final future = _loadPersistentState();
+    _readyFuture = future;
+    try {
+      await future;
+      _isReady = true;
+    } finally {
+      if (identical(_readyFuture, future)) _readyFuture = null;
+    }
+  }
+
+  Future<void> _loadPersistentState() async {
+    await refreshThreads();
+    unawaited(_cleanupOrphanedImages());
   }
 
   Future<void> _cleanupOrphanedImages() async {
@@ -170,6 +190,7 @@ class AiChatService extends ChangeNotifier {
     List<AiImageAttachment> existingAttachments = const [],
     VoidCallback? onAccepted,
   }) async {
+    await ensureReady();
     final trimmed = text.trim();
     if (trimmed.isEmpty && images.isEmpty && existingAttachments.isEmpty) {
       return false;
