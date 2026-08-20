@@ -88,11 +88,6 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     );
   }
 
-  void _toggleIntervals(bool value) {
-    setState(() => _intervalsOn = value);
-    _coach.setIntervalsOn(value);
-  }
-
   void _setGoal(RunSessionGoal goal) {
     setState(() => _goal = goal);
     _coach.setGoal(goal);
@@ -302,8 +297,8 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                     color: theme.colorScheme.surface.withValues(alpha: 0.92),
                     shape: const CircleBorder(),
                     child: IconButton(
-                      icon: const Icon(Icons.record_voice_over_outlined),
-                      tooltip: loc.runRecordVoiceSettings,
+                      icon: const Icon(Icons.settings_outlined),
+                      tooltip: loc.runRecordSettings,
                       onPressed: _openVoiceSettings,
                     ),
                   ),
@@ -367,9 +362,10 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                 final showDebug = kDebugMode &&
                     !state.isActive &&
                     _service.canDebugSimulate;
+                // Room for outdoor-friendly controls (goal + start CTA).
                 final collapsedSize = hasSplitSummary
-                    ? 0.52
-                    : (showDebug ? 0.46 : 0.42);
+                    ? 0.54
+                    : (showDebug ? 0.48 : 0.44);
                 return DraggableScrollableSheet(
                   key: ValueKey('run-sheet-$collapsedSize'),
                   initialChildSize: collapsedSize,
@@ -388,8 +384,6 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                       intervalSnapshot: interval,
                       goal: _goal,
                       goalSnapshot: goalSnap,
-                      onIntervalsChanged:
-                          state.isActive ? null : _toggleIntervals,
                       onGoalChanged: state.isActive ? null : _setGoal,
                       onStart: _ensurePermissionAndStart,
                       onDebugSimulate: _startDebugSimulation,
@@ -418,7 +412,6 @@ class _MetricsSheet extends StatelessWidget {
   final RunIntervalSnapshot intervalSnapshot;
   final RunSessionGoal goal;
   final RunGoalSnapshot goalSnapshot;
-  final ValueChanged<bool>? onIntervalsChanged;
   final ValueChanged<RunSessionGoal>? onGoalChanged;
   final VoidCallback onStart;
   final VoidCallback onDebugSimulate;
@@ -436,7 +429,6 @@ class _MetricsSheet extends StatelessWidget {
     required this.intervalSnapshot,
     required this.goal,
     required this.goalSnapshot,
-    required this.onIntervalsChanged,
     required this.onGoalChanged,
     required this.onStart,
     required this.onDebugSimulate,
@@ -474,49 +466,79 @@ class _MetricsSheet extends StatelessWidget {
     final last = _lastCompleted;
     final best = _bestCompleted;
 
+    final actionButtonStyle = FilledButton.styleFrom(
+      minimumSize: const Size.fromHeight(58),
+      textStyle: theme.textTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.2,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    );
+    final outlineActionStyle = OutlinedButton.styleFrom(
+      minimumSize: const Size.fromHeight(58),
+      textStyle: theme.textTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.w700,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      side: BorderSide(
+        color: theme.colorScheme.outline.withValues(alpha: 0.7),
+        width: 1.5,
+      ),
+    );
+
+    // Always keep clear space above the home indicator / screen edge.
+    // Prefer viewPadding (works edge-to-edge); fall back to a firm minimum
+    // when the system reports no inset (some emulators / gesture modes).
+    final systemBottom = MediaQuery.viewPaddingOf(context).bottom;
+    final bottomPad = (systemBottom > 0 ? systemBottom : 16.0) + 24.0;
     final panel = Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.97),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        color: theme.colorScheme.surface.withValues(alpha: 0.98),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.14),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 20,
+            offset: const Offset(0, -6),
           ),
         ],
       ),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        10,
-        20,
-        16 + MediaQuery.paddingOf(context).bottom,
-      ),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Center(
             child: Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 14),
+              width: 44,
+              height: 5,
+              margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
                 color: theme.colorScheme.onSurfaceVariant.withValues(
-                  alpha: 0.35,
+                  alpha: 0.4,
                 ),
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
           ),
           if (!state.locationGranted && state.supported) ...[
-            Text(
-              loc.runRecordPermissionNeeded,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.errorContainer.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                loc.runRecordPermissionNeeded,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onErrorContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
           ],
           Row(
             children: [
@@ -524,25 +546,38 @@ class _MetricsSheet extends StatelessWidget {
                 child: _Metric(
                   label: loc.runRecordTime,
                   value: RunFormatters.duration(state.durationSeconds),
+                  emphasize: state.isActive,
                 ),
+              ),
+              Container(
+                width: 1,
+                height: 44,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
               ),
               Expanded(
                 child: _Metric(
                   label: loc.runRecordDistance,
                   value: RunFormatters.distanceKm(state.distanceMeters),
                   unit: 'km',
+                  emphasize: state.isActive,
                 ),
+              ),
+              Container(
+                width: 1,
+                height: 44,
+                color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
               ),
               Expanded(
                 child: _Metric(
                   label: loc.runRecordPace,
                   value: RunFormatters.pace(pace),
                   unit: loc.runRecordPaceUnit,
+                  emphasize: state.isActive,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 16),
           _RunPlanCard(
             goal: goal,
             goalSnapshot: goalSnapshot,
@@ -550,39 +585,47 @@ class _MetricsSheet extends StatelessWidget {
             intervalSnapshot: intervalSnapshot,
             active: state.isActive,
             onGoalChanged: onGoalChanged,
-            onIntervalsChanged: onIntervalsChanged,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           if (busy)
-            const Center(child: CircularProgressIndicator())
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              child: Center(child: CircularProgressIndicator()),
+            )
           else if (!state.isActive) ...[
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: FilledButton(
-                onPressed: onStart,
-                child: Text(loc.runRecordStart),
-              ),
+            FilledButton.icon(
+              onPressed: onStart,
+              style: actionButtonStyle,
+              icon: const Icon(Icons.play_arrow_rounded, size: 28),
+              label: Text(loc.runRecordStart),
             ),
             if (showDebugSimulate) ...[
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: OutlinedButton.icon(
-                  onPressed: onDebugSimulate,
-                  icon: const Icon(Icons.bug_report_outlined),
-                  label: Text(loc.runRecordDebugSimulate),
+              const SizedBox(height: 4),
+              TextButton.icon(
+                onPressed: onDebugSimulate,
+                style: TextButton.styleFrom(
+                  foregroundColor: theme.colorScheme.onSurfaceVariant,
+                  minimumSize: const Size.fromHeight(40),
+                  textStyle: theme.textTheme.labelMedium,
                 ),
+                icon: const Icon(Icons.bug_report_outlined, size: 16),
+                label: Text(loc.runRecordDebugSimulate),
               ),
             ],
           ] else
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
+                  child: OutlinedButton.icon(
                     onPressed: state.isPaused ? onResume : onPause,
-                    child: Text(
+                    style: outlineActionStyle,
+                    icon: Icon(
+                      state.isPaused
+                          ? Icons.play_arrow_rounded
+                          : Icons.pause_rounded,
+                      size: 24,
+                    ),
+                    label: Text(
                       state.isPaused
                           ? loc.runRecordResume
                           : loc.runRecordPause,
@@ -591,9 +634,11 @@ class _MetricsSheet extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: FilledButton(
+                  child: FilledButton.icon(
                     onPressed: onFinish,
-                    child: Text(loc.runRecordFinish),
+                    style: actionButtonStyle,
+                    icon: const Icon(Icons.stop_rounded, size: 24),
+                    label: Text(loc.runRecordFinish),
                   ),
                 ),
               ],
@@ -711,7 +756,6 @@ class _RunPlanCard extends StatelessWidget {
   final RunIntervalSnapshot intervalSnapshot;
   final bool active;
   final ValueChanged<RunSessionGoal>? onGoalChanged;
-  final ValueChanged<bool>? onIntervalsChanged;
 
   const _RunPlanCard({
     required this.goal,
@@ -720,7 +764,6 @@ class _RunPlanCard extends StatelessWidget {
     required this.intervalSnapshot,
     required this.active,
     required this.onGoalChanged,
-    required this.onIntervalsChanged,
   });
 
   String _formatGoalValue(RunSessionGoal g) {
@@ -924,157 +967,198 @@ class _RunPlanCard extends StatelessWidget {
 
     String goalSubtitle;
     if (!goal.enabled) {
-      goalSubtitle = loc.runRecordGoalNone;
+      goalSubtitle = onGoalChanged != null && !active
+          ? '${loc.runRecordGoalNone} · ${loc.runRecordGoalTapToChange}'
+          : loc.runRecordGoalNone;
     } else if (goalSnapshot.completed) {
       goalSubtitle = loc.runRecordGoalDone;
     } else if (active) {
       goalSubtitle = loc.runRecordGoalRemaining(_formatRemaining(goalSnapshot));
     } else {
-      goalSubtitle = _formatGoalValue(goal);
+      goalSubtitle = onGoalChanged != null
+          ? '${_formatGoalValue(goal)} · ${loc.runRecordGoalTapToChange}'
+          : _formatGoalValue(goal);
     }
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
+    final showIntervalStatus = intervalsOn && active;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
             loc.runRecordPlanSection.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              letterSpacing: 0.8,
+            style: theme.textTheme.labelMedium?.copyWith(
+              letterSpacing: 1.0,
               color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 6),
-          InkWell(
-            onTap: onGoalChanged == null ? null : () => _editGoal(context),
-            borderRadius: BorderRadius.circular(10),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.flag_outlined,
-                    size: 18,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          loc.runRecordGoal,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          goalSubtitle,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Switch.adaptive(
-                    value: goal.enabled,
-                    onChanged: onGoalChanged == null
-                        ? null
-                        : (v) {
-                            if (v && !goal.enabled) {
-                              _editGoal(context);
-                            } else {
-                              onGoalChanged!(goal.copyWith(enabled: v));
-                            }
-                          },
-                  ),
-                ],
-              ),
-            ),
+        ),
+        _PlanOptionTile(
+          icon: Icons.flag_rounded,
+          title: loc.runRecordGoal,
+          subtitle: goalSubtitle,
+          selected: goal.enabled,
+          showChevron: onGoalChanged != null && !active,
+          onTap: onGoalChanged == null ? null : () => _editGoal(context),
+          trailing: Switch.adaptive(
+            value: goal.enabled,
+            onChanged: onGoalChanged == null
+                ? null
+                : (v) {
+                    if (v && !goal.enabled) {
+                      _editGoal(context);
+                    } else {
+                      onGoalChanged!(goal.copyWith(enabled: v));
+                    }
+                  },
           ),
-          if (goal.enabled && active) ...[
-            const SizedBox(height: 4),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: goalSnapshot.progress.clamp(0.0, 1.0),
-                minHeight: 5,
-              ),
-            ),
-          ],
-          Divider(
-            height: 16,
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-          ),
-          Row(
-            children: [
-              Icon(
-                Icons.av_timer,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      loc.runRecordIntervals,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (intervalPhase != null)
-                      Text(
-                        intervalPhase,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              if (intervalSnapshot.isActive)
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: Text(
+          footer: goal.enabled && active
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: goalSnapshot.progress.clamp(0.0, 1.0),
+                    minHeight: 6,
+                  ),
+                )
+              : null,
+        ),
+        if (showIntervalStatus) ...[
+          const SizedBox(height: 10),
+          _PlanOptionTile(
+            icon: Icons.av_timer_rounded,
+            title: loc.runRecordIntervals,
+            subtitle: intervalPhase ?? loc.runRecordIntervals,
+            selected: true,
+            trailing: intervalSnapshot.isActive
+                ? Text(
                     intervalSnapshot.currentMetric ==
                             RunIntervalMetric.distance
                         ? '${intervalSnapshot.remaining.round()} m'
                         : RunFormatters.duration(
                             intervalSnapshot.remaining.round(),
                           ),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
+                  )
+                : const SizedBox.shrink(),
+            footer: intervalSnapshot.isActive
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: intervalSnapshot.progress.clamp(0.0, 1.0),
+                      minHeight: 6,
+                    ),
+                  )
+                : null,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _PlanOptionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final bool showChevron;
+  final VoidCallback? onTap;
+  final Widget trailing;
+  final Widget? footer;
+
+  const _PlanOptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.trailing,
+    this.showChevron = false,
+    this.onTap,
+    this.footer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final iconBg = selected
+        ? theme.colorScheme.primaryContainer
+        : theme.colorScheme.surfaceContainerHighest;
+    final iconColor = selected
+        ? theme.colorScheme.onPrimaryContainer
+        : theme.colorScheme.onSurfaceVariant;
+
+    return Material(
+      color: selected
+          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.35)
+          : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.65),
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: iconBg,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, size: 24, color: iconColor),
                   ),
-                ),
-              Switch.adaptive(
-                value: intervalsOn,
-                onChanged: onIntervalsChanged,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (showChevron)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 2),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  trailing,
+                ],
               ),
+              if (footer != null) ...[
+                const SizedBox(height: 10),
+                footer!,
+              ],
             ],
           ),
-          if (intervalsOn && intervalSnapshot.isActive) ...[
-            const SizedBox(height: 4),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: intervalSnapshot.progress.clamp(0.0, 1.0),
-                minHeight: 5,
-              ),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -1209,8 +1293,14 @@ class _Metric extends StatelessWidget {
   final String label;
   final String value;
   final String? unit;
+  final bool emphasize;
 
-  const _Metric({required this.label, required this.value, this.unit});
+  const _Metric({
+    required this.label,
+    required this.value,
+    this.unit,
+    this.emphasize = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1219,26 +1309,34 @@ class _Metric extends StatelessWidget {
       children: [
         Text(
           label.toUpperCase(),
-          style: theme.textTheme.labelSmall?.copyWith(
-            letterSpacing: 1.1,
+          style: theme.textTheme.labelMedium?.copyWith(
+            letterSpacing: 0.9,
+            fontWeight: FontWeight.w700,
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Text(
           value,
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.w700,
+          style: (emphasize
+                  ? theme.textTheme.headlineMedium
+                  : theme.textTheme.headlineSmall)
+              ?.copyWith(
+            fontWeight: FontWeight.w800,
+            height: 1.05,
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
-        if (unit != null)
+        if (unit != null) ...[
+          const SizedBox(height: 2),
           Text(
             unit!,
-            style: theme.textTheme.labelSmall?.copyWith(
+            style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
             ),
           ),
+        ],
       ],
     );
   }
