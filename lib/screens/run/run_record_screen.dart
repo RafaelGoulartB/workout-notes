@@ -350,7 +350,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
           ),
           NotificationListener<DraggableScrollableNotification>(
             onNotification: (notification) {
-              final expanded = notification.extent >= 0.70;
+              final expanded = notification.extent >= 0.75;
               if (expanded != _sheetExpanded && mounted) {
                 setState(() => _sheetExpanded = expanded);
               }
@@ -396,9 +396,9 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                   ),
                   initialChildSize: collapsedSize,
                   minChildSize: collapsedSize,
-                  maxChildSize: 0.92,
+                  maxChildSize: 0.90,
                   snap: true,
-                  snapSizes: [collapsedSize, 0.92],
+                  snapSizes: [collapsedSize, 0.90],
                   builder: (context, scrollController) {
                     return _MetricsSheet(
                       scrollController: scrollController,
@@ -578,13 +578,174 @@ class _MetricsSheet extends StatelessWidget {
       );
     }
 
-    // Pack content tightly — no Expanded gaps. Sheet height is sized to
-    // match visible widgets; extra room only appears when user expands.
-    return Container(
+    // Collapsed: hug content. Expanded: metrics + buttons stay put; only
+    // splits scroll. Sheet max is 90% of the screen.
+    const sheetRadius = BorderRadius.vertical(top: Radius.circular(28));
+
+    Widget buildHandle() {
+      return Center(
+        child: Container(
+          width: 44,
+          height: 5,
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+      );
+    }
+
+    Widget buildPermissionBanner() {
+      if (state.locationGranted || !state.supported) {
+        return const SizedBox.shrink();
+      }
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.errorContainer.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Text(
+            loc.runRecordPermissionNeeded,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onErrorContainer,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget buildMetrics() {
+      return Row(
+        children: [
+          Expanded(
+            child: _Metric(
+              label: loc.runRecordTime,
+              value: RunFormatters.duration(state.durationSeconds),
+              emphasize: state.isActive,
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 40,
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
+          ),
+          Expanded(
+            child: _Metric(
+              label: loc.runRecordDistance,
+              value: RunFormatters.distanceKm(state.distanceMeters),
+              unit: 'km',
+              emphasize: state.isActive,
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 40,
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
+          ),
+          Expanded(
+            child: _Metric(
+              label: loc.runRecordPace,
+              value: RunFormatters.pace(pace),
+              unit: loc.runRecordPaceUnit,
+              emphasize: state.isActive,
+            ),
+          ),
+        ],
+      );
+    }
+
+    Widget buildHeader() {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          buildHandle(),
+          buildPermissionBanner(),
+          buildMetrics(),
+          const SizedBox(height: 12),
+          _RunPlanCard(
+            goal: goal,
+            goalSnapshot: goalSnapshot,
+            intervalsOn: intervalsOn,
+            intervalSnapshot: intervalSnapshot,
+            active: state.isActive,
+            onGoalChanged: onGoalChanged,
+          ),
+        ],
+      );
+    }
+
+    Widget buildCollapsedSplits() {
+      if (last == null && best == null) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: _SplitSummaryList(
+          lastTitle: loc.runRecordSplitLast,
+          bestTitle: loc.runRecordSplitBest,
+          last: last,
+          best: best,
+          emptyLabel: '—',
+          expandHint: state.splits.length > 1
+              ? loc.runRecordSplitsExpandHint
+              : null,
+        ),
+      );
+    }
+
+    final splitsHeader = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 16),
+        Text(
+          loc.runRecordSplitsTitle,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.6,
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (allSplits.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                const Expanded(flex: 2, child: SizedBox.shrink()),
+                Expanded(
+                  child: Text(
+                    loc.runRecordSplitTime,
+                    textAlign: TextAlign.end,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    loc.runRecordSplitPace,
+                    textAlign: TextAlign.end,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+
+    final sheet = Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: theme.colorScheme.surface.withValues(alpha: 0.98),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: sheetRadius,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
@@ -593,183 +754,57 @@ class _MetricsSheet extends StatelessWidget {
           ),
         ],
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final body = Padding(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 5,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurfaceVariant.withValues(
-                        alpha: 0.4,
-                      ),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                ),
-                if (!state.locationGranted && state.supported) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.errorContainer.withValues(
-                        alpha: 0.7,
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Text(
-                      loc.runRecordPermissionNeeded,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onErrorContainer,
-                        fontWeight: FontWeight.w600,
-                      ),
+      child: expanded
+          ? Padding(
+              padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  buildHeader(),
+                  splitsHeader,
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      physics: const ClampingScrollPhysics(),
+                      itemCount: allSplits.isEmpty ? 1 : allSplits.length,
+                      itemBuilder: (context, index) {
+                        if (allSplits.isEmpty) {
+                          return Text(
+                            loc.runRecordSplitsEmpty,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          );
+                        }
+                        return _SplitRow(split: allSplits[index]);
+                      },
                     ),
                   ),
                   const SizedBox(height: 12),
+                  actions,
                 ],
-                Row(
+              ),
+            )
+          : SingleChildScrollView(
+              controller: scrollController,
+              physics: const ClampingScrollPhysics(),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: _Metric(
-                        label: loc.runRecordTime,
-                        value: RunFormatters.duration(state.durationSeconds),
-                        emphasize: state.isActive,
-                      ),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 40,
-                      color: theme.colorScheme.outlineVariant.withValues(
-                        alpha: 0.45,
-                      ),
-                    ),
-                    Expanded(
-                      child: _Metric(
-                        label: loc.runRecordDistance,
-                        value: RunFormatters.distanceKm(state.distanceMeters),
-                        unit: 'km',
-                        emphasize: state.isActive,
-                      ),
-                    ),
-                    Container(
-                      width: 1,
-                      height: 40,
-                      color: theme.colorScheme.outlineVariant.withValues(
-                        alpha: 0.45,
-                      ),
-                    ),
-                    Expanded(
-                      child: _Metric(
-                        label: loc.runRecordPace,
-                        value: RunFormatters.pace(pace),
-                        unit: loc.runRecordPaceUnit,
-                        emphasize: state.isActive,
-                      ),
-                    ),
+                    buildHeader(),
+                    buildCollapsedSplits(),
+                    const SizedBox(height: 12),
+                    actions,
                   ],
                 ),
-                const SizedBox(height: 12),
-                _RunPlanCard(
-                  goal: goal,
-                  goalSnapshot: goalSnapshot,
-                  intervalsOn: intervalsOn,
-                  intervalSnapshot: intervalSnapshot,
-                  active: state.isActive,
-                  onGoalChanged: onGoalChanged,
-                ),
-                if (!expanded && (last != null || best != null)) ...[
-                  const SizedBox(height: 10),
-                  _SplitSummaryList(
-                    lastTitle: loc.runRecordSplitLast,
-                    bestTitle: loc.runRecordSplitBest,
-                    last: last,
-                    best: best,
-                    emptyLabel: '—',
-                    expandHint: state.splits.length > 1
-                        ? loc.runRecordSplitsExpandHint
-                        : null,
-                  ),
-                ],
-                if (expanded) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    loc.runRecordSplitsTitle,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (allSplits.isEmpty)
-                    Text(
-                      loc.runRecordSplitsEmpty,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    )
-                  else ...[
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        children: [
-                          const Expanded(flex: 2, child: SizedBox.shrink()),
-                          Expanded(
-                            child: Text(
-                              loc.runRecordSplitTime,
-                              textAlign: TextAlign.end,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              loc.runRecordSplitPace,
-                              textAlign: TextAlign.end,
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    ...allSplits.map((split) => _SplitRow(split: split)),
-                  ],
-                ],
-                const SizedBox(height: 12),
-                actions,
-              ],
+              ),
             ),
-          );
-
-          // Only stretch when expanded so the sheet can scroll long split lists.
-          // Collapsed: hug content — no empty slots between widgets.
-          return SingleChildScrollView(
-            controller: scrollController,
-            physics: const ClampingScrollPhysics(),
-            child: expanded
-                ? ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
-                    child: body,
-                  )
-                : body,
-          );
-        },
-      ),
     );
+
+    return sheet;
   }
 }
 
