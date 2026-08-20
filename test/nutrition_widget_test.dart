@@ -644,6 +644,7 @@ void main() {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 100)),
       );
+      await _waitUntilFound(tester, find.text(loc.nutritionSearchEmpty));
       await tester.pumpAndSettle();
 
       expect(find.byType(FoodSearchScreen), findsOneWidget);
