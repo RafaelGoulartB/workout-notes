@@ -27,6 +27,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   final _coach = RunVoiceCoach();
   bool _busy = false;
   bool _sheetExpanded = false;
+  double _lastCollapsedSize = 0.40;
   bool _intervalsOn = false;
   RunSessionGoal _goal = const RunSessionGoal.defaults();
 
@@ -350,6 +351,14 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
           ),
           NotificationListener<DraggableScrollableNotification>(
             onNotification: (notification) {
+              // Evita trocar o conteúdo (altura) no meio do gesto — isso
+              // causava o "para no meio" porque o SingleChildScrollView
+              // mudava de tamanho enquanto o usuário arrastava. Só atualiza
+              // quando o sheet já assentou num snap.
+              final nearCollapsed =
+                  (notification.extent - _lastCollapsedSize).abs() < 0.03;
+              final nearExpanded = (notification.extent - 0.90).abs() < 0.03;
+              if (!nearCollapsed && !nearExpanded) return false;
               final expanded = notification.extent >= 0.75;
               if (expanded != _sheetExpanded && mounted) {
                 setState(() => _sheetExpanded = expanded);
@@ -389,6 +398,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                 contentH += bottomPad;
                 final collapsedSize =
                     (contentH / media.size.height).clamp(0.28, 0.72);
+                _lastCollapsedSize = collapsedSize;
                 return DraggableScrollableSheet(
                   key: ValueKey(
                     'run-sheet-${collapsedSize.toStringAsFixed(3)}-'
@@ -754,54 +764,47 @@ class _MetricsSheet extends StatelessWidget {
           ),
         ],
       ),
-      child: expanded
-          ? Padding(
-              padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  buildHeader(),
-                  splitsHeader,
-                  Expanded(
-                    child: ListView.builder(
-                      controller: scrollController,
-                      physics: const ClampingScrollPhysics(),
-                      itemCount: allSplits.isEmpty ? 1 : allSplits.length,
-                      itemBuilder: (context, index) {
-                        if (allSplits.isEmpty) {
-                          return Text(
-                            loc.runRecordSplitsEmpty,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          );
-                        }
-                        return _SplitRow(split: allSplits[index]);
-                      },
+      // Fix: sheet deve usar sempre o mesmo scrollable com o controller do
+      // DraggableScrollableSheet. Antes, expandido era Column+Expanded(ListView)
+      // e recolhido SingleChildScrollView — trocar o tipo no meio do gesto
+      // (via extent >= 0.75) destacava o controller e travava para baixo.
+      // Tentativa anterior de manter header/actions pinados fora do scroll
+      // quebrou o arraste para cima, pois o gesto no header não chegava ao
+      // controller. Agora todo o conteúdo fica dentro de um único
+      // SingleChildScrollView com o scrollController, então qualquer ponto
+      // do sheet arrasta/expande e, quando no topo, recolhe.
+      child: SingleChildScrollView(
+        controller: scrollController,
+        physics: const ClampingScrollPhysics(),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              buildHeader(),
+              if (expanded) ...[
+                splitsHeader,
+                if (allSplits.isEmpty)
+                  Text(
+                    loc.runRecordSplitsEmpty,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  actions,
-                ],
-              ),
-            )
-          : SingleChildScrollView(
-              controller: scrollController,
-              physics: const ClampingScrollPhysics(),
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    buildHeader(),
-                    buildCollapsedSplits(),
-                    const SizedBox(height: 12),
-                    actions,
-                  ],
-                ),
-              ),
-            ),
+                  )
+                else
+                  ...allSplits.map((s) => _SplitRow(split: s)),
+                const SizedBox(height: 12),
+              ] else ...[
+                const SizedBox(height: 10),
+                buildCollapsedSplits(),
+                const SizedBox(height: 12),
+              ],
+              actions,
+            ],
+          ),
+        ),
+      ),
     );
 
     return sheet;
