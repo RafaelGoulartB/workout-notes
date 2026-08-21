@@ -88,9 +88,9 @@ class _ProgressScreenState extends State<ProgressScreen>
       case 1:
         _loadTraining();
       case 2:
-        _loadPerformance();
-      case 3:
         _loadWellness();
+      case 3:
+        _loadPerformance();
     }
   }
 
@@ -322,8 +322,8 @@ class _ProgressScreenState extends State<ProgressScreen>
                   tabs: [
                     Tab(text: loc.progressTabFrequency),
                     Tab(text: loc.progressTabTraining),
-                    Tab(text: loc.progressTabExercises),
                     Tab(text: loc.progressTabWellness),
+                    Tab(text: loc.progressTabExercises),
                   ],
                 ),
                 backgroundColor: theme.scaffoldBackgroundColor,
@@ -338,8 +338,8 @@ class _ProgressScreenState extends State<ProgressScreen>
         children: [
           _buildTabScroll(child: _buildFrequencyContent(theme)),
           _buildTabScroll(child: _buildTrainingContent(theme)),
-          _buildTabScroll(child: _buildPerformanceContent(theme)),
           _buildTabScroll(child: _buildWellnessContent(theme)),
+          _buildTabScroll(child: _buildPerformanceContent(theme)),
         ],
       ),
     );
