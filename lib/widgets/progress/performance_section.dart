@@ -50,18 +50,17 @@ class PerformanceSection extends StatelessWidget {
     }
     final sortedKeys = grouped.keys.toList()..sort();
 
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            loc.progressTapForHistory,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          loc.progressTapForHistory,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
-          const SizedBox(height: 12),
-          ...sortedKeys.map((catName) {
+        ),
+        const SizedBox(height: 12),
+        ...sortedKeys.map((catName) {
             final exercises = grouped[catName]!;
             final catColor = Color(exercises.first['category_color']
                     as int? ??
@@ -123,8 +122,7 @@ class PerformanceSection extends StatelessWidget {
                   .toList(),
             );
           }),
-        ],
-      ),
+      ],
     );
   }
 }

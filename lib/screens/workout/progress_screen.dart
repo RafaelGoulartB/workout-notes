@@ -5,7 +5,6 @@ import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/repositories/analytics_repository.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/exercise_repository.dart';
-import 'package:workout_notes/utils/progress_helpers.dart';
 import 'package:workout_notes/widgets/goals/goals_section.dart';
 import 'package:workout_notes/widgets/progress/body_section_charts.dart';
 import 'package:workout_notes/widgets/progress/duration_recovery_charts.dart';
@@ -14,7 +13,7 @@ import 'package:workout_notes/widgets/progress/exercise_detail_view.dart';
 import 'package:workout_notes/widgets/progress/frequency_charts.dart';
 import 'package:workout_notes/widgets/progress/monthly_report_card.dart';
 import 'package:workout_notes/widgets/progress/performance_section.dart';
-import 'package:workout_notes/widgets/progress/progress_stat_cards.dart';
+import 'package:workout_notes/widgets/progress/progress_chart_shell.dart';
 import 'package:workout_notes/widgets/progress/volume_charts.dart';
 
 class ProgressScreen extends StatefulWidget {
@@ -26,7 +25,7 @@ class ProgressScreen extends StatefulWidget {
 
 class _ProgressScreenState extends State<ProgressScreen>
     with SingleTickerProviderStateMixin {
-  static const _tabCount = 6;
+  static const _tabCount = 4;
 
   final _analytics = AnalyticsRepository();
   final _exerciseRepo = ExerciseRepository();
@@ -36,46 +35,29 @@ class _ProgressScreenState extends State<ProgressScreen>
 
   bool _isLoading = true;
 
-  // === OVERVIEW DATA (loaded immediately) ===
-  Map<String, dynamic>? _overviewStats;
   Map<String, dynamic>? _monthReport;
   Map<String, dynamic>? _monthComparison;
 
-  // === LAZY LOADING FLAGS ===
   bool _isLoadingFrequency = false;
-  bool _isLoadingVolume = false;
+  bool _isLoadingTraining = false;
   bool _isLoadingPerformance = false;
-  bool _isLoadingDuration = false;
-  bool _isLoadingRecovery = false;
-  bool _isLoadingBody = false;
+  bool _isLoadingWellness = false;
   bool _loadedFrequency = false;
-  bool _loadedVolume = false;
+  bool _loadedTraining = false;
   bool _loadedPerformance = false;
-  bool _loadedDuration = false;
-  bool _loadedRecovery = false;
-  bool _loadedBody = false;
+  bool _loadedWellness = false;
 
-  // === FREQUENCY DATA ===
   Map<String, int> _heatmapData = {};
   List<Map<String, dynamic>> _workoutDates = [];
-
-  // === PERFORMANCE DATA ===
   List<Map<String, dynamic>> _allExercises = [];
-
-  // === DURATION / DENSITY ===
   List<Map<String, dynamic>> _durationTrend = [];
   List<Map<String, dynamic>> _densityData = [];
-
-  // === RECOVERY ===
   List<Map<String, dynamic>> _feelingTrend = [];
   List<Map<String, dynamic>> _feelingVsVolume = [];
-
-  // === BODY ===
   List<Map<String, dynamic>> _bodyData = [];
   List<Map<String, dynamic>> _bodySummary = [];
   List<Map<String, dynamic>> _bodyComposition = [];
 
-  // === EXERCISE DETAIL STATE ===
   Map<String, dynamic>? _selectedHistory;
   bool _showingOverview = true;
 
@@ -104,15 +86,11 @@ class _ProgressScreenState extends State<ProgressScreen>
       case 0:
         _loadFrequency();
       case 1:
-        _loadVolume();
+        _loadTraining();
       case 2:
         _loadPerformance();
       case 3:
-        _loadDuration();
-      case 4:
-        _loadRecovery();
-      case 5:
-        _loadBody();
+        _loadWellness();
     }
   }
 
@@ -123,17 +101,15 @@ class _ProgressScreenState extends State<ProgressScreen>
     try {
       final previousMonth = DateTime(now.year, now.month - 1, 1);
       final results = await Future.wait([
-        _analytics.getWorkoutOverviewStats(),
         _analytics.getMonthlyReport(now.year, now.month),
         _analytics.getMonthlyReport(previousMonth.year, previousMonth.month),
       ]);
 
       if (!mounted) return;
 
-      _overviewStats = results[0];
-      final currentReport = results[1];
+      final currentReport = results[0];
       _monthReport = currentReport;
-      final previousReport = results[2];
+      final previousReport = results[1];
       _monthComparison = {
         'current': currentReport,
         'previous': previousReport,
@@ -171,14 +147,21 @@ class _ProgressScreenState extends State<ProgressScreen>
     }
   }
 
-  Future<void> _loadVolume() async {
-    if (_loadedVolume || _isLoadingVolume) return;
-    setState(() => _isLoadingVolume = true);
+  Future<void> _loadTraining() async {
+    if (_loadedTraining || _isLoadingTraining) return;
+    setState(() => _isLoadingTraining = true);
     try {
-      _loadedVolume = true;
-      if (mounted) setState(() => _isLoadingVolume = false);
+      final results = await Future.wait([
+        _analytics.getDurationTrend(),
+        _analytics.getWorkoutDensity(),
+      ]);
+      if (!mounted) return;
+      _durationTrend = results[0];
+      _densityData = results[1];
+      _loadedTraining = true;
+      setState(() => _isLoadingTraining = false);
     } catch (_) {
-      if (mounted) setState(() => _isLoadingVolume = false);
+      if (mounted) setState(() => _isLoadingTraining = false);
     }
   }
 
@@ -198,59 +181,27 @@ class _ProgressScreenState extends State<ProgressScreen>
     }
   }
 
-  Future<void> _loadDuration() async {
-    if (_loadedDuration || _isLoadingDuration) return;
-    setState(() => _isLoadingDuration = true);
-    try {
-      final results = await Future.wait([
-        _analytics.getDurationTrend(),
-        _analytics.getWorkoutDensity(),
-      ]);
-      if (!mounted) return;
-      _durationTrend = results[0];
-      _densityData = results[1];
-      _loadedDuration = true;
-      setState(() => _isLoadingDuration = false);
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingDuration = false);
-    }
-  }
-
-  Future<void> _loadRecovery() async {
-    if (_loadedRecovery || _isLoadingRecovery) return;
-    setState(() => _isLoadingRecovery = true);
+  Future<void> _loadWellness() async {
+    if (_loadedWellness || _isLoadingWellness) return;
+    setState(() => _isLoadingWellness = true);
     try {
       final results = await Future.wait([
         _analytics.getFeelingTrend(),
         _analytics.getFeelingVsVolume(),
-      ]);
-      if (!mounted) return;
-      _feelingTrend = results[0];
-      _feelingVsVolume = results[1];
-      _loadedRecovery = true;
-      setState(() => _isLoadingRecovery = false);
-    } catch (_) {
-      if (mounted) setState(() => _isLoadingRecovery = false);
-    }
-  }
-
-  Future<void> _loadBody() async {
-    if (_loadedBody || _isLoadingBody) return;
-    setState(() => _isLoadingBody = true);
-    try {
-      final results = await Future.wait([
         _analytics.getBodyWeightWithVolume(),
         _bodyRepo.getBodyMeasurementsSummary(),
         _bodyRepo.getBodyCompositionTrend(),
       ]);
       if (!mounted) return;
-      _bodyData = results[0];
-      _bodySummary = results[1];
-      _bodyComposition = results[2];
-      _loadedBody = true;
-      setState(() => _isLoadingBody = false);
+      _feelingTrend = results[0];
+      _feelingVsVolume = results[1];
+      _bodyData = results[2];
+      _bodySummary = results[3];
+      _bodyComposition = results[4];
+      _loadedWellness = true;
+      setState(() => _isLoadingWellness = false);
     } catch (_) {
-      if (mounted) setState(() => _isLoadingBody = false);
+      if (mounted) setState(() => _isLoadingWellness = false);
     }
   }
 
@@ -346,8 +297,6 @@ class _ProgressScreenState extends State<ProgressScreen>
                     report: _monthReport,
                     comparison: _monthComparison,
                   ),
-                  const SizedBox(height: 12),
-                  _buildStatsGrid(theme),
                   const SizedBox(height: 16),
                   _buildGoalsHeader(theme),
                   const SizedBox(height: 8),
@@ -368,16 +317,13 @@ class _ProgressScreenState extends State<ProgressScreen>
               delegate: _ProgressTabBarDelegate(
                 tabBar: TabBar(
                   controller: _tabController,
-                  isScrollable: true,
-                  tabAlignment: TabAlignment.start,
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+                  isScrollable: false,
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                   tabs: [
                     Tab(text: loc.progressTabFrequency),
-                    Tab(text: loc.progressTabVolume),
+                    Tab(text: loc.progressTabTraining),
                     Tab(text: loc.progressTabExercises),
-                    Tab(text: loc.progressTabDuration),
-                    Tab(text: loc.progressTabRecovery),
-                    Tab(text: loc.progressTabBody),
+                    Tab(text: loc.progressTabWellness),
                   ],
                 ),
                 backgroundColor: theme.scaffoldBackgroundColor,
@@ -391,11 +337,9 @@ class _ProgressScreenState extends State<ProgressScreen>
         controller: _tabController,
         children: [
           _buildTabScroll(child: _buildFrequencyContent(theme)),
-          _buildTabScroll(child: _buildVolumeContent(theme)),
+          _buildTabScroll(child: _buildTrainingContent(theme)),
           _buildTabScroll(child: _buildPerformanceContent(theme)),
-          _buildTabScroll(child: _buildDurationContent(theme)),
-          _buildTabScroll(child: _buildRecoveryContent(theme)),
-          _buildTabScroll(child: _buildBodyContent(theme)),
+          _buildTabScroll(child: _buildWellnessContent(theme)),
         ],
       ),
     );
@@ -416,65 +360,6 @@ class _ProgressScreenState extends State<ProgressScreen>
           ],
         );
       },
-    );
-  }
-
-  Widget _buildStatsGrid(ThemeData theme) {
-    final loc = AppLocalizations.of(context)!;
-    final stats = _overviewStats;
-    final totalWorkouts = (stats?['total_workouts'] as int?) ?? 0;
-    final totalSets = (stats?['total_sets'] as int?) ?? 0;
-    final totalVolume = (stats?['total_volume'] as num?)?.toDouble() ?? 0.0;
-    final streak = (stats?['current_streak'] as int?) ?? 0;
-    final dayLabel =
-        streak == 1 ? loc.workoutHomeDay : loc.workoutHomeDays;
-
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: ProgressStatCard(
-                label: loc.progressWorkouts,
-                value: '$totalWorkouts',
-                icon: Icons.fitness_center,
-                color: theme.colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ProgressStatCard(
-                label: loc.progressSets,
-                value: '$totalSets',
-                icon: Icons.repeat,
-                color: theme.colorScheme.secondary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: ProgressStatCard(
-                label: loc.progressStreak,
-                value: '$streak $dayLabel',
-                icon: Icons.local_fire_department,
-                color: Colors.orange,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: ProgressStatCard(
-                label: loc.commonVolume,
-                value: formatVolume(totalVolume),
-                icon: Icons.auto_graph,
-                color: Colors.teal,
-              ),
-            ),
-          ],
-        ),
-      ],
     );
   }
 
@@ -516,8 +401,7 @@ class _ProgressScreenState extends State<ProgressScreen>
   }
 
   Widget _buildFrequencyContent(ThemeData theme) {
-    if (_isLoadingFrequency) return _sectionLoading();
-    if (!_loadedFrequency) return _sectionLoading();
+    if (_isLoadingFrequency || !_loadedFrequency) return _sectionLoading();
     return FrequencyCharts(
       heatmapData: _heatmapData,
       workoutDates: _workoutDates,
@@ -525,15 +409,40 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
-  Widget _buildVolumeContent(ThemeData theme) {
-    if (_isLoadingVolume) return _sectionLoading();
-    if (!_loadedVolume) return _sectionLoading();
-    return VolumeCharts(analytics: _analytics);
+  Widget _buildTrainingContent(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
+    if (_isLoadingTraining || !_loadedTraining) return _sectionLoading();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ProgressGroupLabel(
+          title: loc.progressGroupVolume,
+          icon: Icons.pie_chart_outline,
+          color: Colors.teal,
+        ),
+        VolumeCharts(analytics: _analytics),
+        const SizedBox(height: 20),
+        ProgressGroupLabel(
+          title: loc.progressGroupEfficiency,
+          icon: Icons.timer_outlined,
+          color: Colors.purple,
+        ),
+        if (_durationTrend.isEmpty && _densityData.isEmpty)
+          _emptyTab(theme, loc.progressNoChartData)
+        else
+          DurationRecoveryCharts(
+            durationTrend: _durationTrend,
+            densityData: _densityData,
+            feelingTrend: const [],
+            feelingVsVolume: const [],
+          ),
+      ],
+    );
   }
 
   Widget _buildPerformanceContent(ThemeData theme) {
-    if (_isLoadingPerformance) return _sectionLoading();
-    if (!_loadedPerformance) return _sectionLoading();
+    if (_isLoadingPerformance || !_loadedPerformance) return _sectionLoading();
     if (_allExercises.isEmpty) {
       return _emptyTab(
         theme,
@@ -546,47 +455,50 @@ class _ProgressScreenState extends State<ProgressScreen>
     );
   }
 
-  Widget _buildDurationContent(ThemeData theme) {
-    if (_isLoadingDuration) return _sectionLoading();
-    if (!_loadedDuration) return _sectionLoading();
-    if (_durationTrend.isEmpty && _densityData.isEmpty) {
-      return _emptyTab(
-        theme,
-        AppLocalizations.of(context)!.progressNoChartData,
-      );
-    }
-    return DurationRecoveryCharts(
-      durationTrend: _durationTrend,
-      densityData: _densityData,
-      feelingTrend: const [],
-      feelingVsVolume: const [],
-    );
-  }
+  Widget _buildWellnessContent(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
+    if (_isLoadingWellness || !_loadedWellness) return _sectionLoading();
 
-  Widget _buildRecoveryContent(ThemeData theme) {
-    if (_isLoadingRecovery) return _sectionLoading();
-    if (!_loadedRecovery) return _sectionLoading();
-    if (_feelingTrend.isEmpty && _feelingVsVolume.isEmpty) {
-      return _emptyTab(
-        theme,
-        AppLocalizations.of(context)!.progressNoChartData,
-      );
-    }
-    return DurationRecoveryCharts(
-      durationTrend: const [],
-      densityData: const [],
-      feelingTrend: _feelingTrend,
-      feelingVsVolume: _feelingVsVolume,
-    );
-  }
+    final hasRecovery =
+        _feelingTrend.isNotEmpty || _feelingVsVolume.isNotEmpty;
 
-  Widget _buildBodyContent(ThemeData theme) {
-    if (_isLoadingBody) return _sectionLoading();
-    if (!_loadedBody) return _sectionLoading();
-    return BodySectionCharts(
-      bodySummary: _bodySummary,
-      bodyComposition: _bodyComposition,
-      bodyData: _bodyData,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ProgressGroupLabel(
+          title: loc.progressGroupRecovery,
+          icon: Icons.favorite_outline,
+          color: Colors.redAccent,
+        ),
+        if (!hasRecovery)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              loc.progressNoChartData,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          )
+        else
+          DurationRecoveryCharts(
+            durationTrend: const [],
+            densityData: const [],
+            feelingTrend: _feelingTrend,
+            feelingVsVolume: _feelingVsVolume,
+          ),
+        const SizedBox(height: 20),
+        ProgressGroupLabel(
+          title: loc.progressGroupBody,
+          icon: Icons.monitor_weight_outlined,
+          color: Colors.indigo,
+        ),
+        BodySectionCharts(
+          bodySummary: _bodySummary,
+          bodyComposition: _bodyComposition,
+          bodyData: _bodyData,
+        ),
+      ],
     );
   }
 
