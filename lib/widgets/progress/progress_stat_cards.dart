@@ -20,27 +20,29 @@ class ProgressStatCard extends StatelessWidget {
     final theme = Theme.of(context);
     return Card(
       elevation: 0,
-      color: color.withAlpha(15),
+      color: color.withAlpha(18),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: color.withAlpha(40)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(height: 4),
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 6),
             Text(
               value,
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
+                fontSize: 15,
               ),
             ),
+            const SizedBox(height: 2),
             Text(
               label,
               style: theme.textTheme.bodySmall?.copyWith(
-                fontSize: 10,
+                fontSize: 11,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),

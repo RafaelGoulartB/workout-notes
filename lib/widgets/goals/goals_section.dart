@@ -13,10 +13,15 @@ class GoalsSection extends StatefulWidget {
   final DatabaseHelper db;
   final SettingsRepository settingsRepo;
 
+  /// When set, only goals in these scopes are listed and the create/edit
+  /// sheet is restricted to the same scopes.
+  final List<GoalScope> allowedScopes;
+
   const GoalsSection({
     super.key,
     required this.db,
     required this.settingsRepo,
+    this.allowedScopes = const [GoalScope.anaerobic, GoalScope.aerobic],
   });
 
   @override
@@ -39,16 +44,27 @@ class _GoalsSectionState extends State<GoalsSection> {
   @override
   void didUpdateWidget(covariant GoalsSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.db != widget.db) {
+    if (oldWidget.db != widget.db ||
+        !_sameScopes(oldWidget.allowedScopes, widget.allowedScopes)) {
       _load();
     }
+  }
+
+  bool _sameScopes(List<GoalScope> a, List<GoalScope> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   Future<void> _load() async {
     setState(() => _isLoading = true);
     try {
       _isKm = await widget.settingsRepo.getIsDistanceKm();
-      final goals = await _goalRepo.getAll();
+      final goals = (await _goalRepo.getAll())
+          .where((g) => widget.allowedScopes.contains(g.scope))
+          .toList();
       final progressEntries = await Future.wait(
         goals.map((g) async {
           try {
@@ -73,7 +89,11 @@ class _GoalsSectionState extends State<GoalsSection> {
   }
 
   Future<void> _addGoal() async {
-    final saved = await GoalFormSheet.show(context, widget.settingsRepo);
+    final saved = await GoalFormSheet.show(
+      context,
+      widget.settingsRepo,
+      allowedScopes: widget.allowedScopes,
+    );
     if (saved == null) return;
     try {
       await _goalRepo.insert(saved);
@@ -91,7 +111,12 @@ class _GoalsSectionState extends State<GoalsSection> {
   }
 
   Future<void> _editGoal(Goal goal) async {
-    final saved = await GoalFormSheet.show(context, widget.settingsRepo, existing: goal);
+    final saved = await GoalFormSheet.show(
+      context,
+      widget.settingsRepo,
+      existing: goal,
+      allowedScopes: widget.allowedScopes,
+    );
     if (saved == null) return;
     try {
       await _goalRepo.update(saved);

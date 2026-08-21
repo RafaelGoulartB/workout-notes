@@ -11,15 +11,27 @@ class GoalFormSheet extends StatefulWidget {
   final Goal? existing; // null = create, non-null = edit
   final SettingsRepository settingsRepo;
 
+  /// Scopes the user may pick. When a single scope is allowed, the
+  /// scope step is hidden and that scope is forced.
+  final List<GoalScope> allowedScopes;
+
   const GoalFormSheet({
     super.key,
     this.existing,
     required this.settingsRepo,
+    this.allowedScopes = const [GoalScope.anaerobic, GoalScope.aerobic],
   });
 
   /// Convenience: shows the sheet and returns the saved goal (or null on cancel).
-  static Future<Goal?> show(BuildContext context, SettingsRepository settingsRepo,
-      {Goal? existing}) {
+  static Future<Goal?> show(
+    BuildContext context,
+    SettingsRepository settingsRepo, {
+    Goal? existing,
+    List<GoalScope> allowedScopes = const [
+      GoalScope.anaerobic,
+      GoalScope.aerobic,
+    ],
+  }) {
     return showModalBottomSheet<Goal>(
       context: context,
       isScrollControlled: true,
@@ -27,6 +39,7 @@ class GoalFormSheet extends StatefulWidget {
       builder: (ctx) => GoalFormSheet(
         existing: existing,
         settingsRepo: settingsRepo,
+        allowedScopes: allowedScopes,
       ),
     );
   }
@@ -44,12 +57,26 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
   double? _suggestedTarget;
   bool _isLoadingSuggestion = false;
 
+  List<GoalScope> get _scopes {
+    final scopes = widget.allowedScopes;
+    if (scopes.isEmpty) return const [GoalScope.anaerobic];
+    return scopes;
+  }
+
+  bool get _showScopeSelector => _scopes.length > 1;
+
   @override
   void initState() {
     super.initState();
     final g = widget.existing;
-    _scope = g?.scope ?? GoalScope.anaerobic;
-    _metric = g?.metric ?? GoalMetric.volume;
+    final defaultScope = _scopes.first;
+    final existingScope = g?.scope;
+    _scope = (existingScope != null && _scopes.contains(existingScope))
+        ? existingScope
+        : defaultScope;
+    final validMetrics = GoalMetric.forScope(_scope);
+    final preferred = g?.metric ?? GoalMetric.volume;
+    _metric = validMetrics.contains(preferred) ? preferred : validMetrics.first;
     _period = g?.period ?? GoalPeriod.weekly;
     _titleController = TextEditingController(text: g?.title ?? '');
     _valueController = TextEditingController(
@@ -157,8 +184,10 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 16),
-              _buildScopeSelector(loc),
+              if (_showScopeSelector) ...[
+                const SizedBox(height: 16),
+                _buildScopeSelector(loc),
+              ],
               const SizedBox(height: 16),
               _buildMetricSelector(loc),
               const SizedBox(height: 16),
@@ -205,23 +234,23 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
         const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(
-              child: _scopeOption(
-                label: loc.goalScopeAnaerobic,
-                icon: Icons.fitness_center,
-                color: theme.colorScheme.primary,
-                value: GoalScope.anaerobic,
+            for (var i = 0; i < _scopes.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(
+                child: _scopeOption(
+                  label: _scopes[i] == GoalScope.aerobic
+                      ? loc.goalScopeAerobic
+                      : loc.goalScopeAnaerobic,
+                  icon: _scopes[i] == GoalScope.aerobic
+                      ? Icons.directions_run
+                      : Icons.fitness_center,
+                  color: _scopes[i] == GoalScope.aerobic
+                      ? const Color(0xFFE53935)
+                      : theme.colorScheme.primary,
+                  value: _scopes[i],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _scopeOption(
-                label: loc.goalScopeAerobic,
-                icon: Icons.directions_run,
-                color: const Color(0xFFE53935),
-                value: GoalScope.aerobic,
-              ),
-            ),
+            ],
           ],
         ),
       ],
