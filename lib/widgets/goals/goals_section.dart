@@ -8,7 +8,7 @@ import 'package:workout_notes/screens/workout/goal_detail_screen.dart';
 import 'package:workout_notes/widgets/goals/goal_card.dart';
 import 'package:workout_notes/widgets/goals/goal_form_sheet.dart';
 
-/// Renders the goals grid with the "+" add button at the end.
+/// Renders goals as a vertical list with an add action.
 class GoalsSection extends StatefulWidget {
   final DatabaseHelper db;
   final SettingsRepository settingsRepo;
@@ -105,7 +105,9 @@ class _GoalsSectionState extends State<GoalsSection> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.commonError(e.toString()))),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.commonError(e.toString())),
+        ),
       );
     }
   }
@@ -128,7 +130,9 @@ class _GoalsSectionState extends State<GoalsSection> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.commonError(e.toString()))),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.commonError(e.toString())),
+        ),
       );
     }
   }
@@ -168,9 +172,13 @@ class _GoalsSectionState extends State<GoalsSection> {
   }
 
   void _openDetail(Goal goal) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => GoalDetailScreen(goal: goal, db: widget.db),
-    )).then((_) => _load());
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => GoalDetailScreen(goal: goal, db: widget.db),
+          ),
+        )
+        .then((_) => _load());
   }
 
   @override
@@ -196,45 +204,33 @@ class _GoalsSectionState extends State<GoalsSection> {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: EdgeInsets.zero,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 1.4,
+        for (var i = 0; i < _goals.length; i++) ...[
+          if (i > 0) const SizedBox(height: 8),
+          GoalCard(
+            goal: _goals[i],
+            progress: _progressByGoal[_goals[i].id] ??
+                GoalProgress.empty(DateTime.now()),
+            isKm: _isKm,
+            onTap: () => _openDetail(_goals[i]),
+            onEdit: () => _editGoal(_goals[i]),
+            onTogglePause: () => _togglePause(_goals[i]),
+            onDelete: () => _deleteGoal(_goals[i]),
           ),
-          itemCount: _goals.length,
-          itemBuilder: (context, i) {
-            final goal = _goals[i];
-            final progress = _progressByGoal[goal.id] ?? GoalProgress.empty(DateTime.now());
-            return GoalCard(
-              goal: goal,
-              progress: progress,
-              isKm: _isKm,
-              onTap: () => _openDetail(goal),
-              onEdit: () => _editGoal(goal),
-              onTogglePause: () => _togglePause(goal),
-              onDelete: () => _deleteGoal(goal),
-            );
-          },
-        ),
-        SizedBox(
-          width: double.infinity,
-          height: 32,
+        ],
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerLeft,
           child: TextButton.icon(
             onPressed: _addGoal,
             style: TextButton.styleFrom(
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(0, 32),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              minimumSize: const Size(0, 36),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            icon: const Icon(Icons.add, size: 16),
-            label: Text(loc.goalGridAdd, style: const TextStyle(fontSize: 12)),
+            icon: const Icon(Icons.add, size: 18),
+            label: Text(loc.goalGridAdd),
           ),
         ),
       ],
@@ -242,27 +238,35 @@ class _GoalsSectionState extends State<GoalsSection> {
   }
 
   Widget _buildEmpty(ThemeData theme, AppLocalizations loc) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withAlpha(80),
+        ),
+      ),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer.withAlpha(60),
-              shape: BoxShape.circle,
+              color: theme.colorScheme.primary.withAlpha(28),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               Icons.flag_outlined,
-              size: 40,
+              size: 28,
               color: theme.colorScheme.primary,
             ),
           ),
           const SizedBox(height: 12),
           Text(
             loc.goalEmpty,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 4),
@@ -273,8 +277,8 @@ class _GoalsSectionState extends State<GoalsSection> {
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
+          const SizedBox(height: 14),
+          FilledButton.tonalIcon(
             onPressed: _addGoal,
             icon: const Icon(Icons.add, size: 18),
             label: Text(loc.goalGridAdd),

@@ -365,38 +365,10 @@ class _ProgressScreenState extends State<ProgressScreen>
 
   Widget _buildGoalsHeader(ThemeData theme) {
     final loc = AppLocalizations.of(context)!;
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: Colors.deepPurple.withAlpha(25),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Icons.flag, size: 18, color: Colors.deepPurple),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          loc.progressGoals.toUpperCase(),
-          style: theme.textTheme.labelSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.2,
-            color: theme.colorScheme.onSurface,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            loc.progressGoalsSubtitle,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontSize: 11,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
+    return ProgressGroupLabel(
+      title: loc.progressGoals,
+      icon: Icons.flag_outlined,
+      color: Colors.deepPurple,
     );
   }
 

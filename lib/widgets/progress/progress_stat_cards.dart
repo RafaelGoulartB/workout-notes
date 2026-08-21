@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// A compact stat card used in the progress overview.
+/// A compact stat card used in exercise detail views.
 class ProgressStatCard extends StatelessWidget {
   final String label;
   final String value;
@@ -48,68 +48,6 @@ class ProgressStatCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// A mini stat row used in the monthly report card.
-class ProgressMiniStat extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-  final ThemeData theme;
-  final int? delta;
-
-  const ProgressMiniStat({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.theme,
-    this.delta,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 3),
-              Text(
-                value,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 1),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontSize: 9,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          if (delta != null && delta != 0)
-            Text(
-              '${delta! > 0 ? '+' : ''}$delta',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-                color: delta! > 0 ? Colors.green : Colors.red,
-              ),
-            ),
-        ],
       ),
     );
   }
