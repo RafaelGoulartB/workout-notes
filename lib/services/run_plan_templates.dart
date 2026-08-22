@@ -125,8 +125,12 @@ class RunPlanTemplate {
   String prerequisite(bool pt) => pt ? prerequisitePt : prerequisiteEn;
 
   /// Suggested days/week choices for the customize wizard.
+  ///
+  /// A run/walk progression caps at four days: bone and tendon adaptation lags
+  /// the cardiovascular system, so a brand-new runner gains nothing from a
+  /// fifth day and takes on the injury risk of one.
   List<int> get allowedSessionsPerWeek => switch (style) {
-    RunPlanTemplateStyle.runWalk => const [3, 4, 5],
+    RunPlanTemplateStyle.runWalk => const [3, 4],
     RunPlanTemplateStyle.continuous => const [3, 4, 5],
     RunPlanTemplateStyle.performance => const [3, 4, 5],
   };

@@ -21,6 +21,7 @@ class RunPlanCustomizeScreen extends StatefulWidget {
 class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
   final _repo = RunPlanRepository();
   final _timeCtl = TextEditingController();
+  final _weeklyKmCtl = TextEditingController();
 
   int _step = 0;
   late int _sessions;
@@ -36,7 +37,11 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
   @override
   void initState() {
     super.initState();
-    _sessions = widget.template.sessionsPerWeek.clamp(3, 5);
+    // Templates cap what they allow (a run/walk progression tops out at four
+    // days), so the default has to be a value the user can actually re-pick.
+    final allowed = widget.template.allowedSessionsPerWeek;
+    final preferred = widget.template.sessionsPerWeek.clamp(3, 5);
+    _sessions = allowed.contains(preferred) ? preferred : allowed.last;
     _paceDistanceMeters = _defaultDistance(widget.template.goalKind);
     _seedDefaultDays();
     if (widget.template.level == RunPlanTemplateLevel.beginner &&
@@ -53,7 +58,17 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
   @override
   void dispose() {
     _timeCtl.dispose();
+    _weeklyKmCtl.dispose();
     super.dispose();
+  }
+
+  /// Current weekly volume, when the athlete filled it in.
+  double? get _currentWeeklyKm {
+    final raw = _weeklyKmCtl.text.trim().replaceAll(',', '.');
+    if (raw.isEmpty) return null;
+    final value = double.tryParse(raw);
+    if (value == null || value <= 0) return null;
+    return value;
   }
 
   void _seedDefaultDays() {
@@ -103,6 +118,7 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     intensity: _intensity,
     calibration: _calibration,
     raceDate: _raceDate,
+    currentWeeklyKm: _currentWeeklyKm,
   );
 
   List<RunPlanTemplateWorkout> get _weekPreview {
@@ -404,6 +420,30 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
                 onSelected: (_) => setState(() => _intensity = value),
               ),
           ],
+        ),
+        const SizedBox(height: 24),
+        Text(
+          loc.runPlanCustomizeBaselineTitle,
+          style: theme.textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          loc.runPlanCustomizeBaselineHelp,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _weeklyKmCtl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            labelText: loc.runPlanCustomizeBaselineField,
+            hintText: loc.runPlanCustomizeBaselineHint,
+            suffixText: 'km',
+            border: const OutlineInputBorder(),
+          ),
+          onChanged: (_) => setState(() {}),
         ),
       ],
     );

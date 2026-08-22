@@ -44,6 +44,35 @@ No DB migration: `target_pace_sec_per_km` and step pace min/max already exist.
 - [ ] Unit tests: day spacing, 3-day alternation, recovery/taper, pace ordering
 - [ ] Create path smoke; `flutter analyze` + targeted tests
 
+### Phase 5: Training quality pass
+
+Review of the generated output found the paces sound (validated against Daniels'
+VDOT tables to within ~10 s/km) but the composer unsound. Fixed:
+
+- [x] **Weekday collisions** — day assignment is now per-week from a pool, so two
+      quality kinds can never share a day and leave another day empty
+- [x] **Race week** — was a full build week (a fartlek five days before a
+      marathon). Now a short race-pace sharpener 3+ days out, easy days, race
+- [x] **Race pace by goal distance** — `racePaceFor()` solves the VDOT model for
+      the target distance; a 25:00 5K no longer prescribes a 5:00/km marathon
+- [x] **Inverted pace ranges** — `orderedBand()` keeps the faster bound as `min`
+- [x] **Volume as the primary quantity** — weekly budget drives the plan; the
+      long run is a bounded share (was 47–69% of the week, now a steady ~45%);
+      easy days absorb the remainder so realised volume tracks the budget
+- [x] **Progression capped at ~10%/week** off the previous build week
+- [x] **Taper inverted** — cuts volume, keeps intensity (was the reverse)
+- [x] **Quality caps** — VO2 work ≤8% of weekly km, threshold ≤10%; rep distance
+      shrinks on low-volume weeks instead of forcing an unrunnable rep count
+- [x] **Rep recovery scales with rep duration** (was a flat 120 s for 1000 m)
+- [x] **Hills by effort only** — no flat-ground pace on an uphill rep
+- [x] **Marathon/half specificity** — goal-pace blocks and long runs finishing at
+      race pace; the plans previously had no race-pace work at all
+- [x] **Easy pace as a window**, threshold >20 min as cruise intervals, strides on
+      one easy day per build week
+- [x] `currentWeeklyKm` input anchors week 1 to the athlete's actual baseline
+- [x] Run/walk capped at 4 days with spaced weekdays
+- [x] `test/run_plan_composer_quality_test.dart`: 16 invariants, one per fix
+
 ## Risks & Technical Debt
 
 - VDOT paces are estimates — UI copy must say targets, not prescriptions

@@ -222,13 +222,19 @@ void main() {
       expect(long.dayOfWeek, 7);
     });
 
-    test('run-walk expands to five selected days', () {
+    test('run-walk expands to the selected days', () {
       final week = RunPlanComposer.compose(
         RunPlanTemplates.runWalk,
-        config(sessions: 5, days: const [1, 2, 3, 4, 5]),
+        config(sessions: 4, days: const [1, 2, 4, 6]),
       ).first;
-      expect(week, hasLength(5));
+      expect(week, hasLength(4));
       expect(week.every((s) => s.kind == RunWorkoutKind.easy), isTrue);
+    });
+
+    test('run-walk is capped at four days a week', () {
+      // Bone and tendon adaptation lags the cardiovascular system: a brand-new
+      // runner must not be offered a fifth run/walk day.
+      expect(RunPlanTemplates.runWalk.allowedSessionsPerWeek, isNot(contains(5)));
     });
   });
 }
