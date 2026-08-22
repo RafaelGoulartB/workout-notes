@@ -20,9 +20,9 @@ void main() {
     await uninstallAiTestDb();
   });
 
-  test('openAiReadToolsSchema returns 32 tools with valid shape', () {
+  test('openAiReadToolsSchema returns 35 tools with valid shape', () {
     final tools = registry.openAiReadToolsSchema();
-    expect(tools.length, 32);
+    expect(tools.length, 35);
     for (final t in tools) {
       expect(t['type'], 'function');
       expect(t['function'], isA<Map>());
@@ -34,7 +34,7 @@ void main() {
 
   test('openAiChatToolsSchema includes the guarded routine proposal tool', () {
     final tools = registry.openAiChatToolsSchema();
-    expect(tools, hasLength(35));
+    expect(tools, hasLength(38));
     final proposal = tools.firstWhere(
       (tool) => (tool['function'] as Map)['name'] == 'propose_routine_change',
     );

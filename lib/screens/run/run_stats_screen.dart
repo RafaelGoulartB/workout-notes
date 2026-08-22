@@ -6,6 +6,7 @@ import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_history_screen.dart';
+import 'package:workout_notes/screens/run/run_plans_screen.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/screens/run/run_voice_settings_screen.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
@@ -59,6 +60,14 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const RunHistoryScreen()),
+    );
+    if (mounted) _load();
+  }
+
+  Future<void> _openPlans() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RunPlansScreen()),
     );
     if (mounted) _load();
   }
@@ -138,6 +147,11 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
                 ),
               );
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.route_outlined),
+            tooltip: loc.runPlansTitle,
+            onPressed: _openPlans,
           ),
           IconButton(
             icon: const Icon(Icons.history),

@@ -2,15 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/widgets/goals/goal_formatters.dart';
-import 'package:workout_notes/widgets/goals/goal_progress_ring.dart';
 
-/// Card widget for a single goal, displayed in the goals section grid.
-///
-/// Modern, borderless design:
-/// - Solid colored background (scope color) with a subtle dark overlay
-///   for legibility of white text
-/// - Large progress ring on the left with translucent track
-/// - White text and translucent pills for metadata
+/// Compact full-width goal row matching progress chart card styling.
 class GoalCard extends StatelessWidget {
   final Goal goal;
   final GoalProgress progress;
@@ -31,11 +24,13 @@ class GoalCard extends StatelessWidget {
     this.onDelete,
   });
 
-  Color _scopeColor(BuildContext context) {
+  Color _accent(BuildContext context) {
+    if (progress.isComplete) return const Color(0xFF43A047);
     if (goal.color != null) return Color(goal.color!);
+    final theme = Theme.of(context);
     return goal.scope == GoalScope.aerobic
         ? const Color(0xFFE53935)
-        : const Color(0xFF1565C0); // deep blue, distinct from theme primary
+        : theme.colorScheme.primary;
   }
 
   IconData _metricIcon() {
@@ -43,11 +38,11 @@ class GoalCard extends StatelessWidget {
       case GoalMetric.volume:
         return Icons.auto_graph;
       case GoalMetric.days:
-        return Icons.calendar_today;
+        return Icons.calendar_today_outlined;
       case GoalMetric.distance:
-        return Icons.map;
+        return Icons.map_outlined;
       case GoalMetric.time:
-        return Icons.timer;
+        return Icons.timer_outlined;
     }
   }
 
@@ -66,182 +61,150 @@ class GoalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
-    final color = _scopeColor(context);
-    final percent = progress.percent;
+    final accent = _accent(context);
+    final percent = progress.percent.clamp(0.0, 1.0);
     final isComplete = progress.isComplete;
     final isPaused = !goal.isActive;
-
-    // For complete goals, use green; otherwise use the scope color.
-    final accent = isComplete ? const Color(0xFF2E7D32) : color;
+    final title = goal.title.isNotEmpty ? goal.title : _metricLabel(loc);
+    final current = GoalFormatters.formatValueShort(
+      goal.metric,
+      progress.currentValue,
+      isKm: isKm,
+    );
+    final target = GoalFormatters.formatValueShort(
+      goal.metric,
+      progress.targetValue,
+      isKm: isKm,
+    );
+    final periodLabel = goal.period == GoalPeriod.weekly
+        ? loc.goalPeriodWeekly
+        : loc.goalPeriodMonthly;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         onLongPress: () => _showContextMenu(context),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(14),
         child: Opacity(
-          opacity: isPaused ? 0.75 : 1.0,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              // Solid color background with subtle dark overlay for legibility.
-              decoration: BoxDecoration(
-                color: accent,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: accent.withAlpha(80),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+          opacity: isPaused ? 0.55 : 1,
+          child: Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: theme.colorScheme.outlineVariant.withAlpha(80),
               ),
-              child: Stack(
-                children: [
-                  // Subtle dark overlay at the bottom for text legibility.
-                  Positioned.fill(
-                    child: DecoratedBox(
+            ),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.black.withAlpha(0),
-                            Colors.black.withAlpha(40),
-                          ],
-                          stops: const [0.5, 1.0],
+                        color: accent.withAlpha(28),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        isComplete
+                            ? Icons.check_rounded
+                            : (isPaused ? Icons.pause_rounded : _metricIcon()),
+                        size: 18,
+                        color: accent,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              height: 1.15,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${_metricLabel(loc)} · $periodLabel',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 11,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${(percent * 100).round()}%',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: accent,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: percent,
+                    minHeight: 6,
+                    backgroundColor: accent.withAlpha(28),
+                    valueColor: AlwaysStoppedAnimation<Color>(accent),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '$current / $target',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
                         ),
                       ),
                     ),
-                  ),
-                  // Content
-                  Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Top row: ring + status pill
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            GoalProgressRing(
-                              percent: percent,
-                              color: Colors.white,
-                              trackColor: Colors.white.withAlpha(40),
-                              size: 44,
-                              strokeWidth: 5,
-                              child: Text(
-                                '${(percent * 100).clamp(0, 999).toInt()}%',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 9,
-                                  color: Colors.white,
-                                  height: 1.0,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _StatusPill(
-                                icon: isComplete
-                                    ? Icons.check_circle
-                                    : (isPaused
-                                        ? Icons.pause_circle
-                                        : _metricIcon()),
-                                label: _metricLabel(loc),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        // Title (custom or default)
-                        Text(
-                          goal.title.isNotEmpty
-                              ? goal.title
-                              : _periodShort(loc),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                            height: 1.1,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 1),
-                        // Values
-                        Text(
-                          '${GoalFormatters.formatValueShort(goal.metric, progress.currentValue, isKm: isKm)} / ${GoalFormatters.formatValueShort(goal.metric, progress.targetValue, isKm: isKm)}',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white.withAlpha(220),
-                            height: 1.1,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                        // Translucent bar
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: percent.clamp(0.0, 1.0),
-                            minHeight: 4,
-                            backgroundColor: Colors.white.withAlpha(40),
-                            valueColor:
-                                const AlwaysStoppedAnimation<Color>(
-                                    Colors.white),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        // Footer
-                        Row(
-                          children: [
-                            Icon(
-                              isComplete
-                                  ? Icons.emoji_events
-                                  : Icons.hourglass_bottom,
-                              size: 10,
-                              color: Colors.white.withAlpha(220),
-                            ),
-                            const SizedBox(width: 3),
-                            Expanded(
-                              child: Text(
-                                isComplete
-                                    ? loc.goalCompleted
-                                    : loc.goalDaysRemaining(
-                                        progress.daysRemaining),
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white.withAlpha(220),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                    Icon(
+                      isComplete
+                          ? Icons.emoji_events_outlined
+                          : Icons.schedule_outlined,
+                      size: 14,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isComplete
+                          ? loc.goalCompleted
+                          : loc.goalDaysRemaining(progress.daysRemaining),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
       ),
     );
-  }
-
-  String _periodShort(AppLocalizations loc) {
-    return goal.period == GoalPeriod.weekly
-        ? loc.goalPeriodWeekly
-        : loc.goalPeriodMonthly;
   }
 
   void _showContextMenu(BuildContext context) {
@@ -254,7 +217,7 @@ class GoalCard extends StatelessWidget {
           children: [
             if (onEdit != null)
               ListTile(
-                leading: const Icon(Icons.edit),
+                leading: const Icon(Icons.edit_outlined),
                 title: Text(loc.goalEditTitle),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -263,7 +226,11 @@ class GoalCard extends StatelessWidget {
               ),
             if (onTogglePause != null)
               ListTile(
-                leading: Icon(goal.isActive ? Icons.pause : Icons.play_arrow),
+                leading: Icon(
+                  goal.isActive
+                      ? Icons.pause_circle_outline
+                      : Icons.play_circle_outline,
+                ),
                 title: Text(goal.isActive ? loc.goalPause : loc.goalResume),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -273,8 +240,10 @@ class GoalCard extends StatelessWidget {
             if (onDelete != null)
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: Text(loc.goalDelete,
-                    style: const TextStyle(color: Colors.red)),
+                title: Text(
+                  loc.goalDelete,
+                  style: const TextStyle(color: Colors.red),
+                ),
                 onTap: () {
                   Navigator.of(ctx).pop();
                   onDelete?.call();
@@ -282,43 +251,6 @@ class GoalCard extends StatelessWidget {
               ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Translucent pill displayed in the top-right of the card.
-class _StatusPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _StatusPill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: Colors.white.withAlpha(30),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 9, color: Colors.white),
-          const SizedBox(width: 3),
-          Flexible(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
       ),
     );
   }

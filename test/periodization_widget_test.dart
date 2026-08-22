@@ -5,6 +5,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/database/database_periodization_schema.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/periodization_checkin.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
@@ -65,6 +66,56 @@ void main() {
               start_time TEXT,
               end_time TEXT,
               routine_id TEXT
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE exercise_entries (
+              id TEXT PRIMARY KEY,
+              workout_id TEXT NOT NULL,
+              exercise_id TEXT NOT NULL,
+              order_index INTEGER,
+              FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE sets (
+              id TEXT PRIMARY KEY,
+              exercise_entry_id TEXT NOT NULL,
+              weight REAL,
+              reps INTEGER,
+              rpe REAL,
+              is_complete INTEGER DEFAULT 0,
+              is_warmup INTEGER DEFAULT 0,
+              order_index INTEGER,
+              FOREIGN KEY (exercise_entry_id) REFERENCES exercise_entries(id)
+                ON DELETE CASCADE
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE sleep_entries (
+              id TEXT PRIMARY KEY,
+              date TEXT,
+              sleep_minutes INTEGER,
+              actual_sleep_minutes INTEGER,
+              estimated_sleep_minutes INTEGER
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE meal_logs (
+              id TEXT PRIMARY KEY,
+              date TEXT,
+              meal_type TEXT
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE meal_log_items (
+              id TEXT PRIMARY KEY,
+              meal_log_id TEXT,
+              calories REAL,
+              protein_g REAL,
+              carbs_g REAL,
+              fat_g REAL,
+              FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE
             )
           ''');
           await db.execute('''
@@ -343,16 +394,184 @@ void main() {
       await tester.pump();
     });
 
-    expect(find.text('Resumo do plano'), findsOneWidget);
+    expect(find.text('PLANO ATIVO'), findsOneWidget);
     expect(find.text('Preparação completa para a temporada'), findsOneWidget);
-    expect(find.text('Semana atual'), findsOneWidget);
+    expect(find.text('Restante'), findsOneWidget);
     expect(find.text('Término'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -650));
+    // Scroll until reached instead of a fixed offset: the cards above the
+    // timeline change height as the screen grows.
+    await tester.scrollUntilVisible(
+      find.text('Pico'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     expect(find.text('Pico'), findsOneWidget);
     expect(find.byIcon(Icons.check_rounded), findsWidgets);
+    // Past phases read "Concluída", future ones count down from today.
+    expect(find.textContaining('Concluída'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('current phase without targets offers a way to set them', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    final plan = PeriodizationPlan(
+      id: 'cta-plan',
+      name: 'Ciclo sem metas',
+      startDate: now.subtract(const Duration(days: 7)),
+      endDate: now.add(const Duration(days: 30)),
+      status: PeriodizationPlanStatus.active,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final phase = PeriodizationPhase(
+      id: 'cta-phase',
+      planId: plan.id,
+      name: 'Base',
+      color: 0xFF36B7AA,
+      startDate: plan.startDate,
+      endDate: plan.endDate,
+      orderIndex: 0,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await tester.runAsync(() async {
+      await database.insert('periodization_plans', plan.toMap());
+      await database.insert('periodization_phases', phase.toMap());
+    });
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app());
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      await tester.pump();
+    });
+
+    expect(find.text('Nenhum alvo definido'), findsOneWidget);
+    expect(find.text('Definir metas'), findsOneWidget);
+    expect(find.text('Revisão semanal'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('phase target tiles fit the card at 320px', (tester) async {
+    tester.view.physicalSize = const Size(320, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    final plan = PeriodizationPlan(
+      id: 'tiles-plan',
+      name: 'Ciclo com metas',
+      startDate: now.subtract(const Duration(days: 7)),
+      endDate: now.add(const Duration(days: 30)),
+      status: PeriodizationPlanStatus.active,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final phase = PeriodizationPhase(
+      id: 'tiles-phase',
+      planId: plan.id,
+      name: 'Base',
+      color: 0xFF36B7AA,
+      startDate: plan.startDate,
+      endDate: plan.endDate,
+      orderIndex: 0,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await tester.runAsync(() async {
+      await database.insert('periodization_plans', plan.toMap());
+      await database.insert('periodization_phases', phase.toMap());
+      await PeriodizationRepository().saveTargetVersion(
+        phase.id,
+        PeriodizationTarget(
+          id: 'tiles-target',
+          phaseId: phase.id,
+          version: 1,
+          validFrom: plan.startDate,
+          calories: 2450,
+          proteinG: 180,
+          workoutsPerWeek: 5,
+          createdAt: now,
+        ),
+        validFrom: plan.startDate,
+      );
+    });
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app());
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      await tester.pump();
+    });
+
+    expect(find.text('2450'), findsOneWidget);
+    expect(find.text('180 g'), findsOneWidget);
+    expect(find.text('5×'), findsOneWidget);
+    expect(find.text('Nenhum alvo definido'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a saved review for this week flips the check-in button', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    final plan = PeriodizationPlan(
+      id: 'checkin-plan',
+      name: 'Ciclo revisado',
+      startDate: now.subtract(const Duration(days: 21)),
+      endDate: now.add(const Duration(days: 21)),
+      status: PeriodizationPlanStatus.active,
+      createdAt: now,
+      updatedAt: now,
+    );
+    final phase = PeriodizationPhase(
+      id: 'checkin-phase',
+      planId: plan.id,
+      name: 'Base',
+      color: 0xFF36B7AA,
+      startDate: plan.startDate,
+      endDate: plan.endDate,
+      orderIndex: 0,
+      createdAt: now,
+      updatedAt: now,
+    );
+    await tester.runAsync(() async {
+      await database.insert('periodization_plans', plan.toMap());
+      await database.insert('periodization_phases', phase.toMap());
+      await PeriodizationRepository().saveCheckin(
+        PeriodizationCheckin(
+          id: 'checkin-1',
+          phaseId: phase.id,
+          weekStart: now,
+          energy: 3,
+          hunger: 3,
+          recovery: 3,
+          performance: 'stable',
+          decision: PeriodizationDecision.maintain,
+          createdAt: now,
+        ),
+      );
+    });
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(_app());
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      await tester.pump();
+    });
+
+    expect(find.text('Revisão desta semana concluída'), findsOneWidget);
+    expect(find.text('Revisão semanal'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

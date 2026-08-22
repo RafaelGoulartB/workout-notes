@@ -8,7 +8,10 @@ import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'package:workout_notes/models/run_plan.dart';
+import 'package:workout_notes/periodization/run_plan_week_resolver.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/utils/periodization_palette.dart';
 
@@ -67,6 +70,16 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   bool loading = true;
   List<String> routineIds = [];
   List<Map<String, dynamic>> routines = const [];
+
+  /// Ordered day names per routine id, used to preview the training sequence
+  /// a routine selection produces.
+  Map<String, List<String>> routineDayNames = const {};
+  List<String> runPlanIds = [];
+
+  /// Zero-based plan week that this phase's FIRST week maps to. 0 means the
+  /// phase and the plan start together; see [RunPlanWeekResolver].
+  int runPlanStartWeek = 0;
+  List<RunPlan> runPlans = const [];
   double? latestWeight;
   List<PeriodizationTarget> history = const [];
 
@@ -132,14 +145,19 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   Future<void> load() async {
     final weightFuture = _bodyRepository.getLatestWeightKg();
     final tdeeFuture = _nutritionRepository.getActiveGoal();
+    // Hydrated: the alignment preview and the week picker need each plan's
+    // sessions to show volume per week, not just the plan names.
+    final runPlansFuture = RunPlanRepository().listPlans(hydrate: true);
     final results = await Future.wait([
       RoutineRepository().getRoutines(),
+      RoutineRepository().getRoutineDayNames(),
       if (editing) _repository.getTargetHistory(phase!.id),
     ]);
     if (_disposed) return;
     routines = results[0] as List<Map<String, dynamic>>;
+    routineDayNames = results[1] as Map<String, List<String>>;
     if (editing) {
-      history = results[1] as List<PeriodizationTarget>;
+      history = results[2] as List<PeriodizationTarget>;
       weekOverrides = _resolver.reconstructOverrides(
         weekStarts: weekStarts,
         history: history,
@@ -153,6 +171,7 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
     }
     latestWeight = await weightFuture;
     final goal = await tdeeFuture;
+    runPlans = await runPlansFuture;
     if (_disposed) return;
     tdee = goal?.tdee;
     loadIntoControllers(effective);
@@ -277,6 +296,15 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
       minRpe: doubleValue('minRpe'),
       maxRpe: doubleValue('maxRpe'),
       routineIds: routineIds,
+      runSessionsPerWeek: intValue('runSessions'),
+      // Stored in meters; the field is in km because that is how runners think.
+      runWeeklyDistanceMeters: _kmToMeters(doubleValue('runDistance')),
+      longRunDistanceMeters: _kmToMeters(doubleValue('longRun')),
+      qualitySessionsPerWeek: intValue('runQuality'),
+      runPlanIds: runPlanIds,
+      runPlanStartWeek: runPlanIds.isEmpty || runPlanStartWeek == 0
+          ? null
+          : runPlanStartWeek,
       targetWeightKg: doubleValue('weight'),
       weeklyWeightChangePercent: doubleValue('change'),
       sleepHours: doubleValue('sleep'),
@@ -395,12 +423,24 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
       'weight': formatRatio(target?.targetWeightKg),
       'change': formatRatio(target?.weeklyWeightChangePercent),
       'sleep': formatRatio(target?.sleepHours),
+      'runSessions': target?.runSessionsPerWeek?.toString(),
+      'runDistance': formatRatio(_metersToKm(target?.runWeeklyDistanceMeters)),
+      'longRun': formatRatio(_metersToKm(target?.longRunDistanceMeters)),
+      'runQuality': target?.qualitySessionsPerWeek?.toString(),
     };
     for (final entry in values.entries) {
       targetControllers[entry.key]!.text = entry.value ?? '';
     }
     routineIds = [...(target?.routineIds ?? const [])];
+    runPlanIds = [...(target?.runPlanIds ?? const [])];
+    runPlanStartWeek = target?.runPlanStartWeek ?? 0;
   }
+
+  static double? _kmToMeters(double? km) =>
+      km == null || !km.isFinite || km <= 0 ? null : km * 1000;
+
+  static double? _metersToKm(double? meters) =>
+      meters == null || !meters.isFinite || meters <= 0 ? null : meters / 1000;
 
   double? deriveRatio(double? grams, double? weight) {
     if (grams == null || weight == null || weight <= 0) return null;
@@ -630,6 +670,37 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setRunPlans(Iterable<String> values) {
+    _targetDebounce?.cancel();
+    final next = values.toSet().toList();
+    // Dropping every plan drops the alignment with it, so re-picking a plan
+    // does not silently inherit an offset from an unrelated one.
+    if (next.isEmpty) runPlanStartWeek = 0;
+    runPlanIds = next;
+    commitSelectedWeek();
+    notifyListeners();
+  }
+
+  void setRunPlanStartWeek(int value) {
+    _targetDebounce?.cancel();
+    runPlanStartWeek = value < 0 ? 0 : value;
+    commitSelectedWeek();
+    notifyListeners();
+  }
+
+  /// The longest linked plan, which is what the alignment preview describes.
+  /// Null when nothing is linked or the plans are unknown to this editor.
+  RunPlan? get alignmentPlan {
+    RunPlan? best;
+    for (final id in runPlanIds) {
+      for (final plan in runPlans) {
+        if (plan.id != id) continue;
+        if (best == null || plan.weeks > best.weeks) best = plan;
+      }
+    }
+    return best;
+  }
+
   @override
   void dispose() {
     _disposed = true;
@@ -657,6 +728,10 @@ const kPhaseTargetKeys = [
   'weight',
   'change',
   'sleep',
+  'runSessions',
+  'runDistance',
+  'longRun',
+  'runQuality',
 ];
 
 /// Read-only text controller that exposes the current TDEE to

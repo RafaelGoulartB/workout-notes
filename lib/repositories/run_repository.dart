@@ -1,3 +1,4 @@
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_track_point.dart';
@@ -63,7 +64,81 @@ class RunRepository extends BaseRepository {
 
   Future<void> deleteActivity(String id) async {
     final database = await db;
+    // The FK only nulls `run_activity_id`, which would leave a plan session
+    // counted as completed with no run behind it. Put it back to planned so
+    // the plan's progress keeps matching reality.
+    if (await _tableExists(database, 'scheduled_runs')) {
+      await database.update(
+        'scheduled_runs',
+        {
+          'status': 'planned',
+          'run_activity_id': null,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'run_activity_id = ?',
+        whereArgs: [id],
+      );
+    }
     await database.delete('run_activities', where: 'id = ?', whereArgs: [id]);
+  }
+
+  static Future<bool> _tableExists(
+    DatabaseExecutor database,
+    String table,
+  ) async {
+    final rows = await database.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      [table],
+    );
+    return rows.isNotEmpty;
+  }
+
+  /// Monthly aggregation for the home hero card — pure run data.
+  /// Returns `total_distance_meters`, `total_moving_time`, `total_duration`
+  /// and `run_count` for the calendar month of [month].
+  /// Uses `started_at` range so it matches the `run_activities` storage
+  /// format (ISO-8601 with `T` separator).
+  Future<Map<String, dynamic>> getMonthlyRunSummary(DateTime month) async {
+    final database = await db;
+    final start = DateTime(month.year, month.month, 1);
+    final end = DateTime(month.year, month.month + 1, 1);
+    final rows = await database.rawQuery(
+      '''
+      SELECT
+        COALESCE(SUM(distance_meters), 0) AS total_distance_meters,
+        COALESCE(SUM(moving_time_seconds), 0) AS total_moving_time,
+        COALESCE(SUM(duration_seconds), 0) AS total_duration,
+        COUNT(*) AS run_count
+      FROM run_activities
+      WHERE status = 'completed' AND started_at >= ? AND started_at < ?
+      ''',
+      [start.toIso8601String(), end.toIso8601String()],
+    );
+    return rows.first;
+  }
+
+  /// Completed runs of a calendar month, for the calendar view.
+  /// Keyed by `yyyy-MM-dd` of the local start date.
+  Future<Map<String, List<RunActivity>>> getActivitiesByMonth(
+    int year,
+    int month,
+  ) async {
+    final database = await db;
+    final start = DateTime(year, month, 1);
+    final end = DateTime(year, month + 1, 1);
+    final rows = await database.query(
+      'run_activities',
+      where: 'status = ? AND started_at >= ? AND started_at < ?',
+      whereArgs: ['completed', start.toIso8601String(), end.toIso8601String()],
+      orderBy: 'started_at ASC',
+    );
+    final grouped = <String, List<RunActivity>>{};
+    for (final row in rows) {
+      final activity = RunActivity.fromMap(row);
+      final key = activity.startedAt.toIso8601String().substring(0, 10);
+      grouped.putIfAbsent(key, () => []).add(activity);
+    }
+    return grouped;
   }
 
   /// Computes and persists GPS effort metrics for [activityId] when missing.

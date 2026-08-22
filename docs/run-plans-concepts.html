@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Workout Notes — Planos de corrida</title>
+  <style>
+    :root {
+      --page: #f4f6f5;
+      --surface: #ffffff;
+      --surface-soft: #eaf0ed;
+      --ink: #17201b;
+      --muted: #657269;
+      --line: #d8e0db;
+      --brand: #00677e;
+      --brand-soft: #d8f2f8;
+      --work: #b83a3a;
+      --work-soft: #fbe4e4;
+      --easy: #238a5a;
+      --easy-soft: #ddf6e8;
+      --long: #7b4cc7;
+      --long-soft: #f0e7ff;
+      --shadow: 0 18px 50px rgba(28, 49, 37, .10);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --page: #0d1210;
+        --surface: #151c18;
+        --surface-soft: #202a24;
+        --ink: #edf4ef;
+        --muted: #a7b5ac;
+        --line: #334139;
+        --brand: #72cde2;
+        --brand-soft: #153741;
+        --work: #ffaaaa;
+        --work-soft: #45201f;
+        --easy: #73d9a5;
+        --easy-soft: #173b2a;
+        --long: #c5a2ff;
+        --long-soft: #352750;
+        --shadow: 0 18px 50px rgba(0, 0, 0, .28);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 40px 20px 80px;
+      background: var(--page);
+      color: var(--ink);
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    main { max-width: 940px; margin: 0 auto; }
+
+    h1 { font-size: 2rem; margin: 0 0 6px; letter-spacing: -.02em; }
+    h2 { font-size: 1.25rem; margin: 40px 0 12px; }
+    h3 { font-size: 1rem; margin: 24px 0 8px; }
+    p, li { color: var(--ink); }
+    .lead { color: var(--muted); margin: 0 0 32px; font-size: 1.05rem; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 20px 22px;
+      box-shadow: var(--shadow);
+      margin: 16px 0;
+    }
+
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .875em;
+    }
+
+    pre {
+      background: var(--surface-soft);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+      overflow-x: auto;
+    }
+
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+    th, td {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+
+    .steps { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; align-items: center; }
+    .step {
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: .85rem;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+    .step.warm, .step.cool { background: var(--surface-soft); color: var(--muted); }
+    .step.work { background: var(--work-soft); color: var(--work); }
+    .step.rec { background: var(--easy-soft); color: var(--easy); }
+    .arrow { color: var(--muted); }
+    .repeat {
+      border: 1px dashed var(--line);
+      border-radius: 14px;
+      padding: 8px 12px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .repeat .mult { font-weight: 800; color: var(--brand); }
+
+    .pill {
+      display: inline-block;
+      background: var(--brand-soft);
+      color: var(--brand);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: .78rem;
+      font-weight: 700;
+    }
+    .note {
+      border-left: 3px solid var(--brand);
+      padding: 4px 0 4px 14px;
+      color: var(--muted);
+      margin: 14px 0;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Planos de corrida</h1>
+  <p class="lead">
+    Como o app estrutura longões, tiros e treinos de ritmo — e como isso se
+    encaixa no planejamento (periodização) que já existia para musculação.
+  </p>
+
+  <h2>O modelo em três níveis</h2>
+  <div class="card">
+    <p>
+      Um <strong>plano</strong> é o equivalente de corrida a uma rotina de
+      musculação, com uma diferença: ele é <em>progressivo</em>. Um plano tem
+      N semanas, cada semana tem seus treinos, e cada treino tem etapas.
+    </p>
+    <pre>run_plans           →  "10 km em 12 semanas", objetivo, data da prova
+  run_plan_workouts →  "6x800m", terça, tipo = tiros
+    run_workout_steps →  2 km aquecimento, 800 m tiro, 2 min trote, 1 km desaquecimento</pre>
+    <p class="note">
+      Rotinas de musculação sugerem o próximo dia contando treinos concluídos.
+      Corrida não funciona assim: longão é domingo e tiro é terça. Por isso o
+      treino carrega <code>day_of_week</code> e a resolução é por dia da semana.
+    </p>
+  </div>
+
+  <h2>Repetições sem tabela extra</h2>
+  <div class="card">
+    <p>
+      Etapas consecutivas que compartilham o mesmo <code>repeat_group</code>
+      formam um bloco repetido <code>repeat_count</code> vezes. O motor expande
+      esse bloco na hora de executar.
+    </p>
+    <div class="steps">
+      <span class="step warm">2 km aquec.</span>
+      <span class="arrow">→</span>
+      <span class="repeat">
+        <span class="mult">6×</span>
+        <span class="step work">800 m @ 3:55</span>
+        <span class="step rec">2 min trote</span>
+      </span>
+      <span class="arrow">→</span>
+      <span class="step cool">1 km desaquec.</span>
+    </div>
+    <p>
+      Isso expande para <strong>14 etapas</strong>: 1 aquecimento + (2 × 6) +
+      1 desaquecimento. Os três consumidores — resumo na tela, motor Dart e motor
+      nativo — usam a mesma função de expansão, então todos concordam sobre o que
+      "6×800 m" significa.
+    </p>
+  </div>
+
+  <h2>Execução: dois motores, uma verdade</h2>
+  <div class="card">
+    <table>
+      <tr>
+        <th>Camada</th>
+        <th>Arquivo</th>
+        <th>Papel</th>
+      </tr>
+      <tr>
+        <td>Dart</td>
+        <td><code>lib/services/run_workout_step_engine.dart</code></td>
+        <td>Alimenta a UI da tela de gravação (etapa atual, progresso, tiro X de Y).</td>
+      </tr>
+      <tr>
+        <td>Kotlin</td>
+        <td><code>android/.../run/RunWorkoutStepEngineNative.kt</code></td>
+        <td>Fala os cues dentro do foreground service, com o app fechado.</td>
+      </tr>
+    </table>
+    <p>
+      O plano vai para o nativo em <code>beginSession</code> e é espelhado no
+      spool da corrida (<code>voice_plan_json</code>). Se o Android matar o
+      processo no meio de um treino de tiro, o serviço reidrata o plano e
+      continua contando as repetições restantes.
+    </p>
+    <p class="note">
+      Os dois motores têm testes espelhados
+      (<code>test/run_workout_step_engine_test.dart</code> e
+      <code>RunWorkoutStepEngineNativeTest</code>) cobrindo os mesmos cenários.
+      Divergência entre as portas é o bug mais provável desta feature.
+    </p>
+    <h3>Preset rápido x plano</h3>
+    <p>
+      O toggle "Intervalos" continua existindo para um par work/rest avulso
+      (<code>RunIntervalEngine</code>). Quando há um plano carregado, ele assume
+      e o preset fica desligado — os dois nunca rodam juntos.
+    </p>
+  </div>
+
+  <h2>Agenda e resultado</h2>
+  <div class="card">
+    <p>
+      <code>scheduled_runs</code> é o equivalente de corrida a um treino com data
+      futura: permite agendar a semana, remarcar e marcar como pulada. Ao
+      terminar a corrida, o app grava:
+    </p>
+    <ul>
+      <li><code>scheduled_runs.run_activity_id</code> — vínculo com a corrida registrada;</li>
+      <li><code>run_activities.plan_workout_id</code> — para uma corrida iniciada direto do plano, sem agendamento;</li>
+      <li><code>run_activity_steps</code> — planejado x realizado por etapa, que alimenta o bloco de comparação no detalhe da corrida.</li>
+    </ul>
+    <p>
+      Os resultados por etapa vêm do nativo quando disponível: ele continua
+      medindo com o app fechado, então o motor Dart pode ter perdido repetições.
+    </p>
+  </div>
+
+  <h2>Integração com a periodização</h2>
+  <div class="card">
+    <p>
+      As metas semanais da fase ganharam um bloco <code>run</code> dentro de
+      <code>training_json</code>:
+    </p>
+    <pre>{
+  "workouts_per_week": 4,
+  "run": {
+    "run_sessions_per_week": 3,
+    "run_weekly_distance_meters": 40000,
+    "long_run_distance_meters": 18000,
+    "quality_sessions_per_week": 1,
+    "run_plan_ids": ["..."]
+  }
+}</pre>
+    <p>
+      É <strong>aditivo</strong>: metas salvas antes desta feature simplesmente
+      não têm a chave <code>run</code>, e todo leitor tolera a ausência.
+    </p>
+    <h3>O que a aderência mede</h3>
+    <table>
+      <tr><th>Métrica</th><th>Origem</th></tr>
+      <tr><td>Volume semanal</td><td>Soma de <code>distance_meters</code> das corridas concluídas.</td></tr>
+      <tr><td>Longão</td><td>Maior corrida única do intervalo.</td></tr>
+      <tr><td>Treinos de qualidade</td><td>Corridas ligadas a um treino de plano do tipo ritmo, tiros, fartlek, subidas ou prova. Corrida avulsa conta como volume, nunca como qualidade.</td></tr>
+    </table>
+    <p class="note">
+      Metas semanais são somadas <em>por semana</em>, não por dia: 40 km/semana
+      em duas semanas viram 80 km planejados, não 40 × 14.
+    </p>
+    <h3>Corrida de hoje</h3>
+    <p>
+      <code>PeriodizationRepository.getRunSuggestion(date)</code> resolve a fase
+      ativa, mapeia a data para a semana do plano (planos mais curtos que a fase
+      repetem — um plano de manutenção de 1 semana vale para todas) e escolhe o
+      treino cujo dia da semana bate. Um <code>scheduled_runs</code> já
+      materializado tem prioridade, porque carrega remarcações e "pulei".
+    </p>
+  </div>
+
+  <h2>Onde isso aparece no app</h2>
+  <div class="card">
+    <table>
+      <tr><th>Tela</th><th>O que mostra</th></tr>
+      <tr><td>Treino → Planos de corrida</td><td>Biblioteca de planos, modelos prontos, editor de semanas e etapas.</td></tr>
+      <tr><td>Corrida (hub)</td><td>Atalho para os planos no topo.</td></tr>
+      <tr><td>Plano (periodização)</td><td>Card "corrida de hoje" e as metas semanais de corrida.</td></tr>
+      <tr><td>Calendário</td><td>Marcador de corrida planejada (tom claro) e concluída (tom cheio).</td></tr>
+      <tr><td>Detalhe da corrida</td><td>Planejado x realizado por tiro, com o delta de ritmo.</td></tr>
+    </table>
+    <p>
+      <span class="pill">IA</span> O coach ganhou três ferramentas somente de
+      leitura: <code>list_run_plans</code>, <code>get_run_plan_detail</code> e
+      <code>get_run_schedule</code>. Como no resto do módulo, a IA não escreve —
+      mudanças passam por proposta e aprovação.
+    </p>
+  </div>
+
+  <h2>A linguagem visual</h2>
+  <div class="card">
+    <p>
+      Três componentes em <code>lib/widgets/run/run_plan_ui.dart</code> carregam
+      a leitura do módulo. Todos derivam da mesma expansão de etapas, então
+      nunca discordam do que o treino é.
+    </p>
+    <table>
+      <tr><th>Componente</th><th>O que responde</th></tr>
+      <tr>
+        <td><code>RunWorkoutProfileBar</code></td>
+        <td>
+          "que forma tem este treino?" — um segmento colorido por etapa
+          executada, largura proporcional à duração estimada. Aparece no card do
+          treino, no plano de hoje e na corrida agendada do calendário.
+        </td>
+      </tr>
+      <tr>
+        <td><code>RunPlanVolumeBars</code></td>
+        <td>
+          "este plano sobe?" — o volume de cada semana. Um plano é uma
+          progressão, e a rampa (e o polimento no fim) é o que se olha primeiro.
+        </td>
+      </tr>
+      <tr>
+        <td><code>RunPlanUi.blocks</code></td>
+        <td>
+          "6× de quê?" — agrupa etapas vizinhas do mesmo <code>repeat_group</code>
+          em um bloco. O editor desenha o bloco com um selo <code>6x</code> e
+          reordena <em>blocos</em>, não etapas: arrastar uma perna do bloco para
+          fora dele o partiria em silêncio.
+        </td>
+      </tr>
+    </table>
+    <p class="note">
+      A semana do plano é desenhada como sete linhas de dia da semana, com
+      "Descanso" explícito nos dias vazios — uma semana com quatro descansos é
+      uma semana leve, e isso é informação. Tocar um dia de descanso já cria o
+      treino naquele dia.
+    </p>
+  </div>
+</main>
+</body>
+</html>

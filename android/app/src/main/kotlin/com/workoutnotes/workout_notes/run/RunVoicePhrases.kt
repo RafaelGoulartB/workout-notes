@@ -37,6 +37,43 @@ object RunVoicePhrases {
     fun intervalsComplete(): String = "Intervals complete."
     fun timeRemaining(seconds: Int): String = "${durationSpeech(seconds)} remaining."
 
+    // ---- Structured plan sessions (RunWorkoutStepEngineNative) ----
+
+    /** Announces the step that just started, e.g. "Rep 3 of 6. 800 meters. Target pace 3 minutes 50 seconds." */
+    fun stepStart(
+        role: RunStepRole,
+        repIndex: Int,
+        repTotal: Int,
+        metric: RunIntervalMetric,
+        value: Int,
+        targetPaceSecPerKm: Double?,
+    ): String {
+        val amount = if (metric == RunIntervalMetric.time) durationSpeech(value) else distanceSpeech(value)
+        val head = when (role) {
+            RunStepRole.warmup -> "Warm up. $amount."
+            RunStepRole.cooldown -> "Cool down. $amount."
+            RunStepRole.recovery -> "Recover. $amount."
+            RunStepRole.steady -> "Steady. $amount."
+            RunStepRole.work -> if (repTotal > 1) "Rep $repIndex of $repTotal. $amount." else "Effort. $amount."
+        }
+        if (targetPaceSecPerKm != null && targetPaceSecPerKm > 0 && targetPaceSecPerKm.isFinite() && role.isEffort) {
+            return "$head Target pace ${paceSpeech(targetPaceSecPerKm)} per kilometer."
+        }
+        return head
+    }
+
+    fun stepPaceTooSlow(paceSecPerKm: Double?): String {
+        if (paceSecPerKm == null || paceSecPerKm <= 0 || !paceSecPerKm.isFinite()) return "Pick it up."
+        return "Pick it up. Current pace ${paceSpeech(paceSecPerKm)}."
+    }
+
+    fun stepPaceTooFast(paceSecPerKm: Double?): String {
+        if (paceSecPerKm == null || paceSecPerKm <= 0 || !paceSecPerKm.isFinite()) return "Ease off."
+        return "Ease off. Current pace ${paceSpeech(paceSecPerKm)}."
+    }
+
+    fun workoutComplete(): String = "Workout complete. Well done."
+
     fun goalComplete(metric: RunIntervalMetric, value: Int): String {
         return if (metric == RunIntervalMetric.time) {
             "Goal complete. ${durationSpeech(value)}."

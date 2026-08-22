@@ -6,13 +6,16 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
+import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/periodization/periodization_phase_form_controller.dart';
 import 'package:workout_notes/periodization/phase_draft_data.dart';
+import 'package:workout_notes/periodization/run_plan_week_resolver.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/utils/periodization_palette.dart';
 import 'package:workout_notes/widgets/periodization/nutrition_target_fields.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 import 'package:workout_notes/widgets/periodization/phase_week_selector.dart';
+import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/widgets/periodization/week_copy_sheet.dart';
 
 import 'nutrition_goal_suggest_sheet.dart';
@@ -31,6 +34,11 @@ class PeriodizationPhaseFormScreen extends StatefulWidget {
   /// responsible for [PeriodizationPhaseFormController.load] and dispose.
   final PeriodizationPhaseFormController? controller;
 
+  /// Opens scrolled to the targets section. The planning home links here with
+  /// a "set targets" call to action, which would otherwise land on the name
+  /// field with the targets far below the fold.
+  final bool focusTargets;
+
   const PeriodizationPhaseFormScreen({
     super.key,
     required this.plan,
@@ -38,6 +46,7 @@ class PeriodizationPhaseFormScreen extends StatefulWidget {
     this.draftMode = false,
     this.draft,
     this.controller,
+    this.focusTargets = false,
   });
 
   @override
@@ -48,8 +57,10 @@ class PeriodizationPhaseFormScreen extends StatefulWidget {
 class _PeriodizationPhaseFormScreenState
     extends State<PeriodizationPhaseFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _targetsKey = GlobalKey();
   late final PeriodizationPhaseFormController _controller;
   late final bool _ownsController;
+  bool _targetsRevealed = false;
 
   @override
   void initState() {
@@ -69,6 +80,23 @@ class _PeriodizationPhaseFormScreenState
 
   void _onControllerChanged() {
     if (mounted) setState(() {});
+  }
+
+  /// The form body only exists once the controller finishes loading, so the
+  /// reveal waits for the first frame that actually has the targets section.
+  void _maybeRevealTargets() {
+    if (!widget.focusTargets || _targetsRevealed || _controller.loading) return;
+    _targetsRevealed = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _targetsKey.currentContext;
+      if (!mounted || target == null) return;
+      Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        alignment: 0.05,
+      );
+    });
   }
 
   @override
@@ -244,9 +272,16 @@ class _PeriodizationPhaseFormScreenState
                 else
                   ..._controller.routines.map((routine) {
                     final id = routine['id'] as String;
+                    final days = _controller.routineDayNames[id] ?? const [];
                     return CheckboxListTile(
                       value: selected.contains(id),
                       title: Text(routine['name'] as String),
+                      // A routine is only useful here through its days: the
+                      // suggestion engine walks them in order, so the count
+                      // is what decides how the week actually looks.
+                      subtitle: Text(
+                        loc.periodizationRoutineDays(days.length),
+                      ),
                       controlAffinity: ListTileControlAffinity.leading,
                       onChanged: (value) => setSheetState(() {
                         if (value == true) {
@@ -257,6 +292,15 @@ class _PeriodizationPhaseFormScreenState
                       }),
                     );
                   }),
+                if (selected.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  _RoutineSequencePreview(
+                    days: [
+                      for (final id in selected)
+                        ...?_controller.routineDayNames[id],
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 8),
                 FilledButton(
                   onPressed: () => Navigator.pop(sheetContext, selected),
@@ -271,11 +315,139 @@ class _PeriodizationPhaseFormScreenState
     if (result != null && mounted) _controller.setRoutines(result);
   }
 
+  Future<void> _pickRunPlans() async {
+    final loc = AppLocalizations.of(context)!;
+    final selected = {..._controller.runPlanIds};
+    final result = await showModalBottomSheet<Set<String>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  loc.periodizationRunPlans,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                Text(loc.periodizationRunPlansHelp),
+                const SizedBox(height: 10),
+                if (_controller.runPlans.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(loc.periodizationRunNoPlan),
+                  )
+                else
+                  ..._controller.runPlans.map(
+                    (plan) => CheckboxListTile(
+                      value: selected.contains(plan.id),
+                      title: Text(plan.name),
+                      subtitle: Text(loc.runPlanWeeksValue(plan.weeks)),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      onChanged: (value) => setSheetState(() {
+                        if (value == true) {
+                          selected.add(plan.id);
+                        } else {
+                          selected.remove(plan.id);
+                        }
+                      }),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: () => Navigator.pop(sheetContext, selected),
+                  child: Text(loc.commonSave),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (result != null && mounted) _controller.setRunPlans(result);
+  }
+
+  /// Sheet listing the plan's weeks so the phase can start on any of them.
+  /// Each row carries that week's volume, which is how a runner recognises
+  /// "the week I am on" without counting.
+  Future<void> _pickAlignment(RunPlan plan) async {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+              child: Text(
+                loc.periodizationRunAlignPick,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: Text(
+                loc.periodizationRunAlignHelp,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: plan.weeks,
+                itemBuilder: (context, index) {
+                  final volume = plan.weeklyDistanceMeters(index);
+                  final sessions = plan.workoutsForWeek(index).length;
+                  final selected = index == _controller.runPlanStartWeek;
+                  return ListTile(
+                    onTap: () => Navigator.pop(sheetContext, index),
+                    selected: selected,
+                    leading: Icon(
+                      selected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                    ),
+                    title: Text(loc.periodizationWeekChip(index + 1)),
+                    subtitle: Text(
+                      loc.runPlanWeekSummary(
+                        RunPlanUi.kmValue(volume),
+                        sessions,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (picked != null && mounted) _controller.setRunPlanStartWeek(picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final c = _controller;
+    _maybeRevealTargets();
     final locked = c.lockedWeeks;
     final effective = c.effective;
     final weekLocked = c.weekLocked;
@@ -525,10 +697,13 @@ class _PeriodizationPhaseFormScreenState
                     ),
                   ],
                   const SizedBox(height: 20),
-                  PeriodizationSectionHeader(
-                    title: loc.periodizationTargets,
-                    subtitle: loc.periodizationWeeklyTargetsHelp,
-                    icon: Icons.track_changes_rounded,
+                  KeyedSubtree(
+                    key: _targetsKey,
+                    child: PeriodizationSectionHeader(
+                      title: loc.periodizationTargets,
+                      subtitle: loc.periodizationWeeklyTargetsHelp,
+                      icon: Icons.track_changes_rounded,
+                    ),
                   ),
                   PeriodizationSurface(
                     padding: EdgeInsets.zero,
@@ -771,6 +946,101 @@ class _PeriodizationPhaseFormScreenState
         },
       ),
     );
+    final running = _targetTile(
+      loc,
+      theme,
+      title: loc.periodizationRunSectionTitle,
+      icon: Icons.directions_run,
+      keys: const ['runSessions', 'runDistance', 'longRun', 'runQuality'],
+      help: loc.periodizationRunSectionHelp,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth >= 560
+                  ? (constraints.maxWidth - 10) / 2
+                  : constraints.maxWidth;
+              Widget field(
+                String key,
+                String label, {
+                bool integer = false,
+                String? unit,
+              }) => SizedBox(
+                width: width,
+                child: _field(key, label, integer: integer, unit: unit),
+              );
+              return Wrap(
+                spacing: 10,
+                runSpacing: 12,
+                children: [
+                  field(
+                    'runSessions',
+                    loc.periodizationRunSessionsPerWeek,
+                    integer: true,
+                    unit: loc.periodizationPerWeekUnit,
+                  ),
+                  field(
+                    'runDistance',
+                    loc.periodizationRunWeeklyDistance,
+                    unit: 'km',
+                  ),
+                  field(
+                    'longRun',
+                    loc.periodizationRunLongRunDistance,
+                    unit: 'km',
+                  ),
+                  field(
+                    'runQuality',
+                    loc.periodizationRunQualitySessions,
+                    integer: true,
+                    unit: loc.periodizationPerWeekUnit,
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          InkWell(
+            onTap: weekLocked ? null : _pickRunPlans,
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: loc.periodizationRunPlans,
+                prefixIcon: const Icon(Icons.route_outlined),
+                suffixIcon: const Icon(Icons.chevron_right_rounded),
+              ),
+              child: Text(
+                c.runPlanIds.isEmpty
+                    ? loc.periodizationRunNoPlan
+                    : c.runPlanIds
+                          .map(
+                            (id) => c.runPlans
+                                .where((plan) => plan.id == id)
+                                .map((plan) => plan.name)
+                                .firstOrNull,
+                          )
+                          .whereType<String>()
+                          .join(', '),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          if (c.alignmentPlan case final alignmentPlan?) ...[
+            const SizedBox(height: 12),
+            _RunPlanAlignment(
+              phaseWeeks: c.weeksCount,
+              plan: alignmentPlan,
+              startWeek: c.runPlanStartWeek,
+              enabled: !weekLocked,
+              onPick: () => _pickAlignment(alignmentPlan),
+              onChange: c.setRunPlanStartWeek,
+            ),
+          ],
+        ],
+      ),
+    );
     final sleep = _targetTile(
       loc,
       theme,
@@ -785,6 +1055,8 @@ class _PeriodizationPhaseFormScreenState
       nutrition,
       _targetsDivider(theme),
       training,
+      _targetsDivider(theme),
+      running,
       _targetsDivider(theme),
       body,
       _targetsDivider(theme),
@@ -861,6 +1133,41 @@ class _PeriodizationPhaseFormScreenState
           '${target.minRpe ?? '-'}–${target.maxRpe ?? '-'}',
         ),
     ];
+    List<(String, String)> runningRows() => [
+      if (target.runPlanIds.isNotEmpty)
+        (
+          loc.periodizationRunPlans,
+          target.runPlanIds
+              .map(
+                (id) => c.runPlans
+                    .where((plan) => plan.id == id)
+                    .map((plan) => plan.name)
+                    .firstOrNull,
+              )
+              .whereType<String>()
+              .join(', '),
+        ),
+      if (target.runSessionsPerWeek != null)
+        (
+          loc.periodizationRunSessionsPerWeek,
+          '${target.runSessionsPerWeek}${loc.periodizationPerWeekUnit}',
+        ),
+      if (target.runWeeklyDistanceMeters != null)
+        (
+          loc.periodizationRunWeeklyDistance,
+          RunPlanUi.distanceLabel(target.runWeeklyDistanceMeters!),
+        ),
+      if (target.longRunDistanceMeters != null)
+        (
+          loc.periodizationRunLongRunDistance,
+          RunPlanUi.distanceLabel(target.longRunDistanceMeters!),
+        ),
+      if (target.qualitySessionsPerWeek != null)
+        (
+          loc.periodizationRunQualitySessions,
+          '${target.qualitySessionsPerWeek}${loc.periodizationPerWeekUnit}',
+        ),
+    ];
     List<(String, String)> bodyRows() => [
       if (target.targetWeightKg != null)
         (loc.periodizationTargetWeight, '${target.targetWeightKg} kg'),
@@ -882,6 +1189,7 @@ class _PeriodizationPhaseFormScreenState
         nutritionRows(),
       ),
       (loc.periodizationTrainingTargets, Icons.fitness_center, trainingRows()),
+      (loc.periodizationRunSectionTitle, Icons.directions_run, runningRows()),
       (loc.periodizationBodyTargets, Icons.monitor_weight_outlined, bodyRows()),
       (loc.periodizationSleepTargets, Icons.nightlight_outlined, sleepRows()),
     ];
@@ -1177,4 +1485,210 @@ class _DateTile extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Shows and edits how the phase's weeks line up with the linked running
+/// plan's weeks, plus what that alignment implies (exact fit, repeats, or a
+/// tail of plan weeks the phase never reaches).
+class _RunPlanAlignment extends StatelessWidget {
+  final int phaseWeeks;
+  final RunPlan plan;
+  final int startWeek;
+  final bool enabled;
+  final VoidCallback onPick;
+  final ValueChanged<int> onChange;
+
+  const _RunPlanAlignment({
+    required this.phaseWeeks,
+    required this.plan,
+    required this.startWeek,
+    required this.enabled,
+    required this.onPick,
+    required this.onChange,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const resolver = RunPlanWeekResolver();
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final coverage = resolver.coverage(
+      phaseWeeks: phaseWeeks,
+      planWeeks: plan.weeks,
+      startWeek: startWeek,
+    );
+    final String fit;
+    switch (coverage) {
+      case RunPlanCoverage.exact:
+        fit = loc.periodizationRunAlignExact;
+      case RunPlanCoverage.planRepeats:
+        fit = loc.periodizationRunAlignRepeats(
+          resolver.repeatsWithin(
+            phaseWeeks: phaseWeeks,
+            planWeeks: plan.weeks,
+            startWeek: startWeek,
+          ),
+        );
+      case RunPlanCoverage.planLonger:
+        fit = loc.periodizationRunAlignLeftover(
+          resolver.leftoverPlanWeeks(
+            phaseWeeks: phaseWeeks,
+            planWeeks: plan.weeks,
+            startWeek: startWeek,
+          ),
+        );
+      case RunPlanCoverage.empty:
+        fit = '';
+    }
+    final lastPlanWeek = resolver.planWeekFor(
+      phaseWeek: phaseWeeks - 1,
+      planWeeks: plan.weeks,
+      startWeek: startWeek,
+    );
+    final finishAligned = resolver.startWeekForFinish(
+      phaseWeeks: phaseWeeks,
+      planWeeks: plan.weeks,
+    );
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withAlpha(90),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.link_rounded, size: 17, color: scheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  loc.periodizationRunAlignTitle,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: enabled ? onPick : null,
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: Text(loc.periodizationWeekChip(startWeek + 1)),
+              ),
+            ],
+          ),
+          Text(
+            loc.periodizationRunAlignValue(startWeek + 1),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // The two ends of the mapping say more than any explanation: the
+          // user reads where the phase starts in the plan and where it lands.
+          Text(
+            loc.periodizationRunAlignPreview(1, startWeek + 1),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (phaseWeeks > 1 && lastPlanWeek != null)
+            Text(
+              loc.periodizationRunAlignPreview(phaseWeeks, lastPlanWeek + 1),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          if (fit.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              fit,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: coverage == RunPlanCoverage.exact
+                    ? scheme.primary
+                    : scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          if (enabled) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                if (startWeek != 0)
+                  TextButton(
+                    onPressed: () => onChange(0),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: Text(loc.periodizationRunAlignReset),
+                  ),
+                if (startWeek != finishAligned && finishAligned != 0)
+                  TextButton(
+                    onPressed: () => onChange(finishAligned),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: Text(loc.periodizationRunAlignFinish),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The training order the picked routines produce. The suggestion engine walks
+/// every day of every selected routine in sequence and restarts at the end, so
+/// showing the resulting chain is the only way to see what a multi-routine
+/// selection actually schedules.
+class _RoutineSequencePreview extends StatelessWidget {
+  final List<String> days;
+
+  const _RoutineSequencePreview({required this.days});
+
+  @override
+  Widget build(BuildContext context) {
+    if (days.isEmpty) return const SizedBox.shrink();
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    // Long chains are unreadable in a sheet; the first few convey the shape.
+    final shown = days.take(6).toList();
+    final suffix = days.length > shown.length ? ' → …' : '';
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withAlpha(90),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            loc.periodizationRoutineSequence('${shown.join(' → ')}$suffix'),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            loc.periodizationRoutineSequenceHelp,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

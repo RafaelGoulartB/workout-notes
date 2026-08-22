@@ -9,6 +9,8 @@ import 'ai_sleep_tool_service.dart';
 import 'ai_wellness_analytics_service.dart';
 import 'ai_workout_tool_service.dart';
 
+part 'ai_tool_registry_labels.dart';
+
 class AiToolRegistry {
   final DatabaseHelper db;
   final GoalRepository goalRepo;
@@ -410,6 +412,26 @@ class AiToolRegistry {
     if (hasAny(['cardio', 'corrida', 'correr', 'distancia', 'distância'])) {
       selected.add('get_cardio_summary');
     }
+    if (hasAny([
+      'plano de corrida',
+      'planos de corrida',
+      'longao',
+      'longão',
+      'tiro',
+      'tiros',
+      'intervalado',
+      'fartlek',
+      'meia maratona',
+      'maratona',
+      'run plan',
+      'long run',
+    ])) {
+      selected.addAll({
+        'list_run_plans',
+        'get_run_plan_detail',
+        'get_run_schedule',
+      });
+    }
     if (!sleepIntent &&
         !nutritionIntent &&
         hasAny(['meta', 'goal', 'objetivo'])) {
@@ -462,6 +484,15 @@ class AiToolRegistry {
         case 'list_routines':
           next.add('get_routine_detail');
           break;
+        case 'list_run_plans':
+          next.addAll({'get_run_plan_detail', 'get_run_schedule'});
+          break;
+        case 'get_run_plan_detail':
+          next.add('get_run_schedule');
+          break;
+        case 'get_cardio_summary':
+          next.add('get_run_schedule');
+          break;
         case 'get_routine_detail':
           next.add('list_exercises');
           break;
@@ -496,158 +527,6 @@ class AiToolRegistry {
       }
     }
     return next;
-  }
-
-  /// Human-friendly label for a tool name (used in chat bubbles).
-  String humanLabel(String toolName, [AppLocalizations? l10n]) {
-    if (l10n != null) {
-      switch (toolName) {
-        case 'list_recent_workouts':
-          return l10n.aiToolListRecentWorkouts;
-        case 'get_workout_history':
-          return l10n.aiToolWorkoutHistory;
-        case 'get_workout_detail':
-          return l10n.aiToolGetWorkoutDetail;
-        case 'list_exercises':
-          return l10n.aiToolListExercises;
-        case 'get_exercise_detail':
-          return l10n.aiToolExerciseDetail;
-        case 'get_exercise_history':
-          return l10n.aiToolGetExerciseHistory;
-        case 'get_exercise_personal_records':
-          return l10n.aiToolGetExerciseRecords;
-        case 'get_weekly_volume_breakdown':
-          return l10n.aiToolWeeklyVolume;
-        case 'get_training_summary':
-          return l10n.aiToolTrainingSummary;
-        case 'get_progress_trend':
-          return l10n.aiToolProgressTrend;
-        case 'list_routines':
-          return l10n.aiToolListRoutines;
-        case 'get_routine_detail':
-          return l10n.aiToolGetRoutineDetail;
-        case 'list_body_measurements':
-          return l10n.aiToolBodyMeasurements;
-        case 'get_cardio_summary':
-          return l10n.aiToolCardioSummary;
-        case 'list_goals':
-          return l10n.aiToolListGoals;
-        case 'get_goal_progress_history':
-          return l10n.aiToolGoalHistory;
-        case 'get_sleep_summary':
-          return l10n.aiToolSleepSummary;
-        case 'get_sleep_night_detail':
-          return l10n.aiToolSleepNightDetail;
-        case 'get_sleep_history':
-          return l10n.aiToolSleepHistory;
-        case 'get_sleep_profile':
-          return l10n.aiToolSleepProfile;
-        case 'get_nutrition_summary':
-          return l10n.aiToolNutritionSummary;
-        case 'get_nutrition_diary_day':
-          return l10n.aiToolNutritionDiaryDay;
-        case 'get_nutrition_history':
-          return l10n.aiToolNutritionHistory;
-        case 'get_micronutrient_summary':
-          return l10n.aiToolMicronutrientSummary;
-        case 'search_food_library':
-          return l10n.aiToolSearchFoodLibrary;
-        case 'get_food_detail':
-          return l10n.aiToolFoodDetail;
-        case 'list_saved_meals':
-          return l10n.aiToolListSavedMeals;
-        case 'get_saved_meal_detail':
-          return l10n.aiToolSavedMealDetail;
-        case 'get_nutrition_profile':
-          return l10n.aiToolNutritionProfile;
-        case 'analyze_sleep_performance':
-          return l10n.aiToolSleepPerformance;
-        case 'analyze_nutrition_body_trend':
-          return l10n.aiToolNutritionBodyTrend;
-        case 'get_weekly_recovery_trend':
-          return l10n.aiToolRecoveryTrend;
-        case 'propose_routine_change':
-          return l10n.aiToolProposeRoutineChange;
-        case 'propose_manual_food_creation':
-          return l10n.aiToolProposeManualFoodCreation;
-        case 'discover_app_capabilities':
-          return l10n.aiToolDiscoverAppCapabilities;
-      }
-    }
-    switch (toolName) {
-      case 'list_recent_workouts':
-        return 'Listando treinos recentes';
-      case 'get_workout_history':
-        return 'Consultando histórico de treinos';
-      case 'get_workout_detail':
-        return 'Detalhando treino';
-      case 'list_exercises':
-        return 'Buscando exercícios';
-      case 'get_exercise_detail':
-        return 'Detalhando exercício';
-      case 'get_exercise_history':
-        return 'Histórico do exercício';
-      case 'get_exercise_personal_records':
-        return 'Recordes pessoais';
-      case 'get_weekly_volume_breakdown':
-        return 'Volume semanal';
-      case 'get_training_summary':
-        return 'Analisando período de treinos';
-      case 'get_progress_trend':
-        return 'Tendência de progressão';
-      case 'list_routines':
-        return 'Listando rotinas';
-      case 'get_routine_detail':
-        return 'Detalhando rotina';
-      case 'list_body_measurements':
-        return 'Medidas corporais';
-      case 'get_cardio_summary':
-        return 'Resumo de cardio';
-      case 'list_goals':
-        return 'Metas ativas';
-      case 'get_goal_progress_history':
-        return 'Histórico da meta';
-      case 'get_sleep_summary':
-        return 'Analisando sono recente';
-      case 'get_sleep_night_detail':
-        return 'Consultando detalhes da noite';
-      case 'get_sleep_history':
-        return 'Consultando histórico de sono';
-      case 'get_sleep_profile':
-        return 'Consultando perfil de sono';
-      case 'get_nutrition_summary':
-        return 'Analisando nutrição';
-      case 'get_nutrition_diary_day':
-        return 'Consultando diário alimentar';
-      case 'get_nutrition_history':
-        return 'Consultando histórico nutricional';
-      case 'get_micronutrient_summary':
-        return 'Analisando micronutrientes';
-      case 'search_food_library':
-        return 'Buscando alimentos';
-      case 'get_food_detail':
-        return 'Detalhando alimento';
-      case 'list_saved_meals':
-        return 'Listando refeições salvas';
-      case 'get_saved_meal_detail':
-        return 'Detalhando refeição salva';
-      case 'get_nutrition_profile':
-        return 'Consultando perfil nutricional';
-      case 'analyze_sleep_performance':
-        return 'Relacionando sono e desempenho';
-      case 'analyze_nutrition_body_trend':
-        return 'Relacionando ingestão e peso';
-      case 'get_weekly_recovery_trend':
-        return 'Calculando recuperação semanal';
-      case 'propose_routine_change':
-        return 'Preparando proposta de rotina';
-      case 'propose_manual_food_creation':
-        return 'Preparando alimento manual';
-      case 'discover_app_capabilities':
-        return 'Selecionando recursos do app';
-      default:
-        return toolName;
-    }
   }
 
   /// Dispatch a read tool call to the right DB query.
@@ -745,6 +624,34 @@ class AiToolRegistry {
           return _ok(await _listBodyMeasurements(args));
         case 'get_cardio_summary':
           return _ok(await _getCardioSummary(args));
+        case 'list_run_plans':
+          return _ok(
+            await workouts.listRunPlans(
+              includeArchived:
+                  args['include_archived'] as bool? ??
+                  args['includeArchived'] as bool? ??
+                  false,
+            ),
+          );
+        case 'get_run_plan_detail':
+          final planId = _nullableString(args['plan_id'] ?? args['planId']);
+          if (planId == null) {
+            return const AiToolResult(
+              ok: false,
+              code: 'invalid_args',
+              message: 'plan_id é obrigatório.',
+            );
+          }
+          return _ok(await workouts.runPlanDetail(planId));
+        case 'get_run_schedule':
+          return _ok(
+            await workouts.runSchedule(
+              startDate: _nullableString(
+                args['start_date'] ?? args['startDate'],
+              ),
+              endDate: _nullableString(args['end_date'] ?? args['endDate']),
+            ),
+          );
         case 'list_goals':
           return _ok(await _listGoals(args));
         case 'get_goal_progress_history':
@@ -1182,6 +1089,11 @@ class AiToolRegistry {
         'routines' => {'list_routines', 'get_routine_detail'},
         'body' => {'list_body_measurements'},
         'cardio' => {'get_cardio_summary'},
+        'run_plans' => {
+          'list_run_plans',
+          'get_run_plan_detail',
+          'get_run_schedule',
+        },
         'goals' => {'list_goals', 'get_goal_progress_history'},
         'sleep' => {
           'get_sleep_summary',
@@ -1258,6 +1170,7 @@ class AiToolRegistry {
                       'routines',
                       'body',
                       'cardio',
+                      'run_plans',
                       'goals',
                       'sleep',
                       'nutrition',
@@ -1540,6 +1453,64 @@ class AiToolRegistry {
               'type': 'object',
               'properties': {
                 'weeks_back': {'type': 'integer', 'default': 4},
+              },
+              'required': const [],
+            },
+          },
+        };
+      case 'list_run_plans':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Lista planos de corrida (longão, tiros, ritmo) com objetivo '
+                'e número de semanas.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'include_archived': {'type': 'boolean', 'default': false},
+              },
+              'required': const [],
+            },
+          },
+        };
+      case 'get_run_plan_detail':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Detalha um plano de corrida: semanas, treinos e etapas '
+                '(aquecimento, tiros, recuperação, desaquecimento).',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'plan_id': {'type': 'string'},
+              },
+              'required': const ['plan_id'],
+            },
+          },
+        };
+      case 'get_run_schedule':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Corridas planejadas em um intervalo de datas, com status e a '
+                'corrida registrada quando já foi concluída.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'start_date': {
+                  'type': 'string',
+                  'description': 'yyyy-MM-dd. Padrão: hoje.',
+                },
+                'end_date': {
+                  'type': 'string',
+                  'description': 'yyyy-MM-dd. Padrão: 4 semanas à frente.',
+                },
               },
               'required': const [],
             },
@@ -2105,6 +2076,9 @@ class AiToolRegistry {
     {'name': 'get_routine_detail', 'description': 'Routine details'},
     {'name': 'list_body_measurements', 'description': 'List body measurements'},
     {'name': 'get_cardio_summary', 'description': 'Cardio summary'},
+    {'name': 'list_run_plans', 'description': 'List running plans'},
+    {'name': 'get_run_plan_detail', 'description': 'Running plan details'},
+    {'name': 'get_run_schedule', 'description': 'Planned runs in a window'},
     {'name': 'list_goals', 'description': 'List active goals'},
     {
       'name': 'get_goal_progress_history',

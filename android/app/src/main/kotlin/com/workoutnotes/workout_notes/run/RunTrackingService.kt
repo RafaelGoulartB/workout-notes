@@ -357,7 +357,8 @@ class RunTrackingService : Service(), LocationListener {
             val pendingG = RunVoiceBridge.pendingGoal
             val pendingI = RunVoiceBridge.pendingIntervalsOn
             val pendingB = RunVoiceBridge.pendingBypassGate
-            voiceController.begin(pendingS, pendingG, pendingI, pendingB)
+            voiceController.begin(pendingS, pendingG, pendingI, pendingB, RunVoiceBridge.pendingPlan)
+            persistVoicePlan()
         } catch (_: Throwable) {
             voiceController.begin(null, null, null, null)
         }
@@ -425,7 +426,8 @@ class RunTrackingService : Service(), LocationListener {
             val pendingI = RunVoiceBridge.pendingIntervalsOn
             val pendingB = RunVoiceBridge.pendingBypassGate
             // For debug sim we force bypass headset gate so emulator without headset still speaks
-            voiceController.begin(pendingS, pendingG, pendingI, true)
+            voiceController.begin(pendingS, pendingG, pendingI, true, RunVoiceBridge.pendingPlan)
+            persistVoicePlan()
         } catch (_: Throwable) {
             voiceController.begin(null, null, null, true)
         }
@@ -519,11 +521,15 @@ class RunTrackingService : Service(), LocationListener {
                 RunVoiceBridge.pendingIntervalsOn
             }
             // We don't have persisted goal — re-hydrate as disabled; distance cues still work.
+            // Rehydrate the structured plan from the spool so a killed process
+            // keeps cueing the remaining reps.
+            val restoredPlan = session["voice_plan_json"] as? String
             voiceController.begin(
                 null,
                 null,
                 hasIntervals,
                 RunVoiceBridge.pendingBypassGate,
+                restoredPlan,
             )
             if (restoredStatus == "paused") {
                 // voice pauses naturally via tick(recording=false)
@@ -809,6 +815,23 @@ class RunTrackingService : Service(), LocationListener {
 
         persistLiveTotals()
         publishState()
+    }
+
+    /**
+     * Mirrors the structured plan (and the intervals flag) into the spool so a
+     * process death mid-session resumes cueing the remaining reps instead of
+     * silently degrading to a plain run.
+     */
+    fun persistVoicePlan() {
+        val session = activity ?: return
+        try {
+            session["voice_plan_json"] = voiceController.planStepsJson()
+            session["voice_intervals_on"] = voiceController.hasPlan ||
+                (RunVoiceBridge.pendingIntervalsOn ?: false)
+            spool.updateActivity(session)
+        } catch (_: Throwable) {
+            // Best-effort: a spool write failure must never abort the run.
+        }
     }
 
     private fun persistLiveTotals() {
