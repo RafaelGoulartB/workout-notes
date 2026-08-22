@@ -685,7 +685,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           padding: EdgeInsets.zero,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            childAspectRatio: 1.85,
+            childAspectRatio: 1.65,
             mainAxisSpacing: 0,
             crossAxisSpacing: 0,
           ),
