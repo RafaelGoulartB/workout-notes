@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+/// Distinguishes "not passed" from an explicit null in [PeriodizationTarget.copyWith].
+const Object _unset = Object();
+
 class PeriodizationTarget {
   final String id;
   final String phaseId;
@@ -31,6 +34,13 @@ class PeriodizationTarget {
 
   /// Running plans linked to the week this target applies to.
   final List<String> runPlanIds;
+
+  /// Zero-based plan week that the phase's FIRST week maps to. 0 means the
+  /// phase and the plan start together; 4 means the phase begins already on
+  /// week 5 of the plan (you joined a plan in progress). Weeks past the end
+  /// of the plan wrap, so a short plan repeats across a long phase.
+  /// Meaningless without [runPlanIds], so it is only serialized with them.
+  final int? runPlanStartWeek;
 
   /// Routines linked to the week this target applies to. Serialized inside
   /// [trainingJson]; each phase week may carry its own routine sequence.
@@ -64,6 +74,7 @@ class PeriodizationTarget {
     this.longRunDistanceMeters,
     this.qualitySessionsPerWeek,
     List<String> runPlanIds = const [],
+    this.runPlanStartWeek,
     this.targetWeightKg,
     this.weeklyWeightChangePercent,
     this.sleepHours,
@@ -130,6 +141,8 @@ class PeriodizationTarget {
     if (qualitySessionsPerWeek != null)
       'quality_sessions_per_week': qualitySessionsPerWeek,
     if (runPlanIds.isNotEmpty) 'run_plan_ids': runPlanIds,
+    if (runPlanIds.isNotEmpty && runPlanStartWeek != null)
+      'run_plan_start_week': runPlanStartWeek,
   };
 
   Map<String, dynamic> get bodyJson => {
@@ -166,6 +179,7 @@ class PeriodizationTarget {
     double? longRunDistanceMeters,
     int? qualitySessionsPerWeek,
     List<String>? runPlanIds,
+    Object? runPlanStartWeek = _unset,
     double? targetWeightKg,
     double? weeklyWeightChangePercent,
     double? sleepHours,
@@ -196,6 +210,9 @@ class PeriodizationTarget {
     qualitySessionsPerWeek:
         qualitySessionsPerWeek ?? this.qualitySessionsPerWeek,
     runPlanIds: runPlanIds ?? this.runPlanIds,
+    runPlanStartWeek: identical(runPlanStartWeek, _unset)
+        ? this.runPlanStartWeek
+        : runPlanStartWeek as int?,
     targetWeightKg: targetWeightKg ?? this.targetWeightKg,
     weeklyWeightChangePercent:
         weeklyWeightChangePercent ?? this.weeklyWeightChangePercent,
@@ -255,6 +272,7 @@ class PeriodizationTarget {
       qualitySessionsPerWeek: (run['quality_sessions_per_week'] as num?)
           ?.toInt(),
       runPlanIds: _runPlanIds(run),
+      runPlanStartWeek: (run['run_plan_start_week'] as num?)?.toInt(),
       targetWeightKg: _double(body['target_weight_kg']),
       weeklyWeightChangePercent: _double(body['weekly_weight_change_percent']),
       sleepHours: _double(sleep['hours']),

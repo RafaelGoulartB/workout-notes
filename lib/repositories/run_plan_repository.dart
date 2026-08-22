@@ -63,6 +63,250 @@ class RunPlanRepository extends BaseRepository {
     return RunPlan.fromMap(rows.first, workouts: byPlan[id] ?? const []);
   }
 
+  /// The plan currently being followed, or null when none is activated.
+  ///
+  /// "Activated" is a single-choice pointer: [activatePlan] clears every other
+  /// plan, so this is at most one row. Archived plans are excluded even if an
+  /// old activation date lingers.
+  Future<RunPlan?> getActivatedPlan({bool hydrate = true}) async {
+    final database = await db;
+    if (!await _tableExists(database, 'run_plans')) return null;
+    if (!await _columnExists(database, 'run_plans', 'activated_at')) {
+      return null;
+    }
+    final rows = await database.query(
+      'run_plans',
+      where: 'activated_at IS NOT NULL AND status = ?',
+      whereArgs: [RunPlanStatus.active.value],
+      orderBy: 'activated_at DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    final id = rows.first['id'] as String;
+    if (!hydrate) return RunPlan.fromMap(rows.first);
+    final byPlan = await _loadWorkoutsByPlan(database, [id]);
+    return RunPlan.fromMap(rows.first, workouts: byPlan[id] ?? const []);
+  }
+
+  /// Starts following [id] from [from] (default: today), clearing any other
+  /// activation. Returns the number of scheduled rows created for the weeks
+  /// from [from] to the end of the plan, so the calendar has planned sessions
+  /// to tick off. Safe to call twice: [materializeWeek] skips existing rows.
+  Future<int> activatePlan(String id, {DateTime? from}) async {
+    final database = await db;
+    if (!await _tableExists(database, 'run_plans')) return 0;
+    if (!await _columnExists(database, 'run_plans', 'activated_at')) return 0;
+    final start = _day(from ?? DateTime.now());
+    final now = DateTime.now().toIso8601String();
+    await database.transaction((txn) async {
+      await txn.update(
+        'run_plans',
+        {'activated_at': null, 'updated_at': now},
+        where: 'activated_at IS NOT NULL AND id != ?',
+        whereArgs: [id],
+      );
+      await txn.update(
+        'run_plans',
+        {'activated_at': _date(start), 'updated_at': now},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    });
+    final plan = await getPlan(id);
+    if (plan == null) return 0;
+    var created = 0;
+    final anchorWeek = _weekStart(start);
+    // Only the weeks from here on: back-filling earlier weeks would invent
+    // planned sessions the user never had a chance to run.
+    final firstWeek = plan.activeWeekIndexOn(start) ?? 0;
+    for (var week = firstWeek; week < plan.weeks; week++) {
+      created += (await materializeWeek(
+        planId: id,
+        weekIndex: week,
+        weekStart: anchorWeek.add(Duration(days: 7 * (week - firstWeek))),
+      )).length;
+    }
+    return created;
+  }
+
+  /// Stops following [id] and, by default, clears the sessions it left in the
+  /// calendar that were never run.
+  ///
+  /// Completed and skipped rows always survive — they are real history and the
+  /// plan's progress is read from them. Only untouched `planned` rows go, so
+  /// abandoning a 16-week plan does not leave four months of ghost entries.
+  /// Returns how many were removed.
+  Future<int> deactivatePlan(String id, {bool clearPlanned = true}) async {
+    final database = await db;
+    if (!await _tableExists(database, 'run_plans')) return 0;
+    if (!await _columnExists(database, 'run_plans', 'activated_at')) return 0;
+    await database.update(
+      'run_plans',
+      {'activated_at': null, 'updated_at': DateTime.now().toIso8601String()},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    if (!clearPlanned || !await _tableExists(database, 'scheduled_runs')) {
+      return 0;
+    }
+    return database.delete(
+      'scheduled_runs',
+      where: 'run_plan_id = ? AND status = ?',
+      whereArgs: [id, ScheduledRunStatus.planned.value],
+    );
+  }
+
+  /// Completed / skipped / planned counts for a plan, read from the scheduled
+  /// ledger, plus how many sessions the plan defines in total.
+  Future<RunPlanProgress> getPlanProgress(String planId) async {
+    final database = await db;
+    if (!await _tableExists(database, 'run_plan_workouts')) {
+      return const RunPlanProgress();
+    }
+    final total =
+        Sqflite.firstIntValue(
+          await database.rawQuery(
+            'SELECT COUNT(*) FROM run_plan_workouts WHERE run_plan_id = ?',
+            [planId],
+          ),
+        ) ??
+        0;
+    if (!await _tableExists(database, 'scheduled_runs')) {
+      return RunPlanProgress(totalSessions: total);
+    }
+    final rows = await database.rawQuery(
+      'SELECT status, COUNT(*) AS total FROM scheduled_runs '
+      'WHERE run_plan_id = ? GROUP BY status',
+      [planId],
+    );
+    var completed = 0;
+    var skipped = 0;
+    var planned = 0;
+    for (final row in rows) {
+      final count = (row['total'] as num?)?.toInt() ?? 0;
+      switch (ScheduledRunStatus.fromString(row['status'] as String?)) {
+        case ScheduledRunStatus.completed:
+          completed = count;
+        case ScheduledRunStatus.skipped:
+          skipped = count;
+        case ScheduledRunStatus.planned:
+          planned = count;
+      }
+    }
+    return RunPlanProgress(
+      totalSessions: total,
+      completedSessions: completed,
+      skippedSessions: skipped,
+      plannedSessions: planned,
+    );
+  }
+
+  /// Marks the plan session [planWorkoutId] as done on [date], attaching
+  /// [runActivityId].
+  ///
+  /// Reuses the scheduled row for that date and session when there is one, so
+  /// running from the calendar and running straight from the plan converge on
+  /// the same ledger entry. When the session was never materialised (a run
+  /// started from the plan screen, or a plan followed without scheduling) the
+  /// row is created on the spot — otherwise finishing the run would leave no
+  /// trace of progress. Returns the row, or null when the session is unknown.
+  Future<ScheduledRun?> markPlanWorkoutCompleted({
+    required String planWorkoutId,
+    required DateTime date,
+    required String runActivityId,
+  }) async {
+    final database = await db;
+    if (!await _tableExists(database, 'scheduled_runs')) return null;
+    final planId = await _planIdForWorkout(database, planWorkoutId);
+    if (planId == null) return null;
+    final day = _day(date);
+    // A plan session is one logical unit, so running Wednesday's workout on
+    // Saturday must tick off that same row rather than spawn a twin and leave
+    // the original planned forever. Exact date first, then the session's own
+    // still-planned row, which is moved to the day it was actually run.
+    var existing = await database.query(
+      'scheduled_runs',
+      columns: ['id'],
+      where: 'run_plan_workout_id = ? AND date = ?',
+      whereArgs: [planWorkoutId, _date(day)],
+      limit: 1,
+    );
+    var moved = false;
+    if (existing.isEmpty) {
+      // Bounded to the same week either way: a session run a few days late
+      // (or early) is the same session, but a row two weeks out belongs to a
+      // different week of the plan and must not be cannibalised.
+      final from = day.subtract(const Duration(days: 6));
+      final to = day.add(const Duration(days: 6));
+      existing = await database.query(
+        'scheduled_runs',
+        columns: ['id'],
+        where: 'run_plan_workout_id = ? AND status = ? AND date BETWEEN ? AND ?',
+        whereArgs: [
+          planWorkoutId,
+          ScheduledRunStatus.planned.value,
+          _date(from),
+          _date(to),
+        ],
+        orderBy: 'date ASC',
+        limit: 1,
+      );
+      moved = existing.isNotEmpty;
+    }
+    final now = DateTime.now().toIso8601String();
+    final String id;
+    if (existing.isEmpty) {
+      id = _uuid.v4();
+      await database.insert('scheduled_runs', {
+        'id': id,
+        'date': _date(day),
+        'run_plan_id': planId,
+        'run_plan_workout_id': planWorkoutId,
+        'status': ScheduledRunStatus.completed.value,
+        'notes': null,
+        'run_activity_id': runActivityId,
+        'created_at': now,
+        'updated_at': now,
+      });
+    } else {
+      id = existing.first['id'] as String;
+      await database.update(
+        'scheduled_runs',
+        {
+          'status': ScheduledRunStatus.completed.value,
+          'run_activity_id': runActivityId,
+          if (moved) 'date': _date(day),
+          'updated_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+    return getScheduledRun(id);
+  }
+
+  /// True when a periodization phase target links [planId]. The plan's weeks
+  /// are then driven by the phase, so the library shows it as active through
+  /// the planning instead of offering its own activation.
+  Future<bool> isLinkedToPeriodization(String planId) async {
+    final database = await db;
+    if (!await _tableExists(database, 'phase_targets')) return false;
+    final rows = await database.query(
+      'phase_targets',
+      columns: ['training_json'],
+      where: 'training_json LIKE ?',
+      whereArgs: ['%$planId%'],
+    );
+    for (final row in rows) {
+      final training = _decodeJson(row['training_json'] as String? ?? '');
+      final run = training['run'];
+      if (run is! Map) continue;
+      final ids = (run['run_plan_ids'] as List?)?.whereType<String>();
+      if (ids != null && ids.contains(planId)) return true;
+    }
+    return false;
+  }
+
   Future<RunPlan> createPlan({
     required String name,
     String? notes,
@@ -560,18 +804,19 @@ class RunPlanRepository extends BaseRepository {
   /// at [weekStart]. Idempotent: rows already scheduled for the same
   /// plan session and date are left alone, so re-running never duplicates.
   /// Returns how many rows were created.
-  Future<int> materializeWeek({
+  /// Returns the ids of the rows it created, so a bulk caller can offer undo.
+  Future<List<String>> materializeWeek({
     required String planId,
     required int weekIndex,
     required DateTime weekStart,
   }) async {
     final plan = await getPlan(planId);
-    if (plan == null) return 0;
+    if (plan == null) return const [];
     final sessions = plan.workoutsForWeek(weekIndex);
-    if (sessions.isEmpty) return 0;
+    if (sessions.isEmpty) return const [];
     final monday = _weekStart(weekStart);
     final database = await db;
-    var created = 0;
+    final created = <String>[];
     await database.transaction((txn) async {
       for (final session in sessions) {
         final day = session.dayOfWeek ?? 1;
@@ -585,8 +830,9 @@ class RunPlanRepository extends BaseRepository {
         );
         if (existing.isNotEmpty) continue;
         final now = DateTime.now();
+        final id = _uuid.v4();
         await txn.insert('scheduled_runs', {
-          'id': _uuid.v4(),
+          'id': id,
           'date': _date(date),
           'run_plan_id': planId,
           'run_plan_workout_id': session.id,
@@ -596,10 +842,22 @@ class RunPlanRepository extends BaseRepository {
           'created_at': now.toIso8601String(),
           'updated_at': now.toIso8601String(),
         });
-        created++;
+        created.add(id);
       }
     });
     return created;
+  }
+
+  /// Removes scheduled rows by id. Used to undo a bulk materialisation.
+  Future<int> deleteScheduledRuns(List<String> ids) async {
+    if (ids.isEmpty) return 0;
+    final database = await db;
+    if (!await _tableExists(database, 'scheduled_runs')) return 0;
+    return database.delete(
+      'scheduled_runs',
+      where: 'id IN (${List.filled(ids.length, '?').join(', ')})',
+      whereArgs: ids,
+    );
   }
 
   Future<void> updateScheduledRun(
@@ -906,9 +1164,23 @@ class RunPlanRepository extends BaseRepository {
     value.day,
   ).toIso8601String().substring(0, 10);
 
+  static DateTime _day(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
   static DateTime _weekStart(DateTime date) {
     final day = DateTime(date.year, date.month, date.day);
     return day.subtract(Duration(days: day.weekday - 1));
+  }
+
+  /// Guards reads of columns added by a later migration. A device whose
+  /// upgrade failed keeps working, minus the newer feature.
+  static Future<bool> _columnExists(
+    DatabaseExecutor database,
+    String table,
+    String column,
+  ) async {
+    final rows = await database.rawQuery('PRAGMA table_info($table)');
+    return rows.any((row) => row['name'] == column);
   }
 }
 

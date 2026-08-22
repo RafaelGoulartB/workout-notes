@@ -18,6 +18,37 @@ enum RunPlanGoalKind {
   );
 }
 
+/// How far along a plan is, counted from the scheduled ledger.
+class RunPlanProgress {
+  /// Sessions the plan defines across every week.
+  final int totalSessions;
+
+  /// Sessions with a recorded run attached.
+  final int completedSessions;
+  final int skippedSessions;
+
+  /// Sessions materialised in the calendar and still waiting.
+  final int plannedSessions;
+
+  const RunPlanProgress({
+    this.totalSessions = 0,
+    this.completedSessions = 0,
+    this.skippedSessions = 0,
+    this.plannedSessions = 0,
+  });
+
+  /// Sessions settled one way or the other — the denominator users think in is
+  /// still [totalSessions], but skipping should not stall the bar forever.
+  int get resolvedSessions => completedSessions + skippedSessions;
+
+  /// 0..1 completion against the whole plan. 0 when the plan has no sessions.
+  double get fraction => totalSessions < 1
+      ? 0
+      : (completedSessions / totalSessions).clamp(0.0, 1.0);
+
+  bool get hasProgress => completedSessions > 0 || skippedSessions > 0;
+}
+
 enum RunPlanStatus {
   active('active'),
   archived('archived');
@@ -41,6 +72,12 @@ class RunPlan {
   final DateTime? raceDate;
   final int weeks;
   final RunPlanStatus status;
+
+  /// Day the plan was activated, or null when it is just a template sitting in
+  /// the library. Activating anchors "week 1 of the plan" to this date's week,
+  /// which is what lets a completed run tick off the right planned session.
+  /// At most one plan is activated at a time.
+  final DateTime? activatedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -55,12 +92,33 @@ class RunPlan {
     this.raceDate,
     required this.weeks,
     required this.status,
+    this.activatedAt,
     required this.createdAt,
     required this.updatedAt,
     List<RunPlanWorkout> workouts = const [],
   }) : workouts = List.unmodifiable(workouts);
 
   bool get isArchived => status == RunPlanStatus.archived;
+
+  /// Being followed right now. Archived plans never count, even if an old
+  /// activation date is still stored.
+  bool get isActivated => activatedAt != null && !isArchived;
+
+  /// Zero-based plan week that [date] falls in, counting from the activation
+  /// week. Null when the plan is not activated. Wraps, so a short plan repeats
+  /// for as long as it stays active.
+  int? activeWeekIndexOn(DateTime date) {
+    final anchor = activatedAt;
+    if (anchor == null || weeks < 1) return null;
+    final elapsed = _weekStart(date).difference(_weekStart(anchor)).inDays ~/ 7;
+    if (elapsed < 0) return null;
+    return elapsed % weeks;
+  }
+
+  static DateTime _weekStart(DateTime date) {
+    final day = DateTime(date.year, date.month, date.day);
+    return day.subtract(Duration(days: day.weekday - 1));
+  }
 
   /// Sessions of [weekIndex] (zero-based), ordered by weekday then order.
   List<RunPlanWorkout> workoutsForWeek(int weekIndex) {
@@ -99,6 +157,7 @@ class RunPlan {
     Object? raceDate = _sentinel,
     int? weeks,
     RunPlanStatus? status,
+    Object? activatedAt = _sentinel,
     DateTime? updatedAt,
     List<RunPlanWorkout>? workouts,
   }) => RunPlan(
@@ -111,6 +170,9 @@ class RunPlan {
         : raceDate as DateTime?,
     weeks: weeks ?? this.weeks,
     status: status ?? this.status,
+    activatedAt: identical(activatedAt, _sentinel)
+        ? this.activatedAt
+        : activatedAt as DateTime?,
     createdAt: createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     workouts: workouts ?? this.workouts,
@@ -124,6 +186,7 @@ class RunPlan {
     'race_date': raceDate == null ? null : _date(raceDate!),
     'weeks': weeks,
     'status': status.value,
+    'activated_at': activatedAt == null ? null : _date(activatedAt!),
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
   };
@@ -141,6 +204,10 @@ class RunPlan {
         : DateTime.tryParse(map['race_date'] as String),
     weeks: (map['weeks'] as num?)?.toInt() ?? 1,
     status: RunPlanStatus.fromString(map['status'] as String?),
+    // Absent on databases older than v46.
+    activatedAt: map['activated_at'] == null
+        ? null
+        : DateTime.tryParse(map['activated_at'] as String),
     createdAt:
         DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime(2000),
     updatedAt:
