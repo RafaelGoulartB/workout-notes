@@ -39,6 +39,8 @@ void main() {
     expect(report.workouts, greaterThan(40));
     expect(report.routines, 2);
     expect(report.runs, greaterThan(20));
+    expect(report.runPlans, 3);
+    expect(report.completedRunPlans, 2);
     expect(report.measurements, greaterThan(40));
     expect(report.sleepNights, greaterThan(100));
     expect(report.monitoredNights, greaterThan(5));
@@ -118,6 +120,44 @@ void main() {
       ),
       greaterThan(0),
     );
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          'SELECT COUNT(*) FROM run_plans WHERE id LIKE ?',
+          ['$devDataPrefix%'],
+        ),
+      ),
+      3,
+    );
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          "SELECT COUNT(*) FROM run_plans WHERE id LIKE ? AND activated_at IS NOT NULL",
+          ['$devDataPrefix%'],
+        ),
+      ),
+      1,
+    );
+    final completionCounts = await database.query(
+      'run_plans',
+      columns: ['completion_count'],
+      where: 'id LIKE ? AND completion_count > 0',
+      whereArgs: ['$devDataPrefix%'],
+      orderBy: 'completion_count',
+    );
+    expect(
+      completionCounts.map((row) => row['completion_count']),
+      orderedEquals([1, 2]),
+    );
+    final completedPlans = await database.rawQuery(
+      'SELECT p.id FROM run_plans p '
+      'WHERE p.id LIKE ? AND NOT EXISTS ('
+      'SELECT 1 FROM run_plan_workouts w '
+      'LEFT JOIN scheduled_runs s ON s.run_plan_workout_id = w.id '
+      "WHERE w.run_plan_id = p.id AND COALESCE(s.status, 'planned') != 'completed')",
+      ['$devDataPrefix%'],
+    );
+    expect(completedPlans, hasLength(2));
 
     final range = await database.rawQuery(
       'SELECT MIN(date) AS first_date, MAX(date) AS last_date FROM sleep_entries',
@@ -167,6 +207,15 @@ void main() {
         ),
       ),
       secondReport.workouts,
+    );
+    expect(
+      Sqflite.firstIntValue(
+        await database.rawQuery(
+          'SELECT COUNT(*) FROM run_plans WHERE id LIKE ?',
+          ['$devDataPrefix%'],
+        ),
+      ),
+      secondReport.runPlans,
     );
     expect(
       Sqflite.firstIntValue(

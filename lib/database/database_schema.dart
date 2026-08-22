@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 
 import 'database_nutrition_schema.dart';
 import 'database_periodization_schema.dart';
+import 'database_run_plan_schema.dart';
 import 'database_seed.dart';
 import 'migrations/database_migrations_catalog_v11.dart';
 import 'migrations/database_migrations_catalog_v12.dart';
@@ -379,7 +380,8 @@ abstract final class DatabaseSchema {
         best_effort_10k_sec INTEGER,
         best_effort_half_sec INTEGER,
         best_effort_marathon_sec INTEGER,
-        efforts_computed INTEGER NOT NULL DEFAULT 0
+        efforts_computed INTEGER NOT NULL DEFAULT 0,
+        plan_workout_id TEXT
       )
     ''');
     await db.execute('''
@@ -402,6 +404,7 @@ abstract final class DatabaseSchema {
     // the same definition.
     await DatabaseNutritionSchema.create(db);
     await DatabasePeriodizationSchema.create(db);
+    await DatabaseRunPlanSchema.create(db);
 
     // Indexes
     await db.execute('CREATE INDEX idx_workouts_date ON workouts(date)');

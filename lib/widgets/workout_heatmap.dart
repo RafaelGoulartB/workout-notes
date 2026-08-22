@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 
 /// A GitHub-style contribution heatmap showing workout intensity.
-/// Renders 7 rows (days of week) × ~53 columns (weeks).
+///
+/// For the current year, weeks stop at today (no empty future columns).
+/// The list is reversed horizontally so the most recent week sits against
+/// the right edge of the card.
 class WorkoutHeatmap extends StatelessWidget {
   final Map<String, int> dailyData;
   final int year;
@@ -15,25 +18,37 @@ class WorkoutHeatmap extends StatelessWidget {
 
   static const _cellSize = 12.0;
   static const _cellGap = 2.0;
+  static const _labelWidth = 14.0;
+
+  DateTime get _rangeEnd {
+    final now = DateTime.now();
+    final yearEnd = DateTime(year, 12, 31);
+    if (year < now.year) return yearEnd;
+    if (year > now.year) return DateTime(year, 1, 1);
+    return DateTime(now.year, now.month, now.day);
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Build a map of (weekIndex, dayOfWeek) -> volume
-    // Day of week: 0=Sunday, 1=Monday, ..., 6=Saturday
     final Map<int, Map<int, int>> grid = {};
-    int maxVolume = 0;
+    var maxVolume = 0;
 
     final firstDay = DateTime(year, 1, 1);
-    final lastDay = DateTime(year, 12, 31);
+    final lastDay = _rangeEnd;
 
-    for (var d = firstDay; d.isBefore(lastDay) || d == lastDay; d = d.add(const Duration(days: 1))) {
+    if (lastDay.isBefore(firstDay)) {
+      return _empty(context, theme);
+    }
+
+    for (var d = firstDay;
+        !d.isAfter(lastDay);
+        d = d.add(const Duration(days: 1))) {
       final dateStr = d.toIso8601String().substring(0, 10);
       final volume = dailyData[dateStr] ?? 0;
 
-      // Calculate week index (ISO week, approximately)
-      final dayOfYear = differenceInDays(firstDay, d);
+      final dayOfYear = d.difference(firstDay).inDays;
       final weekIndex = dayOfYear ~/ 7;
       final dayOfWeek = d.weekday % 7; // 0=Sunday
 
@@ -42,17 +57,10 @@ class WorkoutHeatmap extends StatelessWidget {
       if (volume > maxVolume) maxVolume = volume;
     }
 
-    final weeks = grid.keys.length;
-    if (weeks == 0) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(AppLocalizations.of(context)!.progressHeatmapNoData(year),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  )),
-        ),
-      );
+    // Newest week first — with reverse:true this lands on the right edge.
+    final weekIndexes = grid.keys.toList()..sort((a, b) => b.compareTo(a));
+    if (weekIndexes.isEmpty) {
+      return _empty(context, theme);
     }
 
     final dayLabels = [
@@ -69,30 +77,34 @@ class WorkoutHeatmap extends StatelessWidget {
       height: 7 * (_cellSize + _cellGap) + 4,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
+        reverse: true,
         padding: const EdgeInsets.symmetric(horizontal: 4),
-        itemCount: weeks + 1, // +1 for day labels column
+        // [newest week … oldest week, day labels]
+        // reverse:true → day labels on the left, newest on the right.
+        itemCount: weekIndexes.length + 1,
         itemBuilder: (context, col) {
-          if (col == 0) {
-            // Day labels column
+          final isLabelColumn = col == weekIndexes.length;
+          if (isLabelColumn) {
             return Column(
               mainAxisAlignment: MainAxisAlignment.start,
               children: dayLabels.asMap().entries.map((e) {
                 return Container(
-                  width: 14,
+                  width: _labelWidth,
                   height: _cellSize + _cellGap,
                   alignment: Alignment.centerLeft,
                   child: Text(
                     dayLabels[e.key].substring(0, 1),
-                    style: TextStyle(fontSize: 8, color: theme.colorScheme.onSurfaceVariant.withAlpha(150)),
+                    style: TextStyle(
+                      fontSize: 8,
+                      color: theme.colorScheme.onSurfaceVariant.withAlpha(150),
+                    ),
                   ),
                 );
               }).toList(),
             );
           }
 
-          final weekIndex = col - 1;
-          final weekData = grid[weekIndex] ?? {};
-
+          final weekData = grid[weekIndexes[col]] ?? {};
           return Column(
             mainAxisAlignment: MainAxisAlignment.start,
             children: List.generate(7, (row) {
@@ -113,6 +125,20 @@ class WorkoutHeatmap extends StatelessWidget {
     );
   }
 
+  Widget _empty(BuildContext context, ThemeData theme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          AppLocalizations.of(context)!.progressHeatmapNoData(year),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+
   Color _cellColor(int volume, int maxVolume, ThemeData theme) {
     if (volume == 0) {
       return theme.colorScheme.surfaceContainerHighest.withAlpha(80);
@@ -124,9 +150,5 @@ class WorkoutHeatmap extends StatelessWidget {
     if (ratio > 0.5) return Colors.green.shade600;
     if (ratio > 0.25) return Colors.green.shade400;
     return Colors.green.shade200;
-  }
-
-  int differenceInDays(DateTime a, DateTime b) {
-    return b.difference(a).inDays;
   }
 }

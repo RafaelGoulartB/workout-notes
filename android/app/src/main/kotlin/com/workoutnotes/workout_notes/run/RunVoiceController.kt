@@ -15,6 +15,10 @@ class RunVoiceController(private val context: Context) {
 
     private val tts = RunTtsService(context)
     private val intervalEngine = RunIntervalEngineNative()
+
+    /** Structured plan session. Takes precedence over [intervalEngine]. */
+    private val stepEngine = RunWorkoutStepEngineNative()
+    private var planSteps: List<RunWorkoutStepNative> = emptyList()
     private var settings: RunVoiceSettings = RunVoiceSettings.defaults()
     private var goal: RunSessionGoal = RunSessionGoal.disabled()
     private var intervalsOn: Boolean = false
@@ -77,15 +81,44 @@ class RunVoiceController(private val context: Context) {
         return defaults
     }
 
-    fun configure(settings: RunVoiceSettings, goal: RunSessionGoal, intervalsOn: Boolean, bypassHeadphonesGate: Boolean = false) {
+    fun configure(
+        settings: RunVoiceSettings,
+        goal: RunSessionGoal,
+        intervalsOn: Boolean,
+        bypassHeadphonesGate: Boolean = false,
+        planSteps: List<RunWorkoutStepNative> = emptyList(),
+    ) {
         this.settings = settings
         this.goal = goal
         this.intervalsOn = intervalsOn
         this.bypassHeadphonesGate = bypassHeadphonesGate
         intervalEngine.configure(settings.interval)
+        setPlanSteps(planSteps)
     }
 
-    fun syncFromFlutter(settingsMap: Map<String, Any?>?, goalMap: Map<String, Any?>?, intervalsOn: Boolean?, bypassGate: Boolean?) {
+    /** Loads a structured session. Empty clears it and falls back to presets. */
+    fun setPlanSteps(steps: List<RunWorkoutStepNative>) {
+        planSteps = steps
+        stepEngine.configure(steps)
+    }
+
+    /** Serialized plan for the run spool, so a killed process resumes cueing. */
+    fun planStepsJson(): String? =
+        if (planSteps.isEmpty()) null else RunWorkoutStepNative.listToJsonString(planSteps)
+
+    /** Per-step results collected during the session, for Dart to persist. */
+    fun stepResults(): List<Map<String, Any?>> = stepEngine.results.map { it.toMap() }
+
+    val hasPlan: Boolean get() = stepEngine.hasPlan
+
+    fun syncFromFlutter(
+        settingsMap: Map<String, Any?>?,
+        goalMap: Map<String, Any?>?,
+        intervalsOn: Boolean?,
+        bypassGate: Boolean?,
+        plan: Any? = null,
+    ) {
+        if (plan != null) setPlanSteps(RunWorkoutStepNative.listFromAny(plan))
         if (settingsMap != null) {
             val parsed = RunVoiceSettings.fromMap(settingsMap)
             this.settings = parsed
@@ -99,7 +132,13 @@ class RunVoiceController(private val context: Context) {
         Log.i("RunVoice", "sync intervalsOn=$intervalsOn goal=${goal.enabled} enabled=${settings.enabled}")
     }
 
-    fun begin(settingsMap: Map<String, Any?>?, goalMap: Map<String, Any?>?, intervalsOn: Boolean?, bypassGate: Boolean?) {
+    fun begin(
+        settingsMap: Map<String, Any?>?,
+        goalMap: Map<String, Any?>?,
+        intervalsOn: Boolean?,
+        bypassGate: Boolean?,
+        plan: Any? = null,
+    ) {
         // If flutter didn't push settings, load from storage
         if (settingsMap == null && !settingsLoaded) {
             loadSettingsFromDb()
@@ -120,14 +159,22 @@ class RunVoiceController(private val context: Context) {
         lastGpsAnnounceAt = 0L
         lastPaceAnnounceAt = 0L
         intervalEngine.reset()
+        if (plan != null) setPlanSteps(RunWorkoutStepNative.listFromAny(plan))
+        stepEngine.reset()
         tts.ensureReady()
-        Log.i("RunVoice", "begin intervalsOn=${this.intervalsOn} goal=${goal.enabled} ${goal.metric} ${goal.value}")
+        Log.i(
+            "RunVoice",
+            "begin intervalsOn=${this.intervalsOn} goal=${goal.enabled} ${goal.metric} ${goal.value} planSteps=${stepEngine.totalSteps}",
+        )
     }
 
     fun end() {
         active = false
         goalCompleted = false
         intervalEngine.reset()
+        // Keep the step results — Dart reads them after stop() to persist
+        // planned-vs-actual. finish() closes a partial step.
+        stepEngine.finish()
         tts.stop()
         Log.i("RunVoice", "end")
     }
@@ -169,12 +216,29 @@ class RunVoiceController(private val context: Context) {
         val goalJustCompleted = checkGoalCompletion(distanceMeters, movingTimeSeconds, isRecording, isPaused)
         if (goalJustCompleted) {
             phrases.add(RunVoicePhrases.goalComplete(goal.metric, goal.value))
-            // keep interval counters in sync
-            if (intervalsOn && intervalEngine.snapshot.phase == RunIntervalPhase.idle && isRecording) {
-                intervalEngine.start()
+            // keep the structured/preset counters in sync
+            if (stepEngine.hasPlan) {
+                advanceStepEngine(isRecording, distanceMeters, movingTimeSeconds, speak = false)
+            } else {
+                if (intervalsOn && intervalEngine.snapshot.phase == RunIntervalPhase.idle && isRecording) {
+                    intervalEngine.start()
+                }
+                intervalEngine.tick(isRecording, distanceMeters, movingTimeSeconds)
             }
-            intervalEngine.tick(isRecording, distanceMeters, movingTimeSeconds)
             phrases.addAll(collectFreeRunPhrases(distanceMeters, durationSeconds, movingTimeSeconds, currentPaceSecPerKm, lat, accuracyMeters, isRecording, splitsCount, splits))
+        } else if (stepEngine.hasPlan) {
+            // A planned session takes over from the quick interval preset.
+            phrases.addAll(
+                advanceStepEngine(
+                    isRecording,
+                    distanceMeters,
+                    movingTimeSeconds,
+                    speak = settings.announceIntervals,
+                )
+            )
+            if (isRecording || isPaused) {
+                phrases.addAll(collectFreeRunPhrases(distanceMeters, durationSeconds, movingTimeSeconds, currentPaceSecPerKm, lat, accuracyMeters, isRecording, splitsCount, splits))
+            }
         } else {
             if (intervalsOn && settings.announceIntervals && isRecording && intervalEngine.snapshot.phase == RunIntervalPhase.idle) {
                 val startEvents = intervalEngine.start()
@@ -280,6 +344,60 @@ class RunVoiceController(private val context: Context) {
 
         return out
     }
+
+    /**
+     * Starts the plan on the first recording tick and drains its events.
+     * Returns the phrases to speak (empty when [speak] is false).
+     */
+    private fun advanceStepEngine(
+        isRecording: Boolean,
+        distanceMeters: Double,
+        movingTimeSeconds: Int,
+        speak: Boolean,
+    ): List<String> {
+        val out = mutableListOf<String>()
+        val events = mutableListOf<RunStepEventNative>()
+        if (isRecording && stepEngine.snapshot.phase == RunStepEnginePhase.idle) {
+            events.addAll(stepEngine.start())
+        }
+        events.addAll(stepEngine.tick(isRecording, distanceMeters, movingTimeSeconds))
+        if (!speak) return out
+        for (event in events) {
+            phraseForStep(event)?.let { out.add(it) }
+        }
+        return out
+    }
+
+    private fun phraseForStep(event: RunStepEventNative): String? = when (event.kind) {
+        RunStepEventKind.stepStarted -> RunVoicePhrases.stepStart(
+            event.role,
+            event.repIndex,
+            event.repTotal,
+            event.metric,
+            event.target,
+            stepEngine.snapshot.let { snapshot ->
+                if (snapshot.stepIndex == event.stepIndex) targetPaceForCurrentStep() else null
+            },
+        )
+        RunStepEventKind.timeRemainingCue -> RunVoicePhrases.timeRemaining(event.remainingSeconds ?: 30)
+        RunStepEventKind.paceTooSlow -> RunVoicePhrases.stepPaceTooSlow(event.paceSecPerKm)
+        RunStepEventKind.paceTooFast -> RunVoicePhrases.stepPaceTooFast(event.paceSecPerKm)
+        RunStepEventKind.workoutCompleted -> RunVoicePhrases.workoutComplete()
+        // Completion is implied by the next step's start cue.
+        RunStepEventKind.stepCompleted -> null
+    }
+
+    private fun targetPaceForCurrentStep(): Double? {
+        val snapshot = stepEngine.snapshot
+        if (!snapshot.isActive) return null
+        return planStepsForSnapshot(snapshot)
+    }
+
+    private fun planStepsForSnapshot(snapshot: RunStepSnapshotNative): Double? =
+        RunWorkoutStepEngineNative.expand(planSteps)
+            .getOrNull(snapshot.stepIndex)
+            ?.step
+            ?.targetPaceMinSecPerKm
 
     private fun phraseForInterval(event: RunIntervalEvent): String? {
         return when (event.kind) {

@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/screens/run/run_detail_screen.dart';
+import 'package:workout_notes/screens/run/run_record_screen.dart';
+import 'package:workout_notes/widgets/run/run_plan_ui.dart';
+import '../../repositories/run_plan_repository.dart';
+import '../../repositories/run_repository.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/routine_repository.dart';
 import 'workout_detail_screen.dart';
@@ -16,13 +23,33 @@ class CalendarScreen extends StatefulWidget {
 class _CalendarScreenState extends State<CalendarScreen> {
   final _workoutRepo = WorkoutRepository();
   final _routineRepo = RoutineRepository();
+  final _runRepo = RunRepository();
+  final _runPlanRepo = RunPlanRepository();
   DateTime _selectedDate = DateTime.now();
   int _currentMonth = DateTime.now().month;
   int _currentYear = DateTime.now().year;
   Map<String, List<Map<String, dynamic>>> _workoutsByDate = {};
   Map<String, List<Map<String, dynamic>>> _categoriesByDate = {};
   List<Map<String, dynamic>> _selectedDayWorkouts = [];
+  Map<String, List<RunActivity>> _runsByDate = {};
+  Map<String, List<ScheduledRun>> _plannedRunsByDate = {};
   bool _isLoading = true;
+
+  String get _selectedKey => _selectedDate.toIso8601String().substring(0, 10);
+
+  List<RunActivity> get _selectedDayRuns => _runsByDate[_selectedKey] ?? const [];
+
+  /// Planned runs that were not recorded yet — a completed one shows up as an
+  /// activity instead, so listing both would double the day.
+  List<ScheduledRun> get _selectedDayPlannedRuns =>
+      (_plannedRunsByDate[_selectedKey] ?? const <ScheduledRun>[])
+          .where((run) => !run.isCompleted)
+          .toList();
+
+  bool get _selectedDayEmpty =>
+      _selectedDayWorkouts.isEmpty &&
+      _selectedDayRuns.isEmpty &&
+      _selectedDayPlannedRuns.isEmpty;
 
   @override
   void initState() {
@@ -48,13 +75,30 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _currentMonth,
     );
 
-    _selectedDayWorkouts =
-        grouped[_selectedDate.toIso8601String().substring(0, 10)] ?? [];
+    final runs = await _runRepo.getActivitiesByMonth(
+      _currentYear,
+      _currentMonth,
+    );
+    final monthStart = DateTime(_currentYear, _currentMonth, 1);
+    final monthEnd = DateTime(_currentYear, _currentMonth + 1, 0);
+    final scheduled = await _runPlanRepo.getScheduledRuns(
+      monthStart,
+      monthEnd,
+    );
+    final plannedByDate = <String, List<ScheduledRun>>{};
+    for (final run in scheduled) {
+      final key = run.date.toIso8601String().substring(0, 10);
+      plannedByDate.putIfAbsent(key, () => []).add(run);
+    }
+
+    _selectedDayWorkouts = grouped[_selectedKey] ?? [];
 
     if (mounted) {
       setState(() {
         _workoutsByDate = grouped;
         _categoriesByDate = categories;
+        _runsByDate = runs;
+        _plannedRunsByDate = plannedByDate;
         _isLoading = false;
       });
     }
@@ -173,7 +217,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
                 // Selected day workouts
                 Expanded(
-                  child: _selectedDayWorkouts.isEmpty
+                  child: _selectedDayEmpty
                       ? Center(
                           child: Padding(
                             padding: const EdgeInsets.all(24),
@@ -221,11 +265,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             ),
                           ),
                         )
-                      : ListView.builder(
+                      : ListView(
                           padding: const EdgeInsets.all(12),
-                          itemCount: _selectedDayWorkouts.length,
-                          itemBuilder: (ctx, i) {
-                            final w = _selectedDayWorkouts[i];
+                          children: [
+                            ..._selectedDayPlannedRuns.map(_plannedRunCard),
+                            ..._selectedDayRuns.map(_completedRunCard),
+                            ..._selectedDayWorkouts.map((w) {
                             final duration =
                                 (w['duration_seconds'] as int?) ?? 0;
                             final durStr = duration > 0
@@ -294,11 +339,145 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                 },
                               ),
                             );
-                          },
+                            }),
+                          ],
                         ),
                 ),
               ],
             ),
+    );
+  }
+
+  /// A planned-but-not-yet-run session. Tapping starts it with the plan loaded.
+  Widget _plannedRunCard(ScheduledRun scheduled) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    final workout = scheduled.workout;
+    final color = workout == null
+        ? theme.colorScheme.secondary
+        : RunPlanUi.kindColor(theme.colorScheme, workout.kind);
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: color.withAlpha(110)),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withAlpha(30),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            workout == null
+                ? Icons.directions_run
+                : RunPlanUi.kindIcon(workout.kind),
+            color: color,
+            size: 20,
+          ),
+        ),
+        title: Text(workout?.name ?? loc.runScheduleSectionTitle),
+        isThreeLine: workout?.hasSteps ?? false,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              workout == null
+                  ? RunPlanUi.statusLabel(loc, scheduled.status)
+                  : '${RunPlanUi.statusLabel(loc, scheduled.status)} · '
+                        '${RunPlanUi.sessionSummary(loc, workout)}',
+            ),
+            // The session shape, so a planned tiro day is recognisable from the
+            // calendar without opening the plan.
+            if (workout != null && workout.hasSteps) ...[
+              const SizedBox(height: 6),
+              RunWorkoutProfileBar(workout: workout, height: 6),
+            ],
+          ],
+        ),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) async {
+            if (value == 'skip') {
+              await _runPlanRepo.updateScheduledRun(
+                scheduled.id,
+                status: ScheduledRunStatus.skipped,
+              );
+            } else if (value == 'remove') {
+              await _runPlanRepo.deleteScheduledRun(scheduled.id);
+            }
+            if (mounted) _loadMonth();
+          },
+          itemBuilder: (ctx) => [
+            if (!scheduled.isSkipped)
+              PopupMenuItem(
+                value: 'skip',
+                child: Text(loc.runScheduleMarkSkipped),
+              ),
+            PopupMenuItem(
+              value: 'remove',
+              child: Text(loc.runScheduleUnschedule),
+            ),
+          ],
+        ),
+        onTap: scheduled.isSkipped
+            ? null
+            : () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RunRecordScreen(
+                      planWorkout: workout,
+                      scheduledRun: scheduled,
+                    ),
+                  ),
+                );
+                if (mounted) _loadMonth();
+              },
+      ),
+    );
+  }
+
+  Widget _completedRunCard(RunActivity activity) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            Icons.directions_run,
+            color: theme.colorScheme.onSecondaryContainer,
+            size: 20,
+          ),
+        ),
+        title: Text(
+          activity.title ?? DateFormat('HH:mm').format(activity.startedAt),
+        ),
+        subtitle: Text(
+          '${RunPlanUi.distanceLabel(activity.distanceMeters)} · '
+          '${RunPlanUi.durationLabel(activity.movingTimeSeconds)}',
+        ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => RunDetailScreen(activityId: activity.id),
+            ),
+          );
+          if (mounted) _loadMonth();
+        },
+      ),
     );
   }
 
@@ -323,6 +502,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
           '$_currentYear-${_currentMonth.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
       final cats = _categoriesByDate[dateStr] ?? [];
       final hasWorkout = cats.isNotEmpty;
+      final hasRun = (_runsByDate[dateStr] ?? const []).isNotEmpty;
+      final hasPlannedRun = (_plannedRunsByDate[dateStr] ?? const [])
+          .any((run) => !run.isCompleted);
       final isToday = dateStr == today;
       final isSelected = dateStr == selectedStr;
 
@@ -358,6 +540,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: _buildCategoryDots(cats),
+                  ),
+                if (hasRun || hasPlannedRun)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Icon(
+                      Icons.directions_run,
+                      size: 10,
+                      // Hollow-ish tint marks a run that is only planned.
+                      color: hasRun
+                          ? theme.colorScheme.secondary
+                          : theme.colorScheme.secondary.withAlpha(110),
+                    ),
                   ),
               ],
             ),

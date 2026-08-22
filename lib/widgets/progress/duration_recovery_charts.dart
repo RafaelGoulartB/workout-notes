@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/progress_helpers.dart';
+import 'package:workout_notes/widgets/progress/progress_chart_shell.dart';
 
 /// Displays duration/efficiency and recovery/feeling sections.
 class DurationRecoveryCharts extends StatelessWidget {
@@ -20,58 +21,23 @@ class DurationRecoveryCharts extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Duration
         if (durationTrend.isNotEmpty) ...[
-          Text(
-            loc.progressDuration,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 6),
           _DurationChart(data: durationTrend),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
         ],
-
-        // Density
         if (densityData.isNotEmpty) ...[
-          Text(
-            loc.progressDensity,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 6),
           _DensityChart(data: densityData),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
         ],
-
-        // Feeling
         if (feelingTrend.isNotEmpty) ...[
-          Text(
-            loc.progressRecoveryFeeling,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 6),
           _FeelingChart(data: feelingTrend),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
         ],
-
-        // Feeling vs Volume
-        if (feelingVsVolume.isNotEmpty) ...[
-          Text(
-            loc.progressRecoveryFeelingVsVolume,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 6),
+        if (feelingVsVolume.isNotEmpty)
           _FeelingVsVolumeChart(data: feelingVsVolume),
-        ],
       ],
     );
   }
@@ -96,30 +62,18 @@ class _DurationChart extends StatelessWidget {
 
     final avg = values.fold<double>(0, (a, b) => a + b) / values.length;
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  loc.progressAverage(avg.toStringAsFixed(0)),
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(fontSize: 11),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 140,
+    return ProgressChartCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ProgressSectionHeader(
+            title: loc.progressDuration,
+            subtitle: loc.progressAverage(avg.toStringAsFixed(0)),
+            accent: Colors.purple,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+              height: 148,
               child: LineChart(
                 LineChartData(
                   minY: 0,
@@ -129,23 +83,27 @@ class _DurationChart extends StatelessWidget {
                     drawVerticalLine: false,
                     horizontalInterval:
                         niceInterval(maxVal / 4),
+                    getDrawingHorizontalLine: (v) => FlLine(
+                      color: theme.colorScheme.outlineVariant.withAlpha(60),
+                      strokeWidth: 1,
+                    ),
                   ),
                   titlesData: FlTitlesData(
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 32,
+                        reservedSize: 28,
                         getTitlesWidget: (v, _) => Text(
-                          '${v.toInt()}min',
+                          '${v.toInt()}',
                           style: theme.textTheme.bodySmall
-                              ?.copyWith(fontSize: 8),
+                              ?.copyWith(fontSize: 9),
                         ),
                       ),
                     ),
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 20,
+                        reservedSize: 22,
                         interval:
                             data.length > 10 ? 2 : 1,
                         getTitlesWidget: (v, _) {
@@ -162,7 +120,7 @@ class _DurationChart extends StatelessWidget {
                                 ? d.substring(5)
                                 : d,
                             style: theme.textTheme.bodySmall
-                                ?.copyWith(fontSize: 7),
+                                ?.copyWith(fontSize: 8),
                           );
                         },
                       ),
@@ -215,8 +173,7 @@ class _DurationChart extends StatelessWidget {
                 ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -246,31 +203,18 @@ class _DensityChart extends StatelessWidget {
     final avg =
         densities.fold<double>(0, (a, b) => a + b) / densities.length;
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  loc.progressDensityAverage(
-                      avg.toStringAsFixed(1)),
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(fontSize: 11),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 120,
+    return ProgressChartCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ProgressSectionHeader(
+            title: loc.progressDensity,
+            subtitle: loc.progressDensityAverage(avg.toStringAsFixed(1)),
+            accent: Colors.deepPurple,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+              height: 128,
               child: BarChart(
                 BarChartData(
                   alignment:
@@ -352,8 +296,7 @@ class _DensityChart extends StatelessWidget {
                 ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -368,6 +311,7 @@ class _FeelingChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
 
     final reversed = data.reversed.toList();
     final values = reversed
@@ -376,17 +320,17 @@ class _FeelingChart extends StatelessWidget {
 
     if (values.isEmpty) return const SizedBox.shrink();
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: SizedBox(
-          height: 130,
+    return ProgressChartCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ProgressSectionHeader(
+            title: loc.progressRecoveryFeeling,
+            accent: Colors.redAccent,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+          height: 140,
           child: BarChart(
             BarChartData(
               alignment: BarChartAlignment.spaceAround,
@@ -494,6 +438,7 @@ class _FeelingChart extends StatelessWidget {
             ),
           ),
         ),
+        ],
       ),
     );
   }
@@ -515,17 +460,17 @@ class _FeelingVsVolumeChart extends StatelessWidget {
       return a > v ? a : v;
     });
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: SizedBox(
-          height: 140,
+    return ProgressChartCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ProgressSectionHeader(
+            title: loc.progressRecoveryFeelingVsVolume,
+            accent: Colors.teal,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+          height: 148,
           child: BarChart(
             BarChartData(
               alignment: BarChartAlignment.spaceAround,
@@ -624,6 +569,7 @@ class _FeelingVsVolumeChart extends StatelessWidget {
             ),
           ),
         ),
+        ],
       ),
     );
   }

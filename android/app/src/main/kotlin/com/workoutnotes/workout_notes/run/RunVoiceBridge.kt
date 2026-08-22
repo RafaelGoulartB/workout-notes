@@ -13,6 +13,9 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
         @Volatile var pendingGoal: Map<String, Any?>? = null
         @Volatile var pendingIntervalsOn: Boolean? = null
         @Volatile var pendingBypassGate: Boolean? = null
+
+        /** Structured plan steps waiting for the tracking service to start. */
+        @Volatile var pendingPlan: Any? = null
     }
 
     private fun voiceController(): RunVoiceController? {
@@ -42,14 +45,16 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
                 val goalMap = args["goal"] as? Map<String, Any?>
                 val intervalsOn = args["intervalsOn"] as? Boolean
                 val bypassGate = args["bypassHeadphonesGate"] as? Boolean
+                val plan = args["plan"]
                 pendingSettings = settingsMap
                 pendingGoal = goalMap
                 pendingIntervalsOn = intervalsOn
                 pendingBypassGate = bypassGate
+                if (args.containsKey("plan")) pendingPlan = plan
                 // If service already running, push immediately
                 val svc = RunTrackingService.activeInstanceForVoice()
                 if (svc != null) {
-                    svc.voiceController.syncFromFlutter(settingsMap, goalMap, intervalsOn, bypassGate)
+                    svc.voiceController.syncFromFlutter(settingsMap, goalMap, intervalsOn, bypassGate, plan)
                 }
                 Log.i("RunVoiceBridge", "syncSettings intervalsOn=$intervalsOn")
                 result.success(null)
@@ -63,17 +68,20 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
                 val goalMap = args["goal"] as? Map<String, Any?>
                 val intervalsOn = args["intervalsOn"] as? Boolean
                 val bypassGate = args["bypassHeadphonesGate"] as? Boolean
+                val plan = args["plan"]
                 val svc = RunTrackingService.activeInstanceForVoice()
                 if (svc != null) {
-                    svc.voiceController.begin(settingsMap, goalMap, intervalsOn, bypassGate)
+                    svc.voiceController.begin(settingsMap, goalMap, intervalsOn, bypassGate, plan)
+                    svc.persistVoicePlan()
                 } else {
                     // No service yet — store pending, will be consumed on startRun
                     pendingSettings = settingsMap
                     pendingGoal = goalMap
                     pendingIntervalsOn = intervalsOn
                     pendingBypassGate = bypassGate
+                    pendingPlan = plan
                     // Also init ephemeral to allow test-like warm-up
-                    ephemeralController().begin(settingsMap, goalMap, intervalsOn, bypassGate)
+                    ephemeralController().begin(settingsMap, goalMap, intervalsOn, bypassGate, plan)
                 }
                 result.success(null)
             }
@@ -85,7 +93,15 @@ class RunVoiceBridge(private val context: Context) : MethodChannel.MethodCallHan
                 pendingGoal = null
                 pendingIntervalsOn = null
                 pendingBypassGate = null
+                pendingPlan = null
                 result.success(null)
+            }
+            "stepResults" -> {
+                // Native is the source of truth for a structured session: it keeps
+                // cueing (and measuring) while the Flutter engine is dead.
+                val svc = RunTrackingService.activeInstanceForVoice()
+                val controller = svc?.voiceController ?: ephemeral
+                result.success(controller?.stepResults() ?: emptyList<Map<String, Any?>>())
             }
             "speakTest" -> {
                 val ctrl = voiceController()

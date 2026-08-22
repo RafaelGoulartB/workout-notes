@@ -8,7 +8,7 @@ import 'base_repository.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
-  static const int currentBackupVersion = 13;
+  static const int currentBackupVersion = 14;
   static const int minimumSupportedBackupVersion = 2;
 
   final Future<Database> Function()? _databaseProvider;
@@ -58,6 +58,16 @@ class ExportImportRepository extends BaseRepository {
         db,
         'periodization_checkins',
       ),
+      // Runs and running plans (backup v14). Activities and track points are
+      // included because `scheduled_runs` and `run_activity_steps` reference
+      // them — restoring the plans without them would break the FKs.
+      'run_activities': await _queryIfExists(db, 'run_activities'),
+      'run_track_points': await _queryIfExists(db, 'run_track_points'),
+      'run_plans': await _queryIfExists(db, 'run_plans'),
+      'run_plan_workouts': await _queryIfExists(db, 'run_plan_workouts'),
+      'run_workout_steps': await _queryIfExists(db, 'run_workout_steps'),
+      'scheduled_runs': await _queryIfExists(db, 'scheduled_runs'),
+      'run_activity_steps': await _queryIfExists(db, 'run_activity_steps'),
       'settings': await db.query('app_settings'),
     };
   }
@@ -85,6 +95,15 @@ class ExportImportRepository extends BaseRepository {
         'phase_targets',
         'periodization_phases',
         'periodization_plans',
+        // Children before parents: schedule and step rows reference both the
+        // plan sessions and the recorded activities.
+        'run_activity_steps',
+        'scheduled_runs',
+        'run_workout_steps',
+        'run_plan_workouts',
+        'run_plans',
+        'run_track_points',
+        'run_activities',
       ]) {
         if (await _tableExists(txn, table)) {
           await txn.delete(table);
@@ -162,6 +181,14 @@ class ExportImportRepository extends BaseRepository {
         'phase_targets',
         'phase_routine_links',
         'periodization_checkins',
+        // Parents before children, mirroring the clear order above.
+        'run_activities',
+        'run_track_points',
+        'run_plans',
+        'run_plan_workouts',
+        'run_workout_steps',
+        'scheduled_runs',
+        'run_activity_steps',
       ]) {
         if (await _tableExists(txn, table)) {
           totalRows += await _insertAll(txn, table, data[table]);
@@ -362,6 +389,15 @@ class ExportImportRepository extends BaseRepository {
         'phase_targets',
         'periodization_phases',
         'periodization_plans',
+        // Children before parents: schedule and step rows reference both the
+        // plan sessions and the recorded activities.
+        'run_activity_steps',
+        'scheduled_runs',
+        'run_workout_steps',
+        'run_plan_workouts',
+        'run_plans',
+        'run_track_points',
+        'run_activities',
       ]) {
         if (await _tableExists(txn, table)) {
           await txn.delete(table);

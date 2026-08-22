@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+/// Distinguishes "not passed" from an explicit null in [PeriodizationTarget.copyWith].
+const Object _unset = Object();
+
 class PeriodizationTarget {
   final String id;
   final String phaseId;
@@ -20,6 +23,24 @@ class PeriodizationTarget {
   final int? maxSetsPerWeek;
   final double? minRpe;
   final double? maxRpe;
+
+  /// Weekly running targets, serialized under a `run` sub-map inside
+  /// [trainingJson]. Additive: targets saved before running plans existed
+  /// simply have no `run` key, and every reader must tolerate that.
+  final int? runSessionsPerWeek;
+  final double? runWeeklyDistanceMeters;
+  final double? longRunDistanceMeters;
+  final int? qualitySessionsPerWeek;
+
+  /// Running plans linked to the week this target applies to.
+  final List<String> runPlanIds;
+
+  /// Zero-based plan week that the phase's FIRST week maps to. 0 means the
+  /// phase and the plan start together; 4 means the phase begins already on
+  /// week 5 of the plan (you joined a plan in progress). Weeks past the end
+  /// of the plan wrap, so a short plan repeats across a long phase.
+  /// Meaningless without [runPlanIds], so it is only serialized with them.
+  final int? runPlanStartWeek;
 
   /// Routines linked to the week this target applies to. Serialized inside
   /// [trainingJson]; each phase week may carry its own routine sequence.
@@ -48,6 +69,12 @@ class PeriodizationTarget {
     this.maxRpe,
     List<String> routineIds = const [],
     String? routineId,
+    this.runSessionsPerWeek,
+    this.runWeeklyDistanceMeters,
+    this.longRunDistanceMeters,
+    this.qualitySessionsPerWeek,
+    List<String> runPlanIds = const [],
+    this.runPlanStartWeek,
     this.targetWeightKg,
     this.weeklyWeightChangePercent,
     this.sleepHours,
@@ -56,7 +83,8 @@ class PeriodizationTarget {
            ? List.unmodifiable(routineIds)
            : routineId == null
            ? const []
-           : List.unmodifiable([routineId]);
+           : List.unmodifiable([routineId]),
+       runPlanIds = List.unmodifiable(runPlanIds);
 
   /// Backwards-compatible access to the first linked routine.
   String? get routineId => routineIds.isEmpty ? null : routineIds.first;
@@ -72,6 +100,11 @@ class PeriodizationTarget {
       minRpe == null &&
       maxRpe == null &&
       routineIds.isEmpty &&
+      runSessionsPerWeek == null &&
+      runWeeklyDistanceMeters == null &&
+      longRunDistanceMeters == null &&
+      qualitySessionsPerWeek == null &&
+      runPlanIds.isEmpty &&
       targetWeightKg == null &&
       weeklyWeightChangePercent == null &&
       sleepHours == null;
@@ -94,6 +127,22 @@ class PeriodizationTarget {
     if (maxRpe != null) 'max_rpe': maxRpe,
     if (routineIds.isNotEmpty) 'routine_ids': routineIds,
     if (routineIds.isNotEmpty) 'routine_id': routineIds.first,
+    if (runJson.isNotEmpty) 'run': runJson,
+  };
+
+  /// Running sub-map of [trainingJson]. Empty when no running target is set,
+  /// so the key stays absent and old readers are unaffected.
+  Map<String, dynamic> get runJson => {
+    if (runSessionsPerWeek != null) 'run_sessions_per_week': runSessionsPerWeek,
+    if (runWeeklyDistanceMeters != null)
+      'run_weekly_distance_meters': runWeeklyDistanceMeters,
+    if (longRunDistanceMeters != null)
+      'long_run_distance_meters': longRunDistanceMeters,
+    if (qualitySessionsPerWeek != null)
+      'quality_sessions_per_week': qualitySessionsPerWeek,
+    if (runPlanIds.isNotEmpty) 'run_plan_ids': runPlanIds,
+    if (runPlanIds.isNotEmpty && runPlanStartWeek != null)
+      'run_plan_start_week': runPlanStartWeek,
   };
 
   Map<String, dynamic> get bodyJson => {
@@ -125,6 +174,12 @@ class PeriodizationTarget {
     double? maxRpe,
     String? routineId,
     List<String>? routineIds,
+    int? runSessionsPerWeek,
+    double? runWeeklyDistanceMeters,
+    double? longRunDistanceMeters,
+    int? qualitySessionsPerWeek,
+    List<String>? runPlanIds,
+    Object? runPlanStartWeek = _unset,
     double? targetWeightKg,
     double? weeklyWeightChangePercent,
     double? sleepHours,
@@ -148,6 +203,16 @@ class PeriodizationTarget {
     maxRpe: maxRpe ?? this.maxRpe,
     routineIds:
         routineIds ?? (routineId == null ? this.routineIds : [routineId]),
+    runSessionsPerWeek: runSessionsPerWeek ?? this.runSessionsPerWeek,
+    runWeeklyDistanceMeters:
+        runWeeklyDistanceMeters ?? this.runWeeklyDistanceMeters,
+    longRunDistanceMeters: longRunDistanceMeters ?? this.longRunDistanceMeters,
+    qualitySessionsPerWeek:
+        qualitySessionsPerWeek ?? this.qualitySessionsPerWeek,
+    runPlanIds: runPlanIds ?? this.runPlanIds,
+    runPlanStartWeek: identical(runPlanStartWeek, _unset)
+        ? this.runPlanStartWeek
+        : runPlanStartWeek as int?,
     targetWeightKg: targetWeightKg ?? this.targetWeightKg,
     weeklyWeightChangePercent:
         weeklyWeightChangePercent ?? this.weeklyWeightChangePercent,
@@ -179,6 +244,8 @@ class PeriodizationTarget {
   factory PeriodizationTarget.fromMap(Map<String, dynamic> map) {
     final nutrition = _decode(map['nutrition_json']);
     final training = _decode(map['training_json']);
+    final rawRun = training['run'];
+    final run = rawRun is Map ? Map<String, dynamic>.from(rawRun) : const {};
     final body = _decode(map['body_json']);
     final sleep = _decode(map['sleep_json']);
     return PeriodizationTarget(
@@ -199,6 +266,13 @@ class PeriodizationTarget {
       minRpe: _double(training['min_rpe']),
       maxRpe: _double(training['max_rpe']),
       routineIds: _routineIds(training),
+      runSessionsPerWeek: (run['run_sessions_per_week'] as num?)?.toInt(),
+      runWeeklyDistanceMeters: _double(run['run_weekly_distance_meters']),
+      longRunDistanceMeters: _double(run['long_run_distance_meters']),
+      qualitySessionsPerWeek: (run['quality_sessions_per_week'] as num?)
+          ?.toInt(),
+      runPlanIds: _runPlanIds(run),
+      runPlanStartWeek: (run['run_plan_start_week'] as num?)?.toInt(),
       targetWeightKg: _double(body['target_weight_kg']),
       weeklyWeightChangePercent: _double(body['weekly_weight_change_percent']),
       sleepHours: _double(sleep['hours']),
@@ -213,6 +287,12 @@ class PeriodizationTarget {
   }
 
   static double? _double(dynamic value) => (value as num?)?.toDouble();
+
+  static List<String> _runPlanIds(Map<dynamic, dynamic> run) {
+    final raw = run['run_plan_ids'];
+    if (raw is! List) return const [];
+    return raw.whereType<String>().where((id) => id.isNotEmpty).toList();
+  }
 
   static List<String> _routineIds(Map<String, dynamic> training) {
     final raw = training['routine_ids'];

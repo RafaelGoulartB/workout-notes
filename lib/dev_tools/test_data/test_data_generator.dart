@@ -5,6 +5,7 @@ import 'test_data_context.dart';
 import 'test_data_fitness_generator.dart';
 import 'test_data_periodization_generator.dart';
 import 'test_data_run_generator.dart';
+import 'test_data_run_plan_generator.dart';
 import 'test_data_wellness_generator.dart';
 
 /// Debug-only entry point for a complete, disposable usage scenario.
@@ -50,6 +51,7 @@ class TestDataGenerator {
       final fitness = TestDataFitnessGenerator(context);
       final wellness = TestDataWellnessGenerator(context);
       final runResult = await TestDataRunGenerator(context).generate();
+      final runPlanResult = await TestDataRunPlanGenerator(context).generate();
       final fitnessResult = await fitness.generate();
       final wellnessResult = await wellness.generate();
       final periodizationResult = await TestDataPeriodizationGenerator(
@@ -60,6 +62,8 @@ class TestDataGenerator {
         workouts: fitnessResult.workouts,
         routines: fitnessResult.routines,
         runs: runResult.runs,
+        runPlans: runPlanResult.plans,
+        completedRunPlans: runPlanResult.completedPlans,
         measurements: fitnessResult.measurements,
         sleepNights: wellnessResult.sleepNights,
         monitoredNights: wellnessResult.monitoredNights,
@@ -98,6 +102,10 @@ class TestDataGenerator {
       'routine_days',
       'routines',
       // Run tree
+      'scheduled_runs',
+      'run_workout_steps',
+      'run_plan_workouts',
+      'run_plans',
       'run_track_points',
       'run_activities',
       // Sleep monitor tree (sessions/epochs/segments cascade from sleep_entries,

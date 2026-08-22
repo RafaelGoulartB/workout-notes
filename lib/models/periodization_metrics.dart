@@ -32,6 +32,21 @@ class PeriodizationMetrics {
   final double? rpeAdherencePercent;
   final double? rpeCoveragePercent;
 
+  /// Running volume actually logged in the range, from completed runs.
+  final int runCount;
+  final double runDistanceMeters;
+  final int runMovingTimeSeconds;
+
+  /// Longest single run of the range — compared against the long-run target.
+  final double longestRunMeters;
+  final int qualityRunCount;
+
+  /// Weekly targets summed over the range (null when no running target set).
+  final int? plannedRunSessions;
+  final double? plannedRunDistanceMeters;
+  final double? plannedLongRunMeters;
+  final int? plannedQualityRunSessions;
+
   const PeriodizationMetrics({
     required this.startDate,
     required this.endDate,
@@ -65,7 +80,33 @@ class PeriodizationMetrics {
     this.rpeSetsLogged = 0,
     this.rpeAdherencePercent,
     this.rpeCoveragePercent,
+    this.runCount = 0,
+    this.runDistanceMeters = 0,
+    this.runMovingTimeSeconds = 0,
+    this.longestRunMeters = 0,
+    this.qualityRunCount = 0,
+    this.plannedRunSessions,
+    this.plannedRunDistanceMeters,
+    this.plannedLongRunMeters,
+    this.plannedQualityRunSessions,
   });
+
+  /// Share of the planned running volume actually covered. Null when the phase
+  /// carries no running target.
+  double? get runVolumeAdherencePercent =>
+      plannedRunDistanceMeters == null || plannedRunDistanceMeters == 0
+      ? null
+      : (runDistanceMeters / plannedRunDistanceMeters! * 100).clamp(0, 100);
+
+  double? get runSessionAdherencePercent =>
+      plannedRunSessions == null || plannedRunSessions == 0
+      ? null
+      : (runCount / plannedRunSessions! * 100).clamp(0, 100);
+
+  double? get longRunAdherencePercent =>
+      plannedLongRunMeters == null || plannedLongRunMeters == 0
+      ? null
+      : (longestRunMeters / plannedLongRunMeters! * 100).clamp(0, 100);
 
   double? get workoutAdherencePercent =>
       plannedWorkouts == null || plannedWorkouts == 0
@@ -106,6 +147,17 @@ class PeriodizationMetrics {
     'rpe_sets_logged': rpeSetsLogged,
     'rpe_adherence_percent': rpeAdherencePercent,
     'rpe_coverage_percent': rpeCoveragePercent,
+    'run_count': runCount,
+    'run_distance_meters': runDistanceMeters,
+    'run_moving_time_seconds': runMovingTimeSeconds,
+    'longest_run_meters': longestRunMeters,
+    'quality_run_count': qualityRunCount,
+    'planned_run_sessions': plannedRunSessions,
+    'planned_run_distance_meters': plannedRunDistanceMeters,
+    'planned_long_run_meters': plannedLongRunMeters,
+    'planned_quality_run_sessions': plannedQualityRunSessions,
+    'run_volume_adherence_percent': runVolumeAdherencePercent,
+    'run_session_adherence_percent': runSessionAdherencePercent,
   };
 
   static String _date(DateTime value) => DateTime(
