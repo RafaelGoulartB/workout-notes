@@ -76,6 +76,9 @@ dependencies {
     implementation("androidx.camera:camera-view:1.6.1")
     implementation("com.google.mlkit:barcode-scanning:17.3.0")
     testImplementation("junit:junit:4.13.2")
+    // Real org.json for unit tests — the android.jar stub throws "Stub!",
+    // which would block testing the run-plan spool serialization.
+    testImplementation("org.json:json:20240303")
 }
 
 flutter {
