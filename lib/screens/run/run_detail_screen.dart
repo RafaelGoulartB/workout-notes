@@ -6,7 +6,11 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_track_point.dart';
+import 'package:workout_notes/models/run_workout_step.dart';
+import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
@@ -25,7 +29,9 @@ class RunDetailScreen extends StatefulWidget {
 
 class _RunDetailScreenState extends State<RunDetailScreen> {
   final _repo = RunRepository();
+  final _planRepo = RunPlanRepository();
   RunActivity? _activity;
+  List<RunActivityStep> _planSteps = const [];
   List<RunTrackPoint> _points = [];
   List<RunAchievementPlacement> _medals = [];
   RunPaceAnalytics _analytics = const RunPaceAnalytics(
@@ -46,6 +52,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     setState(() => _loading = true);
     final activity = await _repo.ensureEffortMetrics(widget.activityId) ??
         await _repo.getActivity(widget.activityId);
+    final planSteps = await _planRepo.getActivitySteps(widget.activityId);
     final points = activity == null
         ? <RunTrackPoint>[]
         : await _repo.getTrackPoints(widget.activityId);
@@ -66,6 +73,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     setState(() {
       _activity = activity;
       _points = points;
+      _planSteps = planSteps;
       _analytics = analytics;
       _medals = activity == null
           ? const []
@@ -180,6 +188,88 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
       return null;
     }
     return LatLngBounds(LatLng(minLat, minLng), LatLng(maxLat, maxLng));
+  }
+
+  /// One planned-vs-actual row. The pace delta is the number that matters on an
+  /// interval session: did rep 5 hold the target of rep 1?
+  Widget _planStepRow(
+    ThemeData theme,
+    AppLocalizations loc,
+    RunActivityStep step,
+  ) {
+    final role = RunStepRole.fromString(step.role);
+    final color = RunPlanUi.roleColor(theme.colorScheme, role);
+    final planned = step.plannedValue == null
+        ? '—'
+        : step.plannedMetric == 'time'
+        ? RunPlanUi.durationLabel(step.plannedValue!)
+        : RunPlanUi.distanceLabel(step.plannedValue!.toDouble());
+    final actual = step.plannedMetric == 'time'
+        ? RunPlanUi.durationLabel(step.actualDurationSeconds ?? 0)
+        : RunPlanUi.distanceLabel(step.actualDistanceMeters ?? 0);
+    final delta = step.paceDeltaSecPerKm;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 30,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  role == RunStepRole.work
+                      ? '${RunPlanUi.roleLabel(loc, role)} ${step.repIndex}'
+                      : RunPlanUi.roleLabel(loc, role),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  '${loc.runDetailPlanStepPlanned} $planned · '
+                  '${loc.runDetailPlanStepActual} $actual',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                RunFormatters.paceWithUnit(step.actualPaceSecPerKm),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (delta != null)
+                Text(
+                  // Negative delta means faster than planned.
+                  '${delta <= 0 ? '−' : '+'}'
+                  '${RunPlanUi.paceLabel(delta.abs())}',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: delta <= 0
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.error,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildMap(ThemeData theme, List<LatLng> trail) {
@@ -417,6 +507,19 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                       ),
                     ],
                   ),
+                ],
+              ),
+            ),
+          ],
+          if (_planSteps.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _sectionTitle(loc.runDetailPlanComparison),
+                  const SizedBox(height: 8),
+                  for (final step in _planSteps) _planStepRow(theme, loc, step),
                 ],
               ),
             ),

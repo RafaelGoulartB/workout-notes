@@ -1,9 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_session_goal.dart';
+import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
+import 'package:workout_notes/services/run_workout_step_engine.dart';
+import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
@@ -15,7 +21,14 @@ import 'package:workout_notes/services/run_voice_coach.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 
 class RunRecordScreen extends StatefulWidget {
-  const RunRecordScreen({super.key});
+  /// Structured session to execute. When set, the step engine drives the cues
+  /// and the quick interval preset stays off.
+  final RunPlanWorkout? planWorkout;
+
+  /// Scheduled row this run fulfils. Linked to the activity once it is saved.
+  final ScheduledRun? scheduledRun;
+
+  const RunRecordScreen({super.key, this.planWorkout, this.scheduledRun});
 
   @override
   State<RunRecordScreen> createState() => _RunRecordScreenState();
@@ -28,8 +41,23 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   bool _busy = false;
   bool _sheetExpanded = false;
   double _lastCollapsedSize = 0.40;
+
+  /// Real height of the collapsed sheet content, reported by [_MeasureHeight].
+  /// The estimate below is only the first-frame fallback: it has to be updated
+  /// by hand every time a row is added to the sheet, and when it lags behind
+  /// (as it did for the plan tile) the action buttons fall off the bottom.
+  double _measuredSheetH = 0;
+
+  /// Identity of the live sheet. A change means it will be recreated, and a
+  /// recreated sheet always starts collapsed.
+  String? _lastSheetKey;
   bool _intervalsOn = false;
   RunSessionGoal _goal = const RunSessionGoal.defaults();
+  final _planRepo = RunPlanRepository();
+
+  /// The planned session, either passed directly or carried by a scheduled run.
+  RunPlanWorkout? get _planWorkout =>
+      widget.planWorkout ?? widget.scheduledRun?.workout;
 
   @override
   void initState() {
@@ -40,10 +68,20 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     _prepareCoach();
   }
 
+  /// The collapsed sheet content just reported its real height. Resize the
+  /// sheet to fit it, so nothing below the fold can be cut off.
+  void _onSheetContentHeight(double height) {
+    if (!mounted || (height - _measuredSheetH).abs() < 1) return;
+    setState(() => _measuredSheetH = height);
+  }
+
   Future<void> _prepareCoach() async {
     await _coach.prepare();
+    final plan = _planWorkout;
+    if (plan != null) _coach.setPlanWorkout(plan);
     if (!mounted) return;
-    setState(() => _intervalsOn = _coach.intervalsOn);
+    // A planned session replaces the quick interval preset.
+    setState(() => _intervalsOn = plan != null ? false : _coach.intervalsOn);
   }
 
   @override
@@ -85,6 +123,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     await _coach.beginSession(
       intervalsOn: _intervalsOn,
       goal: _goal,
+      planWorkout: _planWorkout,
       bypassHeadphonesGate: debugSim,
     );
   }
@@ -147,6 +186,49 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     }
   }
 
+  /// Links the recorded activity back to the plan and stores the per-step
+  /// planned-vs-actual rows. Best-effort: a failure here must not cost the run.
+  Future<void> _persistPlanResults(
+    String activityId,
+    List<RunStepResult> results,
+  ) async {
+    final plan = _planWorkout;
+    if (plan == null) return;
+    try {
+      await _planRepo.setActivityPlanWorkout(
+        activityId: activityId,
+        planWorkoutId: plan.id,
+      );
+      if (results.isNotEmpty) {
+        await _planRepo.saveActivitySteps(activityId, [
+          for (final result in results)
+            RunActivityStep(
+              id: '',
+              runActivityId: activityId,
+              orderIndex: result.sequence,
+              role: result.role.value,
+              repIndex: result.repIndex,
+              plannedMetric: result.plannedMetric.name,
+              plannedValue: result.plannedValue,
+              plannedPaceSecPerKm: result.plannedPaceSecPerKm,
+              actualDistanceMeters: result.distanceMeters,
+              actualDurationSeconds: result.durationSeconds,
+              actualPaceSecPerKm: result.actualPaceSecPerKm,
+            ),
+        ]);
+      }
+      final scheduled = widget.scheduledRun;
+      if (scheduled != null) {
+        await _planRepo.attachActivity(
+          scheduledRunId: scheduled.id,
+          runActivityId: activityId,
+        );
+      }
+    } catch (_) {
+      // The run itself is already saved; the plan link can be redone later.
+    }
+  }
+
   Future<void> _finish() async {
     final loc = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
@@ -171,7 +253,11 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     setState(() => _busy = true);
     try {
       await _coach.endSession();
+      final stepResults = await _coach.collectStepResults();
       final activity = await _service.stop();
+      if (activity != null) {
+        await _persistPlanResults(activity.id, stepResults);
+      }
       if (!mounted) return;
       if (activity != null) {
         await Navigator.pushReplacement(
@@ -396,28 +482,55 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                 contentH += 12 + 52; // gap + primary actions
                 if (showDebug) contentH += 38;
                 contentH += bottomPad;
-                final collapsedSize =
-                    (contentH / media.size.height).clamp(0.28, 0.72);
+                // Once the sheet has been laid out, trust the measurement over
+                // the estimate — that is what keeps the buttons on screen no
+                // matter which rows the session happens to show.
+                final wanted = _measuredSheetH > 0 ? _measuredSheetH : contentH;
+                const maxSize = 0.90;
+                final collapsedSize = (wanted / media.size.height).clamp(
+                  0.28,
+                  maxSize,
+                );
                 _lastCollapsedSize = collapsedSize;
+                final canExpand = maxSize - collapsedSize > 0.01;
+                // Recreating the sheet is the only way to change its min size,
+                // so the key carries just that. It used to also carry
+                // isActive/splits/intervals, which recreated the sheet mid-run
+                // (first split completing) and dropped it back to the collapsed
+                // extent while the expanded content was still on screen —
+                // pushing the action buttons below the fold.
+                final sheetKey = 'run-sheet-${collapsedSize.toStringAsFixed(3)}';
+                if (_lastSheetKey != null &&
+                    _lastSheetKey != sheetKey &&
+                    _sheetExpanded) {
+                  // A recreated sheet starts collapsed; bring the content back
+                  // in sync so it always fits the extent it lands on.
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted && _sheetExpanded) {
+                      setState(() => _sheetExpanded = false);
+                    }
+                  });
+                }
+                _lastSheetKey = sheetKey;
                 return DraggableScrollableSheet(
-                  key: ValueKey(
-                    'run-sheet-${collapsedSize.toStringAsFixed(3)}-'
-                    '${state.isActive}-$hasSplitSummary-$hasIntervalStatus',
-                  ),
+                  key: ValueKey(sheetKey),
                   initialChildSize: collapsedSize,
                   minChildSize: collapsedSize,
-                  maxChildSize: 0.90,
+                  maxChildSize: maxSize,
                   snap: true,
-                  snapSizes: [collapsedSize, 0.90],
+                  snapSizes: canExpand ? [collapsedSize, maxSize] : null,
                   builder: (context, scrollController) {
                     return _MetricsSheet(
                       scrollController: scrollController,
+                      onContentHeight: _onSheetContentHeight,
                       state: state,
                       busy: _busy,
                       expanded: _sheetExpanded,
                       showDebugSimulate: showDebug,
                       intervalsOn: _intervalsOn,
                       intervalSnapshot: interval,
+                      planWorkout: _planWorkout,
+                      stepSnapshot: _coach.stepSnapshot,
                       goal: _goal,
                       goalSnapshot: goalSnap,
                       onGoalChanged: state.isActive ? null : _setGoal,
@@ -440,12 +553,17 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
 
 class _MetricsSheet extends StatelessWidget {
   final ScrollController scrollController;
+
+  /// Reports the height of the collapsed content so the sheet can hug it.
+  final ValueChanged<double> onContentHeight;
   final RunTrackingState state;
   final bool busy;
   final bool expanded;
   final bool showDebugSimulate;
   final bool intervalsOn;
   final RunIntervalSnapshot intervalSnapshot;
+  final RunPlanWorkout? planWorkout;
+  final RunStepSnapshot stepSnapshot;
   final RunSessionGoal goal;
   final RunGoalSnapshot goalSnapshot;
   final ValueChanged<RunSessionGoal>? onGoalChanged;
@@ -457,12 +575,15 @@ class _MetricsSheet extends StatelessWidget {
 
   const _MetricsSheet({
     required this.scrollController,
+    required this.onContentHeight,
     required this.state,
     required this.busy,
     required this.expanded,
     required this.showDebugSimulate,
     required this.intervalsOn,
     required this.intervalSnapshot,
+    required this.planWorkout,
+    required this.stepSnapshot,
     required this.goal,
     required this.goalSnapshot,
     required this.onGoalChanged,
@@ -684,6 +805,8 @@ class _MetricsSheet extends StatelessWidget {
             goalSnapshot: goalSnapshot,
             intervalsOn: intervalsOn,
             intervalSnapshot: intervalSnapshot,
+            planWorkout: planWorkout,
+            stepSnapshot: stepSnapshot,
             active: state.isActive,
             onGoalChanged: onGoalChanged,
           ),
@@ -776,32 +899,38 @@ class _MetricsSheet extends StatelessWidget {
       child: SingleChildScrollView(
         controller: scrollController,
         physics: const ClampingScrollPhysics(),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              buildHeader(),
-              if (expanded) ...[
-                splitsHeader,
-                if (allSplits.isEmpty)
-                  Text(
-                    loc.runRecordSplitsEmpty,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  )
-                else
-                  ...allSplits.map((s) => _SplitRow(split: s)),
-                const SizedBox(height: 12),
-              ] else ...[
-                const SizedBox(height: 10),
-                buildCollapsedSplits(),
-                const SizedBox(height: 12),
+        // Measured only while collapsed: expanded content is the full splits
+        // list, which must not drive the collapsed height. The scroll view
+        // gives its child unbounded height, so this is the intrinsic height.
+        child: _MeasureHeight(
+          onHeight: expanded ? null : onContentHeight,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                buildHeader(),
+                if (expanded) ...[
+                  splitsHeader,
+                  if (allSplits.isEmpty)
+                    Text(
+                      loc.runRecordSplitsEmpty,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    )
+                  else
+                    ...allSplits.map((s) => _SplitRow(split: s)),
+                  const SizedBox(height: 12),
+                ] else ...[
+                  const SizedBox(height: 10),
+                  buildCollapsedSplits(),
+                  const SizedBox(height: 12),
+                ],
+                actions,
               ],
-              actions,
-            ],
+            ),
           ),
         ),
       ),
@@ -811,11 +940,53 @@ class _MetricsSheet extends StatelessWidget {
   }
 }
 
+/// Reports its child's laid-out height, without affecting layout. Lets the run
+/// sheet size itself from what it actually renders instead of from an estimate
+/// that has to be kept in sync by hand.
+class _MeasureHeight extends SingleChildRenderObjectWidget {
+  final ValueChanged<double>? onHeight;
+
+  const _MeasureHeight({required this.onHeight, required Widget super.child});
+
+  @override
+  _RenderMeasureHeight createRenderObject(BuildContext context) =>
+      _RenderMeasureHeight(onHeight);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderMeasureHeight renderObject,
+  ) {
+    renderObject.onHeight = onHeight;
+  }
+}
+
+class _RenderMeasureHeight extends RenderProxyBox {
+  _RenderMeasureHeight(this.onHeight);
+
+  ValueChanged<double>? onHeight;
+  double _reported = 0;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    final callback = onHeight;
+    if (callback == null) return;
+    final height = size.height;
+    if ((height - _reported).abs() < 1) return;
+    _reported = height;
+    // setState is illegal during layout — report on the next frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) => callback(height));
+  }
+}
+
 class _RunPlanCard extends StatelessWidget {
   final RunSessionGoal goal;
   final RunGoalSnapshot goalSnapshot;
   final bool intervalsOn;
   final RunIntervalSnapshot intervalSnapshot;
+  final RunPlanWorkout? planWorkout;
+  final RunStepSnapshot stepSnapshot;
   final bool active;
   final ValueChanged<RunSessionGoal>? onGoalChanged;
 
@@ -824,9 +995,28 @@ class _RunPlanCard extends StatelessWidget {
     required this.goalSnapshot,
     required this.intervalsOn,
     required this.intervalSnapshot,
+    required this.planWorkout,
+    required this.stepSnapshot,
     required this.active,
     required this.onGoalChanged,
   });
+
+  /// While recording, show where in the session we are; before starting,
+  /// show what the session is.
+  String _planSubtitle(AppLocalizations loc, RunPlanWorkout plan) {
+    if (!stepSnapshot.isActive) {
+      if (stepSnapshot.isDone && active) return loc.runRecordIntervalDone;
+      return '${RunPlanUi.kindLabel(loc, plan.kind)} · '
+          '${RunPlanUi.sessionSummary(loc, plan)}';
+    }
+    final role = RunPlanUi.roleLabel(loc, stepSnapshot.role);
+    if (stepSnapshot.repTotal > 1) {
+      return '$role · '
+          '${loc.runRecordPlanRepOf(stepSnapshot.repIndex, stepSnapshot.repTotal)}';
+    }
+    return '$role · '
+        '${loc.runRecordPlanStepOf(stepSnapshot.stepIndex + 1, stepSnapshot.totalSteps)}';
+  }
 
   String _formatGoalValue(RunSessionGoal g) {
     if (g.metric == RunIntervalMetric.time) {
@@ -1043,6 +1233,7 @@ class _RunPlanCard extends StatelessWidget {
     }
 
     final showIntervalStatus = intervalsOn && active;
+    final plan = planWorkout;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1098,6 +1289,44 @@ class _RunPlanCard extends StatelessWidget {
                       )
                     : null,
               ),
+              if (plan != null) ...[
+                Divider(
+                  height: 1,
+                  indent: 12,
+                  endIndent: 12,
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.45,
+                  ),
+                ),
+                _PlanOptionTile(
+                  icon: RunPlanUi.kindIcon(plan.kind),
+                  title: loc.runRecordPlanSessionTitle,
+                  subtitle: _planSubtitle(loc, plan),
+                  selected: true,
+                  trailing: stepSnapshot.isActive
+                      ? Text(
+                          stepSnapshot.metric == RunIntervalMetric.distance
+                              ? '${stepSnapshot.remaining.round()} m'
+                              : RunFormatters.duration(
+                                  stepSnapshot.remaining.round(),
+                                ),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                  footer: stepSnapshot.isActive
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            value: stepSnapshot.progress.clamp(0.0, 1.0),
+                            minHeight: 4,
+                          ),
+                        )
+                      : null,
+                ),
+              ],
               if (showIntervalStatus) ...[
                 Divider(
                   height: 1,

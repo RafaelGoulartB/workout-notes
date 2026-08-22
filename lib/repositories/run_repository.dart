@@ -90,6 +90,30 @@ class RunRepository extends BaseRepository {
     return rows.first;
   }
 
+  /// Completed runs of a calendar month, for the calendar view.
+  /// Keyed by `yyyy-MM-dd` of the local start date.
+  Future<Map<String, List<RunActivity>>> getActivitiesByMonth(
+    int year,
+    int month,
+  ) async {
+    final database = await db;
+    final start = DateTime(year, month, 1);
+    final end = DateTime(year, month + 1, 1);
+    final rows = await database.query(
+      'run_activities',
+      where: 'status = ? AND started_at >= ? AND started_at < ?',
+      whereArgs: ['completed', start.toIso8601String(), end.toIso8601String()],
+      orderBy: 'started_at ASC',
+    );
+    final grouped = <String, List<RunActivity>>{};
+    for (final row in rows) {
+      final activity = RunActivity.fromMap(row);
+      final key = activity.startedAt.toIso8601String().substring(0, 10);
+      grouped.putIfAbsent(key, () => []).add(activity);
+    }
+    return grouped;
+  }
+
   /// Computes and persists GPS effort metrics for [activityId] when missing.
   /// Returns the refreshed activity (or null if not found).
   Future<RunActivity?> ensureEffortMetrics(String activityId) async {
