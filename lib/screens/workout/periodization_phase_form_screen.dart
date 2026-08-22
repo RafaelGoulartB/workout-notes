@@ -32,6 +32,11 @@ class PeriodizationPhaseFormScreen extends StatefulWidget {
   /// responsible for [PeriodizationPhaseFormController.load] and dispose.
   final PeriodizationPhaseFormController? controller;
 
+  /// Opens scrolled to the targets section. The planning home links here with
+  /// a "set targets" call to action, which would otherwise land on the name
+  /// field with the targets far below the fold.
+  final bool focusTargets;
+
   const PeriodizationPhaseFormScreen({
     super.key,
     required this.plan,
@@ -39,6 +44,7 @@ class PeriodizationPhaseFormScreen extends StatefulWidget {
     this.draftMode = false,
     this.draft,
     this.controller,
+    this.focusTargets = false,
   });
 
   @override
@@ -49,8 +55,10 @@ class PeriodizationPhaseFormScreen extends StatefulWidget {
 class _PeriodizationPhaseFormScreenState
     extends State<PeriodizationPhaseFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _targetsKey = GlobalKey();
   late final PeriodizationPhaseFormController _controller;
   late final bool _ownsController;
+  bool _targetsRevealed = false;
 
   @override
   void initState() {
@@ -70,6 +78,23 @@ class _PeriodizationPhaseFormScreenState
 
   void _onControllerChanged() {
     if (mounted) setState(() {});
+  }
+
+  /// The form body only exists once the controller finishes loading, so the
+  /// reveal waits for the first frame that actually has the targets section.
+  void _maybeRevealTargets() {
+    if (!widget.focusTargets || _targetsRevealed || _controller.loading) return;
+    _targetsRevealed = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final target = _targetsKey.currentContext;
+      if (!mounted || target == null) return;
+      Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+        alignment: 0.05,
+      );
+    });
   }
 
   @override
@@ -336,6 +361,7 @@ class _PeriodizationPhaseFormScreenState
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final c = _controller;
+    _maybeRevealTargets();
     final locked = c.lockedWeeks;
     final effective = c.effective;
     final weekLocked = c.weekLocked;
@@ -585,10 +611,13 @@ class _PeriodizationPhaseFormScreenState
                     ),
                   ],
                   const SizedBox(height: 20),
-                  PeriodizationSectionHeader(
-                    title: loc.periodizationTargets,
-                    subtitle: loc.periodizationWeeklyTargetsHelp,
-                    icon: Icons.track_changes_rounded,
+                  KeyedSubtree(
+                    key: _targetsKey,
+                    child: PeriodizationSectionHeader(
+                      title: loc.periodizationTargets,
+                      subtitle: loc.periodizationWeeklyTargetsHelp,
+                      icon: Icons.track_changes_rounded,
+                    ),
                   ),
                   PeriodizationSurface(
                     padding: EdgeInsets.zero,
