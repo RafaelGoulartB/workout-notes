@@ -3,6 +3,7 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
+import 'package:workout_notes/services/run_plan_composer.dart';
 
 enum RunPlanTemplateCategory {
   gettingStarted,
@@ -15,18 +16,24 @@ enum RunPlanTemplateCategory {
 
 enum RunPlanTemplateLevel { beginner, intermediate, advanced }
 
+enum RunPlanTemplateStyle { continuous, performance, runWalk }
+
 class RunPlanTemplateStep {
   final RunStepRole role;
   final RunIntervalMetric metric;
   final int value;
   final int? repeatGroup;
   final int repeatCount;
+  final double? targetPaceMinSecPerKm;
+  final double? targetPaceMaxSecPerKm;
   const RunPlanTemplateStep({
     required this.role,
     this.metric = RunIntervalMetric.distance,
     required this.value,
     this.repeatGroup,
     this.repeatCount = 1,
+    this.targetPaceMinSecPerKm,
+    this.targetPaceMaxSecPerKm,
   });
 }
 
@@ -38,6 +45,7 @@ class RunPlanTemplateWorkout {
   final String? effortZone;
   final double? targetDistanceMeters;
   final int? targetDurationSeconds;
+  final double? targetPaceSecPerKm;
   final List<RunPlanTemplateStep> steps;
   const RunPlanTemplateWorkout({
     required this.name,
@@ -47,16 +55,21 @@ class RunPlanTemplateWorkout {
     this.effortZone,
     this.targetDistanceMeters,
     this.targetDurationSeconds,
+    this.targetPaceSecPerKm,
     this.steps = const [],
   });
 }
 
 /// A complete progressive template. Every entry in [schedule] is one week.
+///
+/// Blueprint fields ([continuousKm], [performanceLongKm], …) feed
+/// [RunPlanComposer] when the user customises days / intensity / paces.
 class RunPlanTemplate {
   final String key;
   final RunPlanGoalKind goalKind;
   final RunPlanTemplateCategory category;
   final RunPlanTemplateLevel level;
+  final RunPlanTemplateStyle style;
   final String titlePt,
       titleEn,
       descriptionPt,
@@ -64,11 +77,28 @@ class RunPlanTemplate {
       prerequisitePt,
       prerequisiteEn;
   final List<List<RunPlanTemplateWorkout>> schedule;
+
+  /// Continuous / base ladders: each inner list is one week of km (last = long).
+  final List<List<double>>? continuousKm;
+  final bool raceFinish;
+
+  /// Performance ladders.
+  final List<double>? performanceLongKm;
+  final double? performanceEasyKm;
+  final int? performanceIntervalMeters;
+  final int? performanceBaseReps;
+
+  /// Run/walk ladders (seconds / reps per week).
+  final List<int>? runWalkWork;
+  final List<int>? runWalkRest;
+  final List<int>? runWalkReps;
+
   const RunPlanTemplate({
     required this.key,
     required this.goalKind,
     required this.category,
     required this.level,
+    required this.style,
     required this.titlePt,
     required this.titleEn,
     required this.descriptionPt,
@@ -76,6 +106,15 @@ class RunPlanTemplate {
     required this.prerequisitePt,
     required this.prerequisiteEn,
     required this.schedule,
+    this.continuousKm,
+    this.raceFinish = false,
+    this.performanceLongKm,
+    this.performanceEasyKm,
+    this.performanceIntervalMeters,
+    this.performanceBaseReps,
+    this.runWalkWork,
+    this.runWalkRest,
+    this.runWalkReps,
   });
   int get weeks => schedule.length;
   List<RunPlanTemplateWorkout> get week => schedule.first;
@@ -84,6 +123,13 @@ class RunPlanTemplate {
   String title(bool pt) => pt ? titlePt : titleEn;
   String description(bool pt) => pt ? descriptionPt : descriptionEn;
   String prerequisite(bool pt) => pt ? prerequisitePt : prerequisiteEn;
+
+  /// Suggested days/week choices for the customize wizard.
+  List<int> get allowedSessionsPerWeek => switch (style) {
+    RunPlanTemplateStyle.runWalk => const [3, 4, 5],
+    RunPlanTemplateStyle.continuous => const [3, 4, 5],
+    RunPlanTemplateStyle.performance => const [3, 4, 5],
+  };
 }
 
 abstract final class RunPlanTemplates {
@@ -346,15 +392,19 @@ abstract final class RunPlanTemplates {
     RunPlanTemplate template, {
     required String name,
     DateTime? raceDate,
+    RunPlanBuildConfig? config,
   }) async {
+    final schedule = config == null
+        ? template.schedule
+        : RunPlanComposer.compose(template, config);
     final plan = await repository.createPlan(
       name: name,
       goalKind: template.goalKind,
-      raceDate: raceDate,
-      weeks: template.weeks,
+      raceDate: config?.raceDate ?? raceDate,
+      weeks: schedule.length,
     );
-    for (var week = 0; week < template.schedule.length; week++) {
-      for (final session in template.schedule[week]) {
+    for (var week = 0; week < schedule.length; week++) {
+      for (final session in schedule[week]) {
         final created = await repository.addWorkout(
           planId: plan.id,
           weekIndex: week,
@@ -365,6 +415,7 @@ abstract final class RunPlanTemplates {
           effortZone: session.effortZone,
           targetDistanceMeters: session.targetDistanceMeters,
           targetDurationSeconds: session.targetDurationSeconds,
+          targetPaceSecPerKm: session.targetPaceSecPerKm,
         );
         for (final step in session.steps) {
           await repository.addStep(
@@ -374,6 +425,8 @@ abstract final class RunPlanTemplates {
             value: step.value,
             repeatGroup: step.repeatGroup,
             repeatCount: step.repeatCount,
+            targetPaceMinSecPerKm: step.targetPaceMinSecPerKm,
+            targetPaceMaxSecPerKm: step.targetPaceMaxSecPerKm,
           );
         }
       }
@@ -429,6 +482,7 @@ abstract final class RunPlanTemplates {
       goalKind: RunPlanGoalKind.base,
       category: RunPlanTemplateCategory.gettingStarted,
       level: RunPlanTemplateLevel.beginner,
+      style: RunPlanTemplateStyle.runWalk,
       titlePt: 'Começar a correr',
       titleEn: 'Start running',
       descriptionPt:
@@ -438,6 +492,9 @@ abstract final class RunPlanTemplates {
       prerequisitePt: 'Caminhar 30 minutos sem desconforto',
       prerequisiteEn: 'Walk for 30 minutes without discomfort',
       schedule: weeks,
+      runWalkWork: work,
+      runWalkRest: rest,
+      runWalkReps: reps,
     );
   }
 
@@ -487,6 +544,7 @@ abstract final class RunPlanTemplates {
       goalKind: goal,
       category: category,
       level: level,
+      style: RunPlanTemplateStyle.continuous,
       titlePt: titlePt,
       titleEn: titleEn,
       descriptionPt: descriptionPt,
@@ -494,6 +552,8 @@ abstract final class RunPlanTemplates {
       prerequisitePt: prerequisitePt,
       prerequisiteEn: prerequisiteEn,
       schedule: weeks,
+      continuousKm: km,
+      raceFinish: race,
     );
   }
 
@@ -561,6 +621,7 @@ abstract final class RunPlanTemplates {
       goalKind: goal,
       category: category,
       level: level,
+      style: RunPlanTemplateStyle.performance,
       titlePt: titlePt,
       titleEn: titleEn,
       descriptionPt: descriptionPt,
@@ -568,6 +629,10 @@ abstract final class RunPlanTemplates {
       prerequisitePt: prerequisitePt,
       prerequisiteEn: prerequisiteEn,
       schedule: weeks,
+      performanceLongKm: longKm,
+      performanceEasyKm: easyKm,
+      performanceIntervalMeters: intervalMeters,
+      performanceBaseReps: baseReps,
     );
   }
 

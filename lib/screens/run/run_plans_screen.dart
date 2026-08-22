@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
+import 'package:workout_notes/screens/run/run_plan_customize_screen.dart';
 import 'package:workout_notes/screens/run/run_plan_detail_screen.dart';
+
 import 'package:workout_notes/services/run_plan_templates.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 
@@ -116,16 +118,15 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
     );
     if (template == null || !mounted) return;
 
-    // A template already knows what it is called, so creating it is one tap.
-    // Only a blank plan has to ask for a name.
+    // Templates open the coach customize wizard; blank plans only need a name.
     if (template is RunPlanTemplate) {
-      final isPortuguese = Localizations.localeOf(context).languageCode == 'pt';
-      final plan = await RunPlanTemplates.create(
-        _repo,
-        template,
-        name: template.title(isPortuguese),
+      final plan = await Navigator.push<RunPlan>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RunPlanCustomizeScreen(template: template),
+        ),
       );
-      if (!mounted) return;
+      if (!mounted || plan == null) return;
       await _openPlan(plan);
       return;
     }
