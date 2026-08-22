@@ -8,7 +8,9 @@ import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
 import 'package:workout_notes/utils/periodization_palette.dart';
 
@@ -67,6 +69,8 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   bool loading = true;
   List<String> routineIds = [];
   List<Map<String, dynamic>> routines = const [];
+  List<String> runPlanIds = [];
+  List<RunPlan> runPlans = const [];
   double? latestWeight;
   List<PeriodizationTarget> history = const [];
 
@@ -132,6 +136,7 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   Future<void> load() async {
     final weightFuture = _bodyRepository.getLatestWeightKg();
     final tdeeFuture = _nutritionRepository.getActiveGoal();
+    final runPlansFuture = RunPlanRepository().listPlans();
     final results = await Future.wait([
       RoutineRepository().getRoutines(),
       if (editing) _repository.getTargetHistory(phase!.id),
@@ -153,6 +158,7 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
     }
     latestWeight = await weightFuture;
     final goal = await tdeeFuture;
+    runPlans = await runPlansFuture;
     if (_disposed) return;
     tdee = goal?.tdee;
     loadIntoControllers(effective);
@@ -277,6 +283,12 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
       minRpe: doubleValue('minRpe'),
       maxRpe: doubleValue('maxRpe'),
       routineIds: routineIds,
+      runSessionsPerWeek: intValue('runSessions'),
+      // Stored in meters; the field is in km because that is how runners think.
+      runWeeklyDistanceMeters: _kmToMeters(doubleValue('runDistance')),
+      longRunDistanceMeters: _kmToMeters(doubleValue('longRun')),
+      qualitySessionsPerWeek: intValue('runQuality'),
+      runPlanIds: runPlanIds,
       targetWeightKg: doubleValue('weight'),
       weeklyWeightChangePercent: doubleValue('change'),
       sleepHours: doubleValue('sleep'),
@@ -395,12 +407,23 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
       'weight': formatRatio(target?.targetWeightKg),
       'change': formatRatio(target?.weeklyWeightChangePercent),
       'sleep': formatRatio(target?.sleepHours),
+      'runSessions': target?.runSessionsPerWeek?.toString(),
+      'runDistance': formatRatio(_metersToKm(target?.runWeeklyDistanceMeters)),
+      'longRun': formatRatio(_metersToKm(target?.longRunDistanceMeters)),
+      'runQuality': target?.qualitySessionsPerWeek?.toString(),
     };
     for (final entry in values.entries) {
       targetControllers[entry.key]!.text = entry.value ?? '';
     }
     routineIds = [...(target?.routineIds ?? const [])];
+    runPlanIds = [...(target?.runPlanIds ?? const [])];
   }
+
+  static double? _kmToMeters(double? km) =>
+      km == null || !km.isFinite || km <= 0 ? null : km * 1000;
+
+  static double? _metersToKm(double? meters) =>
+      meters == null || !meters.isFinite || meters <= 0 ? null : meters / 1000;
 
   double? deriveRatio(double? grams, double? weight) {
     if (grams == null || weight == null || weight <= 0) return null;
@@ -630,6 +653,13 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setRunPlans(Iterable<String> values) {
+    _targetDebounce?.cancel();
+    runPlanIds = values.toSet().toList();
+    commitSelectedWeek();
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _disposed = true;
@@ -657,6 +687,10 @@ const kPhaseTargetKeys = [
   'weight',
   'change',
   'sleep',
+  'runSessions',
+  'runDistance',
+  'longRun',
+  'runQuality',
 ];
 
 /// Read-only text controller that exposes the current TDEE to

@@ -6,13 +6,16 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_routine_suggestion.dart';
+import 'package:workout_notes/models/periodization_run_suggestion.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/navigation/ai_coach_navigation.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/periodization/body_measurements_teaser_card.dart';
+import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
+import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 
 import 'body_tracker_screen.dart';
 import 'periodization_calendar_screen.dart';
@@ -41,6 +44,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
   PeriodizationPhase? _currentPhase;
   PeriodizationTarget? _currentTarget;
   PeriodizationRoutineSuggestion? _routineSuggestion;
+  PeriodizationRunSuggestion? _runSuggestion;
   double? _weightKg;
   String? _weightUnit;
   double? _weightDelta;
@@ -111,6 +115,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
         _currentPhase = null;
         _currentTarget = null;
         _routineSuggestion = null;
+        _runSuggestion = null;
         _loading = false;
       });
       return;
@@ -124,10 +129,11 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
       }
     }
     final currentResults = current == null
-        ? const <Object?>[null, null]
+        ? const <Object?>[null, null, null]
         : await Future.wait<Object?>([
             _repository.getEffectiveTarget(current.id),
             _repository.getRoutineSuggestion(DateTime.now()),
+            _repository.getRunSuggestion(DateTime.now()),
           ]);
     if (!mounted) return;
     setState(() {
@@ -136,6 +142,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
       _currentPhase = current;
       _currentTarget = currentResults[0] as PeriodizationTarget?;
       _routineSuggestion = currentResults[1] as PeriodizationRoutineSuggestion?;
+      _runSuggestion = currentResults[2] as PeriodizationRunSuggestion?;
       _loading = false;
     });
   }
@@ -217,6 +224,21 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
         builder: (_) => ActiveWorkoutScreen(
           routineId: suggestion.routineId,
           routineDayId: suggestion.routineDayId,
+        ),
+      ),
+    );
+    if (mounted) await _load();
+  }
+
+  Future<void> _startSuggestedRun() async {
+    final suggestion = _runSuggestion;
+    if (suggestion == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RunRecordScreen(
+          planWorkout: suggestion.workout,
+          scheduledRun: suggestion.scheduled,
         ),
       ),
     );
@@ -321,6 +343,8 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
                   phase: _currentPhase!,
                   target: _currentTarget,
                   routineSuggestion: _routineSuggestion,
+                  runSuggestion: _runSuggestion,
+                  onStartRun: _startSuggestedRun,
                   onTap: () => _openPhase(_currentPhase!),
                   onStartWorkout: _startSuggestedWorkout,
                   onCheckin: _runCheckin,
@@ -732,6 +756,8 @@ class _CurrentPhaseCard extends StatelessWidget {
   final PeriodizationPhase phase;
   final PeriodizationTarget? target;
   final PeriodizationRoutineSuggestion? routineSuggestion;
+  final PeriodizationRunSuggestion? runSuggestion;
+  final VoidCallback onStartRun;
   final VoidCallback onTap;
   final VoidCallback onStartWorkout;
   final VoidCallback onCheckin;
@@ -740,6 +766,8 @@ class _CurrentPhaseCard extends StatelessWidget {
     required this.phase,
     required this.target,
     required this.routineSuggestion,
+    required this.runSuggestion,
+    required this.onStartRun,
     required this.onTap,
     required this.onStartWorkout,
     required this.onCheckin,
@@ -907,6 +935,61 @@ class _CurrentPhaseCard extends StatelessWidget {
                       tooltip: loc.periodizationStartPhaseWorkout,
                       icon: const Icon(Icons.play_arrow_rounded),
                     ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (runSuggestion case final suggestion?) ...[
+            const SizedBox(height: 12),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: color.withAlpha(18),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Icon(
+                      RunPlanUi.kindIcon(suggestion.workout.kind),
+                      color: color,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            suggestion.workout.name,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            '${RunPlanUi.kindLabel(loc, suggestion.workout.kind)}'
+                            ' · '
+                            '${RunPlanUi.sessionSummary(loc, suggestion.workout)}',
+                            style: theme.textTheme.bodySmall,
+                          ),
+                          if (suggestion.workout.hasSteps) ...[
+                            const SizedBox(height: 6),
+                            RunWorkoutProfileBar(
+                              workout: suggestion.workout,
+                              height: 6,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (suggestion.isCompleted)
+                      Icon(Icons.check_circle_outline, color: color)
+                    else
+                      IconButton(
+                        onPressed: onStartRun,
+                        tooltip: loc.runWorkoutStartSession,
+                        icon: const Icon(Icons.play_arrow_rounded),
+                      ),
                   ],
                 ),
               ),

@@ -10,9 +10,23 @@ import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_projection.dart';
 import 'package:workout_notes/models/periodization_routine_suggestion.dart';
+import 'package:workout_notes/models/periodization_run_suggestion.dart';
 import 'package:workout_notes/models/periodization_target.dart';
+import 'package:workout_notes/models/run_plan_workout.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 
 import 'base_repository.dart';
+
+/// Sentinel for "no matching session" — `firstWhere` needs a non-null default.
+final RunPlanWorkout _missingRunWorkout = RunPlanWorkout(
+  id: '',
+  runPlanId: '',
+  weekIndex: -1,
+  orderIndex: -1,
+  kind: RunWorkoutKind.easy,
+  name: '',
+  createdAt: DateTime(2000),
+);
 
 class PeriodizationRepository extends BaseRepository {
   static const _uuid = Uuid();
@@ -926,6 +940,94 @@ class PeriodizationRepository extends BaseRepository {
     );
   }
 
+  /// Resolves the running session the plan expects on [date].
+  ///
+  /// Reads `run_plan_ids` from the effective weekly target, maps the date onto
+  /// the plan week (phase week, wrapping when the plan is shorter than the
+  /// phase) and picks the session whose `day_of_week` matches. Prefers an
+  /// already-scheduled row so a rescheduled or skipped run is respected.
+  Future<PeriodizationRunSuggestion?> getRunSuggestion(DateTime date) async {
+    final day = _day(date);
+    final phase = await getEffectivePhase(day);
+    if (phase == null) return null;
+    final target = await getEffectiveTarget(phase.id, date: day);
+    final planIds = target?.runPlanIds ?? const <String>[];
+    if (planIds.isEmpty) return null;
+
+    final database = await db;
+    if (!await _tableExists(database, 'run_plans')) return null;
+    final runPlanRepo = RunPlanRepository();
+    final weekStart = _weekStart(day);
+    final phaseWeekIndex =
+        day.difference(_weekStart(phase.startDate)).inDays ~/ 7;
+
+    // An already materialised row wins: it carries reschedules and skips.
+    final scheduledToday = await runPlanRepo.getScheduledRunsForDate(day);
+    for (final scheduled in scheduledToday) {
+      final workout = scheduled.workout;
+      if (workout == null || !planIds.contains(scheduled.runPlanId)) continue;
+      final plan = await runPlanRepo.getPlan(workout.runPlanId);
+      if (plan == null) continue;
+      return PeriodizationRunSuggestion(
+        phaseId: phase.id,
+        runPlanId: plan.id,
+        runPlanName: plan.name,
+        weekIndex: workout.weekIndex,
+        workout: workout,
+        scheduled: scheduled,
+        completedRunsThisWeek: await _completedRunsBetween(
+          weekStart,
+          weekStart.add(const Duration(days: 6)),
+        ),
+      );
+    }
+
+    for (final planId in planIds) {
+      final plan = await runPlanRepo.getPlan(planId);
+      if (plan == null || plan.weeks < 1) continue;
+      // Plans shorter than the phase repeat — a 1-week maintenance plan then
+      // applies to every week of the phase.
+      final weekIndex = phaseWeekIndex % plan.weeks;
+      final sessions = plan.workoutsForWeek(weekIndex);
+      final match = sessions.firstWhere(
+        (session) => session.dayOfWeek == day.weekday,
+        orElse: () => sessions.firstWhere(
+          (session) => session.dayOfWeek == null,
+          orElse: () => _missingRunWorkout,
+        ),
+      );
+      if (identical(match, _missingRunWorkout)) continue;
+      return PeriodizationRunSuggestion(
+        phaseId: phase.id,
+        runPlanId: plan.id,
+        runPlanName: plan.name,
+        weekIndex: weekIndex,
+        workout: match,
+        completedRunsThisWeek: await _completedRunsBetween(
+          weekStart,
+          weekStart.add(const Duration(days: 6)),
+        ),
+      );
+    }
+    return null;
+  }
+
+  Future<int> _completedRunsBetween(DateTime start, DateTime end) async {
+    final database = await db;
+    if (!await _tableExists(database, 'run_activities')) return 0;
+    return Sqflite.firstIntValue(
+          await database.rawQuery(
+            '''
+            SELECT COUNT(*) FROM run_activities
+            WHERE status = 'completed'
+              AND date(started_at) BETWEEN ? AND ?
+            ''',
+            [_date(start), _date(end)],
+          ),
+        ) ??
+        0;
+  }
+
   Future<List<PeriodizationCheckin>> getCheckins(String phaseId) async {
     final database = await db;
     final rows = await database.query(
@@ -1034,6 +1136,91 @@ class PeriodizationRepository extends BaseRepository {
         ? ''
         : ' AND w.routine_id IN (${List.filled(routineIds.length, '?').join(', ')})';
     final routineArgs = routineIds.toList();
+
+    // Weekly running targets are summed per week, not per day: a weekly volume
+    // of 40 km must not become 280 km over seven days.
+    var plannedRunSessions = 0;
+    var plannedRunDistance = 0.0;
+    var plannedQualityRuns = 0;
+    double? plannedLongRun;
+    var hasRunTarget = false;
+    for (
+      var weekCursor = _weekStart(start);
+      !weekCursor.isAfter(end);
+      weekCursor = weekCursor.add(const Duration(days: 7))
+    ) {
+      // Anchor on a day that belongs to the range so partial first/last weeks
+      // resolve the target that actually applies.
+      final anchor = weekCursor.isBefore(start) ? start : weekCursor;
+      final target = _targetForDate(targetHistory, anchor);
+      if (target == null) continue;
+      final weekDays = _daysOfWeekInRange(weekCursor, start, end);
+      if (weekDays == 0) continue;
+      final weight = weekDays / 7;
+      if (target.runSessionsPerWeek != null) {
+        hasRunTarget = true;
+        plannedRunSessions += (target.runSessionsPerWeek! * weight).round();
+      }
+      if (target.runWeeklyDistanceMeters != null) {
+        hasRunTarget = true;
+        plannedRunDistance += target.runWeeklyDistanceMeters! * weight;
+      }
+      if (target.qualitySessionsPerWeek != null) {
+        hasRunTarget = true;
+        plannedQualityRuns += (target.qualitySessionsPerWeek! * weight).round();
+      }
+      if (target.longRunDistanceMeters != null) {
+        hasRunTarget = true;
+        // The long run is a per-week peak, so take the largest one asked for.
+        plannedLongRun = plannedLongRun == null
+            ? target.longRunDistanceMeters
+            : (target.longRunDistanceMeters! > plannedLongRun
+                  ? target.longRunDistanceMeters
+                  : plannedLongRun);
+      }
+    }
+
+    // Devices that predate the run tables (or a failed migration) must still
+    // render the phase — the same guard the sleep repository uses.
+    final hasRunActivities = await _tableExists(database, 'run_activities');
+    final run = hasRunActivities
+        ? (await database.rawQuery(
+            '''
+            SELECT COUNT(*) AS run_count,
+                   COALESCE(SUM(distance_meters), 0) AS distance_meters,
+                   COALESCE(SUM(moving_time_seconds), 0) AS moving_time_seconds,
+                   COALESCE(MAX(distance_meters), 0) AS longest_run_meters
+            FROM run_activities
+            WHERE status = 'completed'
+              AND date(started_at) BETWEEN ? AND ?
+            ''',
+            [startText, endText],
+          )).first
+        : const <String, Object?>{};
+
+    // A "quality" run is one linked to a tempo/interval/hills/fartlek/race
+    // session of a plan. Ad-hoc runs count as volume, never as quality.
+    final hasRunPlans =
+        hasRunActivities &&
+        await _tableExists(database, 'run_plan_workouts') &&
+        await _columnExists(database, 'run_activities', 'plan_workout_id');
+    final qualityRunCount = hasRunPlans
+        ? Sqflite.firstIntValue(
+                await database.rawQuery(
+                  '''
+                  SELECT COUNT(*) FROM run_activities activity
+                  JOIN run_plan_workouts session
+                    ON session.id = activity.plan_workout_id
+                  WHERE activity.status = 'completed'
+                    AND date(activity.started_at) BETWEEN ? AND ?
+                    AND session.kind IN
+                        ('tempo', 'interval', 'fartlek', 'hills', 'race')
+                  ''',
+                  [startText, endText],
+                ),
+              ) ??
+              0
+        : 0;
 
     final workoutRows = await database.rawQuery(
       '''
@@ -1327,7 +1514,32 @@ class PeriodizationRepository extends BaseRepository {
       rpeCoveragePercent: rpeExpectedSets == 0
           ? null
           : rpeSetsLogged / rpeExpectedSets * 100,
+      runCount: (run['run_count'] as num?)?.toInt() ?? 0,
+      runDistanceMeters: (run['distance_meters'] as num?)?.toDouble() ?? 0,
+      runMovingTimeSeconds:
+          (run['moving_time_seconds'] as num?)?.toInt() ?? 0,
+      longestRunMeters: (run['longest_run_meters'] as num?)?.toDouble() ?? 0,
+      qualityRunCount: qualityRunCount,
+      plannedRunSessions: hasRunTarget ? plannedRunSessions : null,
+      plannedRunDistanceMeters: hasRunTarget ? plannedRunDistance : null,
+      plannedLongRunMeters: plannedLongRun,
+      plannedQualityRunSessions: hasRunTarget ? plannedQualityRuns : null,
     );
+  }
+
+  /// How many days of the week starting at [weekStart] fall inside
+  /// [start]..[end]. Used to pro-rate weekly targets over a partial week.
+  static int _daysOfWeekInRange(
+    DateTime weekStart,
+    DateTime start,
+    DateTime end,
+  ) {
+    var count = 0;
+    for (var i = 0; i < 7; i++) {
+      final day = weekStart.add(Duration(days: i));
+      if (!day.isBefore(start) && !day.isAfter(end)) count++;
+    }
+    return count;
   }
 
   Future<PeriodizationMetrics> getWeekMetrics(
@@ -1633,6 +1845,28 @@ class PeriodizationRepository extends BaseRepository {
             target.weeklyWeightChangePercent!.abs() > 5)) {
       throw const PeriodizationValidationException('invalid_target');
     }
+    if (target.runSessionsPerWeek != null &&
+        (target.runSessionsPerWeek! < 0 || target.runSessionsPerWeek! > 14)) {
+      throw const PeriodizationValidationException('invalid_target');
+    }
+    if (target.qualitySessionsPerWeek != null &&
+        (target.qualitySessionsPerWeek! < 0 ||
+            target.qualitySessionsPerWeek! > 7)) {
+      throw const PeriodizationValidationException('invalid_target');
+    }
+    for (final value in [
+      target.runWeeklyDistanceMeters,
+      target.longRunDistanceMeters,
+    ]) {
+      if (value != null && (!value.isFinite || value < 0)) {
+        throw const PeriodizationValidationException('invalid_target');
+      }
+    }
+    if (target.runSessionsPerWeek != null &&
+        target.qualitySessionsPerWeek != null &&
+        target.qualitySessionsPerWeek! > target.runSessionsPerWeek!) {
+      throw const PeriodizationValidationException('invalid_target_range');
+    }
   }
 
   static Map<String, dynamic> _targetMap(
@@ -1659,6 +1893,11 @@ class PeriodizationRepository extends BaseRepository {
       minRpe: target.minRpe,
       maxRpe: target.maxRpe,
       routineIds: target.routineIds,
+      runSessionsPerWeek: target.runSessionsPerWeek,
+      runWeeklyDistanceMeters: target.runWeeklyDistanceMeters,
+      longRunDistanceMeters: target.longRunDistanceMeters,
+      qualitySessionsPerWeek: target.qualitySessionsPerWeek,
+      runPlanIds: target.runPlanIds,
       targetWeightKg: target.targetWeightKg,
       weeklyWeightChangePercent: target.weeklyWeightChangePercent,
       sleepHours: target.sleepHours,
@@ -1860,6 +2099,26 @@ class PeriodizationRepository extends BaseRepository {
 
   static DateTime _day(DateTime date) =>
       DateTime(date.year, date.month, date.day);
+  static Future<bool> _tableExists(
+    DatabaseExecutor database,
+    String table,
+  ) async {
+    final rows = await database.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      [table],
+    );
+    return rows.isNotEmpty;
+  }
+
+  static Future<bool> _columnExists(
+    DatabaseExecutor database,
+    String table,
+    String column,
+  ) async {
+    final rows = await database.rawQuery('PRAGMA table_info($table)');
+    return rows.any((row) => row['name'] == column);
+  }
+
   static DateTime _weekStart(DateTime date) {
     final day = _day(date);
     return day.subtract(Duration(days: day.weekday - DateTime.monday));

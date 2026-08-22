@@ -13,6 +13,7 @@ import 'package:workout_notes/utils/periodization_palette.dart';
 import 'package:workout_notes/widgets/periodization/nutrition_target_fields.dart';
 import 'package:workout_notes/widgets/periodization/periodization_ui.dart';
 import 'package:workout_notes/widgets/periodization/phase_week_selector.dart';
+import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/widgets/periodization/week_copy_sheet.dart';
 
 import 'nutrition_goal_suggest_sheet.dart';
@@ -269,6 +270,65 @@ class _PeriodizationPhaseFormScreenState
       ),
     );
     if (result != null && mounted) _controller.setRoutines(result);
+  }
+
+  Future<void> _pickRunPlans() async {
+    final loc = AppLocalizations.of(context)!;
+    final selected = {..._controller.runPlanIds};
+    final result = await showModalBottomSheet<Set<String>>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  loc.periodizationRunPlans,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                Text(loc.periodizationRunPlansHelp),
+                const SizedBox(height: 10),
+                if (_controller.runPlans.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(loc.periodizationRunNoPlan),
+                  )
+                else
+                  ..._controller.runPlans.map(
+                    (plan) => CheckboxListTile(
+                      value: selected.contains(plan.id),
+                      title: Text(plan.name),
+                      subtitle: Text(loc.runPlanWeeksValue(plan.weeks)),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      onChanged: (value) => setSheetState(() {
+                        if (value == true) {
+                          selected.add(plan.id);
+                        } else {
+                          selected.remove(plan.id);
+                        }
+                      }),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: () => Navigator.pop(sheetContext, selected),
+                  child: Text(loc.commonSave),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (result != null && mounted) _controller.setRunPlans(result);
   }
 
   @override
@@ -771,6 +831,90 @@ class _PeriodizationPhaseFormScreenState
         },
       ),
     );
+    final running = _targetTile(
+      loc,
+      theme,
+      title: loc.periodizationRunSectionTitle,
+      icon: Icons.directions_run,
+      keys: const ['runSessions', 'runDistance', 'longRun', 'runQuality'],
+      help: loc.periodizationRunSectionHelp,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth >= 560
+                  ? (constraints.maxWidth - 10) / 2
+                  : constraints.maxWidth;
+              Widget field(
+                String key,
+                String label, {
+                bool integer = false,
+                String? unit,
+              }) => SizedBox(
+                width: width,
+                child: _field(key, label, integer: integer, unit: unit),
+              );
+              return Wrap(
+                spacing: 10,
+                runSpacing: 12,
+                children: [
+                  field(
+                    'runSessions',
+                    loc.periodizationRunSessionsPerWeek,
+                    integer: true,
+                    unit: loc.periodizationPerWeekUnit,
+                  ),
+                  field(
+                    'runDistance',
+                    loc.periodizationRunWeeklyDistance,
+                    unit: 'km',
+                  ),
+                  field(
+                    'longRun',
+                    loc.periodizationRunLongRunDistance,
+                    unit: 'km',
+                  ),
+                  field(
+                    'runQuality',
+                    loc.periodizationRunQualitySessions,
+                    integer: true,
+                    unit: loc.periodizationPerWeekUnit,
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 14),
+          InkWell(
+            onTap: weekLocked ? null : _pickRunPlans,
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: InputDecoration(
+                labelText: loc.periodizationRunPlans,
+                prefixIcon: const Icon(Icons.route_outlined),
+                suffixIcon: const Icon(Icons.chevron_right_rounded),
+              ),
+              child: Text(
+                c.runPlanIds.isEmpty
+                    ? loc.periodizationRunNoPlan
+                    : c.runPlanIds
+                          .map(
+                            (id) => c.runPlans
+                                .where((plan) => plan.id == id)
+                                .map((plan) => plan.name)
+                                .firstOrNull,
+                          )
+                          .whereType<String>()
+                          .join(', '),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
     final sleep = _targetTile(
       loc,
       theme,
@@ -785,6 +929,8 @@ class _PeriodizationPhaseFormScreenState
       nutrition,
       _targetsDivider(theme),
       training,
+      _targetsDivider(theme),
+      running,
       _targetsDivider(theme),
       body,
       _targetsDivider(theme),
@@ -861,6 +1007,41 @@ class _PeriodizationPhaseFormScreenState
           '${target.minRpe ?? '-'}–${target.maxRpe ?? '-'}',
         ),
     ];
+    List<(String, String)> runningRows() => [
+      if (target.runPlanIds.isNotEmpty)
+        (
+          loc.periodizationRunPlans,
+          target.runPlanIds
+              .map(
+                (id) => c.runPlans
+                    .where((plan) => plan.id == id)
+                    .map((plan) => plan.name)
+                    .firstOrNull,
+              )
+              .whereType<String>()
+              .join(', '),
+        ),
+      if (target.runSessionsPerWeek != null)
+        (
+          loc.periodizationRunSessionsPerWeek,
+          '${target.runSessionsPerWeek}${loc.periodizationPerWeekUnit}',
+        ),
+      if (target.runWeeklyDistanceMeters != null)
+        (
+          loc.periodizationRunWeeklyDistance,
+          RunPlanUi.distanceLabel(target.runWeeklyDistanceMeters!),
+        ),
+      if (target.longRunDistanceMeters != null)
+        (
+          loc.periodizationRunLongRunDistance,
+          RunPlanUi.distanceLabel(target.longRunDistanceMeters!),
+        ),
+      if (target.qualitySessionsPerWeek != null)
+        (
+          loc.periodizationRunQualitySessions,
+          '${target.qualitySessionsPerWeek}${loc.periodizationPerWeekUnit}',
+        ),
+    ];
     List<(String, String)> bodyRows() => [
       if (target.targetWeightKg != null)
         (loc.periodizationTargetWeight, '${target.targetWeightKg} kg'),
@@ -882,6 +1063,7 @@ class _PeriodizationPhaseFormScreenState
         nutritionRows(),
       ),
       (loc.periodizationTrainingTargets, Icons.fitness_center, trainingRows()),
+      (loc.periodizationRunSectionTitle, Icons.directions_run, runningRows()),
       (loc.periodizationBodyTargets, Icons.monitor_weight_outlined, bodyRows()),
       (loc.periodizationSleepTargets, Icons.nightlight_outlined, sleepRows()),
     ];
