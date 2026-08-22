@@ -223,6 +223,15 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
           scheduledRunId: scheduled.id,
           runActivityId: activityId,
         );
+      } else {
+        // Started from the plan or the planning screen rather than from the
+        // calendar: without this the session would stay "planned" forever and
+        // the plan's progress would never move.
+        await _planRepo.markPlanWorkoutCompleted(
+          planWorkoutId: plan.id,
+          date: DateTime.now(),
+          runActivityId: activityId,
+        );
       }
     } catch (_) {
       // The run itself is already saved; the plan link can be redone later.

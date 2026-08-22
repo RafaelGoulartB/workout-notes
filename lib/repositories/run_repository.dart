@@ -1,3 +1,4 @@
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_track_point.dart';
@@ -63,7 +64,33 @@ class RunRepository extends BaseRepository {
 
   Future<void> deleteActivity(String id) async {
     final database = await db;
+    // The FK only nulls `run_activity_id`, which would leave a plan session
+    // counted as completed with no run behind it. Put it back to planned so
+    // the plan's progress keeps matching reality.
+    if (await _tableExists(database, 'scheduled_runs')) {
+      await database.update(
+        'scheduled_runs',
+        {
+          'status': 'planned',
+          'run_activity_id': null,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'run_activity_id = ?',
+        whereArgs: [id],
+      );
+    }
     await database.delete('run_activities', where: 'id = ?', whereArgs: [id]);
+  }
+
+  static Future<bool> _tableExists(
+    DatabaseExecutor database,
+    String table,
+  ) async {
+    final rows = await database.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      [table],
+    );
+    return rows.isNotEmpty;
   }
 
   /// Monthly aggregation for the home hero card — pure run data.
