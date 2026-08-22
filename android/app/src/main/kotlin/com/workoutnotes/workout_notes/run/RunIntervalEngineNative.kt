@@ -107,11 +107,12 @@ class RunIntervalEngineNative(
             phaseAccum += timeDelta.toDouble()
         }
 
-        if (metric == RunIntervalMetric.time && !remainingCueSpoken && target > 30) {
+        if (metric == RunIntervalMetric.time && !remainingCueSpoken && target > 15) {
+            val cueAt = if (target <= 120) 10 else 30
             val remaining = target - phaseAccum
-            if (remaining <= 30 && remaining > 0) {
+            if (remaining <= cueAt && remaining > 0) {
                 remainingCueSpoken = true
-                events.add(RunIntervalEvent(RunIntervalEventKind.timeRemainingCue, workIndex, preset.repeats, 30))
+                events.add(RunIntervalEvent(RunIntervalEventKind.timeRemainingCue, workIndex, preset.repeats, cueAt))
             }
         }
 

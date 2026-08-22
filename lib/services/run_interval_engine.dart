@@ -22,15 +22,15 @@ class RunIntervalSnapshot {
   });
 
   const RunIntervalSnapshot.idle()
-      : this(
-          phase: RunIntervalPhase.idle,
-          workIndex: 0,
-          totalWorks: 0,
-          progress: 0,
-          remaining: 0,
-          currentMetric: RunIntervalMetric.distance,
-          currentTarget: 0,
-        );
+    : this(
+        phase: RunIntervalPhase.idle,
+        workIndex: 0,
+        totalWorks: 0,
+        progress: 0,
+        remaining: 0,
+        currentMetric: RunIntervalMetric.distance,
+        currentTarget: 0,
+      );
 
   bool get isActive =>
       phase == RunIntervalPhase.work || phase == RunIntervalPhase.rest;
@@ -68,7 +68,7 @@ class RunIntervalEngine {
   int _lastMovingSeconds = 0;
 
   RunIntervalEngine({RunIntervalPreset? preset})
-      : _preset = preset ?? const RunIntervalPreset.defaults();
+    : _preset = preset ?? const RunIntervalPreset.defaults();
 
   RunIntervalPreset get preset => _preset;
 
@@ -91,10 +91,11 @@ class RunIntervalEngine {
     final metric = _phase == RunIntervalPhase.work
         ? _preset.workMetric
         : _preset.restMetric;
-    final target = (_phase == RunIntervalPhase.work
-            ? _preset.workValue
-            : _preset.restValue)
-        .toDouble();
+    final target =
+        (_phase == RunIntervalPhase.work
+                ? _preset.workValue
+                : _preset.restValue)
+            .toDouble();
     final progress = target <= 0 ? 1.0 : (_phaseAccum / target).clamp(0.0, 1.0);
     return RunIntervalSnapshot(
       phase: _phase,
@@ -144,10 +145,11 @@ class RunIntervalEngine {
       return const [];
     }
 
-    final distanceDelta =
-        (distanceMeters - _lastDistance).clamp(0.0, double.infinity);
-    final timeDelta =
-        (movingTimeSeconds - _lastMovingSeconds).clamp(0, 3600);
+    final distanceDelta = (distanceMeters - _lastDistance).clamp(
+      0.0,
+      double.infinity,
+    );
+    final timeDelta = (movingTimeSeconds - _lastMovingSeconds).clamp(0, 3600);
     _lastDistance = distanceMeters;
     _lastMovingSeconds = movingTimeSeconds;
 
@@ -159,10 +161,11 @@ class RunIntervalEngine {
     final metric = _phase == RunIntervalPhase.work
         ? _preset.workMetric
         : _preset.restMetric;
-    final target = (_phase == RunIntervalPhase.work
-            ? _preset.workValue
-            : _preset.restValue)
-        .toDouble();
+    final target =
+        (_phase == RunIntervalPhase.work
+                ? _preset.workValue
+                : _preset.restValue)
+            .toDouble();
 
     if (metric == RunIntervalMetric.distance) {
       _phaseAccum += distanceDelta;
@@ -170,20 +173,20 @@ class RunIntervalEngine {
       _phaseAccum += timeDelta.toDouble();
     }
 
-    // Optional 30s remaining cue for time-based phases (not on the
-    // same tick that completes the phase).
+    // One short heads-up: 10 s for short phases, 30 s for long phases.
     if (metric == RunIntervalMetric.time &&
         !_remainingCueSpoken &&
-        target > 30) {
+        target > 15) {
+      final cueAt = target <= 120 ? 10 : 30;
       final remaining = target - _phaseAccum;
-      if (remaining <= 30 && remaining > 0) {
+      if (remaining <= cueAt && remaining > 0) {
         _remainingCueSpoken = true;
         events.add(
           RunIntervalEvent(
             kind: RunIntervalEventKind.timeRemainingCue,
             workIndex: _workIndex,
             totalWorks: _preset.repeats,
-            remainingSeconds: 30,
+            remainingSeconds: cueAt,
           ),
         );
       }

@@ -4,38 +4,45 @@ object RunVoicePhrases {
 
     fun distanceMilestone(km: Int, durationSeconds: Int, avgPaceSecPerKm: Double?): String {
         val buf = StringBuilder()
-        buf.append("$km ${kilometersWord(km)}. ")
-        buf.append("Time ${durationSpeech(durationSeconds)}.")
+        buf.append("$km ${kilometersWord(km)}.")
         if (avgPaceSecPerKm != null && avgPaceSecPerKm > 0 && avgPaceSecPerKm.isFinite()) {
-            buf.append(" Average pace ${paceSpeech(avgPaceSecPerKm)} per kilometer.")
+            buf.append(" Average ${paceSpeech(avgPaceSecPerKm)}.")
         }
         return buf.toString()
     }
 
     fun splitComplete(km: Int, paceSecPerKm: Double?): String {
         val pace = if (paceSecPerKm != null && paceSecPerKm > 0 && paceSecPerKm.isFinite()) {
-            " Pace ${paceSpeech(paceSecPerKm)}."
+            " ${paceSpeech(paceSecPerKm)}."
         } else ""
         return "Kilometer $km.$pace"
     }
 
-    fun paceTooFast(): String = "Pace too fast."
-    fun paceTooSlow(): String = "Pace too slow."
+    fun splitSummary(km: Int, splitPace: Double?, avgPace: Double?): String {
+        val split = if (splitPace != null && splitPace > 0 && splitPace.isFinite()) " ${paceSpeech(splitPace)}." else ""
+        val average = if (avgPace != null && avgPace > 0 && avgPace.isFinite()) " Average ${paceSpeech(avgPace)}." else ""
+        return "Kilometer $km.$split$average"
+    }
+
+    fun paceTooFast(): String = "Ease off."
+    fun paceTooSlow(): String = "Pick it up."
+    fun paceOnTarget(): String = "Pace on target."
     fun weakGps(): String = "Weak GPS signal."
     fun gpsRestored(): String = "GPS signal restored."
 
-    fun workIntervalStart(index: Int, total: Int): String = "Work interval $index of $total. Go."
+    fun workIntervalStart(index: Int, total: Int): String = "Rep $index of $total. Go."
 
     fun restIntervalStart(metric: RunIntervalMetric, value: Int): String {
         return if (metric == RunIntervalMetric.time) {
-            "Rest. ${durationSpeech(value)}."
+            "Recover. ${durationSpeech(value)}."
         } else {
-            "Rest. ${distanceSpeech(value)}."
+            "Recover. ${distanceSpeech(value)}."
         }
     }
 
     fun intervalsComplete(): String = "Intervals complete."
-    fun timeRemaining(seconds: Int): String = "${durationSpeech(seconds)} remaining."
+    fun timeRemaining(seconds: Int): String = "$seconds seconds."
+    fun distanceRemaining(meters: Int): String = "$meters meters."
 
     // ---- Structured plan sessions (RunWorkoutStepEngineNative) ----
 
@@ -57,22 +64,22 @@ object RunVoicePhrases {
             RunStepRole.work -> if (repTotal > 1) "Rep $repIndex of $repTotal. $amount." else "Effort. $amount."
         }
         if (targetPaceSecPerKm != null && targetPaceSecPerKm > 0 && targetPaceSecPerKm.isFinite() && role.isEffort) {
-            return "$head Target pace ${paceSpeech(targetPaceSecPerKm)} per kilometer."
+            return "$head Target ${paceSpeech(targetPaceSecPerKm)}."
         }
         return head
     }
 
     fun stepPaceTooSlow(paceSecPerKm: Double?): String {
         if (paceSecPerKm == null || paceSecPerKm <= 0 || !paceSecPerKm.isFinite()) return "Pick it up."
-        return "Pick it up. Current pace ${paceSpeech(paceSecPerKm)}."
+        return "Pick it up. ${paceSpeech(paceSecPerKm)}."
     }
 
     fun stepPaceTooFast(paceSecPerKm: Double?): String {
         if (paceSecPerKm == null || paceSecPerKm <= 0 || !paceSecPerKm.isFinite()) return "Ease off."
-        return "Ease off. Current pace ${paceSpeech(paceSecPerKm)}."
+        return "Ease off. ${paceSpeech(paceSecPerKm)}."
     }
 
-    fun workoutComplete(): String = "Workout complete. Well done."
+    fun workoutComplete(): String = "Workout complete."
 
     fun goalComplete(metric: RunIntervalMetric, value: Int): String {
         return if (metric == RunIntervalMetric.time) {
@@ -81,6 +88,13 @@ object RunVoicePhrases {
             "Goal complete. ${distanceSpeech(value)}."
         }
     }
+
+    fun goalRemaining(metric: RunIntervalMetric, value: Int): String =
+        if (metric == RunIntervalMetric.time) "${durationSpeech(value)} left."
+        else "${distanceSpeech(value)} left."
+
+    fun paused(): String = "Paused."
+    fun resumed(): String = "Resumed."
 
     private fun kilometersWord(km: Int): String = if (km == 1) "kilometer" else "kilometers"
 
@@ -101,7 +115,7 @@ object RunVoicePhrases {
         val total = secPerKm.toInt().coerceIn(0, 99 * 60 + 59)
         val minutes = total / 60
         val seconds = total % 60
-        return "$minutes minutes $seconds seconds"
+        return "$minutes ${seconds.toString().padStart(2, '0')} per kilometer"
     }
 
     private fun distanceSpeech(meters: Int): String {

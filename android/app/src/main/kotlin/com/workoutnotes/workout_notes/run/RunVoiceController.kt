@@ -6,6 +6,13 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.os.Build
 import android.util.Log
+import org.json.JSONObject
+
+private data class RunVoicePacePoint(
+    val atMillis: Long,
+    val distanceMeters: Double,
+    val movingSeconds: Int,
+)
 
 /**
  * Native voice coach — mirrors Dart RunVoiceCoach logic but runs inside
@@ -32,6 +39,12 @@ class RunVoiceController(private val context: Context) {
     private var lastWeakGps: Boolean? = null
     private var lastGpsAnnounceAt: Long = 0L
     private var lastPaceAnnounceAt: Long = 0L
+    private val goalProgressCues = mutableSetOf<Int>()
+    private val paceSamples = ArrayDeque<RunVoicePacePoint>()
+    private var paceDeviationSince: Long = 0L
+    private var paceDeviationDirection: Int = 0
+    private var paceCorrectionSpoken: Boolean = false
+    private var wasPaused: Boolean? = null
 
     // Persisted settings cache
     @Volatile private var settingsLoaded = false
@@ -110,6 +123,16 @@ class RunVoiceController(private val context: Context) {
     fun stepResults(): List<Map<String, Any?>> = stepEngine.results.map { it.toMap() }
 
     val hasPlan: Boolean get() = stepEngine.hasPlan
+    val intervalsEnabled: Boolean get() = intervalsOn
+
+    fun goalJson(): String = goal.toJson().toString()
+
+    fun restoreGoalJson(raw: String?) {
+        if (raw.isNullOrBlank()) return
+        try {
+            goal = RunSessionGoal.fromJson(JSONObject(raw))
+        } catch (_: Throwable) {}
+    }
 
     fun syncFromFlutter(
         settingsMap: Map<String, Any?>?,
@@ -158,6 +181,12 @@ class RunVoiceController(private val context: Context) {
         lastWeakGps = null
         lastGpsAnnounceAt = 0L
         lastPaceAnnounceAt = 0L
+        goalProgressCues.clear()
+        paceSamples.clear()
+        paceDeviationSince = 0L
+        paceDeviationDirection = 0
+        paceCorrectionSpoken = false
+        wasPaused = null
         intervalEngine.reset()
         if (plan != null) setPlanSteps(RunWorkoutStepNative.listFromAny(plan))
         stepEngine.reset()
@@ -190,7 +219,7 @@ class RunVoiceController(private val context: Context) {
         }
         tts.ensureReady()
         // Queue a short test phrase even if queueing before init
-        tts.speak("Voice alerts are working. One kilometer. Pace 5 minutes 30 seconds.")
+        tts.speak("Voice cues ready. Pace 5 30 per kilometer.")
     }
 
     // Called from RunTrackingService on each publishState / location update
@@ -211,6 +240,14 @@ class RunVoiceController(private val context: Context) {
         if (!settings.enabled) return
 
         val phrases = mutableListOf<String>()
+
+        if (isRecording || isPaused) {
+            val previousPaused = wasPaused
+            wasPaused = isPaused
+            if (previousPaused != null && previousPaused != isPaused) {
+                phrases.add(if (isPaused) RunVoicePhrases.paused() else RunVoicePhrases.resumed())
+            }
+        }
 
         // Goal completion wins
         val goalJustCompleted = checkGoalCompletion(distanceMeters, movingTimeSeconds, isRecording, isPaused)
@@ -257,9 +294,9 @@ class RunVoiceController(private val context: Context) {
             }
         }
 
-        for (phrase in phrases) {
-            if (!speakIfAllowed(phrase)) break
-        }
+        // One concise cue per update. Ordering above expresses priority:
+        // transitions/achievements first, background metrics last.
+        phrases.firstOrNull()?.let { speakIfAllowed(it) }
     }
 
     private fun checkGoalCompletion(distanceMeters: Double, movingTimeSeconds: Int, isRecording: Boolean, isPaused: Boolean): Boolean {
@@ -283,27 +320,28 @@ class RunVoiceController(private val context: Context) {
     ): List<String> {
         val out = mutableListOf<String>()
 
-        if (settings.announceDistance) {
-            val every = settings.distanceEveryKm.coerceIn(1, 5)
-            val kmFloor = (distanceMeters / 1000.0).toInt()
-            val milestone = (kmFloor / every) * every
-            if (milestone > 0 && milestone > lastAnnouncedKm) {
-                lastAnnouncedKm = milestone
-                val avgPace = if (distanceMeters > 0) movingTimeSeconds / (distanceMeters / 1000.0) else null
-                out.add(RunVoicePhrases.distanceMilestone(milestone, durationSeconds, avgPace?.takeIf { it.isFinite() && it > 0 }))
-            }
-        }
+        goalProgressPhrase(distanceMeters, movingTimeSeconds, isRecording)?.let { out.add(it) }
 
-        if (settings.announceSplit) {
-            if (splitsCount > lastSplitCount) {
-                val lastSplit = splits.lastOrNull()
-                if (lastSplit != null) {
-                    val km = (lastSplit["km"] as? Number)?.toInt() ?: splitsCount
-                    val pace = (lastSplit["pace_sec_per_km"] as? Number)?.toDouble()
-                    lastSplitCount = splitsCount
-                    out.add(RunVoicePhrases.splitComplete(km, pace))
-                }
+        val every = settings.distanceEveryKm.coerceIn(1, 5)
+        val milestone = (((distanceMeters / 1000.0).toInt()) / every) * every
+        val newMilestone = settings.announceDistance && milestone > 0 && milestone > lastAnnouncedKm
+        val newSplit = settings.announceSplit && splitsCount > lastSplitCount
+        val avgPace = if (distanceMeters > 0) movingTimeSeconds / (distanceMeters / 1000.0) else null
+        if (newSplit) {
+            val lastSplit = splits.lastOrNull()
+            if (lastSplit != null) {
+                val km = (lastSplit["km"] as? Number)?.toInt() ?: splitsCount
+                val pace = (lastSplit["pace_sec_per_km"] as? Number)?.toDouble()
+                lastSplitCount = splitsCount
+                if (newMilestone) lastAnnouncedKm = milestone
+                out.add(
+                    if (newMilestone) RunVoicePhrases.splitSummary(km, pace, avgPace)
+                    else RunVoicePhrases.splitComplete(km, pace)
+                )
             }
+        } else if (newMilestone) {
+            lastAnnouncedKm = milestone
+            out.add(RunVoicePhrases.distanceMilestone(milestone, durationSeconds, avgPace))
         }
 
         if (settings.announceGpsStatus && isRecording) {
@@ -312,7 +350,7 @@ class RunVoiceController(private val context: Context) {
                 lastWeakGps = weak
             } else if (weak != lastWeakGps) {
                 val now = System.currentTimeMillis()
-                val cooled = lastGpsAnnounceAt == 0L || now - lastGpsAnnounceAt >= 20_000
+                val cooled = lastGpsAnnounceAt == 0L || now - lastGpsAnnounceAt >= 30_000
                 if (cooled) {
                     lastWeakGps = weak
                     lastGpsAnnounceAt = now
@@ -321,28 +359,58 @@ class RunVoiceController(private val context: Context) {
             }
         }
 
-        if (settings.announcePaceWarning && settings.targetPaceSecPerKm != null && isRecording) {
-            val pace = currentPaceSecPerKm
-            val target = settings.targetPaceSecPerKm
-            if (pace != null && pace > 0 && pace.isFinite() && distanceMeters >= 200 && target != null) {
-                val tol = settings.paceTolerancePercent / 100.0
-                val fastLimit = target * (1 - tol)
-                val slowLimit = target * (1 + tol)
-                var warning: String? = null
-                if (pace < fastLimit) warning = RunVoicePhrases.paceTooFast()
-                else if (pace > slowLimit) warning = RunVoicePhrases.paceTooSlow()
-                if (warning != null) {
-                    val now = System.currentTimeMillis()
-                    val cooled = lastPaceAnnounceAt == 0L || now - lastPaceAnnounceAt >= 45_000
-                    if (cooled) {
-                        lastPaceAnnounceAt = now
-                        out.add(warning)
-                    }
-                }
-            }
+        if (!stepEngine.hasPlan && settings.announcePaceWarning && settings.targetPaceSecPerKm != null && isRecording) {
+            stablePacePhrase(distanceMeters, movingTimeSeconds)?.let { out.add(it) }
         }
 
         return out
+    }
+
+    private fun goalProgressPhrase(distanceMeters: Double, movingTimeSeconds: Int, recording: Boolean): String? {
+        if (!recording || !goal.enabled || goalCompleted || goal.value <= 0) return null
+        val current = if (goal.metric == RunIntervalMetric.distance) distanceMeters else movingTimeSeconds.toDouble()
+        val progress = (current / goal.value).coerceIn(0.0, 1.0)
+        val threshold = if (progress >= .8) 80 else if (progress >= .5) 50 else 0
+        if (threshold == 0 || goalProgressCues.contains(threshold)) return null
+        if (threshold == 50 && ((goal.metric == RunIntervalMetric.distance && goal.value < 5000) ||
+                (goal.metric == RunIntervalMetric.time && goal.value < 1800))) return null
+        goalProgressCues.add(threshold)
+        val remaining = (goal.value - current).coerceAtLeast(0.0).toInt()
+        return RunVoicePhrases.goalRemaining(goal.metric, remaining)
+    }
+
+    private fun stablePacePhrase(distanceMeters: Double, movingTimeSeconds: Int): String? {
+        val now = System.currentTimeMillis()
+        paceSamples.addLast(RunVoicePacePoint(now, distanceMeters, movingTimeSeconds))
+        while (paceSamples.isNotEmpty() && now - paceSamples.first().atMillis > 25_000) paceSamples.removeFirst()
+        if (paceSamples.size < 2 || distanceMeters < 200) return null
+        val first = paceSamples.first()
+        val elapsed = movingTimeSeconds - first.movingSeconds
+        val distance = distanceMeters - first.distanceMeters
+        if (elapsed < 12 || distance < 40) return null
+        val pace = elapsed / (distance / 1000.0)
+        val target = settings.targetPaceSecPerKm ?: return null
+        val tolerance = settings.paceTolerancePercent / 100.0
+        val direction = if (pace < target * (1 - tolerance)) -1 else if (pace > target * (1 + tolerance)) 1 else 0
+        if (direction == 0) {
+            paceDeviationSince = 0L
+            paceDeviationDirection = 0
+            if (paceCorrectionSpoken) {
+                paceCorrectionSpoken = false
+                return RunVoicePhrases.paceOnTarget()
+            }
+            return null
+        }
+        if (paceDeviationDirection != direction) {
+            paceDeviationDirection = direction
+            paceDeviationSince = now
+            return null
+        }
+        if (paceDeviationSince == 0L || now - paceDeviationSince < 10_000) return null
+        if (paceCorrectionSpoken || (lastPaceAnnounceAt != 0L && now - lastPaceAnnounceAt < 60_000)) return null
+        lastPaceAnnounceAt = now
+        paceCorrectionSpoken = true
+        return if (direction < 0) RunVoicePhrases.paceTooFast() else RunVoicePhrases.paceTooSlow()
     }
 
     /**
@@ -380,6 +448,7 @@ class RunVoiceController(private val context: Context) {
             },
         )
         RunStepEventKind.timeRemainingCue -> RunVoicePhrases.timeRemaining(event.remainingSeconds ?: 30)
+        RunStepEventKind.distanceRemainingCue -> RunVoicePhrases.distanceRemaining(event.remainingMeters ?: 100)
         RunStepEventKind.paceTooSlow -> RunVoicePhrases.stepPaceTooSlow(event.paceSecPerKm)
         RunStepEventKind.paceTooFast -> RunVoicePhrases.stepPaceTooFast(event.paceSecPerKm)
         RunStepEventKind.workoutCompleted -> RunVoicePhrases.workoutComplete()
@@ -393,11 +462,14 @@ class RunVoiceController(private val context: Context) {
         return planStepsForSnapshot(snapshot)
     }
 
-    private fun planStepsForSnapshot(snapshot: RunStepSnapshotNative): Double? =
-        RunWorkoutStepEngineNative.expand(planSteps)
+    private fun planStepsForSnapshot(snapshot: RunStepSnapshotNative): Double? {
+        val step = RunWorkoutStepEngineNative.expand(planSteps)
             .getOrNull(snapshot.stepIndex)
-            ?.step
-            ?.targetPaceMinSecPerKm
+            ?.step ?: return null
+        val min = step.targetPaceMinSecPerKm
+        val max = step.targetPaceMaxSecPerKm
+        return if (min != null && max != null) (min + max) / 2.0 else min ?: max
+    }
 
     private fun phraseForInterval(event: RunIntervalEvent): String? {
         return when (event.kind) {

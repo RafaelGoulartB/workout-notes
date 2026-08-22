@@ -16,6 +16,7 @@ import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_voice_settings_screen.dart';
 import 'package:workout_notes/services/run_interval_engine.dart';
+import 'package:workout_notes/services/run_audio_gate_service.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/services/run_voice_coach.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
@@ -53,6 +54,8 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   String? _lastSheetKey;
   bool _intervalsOn = false;
   RunSessionGoal _goal = const RunSessionGoal.defaults();
+  RunAudioCapabilities _audioCapabilities =
+      const RunAudioCapabilities.unknown();
   final _planRepo = RunPlanRepository();
 
   /// The planned session, either passed directly or carried by a scheduled run.
@@ -77,11 +80,16 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
 
   Future<void> _prepareCoach() async {
     await _coach.prepare();
+    final audioCapabilities = await RunAudioGateService.instance
+        .getCapabilities();
     final plan = _planWorkout;
     if (plan != null) _coach.setPlanWorkout(plan);
     if (!mounted) return;
     // A planned session replaces the quick interval preset.
-    setState(() => _intervalsOn = plan != null ? false : _coach.intervalsOn);
+    setState(() {
+      _intervalsOn = plan != null ? false : _coach.intervalsOn;
+      _audioCapabilities = audioCapabilities;
+    });
   }
 
   @override
@@ -102,7 +110,10 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     setState(() {});
     final state = _service.state;
     if (state.lat != null && state.lng != null) {
-      _mapController.move(LatLng(state.lat!, state.lng!), _mapController.camera.zoom);
+      _mapController.move(
+        LatLng(state.lat!, state.lng!),
+        _mapController.camera.zoom,
+      );
     }
     _coach.onTrackingUpdate(state);
   }
@@ -113,9 +124,16 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       MaterialPageRoute(builder: (_) => const RunVoiceSettingsScreen()),
     );
     await _coach.reloadSettings();
+    final audioCapabilities = await RunAudioGateService.instance
+        .getCapabilities();
     if (!mounted) return;
     if (!_service.state.isActive) {
-      setState(() => _intervalsOn = _coach.settings.intervalsEnabledByDefault);
+      setState(() {
+        _intervalsOn = _coach.settings.intervalsEnabledByDefault;
+        _audioCapabilities = audioCapabilities;
+      });
+    } else {
+      setState(() => _audioCapabilities = audioCapabilities);
     }
   }
 
@@ -131,6 +149,12 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   void _setGoal(RunSessionGoal goal) {
     setState(() => _goal = goal);
     _coach.setGoal(goal);
+  }
+
+  void _setIntervals(bool value) {
+    if (_planWorkout != null || _service.state.isActive) return;
+    setState(() => _intervalsOn = value);
+    _coach.setIntervalsOn(value);
   }
 
   Future<void> _startDebugSimulation() async {
@@ -153,9 +177,9 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
         await _coach.onTrackingUpdate(_service.state);
         if (mounted) {
           final loc = AppLocalizations.of(context)!;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.runVoiceDebugSimHint)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(loc.runVoiceDebugSimHint)));
         }
       }
     } finally {
@@ -166,17 +190,20 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   Future<void> _ensurePermissionAndStart() async {
     final loc = AppLocalizations.of(context)!;
     if (!_service.isSupported) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.runRecordUnsupported)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.runRecordUnsupported)));
       return;
     }
     setState(() => _busy = true);
     try {
       final ok = await _service.start();
       if (!ok && mounted) {
-        final msg = _service.state.errorMessage ?? loc.runRecordPermissionNeeded;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        final msg =
+            _service.state.errorMessage ?? loc.runRecordPermissionNeeded;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(msg)));
       } else if (ok) {
         await _beginVoiceSession();
         await _coach.onTrackingUpdate(_service.state);
@@ -264,6 +291,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       await _coach.endSession();
       final stepResults = await _coach.collectStepResults();
       final activity = await _service.stop();
+      await _coach.announceManualCompletion();
       if (activity != null) {
         await _persistPlanResults(activity.id, stepResults);
       }
@@ -463,9 +491,8 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
             child: Builder(
               builder: (context) {
                 final hasSplitSummary = state.splits.isNotEmpty;
-                final showDebug = kDebugMode &&
-                    !state.isActive &&
-                    _service.canDebugSimulate;
+                final showDebug =
+                    kDebugMode && !state.isActive && _service.canDebugSimulate;
                 final hasIntervalStatus = state.isActive && _intervalsOn;
                 final media = MediaQuery.of(context);
                 final systemBottom = media.viewPadding.bottom;
@@ -508,7 +535,8 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                 // (first split completing) and dropped it back to the collapsed
                 // extent while the expanded content was still on screen —
                 // pushing the action buttons below the fold.
-                final sheetKey = 'run-sheet-${collapsedSize.toStringAsFixed(3)}';
+                final sheetKey =
+                    'run-sheet-${collapsedSize.toStringAsFixed(3)}';
                 if (_lastSheetKey != null &&
                     _lastSheetKey != sheetKey &&
                     _sheetExpanded) {
@@ -538,11 +566,19 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                       showDebugSimulate: showDebug,
                       intervalsOn: _intervalsOn,
                       intervalSnapshot: interval,
+                      intervalPreset: _coach.settings.interval,
                       planWorkout: _planWorkout,
                       stepSnapshot: _coach.stepSnapshot,
                       goal: _goal,
                       goalSnapshot: goalSnap,
                       onGoalChanged: state.isActive ? null : _setGoal,
+                      onIntervalsChanged: state.isActive || _planWorkout != null
+                          ? null
+                          : _setIntervals,
+                      voiceEnabled: _coach.settings.enabled,
+                      headphonesOnly: _coach.settings.headphonesOnly,
+                      headsetConnected: _audioCapabilities.headsetConnected,
+                      onOpenVoiceSettings: _openVoiceSettings,
                       onStart: _ensurePermissionAndStart,
                       onDebugSimulate: _startDebugSimulation,
                       onPause: () => _service.pause(),
@@ -571,11 +607,17 @@ class _MetricsSheet extends StatelessWidget {
   final bool showDebugSimulate;
   final bool intervalsOn;
   final RunIntervalSnapshot intervalSnapshot;
+  final RunIntervalPreset intervalPreset;
   final RunPlanWorkout? planWorkout;
   final RunStepSnapshot stepSnapshot;
   final RunSessionGoal goal;
   final RunGoalSnapshot goalSnapshot;
   final ValueChanged<RunSessionGoal>? onGoalChanged;
+  final ValueChanged<bool>? onIntervalsChanged;
+  final bool voiceEnabled;
+  final bool headphonesOnly;
+  final bool headsetConnected;
+  final VoidCallback onOpenVoiceSettings;
   final VoidCallback onStart;
   final VoidCallback onDebugSimulate;
   final VoidCallback onPause;
@@ -591,11 +633,17 @@ class _MetricsSheet extends StatelessWidget {
     required this.showDebugSimulate,
     required this.intervalsOn,
     required this.intervalSnapshot,
+    required this.intervalPreset,
     required this.planWorkout,
     required this.stepSnapshot,
     required this.goal,
     required this.goalSnapshot,
     required this.onGoalChanged,
+    required this.onIntervalsChanged,
+    required this.voiceEnabled,
+    required this.headphonesOnly,
+    required this.headsetConnected,
+    required this.onOpenVoiceSettings,
     required this.onStart,
     required this.onDebugSimulate,
     required this.onPause,
@@ -624,7 +672,8 @@ class _MetricsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
-    final pace = state.currentPaceSecPerKm ??
+    final pace =
+        state.currentPaceSecPerKm ??
         (state.distanceMeters > 0
             ? state.movingTimeSeconds / (state.distanceMeters / 1000.0)
             : null);
@@ -695,9 +744,7 @@ class _MetricsSheet extends StatelessWidget {
               onPressed: state.isPaused ? onResume : onPause,
               style: outlineActionStyle,
               icon: Icon(
-                state.isPaused
-                    ? Icons.play_arrow_rounded
-                    : Icons.pause_rounded,
+                state.isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
                 size: 22,
               ),
               label: Text(
@@ -814,10 +861,16 @@ class _MetricsSheet extends StatelessWidget {
             goalSnapshot: goalSnapshot,
             intervalsOn: intervalsOn,
             intervalSnapshot: intervalSnapshot,
+            intervalPreset: intervalPreset,
             planWorkout: planWorkout,
             stepSnapshot: stepSnapshot,
             active: state.isActive,
             onGoalChanged: onGoalChanged,
+            onIntervalsChanged: onIntervalsChanged,
+            voiceEnabled: voiceEnabled,
+            headphonesOnly: headphonesOnly,
+            headsetConnected: headsetConnected,
+            onOpenVoiceSettings: onOpenVoiceSettings,
           ),
         ],
       );
@@ -994,20 +1047,32 @@ class _RunPlanCard extends StatelessWidget {
   final RunGoalSnapshot goalSnapshot;
   final bool intervalsOn;
   final RunIntervalSnapshot intervalSnapshot;
+  final RunIntervalPreset intervalPreset;
   final RunPlanWorkout? planWorkout;
   final RunStepSnapshot stepSnapshot;
   final bool active;
   final ValueChanged<RunSessionGoal>? onGoalChanged;
+  final ValueChanged<bool>? onIntervalsChanged;
+  final bool voiceEnabled;
+  final bool headphonesOnly;
+  final bool headsetConnected;
+  final VoidCallback onOpenVoiceSettings;
 
   const _RunPlanCard({
     required this.goal,
     required this.goalSnapshot,
     required this.intervalsOn,
     required this.intervalSnapshot,
+    required this.intervalPreset,
     required this.planWorkout,
     required this.stepSnapshot,
     required this.active,
     required this.onGoalChanged,
+    required this.onIntervalsChanged,
+    required this.voiceEnabled,
+    required this.headphonesOnly,
+    required this.headsetConnected,
+    required this.onOpenVoiceSettings,
   });
 
   /// While recording, show where in the session we are; before starting,
@@ -1049,12 +1114,21 @@ class _RunPlanCard extends StatelessWidget {
     return '${m.round()} m';
   }
 
+  String _formatIntervalAmount(RunIntervalMetric metric, int value) {
+    if (metric == RunIntervalMetric.time) return RunFormatters.duration(value);
+    if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)} km';
+    return '$value m';
+  }
+
   Future<void> _editGoal(BuildContext context) async {
     if (onGoalChanged == null) return;
     final loc = AppLocalizations.of(context)!;
     var draft = goal.enabled
         ? goal
-        : goal.copyWith(enabled: true, value: goal.value > 0 ? goal.value : 5000);
+        : goal.copyWith(
+            enabled: true,
+            value: goal.value > 0 ? goal.value : 5000,
+          );
 
     final result = await showDialog<RunSessionGoal>(
       context: context,
@@ -1118,8 +1192,8 @@ class _RunPlanCard extends StatelessWidget {
                               child: Text(
                                 m >= 1000
                                     ? (m % 1000 == 0
-                                        ? '${m ~/ 1000} km'
-                                        : '${(m / 1000).toStringAsFixed(1)} km')
+                                          ? '${m ~/ 1000} km'
+                                          : '${(m / 1000).toStringAsFixed(1)} km')
                                     : '$m m',
                               ),
                             ),
@@ -1164,10 +1238,8 @@ class _RunPlanCard extends StatelessWidget {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(
-                    ctx,
-                    draft.copyWith(enabled: false),
-                  ),
+                  onPressed: () =>
+                      Navigator.pop(ctx, draft.copyWith(enabled: false)),
                   child: Text(loc.runRecordGoalNone),
                 ),
                 TextButton(
@@ -1175,10 +1247,8 @@ class _RunPlanCard extends StatelessWidget {
                   child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
                 ),
                 FilledButton(
-                  onPressed: () => Navigator.pop(
-                    ctx,
-                    draft.copyWith(enabled: true),
-                  ),
+                  onPressed: () =>
+                      Navigator.pop(ctx, draft.copyWith(enabled: true)),
                   child: Text(loc.commonSave),
                 ),
               ],
@@ -1244,6 +1314,12 @@ class _RunPlanCard extends StatelessWidget {
     final showIntervalStatus = intervalsOn && active;
     final plan = planWorkout;
     final showGoal = !active || goal.enabled;
+    final showQuickIntervals = plan == null && (!active || intervalsOn);
+    final voiceSubtitle = !voiceEnabled
+        ? loc.runRecordVoiceOff
+        : headphonesOnly && !headsetConnected
+        ? loc.runRecordVoiceHeadsetMissing
+        : loc.runRecordVoiceReady;
 
     // An active run without a goal should not show the empty goal tile. Keep
     // the section when it still has a plan or interval status to display.
@@ -1312,10 +1388,22 @@ class _RunPlanCard extends StatelessWidget {
           ),
           child: Column(
             children: [
+              if (!active) ...[
+                _PlanOptionTile(
+                  icon: Icons.record_voice_over_outlined,
+                  title: loc.runVoiceEnabled,
+                  subtitle: voiceSubtitle,
+                  selected:
+                      voiceEnabled && (!headphonesOnly || headsetConnected),
+                  showChevron: true,
+                  trailing: const SizedBox.shrink(),
+                  onTap: onOpenVoiceSettings,
+                ),
+                sectionDivider,
+              ],
               if (showGoal) goalTile,
               if (plan != null) ...[
-                if (showGoal)
-                  sectionDivider,
+                if (showGoal) sectionDivider,
                 _PlanOptionTile(
                   icon: RunPlanUi.kindIcon(plan.kind),
                   title: loc.runRecordPlanSessionTitle,
@@ -1345,15 +1433,26 @@ class _RunPlanCard extends StatelessWidget {
                       : null,
                 ),
               ],
-              if (showIntervalStatus) ...[
-                if (showGoal || plan != null)
-                  sectionDivider,
+              if (showQuickIntervals) ...[
+                if (showGoal || plan != null) sectionDivider,
                 _PlanOptionTile(
                   icon: Icons.av_timer_rounded,
                   title: loc.runRecordIntervals,
-                  subtitle: intervalPhase ?? loc.runRecordIntervals,
-                  selected: true,
-                  trailing: intervalSnapshot.isActive
+                  subtitle: active
+                      ? (intervalPhase ?? loc.runRecordIntervals)
+                      : loc.runIntervalPresetSummary(
+                          _formatIntervalAmount(
+                            intervalPreset.workMetric,
+                            intervalPreset.workValue,
+                          ),
+                          _formatIntervalAmount(
+                            intervalPreset.restMetric,
+                            intervalPreset.restValue,
+                          ),
+                          intervalPreset.repeats,
+                        ),
+                  selected: intervalsOn,
+                  trailing: active && intervalSnapshot.isActive
                       ? Text(
                           intervalSnapshot.currentMetric ==
                                   RunIntervalMetric.distance
@@ -1366,7 +1465,10 @@ class _RunPlanCard extends StatelessWidget {
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         )
-                      : const SizedBox.shrink(),
+                      : Switch.adaptive(
+                          value: intervalsOn,
+                          onChanged: onIntervalsChanged,
+                        ),
                   footer: intervalSnapshot.isActive
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(999),
@@ -1470,10 +1572,7 @@ class _PlanOptionTile extends StatelessWidget {
                   trailing,
                 ],
               ),
-              if (footer != null) ...[
-                const SizedBox(height: 6),
-                footer!,
-              ],
+              if (footer != null) ...[const SizedBox(height: 6), footer!],
             ],
           ),
         ),
@@ -1703,14 +1802,15 @@ class _Metric extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           value,
-          style: (emphasize
-                  ? theme.textTheme.headlineMedium
-                  : theme.textTheme.headlineSmall)
-              ?.copyWith(
-            fontWeight: FontWeight.w800,
-            height: 1.05,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
+          style:
+              (emphasize
+                      ? theme.textTheme.headlineMedium
+                      : theme.textTheme.headlineSmall)
+                  ?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    height: 1.05,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
         ),
         if (unit != null) ...[
           const SizedBox(height: 2),

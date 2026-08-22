@@ -523,6 +523,7 @@ class RunTrackingService : Service(), LocationListener {
             // We don't have persisted goal — re-hydrate as disabled; distance cues still work.
             // Rehydrate the structured plan from the spool so a killed process
             // keeps cueing the remaining reps.
+            voiceController.restoreGoalJson(session["voice_goal_json"] as? String)
             val restoredPlan = session["voice_plan_json"] as? String
             voiceController.begin(
                 null,
@@ -826,8 +827,8 @@ class RunTrackingService : Service(), LocationListener {
         val session = activity ?: return
         try {
             session["voice_plan_json"] = voiceController.planStepsJson()
-            session["voice_intervals_on"] = voiceController.hasPlan ||
-                (RunVoiceBridge.pendingIntervalsOn ?: false)
+            session["voice_goal_json"] = voiceController.goalJson()
+            session["voice_intervals_on"] = voiceController.intervalsEnabled
             spool.updateActivity(session)
         } catch (_: Throwable) {
             // Best-effort: a spool write failure must never abort the run.

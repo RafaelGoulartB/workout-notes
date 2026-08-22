@@ -41,9 +41,9 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
   Future<void> _playTestAnnouncement() async {
     final loc = AppLocalizations.of(context)!;
     if (!_settings.enabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.runVoiceTestDisabled)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.runVoiceTestDisabled)));
       return;
     }
     final coach = RunVoiceCoach();
@@ -51,9 +51,9 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
     final ok = await coach.speakTestAnnouncement();
     if (!mounted) return;
     if (!ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.runVoiceTestFailed)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.runVoiceTestFailed)));
     }
   }
 
@@ -149,8 +149,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () =>
-                      Navigator.pop(ctx, _PaceDialogAction.clear),
+                  onPressed: () => Navigator.pop(ctx, _PaceDialogAction.clear),
                   child: Text(loc.runVoiceClearTargetPace),
                 ),
                 TextButton(
@@ -175,6 +174,31 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
       await _persist(_settings.copyWith(clearTargetPace: true));
     } else if (action.seconds != null) {
       await _persist(_settings.copyWith(targetPaceSecPerKm: action.seconds));
+    }
+  }
+
+  Future<void> _pickPaceTolerance() async {
+    final loc = AppLocalizations.of(context)!;
+    final choice = await showModalBottomSheet<int>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final percent in const [5, 10, 15, 20])
+              ListTile(
+                title: Text(loc.runVoicePaceToleranceValue(percent)),
+                trailing: percent == _settings.paceTolerancePercent
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () => Navigator.pop(ctx, percent),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (choice != null) {
+      await _persist(_settings.copyWith(paceTolerancePercent: choice));
     }
   }
 
@@ -234,10 +258,10 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                             onPressed: draft.repeats <= 1
                                 ? null
                                 : () => setDialogState(() {
-                                      draft = draft.copyWith(
-                                        repeats: draft.repeats - 1,
-                                      );
-                                    }),
+                                    draft = draft.copyWith(
+                                      repeats: draft.repeats - 1,
+                                    );
+                                  }),
                             icon: const Icon(Icons.remove_circle_outline),
                           ),
                           Text('${draft.repeats}'),
@@ -245,10 +269,10 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                             onPressed: draft.repeats >= 99
                                 ? null
                                 : () => setDialogState(() {
-                                      draft = draft.copyWith(
-                                        repeats: draft.repeats + 1,
-                                      );
-                                    }),
+                                    draft = draft.copyWith(
+                                      repeats: draft.repeats + 1,
+                                    );
+                                  }),
                             icon: const Icon(Icons.add_circle_outline),
                           ),
                         ],
@@ -282,7 +306,9 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
       if (metric == RunIntervalMetric.time) {
         return RunFormatters.duration(value);
       }
-      return value >= 1000 ? '${(value / 1000).toStringAsFixed(1)} km' : '$value m';
+      return value >= 1000
+          ? '${(value / 1000).toStringAsFixed(1)} km'
+          : '$value m';
     }
 
     return loc.runIntervalPresetSummary(
@@ -307,8 +333,8 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                 Text(
                   loc.runVoiceEnglishOnlyHint,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 SettingsSectionHeader(text: loc.runVoiceSectionGeneral),
@@ -334,8 +360,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                       title: loc.runVoiceHeadphonesOnly,
                       subtitle: loc.runVoiceHeadphonesOnlySubtitle,
                       value: s.headphonesOnly,
-                      onChanged: (v) =>
-                          _persist(s.copyWith(headphonesOnly: v)),
+                      onChanged: (v) => _persist(s.copyWith(headphonesOnly: v)),
                     ),
                     const SettingsCardDivider(),
                     SettingsSwitchTile(
@@ -343,8 +368,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                       title: loc.runVoiceMuteOnCall,
                       subtitle: loc.runVoiceMuteOnCallSubtitle,
                       value: s.muteDuringCall,
-                      onChanged: (v) =>
-                          _persist(s.copyWith(muteDuringCall: v)),
+                      onChanged: (v) => _persist(s.copyWith(muteDuringCall: v)),
                     ),
                   ],
                 ),
@@ -364,7 +388,9 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                       SettingsLinkTile(
                         icon: Icons.repeat,
                         title: loc.runVoiceDistanceFrequency,
-                        subtitle: loc.runVoiceDistanceEveryKm(s.distanceEveryKm),
+                        subtitle: loc.runVoiceDistanceEveryKm(
+                          s.distanceEveryKm,
+                        ),
                         onTap: _pickDistanceEvery,
                       ),
                     ],
@@ -374,8 +400,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                       title: loc.runVoiceAnnounceSplit,
                       subtitle: loc.runVoiceAnnounceSplitSubtitle,
                       value: s.announceSplit,
-                      onChanged: (v) =>
-                          _persist(s.copyWith(announceSplit: v)),
+                      onChanged: (v) => _persist(s.copyWith(announceSplit: v)),
                     ),
                     const SettingsCardDivider(),
                     SettingsSwitchTile(
@@ -397,6 +422,15 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                                 s.targetPaceSecPerKm!.toDouble(),
                               ),
                         onTap: _editTargetPace,
+                      ),
+                      const SettingsCardDivider(),
+                      SettingsLinkTile(
+                        icon: Icons.tune,
+                        title: loc.runVoicePaceTolerance,
+                        subtitle: loc.runVoicePaceToleranceValue(
+                          s.paceTolerancePercent,
+                        ),
+                        onTap: _pickPaceTolerance,
                       ),
                     ],
                     const SettingsCardDivider(),
@@ -452,7 +486,7 @@ class _PaceDialogAction {
   const _PaceDialogAction._({required this.clear, this.seconds});
   const _PaceDialogAction.clear() : this._(clear: true);
   const _PaceDialogAction.save(int seconds)
-      : this._(clear: false, seconds: seconds);
+    : this._(clear: false, seconds: seconds);
 }
 
 class _IntervalMetricEditor extends StatelessWidget {
@@ -492,8 +526,7 @@ class _IntervalMetricEditor extends StatelessWidget {
           selected: {metric},
           onSelectionChanged: (set) {
             final next = set.first;
-            final defaultValue =
-                next == RunIntervalMetric.distance ? 400 : 90;
+            final defaultValue = next == RunIntervalMetric.distance ? 400 : 90;
             onChanged(next, value > 0 ? value : defaultValue);
           },
         ),

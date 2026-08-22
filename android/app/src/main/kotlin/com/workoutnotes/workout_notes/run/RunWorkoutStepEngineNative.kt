@@ -113,7 +113,7 @@ data class RunExpandedStepNative(
 enum class RunStepEnginePhase { idle, running, done }
 
 enum class RunStepEventKind {
-    stepStarted, stepCompleted, timeRemainingCue, paceTooSlow, paceTooFast, workoutCompleted
+    stepStarted, stepCompleted, timeRemainingCue, distanceRemainingCue, paceTooSlow, paceTooFast, workoutCompleted
 }
 
 data class RunStepEventNative(
@@ -126,6 +126,7 @@ data class RunStepEventNative(
     val metric: RunIntervalMetric,
     val target: Int,
     val remainingSeconds: Int? = null,
+    val remainingMeters: Int? = null,
     val paceSecPerKm: Double? = null,
 )
 
@@ -287,11 +288,18 @@ class RunWorkoutStepEngineNative {
         accum += if (current.step.metric == RunIntervalMetric.distance) distanceDelta else timeDelta.toDouble()
 
         val target = current.step.value.toDouble()
-        if (current.step.metric == RunIntervalMetric.time && !remainingCueSpoken && target > 30) {
+        if (current.step.metric == RunIntervalMetric.time && !remainingCueSpoken && target > 15) {
+            val cueAt = if (target <= 120) 10 else 30
             val remaining = target - accum
-            if (remaining <= 30 && remaining > 0) {
+            if (remaining <= cueAt && remaining > 0) {
                 remainingCueSpoken = true
-                events.add(event(RunStepEventKind.timeRemainingCue, current, remainingSeconds = 30))
+                events.add(event(RunStepEventKind.timeRemainingCue, current, remainingSeconds = cueAt))
+            }
+        } else if (current.step.metric == RunIntervalMetric.distance && !remainingCueSpoken && target >= 300) {
+            val remaining = target - accum
+            if (remaining <= 100 && remaining > 0) {
+                remainingCueSpoken = true
+                events.add(event(RunStepEventKind.distanceRemainingCue, current, remainingMeters = 100))
             }
         }
 
@@ -381,6 +389,7 @@ class RunWorkoutStepEngineNative {
         kind: RunStepEventKind,
         expanded: RunExpandedStepNative,
         remainingSeconds: Int? = null,
+        remainingMeters: Int? = null,
         paceSecPerKm: Double? = null,
     ) = RunStepEventNative(
         kind = kind,
@@ -392,6 +401,7 @@ class RunWorkoutStepEngineNative {
         metric = expanded.step.metric,
         target = expanded.step.value,
         remainingSeconds = remainingSeconds,
+        remainingMeters = remainingMeters,
         paceSecPerKm = paceSecPerKm,
     )
 

@@ -16,7 +16,8 @@ void main() {
         avgPaceSecPerKm: 362,
       );
       expect(text, contains('2 kilometers'));
-      expect(text, contains('Average pace'));
+      expect(text, contains('Average'));
+      expect(text.length, lessThan(70));
     });
 
     test('split and interval phrases are English', () {
@@ -26,14 +27,14 @@ void main() {
       );
       expect(
         RunVoicePhrases.workIntervalStart(index: 1, total: 8),
-        'Work interval 1 of 8. Go.',
+        'Rep 1 of 8. Go.',
       );
       expect(
         RunVoicePhrases.restIntervalStart(
           metric: RunIntervalMetric.time,
           value: 90,
         ),
-        contains('Rest.'),
+        contains('Recover.'),
       );
     });
   });
@@ -50,9 +51,7 @@ void main() {
     });
 
     test('clamps distance frequency', () {
-      final restored = RunVoiceSettings.fromJson({
-        'distanceEveryKm': 7,
-      });
+      final restored = RunVoiceSettings.fromJson({'distanceEveryKm': 7});
       expect(restored.distanceEveryKm, 1);
     });
   });
@@ -62,10 +61,8 @@ void main() {
       final spoken = <String>[];
       final coach = RunVoiceCoach(
         speak: (text) async => spoken.add(text),
-        audioCaps: () async => const RunAudioCapabilities(
-          headsetConnected: true,
-          inCall: false,
-        ),
+        audioCaps: () async =>
+            const RunAudioCapabilities(headsetConnected: true, inCall: false),
         ensureTtsReady: () async {},
         stopTts: () async {},
       );
@@ -94,16 +91,16 @@ void main() {
 
       expect(spoken, isNotEmpty);
       expect(spoken.any((s) => s.toLowerCase().contains('kilometer')), isTrue);
+      expect(spoken, hasLength(1));
+      expect(spoken.single, contains('Average'));
     });
 
     test('skips speech when headphones required but missing', () async {
       final spoken = <String>[];
       final coach = RunVoiceCoach(
         speak: (text) async => spoken.add(text),
-        audioCaps: () async => const RunAudioCapabilities(
-          headsetConnected: false,
-          inCall: false,
-        ),
+        audioCaps: () async =>
+            const RunAudioCapabilities(headsetConnected: false, inCall: false),
         ensureTtsReady: () async {},
         stopTts: () async {},
       );
@@ -126,10 +123,8 @@ void main() {
       final spoken = <String>[];
       final coach = RunVoiceCoach(
         speak: (text) async => spoken.add(text),
-        audioCaps: () async => const RunAudioCapabilities(
-          headsetConnected: true,
-          inCall: true,
-        ),
+        audioCaps: () async =>
+            const RunAudioCapabilities(headsetConnected: true, inCall: true),
         ensureTtsReady: () async {},
         stopTts: () async {},
       );
@@ -149,50 +144,51 @@ void main() {
       expect(spoken, isEmpty);
     });
 
-    test('goal completion preempts other announcements in the same tick', () async {
-      final spoken = <String>[];
-      final coach = RunVoiceCoach(
-        speak: (text) async => spoken.add(text),
-        audioCaps: () async => const RunAudioCapabilities(
-          headsetConnected: true,
-          inCall: false,
-        ),
-        ensureTtsReady: () async {},
-        stopTts: () async {},
-      );
-      coach.settingsOverride = const RunVoiceSettings.defaults().copyWith(
-        headphonesOnly: false,
-        announceGpsStatus: false,
-        announceDistance: true,
-        announceSplit: true,
-      );
-      await coach.beginSession(
-        intervalsOn: false,
-        goal: const RunSessionGoal(
-          enabled: true,
-          metric: RunIntervalMetric.distance,
-          value: 1000,
-        ),
-      );
-      await coach.onTrackingUpdate(
-        _recordingState(
-          distanceMeters: 1000,
-          durationSeconds: 360,
-          movingTimeSeconds: 360,
-          splits: [
-            const RunSplit(
-              km: 1,
-              distanceMeters: 1000,
-              durationSeconds: 360,
-              paceSecPerKm: 360,
-              isPartial: false,
-            ),
-          ],
-        ),
-      );
-      expect(spoken, hasLength(1));
-      expect(spoken.single, startsWith('Goal complete'));
-    });
+    test(
+      'goal completion preempts other announcements in the same tick',
+      () async {
+        final spoken = <String>[];
+        final coach = RunVoiceCoach(
+          speak: (text) async => spoken.add(text),
+          audioCaps: () async =>
+              const RunAudioCapabilities(headsetConnected: true, inCall: false),
+          ensureTtsReady: () async {},
+          stopTts: () async {},
+        );
+        coach.settingsOverride = const RunVoiceSettings.defaults().copyWith(
+          headphonesOnly: false,
+          announceGpsStatus: false,
+          announceDistance: true,
+          announceSplit: true,
+        );
+        await coach.beginSession(
+          intervalsOn: false,
+          goal: const RunSessionGoal(
+            enabled: true,
+            metric: RunIntervalMetric.distance,
+            value: 1000,
+          ),
+        );
+        await coach.onTrackingUpdate(
+          _recordingState(
+            distanceMeters: 1000,
+            durationSeconds: 360,
+            movingTimeSeconds: 360,
+            splits: [
+              const RunSplit(
+                km: 1,
+                distanceMeters: 1000,
+                durationSeconds: 360,
+                paceSecPerKm: 360,
+                isPartial: false,
+              ),
+            ],
+          ),
+        );
+        expect(spoken, hasLength(1));
+        expect(spoken.single, startsWith('Goal complete'));
+      },
+    );
   });
 }
 

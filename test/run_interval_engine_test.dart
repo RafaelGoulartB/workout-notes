@@ -114,7 +114,7 @@ void main() {
       expect(engine.snapshot.workIndex, 2);
     });
 
-    test('emits 30s remaining cue for long time phases', () {
+    test('emits a short 10s cue for short time phases', () {
       final engine = RunIntervalEngine(
         preset: const RunIntervalPreset(
           workMetric: RunIntervalMetric.time,
@@ -128,13 +128,13 @@ void main() {
       final events = engine.tick(
         recording: true,
         distanceMeters: 0,
-        movingTimeSeconds: 60,
+        movingTimeSeconds: 80,
       );
-      expect(
-        events.map((e) => e.kind),
-        [RunIntervalEventKind.timeRemainingCue],
-      );
+      expect(events.map((e) => e.kind), [
+        RunIntervalEventKind.timeRemainingCue,
+      ]);
       expect(engine.snapshot.phase, RunIntervalPhase.work);
+      expect(events.single.remainingSeconds, 10);
     });
   });
 }
