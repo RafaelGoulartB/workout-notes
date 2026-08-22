@@ -659,35 +659,57 @@ void main() {
       final progress = await repository.getPlanProgress(plan.id);
       expect(progress.plannedSessions, 0);
       expect(progress.completedSessions, 1);
+
+      final recreated = await repository.activatePlan(plan.id);
+      expect(
+        recreated,
+        1,
+        reason: 'the completed session is not scheduled again',
+      );
+      final resumed = await repository.getPlanProgress(plan.id);
+      expect(resumed.completedSessions, 1);
+      expect(resumed.plannedSessions, 1);
     });
 
-    test('a far-off planned row is left alone', () async {
-      final plan = await seedPlan(weeks: 1);
-      final session = await repository.addWorkout(
-        planId: plan.id,
-        weekIndex: 0,
-        name: 'Tiros',
-        kind: RunWorkoutKind.interval,
-        dayOfWeek: 2,
-      );
-      // Planned three weeks out: running today is a different session.
-      await repository.scheduleRun(
-        date: DateTime.now().add(const Duration(days: 21)),
-        runPlanId: plan.id,
-        runPlanWorkoutId: session.id,
-      );
-      await seedActivity('act-far');
+    test(
+      'a far-off duplicate row is kept without double-counting progress',
+      () async {
+        final plan = await seedPlan(weeks: 1);
+        final session = await repository.addWorkout(
+          planId: plan.id,
+          weekIndex: 0,
+          name: 'Tiros',
+          kind: RunWorkoutKind.interval,
+          dayOfWeek: 2,
+        );
+        // Planned three weeks out: running today is a different session.
+        await repository.scheduleRun(
+          date: DateTime.now().add(const Duration(days: 21)),
+          runPlanId: plan.id,
+          runPlanWorkoutId: session.id,
+        );
+        await seedActivity('act-far');
 
-      await repository.markPlanWorkoutCompleted(
-        planWorkoutId: session.id,
-        date: DateTime.now(),
-        runActivityId: 'act-far',
-      );
+        await repository.markPlanWorkoutCompleted(
+          planWorkoutId: session.id,
+          date: DateTime.now(),
+          runActivityId: 'act-far',
+        );
 
-      final progress = await repository.getPlanProgress(plan.id);
-      expect(progress.completedSessions, 1);
-      expect(progress.plannedSessions, 1, reason: 'the far row is untouched');
-    });
+        final progress = await repository.getPlanProgress(plan.id);
+        expect(progress.completedSessions, 1);
+        expect(progress.plannedSessions, 0);
+        expect(
+          await database.query(
+            'scheduled_runs',
+            where: 'status = ?',
+            whereArgs: [ScheduledRunStatus.planned.value],
+          ),
+          hasLength(1),
+          reason: 'the future calendar row itself is untouched',
+        );
+      },
+    );
 
     test('deleting the run puts its plan session back to planned', () async {
       final plan = await seedPlan(weeks: 1);
@@ -788,6 +810,92 @@ void main() {
         1,
         reason: 'the planned row must be reused, not duplicated',
       );
+      expect(
+        (await repository.getPlan(plan.id))!.isActivated,
+        isFalse,
+        reason: 'a fully completed plan must not wrap back to week one',
+      );
+      expect(
+        (await repository.getPlanWorkoutStatuses(plan.id))[session.id],
+        ScheduledRunStatus.completed,
+      );
+      expect((await repository.getPlan(plan.id))!.completionCount, 1);
+    });
+
+    test(
+      'counts each new full completion without counting duplicates',
+      () async {
+        final plan = await seedPlan(weeks: 1);
+        final session = await repository.addWorkout(
+          planId: plan.id,
+          weekIndex: 0,
+          name: 'Rodagem',
+          dayOfWeek: 2,
+        );
+        await seedActivity('completion-one');
+        await repository.markPlanWorkoutCompleted(
+          planWorkoutId: session.id,
+          date: DateTime.now(),
+          runActivityId: 'completion-one',
+        );
+        await repository.markPlanWorkoutCompleted(
+          planWorkoutId: session.id,
+          date: DateTime.now(),
+          runActivityId: 'completion-one',
+        );
+        expect((await repository.getPlan(plan.id))!.completionCount, 1);
+
+        await repository.resetPlanProgress(plan.id);
+        await seedActivity('completion-two');
+        await repository.markPlanWorkoutCompleted(
+          planWorkoutId: session.id,
+          date: DateTime.now().add(const Duration(days: 1)),
+          runActivityId: 'completion-two',
+        );
+
+        expect((await repository.getPlan(plan.id))!.completionCount, 2);
+      },
+    );
+
+    test('reset clears plan progress but preserves recorded runs', () async {
+      final plan = await seedPlan(weeks: 1);
+      final done = await repository.addWorkout(
+        planId: plan.id,
+        weekIndex: 0,
+        name: 'Rodagem',
+        dayOfWeek: 2,
+      );
+      final pending = await repository.addWorkout(
+        planId: plan.id,
+        weekIndex: 0,
+        name: 'Longão',
+        dayOfWeek: 7,
+      );
+      await repository.activatePlan(plan.id);
+      await seedActivity('activity-reset');
+      await repository.markPlanWorkoutCompleted(
+        planWorkoutId: done.id,
+        date: DateTime.now(),
+        runActivityId: 'activity-reset',
+      );
+
+      final recreated = await repository.resetPlanProgress(plan.id);
+
+      expect(recreated, 2);
+      expect((await repository.getPlanProgress(plan.id)).completedSessions, 0);
+      expect(await repository.getPlanWorkoutStatuses(plan.id), {
+        done.id: ScheduledRunStatus.planned,
+        pending.id: ScheduledRunStatus.planned,
+      });
+      expect(
+        await database.query(
+          'run_activities',
+          where: 'id = ?',
+          whereArgs: ['activity-reset'],
+        ),
+        hasLength(1),
+      );
+      expect((await repository.getPlan(plan.id))!.isActivated, isTrue);
     });
 
     test('completing an unscheduled session creates its row', () async {
@@ -861,7 +969,9 @@ void main() {
         'version': 1,
         'valid_from': '2026-08-01',
         'training_json': jsonEncode({
-          'run': {'run_plan_ids': [plan.id]},
+          'run': {
+            'run_plan_ids': [plan.id],
+          },
         }),
         'created_at': now,
       });

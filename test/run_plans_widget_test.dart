@@ -175,6 +175,53 @@ void main() {
       await tapAndLoad(tester, find.byTooltip('Mostrar arquivados'));
       expect(find.text('Antigo'), findsOneWidget);
     });
+
+    testWidgets('completion badges use only the medal and repeated count', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await real(tester, () async {
+        for (var count = 1; count <= 2; count++) {
+          final plan = await repo.createPlan(name: 'Completo $count', weeks: 1);
+          final session = await repo.addWorkout(
+            planId: plan.id,
+            weekIndex: 0,
+            name: 'Corrida final',
+            dayOfWeek: 2,
+          );
+          final activityId = 'badge-activity-$count';
+          final now = DateTime.now().toIso8601String();
+          await database.insert('run_activities', {
+            'id': activityId,
+            'started_at': now,
+            'status': 'completed',
+            'created_at': now,
+            'updated_at': now,
+          });
+          await repo.markPlanWorkoutCompleted(
+            planWorkoutId: session.id,
+            date: DateTime.now(),
+            runActivityId: activityId,
+          );
+          if (count == 2) {
+            await database.update(
+              'run_plans',
+              {'completion_count': 2},
+              where: 'id = ?',
+              whereArgs: [plan.id],
+            );
+          }
+        }
+      });
+
+      await pumpScreen(tester, const RunPlansScreen());
+
+      expect(find.text('PLANO CONCLUÃDO'), findsNothing);
+      expect(find.text('1x'), findsNothing);
+      expect(find.text('2x'), findsOneWidget);
+      expect(find.byIcon(Icons.workspace_premium_rounded), findsNWidgets(2));
+    });
   });
 
   group('RunPlanDetailScreen', () {
@@ -230,6 +277,87 @@ void main() {
       await tapAndLoad(tester, find.text('2'));
       expect(find.text('6x800m'), findsNothing);
       expect(find.text('Nenhum treino nesta semana'), findsOneWidget);
+    });
+
+    testWidgets('completed sessions are marked inside the training week', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final planId = await real(tester, () async {
+        final plan = await repo.createPlan(name: 'Base', weeks: 1);
+        final completed = await repo.addWorkout(
+          planId: plan.id,
+          weekIndex: 0,
+          name: 'Rodagem concluída',
+          dayOfWeek: 2,
+        );
+        await repo.addWorkout(
+          planId: plan.id,
+          weekIndex: 0,
+          name: 'Longão pendente',
+          dayOfWeek: 7,
+        );
+        await repo.activatePlan(plan.id);
+        final now = DateTime.now().toIso8601String();
+        await database.insert('run_activities', {
+          'id': 'activity-widget',
+          'started_at': now,
+          'status': 'completed',
+          'created_at': now,
+          'updated_at': now,
+        });
+        await repo.markPlanWorkoutCompleted(
+          planWorkoutId: completed.id,
+          date: DateTime.now(),
+          runActivityId: 'activity-widget',
+        );
+        return plan.id;
+      });
+
+      await pumpScreen(tester, RunPlanDetailScreen(planId: planId));
+
+      expect(find.text('Concluído'), findsOneWidget);
+      expect(find.text('Treino concluído neste plano'), findsOneWidget);
+      expect(find.text('Resetar'), findsOneWidget);
+      expect(find.text('Parar'), findsOneWidget);
+    });
+
+    testWidgets('fully completed plan shows its completion badge', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final planId = await real(tester, () async {
+        final plan = await repo.createPlan(name: 'Meta completa', weeks: 1);
+        final session = await repo.addWorkout(
+          planId: plan.id,
+          weekIndex: 0,
+          name: 'Corrida final',
+          dayOfWeek: 2,
+        );
+        await repo.activatePlan(plan.id);
+        final now = DateTime.now().toIso8601String();
+        await database.insert('run_activities', {
+          'id': 'activity-finish',
+          'started_at': now,
+          'status': 'completed',
+          'created_at': now,
+          'updated_at': now,
+        });
+        await repo.markPlanWorkoutCompleted(
+          planWorkoutId: session.id,
+          date: DateTime.now(),
+          runActivityId: 'activity-finish',
+        );
+        return plan.id;
+      });
+
+      await pumpScreen(tester, RunPlanDetailScreen(planId: planId));
+
+      expect(find.text('PLANO CONCLUÍDO'), findsOneWidget);
+      expect(find.textContaining('concluiu todos os treinos'), findsOneWidget);
+      expect(find.text('Seguir'), findsNothing);
     });
   });
 
