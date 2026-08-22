@@ -129,13 +129,10 @@ abstract final class DatabaseWellnessMigrations {
         'sleep_monitor_default_mode': 'alarm_without_mission',
       }.entries) {
         try {
-          await db.insert(
-              'app_settings',
-              {
-                'key': entry.key,
-                'value': entry.value,
-              },
-              conflictAlgorithm: ConflictAlgorithm.ignore);
+          await db.insert('app_settings', {
+            'key': entry.key,
+            'value': entry.value,
+          }, conflictAlgorithm: ConflictAlgorithm.ignore);
         } catch (_) {}
       }
     }
@@ -169,24 +166,18 @@ abstract final class DatabaseWellnessMigrations {
         );
       } catch (_) {}
       try {
-        await db.insert(
-            'app_settings',
-            {
-              'key': 'alarm_global_max_snoozes',
-              'value': '3',
-            },
-            conflictAlgorithm: ConflictAlgorithm.ignore);
+        await db.insert('app_settings', {
+          'key': 'alarm_global_max_snoozes',
+          'value': '3',
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       } catch (_) {}
     }
     if (oldVersion < 26) {
       try {
-        await db.insert(
-            'app_settings',
-            {
-              'key': 'alarm_global_snooze_enabled',
-              'value': 'true',
-            },
-            conflictAlgorithm: ConflictAlgorithm.ignore);
+        await db.insert('app_settings', {
+          'key': 'alarm_global_snooze_enabled',
+          'value': 'true',
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       } catch (_) {}
     }
     if (oldVersion < 27) {
@@ -501,8 +492,15 @@ abstract final class DatabaseWellnessMigrations {
       // onto the calendar for plans not driven by a periodization phase.
       // At most one plan carries a non-null value at a time.
       try {
+        await db.execute('ALTER TABLE run_plans ADD COLUMN activated_at TEXT');
+      } catch (_) {}
+    }
+    if (oldVersion < 47) {
+      // Lifetime number of times a running plan reached 100%. This survives a
+      // progress reset so repeated completions can be celebrated in the UI.
+      try {
         await db.execute(
-          'ALTER TABLE run_plans ADD COLUMN activated_at TEXT',
+          'ALTER TABLE run_plans ADD COLUMN completion_count INTEGER NOT NULL DEFAULT 0',
         );
       } catch (_) {}
     }
