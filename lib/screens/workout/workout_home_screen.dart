@@ -1212,10 +1212,9 @@ class _NavTile extends StatelessWidget {
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
-                  // Two lines so "Planos de corrida" is not clipped to
-                  // "Planos de c…" at half the grid width.
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  softWrap: false,
                 ),
               ),
               Icon(
