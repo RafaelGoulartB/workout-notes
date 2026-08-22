@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -164,6 +166,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
   int _aboutTapCount = 0;
   DateTime? _aboutFirstTapTime;
   bool _showTestData = false;
+  bool _isGeneratingTestData = false;
 
   // Rest-time choices shown as chips in the timer card. The values are
   // seconds; the label is formatted at render time.
@@ -843,6 +846,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
   }
 
   Future<void> _generateTestData() async {
+    if (_isGeneratingTestData) return;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -862,10 +866,47 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
     );
     if (confirm != true || !mounted) return;
 
+    setState(() => _isGeneratingTestData = true);
+    var progressDialogOpen = true;
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => PopScope(
+          canPop: false,
+          child: AlertDialog(
+            content: Row(
+              children: [
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Text(
+                    AppLocalizations.of(
+                      dialogContext,
+                    )!.settingsGeneratingTestData,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    // Let Flutter paint the progress state before the many SQLite inserts.
+    await WidgetsBinding.instance.endOfFrame;
+
     try {
       final generator = TestDataGenerator();
       final result = await generator.generate();
       if (mounted) {
+        if (progressDialogOpen) {
+          Navigator.of(context, rootNavigator: true).pop();
+          progressDialogOpen = false;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -883,19 +924,30 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
               ),
             ),
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 6),
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('Failed to generate test data: $e\n$stackTrace');
       if (mounted) {
+        if (progressDialogOpen) {
+          Navigator.of(context, rootNavigator: true).pop();
+          progressDialogOpen = false;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               AppLocalizations.of(context)!.commonError(e.toString()),
             ),
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 8),
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingTestData = false);
       }
     }
   }
@@ -1456,7 +1508,9 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                           iconColor: theme.colorScheme.secondary,
                           title: loc.settingsGenerateTestData,
                           subtitle: loc.settingsGenerateTestDataSubtitle,
-                          onTap: _generateTestData,
+                          onTap: _isGeneratingTestData
+                              ? null
+                              : _generateTestData,
                         ),
                       ],
                       const SettingsCardDivider(),

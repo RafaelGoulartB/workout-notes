@@ -43,6 +43,8 @@ class TestDataReport {
   final int workouts;
   final int routines;
   final int runs;
+  final int runPlans;
+  final int completedRunPlans;
   final int measurements;
   final int sleepNights;
   final int monitoredNights;
@@ -57,6 +59,8 @@ class TestDataReport {
     required this.workouts,
     required this.routines,
     required this.runs,
+    required this.runPlans,
+    required this.completedRunPlans,
     required this.measurements,
     required this.sleepNights,
     required this.monitoredNights,
