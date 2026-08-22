@@ -69,6 +69,56 @@ void main() {
             )
           ''');
           await db.execute('''
+            CREATE TABLE exercise_entries (
+              id TEXT PRIMARY KEY,
+              workout_id TEXT NOT NULL,
+              exercise_id TEXT NOT NULL,
+              order_index INTEGER,
+              FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE sets (
+              id TEXT PRIMARY KEY,
+              exercise_entry_id TEXT NOT NULL,
+              weight REAL,
+              reps INTEGER,
+              rpe REAL,
+              is_complete INTEGER DEFAULT 0,
+              is_warmup INTEGER DEFAULT 0,
+              order_index INTEGER,
+              FOREIGN KEY (exercise_entry_id) REFERENCES exercise_entries(id)
+                ON DELETE CASCADE
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE sleep_entries (
+              id TEXT PRIMARY KEY,
+              date TEXT,
+              sleep_minutes INTEGER,
+              actual_sleep_minutes INTEGER,
+              estimated_sleep_minutes INTEGER
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE meal_logs (
+              id TEXT PRIMARY KEY,
+              date TEXT,
+              meal_type TEXT
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE meal_log_items (
+              id TEXT PRIMARY KEY,
+              meal_log_id TEXT,
+              calories REAL,
+              protein_g REAL,
+              carbs_g REAL,
+              fat_g REAL,
+              FOREIGN KEY (meal_log_id) REFERENCES meal_logs(id) ON DELETE CASCADE
+            )
+          ''');
+          await db.execute('''
             CREATE TABLE body_measurements (
               id TEXT PRIMARY KEY,
               type TEXT NOT NULL,
@@ -350,7 +400,13 @@ void main() {
     expect(find.text('Término'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -1100));
+    // Scroll until reached instead of a fixed offset: the cards above the
+    // timeline change height as the screen grows.
+    await tester.scrollUntilVisible(
+      find.text('Pico'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     expect(find.text('Pico'), findsOneWidget);
     expect(find.byIcon(Icons.check_rounded), findsWidgets);

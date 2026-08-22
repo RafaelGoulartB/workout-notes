@@ -6,6 +6,7 @@ import 'package:workout_notes/database/database_periodization_schema.dart';
 import 'package:workout_notes/database/database_run_plan_schema.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
+import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
@@ -88,6 +89,7 @@ void main() {
   /// whose weekly target links [runPlanIds] and carries the given run volume.
   Future<String> seedPhase({
     List<String> runPlanIds = const [],
+    int? runPlanStartWeek,
     int? runSessionsPerWeek,
     double? runWeeklyDistanceMeters,
     double? longRunDistanceMeters,
@@ -111,6 +113,7 @@ void main() {
         validFrom: phaseStart,
         workoutsPerWeek: 3,
         runPlanIds: runPlanIds,
+        runPlanStartWeek: runPlanStartWeek,
         runSessionsPerWeek: runSessionsPerWeek,
         runWeeklyDistanceMeters: runWeeklyDistanceMeters,
         longRunDistanceMeters: longRunDistanceMeters,
@@ -451,6 +454,51 @@ void main() {
   });
 
   group('run targets persistence', () {
+    test('saveTargetVersion keeps the routine and running links', () async {
+      final routine = 'routine-1';
+      await database.insert('routines', {
+        'id': routine,
+        'name': 'Full body',
+        'created_at': phaseStart.toIso8601String(),
+      });
+      final phaseId = await seedPhase();
+      final saved = await periodization.saveTargetVersion(
+        phaseId,
+        PeriodizationTarget(
+          id: '',
+          phaseId: phaseId,
+          version: 0,
+          validFrom: phaseStart,
+          calories: 2400,
+          routineIds: [routine],
+          runPlanIds: ['plan-y'],
+          runSessionsPerWeek: 4,
+          runWeeklyDistanceMeters: 40000,
+          longRunDistanceMeters: 16000,
+          qualitySessionsPerWeek: 2,
+          runPlanStartWeek: 3,
+          createdAt: phaseStart,
+        ),
+        validFrom: phaseStart,
+      );
+
+      // A new version used to be written with only the nutrition/strength
+      // numbers, silently unlinking the routine and the running plan.
+      expect(saved.routineIds, [routine]);
+      expect(saved.runPlanIds, ['plan-y']);
+      expect(saved.runSessionsPerWeek, 4);
+      expect(saved.runPlanStartWeek, 3);
+
+      final reread = await periodization.getEffectiveTarget(
+        phaseId,
+        date: phaseStart,
+      );
+      expect(reread!.routineIds, [routine]);
+      expect(reread.runPlanIds, ['plan-y']);
+      expect(reread.longRunDistanceMeters, 16000);
+      expect(reread.runPlanStartWeek, 3);
+    });
+
     test('survive a save/read round trip inside training_json', () async {
       final phaseId = await seedPhase(
         runPlanIds: ['plan-x'],
@@ -482,6 +530,146 @@ void main() {
         () => seedPhase(runSessionsPerWeek: 2, qualitySessionsPerWeek: 4),
         throwsA(isA<PeriodizationValidationException>()),
       );
+    });
+  });
+  group('plan week alignment', () {
+    test('the offset starts the phase mid-plan', () async {
+      final runPlan = await runPlans.createPlan(
+        name: 'Meia maratona',
+        goalKind: RunPlanGoalKind.half,
+        weeks: 4,
+      );
+      for (var week = 0; week < 4; week++) {
+        await seedIntervalSession(
+          runPlan.id,
+          weekIndex: week,
+          dayOfWeek: 2,
+          name: 'Tiros semana ${week + 1}',
+        );
+      }
+      // The phase joins the plan already on its third week (index 2).
+      await seedPhase(runPlanIds: [runPlan.id], runPlanStartWeek: 2);
+
+      // Phase week 1 → plan week 3.
+      final first = await periodization.getRunSuggestion(DateTime(2026, 1, 6));
+      expect(first!.workout.name, 'Tiros semana 3');
+      expect(first.weekIndex, 2);
+
+      // Phase week 2 → plan week 4, the last one.
+      final second = await periodization.getRunSuggestion(
+        DateTime(2026, 1, 13),
+      );
+      expect(second!.workout.name, 'Tiros semana 4');
+
+      // Phase week 3 wraps back to the start of the plan.
+      final third = await periodization.getRunSuggestion(DateTime(2026, 1, 20));
+      expect(third!.workout.name, 'Tiros semana 1');
+    });
+
+    test('no offset keeps the plan and the phase starting together', () async {
+      final runPlan = await runPlans.createPlan(
+        name: 'Base',
+        goalKind: RunPlanGoalKind.base,
+        weeks: 2,
+      );
+      await seedIntervalSession(
+        runPlan.id,
+        weekIndex: 0,
+        dayOfWeek: 2,
+        name: 'Semana 1',
+      );
+      await seedIntervalSession(
+        runPlan.id,
+        weekIndex: 1,
+        dayOfWeek: 2,
+        name: 'Semana 2',
+      );
+      await seedPhase(runPlanIds: [runPlan.id]);
+
+      final first = await periodization.getRunSuggestion(DateTime(2026, 1, 6));
+      expect(first!.workout.name, 'Semana 1');
+      final second = await periodization.getRunSuggestion(
+        DateTime(2026, 1, 13),
+      );
+      expect(second!.workout.name, 'Semana 2');
+    });
+  });
+
+  group('scheduleRunPlanForPhase', () {
+    test('materialises every phase week through the offset', () async {
+      final runPlan = await runPlans.createPlan(
+        name: 'Base',
+        goalKind: RunPlanGoalKind.base,
+        weeks: 2,
+      );
+      await seedIntervalSession(
+        runPlan.id,
+        weekIndex: 0,
+        dayOfWeek: 2,
+        name: 'Semana 1',
+      );
+      await seedIntervalSession(
+        runPlan.id,
+        weekIndex: 1,
+        dayOfWeek: 2,
+        name: 'Semana 2',
+      );
+      final phaseId = await seedPhase(runPlanIds: [runPlan.id]);
+      final phase = (await periodization.getPhase(phaseId))!;
+
+      final result = await periodization.scheduleRunPlanForPhase(
+        phase,
+        from: phaseStart,
+      );
+
+      // The phase spans 4 weeks and the 2-week plan repeats across them.
+      expect(result.weeksCovered, 4);
+      expect(result.created, 4);
+      final scheduled = await runPlans.getScheduledRuns(phaseStart, phaseEnd);
+      expect(scheduled.map((run) => run.workout?.name).toList(), [
+        'Semana 1',
+        'Semana 2',
+        'Semana 1',
+        'Semana 2',
+      ]);
+
+      // Idempotent — re-running adds nothing.
+      final again = await periodization.scheduleRunPlanForPhase(
+        phase,
+        from: phaseStart,
+      );
+      expect(again.created, 0);
+    });
+
+    test('skips weeks before "from" so the past is not back-filled', () async {
+      final runPlan = await runPlans.createPlan(
+        name: 'Base',
+        goalKind: RunPlanGoalKind.base,
+        weeks: 1,
+      );
+      await seedIntervalSession(runPlan.id, weekIndex: 0, dayOfWeek: 2);
+      final phaseId = await seedPhase(runPlanIds: [runPlan.id]);
+      final phase = (await periodization.getPhase(phaseId))!;
+
+      final result = await periodization.scheduleRunPlanForPhase(
+        phase,
+        from: DateTime(2026, 1, 19), // week 3 of the phase
+      );
+
+      expect(result.weeksCovered, 2);
+      final scheduled = await runPlans.getScheduledRuns(phaseStart, phaseEnd);
+      expect(
+        scheduled.map((run) => run.date).toList(),
+        [DateTime(2026, 1, 20), DateTime(2026, 1, 27)],
+      );
+    });
+
+    test('does nothing when the phase links no plan', () async {
+      final phaseId = await seedPhase();
+      final phase = (await periodization.getPhase(phaseId))!;
+      final result = await periodization.scheduleRunPlanForPhase(phase);
+      expect(result.isEmpty, isTrue);
+      expect(result.weeksCovered, 0);
     });
   });
 }

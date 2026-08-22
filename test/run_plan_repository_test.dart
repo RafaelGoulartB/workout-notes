@@ -12,6 +12,7 @@ import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
+import 'package:workout_notes/repositories/run_repository.dart';
 
 void main() {
   late Database database;
@@ -387,7 +388,7 @@ void main() {
         weekIndex: 0,
         weekStart: DateTime(2026, 1, 7), // mid-week input still snaps to Monday
       );
-      expect(created, 2);
+      expect(created.length, 2);
 
       final scheduled = await repository.getScheduledRuns(
         DateTime(2026, 1, 5),
@@ -413,8 +414,8 @@ void main() {
         weekIndex: 0,
         weekStart: DateTime(2026, 1, 5),
       );
-      expect(first, 1);
-      expect(second, 0);
+      expect(first.length, 1);
+      expect(second, isEmpty);
       expect(
         (await repository.getScheduledRunsForDate(DateTime(2026, 1, 6))).length,
         1,
@@ -573,6 +574,299 @@ void main() {
         whereArgs: ['act1'],
       )).single;
       expect(row['plan_workout_id'], session.id);
+    });
+  });
+  group('activation and progress', () {
+    Future<void> seedActivity(String id) async {
+      final now = DateTime.now().toIso8601String();
+      await database.insert('run_activities', {
+        'id': id,
+        'started_at': now,
+        'created_at': now,
+        'updated_at': now,
+        'status': 'completed',
+      });
+    }
+
+    test('activating one plan deactivates the others', () async {
+      final first = await seedPlan(weeks: 2);
+      final second = await seedPlan(weeks: 2);
+
+      await repository.activatePlan(first.id);
+      expect((await repository.getActivatedPlan())!.id, first.id);
+
+      await repository.activatePlan(second.id);
+      final active = await repository.getActivatedPlan();
+      expect(active!.id, second.id);
+      expect((await repository.getPlan(first.id))!.activatedAt, isNull);
+      expect(active.isActivated, isTrue);
+    });
+
+    test('activating schedules the remaining weeks only once', () async {
+      final plan = await seedPlan(weeks: 3);
+      for (var week = 0; week < 3; week++) {
+        await repository.addWorkout(
+          planId: plan.id,
+          weekIndex: week,
+          name: 'Rodagem',
+          kind: RunWorkoutKind.easy,
+          dayOfWeek: 3,
+          targetDistanceMeters: 6000,
+        );
+      }
+
+      final created = await repository.activatePlan(plan.id);
+      expect(created, 3);
+
+      // Idempotent: a second activation must not duplicate the schedule.
+      expect(await repository.activatePlan(plan.id), 0);
+
+      final progress = await repository.getPlanProgress(plan.id);
+      expect(progress.totalSessions, 3);
+      expect(progress.plannedSessions, 3);
+      expect(progress.completedSessions, 0);
+      expect(progress.hasProgress, isFalse);
+    });
+
+    test('deactivating clears untouched sessions but keeps history', () async {
+      final plan = await seedPlan(weeks: 1);
+      final done = await repository.addWorkout(
+        planId: plan.id,
+        weekIndex: 0,
+        name: 'Rodagem',
+        kind: RunWorkoutKind.easy,
+        dayOfWeek: 3,
+      );
+      await repository.addWorkout(
+        planId: plan.id,
+        weekIndex: 0,
+        name: 'Longão',
+        kind: RunWorkoutKind.long,
+        dayOfWeek: 7,
+      );
+      await repository.activatePlan(plan.id);
+      await seedActivity('act-3');
+      await repository.markPlanWorkoutCompleted(
+        planWorkoutId: done.id,
+        date: DateTime.now(),
+        runActivityId: 'act-3',
+      );
+
+      final removed = await repository.deactivatePlan(plan.id);
+
+      expect(await repository.getActivatedPlan(), isNull);
+      expect(removed, 1, reason: 'only the untouched session goes');
+      final progress = await repository.getPlanProgress(plan.id);
+      expect(progress.plannedSessions, 0);
+      expect(progress.completedSessions, 1);
+    });
+
+    test('a far-off planned row is left alone', () async {
+      final plan = await seedPlan(weeks: 1);
+      final session = await repository.addWorkout(
+        planId: plan.id,
+        weekIndex: 0,
+        name: 'Tiros',
+        kind: RunWorkoutKind.interval,
+        dayOfWeek: 2,
+      );
+      // Planned three weeks out: running today is a different session.
+      await repository.scheduleRun(
+        date: DateTime.now().add(const Duration(days: 21)),
+        runPlanId: plan.id,
+        runPlanWorkoutId: session.id,
+      );
+      await seedActivity('act-far');
+
+      await repository.markPlanWorkoutCompleted(
+        planWorkoutId: session.id,
+        date: DateTime.now(),
+        runActivityId: 'act-far',
+      );
+
+      final progress = await repository.getPlanProgress(plan.id);
+      expect(progress.completedSessions, 1);
+      expect(progress.plannedSessions, 1, reason: 'the far row is untouched');
+    });
+
+    test('deleting the run puts its plan session back to planned', () async {
+      final plan = await seedPlan(weeks: 1);
+      final session = await repository.addWorkout(
+        planId: plan.id,
+        weekIndex: 0,
+        name: 'Rodagem',
+        kind: RunWorkoutKind.easy,
+        dayOfWeek: 3,
+      );
+      await repository.activatePlan(plan.id);
+      await seedActivity('act-del');
+      await repository.markPlanWorkoutCompleted(
+        planWorkoutId: session.id,
+        date: DateTime.now(),
+        runActivityId: 'act-del',
+      );
+      expect((await repository.getPlanProgress(plan.id)).completedSessions, 1);
+
+      await RunRepository().deleteActivity('act-del');
+
+      // Without this the plan would keep counting a run that no longer exists.
+      final progress = await repository.getPlanProgress(plan.id);
+      expect(progress.completedSessions, 0);
+      expect(progress.plannedSessions, 1);
+    });
+
+    test('running a session late reuses its planned row', () async {
+      final plan = await seedPlan(weeks: 1);
+      // Deliberately not today, so the exact-date lookup misses.
+      final session = await repository.addWorkout(
+        planId: plan.id,
+        weekIndex: 0,
+        name: 'Longão',
+        kind: RunWorkoutKind.long,
+        dayOfWeek: DateTime.now().weekday == 1 ? 4 : 1,
+      );
+      await repository.activatePlan(plan.id);
+      await seedActivity('act-late');
+
+      final marked = await repository.markPlanWorkoutCompleted(
+        planWorkoutId: session.id,
+        date: DateTime.now(),
+        runActivityId: 'act-late',
+      );
+
+      expect(marked!.isCompleted, isTrue);
+      final rows = await database.query('scheduled_runs');
+      expect(rows.length, 1, reason: 'no duplicate row for the same session');
+      final progress = await repository.getPlanProgress(plan.id);
+      expect(progress.completedSessions, 1);
+      expect(progress.plannedSessions, 0);
+    });
+
+    test('deactivating can keep the schedule when asked', () async {
+      final plan = await seedPlan(weeks: 1);
+      await repository.addWorkout(
+        planId: plan.id,
+        weekIndex: 0,
+        name: 'Rodagem',
+        kind: RunWorkoutKind.easy,
+        dayOfWeek: 3,
+      );
+      await repository.activatePlan(plan.id);
+      await repository.deactivatePlan(plan.id, clearPlanned: false);
+
+      expect((await repository.getPlanProgress(plan.id)).plannedSessions, 1);
+    });
+
+    test('completing a session reuses the scheduled row', () async {
+      final plan = await seedPlan(weeks: 1);
+      final session = await repository.addWorkout(
+        planId: plan.id,
+        weekIndex: 0,
+        name: 'Rodagem',
+        kind: RunWorkoutKind.easy,
+        dayOfWeek: DateTime.now().weekday,
+        targetDistanceMeters: 6000,
+      );
+      await repository.activatePlan(plan.id);
+      await seedActivity('act-1');
+
+      final marked = await repository.markPlanWorkoutCompleted(
+        planWorkoutId: session.id,
+        date: DateTime.now(),
+        runActivityId: 'act-1',
+      );
+
+      expect(marked!.isCompleted, isTrue);
+      expect(marked.runActivityId, 'act-1');
+      final progress = await repository.getPlanProgress(plan.id);
+      expect(progress.completedSessions, 1);
+      expect(progress.plannedSessions, 0);
+      expect(progress.fraction, 1.0);
+      // One ledger row, not two.
+      expect(
+        (await database.query('scheduled_runs')).length,
+        1,
+        reason: 'the planned row must be reused, not duplicated',
+      );
+    });
+
+    test('completing an unscheduled session creates its row', () async {
+      final plan = await seedPlan(weeks: 1);
+      final session = await repository.addWorkout(
+        planId: plan.id,
+        weekIndex: 0,
+        name: 'Tiros',
+        kind: RunWorkoutKind.interval,
+        dayOfWeek: 2,
+      );
+      await seedActivity('act-2');
+
+      final marked = await repository.markPlanWorkoutCompleted(
+        planWorkoutId: session.id,
+        date: DateTime(2026, 8, 20),
+        runActivityId: 'act-2',
+      );
+
+      expect(marked!.isCompleted, isTrue);
+      expect(marked.runPlanId, plan.id);
+      expect((await repository.getPlanProgress(plan.id)).completedSessions, 1);
+    });
+
+    test('activeWeekIndexOn counts and wraps from the activation week', () {
+      final plan = RunPlan(
+        id: 'p',
+        name: 'p',
+        goalKind: RunPlanGoalKind.tenK,
+        weeks: 4,
+        status: RunPlanStatus.active,
+        activatedAt: DateTime(2026, 8, 3), // a Monday
+        createdAt: DateTime(2026, 8, 3),
+        updatedAt: DateTime(2026, 8, 3),
+      );
+
+      expect(plan.activeWeekIndexOn(DateTime(2026, 8, 5)), 0);
+      expect(plan.activeWeekIndexOn(DateTime(2026, 8, 10)), 1);
+      expect(plan.activeWeekIndexOn(DateTime(2026, 8, 31)), 0, reason: 'wraps');
+      expect(plan.activeWeekIndexOn(DateTime(2026, 7, 27)), isNull);
+    });
+
+    test('isLinkedToPeriodization sees a phase target link', () async {
+      final plan = await seedPlan();
+      expect(await repository.isLinkedToPeriodization(plan.id), isFalse);
+
+      final now = DateTime.now().toIso8601String();
+      await database.insert('periodization_plans', {
+        'id': 'per-1',
+        'name': 'Ciclo',
+        'start_date': '2026-08-01',
+        'end_date': '2026-12-01',
+        'status': 'active',
+        'created_at': now,
+        'updated_at': now,
+      });
+      await database.insert('periodization_phases', {
+        'id': 'phase-1',
+        'plan_id': 'per-1',
+        'name': 'Base',
+        'color': 0xFF36B7AA,
+        'start_date': '2026-08-01',
+        'end_date': '2026-10-01',
+        'order_index': 0,
+        'created_at': now,
+        'updated_at': now,
+      });
+      await database.insert('phase_targets', {
+        'id': 'target-1',
+        'phase_id': 'phase-1',
+        'version': 1,
+        'valid_from': '2026-08-01',
+        'training_json': jsonEncode({
+          'run': {'run_plan_ids': [plan.id]},
+        }),
+        'created_at': now,
+      });
+
+      expect(await repository.isLinkedToPeriodization(plan.id), isTrue);
     });
   });
 }
