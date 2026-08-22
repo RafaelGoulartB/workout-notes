@@ -117,7 +117,7 @@
         <article class="card"><div class="number">03</div><h3>Split combinado</h3><p>Marco de distância e split não são mais falados separadamente no mesmo quilômetro.</p><p class="quote">“Kilometer 3. 5 42 per kilometer. Average 5 48.”</p></article>
         <article class="card"><div class="number">04</div><h3>Metas discretas</h3><p>Metas longas recebem avisos em 50% e 80%. Metas curtas pulam o aviso intermediário para não gerar excesso.</p><p class="quote">“1 kilometer left.”</p></article>
         <article class="card"><div class="number">05</div><h3>Pace estável</h3><p>O alerta livre usa uma janela móvel de até 25 segundos, exige dados mínimos e espera 10 segundos de desvio persistente.</p><p class="quote">“Ease off.” · “Pick it up.” · “Pace on target.”</p></article>
-        <article class="card"><div class="number">06</div><h3>Plano é a fonte de verdade</h3><p>Durante um treino planejado, o pace global é suprimido. O alvo falado usa o centro da faixa da etapa, evitando instruções conflitantes.</p></article>
+        <article class="card"><div class="number">06</div><h3>Plano é a fonte de verdade</h3><p>Durante um treino planejado, o pace global é suprimido. O alvo falado usa o centro da faixa da etapa, evitando instruções conflitantes. Corridas contínuas, como uma rodagem de 2,8 km sem etapas cadastradas, agora geram uma etapa de voz automaticamente.</p><p class="quote">“Steady. 2.8 kilometers.” · “100 meters.” · “Workout complete.”</p></article>
         <article class="card"><div class="number">07</div><h3>Pré-aviso de transição</h3><p>Etapas por tempo usam 10 segundos quando curtas e 30 quando longas. Etapas por distância com ao menos 300 m recebem um aviso único a 100 m.</p></article>
         <article class="card"><div class="number">08</div><h3>Controles confirmados</h3><p>Pause, resume e conclusão manual recebem confirmações mínimas, úteis quando o telefone está bloqueado.</p><p class="quote">“Paused.” · “Resumed.” · “Workout complete.”</p></article>
         <article class="card"><div class="number">09</div><h3>Configuração ao vivo</h3><p>Mudanças feitas durante uma corrida agora são sincronizadas imediatamente com o controlador Android, incluindo plano, meta e intervalos.</p></article>
@@ -136,7 +136,7 @@
             <tr><td>Free run</td><td>Split/marco combinado, GPS relevante e pace persistente quando configurado.</td><td>Narração de tempo contínua e reação a pace instantâneo.</td></tr>
             <tr><td>Goal run</td><td>Progresso discreto, aproximação e conclusão da meta.</td><td>Avisos frequentes em metas curtas.</td></tr>
             <tr><td>Quick intervals</td><td>Rep, recovery, pré-aviso e conclusão.</td><td>Frases longas e métricas secundárias sobre a transição.</td></tr>
-            <tr><td>Structured plan</td><td>Etapa, repetição, alvo central, pré-aviso, correção e conclusão.</td><td>Conflito entre pace global e pace planejado.</td></tr>
+            <tr><td>Structured plan</td><td>Etapa, repetição, alvo central, pré-aviso, correção e conclusão. Em treinos contínuos, distância ou duração vira uma etapa executável automaticamente.</td><td>Conflito entre pace global e pace planejado; dependência do controle de quick intervals.</td></tr>
           </tbody>
         </table>
       </div>
@@ -154,7 +154,7 @@
     <section>
       <h2>Controles disponíveis</h2>
       <div class="grid">
-        <article class="card wide"><h3>Voice settings</h3><ul><li>Ativar ou desativar voz.</li><li>Somente com fones.</li><li>Silenciar durante chamadas.</li><li>Distância a cada 1, 2 ou 5 km.</li><li>Splits, GPS e transições.</li></ul></article>
+        <article class="card wide"><h3>Voice settings</h3><ul><li>Ativar ou desativar voz.</li><li>Somente com fones.</li><li>Silenciar durante chamadas.</li><li>Distância a cada 1, 2 ou 5 km.</li><li>Splits, GPS e quick intervals.</li><li>Orientações do treino planejado permanecem ativas sempre que a voz estiver ligada.</li></ul></article>
         <article class="card wide"><h3>Pace coaching</h3><ul><li>Pace alvo.</li><li>Tolerância selecionável: 5%, 10%, 15% ou 20%.</li><li>Correção somente após desvio estável.</li><li>Confirmação curta ao voltar para a faixa.</li></ul></article>
       </div>
     </section>
@@ -162,7 +162,7 @@
     <section>
       <h2>Validação</h2>
       <div class="grid">
-        <article class="card wide"><h3>Flutter</h3><p><code>flutter analyze</code>: sem problemas.</p><p><code>flutter test</code>: 635 testes aprovados.</p></article>
+        <article class="card wide"><h3>Flutter</h3><p><code>flutter analyze</code>: sem problemas.</p><p><code>flutter test</code>: 637 testes aprovados, incluindo a regressão de uma rodagem contínua de 2,8 km.</p></article>
         <article class="card wide"><h3>Android nativo</h3><p><code>:app:testDebugUnitTest</code>: compilação Kotlin e testes do módulo aprovados.</p><p>O conjunto global do Gradle ainda contém uma falha externa no teste Robolectric de <code>flutter_local_notifications</code>; o módulo do app passa isoladamente.</p></article>
       </div>
     </section>

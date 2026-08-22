@@ -119,9 +119,13 @@ object RunVoicePhrases {
     }
 
     private fun distanceSpeech(meters: Int): String {
-        if (meters >= 1000 && meters % 1000 == 0) {
-            val km = meters / 1000
-            return "$km ${kilometersWord(km)}"
+        if (meters >= 1000) {
+            if (meters % 1000 == 0) {
+                val km = meters / 1000
+                return "$km ${kilometersWord(km)}"
+            }
+            val tenths = (meters + 50) / 100
+            return "${tenths / 10}.${tenths % 10} kilometers"
         }
         return "$meters meters"
     }

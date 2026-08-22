@@ -270,7 +270,7 @@ class RunVoiceController(private val context: Context) {
                     isRecording,
                     distanceMeters,
                     movingTimeSeconds,
-                    speak = settings.announceIntervals,
+                    speak = true,
                 )
             )
             if (isRecording || isPaused) {

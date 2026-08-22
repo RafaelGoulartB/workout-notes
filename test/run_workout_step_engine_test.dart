@@ -117,6 +117,43 @@ void main() {
   });
 
   group('engine execution', () {
+    test('executes a continuous 2.8 km planned run without stored steps', () {
+      final continuous = RunPlanWorkout(
+        id: 'easy-2.8k',
+        runPlanId: 'p1',
+        weekIndex: 0,
+        orderIndex: 0,
+        kind: RunWorkoutKind.easy,
+        name: 'Easy run',
+        targetDistanceMeters: 2800,
+        targetPaceSecPerKm: 360,
+        createdAt: DateTime(2026, 1, 1),
+      );
+      final engine = RunWorkoutStepEngine()..configure(continuous);
+
+      expect(continuous.executionSteps, hasLength(1));
+      expect(continuous.executionSteps.single.role, RunStepRole.steady);
+      expect(continuous.executionSteps.single.value, 2800);
+      expect(engine.totalSteps, 1);
+      expect(engine.start().single.kind, RunStepEventKind.stepStarted);
+
+      final nearFinish = engine.tick(
+        recording: true,
+        distanceMeters: 2700,
+        movingTimeSeconds: 972,
+      );
+      expect(nearFinish.single.kind, RunStepEventKind.distanceRemainingCue);
+      expect(nearFinish.single.remainingMeters, 100);
+
+      final completed = engine.tick(
+        recording: true,
+        distanceMeters: 2800,
+        movingTimeSeconds: 1008,
+      );
+      expect(completed.last.kind, RunStepEventKind.workoutCompleted);
+      expect(engine.snapshot.isDone, isTrue);
+    });
+
     test('walks a distance-only session step by step', () {
       final engine = RunWorkoutStepEngine()
         ..configure(

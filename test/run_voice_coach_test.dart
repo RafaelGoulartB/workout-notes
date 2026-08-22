@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_session_goal.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
@@ -57,6 +58,71 @@ void main() {
   });
 
   group('RunVoiceCoach free-run events', () {
+    test(
+      'announces and completes a continuous 2.8 km plan even when quick intervals are muted',
+      () async {
+        final spoken = <String>[];
+        final coach = RunVoiceCoach(
+          speak: (text) async => spoken.add(text),
+          audioCaps: () async =>
+              const RunAudioCapabilities(headsetConnected: true, inCall: false),
+          ensureTtsReady: () async {},
+          stopTts: () async {},
+        );
+        coach.settingsOverride = const RunVoiceSettings.defaults().copyWith(
+          headphonesOnly: false,
+          announceGpsStatus: false,
+          announceIntervals: false,
+          announceDistance: false,
+          announceSplit: false,
+        );
+        await coach.beginSession(
+          intervalsOn: false,
+          planWorkout: RunPlanWorkout(
+            id: 'easy-2.8k',
+            runPlanId: 'p1',
+            weekIndex: 0,
+            orderIndex: 0,
+            kind: RunWorkoutKind.easy,
+            name: 'Easy run',
+            targetDistanceMeters: 2800,
+            targetPaceSecPerKm: 360,
+            createdAt: DateTime(2026, 1, 1),
+          ),
+        );
+
+        await coach.onTrackingUpdate(
+          _recordingState(
+            distanceMeters: 0,
+            durationSeconds: 0,
+            movingTimeSeconds: 0,
+          ),
+        );
+        expect(
+          spoken.single,
+          'Steady. 2.8 kilometers. Target 6 00 per kilometer.',
+        );
+
+        await coach.onTrackingUpdate(
+          _recordingState(
+            distanceMeters: 2700,
+            durationSeconds: 972,
+            movingTimeSeconds: 972,
+          ),
+        );
+        expect(spoken.last, '100 meters.');
+
+        await coach.onTrackingUpdate(
+          _recordingState(
+            distanceMeters: 2800,
+            durationSeconds: 1008,
+            movingTimeSeconds: 1008,
+          ),
+        );
+        expect(spoken.last, 'Workout complete.');
+      },
+    );
+
     test('announces distance and split with open gate', () async {
       final spoken = <String>[];
       final coach = RunVoiceCoach(

@@ -178,9 +178,13 @@ class RunVoicePhrases {
       pace != null && pace > 0 && pace.isFinite;
 
   static String _distanceSpeech(int meters) {
-    if (meters >= 1000 && meters % 1000 == 0) {
-      final km = meters ~/ 1000;
-      return '$km ${_kilometersWord(km)}';
+    if (meters >= 1000) {
+      if (meters % 1000 == 0) {
+        final km = meters ~/ 1000;
+        return '$km ${_kilometersWord(km)}';
+      }
+      final km = (meters / 1000).toStringAsFixed(1);
+      return '$km kilometers';
     }
     return '$meters meters';
   }

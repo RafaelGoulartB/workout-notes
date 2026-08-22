@@ -295,9 +295,7 @@ class RunVoiceCoach extends ChangeNotifier {
         _collectFreeRunCues(state);
       } else if (hasPlan) {
         // A planned session replaces the quick interval preset.
-        cues.addAll(
-          _advanceStepEngine(state, speak: _settings.announceIntervals),
-        );
+        cues.addAll(_advanceStepEngine(state, speak: true));
         if (state.isRecording || state.isPaused) {
           cues.addAll(_collectFreeRunCues(state));
         }
