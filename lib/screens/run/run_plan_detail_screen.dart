@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
+import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/run_plan_workout_editor_screen.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
@@ -28,6 +29,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
   RunPlan? _plan;
   Set<int> _scheduledWeeks = const {};
   RunPlanProgress _progress = const RunPlanProgress();
+  Map<String, ScheduledRunStatus> _workoutStatuses = const {};
 
   /// Driven by a periodization phase: the phase owns the week mapping, so this
   /// screen reports it instead of offering its own activation.
@@ -56,12 +58,14 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     }
     final scheduled = await _repo.getScheduledWeeks(plan.id);
     final progress = await _repo.getPlanProgress(plan.id);
+    final workoutStatuses = await _repo.getPlanWorkoutStatuses(plan.id);
     final linked = await _repo.isLinkedToPeriodization(plan.id);
     if (!mounted) return;
     setState(() {
       _plan = plan;
       _scheduledWeeks = scheduled;
       _progress = progress;
+      _workoutStatuses = workoutStatuses;
       _linkedToPlanning = linked;
       _week = _week.clamp(0, plan.weeks - 1);
       _loading = false;
@@ -109,6 +113,37 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
         SnackBar(content: Text(loc.runPlanActivatedMessage(created))),
       );
     }
+    await _load();
+  }
+
+  Future<void> _resetProgress() async {
+    final plan = _plan;
+    if (plan == null) return;
+    final loc = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: const Icon(Icons.restart_alt_rounded),
+        title: Text(loc.runPlanResetTitle),
+        content: Text(loc.runPlanResetBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(loc.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(loc.runPlanResetConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _repo.resetPlanProgress(plan.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.runPlanResetDone)));
     await _load();
   }
 
@@ -614,6 +649,9 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
             progress: _progress,
             viaPlanning: _linkedToPlanning,
             onToggle: _linkedToPlanning ? null : _toggleFollow,
+            onReset: _progress.hasProgress && !_linkedToPlanning
+                ? _resetProgress
+                : null,
           ),
         ],
       ),
@@ -657,6 +695,13 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
               peak: peak,
               selected: week == _week,
               scheduled: _scheduledWeeks.contains(week),
+              completed: plan
+                  .workoutsForWeek(week)
+                  .every(
+                    (workout) =>
+                        _workoutStatuses[workout.id] ==
+                        ScheduledRunStatus.completed,
+                  ),
               onTap: () => _selectWeek(week),
             ),
           ),
@@ -777,6 +822,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
           onDuplicate: _duplicateSession,
           onMove: plan.weeks > 1 ? _moveSession : null,
           onDelete: _deleteSession,
+          statuses: _workoutStatuses,
         ),
       );
     }
@@ -793,6 +839,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
           onDuplicate: _duplicateSession,
           onMove: plan.weeks > 1 ? _moveSession : null,
           onDelete: _deleteSession,
+          statuses: _workoutStatuses,
         ),
       );
     }
@@ -846,6 +893,7 @@ class _WeekTile extends StatelessWidget {
   final double peak;
   final bool selected;
   final bool scheduled;
+  final bool completed;
   final VoidCallback onTap;
 
   const _WeekTile({
@@ -854,6 +902,7 @@ class _WeekTile extends StatelessWidget {
     required this.peak,
     required this.selected,
     required this.scheduled,
+    required this.completed,
     required this.onTap,
   });
 
@@ -920,7 +969,14 @@ class _WeekTile extends StatelessWidget {
                             : scheme.onSurface,
                       ),
                     ),
-                    if (scheduled) ...[
+                    if (completed) ...[
+                      const SizedBox(width: 3),
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 12,
+                        color: scheme.tertiary,
+                      ),
+                    ] else if (scheduled) ...[
                       const SizedBox(width: 3),
                       Icon(Icons.circle, size: 5, color: scheme.tertiary),
                     ],
@@ -946,6 +1002,7 @@ class _DayRow extends StatelessWidget {
   final ValueChanged<RunPlanWorkout> onDuplicate;
   final ValueChanged<RunPlanWorkout>? onMove;
   final ValueChanged<RunPlanWorkout> onDelete;
+  final Map<String, ScheduledRunStatus> statuses;
 
   const _DayRow({
     required this.label,
@@ -954,6 +1011,7 @@ class _DayRow extends StatelessWidget {
     required this.onOpen,
     required this.onDuplicate,
     required this.onDelete,
+    required this.statuses,
     this.onAdd,
     this.onMove,
   });
@@ -991,6 +1049,7 @@ class _DayRow extends StatelessWidget {
                           padding: const EdgeInsets.only(bottom: 8),
                           child: _SessionCard(
                             workout: session,
+                            status: statuses[session.id],
                             onTap: () => onOpen(session),
                             onDuplicate: () => onDuplicate(session),
                             onMove: onMove == null
@@ -1109,6 +1168,7 @@ class _Badge extends StatelessWidget {
 
 class _SessionCard extends StatelessWidget {
   final RunPlanWorkout workout;
+  final ScheduledRunStatus? status;
   final VoidCallback onTap;
   final VoidCallback onDuplicate;
   final VoidCallback? onMove;
@@ -1116,6 +1176,7 @@ class _SessionCard extends StatelessWidget {
 
   const _SessionCard({
     required this.workout,
+    required this.status,
     required this.onTap,
     required this.onDuplicate,
     required this.onDelete,
@@ -1130,9 +1191,14 @@ class _SessionCard extends StatelessWidget {
     final color = RunPlanUi.kindColor(scheme, workout.kind);
     final outline = RunPlanUi.stepsOutline(loc, workout);
     final estimate = RunPlanUi.estimatedTotalSeconds(workout);
+    final completed = status == ScheduledRunStatus.completed;
+    final skipped = status == ScheduledRunStatus.skipped;
+    final statusColor = completed ? scheme.tertiary : scheme.onSurfaceVariant;
 
     return Material(
-      color: scheme.surfaceContainerHighest.withAlpha(70),
+      color: completed
+          ? scheme.tertiaryContainer.withAlpha(70)
+          : scheme.surfaceContainerHighest.withAlpha(70),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
@@ -1166,6 +1232,9 @@ class _SessionCard extends StatelessWidget {
                           workout.name,
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w700,
+                            decoration: completed
+                                ? TextDecoration.lineThrough
+                                : null,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1187,6 +1256,19 @@ class _SessionCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (completed || skipped)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 2),
+                      child: _Badge(
+                        icon: completed
+                            ? Icons.check_circle_rounded
+                            : Icons.skip_next_rounded,
+                        label: completed
+                            ? loc.runPlanSessionCompleted
+                            : loc.runPlanSessionSkipped,
+                        highlight: completed,
+                      ),
+                    ),
                   PopupMenuButton<String>(
                     icon: Icon(
                       Icons.more_vert,
@@ -1223,6 +1305,24 @@ class _SessionCard extends StatelessWidget {
                 padding: const EdgeInsets.only(right: 8),
                 child: RunWorkoutProfileBar(workout: workout, height: 8),
               ),
+              if (completed) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(Icons.verified_rounded, size: 14, color: statusColor),
+                    const SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        loc.runPlanSessionCompletedHint,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: statusColor,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               if (outline.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Padding(
@@ -1255,12 +1355,14 @@ class _FollowCard extends StatelessWidget {
   final RunPlanProgress progress;
   final bool viaPlanning;
   final VoidCallback? onToggle;
+  final VoidCallback? onReset;
 
   const _FollowCard({
     required this.plan,
     required this.progress,
     required this.viaPlanning,
     required this.onToggle,
+    required this.onReset,
   });
 
   @override
@@ -1269,11 +1371,18 @@ class _FollowCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final following = plan.isActivated || viaPlanning;
+    final complete = progress.isComplete;
     final week = plan.activeWeekIndexOn(DateTime.now());
-    final accent = following ? scheme.primary : scheme.onSurfaceVariant;
+    final accent = complete
+        ? scheme.tertiary
+        : following
+        ? scheme.primary
+        : scheme.onSurfaceVariant;
 
     final String status;
-    if (viaPlanning) {
+    if (complete) {
+      status = loc.runPlanCompletedHelp;
+    } else if (viaPlanning) {
       status = loc.runPlanActiveViaHelp;
     } else if (week != null) {
       status = loc.runPlanCurrentWeek(week + 1, plan.weeks);
@@ -1284,12 +1393,16 @@ class _FollowCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: following
+        color: complete
+            ? scheme.tertiaryContainer.withAlpha(80)
+            : following
             ? scheme.primary.withAlpha(16)
             : scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: following
+          color: complete
+              ? scheme.tertiary.withAlpha(100)
+              : following
               ? scheme.primary.withAlpha(90)
               : scheme.outlineVariant.withAlpha(90),
         ),
@@ -1300,7 +1413,9 @@ class _FollowCard extends StatelessWidget {
           Row(
             children: [
               Icon(
-                viaPlanning
+                complete
+                    ? Icons.workspace_premium_rounded
+                    : viaPlanning
                     ? Icons.route_rounded
                     : (following
                           ? Icons.play_circle_outline
@@ -1315,8 +1430,12 @@ class _FollowCard extends StatelessWidget {
                 child: Text(
                   viaPlanning
                       ? loc.runPlanActiveVia
+                      : complete
+                      ? loc.runPlanCompletedBadge
                       : (following
                             ? loc.runPlanActiveBadge
+                            : progress.hasProgress
+                            ? loc.runPlanPausedBadge
                             : loc.runPlanNotFollowing),
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w800,
@@ -1324,7 +1443,13 @@ class _FollowCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (onToggle != null)
+              if (onReset != null)
+                TextButton.icon(
+                  onPressed: onReset,
+                  icon: const Icon(Icons.restart_alt_rounded, size: 17),
+                  label: Text(loc.runPlanResetShort),
+                ),
+              if (onToggle != null && !complete)
                 following
                     ? TextButton(
                         onPressed: onToggle,

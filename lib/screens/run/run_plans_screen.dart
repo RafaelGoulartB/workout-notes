@@ -878,7 +878,13 @@ class _PlanCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (plan.isArchived)
+                    if (progress?.isComplete == true)
+                      _CompletedBadge(
+                        completionCount: plan.completionCount < 1
+                            ? 1
+                            : plan.completionCount,
+                      )
+                    else if (plan.isArchived)
                       Padding(
                         padding: const EdgeInsets.only(left: 4),
                         child: Icon(
@@ -1044,6 +1050,62 @@ class _FollowingBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CompletedBadge extends StatelessWidget {
+  final int completionCount;
+
+  const _CompletedBadge({required this.completionCount});
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
+    final repeated = completionCount > 1;
+    return Tooltip(
+      message: repeated
+          ? '${loc.runPlanCompletedBadge} · ${completionCount}x'
+          : loc.runPlanCompletedBadge,
+      child: Semantics(
+        label: repeated
+            ? '${loc.runPlanCompletedBadge}, ${completionCount}x'
+            : loc.runPlanCompletedBadge,
+        child: Container(
+          margin: const EdgeInsets.only(left: 4),
+          padding: EdgeInsets.symmetric(
+            horizontal: repeated ? 7 : 6,
+            vertical: 4,
+          ),
+          decoration: BoxDecoration(
+            color: scheme.primary.withAlpha(30),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.workspace_premium_rounded,
+                size: 14,
+                color: scheme.primary,
+              ),
+              if (repeated) ...[
+                const SizedBox(width: 3),
+                Text(
+                  '${completionCount}x',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 10,
+                    height: 1,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
