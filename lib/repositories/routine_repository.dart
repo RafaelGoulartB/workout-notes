@@ -26,6 +26,25 @@ class RoutineRepository extends BaseRepository {
     return db.query('routines', orderBy: 'created_at DESC');
   }
 
+  /// Day names per routine id, ordered. One query for every routine, so the
+  /// periodization picker can show the weekly sequence a routine produces
+  /// without N round trips.
+  Future<Map<String, List<String>>> getRoutineDayNames() async {
+    final db = await this.db;
+    final rows = await db.query(
+      'routine_days',
+      columns: ['routine_id', 'name'],
+      orderBy: 'routine_id ASC, order_index ASC',
+    );
+    final result = <String, List<String>>{};
+    for (final row in rows) {
+      final routineId = row['routine_id'] as String?;
+      if (routineId == null) continue;
+      (result[routineId] ??= []).add(row['name'] as String? ?? '');
+    }
+    return result;
+  }
+
   Future<Map<String, dynamic>?> getRoutine(String id) async {
     final db = await this.db;
     final result = await db.query('routines', where: 'id = ?', whereArgs: [id]);

@@ -12,7 +12,9 @@ import 'package:workout_notes/models/periodization_projection.dart';
 import 'package:workout_notes/models/periodization_routine_suggestion.dart';
 import 'package:workout_notes/models/periodization_run_suggestion.dart';
 import 'package:workout_notes/models/periodization_target.dart';
+import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
+import 'package:workout_notes/periodization/run_plan_week_resolver.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 
 import 'base_repository.dart';
@@ -27,6 +29,25 @@ final RunPlanWorkout _missingRunWorkout = RunPlanWorkout(
   name: '',
   createdAt: DateTime(2000),
 );
+
+/// Outcome of [PeriodizationRepository.scheduleRunPlanForPhase].
+class PeriodizationRunScheduleResult {
+  /// Rows actually created (already-scheduled sessions are skipped). Kept as
+  /// ids rather than a count so the caller can offer an undo.
+  final List<String> createdIds;
+
+  /// Phase weeks that had a linked plan to schedule.
+  final int weeksCovered;
+
+  const PeriodizationRunScheduleResult({
+    this.createdIds = const [],
+    this.weeksCovered = 0,
+  });
+
+  int get created => createdIds.length;
+
+  bool get isEmpty => createdIds.isEmpty;
+}
 
 class PeriodizationRepository extends BaseRepository {
   static const _uuid = Uuid();
@@ -767,6 +788,15 @@ class PeriodizationRepository extends BaseRepository {
       maxSetsPerWeek: target.maxSetsPerWeek,
       minRpe: target.minRpe,
       maxRpe: target.maxRpe,
+      // Linked routines and running plans have to ride along: dropping them
+      // here silently unlinked the phase every time a new version was saved.
+      routineIds: target.routineIds,
+      runSessionsPerWeek: target.runSessionsPerWeek,
+      runWeeklyDistanceMeters: target.runWeeklyDistanceMeters,
+      longRunDistanceMeters: target.longRunDistanceMeters,
+      qualitySessionsPerWeek: target.qualitySessionsPerWeek,
+      runPlanIds: target.runPlanIds,
+      runPlanStartWeek: target.runPlanStartWeek,
       targetWeightKg: target.targetWeightKg,
       weeklyWeightChangePercent: target.weeklyWeightChangePercent,
       sleepHours: target.sleepHours,
@@ -958,8 +988,11 @@ class PeriodizationRepository extends BaseRepository {
     if (!await _tableExists(database, 'run_plans')) return null;
     final runPlanRepo = RunPlanRepository();
     final weekStart = _weekStart(day);
-    final phaseWeekIndex =
-        day.difference(_weekStart(phase.startDate)).inDays ~/ 7;
+    const resolver = RunPlanWeekResolver();
+    final phaseWeekIndex = resolver.phaseWeekOf(
+      phaseStart: phase.startDate,
+      date: day,
+    );
 
     // An already materialised row wins: it carries reschedules and skips.
     final scheduledToday = await runPlanRepo.getScheduledRunsForDate(day);
@@ -985,9 +1018,15 @@ class PeriodizationRepository extends BaseRepository {
     for (final planId in planIds) {
       final plan = await runPlanRepo.getPlan(planId);
       if (plan == null || plan.weeks < 1) continue;
-      // Plans shorter than the phase repeat — a 1-week maintenance plan then
-      // applies to every week of the phase.
-      final weekIndex = phaseWeekIndex % plan.weeks;
+      // The offset says which plan week the phase's first week is; plans
+      // shorter than the phase wrap, so a 1-week maintenance plan applies to
+      // every week of the phase.
+      final weekIndex = resolver.planWeekFor(
+        phaseWeek: phaseWeekIndex,
+        planWeeks: plan.weeks,
+        startWeek: target?.runPlanStartWeek ?? 0,
+      );
+      if (weekIndex == null) continue;
       final sessions = plan.workoutsForWeek(weekIndex);
       final match = sessions.firstWhere(
         (session) => session.dayOfWeek == day.weekday,
@@ -1010,6 +1049,68 @@ class PeriodizationRepository extends BaseRepository {
       );
     }
     return null;
+  }
+
+  /// Materialises the running plans linked to [phase] across its weeks, so the
+  /// calendar carries every planned session instead of only today's suggestion.
+  ///
+  /// Each phase week resolves its own effective target, so a phase that swaps
+  /// plans mid-way schedules the right plan per week. Weeks before [from]
+  /// (default: this week) are skipped — back-filling would invent sessions the
+  /// user never had a chance to run. Idempotent: existing rows are kept.
+  Future<PeriodizationRunScheduleResult> scheduleRunPlanForPhase(
+    PeriodizationPhase phase, {
+    DateTime? from,
+  }) async {
+    final database = await db;
+    if (!await _tableExists(database, 'run_plans')) {
+      return const PeriodizationRunScheduleResult();
+    }
+    const resolver = RunPlanWeekResolver();
+    final runPlanRepo = RunPlanRepository();
+    final phaseStartWeek = _weekStart(phase.startDate);
+    final fromWeek = _weekStart(_day(from ?? DateTime.now()));
+    final firstWeek = fromWeek.isAfter(phaseStartWeek)
+        ? resolver.phaseWeekOf(phaseStart: phase.startDate, date: fromWeek)
+        : 0;
+    // Plans are reused across weeks; loading each one once keeps a 30-week
+    // phase from re-reading the same sessions thirty times.
+    final plans = <String, RunPlan?>{};
+    final created = <String>[];
+    var weeksCovered = 0;
+    for (var week = firstWeek; week < phase.totalWeeks; week++) {
+      final weekStart = phaseStartWeek.add(Duration(days: 7 * week));
+      final target = await getEffectiveTarget(phase.id, date: weekStart);
+      final planIds = target?.runPlanIds ?? const <String>[];
+      if (planIds.isEmpty) continue;
+      var weekTouched = false;
+      for (final planId in planIds) {
+        if (!plans.containsKey(planId)) {
+          plans[planId] = await runPlanRepo.getPlan(planId);
+        }
+        final plan = plans[planId];
+        if (plan == null || plan.weeks < 1) continue;
+        final planWeek = resolver.planWeekFor(
+          phaseWeek: week,
+          planWeeks: plan.weeks,
+          startWeek: target?.runPlanStartWeek ?? 0,
+        );
+        if (planWeek == null) continue;
+        created.addAll(
+          await runPlanRepo.materializeWeek(
+            planId: planId,
+            weekIndex: planWeek,
+            weekStart: weekStart,
+          ),
+        );
+        weekTouched = true;
+      }
+      if (weekTouched) weeksCovered++;
+    }
+    return PeriodizationRunScheduleResult(
+      createdIds: created,
+      weeksCovered: weeksCovered,
+    );
   }
 
   Future<int> _completedRunsBetween(DateTime start, DateTime end) async {
@@ -1898,6 +1999,7 @@ class PeriodizationRepository extends BaseRepository {
       longRunDistanceMeters: target.longRunDistanceMeters,
       qualitySessionsPerWeek: target.qualitySessionsPerWeek,
       runPlanIds: target.runPlanIds,
+      runPlanStartWeek: target.runPlanStartWeek,
       targetWeightKg: target.targetWeightKg,
       weeklyWeightChangePercent: target.weeklyWeightChangePercent,
       sleepHours: target.sleepHours,

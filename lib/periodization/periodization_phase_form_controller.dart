@@ -9,6 +9,7 @@ import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/models/run_plan.dart';
+import 'package:workout_notes/periodization/run_plan_week_resolver.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/settings_repository.dart';
@@ -69,7 +70,15 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   bool loading = true;
   List<String> routineIds = [];
   List<Map<String, dynamic>> routines = const [];
+
+  /// Ordered day names per routine id, used to preview the training sequence
+  /// a routine selection produces.
+  Map<String, List<String>> routineDayNames = const {};
   List<String> runPlanIds = [];
+
+  /// Zero-based plan week that this phase's FIRST week maps to. 0 means the
+  /// phase and the plan start together; see [RunPlanWeekResolver].
+  int runPlanStartWeek = 0;
   List<RunPlan> runPlans = const [];
   double? latestWeight;
   List<PeriodizationTarget> history = const [];
@@ -136,15 +145,19 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
   Future<void> load() async {
     final weightFuture = _bodyRepository.getLatestWeightKg();
     final tdeeFuture = _nutritionRepository.getActiveGoal();
-    final runPlansFuture = RunPlanRepository().listPlans();
+    // Hydrated: the alignment preview and the week picker need each plan's
+    // sessions to show volume per week, not just the plan names.
+    final runPlansFuture = RunPlanRepository().listPlans(hydrate: true);
     final results = await Future.wait([
       RoutineRepository().getRoutines(),
+      RoutineRepository().getRoutineDayNames(),
       if (editing) _repository.getTargetHistory(phase!.id),
     ]);
     if (_disposed) return;
     routines = results[0] as List<Map<String, dynamic>>;
+    routineDayNames = results[1] as Map<String, List<String>>;
     if (editing) {
-      history = results[1] as List<PeriodizationTarget>;
+      history = results[2] as List<PeriodizationTarget>;
       weekOverrides = _resolver.reconstructOverrides(
         weekStarts: weekStarts,
         history: history,
@@ -289,6 +302,9 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
       longRunDistanceMeters: _kmToMeters(doubleValue('longRun')),
       qualitySessionsPerWeek: intValue('runQuality'),
       runPlanIds: runPlanIds,
+      runPlanStartWeek: runPlanIds.isEmpty || runPlanStartWeek == 0
+          ? null
+          : runPlanStartWeek,
       targetWeightKg: doubleValue('weight'),
       weeklyWeightChangePercent: doubleValue('change'),
       sleepHours: doubleValue('sleep'),
@@ -417,6 +433,7 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
     }
     routineIds = [...(target?.routineIds ?? const [])];
     runPlanIds = [...(target?.runPlanIds ?? const [])];
+    runPlanStartWeek = target?.runPlanStartWeek ?? 0;
   }
 
   static double? _kmToMeters(double? km) =>
@@ -655,9 +672,33 @@ class PeriodizationPhaseFormController extends ChangeNotifier {
 
   void setRunPlans(Iterable<String> values) {
     _targetDebounce?.cancel();
-    runPlanIds = values.toSet().toList();
+    final next = values.toSet().toList();
+    // Dropping every plan drops the alignment with it, so re-picking a plan
+    // does not silently inherit an offset from an unrelated one.
+    if (next.isEmpty) runPlanStartWeek = 0;
+    runPlanIds = next;
     commitSelectedWeek();
     notifyListeners();
+  }
+
+  void setRunPlanStartWeek(int value) {
+    _targetDebounce?.cancel();
+    runPlanStartWeek = value < 0 ? 0 : value;
+    commitSelectedWeek();
+    notifyListeners();
+  }
+
+  /// The longest linked plan, which is what the alignment preview describes.
+  /// Null when nothing is linked or the plans are unknown to this editor.
+  RunPlan? get alignmentPlan {
+    RunPlan? best;
+    for (final id in runPlanIds) {
+      for (final plan in runPlans) {
+        if (plan.id != id) continue;
+        if (best == null || plan.weeks > best.weeks) best = plan;
+      }
+    }
+    return best;
   }
 
   @override
