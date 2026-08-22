@@ -18,6 +18,8 @@ import 'package:workout_notes/utils/nutrition_conversion.dart';
 
 import 'base_repository.dart';
 
+part 'nutrition_repository_calorie_analytics.dart';
+
 /// Thrown when user input fails nutrition-level validation (non-positive
 /// quantities, negative nutrients, etc).
 class NutritionValidationException implements Exception {
@@ -1222,7 +1224,9 @@ class NutritionRepository extends BaseRepository {
             percent.isInfinite ||
             percent <= -100 ||
             percent >= 100)) {
-      throw const NutritionValidationException('goal_invalid_adjustment_percent');
+      throw const NutritionValidationException(
+        'goal_invalid_adjustment_percent',
+      );
     }
     final now = DateTime.now();
     final goal = NutritionGoal(
@@ -1499,98 +1503,6 @@ class NutritionRepository extends BaseRepository {
       result.add(DailyCalorieTotal(date: d, calories: totalsByDate[key]));
     }
     return result;
-  }
-
-  /// Aggregated totals for the [days] window. [goal] is the active
-  /// calorie target, or null when no goal is configured.
-  Future<CalorieBalance> getCalorieBalance({
-    required int days,
-    required double? goal,
-  }) => getCalorieBalanceForRange(
-    startDate: DateTime.now().subtract(Duration(days: days - 1)),
-    endDate: DateTime.now(),
-    goal: goal,
-  );
-
-  Future<CalorieBalance> getCalorieBalanceForRange({
-    required DateTime startDate,
-    required DateTime endDate,
-    required double? goal,
-  }) async {
-    final dailies = await getDailyCalorieTotalsForRange(
-      startDate: startDate,
-      endDate: endDate,
-    );
-    return calculateCalorieBalance(dailies: dailies, goal: goal);
-  }
-
-  /// Builds the aggregate balance from totals already loaded by a caller.
-  /// This avoids repeating the daily-totals query on analytics screens.
-  CalorieBalance calculateCalorieBalance({
-    required List<DailyCalorieTotal> dailies,
-    required double? goal,
-  }) {
-    final days = dailies.length;
-    var consumed = 0.0;
-    var loggedDays = 0;
-    var inDeficit = 0;
-    var onTarget = 0;
-    var inSurplus = 0;
-    final logged = <DailyCalorieTotal>[];
-    for (final d in dailies) {
-      if (d.calories == null) continue;
-      consumed += d.calories!;
-      loggedDays++;
-      logged.add(d);
-      if (goal != null && goal > 0) {
-        final delta = d.calories! - goal;
-        final ratio = (delta).abs() / goal;
-        if (ratio <= 0.10) {
-          onTarget++;
-        } else if (delta < 0) {
-          inDeficit++;
-        } else {
-          inSurplus++;
-        }
-      }
-    }
-    // Current streak: consecutive logged days (newest first) inside
-    // the ±10% goal band. If the user has no goal configured the
-    // streak is the number of consecutive days with any log.
-    var streak = 0;
-    if (goal != null && goal > 0) {
-      for (var i = logged.length - 1; i >= 0; i--) {
-        final d = logged[i];
-        final delta = (d.calories! - goal).abs() / goal;
-        if (delta <= 0.10) {
-          streak++;
-        } else {
-          break;
-        }
-      }
-    } else {
-      for (var i = logged.length - 1; i >= 0; i--) {
-        if (logged[i].calories != null) {
-          streak++;
-        } else {
-          break;
-        }
-      }
-    }
-    final avg = loggedDays == 0 ? 0.0 : consumed / loggedDays;
-    final totalGoal = goal == null ? null : goal * loggedDays;
-    return CalorieBalance(
-      days: days,
-      totalConsumed: consumed,
-      totalGoal: totalGoal,
-      balance: totalGoal == null ? null : consumed - totalGoal,
-      daysLogged: loggedDays,
-      daysInDeficit: inDeficit,
-      daysOnTarget: onTarget,
-      daysInSurplus: inSurplus,
-      currentStreak: streak,
-      averageDailyIntake: avg,
-    );
   }
 
   /// Top calorie-contributing foods in the [days] window, ordered by
