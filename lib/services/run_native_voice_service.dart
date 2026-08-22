@@ -38,6 +38,7 @@ class RunNativeVoiceService {
     required Map<String, dynamic> goal,
     required bool intervalsOn,
     bool bypassHeadphonesGate = false,
+    List<Map<String, dynamic>>? plan,
   }) async {
     if (!_isAndroid) return;
     try {
@@ -46,6 +47,7 @@ class RunNativeVoiceService {
         'goal': goal,
         'intervalsOn': intervalsOn,
         'bypassHeadphonesGate': bypassHeadphonesGate,
+        'plan': plan ?? const <Map<String, dynamic>>[],
       });
     } on MissingPluginException {
       // Desktop/tests
@@ -62,6 +64,24 @@ class RunNativeVoiceService {
       // Desktop/tests
     } catch (_) {
       // Ignore
+    }
+  }
+
+  /// Per-step results measured by the native controller during a structured
+  /// session. Empty on other platforms or when no plan was running.
+  Future<List<Map<String, dynamic>>> stepResults() async {
+    if (!_isAndroid) return const [];
+    try {
+      final raw = await _methods.invokeMethod<List<Object?>>('stepResults');
+      if (raw == null) return const [];
+      return raw
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+    } on MissingPluginException {
+      return const [];
+    } catch (_) {
+      return const [];
     }
   }
 

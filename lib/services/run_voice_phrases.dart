@@ -1,4 +1,5 @@
 import 'package:workout_notes/models/run_voice_settings.dart';
+import 'package:workout_notes/models/run_workout_step.dart';
 
 /// English-only spoken phrases for the run voice coach.
 class RunVoicePhrases {
@@ -61,6 +62,53 @@ class RunVoicePhrases {
 
   static String timeRemaining(int seconds) =>
       '${_durationSpeech(seconds)} remaining.';
+
+  // ---- Structured plan sessions (RunWorkoutStepEngine) ----
+  // Mirrors RunVoicePhrases.kt so the Dart and native cues read the same.
+
+  static String stepStart({
+    required RunStepRole role,
+    required int repIndex,
+    required int repTotal,
+    required RunIntervalMetric metric,
+    required int value,
+    double? targetPaceSecPerKm,
+  }) {
+    final amount = metric == RunIntervalMetric.time
+        ? _durationSpeech(value)
+        : _distanceSpeech(value);
+    final head = switch (role) {
+      RunStepRole.warmup => 'Warm up. $amount.',
+      RunStepRole.cooldown => 'Cool down. $amount.',
+      RunStepRole.recovery => 'Recover. $amount.',
+      RunStepRole.steady => 'Steady. $amount.',
+      RunStepRole.work =>
+        repTotal > 1 ? 'Rep $repIndex of $repTotal. $amount.' : 'Effort. $amount.',
+    };
+    if (role.isEffort &&
+        targetPaceSecPerKm != null &&
+        targetPaceSecPerKm > 0 &&
+        targetPaceSecPerKm.isFinite) {
+      return '$head Target pace ${_paceSpeech(targetPaceSecPerKm)} per kilometer.';
+    }
+    return head;
+  }
+
+  static String stepPaceTooSlow(double? paceSecPerKm) {
+    if (paceSecPerKm == null || paceSecPerKm <= 0 || !paceSecPerKm.isFinite) {
+      return 'Pick it up.';
+    }
+    return 'Pick it up. Current pace ${_paceSpeech(paceSecPerKm)}.';
+  }
+
+  static String stepPaceTooFast(double? paceSecPerKm) {
+    if (paceSecPerKm == null || paceSecPerKm <= 0 || !paceSecPerKm.isFinite) {
+      return 'Ease off.';
+    }
+    return 'Ease off. Current pace ${_paceSpeech(paceSecPerKm)}.';
+  }
+
+  static String workoutComplete() => 'Workout complete. Well done.';
 
   static String goalComplete({
     required RunIntervalMetric metric,

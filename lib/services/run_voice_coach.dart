@@ -3,7 +3,10 @@ import 'package:workout_notes/models/run_session_goal.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/services/run_audio_gate_service.dart';
+import 'package:workout_notes/models/run_plan_workout.dart';
+import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/services/run_interval_engine.dart';
+import 'package:workout_notes/services/run_workout_step_engine.dart';
 import 'package:workout_notes/services/run_native_voice_service.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/services/run_tts_service.dart';
@@ -18,6 +21,7 @@ class RunVoiceCoach extends ChangeNotifier {
   RunVoiceCoach({
     RunVoiceSettingsStore? settingsStore,
     RunIntervalEngine? intervalEngine,
+    RunWorkoutStepEngine? stepEngine,
     RunVoiceSpeakFn? speak,
     RunVoiceCapsFn? audioCaps,
     Future<void> Function()? ensureTtsReady,
@@ -25,6 +29,7 @@ class RunVoiceCoach extends ChangeNotifier {
     bool? useNativeVoice,
   })  : _settingsStore = settingsStore ?? RunVoiceSettingsStore.instance,
         _intervalEngine = intervalEngine ?? RunIntervalEngine(),
+        _stepEngine = stepEngine ?? RunWorkoutStepEngine(),
         _speak = speak ?? ((text) => RunTtsService.instance.speak(text)),
         _audioCaps =
             audioCaps ?? (() => RunAudioGateService.instance.getCapabilities()),
@@ -36,6 +41,9 @@ class RunVoiceCoach extends ChangeNotifier {
 
   final RunVoiceSettingsStore _settingsStore;
   final RunIntervalEngine _intervalEngine;
+
+  /// Structured plan session. When loaded it takes over from [_intervalEngine].
+  final RunWorkoutStepEngine _stepEngine;
   final RunVoiceSpeakFn _speak;
   final RunVoiceCapsFn _audioCaps;
   final Future<void> Function() _ensureTtsReady;
@@ -45,6 +53,7 @@ class RunVoiceCoach extends ChangeNotifier {
 
   RunVoiceSettings _settings = const RunVoiceSettings.defaults();
   RunSessionGoal _goal = const RunSessionGoal.defaults();
+  RunPlanWorkout? _planWorkout;
   bool _goalCompleted = false;
   bool _active = false;
   bool _intervalsOn = false;
@@ -63,6 +72,14 @@ class RunVoiceCoach extends ChangeNotifier {
   bool get intervalsOn => _intervalsOn;
   RunSessionGoal get goal => _goal;
   RunIntervalSnapshot get intervalSnapshot => _intervalEngine.snapshot;
+
+  /// The planned session being executed, if any.
+  RunPlanWorkout? get planWorkout => _planWorkout;
+
+  RunStepSnapshot get stepSnapshot => _stepEngine.snapshot;
+
+  /// True while a structured plan session drives the cues.
+  bool get hasPlan => _planWorkout != null && _stepEngine.totalSteps > 0;
 
   RunGoalSnapshot goalSnapshotFor(RunTrackingState state) {
     return RunGoalSnapshot(
@@ -121,6 +138,19 @@ class RunVoiceCoach extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Loads (or clears) the structured session to execute. A plan overrides the
+  /// quick interval preset — the two never run at the same time.
+  void setPlanWorkout(RunPlanWorkout? workout) {
+    _planWorkout = workout;
+    if (workout == null) {
+      _stepEngine.configureSteps(const []);
+    } else {
+      _stepEngine.configure(workout);
+      _intervalEngine.reset();
+    }
+    notifyListeners();
+  }
+
   void setGoal(RunSessionGoal goal) {
     _goal = goal;
     if (!goal.enabled) {
@@ -132,11 +162,13 @@ class RunVoiceCoach extends ChangeNotifier {
   Future<void> beginSession({
     required bool intervalsOn,
     RunSessionGoal? goal,
+    RunPlanWorkout? planWorkout,
     bool bypassHeadphonesGate = false,
   }) async {
     await prepare();
     _active = true;
-    _intervalsOn = intervalsOn;
+    if (planWorkout != null) setPlanWorkout(planWorkout);
+    _intervalsOn = hasPlan ? false : intervalsOn;
     _goal = goal ?? _goal;
     _goalCompleted = false;
     _bypassHeadphonesGate = bypassHeadphonesGate;
@@ -147,6 +179,7 @@ class RunVoiceCoach extends ChangeNotifier {
     _lastPaceAnnounceAt = null;
     _intervalEngine.reset();
     _intervalEngine.configure(_settings.interval);
+    _stepEngine.reset();
     if (_useNativeVoice) {
       await RunNativeVoiceService.instance.beginSession(
         settings: _settings.toJson(),
@@ -157,6 +190,7 @@ class RunVoiceCoach extends ChangeNotifier {
         },
         intervalsOn: _intervalsOn,
         bypassHeadphonesGate: _bypassHeadphonesGate,
+        plan: _planWorkout?.stepsJson(),
       );
       // Still ensure TTS for test fallback or when service not yet ready,
       // but live announcements will be driven by native controller.
@@ -170,6 +204,8 @@ class RunVoiceCoach extends ChangeNotifier {
     _active = false;
     _goalCompleted = false;
     _intervalEngine.reset();
+    // Keep the results — collectStepResults() reads them after stop().
+    _stepEngine.finish();
     if (_useNativeVoice) {
       await RunNativeVoiceService.instance.endSession();
     }
@@ -193,8 +229,10 @@ class RunVoiceCoach extends ChangeNotifier {
             value: _goal.value,
           ),
         );
-        // Keep interval + free-run counters in sync without speaking them.
-        if (_intervalsOn) {
+        // Keep the structured/preset counters in sync without speaking them.
+        if (hasPlan) {
+          _advanceStepEngine(state, speak: false);
+        } else if (_intervalsOn) {
           if (_intervalEngine.snapshot.phase == RunIntervalPhase.idle &&
               state.isRecording) {
             _intervalEngine.start();
@@ -206,6 +244,14 @@ class RunVoiceCoach extends ChangeNotifier {
           );
         }
         _collectFreeRunPhrases(state);
+      } else if (hasPlan) {
+        // A planned session replaces the quick interval preset.
+        phrases.addAll(
+          _advanceStepEngine(state, speak: _settings.announceIntervals),
+        );
+        if (state.isRecording || state.isPaused) {
+          phrases.addAll(_collectFreeRunPhrases(state));
+        }
       } else {
         if (_intervalsOn &&
             _settings.announceIntervals &&
@@ -348,6 +394,91 @@ class RunVoiceCoach extends ChangeNotifier {
 
     return out;
   }
+
+  /// Starts the plan on the first recording tick and drains its events.
+  /// Returns the phrases to speak (empty when [speak] is false).
+  List<String> _advanceStepEngine(
+    RunTrackingState state, {
+    required bool speak,
+  }) {
+    final events = <RunStepEvent>[];
+    if (state.isRecording &&
+        _stepEngine.snapshot.phase == RunStepEnginePhase.idle) {
+      events.addAll(_stepEngine.start());
+    }
+    events.addAll(
+      _stepEngine.tick(
+        recording: state.isRecording,
+        distanceMeters: state.distanceMeters,
+        movingTimeSeconds: state.movingTimeSeconds,
+      ),
+    );
+    if (!speak) return const [];
+    final phrases = <String>[];
+    for (final event in events) {
+      final phrase = _phraseForStep(event);
+      if (phrase != null) phrases.add(phrase);
+    }
+    return phrases;
+  }
+
+  String? _phraseForStep(RunStepEvent event) {
+    switch (event.kind) {
+      case RunStepEventKind.stepStarted:
+        final expanded = _stepEngine.steps;
+        final target = event.stepIndex >= 0 && event.stepIndex < expanded.length
+            ? expanded[event.stepIndex].step.targetPaceMinSecPerKm
+            : null;
+        return RunVoicePhrases.stepStart(
+          role: event.role,
+          repIndex: event.repIndex,
+          repTotal: event.repTotal,
+          metric: event.metric,
+          value: event.target,
+          targetPaceSecPerKm: target,
+        );
+      case RunStepEventKind.timeRemainingCue:
+        return RunVoicePhrases.timeRemaining(event.remainingSeconds ?? 30);
+      case RunStepEventKind.paceTooSlow:
+        return RunVoicePhrases.stepPaceTooSlow(event.paceSecPerKm);
+      case RunStepEventKind.paceTooFast:
+        return RunVoicePhrases.stepPaceTooFast(event.paceSecPerKm);
+      case RunStepEventKind.workoutCompleted:
+        return RunVoicePhrases.workoutComplete();
+      // Completion is implied by the next step's start cue.
+      case RunStepEventKind.stepCompleted:
+        return null;
+    }
+  }
+
+  /// Per-step outcome of the session that just ended.
+  ///
+  /// Prefers the native results: on Android the foreground service keeps
+  /// measuring while the Flutter engine is dead, so the Dart engine can have
+  /// missed reps. Falls back to the Dart engine elsewhere (and in tests).
+  Future<List<RunStepResult>> collectStepResults() async {
+    if (_useNativeVoice) {
+      final native = await RunNativeVoiceService.instance.stepResults();
+      if (native.isNotEmpty) {
+        return native.map(_stepResultFromNative).toList();
+      }
+    }
+    return _stepEngine.results;
+  }
+
+  static RunStepResult _stepResultFromNative(Map<String, dynamic> row) =>
+      RunStepResult(
+        sequence: (row['sequence'] as num?)?.toInt() ?? 0,
+        role: RunStepRole.fromString(row['role'] as String?),
+        repIndex: (row['repIndex'] as num?)?.toInt() ?? 1,
+        plannedMetric: row['plannedMetric'] == 'time'
+            ? RunIntervalMetric.time
+            : RunIntervalMetric.distance,
+        plannedValue: (row['plannedValue'] as num?)?.toInt() ?? 0,
+        plannedPaceSecPerKm: (row['plannedPaceSecPerKm'] as num?)?.toDouble(),
+        distanceMeters: (row['distanceMeters'] as num?)?.toDouble() ?? 0,
+        durationSeconds: (row['durationSeconds'] as num?)?.toInt() ?? 0,
+      );
 
   String? _phraseForInterval(RunIntervalEvent event) {
     switch (event.kind) {
