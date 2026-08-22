@@ -1243,6 +1243,51 @@ class _RunPlanCard extends StatelessWidget {
 
     final showIntervalStatus = intervalsOn && active;
     final plan = planWorkout;
+    final showGoal = !active || goal.enabled;
+
+    // An active run without a goal should not show the empty goal tile. Keep
+    // the section when it still has a plan or interval status to display.
+    if (!showGoal && plan == null && !showIntervalStatus) {
+      return const SizedBox.shrink();
+    }
+
+    final sectionDivider = Divider(
+      height: 1,
+      indent: 12,
+      endIndent: 12,
+      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
+    );
+    final goalTile = _PlanOptionTile(
+      icon: Icons.flag_rounded,
+      title: loc.runRecordGoal,
+      subtitle: goalSubtitle,
+      selected: goal.enabled,
+      showChevron: onGoalChanged != null && !active,
+      onTap: onGoalChanged == null ? null : () => _editGoal(context),
+      trailing: active
+          ? const SizedBox.shrink()
+          : Switch.adaptive(
+              value: goal.enabled,
+              onChanged: onGoalChanged == null
+                  ? null
+                  : (v) {
+                      if (v && !goal.enabled) {
+                        _editGoal(context);
+                      } else {
+                        onGoalChanged!(goal.copyWith(enabled: v));
+                      }
+                    },
+            ),
+      footer: goal.enabled && active
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: goalSnapshot.progress.clamp(0.0, 1.0),
+                minHeight: 4,
+              ),
+            )
+          : null,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1267,46 +1312,10 @@ class _RunPlanCard extends StatelessWidget {
           ),
           child: Column(
             children: [
-              _PlanOptionTile(
-                icon: Icons.flag_rounded,
-                title: loc.runRecordGoal,
-                subtitle: goalSubtitle,
-                selected: goal.enabled,
-                showChevron: onGoalChanged != null && !active,
-                onTap: onGoalChanged == null ? null : () => _editGoal(context),
-                trailing: active
-                    ? const SizedBox.shrink()
-                    : Switch.adaptive(
-                        value: goal.enabled,
-                        onChanged: onGoalChanged == null
-                            ? null
-                            : (v) {
-                                if (v && !goal.enabled) {
-                                  _editGoal(context);
-                                } else {
-                                  onGoalChanged!(goal.copyWith(enabled: v));
-                                }
-                              },
-                      ),
-                footer: goal.enabled && active
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(999),
-                        child: LinearProgressIndicator(
-                          value: goalSnapshot.progress.clamp(0.0, 1.0),
-                          minHeight: 4,
-                        ),
-                      )
-                    : null,
-              ),
+              if (showGoal) goalTile,
               if (plan != null) ...[
-                Divider(
-                  height: 1,
-                  indent: 12,
-                  endIndent: 12,
-                  color: theme.colorScheme.outlineVariant.withValues(
-                    alpha: 0.45,
-                  ),
-                ),
+                if (showGoal)
+                  sectionDivider,
                 _PlanOptionTile(
                   icon: RunPlanUi.kindIcon(plan.kind),
                   title: loc.runRecordPlanSessionTitle,
@@ -1337,14 +1346,8 @@ class _RunPlanCard extends StatelessWidget {
                 ),
               ],
               if (showIntervalStatus) ...[
-                Divider(
-                  height: 1,
-                  indent: 12,
-                  endIndent: 12,
-                  color: theme.colorScheme.outlineVariant.withValues(
-                    alpha: 0.45,
-                  ),
-                ),
+                if (showGoal || plan != null)
+                  sectionDivider,
                 _PlanOptionTile(
                   icon: Icons.av_timer_rounded,
                   title: loc.runRecordIntervals,
@@ -1723,4 +1726,3 @@ class _Metric extends StatelessWidget {
     );
   }
 }
-
