@@ -39,10 +39,14 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     _sessions = widget.template.sessionsPerWeek.clamp(3, 5);
     _paceDistanceMeters = _defaultDistance(widget.template.goalKind);
     _seedDefaultDays();
-    if (widget.template.level == RunPlanTemplateLevel.beginner) {
+    if (widget.template.level == RunPlanTemplateLevel.beginner &&
+        widget.template.key == 'return') {
       _intent = RunPlanIntent.finish;
-    } else if (widget.template.style == RunPlanTemplateStyle.performance) {
+    } else if (widget.template.style == RunPlanTemplateStyle.performance ||
+        widget.template.raceFinish) {
       _intent = RunPlanIntent.pb;
+    } else {
+      _intent = RunPlanIntent.finish;
     }
   }
 
