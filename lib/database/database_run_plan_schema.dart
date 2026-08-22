@@ -1,6 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 
-/// Schema for structured running plans (v45).
+/// Schema for structured running plans (v45, `activated_at` in v46).
 ///
 /// Mirrors the strength side (`routines` → `routine_days` → `routine_exercises`)
 /// with a progressive twist: a run plan spans N weeks, each week holds the
@@ -21,6 +21,7 @@ abstract final class DatabaseRunPlanSchema {
         race_date TEXT,
         weeks INTEGER NOT NULL DEFAULT 1,
         status TEXT NOT NULL DEFAULT 'active',
+        activated_at TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         CHECK (weeks >= 1)

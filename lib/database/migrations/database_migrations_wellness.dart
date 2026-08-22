@@ -496,5 +496,15 @@ abstract final class DatabaseWellnessMigrations {
         );
       } catch (_) {}
     }
+    if (oldVersion < 46) {
+      // The day a running plan was activated. Anchors "week N of the plan"
+      // onto the calendar for plans not driven by a periodization phase.
+      // At most one plan carries a non-null value at a time.
+      try {
+        await db.execute(
+          'ALTER TABLE run_plans ADD COLUMN activated_at TEXT',
+        );
+      } catch (_) {}
+    }
   }
 }
