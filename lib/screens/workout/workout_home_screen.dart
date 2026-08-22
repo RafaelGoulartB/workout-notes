@@ -11,6 +11,7 @@ import '../../repositories/analytics_repository.dart';
 import '../../repositories/run_repository.dart';
 import '../../services/rest_timer_service.dart';
 import 'active_workout_screen.dart';
+import '../run/run_plans_screen.dart';
 import '../run/run_record_screen.dart';
 import '../run/run_stats_screen.dart';
 import 'calendar_screen.dart';
@@ -656,6 +657,14 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         ),
       ),
       _NavItemData(
+        Icons.route_outlined,
+        loc.workoutHomeRunPlans,
+        () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RunPlansScreen()),
+        ),
+      ),
+      _NavItemData(
         Icons.bar_chart,
         loc.workoutHomeProgress,
         () => Navigator.push(
@@ -663,9 +672,18 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           MaterialPageRoute(builder: (_) => const ProgressScreen()),
         ),
       ),
+      _NavItemData(
+        Icons.calendar_month_outlined,
+        loc.workoutHomeHistoryTooltip,
+        () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const CalendarScreen()),
+        ),
+      ),
     ];
 
-    // Tools grid: Routines, Exercises, Runs, Progress.
+    // Tools grid (3x2): Routines, Exercises, Runs, Run plans, Progress,
+    // Calendar.
     const crossAxisCount = 2;
 
     return Padding(
@@ -1212,7 +1230,9 @@ class _NavTile extends StatelessWidget {
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
-                  maxLines: 1,
+                  // Two lines so "Planos de corrida" is not clipped to
+                  // "Planos de c…" at half the grid width.
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
