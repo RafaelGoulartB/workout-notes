@@ -27,6 +27,11 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
   final _weekStrip = ScrollController();
   RunPlan? _plan;
   Set<int> _scheduledWeeks = const {};
+  RunPlanProgress _progress = const RunPlanProgress();
+
+  /// Driven by a periodization phase: the phase owns the week mapping, so this
+  /// screen reports it instead of offering its own activation.
+  bool _linkedToPlanning = false;
   bool _loading = true;
   int _week = 0;
 
@@ -50,13 +55,61 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       return;
     }
     final scheduled = await _repo.getScheduledWeeks(plan.id);
+    final progress = await _repo.getPlanProgress(plan.id);
+    final linked = await _repo.isLinkedToPeriodization(plan.id);
     if (!mounted) return;
     setState(() {
       _plan = plan;
       _scheduledWeeks = scheduled;
+      _progress = progress;
+      _linkedToPlanning = linked;
       _week = _week.clamp(0, plan.weeks - 1);
       _loading = false;
     });
+  }
+
+  /// Follows this plan from today, or stops following it. Only one plan is
+  /// followed at a time, so this replaces any previous one.
+  Future<void> _toggleFollow() async {
+    final loc = AppLocalizations.of(context)!;
+    final plan = _plan;
+    if (plan == null) return;
+    if (plan.isActivated) {
+      await _repo.deactivatePlan(plan.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.runPlanDeactivatedMessage)));
+    } else {
+      final current = await _repo.getActivatedPlan(hydrate: false);
+      if (!mounted) return;
+      if (current != null && current.id != plan.id) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(loc.runPlanReplaceActiveTitle),
+            content: Text(loc.runPlanReplaceActiveBody(current.name)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(loc.runPlanActivate),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true || !mounted) return;
+      }
+      final created = await _repo.activatePlan(plan.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.runPlanActivatedMessage(created))),
+      );
+    }
+    await _load();
   }
 
   void _selectWeek(int week) {
@@ -446,14 +499,14 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
       lastDate: DateTime(now.year + 5),
     );
     if (picked == null || !mounted) return;
-    final created = await _repo.materializeWeek(
+    final createdIds = await _repo.materializeWeek(
       planId: plan.id,
       weekIndex: _week,
       weekStart: picked,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.runPlanScheduleWeekDone(created))),
+      SnackBar(content: Text(loc.runPlanScheduleWeekDone(createdIds.length))),
     );
     _load();
   }
@@ -555,6 +608,13 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 14),
+          _FollowCard(
+            plan: plan,
+            progress: _progress,
+            viaPlanning: _linkedToPlanning,
+            onToggle: _linkedToPlanning ? null : _toggleFollow,
+          ),
         ],
       ),
     );
@@ -1180,6 +1240,140 @@ class _SessionCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Follow state of the plan: whether it is driving "which run is due today",
+/// how far along it is, and the action to start or stop following it.
+///
+/// [onToggle] is null when a periodization phase owns the plan's weeks — the
+/// card then only reports that, since a second anchor would contradict it.
+class _FollowCard extends StatelessWidget {
+  final RunPlan plan;
+  final RunPlanProgress progress;
+  final bool viaPlanning;
+  final VoidCallback? onToggle;
+
+  const _FollowCard({
+    required this.plan,
+    required this.progress,
+    required this.viaPlanning,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final following = plan.isActivated || viaPlanning;
+    final week = plan.activeWeekIndexOn(DateTime.now());
+    final accent = following ? scheme.primary : scheme.onSurfaceVariant;
+
+    final String status;
+    if (viaPlanning) {
+      status = loc.runPlanActiveViaHelp;
+    } else if (week != null) {
+      status = loc.runPlanCurrentWeek(week + 1, plan.weeks);
+    } else {
+      status = loc.runPlanActivateHint;
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: following
+            ? scheme.primary.withAlpha(16)
+            : scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: following
+              ? scheme.primary.withAlpha(90)
+              : scheme.outlineVariant.withAlpha(90),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                viaPlanning
+                    ? Icons.route_rounded
+                    : (following
+                          ? Icons.play_circle_outline
+                          : Icons.flag_outlined),
+                size: 18,
+                color: accent,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                // The heading is the state; the button is the action. Saying
+                // "Seguir este plano" in both read like a duplicate.
+                child: Text(
+                  viaPlanning
+                      ? loc.runPlanActiveVia
+                      : (following
+                            ? loc.runPlanActiveBadge
+                            : loc.runPlanNotFollowing),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: accent,
+                  ),
+                ),
+              ),
+              if (onToggle != null)
+                following
+                    ? TextButton(
+                        onPressed: onToggle,
+                        child: Text(loc.runPlanUnfollowShort),
+                      )
+                    : FilledButton.tonalIcon(
+                        onPressed: onToggle,
+                        icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                        label: Text(loc.runPlanFollowShort),
+                      ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            status,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          if (progress.totalSessions > 0) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: progress.fraction,
+                      minHeight: 6,
+                      color: scheme.primary,
+                      backgroundColor: scheme.primary.withAlpha(30),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  loc.runPlanProgressValue(
+                    progress.completedSessions,
+                    progress.totalSessions,
+                  ),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

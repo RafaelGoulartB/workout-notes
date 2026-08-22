@@ -6,8 +6,10 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
+import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/periodization/periodization_phase_form_controller.dart';
 import 'package:workout_notes/periodization/phase_draft_data.dart';
+import 'package:workout_notes/periodization/run_plan_week_resolver.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/utils/periodization_palette.dart';
 import 'package:workout_notes/widgets/periodization/nutrition_target_fields.dart';
@@ -270,9 +272,16 @@ class _PeriodizationPhaseFormScreenState
                 else
                   ..._controller.routines.map((routine) {
                     final id = routine['id'] as String;
+                    final days = _controller.routineDayNames[id] ?? const [];
                     return CheckboxListTile(
                       value: selected.contains(id),
                       title: Text(routine['name'] as String),
+                      // A routine is only useful here through its days: the
+                      // suggestion engine walks them in order, so the count
+                      // is what decides how the week actually looks.
+                      subtitle: Text(
+                        loc.periodizationRoutineDays(days.length),
+                      ),
                       controlAffinity: ListTileControlAffinity.leading,
                       onChanged: (value) => setSheetState(() {
                         if (value == true) {
@@ -283,6 +292,15 @@ class _PeriodizationPhaseFormScreenState
                       }),
                     );
                   }),
+                if (selected.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  _RoutineSequencePreview(
+                    days: [
+                      for (final id in selected)
+                        ...?_controller.routineDayNames[id],
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 8),
                 FilledButton(
                   onPressed: () => Navigator.pop(sheetContext, selected),
@@ -354,6 +372,74 @@ class _PeriodizationPhaseFormScreenState
       ),
     );
     if (result != null && mounted) _controller.setRunPlans(result);
+  }
+
+  /// Sheet listing the plan's weeks so the phase can start on any of them.
+  /// Each row carries that week's volume, which is how a runner recognises
+  /// "the week I am on" without counting.
+  Future<void> _pickAlignment(RunPlan plan) async {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+              child: Text(
+                loc.periodizationRunAlignPick,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: Text(
+                loc.periodizationRunAlignHelp,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: plan.weeks,
+                itemBuilder: (context, index) {
+                  final volume = plan.weeklyDistanceMeters(index);
+                  final sessions = plan.workoutsForWeek(index).length;
+                  final selected = index == _controller.runPlanStartWeek;
+                  return ListTile(
+                    onTap: () => Navigator.pop(sheetContext, index),
+                    selected: selected,
+                    leading: Icon(
+                      selected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                    ),
+                    title: Text(loc.periodizationWeekChip(index + 1)),
+                    subtitle: Text(
+                      loc.runPlanWeekSummary(
+                        RunPlanUi.kmValue(volume),
+                        sessions,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (picked != null && mounted) _controller.setRunPlanStartWeek(picked);
   }
 
   @override
@@ -941,6 +1027,17 @@ class _PeriodizationPhaseFormScreenState
               ),
             ),
           ),
+          if (c.alignmentPlan case final alignmentPlan?) ...[
+            const SizedBox(height: 12),
+            _RunPlanAlignment(
+              phaseWeeks: c.weeksCount,
+              plan: alignmentPlan,
+              startWeek: c.runPlanStartWeek,
+              enabled: !weekLocked,
+              onPick: () => _pickAlignment(alignmentPlan),
+              onChange: c.setRunPlanStartWeek,
+            ),
+          ],
         ],
       ),
     );
@@ -1388,4 +1485,210 @@ class _DateTile extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// Shows and edits how the phase's weeks line up with the linked running
+/// plan's weeks, plus what that alignment implies (exact fit, repeats, or a
+/// tail of plan weeks the phase never reaches).
+class _RunPlanAlignment extends StatelessWidget {
+  final int phaseWeeks;
+  final RunPlan plan;
+  final int startWeek;
+  final bool enabled;
+  final VoidCallback onPick;
+  final ValueChanged<int> onChange;
+
+  const _RunPlanAlignment({
+    required this.phaseWeeks,
+    required this.plan,
+    required this.startWeek,
+    required this.enabled,
+    required this.onPick,
+    required this.onChange,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const resolver = RunPlanWeekResolver();
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final coverage = resolver.coverage(
+      phaseWeeks: phaseWeeks,
+      planWeeks: plan.weeks,
+      startWeek: startWeek,
+    );
+    final String fit;
+    switch (coverage) {
+      case RunPlanCoverage.exact:
+        fit = loc.periodizationRunAlignExact;
+      case RunPlanCoverage.planRepeats:
+        fit = loc.periodizationRunAlignRepeats(
+          resolver.repeatsWithin(
+            phaseWeeks: phaseWeeks,
+            planWeeks: plan.weeks,
+            startWeek: startWeek,
+          ),
+        );
+      case RunPlanCoverage.planLonger:
+        fit = loc.periodizationRunAlignLeftover(
+          resolver.leftoverPlanWeeks(
+            phaseWeeks: phaseWeeks,
+            planWeeks: plan.weeks,
+            startWeek: startWeek,
+          ),
+        );
+      case RunPlanCoverage.empty:
+        fit = '';
+    }
+    final lastPlanWeek = resolver.planWeekFor(
+      phaseWeek: phaseWeeks - 1,
+      planWeeks: plan.weeks,
+      startWeek: startWeek,
+    );
+    final finishAligned = resolver.startWeekForFinish(
+      phaseWeeks: phaseWeeks,
+      planWeeks: plan.weeks,
+    );
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withAlpha(90),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.link_rounded, size: 17, color: scheme.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  loc.periodizationRunAlignTitle,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: enabled ? onPick : null,
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: Text(loc.periodizationWeekChip(startWeek + 1)),
+              ),
+            ],
+          ),
+          Text(
+            loc.periodizationRunAlignValue(startWeek + 1),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          // The two ends of the mapping say more than any explanation: the
+          // user reads where the phase starts in the plan and where it lands.
+          Text(
+            loc.periodizationRunAlignPreview(1, startWeek + 1),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (phaseWeeks > 1 && lastPlanWeek != null)
+            Text(
+              loc.periodizationRunAlignPreview(phaseWeeks, lastPlanWeek + 1),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          if (fit.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              fit,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: coverage == RunPlanCoverage.exact
+                    ? scheme.primary
+                    : scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          if (enabled) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                if (startWeek != 0)
+                  TextButton(
+                    onPressed: () => onChange(0),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: Text(loc.periodizationRunAlignReset),
+                  ),
+                if (startWeek != finishAligned && finishAligned != 0)
+                  TextButton(
+                    onPressed: () => onChange(finishAligned),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: Text(loc.periodizationRunAlignFinish),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The training order the picked routines produce. The suggestion engine walks
+/// every day of every selected routine in sequence and restarts at the end, so
+/// showing the resulting chain is the only way to see what a multi-routine
+/// selection actually schedules.
+class _RoutineSequencePreview extends StatelessWidget {
+  final List<String> days;
+
+  const _RoutineSequencePreview({required this.days});
+
+  @override
+  Widget build(BuildContext context) {
+    if (days.isEmpty) return const SizedBox.shrink();
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    // Long chains are unreadable in a sheet; the first few convey the shape.
+    final shown = days.take(6).toList();
+    final suffix = days.length > shown.length ? ' → …' : '';
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withAlpha(90),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            loc.periodizationRoutineSequence('${shown.join(' → ')}$suffix'),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            loc.periodizationRoutineSequenceHelp,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

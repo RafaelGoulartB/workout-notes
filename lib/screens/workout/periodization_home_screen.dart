@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/periodization_metrics.dart';
 import 'package:workout_notes/models/periodization_phase.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_routine_suggestion.dart';
@@ -11,6 +12,7 @@ import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/navigation/ai_coach_navigation.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/periodization/body_measurements_teaser_card.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
@@ -46,6 +48,11 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
   PeriodizationRoutineSuggestion? _routineSuggestion;
   PeriodizationRunSuggestion? _runSuggestion;
   bool _weekCheckinDone = false;
+
+  /// Planned vs actual for the current week, across workouts, runs, nutrition
+  /// and sleep. The numbers already existed for the phase report; this is the
+  /// first place they answer "how is THIS week going".
+  PeriodizationMetrics? _weekMetrics;
   double? _weightKg;
   String? _weightUnit;
   double? _weightDelta;
@@ -118,6 +125,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
         _routineSuggestion = null;
         _runSuggestion = null;
         _weekCheckinDone = false;
+        _weekMetrics = null;
         _loading = false;
       });
       return;
@@ -131,12 +139,18 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
       }
     }
     final currentResults = current == null
-        ? const <Object?>[null, null, null, null]
+        ? const <Object?>[null, null, null, null, null]
         : await Future.wait<Object?>([
             _repository.getEffectiveTarget(current.id),
             _repository.getRoutineSuggestion(DateTime.now()),
             _repository.getRunSuggestion(DateTime.now()),
             _repository.getCheckin(current.id, DateTime.now()),
+            // The weekly card is informational, so a failure here must not
+            // take the whole screen down with it.
+            _repository
+                .getWeekMetrics(current, DateTime.now())
+                .then<Object?>((value) => value)
+                .catchError((Object _) => null),
           ]);
     if (!mounted) return;
     setState(() {
@@ -147,6 +161,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
       _routineSuggestion = currentResults[1] as PeriodizationRoutineSuggestion?;
       _runSuggestion = currentResults[2] as PeriodizationRunSuggestion?;
       _weekCheckinDone = currentResults[3] != null;
+      _weekMetrics = currentResults[4] as PeriodizationMetrics?;
       _loading = false;
     });
   }
@@ -280,6 +295,34 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
     if (mounted) await _load();
   }
 
+  /// Puts every remaining week of the phase's running plan on the calendar.
+  /// Without this the plan only ever surfaced as "today's suggestion".
+  Future<void> _scheduleRuns() async {
+    final phase = _currentPhase;
+    if (phase == null) return;
+    final loc = AppLocalizations.of(context)!;
+    final result = await _repository.scheduleRunPlanForPhase(phase);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(loc.periodizationRunScheduleDone(result.created)),
+        // Filling weeks of calendar in one tap deserves a way back.
+        action: result.isEmpty
+            ? null
+            : SnackBarAction(
+                label: loc.commonUndo,
+                onPressed: () async {
+                  await RunPlanRepository().deleteScheduledRuns(
+                    result.createdIds,
+                  );
+                  if (mounted) await _load();
+                },
+              ),
+      ),
+    );
+    await _load();
+  }
+
   void _openCalendar() {
     final plan = _plan;
     if (plan == null) return;
@@ -372,9 +415,32 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
                   onCheckin: _runCheckin,
                   onEditTargets: () => _editPhase(_currentPhase!),
                   checkinDone: _weekCheckinDone,
+                  onScheduleRuns: _scheduleRuns,
+                  hasRunPlan: _currentTarget?.runPlanIds.isNotEmpty ?? false,
                 ),
         ),
       ),
+      if (_currentPhase != null && _weekMetrics != null) ...[
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
+          sliver: SliverToBoxAdapter(
+            child: PeriodizationSectionHeader(
+              title: loc.periodizationThisWeek,
+              icon: Icons.insights_rounded,
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          sliver: SliverToBoxAdapter(
+            child: _WeekAdherenceCard(
+              metrics: _weekMetrics!,
+              accent: Color(_currentPhase!.color),
+              onTap: () => _openPhase(_currentPhase!),
+            ),
+          ),
+        ),
+      ],
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
         sliver: SliverToBoxAdapter(
@@ -938,6 +1004,12 @@ class _CurrentPhaseCard extends StatelessWidget {
   /// looked identical whether or not the weekly ritual had been done.
   final bool checkinDone;
 
+  /// Materialises the phase's running plan across its weeks.
+  final VoidCallback onScheduleRuns;
+
+  /// Whether this phase links a running plan at all.
+  final bool hasRunPlan;
+
   const _CurrentPhaseCard({
     required this.phase,
     required this.target,
@@ -949,6 +1021,8 @@ class _CurrentPhaseCard extends StatelessWidget {
     required this.onCheckin,
     required this.onEditTargets,
     required this.checkinDone,
+    required this.onScheduleRuns,
+    required this.hasRunPlan,
   });
 
   @override
@@ -1103,9 +1177,10 @@ class _CurrentPhaseCard extends StatelessWidget {
                 ],
               ),
             ),
-          ] else ...[
-            // A phase with no targets makes the weekly review meaningless, and
-            // nothing else on this screen said so.
+          ] else if (target == null || target!.isEmpty) ...[
+            // A phase with no targets at all makes the weekly review
+            // meaningless, and nothing else on this screen said so. A phase
+            // that only links a running plan is not "empty".
             const SizedBox(height: 12),
             _MissingTargetsRow(color: color, onTap: onEditTargets),
           ],
@@ -1206,6 +1281,20 @@ class _CurrentPhaseCard extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
+          ],
+          // Reachable whenever the phase links a plan, not only on days the
+          // plan happens to schedule a run.
+          if (hasRunPlan) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: onScheduleRuns,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: color,
+                side: BorderSide(color: color.withAlpha(110)),
+              ),
+              icon: const Icon(Icons.event_repeat_outlined, size: 19),
+              label: Text(loc.periodizationRunScheduleAction),
             ),
           ],
           const SizedBox(height: 12),
@@ -1749,5 +1838,192 @@ class _HomeSkeleton extends StatelessWidget {
         )
         .animate(onPlay: (controller) => controller.repeat(reverse: true))
         .fade(begin: .45, end: .85, duration: 900.ms);
+  }
+}
+
+/// Planned vs actual for the running week, one row per target that exists.
+///
+/// Rows with no target are omitted rather than shown as "— / —": a phase that
+/// only tracks nutrition should not be nagged about running volume.
+class _WeekAdherenceCard extends StatelessWidget {
+  final PeriodizationMetrics metrics;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _WeekAdherenceCard({
+    required this.metrics,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final rows = <Widget>[];
+
+    void add({
+      required IconData icon,
+      required String label,
+      required double done,
+      required double planned,
+      required String doneText,
+      required String plannedText,
+    }) {
+      rows.add(
+        _AdherenceRow(
+          icon: icon,
+          label: label,
+          value: loc.periodizationAdherenceOf(doneText, plannedText),
+          fraction: planned <= 0 ? 0 : (done / planned).clamp(0.0, 1.0),
+          accent: accent,
+        ),
+      );
+    }
+
+    if (metrics.plannedWorkouts != null && metrics.plannedWorkouts! > 0) {
+      add(
+        icon: Icons.fitness_center_rounded,
+        label: loc.periodizationAdherenceWorkouts,
+        done: metrics.workoutCount.toDouble(),
+        planned: metrics.plannedWorkouts!.toDouble(),
+        doneText: '${metrics.workoutCount}',
+        plannedText: '${metrics.plannedWorkouts}',
+      );
+    }
+    if (metrics.plannedRunSessions != null &&
+        metrics.plannedRunSessions! > 0) {
+      add(
+        icon: Icons.directions_run_rounded,
+        label: loc.periodizationAdherenceRuns,
+        done: metrics.runCount.toDouble(),
+        planned: metrics.plannedRunSessions!.toDouble(),
+        doneText: '${metrics.runCount}',
+        plannedText: '${metrics.plannedRunSessions}',
+      );
+    }
+    if (metrics.plannedRunDistanceMeters != null &&
+        metrics.plannedRunDistanceMeters! > 0) {
+      add(
+        icon: Icons.route_outlined,
+        label: loc.periodizationAdherenceVolume,
+        done: metrics.runDistanceMeters,
+        planned: metrics.plannedRunDistanceMeters!,
+        doneText: '${RunPlanUi.kmValue(metrics.runDistanceMeters)} km',
+        plannedText:
+            '${RunPlanUi.kmValue(metrics.plannedRunDistanceMeters!)} km',
+      );
+    }
+    if (metrics.averageCalories != null &&
+        metrics.nutritionAdherencePercent != null) {
+      rows.add(
+        _AdherenceRow(
+          icon: Icons.local_fire_department_outlined,
+          label: loc.periodizationAdherenceCalories,
+          value: '${metrics.averageCalories!.round()}',
+          fraction: (metrics.nutritionAdherencePercent! / 100).clamp(0.0, 1.0),
+          accent: accent,
+        ),
+      );
+    }
+    if (metrics.averageSleepHours != null &&
+        metrics.sleepAdherencePercent != null) {
+      rows.add(
+        _AdherenceRow(
+          icon: Icons.nightlight_outlined,
+          label: loc.periodizationAdherenceSleep,
+          value: '${metrics.averageSleepHours!.toStringAsFixed(1)} h',
+          fraction: (metrics.sleepAdherencePercent! / 100).clamp(0.0, 1.0),
+          accent: accent,
+        ),
+      );
+    }
+
+    return PeriodizationSurface(
+      onTap: onTap,
+      child: rows.isEmpty
+          ? Row(
+              children: [
+                Icon(
+                  Icons.insights_outlined,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    loc.periodizationAdherenceEmpty,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var index = 0; index < rows.length; index++) ...[
+                  if (index > 0) const SizedBox(height: 12),
+                  rows[index],
+                ],
+              ],
+            ),
+    );
+  }
+}
+
+class _AdherenceRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final double fraction;
+  final Color accent;
+
+  const _AdherenceRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.fraction,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 17, color: accent),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 78,
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: fraction,
+              minHeight: 6,
+              color: accent,
+              backgroundColor: accent.withAlpha(30),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          value,
+          style: theme.textTheme.labelSmall?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
   }
 }

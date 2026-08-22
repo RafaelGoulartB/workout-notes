@@ -19,6 +19,11 @@ class RunPlansScreen extends StatefulWidget {
 class _RunPlansScreenState extends State<RunPlansScreen> {
   final _repo = RunPlanRepository();
   List<RunPlan> _plans = const [];
+  Map<String, RunPlanProgress> _progress = const {};
+
+  /// Plans whose weeks are driven by a periodization phase. Those are shown as
+  /// followed through the planning instead of offering their own activation.
+  Set<String> _linkedToPlanning = const {};
   bool _loading = true;
   bool _showArchived = false;
 
@@ -34,11 +39,63 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
       includeArchived: _showArchived,
       hydrate: true,
     );
+    final progress = <String, RunPlanProgress>{};
+    final linked = <String>{};
+    for (final plan in plans) {
+      progress[plan.id] = await _repo.getPlanProgress(plan.id);
+      if (await _repo.isLinkedToPeriodization(plan.id)) linked.add(plan.id);
+    }
     if (!mounted) return;
     setState(() {
       _plans = plans;
+      _progress = progress;
+      _linkedToPlanning = linked;
       _loading = false;
     });
+  }
+
+  /// Starts following [plan], confirming first when another plan is active —
+  /// only one plan can drive "which run is due today".
+  Future<void> _activate(RunPlan plan) async {
+    final loc = AppLocalizations.of(context)!;
+    final current = await _repo.getActivatedPlan(hydrate: false);
+    if (!mounted) return;
+    if (current != null && current.id != plan.id) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(loc.runPlanReplaceActiveTitle),
+          content: Text(loc.runPlanReplaceActiveBody(current.name)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(loc.runPlanActivate),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    final created = await _repo.activatePlan(plan.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(loc.runPlanActivatedMessage(created))),
+    );
+    await _load();
+  }
+
+  Future<void> _deactivate(RunPlan plan) async {
+    final loc = AppLocalizations.of(context)!;
+    await _repo.deactivatePlan(plan.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.runPlanDeactivatedMessage)));
+    await _load();
   }
 
   Future<void> _openPlan(RunPlan plan) async {
@@ -205,10 +262,14 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
                   for (final plan in active) ...[
                     _PlanCard(
                       plan: plan,
+                      progress: _progress[plan.id],
+                      linkedToPlanning: _linkedToPlanning.contains(plan.id),
                       onTap: () => _openPlan(plan),
                       onDuplicate: () => _duplicate(plan),
                       onToggleArchive: () => _toggleArchive(plan),
                       onDelete: () => _delete(plan),
+                      onActivate: () => _activate(plan),
+                      onDeactivate: () => _deactivate(plan),
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -226,10 +287,14 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
                     for (final plan in archived) ...[
                       _PlanCard(
                         plan: plan,
+                        progress: _progress[plan.id],
+                        linkedToPlanning: _linkedToPlanning.contains(plan.id),
                         onTap: () => _openPlan(plan),
                         onDuplicate: () => _duplicate(plan),
                         onToggleArchive: () => _toggleArchive(plan),
                         onDelete: () => _delete(plan),
+                        onActivate: () => _activate(plan),
+                        onDeactivate: () => _deactivate(plan),
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -404,17 +469,28 @@ class _TemplateCard extends StatelessWidget {
 
 class _PlanCard extends StatelessWidget {
   final RunPlan plan;
+  final RunPlanProgress? progress;
+
+  /// Driven by a periodization phase: the card says so and hides its own
+  /// activation, which would fight the phase for the week mapping.
+  final bool linkedToPlanning;
   final VoidCallback onTap;
   final VoidCallback onDuplicate;
   final VoidCallback onToggleArchive;
   final VoidCallback onDelete;
+  final VoidCallback onActivate;
+  final VoidCallback onDeactivate;
 
   const _PlanCard({
     required this.plan,
+    required this.progress,
+    required this.linkedToPlanning,
     required this.onTap,
     required this.onDuplicate,
     required this.onToggleArchive,
     required this.onDelete,
+    required this.onActivate,
+    required this.onDeactivate,
   });
 
   @override
@@ -499,15 +575,37 @@ class _PlanCard extends StatelessWidget {
                           size: 16,
                           color: scheme.onSurfaceVariant,
                         ),
+                      )
+                    else if (plan.isActivated || linkedToPlanning)
+                      _FollowingBadge(
+                        label: linkedToPlanning
+                            ? loc.periodizationTitle.toUpperCase()
+                            : loc.runPlanActiveBadge,
+                        icon: linkedToPlanning
+                            ? Icons.route_rounded
+                            : Icons.play_circle_outline,
                       ),
                     PopupMenuButton<String>(
                       onSelected: (value) => switch (value) {
+                        'activate' => onActivate(),
+                        'deactivate' => onDeactivate(),
                         'duplicate' => onDuplicate(),
                         'archive' => onToggleArchive(),
                         'delete' => onDelete(),
                         _ => null,
                       },
                       itemBuilder: (ctx) => [
+                        if (!plan.isArchived && !linkedToPlanning)
+                          PopupMenuItem(
+                            value: plan.isActivated
+                                ? 'deactivate'
+                                : 'activate',
+                            child: Text(
+                              plan.isActivated
+                                  ? loc.runPlanDeactivate
+                                  : loc.runPlanActivate,
+                            ),
+                          ),
                         PopupMenuItem(
                           value: 'duplicate',
                           child: Text(loc.runPlansDuplicate),
@@ -563,6 +661,19 @@ class _PlanCard extends StatelessWidget {
                     child: RunPlanVolumeBars(plan: plan, height: 26),
                   ),
                 ],
+                if (progress?.hasProgress == true ||
+                    plan.isActivated ||
+                    linkedToPlanning) ...[
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _PlanProgressRow(
+                      plan: plan,
+                      progress: progress ?? const RunPlanProgress(),
+                      viaPlanning: linkedToPlanning,
+                    ),
+                  ),
+                ],
                 if (countdown != null) ...[
                   const SizedBox(height: 10),
                   _MiniStat(
@@ -589,6 +700,123 @@ class _PlanCard extends StatelessWidget {
       raceDate.day,
     ).difference(DateTime(now.year, now.month, now.day)).inDays;
     return days < 0 ? null : days;
+  }
+}
+
+class _FollowingBadge extends StatelessWidget {
+  final String label;
+  final IconData icon;
+
+  const _FollowingBadge({required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(left: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: scheme.primary.withAlpha(30),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: scheme.primary),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: scheme.primary,
+              fontWeight: FontWeight.w900,
+              fontSize: 10,
+              letterSpacing: .6,
+              height: 1,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Sessions ticked off against the plan's total, plus where in the plan the
+/// user currently is. The week only shows for a plan with a real anchor —
+/// either its own activation or a periodization phase.
+class _PlanProgressRow extends StatelessWidget {
+  final RunPlan plan;
+  final RunPlanProgress progress;
+  final bool viaPlanning;
+
+  const _PlanProgressRow({
+    required this.plan,
+    required this.progress,
+    required this.viaPlanning,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final week = plan.activeWeekIndexOn(DateTime.now());
+    final detail = <String>[
+      if (week != null) loc.runPlanCurrentWeek(week + 1, plan.weeks),
+      if (viaPlanning && week == null) loc.runPlanActiveVia,
+      if (progress.skippedSessions > 0)
+        loc.runPlanSkippedCount(progress.skippedSessions),
+    ].join('  ·  ');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                loc.runPlanProgressTitle,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: .8,
+                ),
+              ),
+            ),
+            Text(
+              loc.runPlanProgressValue(
+                progress.completedSessions,
+                progress.totalSessions,
+              ),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: progress.fraction,
+            minHeight: 6,
+            color: scheme.primary,
+            backgroundColor: scheme.primary.withAlpha(30),
+          ),
+        ),
+        if (detail.isNotEmpty) ...[
+          const SizedBox(height: 5),
+          Text(
+            detail,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }
 
