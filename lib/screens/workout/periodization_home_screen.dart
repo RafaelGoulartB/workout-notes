@@ -373,6 +373,16 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
         ),
       ),
       SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        sliver: SliverToBoxAdapter(
+          child: _QuickActions(
+            onCalendar: _openCalendar,
+            onPlans: _openPlans,
+            onCompare: _openComparison,
+          ),
+        ),
+      ),
+      SliverPadding(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
         sliver: SliverToBoxAdapter(
           child: PeriodizationSectionHeader(
@@ -470,25 +480,6 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
                     onPhaseTap: _openPhase,
                   ),
                 ),
-        ),
-      ),
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(16, 22, 16, 0),
-        sliver: SliverToBoxAdapter(
-          child: PeriodizationSectionHeader(
-            title: loc.periodizationMoreSection,
-            icon: Icons.apps_rounded,
-          ),
-        ),
-      ),
-      SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        sliver: SliverToBoxAdapter(
-          child: _QuickActions(
-            onCalendar: _openCalendar,
-            onPlans: _openPlans,
-            onCompare: _openComparison,
-          ),
         ),
       ),
       const SliverToBoxAdapter(child: SizedBox(height: 110)),

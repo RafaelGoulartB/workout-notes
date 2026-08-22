@@ -11,7 +11,6 @@ import '../../repositories/analytics_repository.dart';
 import '../../repositories/run_repository.dart';
 import '../../services/rest_timer_service.dart';
 import 'active_workout_screen.dart';
-import '../run/run_plans_screen.dart';
 import '../run/run_record_screen.dart';
 import '../run/run_stats_screen.dart';
 import 'calendar_screen.dart';
@@ -657,14 +656,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         ),
       ),
       _NavItemData(
-        Icons.route_outlined,
-        loc.workoutHomeRunPlans,
-        () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const RunPlansScreen()),
-        ),
-      ),
-      _NavItemData(
         Icons.bar_chart,
         loc.workoutHomeProgress,
         () => Navigator.push(
@@ -672,18 +663,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           MaterialPageRoute(builder: (_) => const ProgressScreen()),
         ),
       ),
-      _NavItemData(
-        Icons.calendar_month_outlined,
-        loc.workoutHomeHistoryTooltip,
-        () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const CalendarScreen()),
-        ),
-      ),
     ];
 
-    // Tools grid (3x2): Routines, Exercises, Runs, Run plans, Progress,
-    // Calendar.
+    // Tools grid (2x2): Routines, Exercises, Runs, Progress.
     const crossAxisCount = 2;
 
     return Padding(
