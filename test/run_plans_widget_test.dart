@@ -296,11 +296,15 @@ void main() {
       expect(plan.workoutsForWeek(0).length, 4);
       expect(plan.workoutsForWeek(11).length, 4);
       // Steps ride along into the copied weeks.
-      final lastWeekInterval = plan
-          .workoutsForWeek(11)
+      final buildWeekInterval = plan
+          .workoutsForWeek(6)
           .firstWhere((session) => session.kind == RunWorkoutKind.interval);
-      expect(lastWeekInterval.workRepCount, 6);
+      expect(buildWeekInterval.workRepCount, 6);
       expect(plan.qualitySessionsForWeek(0), 2);
+      expect(
+        plan.weeklyDistanceMeters(6),
+        greaterThan(plan.weeklyDistanceMeters(3)),
+      );
     });
 
     test('the maintenance template is a single repeating week', () async {
@@ -310,7 +314,7 @@ void main() {
         name: 'Manutenção',
       );
       expect(plan.weeks, 1);
-      expect(plan.workoutsForWeek(0).length, 2);
+      expect(plan.workoutsForWeek(0).length, 3);
     });
   });
 
