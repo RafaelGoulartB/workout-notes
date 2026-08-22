@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../database_nutrition_schema.dart';
+import '../database_run_plan_schema.dart';
 import '../database_seed.dart';
 
 /// Incremental database upgrades extracted from the legacy schema versions.
@@ -481,6 +482,19 @@ abstract final class DatabaseWellnessMigrations {
           await db.execute(sql);
         } catch (_) {}
       }
+    }
+    if (oldVersion < 45) {
+      // Structured running plans: templates, weekly schedule and per-step
+      // results. `create` is idempotent (CREATE TABLE IF NOT EXISTS).
+      try {
+        await DatabaseRunPlanSchema.create(db);
+      } catch (_) {}
+      // Links an ad-hoc run started straight from a plan (no scheduled row).
+      try {
+        await db.execute(
+          'ALTER TABLE run_activities ADD COLUMN plan_workout_id TEXT',
+        );
+      } catch (_) {}
     }
   }
 }
