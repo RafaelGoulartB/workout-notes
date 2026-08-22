@@ -41,10 +41,7 @@ class RunPlanRepository extends BaseRepository {
     );
     return [
       for (final row in rows)
-        RunPlan.fromMap(
-          row,
-          workouts: byPlan[row['id'] as String] ?? const [],
-        ),
+        RunPlan.fromMap(row, workouts: byPlan[row['id'] as String] ?? const []),
     ];
   }
 
@@ -174,31 +171,85 @@ class RunPlanRepository extends BaseRepository {
     if (!await _tableExists(database, 'scheduled_runs')) {
       return RunPlanProgress(totalSessions: total);
     }
-    final rows = await database.rawQuery(
-      'SELECT status, COUNT(*) AS total FROM scheduled_runs '
-      'WHERE run_plan_id = ? GROUP BY status',
-      [planId],
-    );
-    var completed = 0;
-    var skipped = 0;
-    var planned = 0;
-    for (final row in rows) {
-      final count = (row['total'] as num?)?.toInt() ?? 0;
-      switch (ScheduledRunStatus.fromString(row['status'] as String?)) {
-        case ScheduledRunStatus.completed:
-          completed = count;
-        case ScheduledRunStatus.skipped:
-          skipped = count;
-        case ScheduledRunStatus.planned:
-          planned = count;
-      }
-    }
+    // Count logical plan sessions, not calendar rows. Pausing and resuming may
+    // have scheduled the same session on different dates in older app versions.
+    final statuses = await getPlanWorkoutStatuses(planId);
+    final completed = statuses.values
+        .where((status) => status == ScheduledRunStatus.completed)
+        .length;
+    final skipped = statuses.values
+        .where((status) => status == ScheduledRunStatus.skipped)
+        .length;
+    final planned = statuses.values
+        .where((status) => status == ScheduledRunStatus.planned)
+        .length;
     return RunPlanProgress(
       totalSessions: total,
       completedSessions: completed,
       skippedSessions: skipped,
       plannedSessions: planned,
     );
+  }
+
+  /// Latest effective state for each session in a plan. Completed wins over
+  /// skipped and planned if old/repeated schedules exist for the same session.
+  Future<Map<String, ScheduledRunStatus>> getPlanWorkoutStatuses(
+    String planId,
+  ) async {
+    final database = await db;
+    if (!await _tableExists(database, 'scheduled_runs')) return const {};
+    final rows = await database.query(
+      'scheduled_runs',
+      columns: ['run_plan_workout_id', 'status'],
+      where: 'run_plan_id = ? AND run_plan_workout_id IS NOT NULL',
+      whereArgs: [planId],
+    );
+    const rank = {
+      ScheduledRunStatus.planned: 0,
+      ScheduledRunStatus.skipped: 1,
+      ScheduledRunStatus.completed: 2,
+    };
+    final result = <String, ScheduledRunStatus>{};
+    for (final row in rows) {
+      final workoutId = row['run_plan_workout_id'] as String;
+      final status = ScheduledRunStatus.fromString(row['status'] as String?);
+      final current = result[workoutId];
+      if (current == null || rank[status]! > rank[current]!) {
+        result[workoutId] = status;
+      }
+    }
+    return result;
+  }
+
+  /// Clears only this plan's completion ledger. Recorded run activities and
+  /// the plan's sessions remain untouched. If it was being followed, restart
+  /// it from week 1 today and recreate its future calendar schedule.
+  Future<int> resetPlanProgress(String planId) async {
+    final database = await db;
+    final plan = await getPlan(planId);
+    if (plan == null || !await _tableExists(database, 'scheduled_runs')) {
+      return 0;
+    }
+    final wasActivated = plan.isActivated;
+    final progress = await getPlanProgress(planId);
+    if (progress.isComplete &&
+        plan.completionCount == 0 &&
+        await _columnExists(database, 'run_plans', 'completion_count')) {
+      // A plan completed before v47 still deserves its first completion.
+      await database.update(
+        'run_plans',
+        {'completion_count': 1},
+        where: 'id = ?',
+        whereArgs: [planId],
+      );
+    }
+    await database.delete(
+      'scheduled_runs',
+      where: 'run_plan_id = ?',
+      whereArgs: [planId],
+    );
+    if (!wasActivated) return 0;
+    return activatePlan(planId, from: DateTime.now());
   }
 
   /// Marks the plan session [planWorkoutId] as done on [date], attaching
@@ -219,6 +270,7 @@ class RunPlanRepository extends BaseRepository {
     if (!await _tableExists(database, 'scheduled_runs')) return null;
     final planId = await _planIdForWorkout(database, planWorkoutId);
     if (planId == null) return null;
+    final wasComplete = (await getPlanProgress(planId)).isComplete;
     final day = _day(date);
     // A plan session is one logical unit, so running Wednesday's workout on
     // Saturday must tick off that same row rather than spawn a twin and leave
@@ -241,7 +293,8 @@ class RunPlanRepository extends BaseRepository {
       existing = await database.query(
         'scheduled_runs',
         columns: ['id'],
-        where: 'run_plan_workout_id = ? AND status = ? AND date BETWEEN ? AND ?',
+        where:
+            'run_plan_workout_id = ? AND status = ? AND date BETWEEN ? AND ?',
         whereArgs: [
           planWorkoutId,
           ScheduledRunStatus.planned.value,
@@ -282,7 +335,30 @@ class RunPlanRepository extends BaseRepository {
         whereArgs: [id],
       );
     }
-    return getScheduledRun(id);
+    final scheduled = await getScheduledRun(id);
+    final progress = await getPlanProgress(planId);
+    if (!wasComplete &&
+        progress.isComplete &&
+        await _columnExists(database, 'run_plans', 'completion_count')) {
+      await database.rawUpdate(
+        'UPDATE run_plans '
+        'SET completion_count = completion_count + 1, updated_at = ? '
+        'WHERE id = ?',
+        [now, planId],
+      );
+    }
+    if (progress.isComplete &&
+        await _columnExists(database, 'run_plans', 'activated_at')) {
+      // Completion is terminal. Do not let activeWeekIndexOn wrap back to week
+      // one after the user has finished every session.
+      await database.update(
+        'run_plans',
+        {'activated_at': null, 'updated_at': now},
+        where: 'id = ?',
+        whereArgs: [planId],
+      );
+    }
+    return scheduled;
   }
 
   /// True when a periodization phase target links [planId]. The plan's weeks
@@ -688,7 +764,11 @@ class RunPlanRepository extends BaseRepository {
       whereArgs: [id],
       limit: 1,
     );
-    await database.delete('run_workout_steps', where: 'id = ?', whereArgs: [id]);
+    await database.delete(
+      'run_workout_steps',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
     final workoutId = rows.isEmpty
         ? null
         : rows.first['run_plan_workout_id'] as String?;
@@ -824,8 +904,15 @@ class RunPlanRepository extends BaseRepository {
         final existing = await txn.query(
           'scheduled_runs',
           columns: ['id'],
-          where: 'date = ? AND run_plan_workout_id = ?',
-          whereArgs: [_date(date), session.id],
+          where:
+              'run_plan_workout_id = ? AND '
+              '(date = ? OR status IN (?, ?))',
+          whereArgs: [
+            session.id,
+            _date(date),
+            ScheduledRunStatus.completed.value,
+            ScheduledRunStatus.skipped.value,
+          ],
           limit: 1,
         );
         if (existing.isNotEmpty) continue;
@@ -1077,7 +1164,10 @@ class RunPlanRepository extends BaseRepository {
   }
 
   /// Weekly periodization targets keep `run_plan_ids` inside `training_json`.
-  Future<void> _clearPlanFromTargets(DatabaseExecutor txn, String planId) async {
+  Future<void> _clearPlanFromTargets(
+    DatabaseExecutor txn,
+    String planId,
+  ) async {
     final targets = await txn.query(
       'phase_targets',
       columns: ['id', 'training_json'],

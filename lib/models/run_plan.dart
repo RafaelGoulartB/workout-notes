@@ -47,6 +47,11 @@ class RunPlanProgress {
       : (completedSessions / totalSessions).clamp(0.0, 1.0);
 
   bool get hasProgress => completedSessions > 0 || skippedSessions > 0;
+
+  /// A plan is complete only when every defined session was actually run.
+  /// Skipped sessions resolve calendar items but do not earn completion.
+  bool get isComplete =>
+      totalSessions > 0 && completedSessions >= totalSessions;
 }
 
 enum RunPlanStatus {
@@ -72,6 +77,7 @@ class RunPlan {
   final DateTime? raceDate;
   final int weeks;
   final RunPlanStatus status;
+  final int completionCount;
 
   /// Day the plan was activated, or null when it is just a template sitting in
   /// the library. Activating anchors "week 1 of the plan" to this date's week,
@@ -92,6 +98,7 @@ class RunPlan {
     this.raceDate,
     required this.weeks,
     required this.status,
+    this.completionCount = 0,
     this.activatedAt,
     required this.createdAt,
     required this.updatedAt,
@@ -157,6 +164,7 @@ class RunPlan {
     Object? raceDate = _sentinel,
     int? weeks,
     RunPlanStatus? status,
+    int? completionCount,
     Object? activatedAt = _sentinel,
     DateTime? updatedAt,
     List<RunPlanWorkout>? workouts,
@@ -170,6 +178,7 @@ class RunPlan {
         : raceDate as DateTime?,
     weeks: weeks ?? this.weeks,
     status: status ?? this.status,
+    completionCount: completionCount ?? this.completionCount,
     activatedAt: identical(activatedAt, _sentinel)
         ? this.activatedAt
         : activatedAt as DateTime?,
@@ -186,6 +195,7 @@ class RunPlan {
     'race_date': raceDate == null ? null : _date(raceDate!),
     'weeks': weeks,
     'status': status.value,
+    'completion_count': completionCount,
     'activated_at': activatedAt == null ? null : _date(activatedAt!),
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
@@ -204,6 +214,7 @@ class RunPlan {
         : DateTime.tryParse(map['race_date'] as String),
     weeks: (map['weeks'] as num?)?.toInt() ?? 1,
     status: RunPlanStatus.fromString(map['status'] as String?),
+    completionCount: (map['completion_count'] as num?)?.toInt() ?? 0,
     // Absent on databases older than v46.
     activatedAt: map['activated_at'] == null
         ? null
