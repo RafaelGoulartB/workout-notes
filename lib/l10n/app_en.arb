@@ -2480,5 +2480,109 @@
   "runPlanCustomizeCreate": "Create plan",
   "runPlanCustomizeNext": "Next",
   "runPlanCustomizeBack": "Back",
-  "runPlanCustomizeRaceDate": "Race date (optional)"
+  "runPlanCustomizeRaceDate": "Race date (optional)",
+  "bodyStatsTitle": "Progress stats",
+  "bodyStatsTooltip": "Progress stats",
+  "bodyStatsPeriod4Weeks": "4 weeks",
+  "bodyStatsPeriod12Weeks": "12 weeks",
+  "bodyStatsPeriod6Months": "6 months",
+  "bodyStatsPeriodAll": "All",
+  "bodyStatsEmptyTitle": "Not enough data yet",
+  "bodyStatsEmptySubtitle": "Log at least two measurements to see weekly averages and trends.",
+  "bodyStatsSectionChart": "TRENDS",
+  "bodyStatsSectionRate": "RATE OF CHANGE",
+  "bodyStatsSectionGoal": "GOAL",
+  "bodyStatsSectionConsistency": "CONSISTENCY",
+  "bodyStatsSectionMonthly": "MONTHLY SUMMARY",
+  "bodyStatsWeeklyAverage": "Weekly average",
+  "bodyStatsWeekRange": "{start} – {end}",
+  "@bodyStatsWeekRange": {
+    "placeholders": {
+      "start": { "type": "String" },
+      "end": { "type": "String" }
+    }
+  },
+  "bodyStatsVsPreviousWeek": "vs. previous week",
+  "bodyStatsVsWeekOf": "vs. week of {date}",
+  "@bodyStatsVsWeekOf": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "bodyStatsNoComparison": "No earlier week to compare with",
+  "bodyStatsNoWeekData": "Nothing logged this week yet",
+  "bodyStatsWeekEntries": "{entries, plural, =1{1 entry} other{{entries} entries}} · {days, plural, =1{1 day} other{{days} days}}",
+  "@bodyStatsWeekEntries": {
+    "placeholders": {
+      "entries": { "type": "int" },
+      "days": { "type": "int" }
+    }
+  },
+  "bodyStatsPeriodAverage": "Period avg",
+  "bodyStatsMin": "Min",
+  "bodyStatsMax": "Max",
+  "bodyStatsAmplitude": "Range",
+  "bodyStatsChartWeekly": "Weekly",
+  "bodyStatsChartDelta": "Change",
+  "bodyStatsChartDaily": "Daily",
+  "bodyStatsChartWeeklyEmpty": "Two weeks of data are needed for this chart.",
+  "bodyStatsChartDeltaEmpty": "No week-over-week change to show yet.",
+  "bodyStatsChartDailyEmpty": "Not enough entries for this chart.",
+  "bodyStatsChartWeeklyLegend": "Weekly average — the dashed line is the period average",
+  "bodyStatsChartDeltaLegend": "Difference between each week and the one before",
+  "bodyStatsChartDailyLegend": "Every entry, with a 7-entry moving average",
+  "bodyStatsRatePerWeek": "Per week",
+  "bodyStatsTotalChange": "Change in period",
+  "bodyStatsProjection": "In 4 weeks",
+  "bodyStatsProjectionNote": "Projection if the current rate holds.",
+  "bodyStatsRateUnavailable": "Log for at least two weeks to see the rate of change.",
+  "bodyStatsPaceStable": "Stable",
+  "bodyStatsPaceSustainable": "Sustainable pace",
+  "bodyStatsPaceAggressive": "Aggressive pace",
+  "bodyStatsGoalTarget": "Target",
+  "bodyStatsGoalRemaining": "{value} to go",
+  "@bodyStatsGoalRemaining": {
+    "placeholders": {
+      "value": { "type": "String" }
+    }
+  },
+  "bodyStatsGoalReached": "Target reached",
+  "bodyStatsGoalEta": "On pace for {date}",
+  "@bodyStatsGoalEta": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "bodyStatsGoalOffTrack": "The current trend is not moving toward the target",
+  "bodyStatsGoalPhase": "Phase: {phase}",
+  "@bodyStatsGoalPhase": {
+    "placeholders": {
+      "phase": { "type": "String" }
+    }
+  },
+  "bodyStatsGoalStart": "Start",
+  "bodyStatsGoalCurrent": "Now",
+  "bodyStatsConsistencyWeeks": "Weeks logged",
+  "bodyStatsStreak": "Streak",
+  "bodyStatsStreakWeeks": "{count} wk",
+  "@bodyStatsStreakWeeks": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bodyStatsEntriesPerWeek": "Per week",
+  "bodyStatsDaysSinceLast": "Since last",
+  "bodyStatsEntries": "Entries",
+  "bodyStatsToday": "Today",
+  "bodyStatsBmi": "BMI",
+  "bodyStatsBmiUnder": "Underweight",
+  "bodyStatsBmiNormal": "Normal",
+  "bodyStatsBmiOver": "Overweight",
+  "bodyStatsBmiObese": "Obese",
+  "bodyStatsMonthEntries": "{count, plural, =1{1 entry} other{{count} entries}}",
+  "@bodyStatsMonthEntries": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  }
 }

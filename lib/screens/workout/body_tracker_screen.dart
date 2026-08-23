@@ -3,6 +3,7 @@ import '../../repositories/body_measurement_repository.dart';
 import '../../repositories/settings_repository.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
+import 'package:workout_notes/screens/workout/body_stats_screen.dart';
 import 'package:workout_notes/screens/workout/body_tracker_dialogs.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
 import 'package:workout_notes/widgets/body_tracker_badges.dart';
@@ -50,19 +51,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
       _allTypes.where((t) => _enabledTypeIds.contains(t.id)).toList();
 
   // ── Measurement type definitions ───────────────────────────────────
-  static const _allTypes = <MeasureType>[
-    MeasureType('weight', Icons.monitor_weight, 'kg', Colors.indigo, false),
-    MeasureType('bodyFat', Icons.water_drop, '%', Colors.orange, false),
-    MeasureType('waist', Icons.straighten, 'cm', Colors.teal, false),
-    MeasureType('chest', Icons.straighten, 'cm', Colors.blue, false),
-    MeasureType('arm', Icons.straighten, 'cm', Colors.purple, true),
-    MeasureType('forearm', Icons.straighten, 'cm', Colors.deepPurple, true),
-    MeasureType('neck', Icons.straighten, 'cm', Colors.blueGrey, false),
-    MeasureType('thigh', Icons.straighten, 'cm', Colors.deepOrange, true),
-    MeasureType('calf', Icons.straighten, 'cm', Colors.brown, true),
-    MeasureType('hip', Icons.straighten, 'cm', Colors.cyan, false),
-    MeasureType('bloodPressure', Icons.favorite, 'mmHg', Colors.red, false),
-  ];
+  static const _allTypes = kBodyMeasureTypes;
 
   MeasureType get _currentType {
     if (_activeTypes.isEmpty) return _allTypes.first;
@@ -173,6 +162,16 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
     setState(() => _historyDisplayCount += 5);
   }
 
+  void _openStats() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            BodyStatsScreen(initialTypeId: _selectedType, types: _activeTypes),
+      ),
+    );
+  }
+
   void _onCustomizeTypes(List<MeasureType> enabled) {
     final newIds = enabled.map((t) => t.id).toSet();
     if (newIds.isEmpty) return;
@@ -225,8 +224,7 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
         _measurements.length;
   }
 
-  bool get _isDecreasingGood =>
-      _selectedType == 'weight' || _selectedType == 'bodyFat';
+  bool get _isDecreasingGood => isDecreasingGoodFor(_selectedType);
 
   // ── Derived stats (bilateral) ──────────────────────────────────────
   double? get _leftCurrentValue {
@@ -358,7 +356,17 @@ class _BodyTrackerScreenState extends State<BodyTrackerScreen> {
     final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: Text(loc.bodyTrackerTitle), centerTitle: true),
+      appBar: AppBar(
+        title: Text(loc.bodyTrackerTitle),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.insights_outlined),
+            tooltip: loc.bodyStatsTooltip,
+            onPressed: _openStats,
+          ),
+        ],
+      ),
       body: Stack(
         children: [
           _isLoading

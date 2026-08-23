@@ -96,3 +96,12 @@ String formatMeasurementValue(
   }
   return '${value.toStringAsFixed(1)} ${type.unit}';
 }
+
+/// Whether a falling value is progress for [typeId]. Weight, body fat and the
+/// central circumferences read as improvements when they shrink; limb and
+/// chest measurements read as improvements when they grow.
+bool isDecreasingGoodFor(String typeId) =>
+    typeId == 'weight' ||
+    typeId == 'bodyFat' ||
+    typeId == 'waist' ||
+    typeId == 'hip';

@@ -2460,5 +2460,109 @@
   "runPlanCustomizeCreate": "Criar plano",
   "runPlanCustomizeNext": "Próximo",
   "runPlanCustomizeBack": "Voltar",
-  "runPlanCustomizeRaceDate": "Data da prova (opcional)"
+  "runPlanCustomizeRaceDate": "Data da prova (opcional)",
+  "bodyStatsTitle": "Estatísticas",
+  "bodyStatsTooltip": "Estatísticas de evolução",
+  "bodyStatsPeriod4Weeks": "4 semanas",
+  "bodyStatsPeriod12Weeks": "12 semanas",
+  "bodyStatsPeriod6Months": "6 meses",
+  "bodyStatsPeriodAll": "Tudo",
+  "bodyStatsEmptyTitle": "Dados insuficientes",
+  "bodyStatsEmptySubtitle": "Registre pelo menos duas medidas para ver médias semanais e tendências.",
+  "bodyStatsSectionChart": "TENDÊNCIAS",
+  "bodyStatsSectionRate": "RITMO DE MUDANÇA",
+  "bodyStatsSectionGoal": "META",
+  "bodyStatsSectionConsistency": "CONSISTÊNCIA",
+  "bodyStatsSectionMonthly": "RESUMO MENSAL",
+  "bodyStatsWeeklyAverage": "Média semanal",
+  "bodyStatsWeekRange": "{start} – {end}",
+  "@bodyStatsWeekRange": {
+    "placeholders": {
+      "start": { "type": "String" },
+      "end": { "type": "String" }
+    }
+  },
+  "bodyStatsVsPreviousWeek": "vs. semana anterior",
+  "bodyStatsVsWeekOf": "vs. semana de {date}",
+  "@bodyStatsVsWeekOf": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "bodyStatsNoComparison": "Sem semana anterior para comparar",
+  "bodyStatsNoWeekData": "Nenhum registro nesta semana ainda",
+  "bodyStatsWeekEntries": "{entries, plural, =1{1 registro} other{{entries} registros}} · {days, plural, =1{1 dia} other{{days} dias}}",
+  "@bodyStatsWeekEntries": {
+    "placeholders": {
+      "entries": { "type": "int" },
+      "days": { "type": "int" }
+    }
+  },
+  "bodyStatsPeriodAverage": "Média do período",
+  "bodyStatsMin": "Mínimo",
+  "bodyStatsMax": "Máximo",
+  "bodyStatsAmplitude": "Amplitude",
+  "bodyStatsChartWeekly": "Semanal",
+  "bodyStatsChartDelta": "Variação",
+  "bodyStatsChartDaily": "Diário",
+  "bodyStatsChartWeeklyEmpty": "São necessárias duas semanas de dados para este gráfico.",
+  "bodyStatsChartDeltaEmpty": "Ainda não há variação semanal para mostrar.",
+  "bodyStatsChartDailyEmpty": "Registros insuficientes para este gráfico.",
+  "bodyStatsChartWeeklyLegend": "Média de cada semana — a linha tracejada é a média do período",
+  "bodyStatsChartDeltaLegend": "Diferença entre cada semana e a anterior",
+  "bodyStatsChartDailyLegend": "Cada registro, com média móvel de 7 registros",
+  "bodyStatsRatePerWeek": "Por semana",
+  "bodyStatsTotalChange": "Variação no período",
+  "bodyStatsProjection": "Em 4 semanas",
+  "bodyStatsProjectionNote": "Projeção se o ritmo atual continuar.",
+  "bodyStatsRateUnavailable": "Registre por pelo menos duas semanas para calcular o ritmo.",
+  "bodyStatsPaceStable": "Estável",
+  "bodyStatsPaceSustainable": "Ritmo sustentável",
+  "bodyStatsPaceAggressive": "Ritmo agressivo",
+  "bodyStatsGoalTarget": "Meta",
+  "bodyStatsGoalRemaining": "Faltam {value}",
+  "@bodyStatsGoalRemaining": {
+    "placeholders": {
+      "value": { "type": "String" }
+    }
+  },
+  "bodyStatsGoalReached": "Meta atingida",
+  "bodyStatsGoalEta": "No ritmo atual, {date}",
+  "@bodyStatsGoalEta": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "bodyStatsGoalOffTrack": "O ritmo atual não caminha para a meta",
+  "bodyStatsGoalPhase": "Fase: {phase}",
+  "@bodyStatsGoalPhase": {
+    "placeholders": {
+      "phase": { "type": "String" }
+    }
+  },
+  "bodyStatsGoalStart": "Início",
+  "bodyStatsGoalCurrent": "Agora",
+  "bodyStatsConsistencyWeeks": "Semanas com registro",
+  "bodyStatsStreak": "Sequência",
+  "bodyStatsStreakWeeks": "{count} sem",
+  "@bodyStatsStreakWeeks": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bodyStatsEntriesPerWeek": "Por semana",
+  "bodyStatsDaysSinceLast": "Desde o último",
+  "bodyStatsEntries": "Registros",
+  "bodyStatsToday": "Hoje",
+  "bodyStatsBmi": "IMC",
+  "bodyStatsBmiUnder": "Abaixo do peso",
+  "bodyStatsBmiNormal": "Normal",
+  "bodyStatsBmiOver": "Sobrepeso",
+  "bodyStatsBmiObese": "Obesidade",
+  "bodyStatsMonthEntries": "{count, plural, =1{1 registro} other{{count} registros}}",
+  "@bodyStatsMonthEntries": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  }
 }
