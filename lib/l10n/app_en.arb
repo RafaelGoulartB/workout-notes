@@ -1984,7 +1984,7 @@
   "runStatsPeriodAll": "All",
   "runStatsSectionThisWeek": "THIS WEEK",
   "runStatsSectionHighlights": "PERIOD HIGHLIGHTS",
-  "runStatsSectionRecords": "RECORDS",
+  "runStatsSectionRecords": "LAST 5 ACHIEVEMENTS",
   "runStatsSectionTrends": "TRENDS",
   "runStatsSectionRecent": "RECENT RUNS",
   "runStatsVsPrevious": "vs. previous period",

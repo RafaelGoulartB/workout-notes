@@ -49,7 +49,7 @@ class RunAchievementsSection extends StatelessWidget {
   final int limit;
 
   /// The stats dashboard already labels the card with a section header, so it
-  /// hides the inner title to avoid repeating it.
+  /// hides the inner title and subtitle to avoid repeating them.
   final bool showTitle;
 
   const RunAchievementsSection({
@@ -79,14 +79,14 @@ class RunAchievementsSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-        ],
-        Text(
-          loc.runAchievementRecentSubtitle,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colors.onSurfaceVariant,
+          Text(
+            loc.runAchievementRecentSubtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
+        ],
         if (recent.isEmpty)
           Text(
             loc.runAchievementEmpty,

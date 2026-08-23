@@ -759,6 +759,8 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
                           .fadeIn(duration: 300.ms, delay: 80.ms),
                       _sectionHeader(loc.runStatsSectionHighlights),
                       _buildHighlights(loc, analytics),
+                      _sectionHeader(loc.runStatsSectionTrends),
+                      _buildTrends(loc, analytics),
                       _sectionHeader(loc.runStatsSectionRecords),
                       _sectionCard(
                         child: RunAchievementsSection(
@@ -767,8 +769,6 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
                           showTitle: false,
                         ),
                       ),
-                      _sectionHeader(loc.runStatsSectionTrends),
-                      _buildTrends(loc, analytics),
                       if (analytics.activities.isNotEmpty) ...[
                         _sectionHeader(
                           loc.runStatsSectionRecent,
