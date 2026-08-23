@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_achievement.dart';
@@ -14,7 +15,12 @@ import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/run/run_achievements_section.dart';
+import 'package:workout_notes/widgets/run/run_medal_badge.dart';
 import 'package:workout_notes/widgets/run/run_progress_charts.dart';
+import 'package:workout_notes/widgets/run/run_week_strip.dart';
+
+/// Which trend chart the single chart card is showing.
+enum _RunChartTab { volume, pace, frequency }
 
 class RunStatsScreen extends StatefulWidget {
   const RunStatsScreen({super.key});
@@ -29,6 +35,7 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
   RunAchievementBoard _board = RunAchievementBoard.empty;
   bool _loading = true;
   RunStatsPeriod _period = RunStatsPeriod.weeks12;
+  _RunChartTab _chartTab = _RunChartTab.volume;
 
   @override
   void initState() {
@@ -82,27 +89,42 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
     if (mounted) _load();
   }
 
-  Widget _sectionCard({required Widget child}) {
+  Widget _sectionCard({required Widget child, EdgeInsets? padding}) {
     final theme = Theme.of(context);
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55),
+          color: theme.colorScheme.outlineVariant.withAlpha(80),
         ),
       ),
-      child: Padding(padding: const EdgeInsets.all(16), child: child),
+      child: Padding(
+        padding: padding ?? const EdgeInsets.all(16),
+        child: child,
+      ),
     );
   }
 
-  Widget _sectionTitle(String text) {
+  Widget _sectionHeader(String text, {Widget? trailing}) {
     final theme = Theme.of(context);
-    return Text(
-      text,
-      style: theme.textTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.w700,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 22, 0, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.5,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          ?trailing,
+        ],
       ),
     );
   }
@@ -123,10 +145,555 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
     return loc.runStatsWeekFlat;
   }
 
+  String? _periodRangeLabel(RunProgressAnalytics analytics) {
+    final start = analytics.periodStart;
+    if (start == null) return null;
+    final locale = Localizations.localeOf(context).toString();
+    final format = DateFormat.MMMd(locale);
+    return '${format.format(start)} – ${format.format(analytics.now)}';
+  }
+
+  // ===================== PERIOD SELECTOR =====================
+  Widget _buildPeriodSelector(AppLocalizations loc) {
+    return Row(
+      children: [
+        for (final period in RunStatsPeriod.values) ...[
+          if (period != RunStatsPeriod.values.first) const SizedBox(width: 8),
+          Expanded(
+            child: ChoiceChip(
+              // The four periods share the row, so the label scales down
+              // instead of being clipped on narrow screens.
+              label: SizedBox(
+                width: double.infinity,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    _periodLabel(loc, period),
+                    maxLines: 1,
+                  ),
+                ),
+              ),
+              labelStyle: Theme.of(context).textTheme.labelMedium,
+              labelPadding: EdgeInsets.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
+              showCheckmark: false,
+              selected: _period == period,
+              onSelected: (_) => setState(() => _period = period),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ===================== HERO =====================
+  Widget _buildHero(AppLocalizations loc, RunProgressAnalytics analytics) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final divider = colors.outlineVariant.withAlpha(80);
+    final ratio = analytics.distanceRatioVsPreviousPeriod;
+    final paceDelta = analytics.paceDeltaVsPreviousPeriod;
+    final range = _periodRangeLabel(analytics);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            colors.surfaceContainerHighest.withAlpha(200),
+            colors.surfaceContainerLow,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colors.primary.withAlpha(30),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.directions_run,
+                  size: 18,
+                  color: colors.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loc.runStatsOverview,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (range != null)
+                      Text(
+                        range,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        RunFormatters.distanceKm(analytics.totalDistanceMeters),
+                        style: theme.textTheme.displaySmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          height: 1.0,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'km',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              if (ratio != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: _TrendPill(
+                    label: '${ratio >= 0 ? '+' : '-'}'
+                        '${(ratio.abs() * 100).round()}%',
+                    icon: ratio >= 0
+                        ? Icons.trending_up_rounded
+                        : Icons.trending_down_rounded,
+                    positive: ratio >= 0,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            analytics.hasPreviousPeriod
+                ? loc.runStatsVsPrevious
+                : loc.runStatsNoPrevious,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(height: 1, color: divider),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _HeroMetric(
+                  icon: Icons.timer_outlined,
+                  color: colors.secondary,
+                  label: loc.runRecordTime,
+                  value: RunFormatters.duration(
+                    analytics.totalMovingTimeSeconds,
+                  ),
+                ),
+              ),
+              _HeroDivider(color: divider),
+              Expanded(
+                child: _HeroMetric(
+                  icon: Icons.speed_rounded,
+                  color: colors.tertiary,
+                  label: loc.runRecordPace,
+                  value: RunFormatters.pace(analytics.avgPaceSecPerKm),
+                  unit: loc.runRecordPaceUnit,
+                ),
+              ),
+              _HeroDivider(color: divider),
+              Expanded(
+                child: _HeroMetric(
+                  icon: Icons.flag_outlined,
+                  color: colors.primary,
+                  label: loc.runStatsRunCount,
+                  value: '${analytics.runCount}',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: _HeroMetric(
+                  icon: Icons.local_fire_department_outlined,
+                  color: Colors.deepOrange,
+                  label: loc.runDetailCalories,
+                  value: '${analytics.totalCalories}',
+                  unit: 'kcal',
+                ),
+              ),
+              _HeroDivider(color: divider),
+              Expanded(
+                child: _HeroMetric(
+                  icon: Icons.calendar_view_week_outlined,
+                  color: colors.primary,
+                  label: loc.runStatsAvgPerWeek,
+                  value: analytics.avgRunsPerWeek.toStringAsFixed(1),
+                ),
+              ),
+              _HeroDivider(color: divider),
+              Expanded(
+                child: _HeroMetric(
+                  icon: Icons.straighten_rounded,
+                  color: colors.secondary,
+                  label: loc.runStatsAvgPerRun,
+                  value: analytics.runCount == 0
+                      ? '--'
+                      : RunFormatters.distanceKm(
+                          analytics.totalDistanceMeters / analytics.runCount,
+                        ),
+                  unit: analytics.runCount == 0 ? null : 'km',
+                ),
+              ),
+            ],
+          ),
+          if (paceDelta != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  paceDelta.abs() < 3
+                      ? Icons.trending_flat_rounded
+                      : paceDelta < 0
+                          ? Icons.trending_up_rounded
+                          : Icons.trending_down_rounded,
+                  size: 16,
+                  color: colors.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    paceDelta.abs() < 3
+                        ? loc.runStatsPaceStable
+                        : paceDelta < 0
+                            ? loc.runStatsPaceFaster(
+                                '${paceDelta.abs().round()} s/km',
+                              )
+                            : loc.runStatsPaceSlower(
+                                '${paceDelta.abs().round()} s/km',
+                              ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ===================== THIS WEEK =====================
+  Widget _buildWeekCard(AppLocalizations loc, RunProgressAnalytics analytics) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final ratio = analytics.thisWeekVsAverageRatio;
+
+    return _sectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          RunFormatters.distanceKm(
+                            analytics.thisWeekDistanceMeters,
+                          ),
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'km',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      analytics.thisWeekRunCount == 0
+                          ? loc.runStatsWeekNoRuns
+                          : '${analytics.thisWeekRunCount} '
+                              '${loc.runStatsRunCount.toLowerCase()}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (analytics.weekStreak > 0)
+                _TrendPill(
+                  label: loc.runStatsStreakWeeks(analytics.weekStreak),
+                  icon: Icons.local_fire_department_rounded,
+                  positive: true,
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          RunWeekStrip(
+            days: analytics.thisWeekDays,
+            today: analytics.now,
+          ),
+          if (ratio != null) ...[
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: ratio.clamp(0.0, 1.0),
+                minHeight: 6,
+                backgroundColor: colors.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation(
+                  ratio >= 1 ? colors.primary : colors.primary.withAlpha(180),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    loc.runStatsWeeklyAverageValue(
+                      RunFormatters.distanceWithUnit(
+                        analytics.avgWeeklyDistanceMeters,
+                      ),
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                Text(
+                  loc.runStatsVsWeeklyAverage((ratio * 100).round()),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: ratio >= 1 ? colors.primary : colors.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 10),
+          Text(
+            _deltaLabel(loc, analytics.distanceDeltaVsLastWeek),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===================== PERIOD HIGHLIGHTS =====================
+  Widget _buildHighlights(
+    AppLocalizations loc,
+    RunProgressAnalytics analytics,
+  ) {
+    final locale = Localizations.localeOf(context).toString();
+    final dateFormat = DateFormat.yMMMd(locale);
+    final longest = analytics.longestRun;
+    final fastest = analytics.fastestRun;
+    final bestSplit = analytics.bestKmSplitSecPerKm;
+    final theme = Theme.of(context);
+
+    final rows = <Widget>[
+      _HighlightRow(
+        icon: Icons.straighten_rounded,
+        label: loc.runStatsLongestRun,
+        value: longest == null
+            ? '--'
+            : RunFormatters.distanceWithUnit(longest.distanceMeters),
+        subtitle: longest == null
+            ? null
+            : dateFormat.format(longest.startedAt.toLocal()),
+        onTap: longest == null ? null : () => _openDetail(longest.id),
+      ),
+      _HighlightRow(
+        icon: Icons.bolt_rounded,
+        label: loc.runStatsBestPace,
+        value: RunFormatters.paceWithUnit(analytics.bestPaceSecPerKm),
+        subtitle: fastest == null
+            ? null
+            : dateFormat.format(fastest.startedAt.toLocal()),
+        onTap: fastest == null ? null : () => _openDetail(fastest.id),
+      ),
+      if (bestSplit != null)
+        _HighlightRow(
+          icon: Icons.timer_outlined,
+          label: loc.runStatsBestKmSplit,
+          value: RunFormatters.paceWithUnit(bestSplit),
+        ),
+    ];
+
+    return _sectionCard(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                color: theme.colorScheme.outlineVariant.withAlpha(70),
+              ),
+            rows[i],
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ===================== TRENDS =====================
+  Widget _buildTrends(AppLocalizations loc, RunProgressAnalytics analytics) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    final caption = switch (_chartTab) {
+      _RunChartTab.volume => loc.runStatsChartAverageLegend(
+          RunFormatters.distanceWithUnit(analytics.avgWeeklyDistanceMeters),
+        ),
+      _RunChartTab.pace => loc.runStatsPaceTrendHint,
+      _RunChartTab.frequency => loc.runStatsChartAverageLegend(
+          analytics.avgRunsPerWeek.toStringAsFixed(1),
+        ),
+    };
+
+    final chart = switch (_chartTab) {
+      _RunChartTab.volume => RunWeeklyDistanceChart(
+          buckets: analytics.weeklyBuckets,
+          emptyLabel: loc.runStatsChartEmpty,
+          averageMeters: analytics.avgWeeklyDistanceMeters,
+        ),
+      _RunChartTab.pace => RunPaceTrendChart(
+          points: analytics.paceTrend,
+          emptyLabel: loc.runStatsPaceChartEmpty,
+        ),
+      _RunChartTab.frequency => RunWeeklyFrequencyChart(
+          buckets: analytics.weeklyBuckets,
+          emptyLabel: loc.runStatsChartEmpty,
+        ),
+    };
+
+    return _sectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ChartTabBar(
+            selected: _chartTab,
+            labels: {
+              _RunChartTab.volume: loc.runStatsChartTabVolume,
+              _RunChartTab.pace: loc.runStatsChartTabPace,
+              _RunChartTab.frequency: loc.runStatsChartTabFrequency,
+            },
+            onChanged: (tab) => setState(() => _chartTab = tab),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              // Legend swatch for the dashed average line drawn on the
+              // volume chart only.
+              if (_chartTab == _RunChartTab.volume)
+                Container(
+                  width: 14,
+                  height: 2,
+                  margin: const EdgeInsets.only(right: 6),
+                  color: colors.tertiary.withValues(alpha: 0.7),
+                ),
+              Expanded(
+                child: Text(
+                  caption,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          chart,
+        ],
+      ),
+    );
+  }
+
+  // ===================== RECENT RUNS =====================
+  Widget _buildRecentRuns(RunProgressAnalytics analytics) {
+    final theme = Theme.of(context);
+    final recent = analytics.activities.reversed.take(5).toList();
+
+    return _sectionCard(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < recent.length; i++) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                color: theme.colorScheme.outlineVariant.withAlpha(70),
+              ),
+            _RecentRunTile(
+              activity: recent[i],
+              medals: _board.forActivity(recent[i].id),
+              onTap: () => _openDetail(recent[i].id),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
     final analytics = RunProgressAnalytics.fromActivities(
       _activities,
       period: _period,
@@ -178,251 +745,45 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
                     children: [
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            for (final period in RunStatsPeriod.values) ...[
-                              if (period != RunStatsPeriod.values.first)
-                                const SizedBox(width: 8),
-                              ChoiceChip(
-                                label: Text(_periodLabel(loc, period)),
-                                selected: _period == period,
-                                onSelected: (_) {
-                                  setState(() => _period = period);
-                                },
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _PeriodHeroCard(
-                        title: loc.runStatsOverview,
-                        distanceKm: RunFormatters.distanceKm(
-                          analytics.totalDistanceMeters,
-                        ),
-                        distanceUnit: 'km',
-                        distanceLabel: loc.runRecordDistance,
-                        durationLabel: loc.runRecordTime,
-                        durationValue: RunFormatters.duration(
-                          analytics.totalMovingTimeSeconds,
-                        ),
-                        paceLabel: loc.runRecordPace,
-                        paceValue: RunFormatters.paceWithUnit(
-                          analytics.avgPaceSecPerKm,
-                        ),
-                        footerItems: [
-                          _HeroFooterItem(
-                            label: loc.runStatsRunCount,
-                            value: '${analytics.runCount}',
-                          ),
-                          _HeroFooterItem(
-                            label: loc.runDetailCalories,
-                            value: '${analytics.totalCalories} kcal',
-                          ),
-                          _HeroFooterItem(
-                            label: loc.runStatsAvgPerWeek,
-                            value: analytics.avgRunsPerWeek.toStringAsFixed(1),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _sectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _sectionTitle(loc.runStatsThisWeek),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _SummaryTile(
-                                    label: loc.runRecordDistance,
-                                    value: RunFormatters.distanceWithUnit(
-                                      analytics.thisWeekDistanceMeters,
-                                    ),
-                                    highlight: true,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _SummaryTile(
-                                    label: loc.runStatsRunCount,
-                                    value: '${analytics.thisWeekRunCount}',
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              _deltaLabel(
-                                loc,
-                                analytics.distanceDeltaVsLastWeek,
-                              ),
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _sectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _sectionTitle(loc.runStatsHighlights),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _SummaryTile(
-                                    label: loc.runStatsLongestRun,
-                                    value: analytics.longestRun == null
-                                        ? '--'
-                                        : RunFormatters.distanceWithUnit(
-                                            analytics
-                                                .longestRun!.distanceMeters,
-                                          ),
-                                    highlight: true,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _SummaryTile(
-                                    label: loc.runStatsBestPace,
-                                    value: RunFormatters.paceWithUnit(
-                                      analytics.bestPaceSecPerKm,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (analytics.longestRun != null ||
-                                analytics.fastestRun != null) ...[
-                              const SizedBox(height: 8),
-                              if (analytics.longestRun != null)
-                                _HighlightLink(
-                                  label: loc.runStatsViewLongest,
-                                  subtitle: DateFormat.yMMMd(
-                                    Localizations.localeOf(context)
-                                        .toString(),
-                                  ).format(
-                                    analytics.longestRun!.startedAt.toLocal(),
-                                  ),
-                                  onTap: () => _openDetail(
-                                    analytics.longestRun!.id,
-                                  ),
-                                ),
-                              if (analytics.fastestRun != null &&
-                                  analytics.fastestRun!.id !=
-                                      analytics.longestRun?.id)
-                                _HighlightLink(
-                                  label: loc.runStatsViewFastest,
-                                  subtitle: DateFormat.yMMMd(
-                                    Localizations.localeOf(context)
-                                        .toString(),
-                                  ).format(
-                                    analytics.fastestRun!.startedAt.toLocal(),
-                                  ),
-                                  onTap: () => _openDetail(
-                                    analytics.fastestRun!.id,
-                                  ),
-                                ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
+                      _buildPeriodSelector(loc),
+                      const SizedBox(height: 14),
+                      _buildHero(loc, analytics)
+                          .animate()
+                          .fadeIn(duration: 300.ms)
+                          .slideY(begin: 0.04),
+                      _sectionHeader(loc.runStatsSectionThisWeek),
+                      _buildWeekCard(loc, analytics)
+                          .animate()
+                          .fadeIn(duration: 300.ms, delay: 80.ms),
+                      _sectionHeader(loc.runStatsSectionHighlights),
+                      _buildHighlights(loc, analytics),
+                      _sectionHeader(loc.runStatsSectionRecords),
                       _sectionCard(
                         child: RunAchievementsSection(
                           board: _board,
                           onOpenActivity: _openDetail,
+                          showTitle: false,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      _sectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _sectionTitle(loc.runStatsWeeklyDistance),
-                            const SizedBox(height: 12),
-                            RunWeeklyDistanceChart(
-                              buckets: analytics.weeklyBuckets,
-                              emptyLabel: loc.runStatsChartEmpty,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _sectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _sectionTitle(loc.runStatsPaceTrend),
-                            const SizedBox(height: 4),
-                            Text(
-                              loc.runStatsPaceTrendHint,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            RunPaceTrendChart(
-                              points: analytics.paceTrend,
-                              emptyLabel: loc.runStatsPaceChartEmpty,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _sectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _sectionTitle(loc.runStatsWeeklyFrequency),
-                            const SizedBox(height: 12),
-                            RunWeeklyFrequencyChart(
-                              buckets: analytics.weeklyBuckets,
-                              emptyLabel: loc.runStatsChartEmpty,
-                            ),
-                          ],
-                        ),
-                      ),
+                      _sectionHeader(loc.runStatsSectionTrends),
+                      _buildTrends(loc, analytics),
                       if (analytics.activities.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        _sectionCard(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _sectionTitle(
-                                      loc.runStatsRecentRuns,
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: _openHistory,
-                                    child: Text(loc.runStatsSeeAll),
-                                  ),
-                                ],
+                        _sectionHeader(
+                          loc.runStatsSectionRecent,
+                          trailing: TextButton(
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
                               ),
-                              const SizedBox(height: 4),
-                              for (final activity in analytics.activities
-                                  .reversed
-                                  .take(5)) ...[
-                                _RecentRunTile(
-                                  activity: activity,
-                                  onTap: () => _openDetail(activity.id),
-                                ),
-                              ],
-                            ],
+                            ),
+                            onPressed: _openHistory,
+                            child: Text(loc.runStatsSeeAll),
                           ),
                         ),
+                        _buildRecentRuns(analytics),
                       ],
                     ],
                   ),
@@ -431,231 +792,41 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
   }
 }
 
-class _HighlightLink extends StatelessWidget {
+/// Small coloured pill used for period-over-period deltas and streaks.
+class _TrendPill extends StatelessWidget {
   final String label;
-  final String subtitle;
-  final VoidCallback onTap;
+  final IconData icon;
+  final bool positive;
 
-  const _HighlightLink({
+  const _TrendPill({
     required this.label,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      dense: true,
-      title: Text(
-        label,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      subtitle: Text(subtitle),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap,
-    );
-  }
-}
-
-class _RecentRunTile extends StatelessWidget {
-  final RunActivity activity;
-  final VoidCallback onTap;
-
-  const _RecentRunTile({required this.activity, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    final date = DateFormat.MMMd(
-      Localizations.localeOf(context).toString(),
-    ).add_Hm().format(activity.startedAt.toLocal());
-
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(
-        backgroundColor: theme.colorScheme.primaryContainer,
-        child: Icon(
-          Icons.directions_run,
-          color: theme.colorScheme.onPrimaryContainer,
-          size: 20,
-        ),
-      ),
-      title: Text(
-        activity.title?.isNotEmpty == true
-            ? activity.title!
-            : loc.runDetailUntitled,
-        style: const TextStyle(fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text(
-        '$date · ${RunFormatters.distanceWithUnit(activity.distanceMeters)}',
-      ),
-      trailing: Text(
-        RunFormatters.pace(activity.avgPaceSecPerKm),
-        style: theme.textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-      onTap: onTap,
-    );
-  }
-}
-
-class _HeroFooterItem {
-  final String label;
-  final String value;
-
-  const _HeroFooterItem({required this.label, required this.value});
-}
-
-class _PeriodHeroCard extends StatelessWidget {
-  final String title;
-  final String distanceKm;
-  final String distanceUnit;
-  final String distanceLabel;
-  final String durationLabel;
-  final String durationValue;
-  final String paceLabel;
-  final String paceValue;
-  final List<_HeroFooterItem> footerItems;
-
-  const _PeriodHeroCard({
-    required this.title,
-    required this.distanceKm,
-    required this.distanceUnit,
-    required this.distanceLabel,
-    required this.durationLabel,
-    required this.durationValue,
-    required this.paceLabel,
-    required this.paceValue,
-    required this.footerItems,
+    required this.icon,
+    required this.positive,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final divider = colors.outlineVariant.withValues(alpha: 0.55);
+    final color = positive ? colors.primary : colors.error;
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colors.surfaceContainerHighest.withAlpha(200),
-            colors.surfaceContainerLow,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: divider),
+        color: color.withAlpha(30),
+        borderRadius: BorderRadius.circular(999),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
           Text(
-            title,
-            style: theme.textTheme.titleSmall?.copyWith(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
               fontWeight: FontWeight.w700,
             ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                flex: 5,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      distanceLabel,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colors.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            distanceKm,
-                            style: theme.textTheme.displaySmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              height: 1.05,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            distanceUnit,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: colors.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 1,
-                height: 64,
-                margin: const EdgeInsets.symmetric(horizontal: 14),
-                color: divider,
-              ),
-              Expanded(
-                flex: 4,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _HeroSideMetric(
-                      label: durationLabel,
-                      value: durationValue,
-                    ),
-                    const SizedBox(height: 12),
-                    _HeroSideMetric(
-                      label: paceLabel,
-                      value: paceValue,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(height: 1, color: divider),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              for (var i = 0; i < footerItems.length; i++) ...[
-                if (i > 0)
-                  Container(
-                    width: 1,
-                    height: 34,
-                    margin: const EdgeInsets.symmetric(horizontal: 10),
-                    color: divider,
-                  ),
-                Expanded(
-                  child: _HeroFooterMetric(item: footerItems[i]),
-                ),
-              ],
-            ],
           ),
         ],
       ),
@@ -663,116 +834,335 @@ class _PeriodHeroCard extends StatelessWidget {
   }
 }
 
-class _HeroSideMetric extends StatelessWidget {
-  final String label;
-  final String value;
+class _HeroDivider extends StatelessWidget {
+  final Color color;
 
-  const _HeroSideMetric({required this.label, required this.value});
+  const _HeroDivider({required this.color});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-        ),
-      ],
+    return Container(
+      width: 1,
+      height: 34,
+      margin: const EdgeInsets.symmetric(horizontal: 8),
+      color: color,
     );
   }
 }
 
-class _HeroFooterMetric extends StatelessWidget {
-  final _HeroFooterItem item;
-
-  const _HeroFooterMetric({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          item.label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          item.value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SummaryTile extends StatelessWidget {
+class _HeroMetric extends StatelessWidget {
+  final IconData icon;
+  final Color color;
   final String label;
   final String value;
-  final bool highlight;
+  final String? unit;
 
-  const _SummaryTile({
+  const _HeroMetric({
+    required this.icon,
+    required this.color,
     required this.label,
     required this.value,
-    this.highlight = false,
+    this.unit,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bg = highlight
-        ? theme.colorScheme.primaryContainer.withValues(alpha: 0.55)
-        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Icon(icon, size: 15, color: color),
+              const SizedBox(width: 4),
+              Text(
+                value,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  height: 1.1,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              if (unit != null) ...[
+                const SizedBox(width: 2),
+                Text(
+                  unit!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Segmented pill row that swaps the chart shown in the trends card.
+class _ChartTabBar extends StatelessWidget {
+  final _RunChartTab selected;
+  final Map<_RunChartTab, String> labels;
+  final ValueChanged<_RunChartTab> onChanged;
+
+  const _ChartTabBar({
+    required this.selected,
+    required this.labels,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: bg,
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          for (final tab in _RunChartTab.values)
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(9),
+                onTap: () => onChanged(tab),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: tab == selected
+                        ? colors.primary.withAlpha(45)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      labels[tab] ?? '',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight:
+                            tab == selected ? FontWeight.w700 : FontWeight.w500,
+                        color: tab == selected
+                            ? colors.primary
+                            : colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
         ],
+      ),
+    );
+  }
+}
+
+/// Period highlight row: icon, label + date, value and an optional chevron.
+class _HighlightRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final String? subtitle;
+  final VoidCallback? onTap;
+
+  const _HighlightRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.subtitle,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: colors.primary.withAlpha(25),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 18, color: colors.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (subtitle != null)
+                    Text(
+                      subtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              value,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+            if (onTap != null)
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colors.onSurfaceVariant,
+              )
+            else
+              const SizedBox(width: 24),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentRunTile extends StatelessWidget {
+  final RunActivity activity;
+  final List<RunAchievementPlacement> medals;
+  final VoidCallback onTap;
+
+  const _RecentRunTile({
+    required this.activity,
+    required this.medals,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+    final date = DateFormat.MMMd(
+      Localizations.localeOf(context).toString(),
+    ).add_Hm().format(activity.startedAt.toLocal());
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: colors.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.directions_run,
+                size: 20,
+                color: colors.onPrimaryContainer,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          activity.title?.isNotEmpty == true
+                              ? activity.title!
+                              : loc.runDetailUntitled,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (medals.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        RunMedalDot(tier: medals.first.tier, size: 14),
+                      ],
+                    ],
+                  ),
+                  Text(
+                    date,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  RunFormatters.distanceWithUnit(activity.distanceMeters),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                Text(
+                  RunFormatters.paceWithUnit(activity.avgPaceSecPerKm),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: colors.onSurfaceVariant,
+            ),
+          ],
+        ),
       ),
     );
   }
