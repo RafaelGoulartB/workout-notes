@@ -17,6 +17,7 @@ class RunNativeVoiceService {
     required Map<String, dynamic> goal,
     required bool intervalsOn,
     bool bypassHeadphonesGate = false,
+    List<Map<String, dynamic>>? plan,
   }) async {
     if (!_isAndroid) return;
     try {
@@ -25,6 +26,7 @@ class RunNativeVoiceService {
         'goal': goal,
         'intervalsOn': intervalsOn,
         'bypassHeadphonesGate': bypassHeadphonesGate,
+        'plan': plan ?? const <Map<String, dynamic>>[],
       });
     } on MissingPluginException {
       // Desktop/tests — no native channel.

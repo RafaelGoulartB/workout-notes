@@ -444,6 +444,25 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     _load();
   }
 
+  Future<void> _moveSessionToDay(RunPlanWorkout workout, int dayOfWeek) async {
+    if (workout.dayOfWeek == dayOfWeek) return;
+    await _repo.updateWorkout(workout.id, dayOfWeek: dayOfWeek);
+    if (!mounted) return;
+    setState(() {
+      final plan = _plan;
+      if (plan == null) return;
+      _plan = plan.copyWith(
+        workouts: [
+          for (final item in plan.workouts)
+            if (item.id == workout.id)
+              item.copyWith(dayOfWeek: dayOfWeek)
+            else
+              item,
+        ],
+      );
+    });
+  }
+
   Future<void> _copyWeek() async {
     final plan = _plan;
     if (plan == null || plan.weeks < 2) return;
@@ -814,6 +833,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
           .toList();
       rows.add(
         _DayRow(
+          dayOfWeek: day,
           label: RunPlanUi.weekdayLabel(loc, day),
           isToday: day == today,
           sessions: ofDay,
@@ -822,6 +842,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
           onDuplicate: _duplicateSession,
           onMove: plan.weeks > 1 ? _moveSession : null,
           onDelete: _deleteSession,
+          onMoveToDay: _moveSessionToDay,
           statuses: _workoutStatuses,
         ),
       );
@@ -832,6 +853,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
     if (floating.isNotEmpty) {
       rows.add(
         _DayRow(
+          dayOfWeek: null,
           label: '—',
           isToday: false,
           sessions: floating,
@@ -839,6 +861,7 @@ class _RunPlanDetailScreenState extends State<RunPlanDetailScreen> {
           onDuplicate: _duplicateSession,
           onMove: plan.weeks > 1 ? _moveSession : null,
           onDelete: _deleteSession,
+          onMoveToDay: _moveSessionToDay,
           statuses: _workoutStatuses,
         ),
       );
@@ -994,6 +1017,7 @@ class _WeekTile extends StatelessWidget {
 /// A weekday and whatever is planned on it — or an explicit rest marker, which
 /// is information too: a week with four rest days is a light week.
 class _DayRow extends StatelessWidget {
+  final int? dayOfWeek;
   final String label;
   final bool isToday;
   final List<RunPlanWorkout> sessions;
@@ -1002,15 +1026,18 @@ class _DayRow extends StatelessWidget {
   final ValueChanged<RunPlanWorkout> onDuplicate;
   final ValueChanged<RunPlanWorkout>? onMove;
   final ValueChanged<RunPlanWorkout> onDelete;
+  final void Function(RunPlanWorkout workout, int dayOfWeek) onMoveToDay;
   final Map<String, ScheduledRunStatus> statuses;
 
   const _DayRow({
+    required this.dayOfWeek,
     required this.label,
     required this.isToday,
     required this.sessions,
     required this.onOpen,
     required this.onDuplicate,
     required this.onDelete,
+    required this.onMoveToDay,
     required this.statuses,
     this.onAdd,
     this.onMove,
@@ -1040,26 +1067,73 @@ class _DayRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: sessions.isEmpty
-                ? _RestRow(onAdd: onAdd)
-                : Column(
-                    children: [
-                      for (final session in sessions)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _SessionCard(
-                            workout: session,
-                            status: statuses[session.id],
-                            onTap: () => onOpen(session),
-                            onDuplicate: () => onDuplicate(session),
-                            onMove: onMove == null
-                                ? null
-                                : () => onMove!(session),
-                            onDelete: () => onDelete(session),
-                          ),
-                        ),
-                    ],
+            child: DragTarget<RunPlanWorkout>(
+              key: dayOfWeek == null
+                  ? null
+                  : ValueKey('run-plan-day-$dayOfWeek'),
+              onWillAcceptWithDetails: (details) =>
+                  dayOfWeek != null && details.data.dayOfWeek != dayOfWeek,
+              onAcceptWithDetails: (details) {
+                final targetDay = dayOfWeek;
+                if (targetDay != null) {
+                  onMoveToDay(details.data, targetDay);
+                }
+              },
+              builder: (context, candidates, rejected) {
+                final isTarget = candidates.isNotEmpty;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: isTarget ? const EdgeInsets.all(3) : EdgeInsets.zero,
+                  decoration: BoxDecoration(
+                    color: isTarget
+                        ? scheme.primaryContainer.withAlpha(90)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                    border: isTarget
+                        ? Border.all(color: scheme.primary, width: 1.5)
+                        : null,
                   ),
+                  child: sessions.isEmpty
+                      ? _RestRow(onAdd: onAdd)
+                      : Column(
+                          children: [
+                            for (final session in sessions)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: LongPressDraggable<RunPlanWorkout>(
+                                  data: session,
+                                  hapticFeedbackOnStart: true,
+                                  feedback: Material(
+                                    color: Colors.transparent,
+                                    elevation: 8,
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: SizedBox(
+                                      width:
+                                          (MediaQuery.sizeOf(context).width -
+                                                  96)
+                                              .clamp(220.0, 360.0)
+                                              .toDouble(),
+                                      child: _SessionCard(
+                                        workout: session,
+                                        status: statuses[session.id],
+                                        onTap: () {},
+                                        onDuplicate: () {},
+                                        onDelete: () {},
+                                      ),
+                                    ),
+                                  ),
+                                  childWhenDragging: Opacity(
+                                    opacity: 0.25,
+                                    child: _buildSessionCard(session),
+                                  ),
+                                  child: _buildSessionCard(session),
+                                ),
+                              ),
+                          ],
+                        ),
+                );
+              },
+            ),
           ),
           if (isToday)
             Padding(
@@ -1079,6 +1153,16 @@ class _DayRow extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildSessionCard(RunPlanWorkout session) => _SessionCard(
+    key: ValueKey('run-plan-session-${session.id}'),
+    workout: session,
+    status: statuses[session.id],
+    onTap: () => onOpen(session),
+    onDuplicate: () => onDuplicate(session),
+    onMove: onMove == null ? null : () => onMove!(session),
+    onDelete: () => onDelete(session),
+  );
 }
 
 class _RestRow extends StatelessWidget {
@@ -1175,6 +1259,7 @@ class _SessionCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   const _SessionCard({
+    super.key,
     required this.workout,
     required this.status,
     required this.onTap,

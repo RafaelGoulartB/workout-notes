@@ -115,11 +115,41 @@ class RunPlanWorkout {
   /// Flattens [steps] into the actual execution sequence, expanding repeat
   /// blocks. Shared by the UI summary, the engine and the native bridge so all
   /// three agree on what "6×800 m" means.
-  List<RunExpandedStep> expandSteps() => expand(steps);
+  List<RunExpandedStep> expandSteps() => expand(executionSteps);
+
+  /// Steps used by the live runner. Continuous workouts intentionally have no
+  /// stored step rows, so synthesize one from their distance/duration target.
+  /// Without this fallback an easy/long run appears as planned in the UI but
+  /// never enters the voice step engine.
+  List<RunWorkoutStep> get executionSteps {
+    if (steps.isNotEmpty) return steps;
+    final distance = targetDistanceMeters?.round() ?? 0;
+    final duration = targetDurationSeconds ?? 0;
+    if (distance <= 0 && duration <= 0) return const [];
+    final targetPace = targetPaceSecPerKm;
+    return [
+      RunWorkoutStep(
+        id: '$id:continuous',
+        runPlanWorkoutId: id,
+        orderIndex: 0,
+        role: switch (kind) {
+          RunWorkoutKind.recovery => RunStepRole.recovery,
+          RunWorkoutKind.easy || RunWorkoutKind.long => RunStepRole.steady,
+          _ => RunStepRole.work,
+        },
+        metric: distance > 0
+            ? RunIntervalMetric.distance
+            : RunIntervalMetric.time,
+        value: distance > 0 ? distance : duration,
+        targetPaceMinSecPerKm: targetPace == null ? null : targetPace * .95,
+        targetPaceMaxSecPerKm: targetPace == null ? null : targetPace * 1.05,
+      ),
+    ];
+  }
 
   /// Wire format for the native engine.
   List<Map<String, dynamic>> stepsJson() =>
-      steps.map((step) => step.toJson()).toList();
+      executionSteps.map((step) => step.toJson()).toList();
 
   static List<RunExpandedStep> expand(List<RunWorkoutStep> steps) {
     final ordered = [...steps]

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 
 /// A GitHub-style contribution heatmap showing workout intensity.
 ///
 /// For the current year, weeks stop at today (no empty future columns).
-/// The list is reversed horizontally so the most recent week sits against
-/// the right edge of the card.
+/// The grid scrolls horizontally with the most recent week against the right
+/// edge, while the weekday labels stay pinned outside the scroll view and a
+/// month ruler runs above the columns.
 class WorkoutHeatmap extends StatelessWidget {
   final Map<String, int> dailyData;
   final int year;
@@ -18,7 +20,10 @@ class WorkoutHeatmap extends StatelessWidget {
 
   static const _cellSize = 12.0;
   static const _cellGap = 2.0;
-  static const _labelWidth = 14.0;
+  static const _labelWidth = 24.0;
+  static const _monthRowHeight = 14.0;
+
+  double get _columnWidth => _cellSize + _cellGap;
 
   DateTime get _rangeEnd {
     final now = DateTime.now();
@@ -31,8 +36,10 @@ class WorkoutHeatmap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final locale = Localizations.localeOf(context).toString();
 
     final Map<int, Map<int, int>> grid = {};
+    final Map<int, DateTime> weekStarts = {};
     var maxVolume = 0;
 
     final firstDay = DateTime(year, 1, 1);
@@ -54,73 +61,121 @@ class WorkoutHeatmap extends StatelessWidget {
 
       grid.putIfAbsent(weekIndex, () => {});
       grid[weekIndex]![dayOfWeek] = volume;
+      weekStarts.putIfAbsent(weekIndex, () => d);
       if (volume > maxVolume) maxVolume = volume;
     }
 
-    // Newest week first — with reverse:true this lands on the right edge.
-    final weekIndexes = grid.keys.toList()..sort((a, b) => b.compareTo(a));
+    // Oldest → newest, so the scroll view can be reversed to open on today.
+    final weekIndexes = grid.keys.toList()..sort();
     if (weekIndexes.isEmpty) {
       return _empty(context, theme);
     }
 
+    final loc = AppLocalizations.of(context)!;
     final dayLabels = [
-      AppLocalizations.of(context)!.calendarSun,
-      AppLocalizations.of(context)!.calendarMon,
-      AppLocalizations.of(context)!.calendarTue,
-      AppLocalizations.of(context)!.calendarWed,
-      AppLocalizations.of(context)!.calendarThu,
-      AppLocalizations.of(context)!.calendarFri,
-      AppLocalizations.of(context)!.calendarSat,
+      loc.calendarSun,
+      loc.calendarMon,
+      loc.calendarTue,
+      loc.calendarWed,
+      loc.calendarThu,
+      loc.calendarFri,
+      loc.calendarSat,
     ];
+    final monthFormat = DateFormat.MMM(locale);
 
     return SizedBox(
-      height: 7 * (_cellSize + _cellGap) + 4,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        reverse: true,
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        // [newest week … oldest week, day labels]
-        // reverse:true → day labels on the left, newest on the right.
-        itemCount: weekIndexes.length + 1,
-        itemBuilder: (context, col) {
-          final isLabelColumn = col == weekIndexes.length;
-          if (isLabelColumn) {
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: dayLabels.asMap().entries.map((e) {
-                return Container(
-                  width: _labelWidth,
-                  height: _cellSize + _cellGap,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    dayLabels[e.key].substring(0, 1),
-                    style: TextStyle(
-                      fontSize: 8,
-                      color: theme.colorScheme.onSurfaceVariant.withAlpha(150),
-                    ),
+      height: _monthRowHeight + 7 * _columnWidth + 4,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Pinned weekday ruler: only alternate days are labelled so the
+          // 8px text never collides with the 12px cells.
+          Padding(
+            padding: const EdgeInsets.only(top: _monthRowHeight),
+            child: Column(
+              children: [
+                for (var row = 0; row < 7; row++)
+                  SizedBox(
+                    width: _labelWidth,
+                    height: _columnWidth,
+                    child: row.isOdd
+                        ? Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              dayLabels[row],
+                              maxLines: 1,
+                              overflow: TextOverflow.clip,
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          )
+                        : null,
                   ),
-                );
-              }).toList(),
-            );
-          }
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              padding: const EdgeInsets.only(left: 2, right: 4),
+              itemCount: weekIndexes.length,
+              itemBuilder: (context, col) {
+                // reverse:true renders index 0 at the right edge.
+                final weekIndex = weekIndexes[weekIndexes.length - 1 - col];
+                final weekData = grid[weekIndex] ?? {};
+                final weekStart = weekStarts[weekIndex]!;
+                final previousStart = weekIndex == weekIndexes.first
+                    ? null
+                    : weekStarts[weekIndex - 1];
+                final startsNewMonth = previousStart == null ||
+                    previousStart.month != weekStart.month;
 
-          final weekData = grid[weekIndexes[col]] ?? {};
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: List.generate(7, (row) {
-              final volume = weekData[row] ?? 0;
-              return Container(
-                width: _cellSize,
-                height: _cellSize,
-                margin: EdgeInsets.all(_cellGap / 2),
-                decoration: BoxDecoration(
-                  color: _cellColor(volume, maxVolume, theme),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              );
-            }),
-          );
-        },
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      height: _monthRowHeight,
+                      width: _columnWidth,
+                      child: startsNewMonth
+                          ? OverflowBox(
+                              alignment: Alignment.centerLeft,
+                              maxWidth: 40,
+                              child: Text(
+                                monthFormat
+                                    .format(weekStart)
+                                    .replaceAll('.', ''),
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                    for (var row = 0; row < 7; row++)
+                      Container(
+                        width: _cellSize,
+                        height: _cellSize,
+                        margin: const EdgeInsets.all(_cellGap / 2),
+                        decoration: BoxDecoration(
+                          color: _cellColor(
+                            weekData[row] ?? 0,
+                            maxVolume,
+                            theme,
+                          ),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

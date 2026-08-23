@@ -60,6 +60,8 @@ class _ProgressScreenState extends State<ProgressScreen>
 
   Map<String, dynamic>? _selectedHistory;
   bool _showingOverview = true;
+  int _goalsAchieved = 0;
+  int _goalsTotal = 0;
 
   @override
   void initState() {
@@ -304,6 +306,16 @@ class _ProgressScreenState extends State<ProgressScreen>
                     db: DatabaseHelper.instance,
                     settingsRepo: DatabaseHelper.instance.settingsRepo,
                     allowedScopes: const [GoalScope.anaerobic],
+                    onSummaryChanged: (achieved, total) {
+                      if (!mounted) return;
+                      if (achieved == _goalsAchieved && total == _goalsTotal) {
+                        return;
+                      }
+                      setState(() {
+                        _goalsAchieved = achieved;
+                        _goalsTotal = total;
+                      });
+                    },
                   ),
                   const SizedBox(height: 8),
                 ],
@@ -365,10 +377,29 @@ class _ProgressScreenState extends State<ProgressScreen>
 
   Widget _buildGoalsHeader(ThemeData theme) {
     final loc = AppLocalizations.of(context)!;
+    final allDone = _goalsTotal > 0 && _goalsAchieved == _goalsTotal;
     return ProgressGroupLabel(
       title: loc.progressGoals,
       icon: Icons.flag_outlined,
       color: Colors.deepPurple,
+      trailing: _goalsTotal == 0
+          ? null
+          : Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: (allDone ? Colors.green : theme.colorScheme.primary)
+                    .withAlpha(28),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                loc.progressGoalsAchieved(_goalsAchieved, _goalsTotal),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: allDone ? Colors.green : theme.colorScheme.primary,
+                ),
+              ),
+            ),
     );
   }
 

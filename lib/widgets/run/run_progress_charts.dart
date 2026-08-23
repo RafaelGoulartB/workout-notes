@@ -4,15 +4,19 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 
-/// Weekly distance bars for the run stats dashboard.
+/// Weekly distance bars for the run stats dashboard. The last bucket is the
+/// week in progress and is highlighted; [averageMeters] draws a reference
+/// line so the current volume can be read against the period average.
 class RunWeeklyDistanceChart extends StatelessWidget {
   final List<RunWeekBucket> buckets;
   final String emptyLabel;
+  final double? averageMeters;
 
   const RunWeeklyDistanceChart({
     super.key,
     required this.buckets,
     required this.emptyLabel,
+    this.averageMeters,
   });
 
   @override
@@ -29,14 +33,10 @@ class RunWeeklyDistanceChart extends StatelessWidget {
     final maxY = (maxKm * 1.2).clamp(1.0, double.infinity);
     final primary = theme.colorScheme.primary;
     final muted = theme.colorScheme.onSurfaceVariant;
-    final showEvery = buckets.length > 12
-        ? 4
-        : buckets.length > 8
-            ? 2
-            : 1;
+    final averageKm = (averageMeters ?? 0) / 1000.0;
 
     return SizedBox(
-      height: 200,
+      height: 190,
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
@@ -44,6 +44,7 @@ class RunWeeklyDistanceChart extends StatelessWidget {
           minY: 0,
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
+              getTooltipColor: (_) => theme.colorScheme.surfaceContainerHighest,
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 if (groupIndex < 0 || groupIndex >= buckets.length) {
                   return null;
@@ -61,6 +62,17 @@ class RunWeeklyDistanceChart extends StatelessWidget {
               },
             ),
           ),
+          extraLinesData: ExtraLinesData(
+            horizontalLines: [
+              if (averageKm > 0 && averageKm < maxY)
+                HorizontalLine(
+                  y: averageKm,
+                  color: theme.colorScheme.tertiary.withValues(alpha: 0.7),
+                  strokeWidth: 1.4,
+                  dashArray: const [5, 4],
+                ),
+            ],
+          ),
           titlesData: FlTitlesData(
             show: true,
             topTitles: const AxisTitles(
@@ -72,17 +84,21 @@ class RunWeeklyDistanceChart extends StatelessWidget {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 36,
+                reservedSize: 34,
                 interval: _niceInterval(maxY),
                 getTitlesWidget: (value, meta) {
                   if (value <= 0 || value >= maxY) {
                     return const SizedBox.shrink();
                   }
-                  return Text(
-                    value >= 10
-                        ? value.toStringAsFixed(0)
-                        : value.toStringAsFixed(1),
-                    style: theme.textTheme.labelSmall?.copyWith(color: muted),
+                  return SideTitleWidget(
+                    meta: meta,
+                    space: 6,
+                    child: Text(
+                      value >= 10
+                          ? value.toStringAsFixed(0)
+                          : value.toStringAsFixed(1),
+                      style: theme.textTheme.labelSmall?.copyWith(color: muted),
+                    ),
                   );
                 },
               ),
@@ -90,17 +106,16 @@ class RunWeeklyDistanceChart extends StatelessWidget {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 28,
+                reservedSize: 26,
                 getTitlesWidget: (value, meta) {
                   final i = value.round();
-                  if (i < 0 || i >= buckets.length) {
+                  if (!_showBucketTick(i, buckets.length)) {
                     return const SizedBox.shrink();
                   }
-                  if (i % showEvery != 0 && i != buckets.length - 1) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 6),
+                  return SideTitleWidget(
+                    meta: meta,
+                    space: 6,
+                    fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
                     child: Text(
                       DateFormat.Md().format(buckets[i].weekStart),
                       style: theme.textTheme.labelSmall?.copyWith(color: muted),
@@ -115,7 +130,7 @@ class RunWeeklyDistanceChart extends StatelessWidget {
             drawVerticalLine: false,
             horizontalInterval: _niceInterval(maxY),
             getDrawingHorizontalLine: (value) => FlLine(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
               strokeWidth: 1,
             ),
           ),
@@ -127,15 +142,19 @@ class RunWeeklyDistanceChart extends StatelessWidget {
                 barRods: [
                   BarChartRodData(
                     toY: buckets[i].distanceMeters / 1000.0,
-                    width: buckets.length > 20
-                        ? 6
-                        : buckets.length > 12
-                            ? 10
-                            : 14,
+                    width: _barWidth(buckets.length),
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(5),
                     ),
-                    color: primary,
+                    color: i == buckets.length - 1
+                        ? primary
+                        : primary.withValues(alpha: 0.5),
+                    backDrawRodData: BackgroundBarChartRodData(
+                      show: true,
+                      toY: maxY,
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.35),
+                    ),
                   ),
                 ],
               ),
@@ -173,6 +192,10 @@ class RunPaceTrendChart extends StatelessWidget {
     final pad = ((maxPace - minPace) * 0.15).clamp(10.0, 60.0);
     final chartMin = (minPace - pad).clamp(30.0, maxPace);
     final chartMax = maxPace + pad;
+    final range = (chartMax - chartMin).abs();
+    // Keep the pace labels on round steps so they never overlap.
+    final paceInterval = _nicePaceInterval(range);
+    final edgeGuard = range * 0.08;
 
     final spots = [
       for (var i = 0; i < points.length; i++)
@@ -181,10 +204,9 @@ class RunPaceTrendChart extends StatelessWidget {
 
     final primary = theme.colorScheme.primary;
     final muted = theme.colorScheme.onSurfaceVariant;
-    final showEvery = points.length > 10 ? (points.length / 5).ceil() : 1;
 
     return SizedBox(
-      height: 200,
+      height: 190,
       child: LineChart(
         LineChartData(
           minX: 0,
@@ -195,6 +217,7 @@ class RunPaceTrendChart extends StatelessWidget {
           lineTouchData: LineTouchData(
             handleBuiltInTouches: true,
             touchTooltipData: LineTouchTooltipData(
+              getTooltipColor: (_) => theme.colorScheme.surfaceContainerHighest,
               getTooltipItems: (touched) {
                 return touched.map((t) {
                   final i = t.x.round();
@@ -202,7 +225,8 @@ class RunPaceTrendChart extends StatelessWidget {
                   final p = points[i];
                   final date = DateFormat.MMMd().format(p.date);
                   return LineTooltipItem(
-                    '$date\n${RunFormatters.paceWithUnit(p.paceSecPerKm)}',
+                    '$date\n${RunFormatters.paceWithUnit(p.paceSecPerKm)}'
+                    '\n${RunFormatters.distanceWithUnit(p.distanceMeters)}',
                     TextStyle(
                       color: theme.colorScheme.onSurface,
                       fontWeight: FontWeight.w700,
@@ -216,8 +240,9 @@ class RunPaceTrendChart extends StatelessWidget {
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
+            horizontalInterval: paceInterval,
             getDrawingHorizontalLine: (value) => FlLine(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
               strokeWidth: 1,
             ),
           ),
@@ -232,15 +257,21 @@ class RunPaceTrendChart extends StatelessWidget {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 44,
+                reservedSize: 42,
+                interval: paceInterval,
                 getTitlesWidget: (value, meta) {
                   final pace = -value;
-                  if (pace < chartMin || pace > chartMax) {
+                  if (pace < chartMin + edgeGuard ||
+                      pace > chartMax - edgeGuard) {
                     return const SizedBox.shrink();
                   }
-                  return Text(
-                    RunFormatters.pace(pace),
-                    style: theme.textTheme.labelSmall?.copyWith(color: muted),
+                  return SideTitleWidget(
+                    meta: meta,
+                    space: 6,
+                    child: Text(
+                      RunFormatters.pace(pace),
+                      style: theme.textTheme.labelSmall?.copyWith(color: muted),
+                    ),
                   );
                 },
               ),
@@ -248,18 +279,17 @@ class RunPaceTrendChart extends StatelessWidget {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 28,
+                reservedSize: 26,
                 interval: 1,
                 getTitlesWidget: (value, meta) {
                   final i = value.round();
-                  if (i < 0 || i >= points.length) {
+                  if (!_showBucketTick(i, points.length, maxTicks: 5)) {
                     return const SizedBox.shrink();
                   }
-                  if (i % showEvery != 0 && i != points.length - 1) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 6),
+                  return SideTitleWidget(
+                    meta: meta,
+                    space: 6,
+                    fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
                     child: Text(
                       DateFormat.Md().format(points[i].date),
                       style: theme.textTheme.labelSmall?.copyWith(color: muted),
@@ -325,20 +355,15 @@ class RunWeeklyFrequencyChart extends StatelessWidget {
       return _EmptyChart(label: emptyLabel);
     }
 
-    final maxCount = buckets
-        .map((b) => b.runCount)
-        .fold<int>(0, (a, b) => a > b ? a : b);
+    final maxCount =
+        buckets.map((b) => b.runCount).fold<int>(0, (a, b) => a > b ? a : b);
     final maxY = (maxCount + 1).toDouble().clamp(3.0, double.infinity);
     final secondary = theme.colorScheme.secondary;
     final muted = theme.colorScheme.onSurfaceVariant;
-    final showEvery = buckets.length > 12
-        ? 4
-        : buckets.length > 8
-            ? 2
-            : 1;
+    final countInterval = maxY > 8 ? 2.0 : 1.0;
 
     return SizedBox(
-      height: 180,
+      height: 190,
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
@@ -346,6 +371,7 @@ class RunWeeklyFrequencyChart extends StatelessWidget {
           minY: 0,
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
+              getTooltipColor: (_) => theme.colorScheme.surfaceContainerHighest,
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 if (groupIndex < 0 || groupIndex >= buckets.length) {
                   return null;
@@ -374,15 +400,19 @@ class RunWeeklyFrequencyChart extends StatelessWidget {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 28,
-                interval: 1,
+                reservedSize: 26,
+                interval: countInterval,
                 getTitlesWidget: (value, meta) {
                   if (value <= 0 || value != value.roundToDouble()) {
                     return const SizedBox.shrink();
                   }
-                  return Text(
-                    value.toInt().toString(),
-                    style: theme.textTheme.labelSmall?.copyWith(color: muted),
+                  return SideTitleWidget(
+                    meta: meta,
+                    space: 6,
+                    child: Text(
+                      value.toInt().toString(),
+                      style: theme.textTheme.labelSmall?.copyWith(color: muted),
+                    ),
                   );
                 },
               ),
@@ -390,17 +420,16 @@ class RunWeeklyFrequencyChart extends StatelessWidget {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 28,
+                reservedSize: 26,
                 getTitlesWidget: (value, meta) {
                   final i = value.round();
-                  if (i < 0 || i >= buckets.length) {
+                  if (!_showBucketTick(i, buckets.length)) {
                     return const SizedBox.shrink();
                   }
-                  if (i % showEvery != 0 && i != buckets.length - 1) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 6),
+                  return SideTitleWidget(
+                    meta: meta,
+                    space: 6,
+                    fitInside: SideTitleFitInsideData.fromTitleMeta(meta),
                     child: Text(
                       DateFormat.Md().format(buckets[i].weekStart),
                       style: theme.textTheme.labelSmall?.copyWith(color: muted),
@@ -413,9 +442,9 @@ class RunWeeklyFrequencyChart extends StatelessWidget {
           gridData: FlGridData(
             show: true,
             drawVerticalLine: false,
-            horizontalInterval: 1,
+            horizontalInterval: countInterval,
             getDrawingHorizontalLine: (value) => FlLine(
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.35),
               strokeWidth: 1,
             ),
           ),
@@ -427,15 +456,19 @@ class RunWeeklyFrequencyChart extends StatelessWidget {
                 barRods: [
                   BarChartRodData(
                     toY: buckets[i].runCount.toDouble(),
-                    width: buckets.length > 20
-                        ? 6
-                        : buckets.length > 12
-                            ? 10
-                            : 14,
+                    width: _barWidth(buckets.length),
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(5),
                     ),
-                    color: secondary,
+                    color: i == buckets.length - 1
+                        ? secondary
+                        : secondary.withValues(alpha: 0.5),
+                    backDrawRodData: BackgroundBarChartRodData(
+                      show: true,
+                      toY: maxY,
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.35),
+                    ),
                   ),
                 ],
               ),
@@ -469,10 +502,35 @@ class _EmptyChart extends StatelessWidget {
   }
 }
 
+double _barWidth(int count) {
+  if (count > 26) return 5;
+  if (count > 20) return 6;
+  if (count > 12) return 9;
+  return 14;
+}
+
+/// Ticks are spaced counting back from the newest bucket, so the most recent
+/// label is always shown and never collides with its neighbour.
+bool _showBucketTick(int index, int length, {int maxTicks = 6}) {
+  if (index < 0 || index >= length) return false;
+  final step = (length / maxTicks).ceil().clamp(1, length);
+  return (length - 1 - index) % step == 0;
+}
+
 double _niceInterval(double maxY) {
   if (maxY <= 2) return 0.5;
   if (maxY <= 5) return 1;
   if (maxY <= 10) return 2;
   if (maxY <= 25) return 5;
-  return 10;
+  if (maxY <= 60) return 10;
+  return 20;
+}
+
+/// Pace steps in seconds, chosen so at most ~4 gridlines are drawn.
+double _nicePaceInterval(double range) {
+  const steps = <double>[10, 15, 30, 60, 120, 300, 600];
+  for (final step in steps) {
+    if (range / step <= 4) return step;
+  }
+  return (range / 4).ceilToDouble();
 }

@@ -96,11 +96,15 @@ class ProgressGroupLabel extends StatelessWidget {
   final IconData icon;
   final Color color;
 
+  /// Optional summary/action rendered at the end of the label row.
+  final Widget? trailing;
+
   const ProgressGroupLabel({
     super.key,
     required this.title,
     required this.icon,
     required this.color,
+    this.trailing,
   });
 
   @override
@@ -119,14 +123,17 @@ class ProgressGroupLabel extends StatelessWidget {
             child: Icon(icon, size: 16, color: color),
           ),
           const SizedBox(width: 8),
-          Text(
-            title.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.1,
-              color: theme.colorScheme.onSurface,
+          Expanded(
+            child: Text(
+              title.toUpperCase(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.1,
+                color: theme.colorScheme.onSurface,
+              ),
             ),
           ),
+          ?trailing,
         ],
       ),
     );

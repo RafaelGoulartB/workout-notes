@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Run Voice Coach — melhorias implementadas</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07100d;
+      --panel: #0f1c17;
+      --panel-2: #14261f;
+      --text: #edf8f2;
+      --muted: #9fb7ab;
+      --line: #294137;
+      --green: #69e6a6;
+      --cyan: #6ed7df;
+      --amber: #ffc66d;
+      --red: #ff8b8b;
+      --radius: 20px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 85% 8%, rgba(105, 230, 166, .13), transparent 28rem),
+        radial-gradient(circle at 10% 34%, rgba(110, 215, 223, .08), transparent 26rem),
+        var(--bg);
+      color: var(--text);
+      font: 16px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 56px 0 80px; }
+    header { max-width: 850px; padding: 48px 0 42px; }
+    .eyebrow { color: var(--green); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: .78rem; }
+    h1 { font-size: clamp(2.6rem, 7vw, 5.8rem); line-height: .95; letter-spacing: -.055em; margin: 16px 0 24px; }
+    h2 { font-size: clamp(1.7rem, 4vw, 2.45rem); line-height: 1.1; letter-spacing: -.035em; margin: 0 0 12px; }
+    h3 { font-size: 1.1rem; margin: 0 0 8px; }
+    p { margin: 0 0 16px; }
+    .lead { color: var(--muted); font-size: clamp(1.05rem, 2vw, 1.28rem); max-width: 720px; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+    .pill { border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; color: var(--muted); background: rgba(15, 28, 23, .72); }
+    .pill strong { color: var(--text); }
+    section { margin-top: 68px; }
+    .section-intro { color: var(--muted); max-width: 760px; margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+    .card { grid-column: span 4; background: linear-gradient(145deg, rgba(20,38,31,.95), rgba(15,28,23,.9)); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
+    .card.wide { grid-column: span 6; }
+    .card.full { grid-column: 1 / -1; }
+    .number { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: rgba(105, 230, 166, .13); color: var(--green); font-weight: 900; margin-bottom: 18px; }
+    .card p, .card li { color: var(--muted); }
+    ul { padding-left: 20px; margin: 12px 0 0; }
+    li + li { margin-top: 6px; }
+    .quote { border-left: 3px solid var(--green); padding: 10px 0 10px 16px; margin-top: 16px; color: var(--text) !important; font-weight: 650; }
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); align-items: stretch; gap: 12px; margin-top: 28px; }
+    .flow-step { position: relative; padding: 18px; min-height: 126px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+    .flow-step:not(:last-child)::after { content: "→"; position: absolute; right: -17px; top: 42%; color: var(--green); z-index: 2; font-weight: 900; }
+    .flow-step b { display: block; margin-bottom: 7px; }
+    .flow-step span { color: var(--muted); font-size: .91rem; }
+    table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+    th, td { text-align: left; vertical-align: top; padding: 15px 17px; border-bottom: 1px solid var(--line); }
+    th { color: var(--green); font-size: .78rem; letter-spacing: .09em; text-transform: uppercase; background: var(--panel-2); }
+    td { color: var(--muted); }
+    tr:last-child td { border-bottom: 0; }
+    code { color: var(--cyan); background: rgba(110, 215, 223, .08); padding: 2px 6px; border-radius: 6px; }
+    .priority { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .priority span { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
+    .priority span:first-child { color: var(--green); border-color: rgba(105,230,166,.45); }
+    .callout { padding: 24px; border-radius: var(--radius); border: 1px solid rgba(105,230,166,.35); background: rgba(105,230,166,.08); }
+    .callout strong { color: var(--green); }
+    footer { margin-top: 72px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
+    @media (max-width: 840px) {
+      .card, .card.wide { grid-column: 1 / -1; }
+      .flow { grid-template-columns: 1fr; }
+      .flow-step:not(:last-child)::after { content: "↓"; right: auto; left: 49%; top: auto; bottom: -20px; }
+      table { display: block; overflow-x: auto; }
+    }
+    @media print {
+      :root { color-scheme: light; --bg: white; --panel: #f6faf8; --panel-2: #eef6f2; --text: #102018; --muted: #425a4e; --line: #ccdcd3; }
+      body { background: white; }
+      main { width: 100%; padding: 20px; }
+      section { break-inside: avoid; margin-top: 38px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="eyebrow">Workout Notes · Run Voice Coach</div>
+      <h1>Useful cues.<br>Less noise.</h1>
+      <p class="lead">A experiência de voz foi redesenhada para auxiliar a corrida sem competir com música, podcast ou atenção ao ambiente. A voz continua exclusivamente em inglês, mas agora usa frases curtas, contexto e prioridade.</p>
+      <div class="pill-row">
+        <span class="pill"><strong>1</strong> cue por momento</span>
+        <span class="pill"><strong>English-only</strong> speech</span>
+        <span class="pill">Pace com janela de <strong>25 s</strong></span>
+        <span class="pill">Android com tela apagada</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>Princípio da experiência</h2>
+      <p class="section-intro">O sistema não tenta narrar a corrida. Ele só interrompe quando existe uma informação operacional, uma mudança relevante ou um resumo solicitado pelas preferências do usuário.</p>
+      <div class="flow">
+        <div class="flow-step"><b>Run events</b><span>GPS, split, goal, pace, plan step e interval transition.</span></div>
+        <div class="flow-step"><b>Context</b><span>Free run, goal, quick intervals ou structured plan.</span></div>
+        <div class="flow-step"><b>Priority</b><span>Transitions vencem coaching; coaching vence métricas periódicas.</span></div>
+        <div class="flow-step"><b>Deduplication</b><span>Eventos repetidos e informações equivalentes são removidos.</span></div>
+        <div class="flow-step"><b>One short cue</b><span>Uma única frase compacta chega ao TTS.</span></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Melhorias implementadas</h2>
+      <p class="section-intro">As mudanças foram aplicadas no coordenador Dart e espelhadas no serviço nativo Android.</p>
+      <div class="grid">
+        <article class="card"><div class="number">01</div><h3>Árbitro de voz</h3><p>Um novo árbitro seleciona somente o evento mais importante de cada atualização e bloqueia duplicatas recentes.</p><p class="quote">“Recover. 90 seconds.”</p></article>
+        <article class="card"><div class="number">02</div><h3>Sem cortes no Android</h3><p>O TTS nativo deixou de cancelar a fala anterior a cada novo evento. Cues curtos são adicionados à fila e o controlador emite apenas um por atualização.</p></article>
+        <article class="card"><div class="number">03</div><h3>Split combinado</h3><p>Marco de distância e split não são mais falados separadamente no mesmo quilômetro.</p><p class="quote">“Kilometer 3. 5 42 per kilometer. Average 5 48.”</p></article>
+        <article class="card"><div class="number">04</div><h3>Metas discretas</h3><p>Metas longas recebem avisos em 50% e 80%. Metas curtas pulam o aviso intermediário para não gerar excesso.</p><p class="quote">“1 kilometer left.”</p></article>
+        <article class="card"><div class="number">05</div><h3>Pace estável</h3><p>O alerta livre usa uma janela móvel de até 25 segundos, exige dados mínimos e espera 10 segundos de desvio persistente.</p><p class="quote">“Ease off.” · “Pick it up.” · “Pace on target.”</p></article>
+        <article class="card"><div class="number">06</div><h3>Plano é a fonte de verdade</h3><p>Durante um treino planejado, o pace global é suprimido. O alvo falado usa o centro da faixa da etapa, evitando instruções conflitantes. Corridas contínuas, como uma rodagem de 2,8 km sem etapas cadastradas, agora geram uma etapa de voz automaticamente.</p><p class="quote">“Steady. 2.8 kilometers.” · “100 meters.” · “Workout complete.”</p></article>
+        <article class="card"><div class="number">07</div><h3>Pré-aviso de transição</h3><p>Etapas por tempo usam 10 segundos quando curtas e 30 quando longas. Etapas por distância com ao menos 300 m recebem um aviso único a 100 m.</p></article>
+        <article class="card"><div class="number">08</div><h3>Controles confirmados</h3><p>Pause, resume e conclusão manual recebem confirmações mínimas, úteis quando o telefone está bloqueado.</p><p class="quote">“Paused.” · “Resumed.” · “Workout complete.”</p></article>
+        <article class="card"><div class="number">09</div><h3>Configuração ao vivo</h3><p>Mudanças feitas durante uma corrida agora são sincronizadas imediatamente com o controlador Android, incluindo plano, meta e intervalos.</p></article>
+        <article class="card"><div class="number">10</div><h3>Meta restaurada</h3><p>A meta da sessão passa a ser armazenada junto ao spool nativo, evitando que desapareça após restauração do processo Android.</p></article>
+        <article class="card"><div class="number">11</div><h3>Preparação visível</h3><p>Antes da largada, a tela mostra se a voz está pronta, desligada ou aguardando fones. O card abre diretamente as configurações.</p></article>
+        <article class="card"><div class="number">12</div><h3>Intervalo por corrida</h3><p>Quick intervals podem ser ligados ou desligados na preparação da sessão. O preset completo aparece resumido antes de iniciar.</p></article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Comportamento por tipo de corrida</h2>
+      <div class="card full">
+        <table>
+          <thead><tr><th>Modo</th><th>O que fala</th><th>O que evita</th></tr></thead>
+          <tbody>
+            <tr><td>Free run</td><td>Split/marco combinado, GPS relevante e pace persistente quando configurado.</td><td>Narração de tempo contínua e reação a pace instantâneo.</td></tr>
+            <tr><td>Goal run</td><td>Progresso discreto, aproximação e conclusão da meta.</td><td>Avisos frequentes em metas curtas.</td></tr>
+            <tr><td>Quick intervals</td><td>Rep, recovery, pré-aviso e conclusão.</td><td>Frases longas e métricas secundárias sobre a transição.</td></tr>
+            <tr><td>Structured plan</td><td>Etapa, repetição, alvo central, pré-aviso, correção e conclusão. Em treinos contínuos, distância ou duração vira uma etapa executável automaticamente.</td><td>Conflito entre pace global e pace planejado; dependência do controle de quick intervals.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>Ordem de prioridade</h2>
+      <p class="section-intro">Quando vários eventos acontecem juntos, o corredor ouve somente o que ainda é útil naquele instante.</p>
+      <div class="priority">
+        <span>1 · Transition</span><span>2 · Safety</span><span>3 · Achievement</span><span>4 · Coaching</span><span>5 · Progress</span>
+      </div>
+      <div class="callout" style="margin-top: 20px"><strong>Exemplo:</strong> se um quilômetro termina exatamente quando começa uma recuperação, “Recover” vence o split. O split atrasado não entra na fila para interromper o podcast alguns segundos depois.</div>
+    </section>
+
+    <section>
+      <h2>Controles disponíveis</h2>
+      <div class="grid">
+        <article class="card wide"><h3>Voice settings</h3><ul><li>Ativar ou desativar voz.</li><li>Somente com fones.</li><li>Silenciar durante chamadas.</li><li>Distância a cada 1, 2 ou 5 km.</li><li>Splits, GPS e quick intervals.</li><li>Orientações do treino planejado permanecem ativas sempre que a voz estiver ligada.</li></ul></article>
+        <article class="card wide"><h3>Pace coaching</h3><ul><li>Pace alvo.</li><li>Tolerância selecionável: 5%, 10%, 15% ou 20%.</li><li>Correção somente após desvio estável.</li><li>Confirmação curta ao voltar para a faixa.</li></ul></article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Validação</h2>
+      <div class="grid">
+        <article class="card wide"><h3>Flutter</h3><p><code>flutter analyze</code>: sem problemas.</p><p><code>flutter test</code>: 637 testes aprovados, incluindo a regressão de uma rodagem contínua de 2,8 km.</p></article>
+        <article class="card wide"><h3>Android nativo</h3><p><code>:app:testDebugUnitTest</code>: compilação Kotlin e testes do módulo aprovados.</p><p>O conjunto global do Gradle ainda contém uma falha externa no teste Robolectric de <code>flutter_local_notifications</code>; o módulo do app passa isoladamente.</p></article>
+      </div>
+    </section>
+
+    <footer>Documento de implementação · Workout Notes · Run Voice Coach · Gerado em 22 de agosto de 2026</footer>
+  </main>
+</body>
+</html>

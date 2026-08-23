@@ -422,6 +422,12 @@
   "progressAverage": "Average: {avg}min",
   "progressDensity": "Density (Volume per Minute)",
   "progressDensityAverage": "Average: {avg} kg/min",
+  "progressAverageWorkouts": "Average: {avg} workouts/week",
+  "@progressAverageWorkouts": { "placeholders": { "avg": { "type": "String" } } },
+  "progressHeatmapLess": "less",
+  "progressHeatmapMore": "more",
+  "progressGoalsAchieved": "{done}/{total} achieved",
+  "@progressGoalsAchieved": { "placeholders": { "done": { "type": "int" }, "total": { "type": "int" } } },
   "progressWeekAbbreviation": "W",
   "progressBodyWeight": "Body Weight",
   "progressNoChartData": "No data available for this chart",
@@ -743,7 +749,7 @@
   "goalTargetValue": "Target value",
   "goalTargetHint": "Numeric value",
   "goalCurrentProgress": "Current progress",
-  "goalDaysRemaining": "{days, plural, =1{1 day left} other{{days} days left}}",
+  "goalDaysRemaining": "{days, plural, =0{Last day} =1{1 day left} other{{days} days left}}",
   "goalCompleted": "Goal reached! 🎉",
   "goalHistory": "History",
   "goalEmpty": "No goals yet",
@@ -770,6 +776,22 @@
 
   "goalContributingWorkouts": "Workouts this period",
   "goalNoContributors": "No workouts in this period yet",
+  "goalPaceTitle": "Goal pace",
+  "goalRemainingLabel": "To go",
+  "goalSurplusLabel": "Surplus",
+  "goalPerDayLabel": "Needed / day",
+  "goalDaysLeftLabel": "Days left",
+  "goalProjectionLabel": "Projection",
+  "goalStatusAchieved": "Achieved",
+  "goalStatusInProgress": "In progress",
+  "goalPeriodDayOfTotal": "Day {elapsed} of {total}",
+  "@goalPeriodDayOfTotal": { "placeholders": { "elapsed": { "type": "int" }, "total": { "type": "int" } } },
+  "goalStreakPeriods": "{count, plural, =0{No streak} =1{1 period streak} other{{count} period streak}}",
+  "@goalStreakPeriods": { "placeholders": { "count": { "type": "int" } } },
+  "goalWorkoutCompletedLabel": "Workout completed",
+  "goalWorkoutSets": "{count, plural, =1{1 set} other{{count} sets}}",
+  "@goalWorkoutSets": { "placeholders": { "count": { "type": "int" } } },
+  "goalWorkoutLabel": "Workout",
 
   "progressPeriodWeek": "Week",
   "progressPeriodMonth": "Month",
@@ -1982,6 +2004,32 @@
   "runStatsPeriod12Weeks": "12 weeks",
   "runStatsPeriodYear": "Year",
   "runStatsPeriodAll": "All",
+  "runStatsSectionThisWeek": "THIS WEEK",
+  "runStatsSectionHighlights": "PERIOD HIGHLIGHTS",
+  "runStatsSectionRecords": "LAST 5 ACHIEVEMENTS",
+  "runStatsSectionTrends": "TRENDS",
+  "runStatsSectionRecent": "RECENT RUNS",
+  "runStatsVsPrevious": "vs. previous period",
+  "runStatsNoPrevious": "No previous period to compare",
+  "runStatsAvgPerRun": "Avg / run",
+  "runStatsStreakWeeks": "{count, plural, =0{No week streak} =1{1 week streak} other{{count} week streak}}",
+  "@runStatsStreakWeeks": { "placeholders": { "count": { "type": "int" } } },
+  "runStatsWeeklyAverageValue": "Weekly average: {value}",
+  "@runStatsWeeklyAverageValue": { "placeholders": { "value": { "type": "String" } } },
+  "runStatsVsWeeklyAverage": "{percent}% of the weekly average",
+  "@runStatsVsWeeklyAverage": { "placeholders": { "percent": { "type": "int" } } },
+  "runStatsWeekNoRuns": "No runs yet this week",
+  "runStatsChartTabVolume": "Volume",
+  "runStatsChartTabPace": "Pace",
+  "runStatsChartTabFrequency": "Frequency",
+  "runStatsChartAverageLegend": "Average: {value}",
+  "@runStatsChartAverageLegend": { "placeholders": { "value": { "type": "String" } } },
+  "runStatsPaceFaster": "{delta} faster than the previous period",
+  "@runStatsPaceFaster": { "placeholders": { "delta": { "type": "String" } } },
+  "runStatsPaceSlower": "{delta} slower than the previous period",
+  "@runStatsPaceSlower": { "placeholders": { "delta": { "type": "String" } } },
+  "runStatsPaceStable": "Pace steady vs. the previous period",
+  "runStatsBestKmSplit": "Best km",
   "runRecordTitle": "Run",
   "runRecordStart": "Start",
   "runRecordPause": "Pause",
@@ -2094,6 +2142,9 @@
   "runVoiceClearTargetPace": "Clear",
   "runVoiceMinutes": "Minutes",
   "runVoiceSeconds": "Seconds",
+  "runVoicePaceTolerance": "Pace tolerance",
+  "runVoicePaceToleranceValue": "{percent}% outside target",
+  "@runVoicePaceToleranceValue": { "placeholders": { "percent": { "type": "int" } } },
   "runVoiceAnnounceGps": "GPS status",
   "runVoiceAnnounceGpsSubtitle": "Announce weak or restored GPS signal",
   "runVoiceAnnounceIntervals": "Interval transitions",
@@ -2138,6 +2189,9 @@
   "runRecordGoalPickTitle": "Run goal",
   "runRecordPlanSection": "This run",
   "runRecordGoalTapToChange": "Tap to change",
+  "runRecordVoiceReady": "Ready for short English cues",
+  "runRecordVoiceOff": "Voice cues are off",
+  "runRecordVoiceHeadsetMissing": "Connect headphones or change audio settings",
   "runVoiceDebugSimHint": "Debug sim: voice bypasses headphones. First km cue ~1 min; enable Intervals for faster cues (~30s).",
   "runVoiceTestAnnouncement": "Play test announcement",
   "runVoiceTestAnnouncementSubtitle": "Speaks a sample English cue now (ignores headphones rule)",
@@ -2426,5 +2480,109 @@
   "runPlanCustomizeCreate": "Create plan",
   "runPlanCustomizeNext": "Next",
   "runPlanCustomizeBack": "Back",
-  "runPlanCustomizeRaceDate": "Race date (optional)"
+  "runPlanCustomizeRaceDate": "Race date (optional)",
+  "bodyStatsTitle": "Progress stats",
+  "bodyStatsTooltip": "Progress stats",
+  "bodyStatsPeriod4Weeks": "4 weeks",
+  "bodyStatsPeriod12Weeks": "12 weeks",
+  "bodyStatsPeriod6Months": "6 months",
+  "bodyStatsPeriodAll": "All",
+  "bodyStatsEmptyTitle": "Not enough data yet",
+  "bodyStatsEmptySubtitle": "Log at least two measurements to see weekly averages and trends.",
+  "bodyStatsSectionChart": "TRENDS",
+  "bodyStatsSectionRate": "RATE OF CHANGE",
+  "bodyStatsSectionGoal": "GOAL",
+  "bodyStatsSectionConsistency": "CONSISTENCY",
+  "bodyStatsSectionMonthly": "MONTHLY SUMMARY",
+  "bodyStatsWeeklyAverage": "Weekly average",
+  "bodyStatsWeekRange": "{start} – {end}",
+  "@bodyStatsWeekRange": {
+    "placeholders": {
+      "start": { "type": "String" },
+      "end": { "type": "String" }
+    }
+  },
+  "bodyStatsVsPreviousWeek": "vs. previous week",
+  "bodyStatsVsWeekOf": "vs. week of {date}",
+  "@bodyStatsVsWeekOf": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "bodyStatsNoComparison": "No earlier week to compare with",
+  "bodyStatsNoWeekData": "Nothing logged this week yet",
+  "bodyStatsWeekEntries": "{entries, plural, =1{1 entry} other{{entries} entries}} · {days, plural, =1{1 day} other{{days} days}}",
+  "@bodyStatsWeekEntries": {
+    "placeholders": {
+      "entries": { "type": "int" },
+      "days": { "type": "int" }
+    }
+  },
+  "bodyStatsPeriodAverage": "Period avg",
+  "bodyStatsMin": "Min",
+  "bodyStatsMax": "Max",
+  "bodyStatsAmplitude": "Range",
+  "bodyStatsChartWeekly": "Weekly",
+  "bodyStatsChartDelta": "Change",
+  "bodyStatsChartDaily": "Daily",
+  "bodyStatsChartWeeklyEmpty": "Two weeks of data are needed for this chart.",
+  "bodyStatsChartDeltaEmpty": "No week-over-week change to show yet.",
+  "bodyStatsChartDailyEmpty": "Not enough entries for this chart.",
+  "bodyStatsChartWeeklyLegend": "Weekly average — the dashed line is the period average",
+  "bodyStatsChartDeltaLegend": "Difference between each week and the one before",
+  "bodyStatsChartDailyLegend": "Every entry, with a 7-entry moving average",
+  "bodyStatsRatePerWeek": "Per week",
+  "bodyStatsTotalChange": "Change in period",
+  "bodyStatsProjection": "In 4 weeks",
+  "bodyStatsProjectionNote": "Projection if the current rate holds.",
+  "bodyStatsRateUnavailable": "Log for at least two weeks to see the rate of change.",
+  "bodyStatsPaceStable": "Stable",
+  "bodyStatsPaceSustainable": "Sustainable pace",
+  "bodyStatsPaceAggressive": "Aggressive pace",
+  "bodyStatsGoalTarget": "Target",
+  "bodyStatsGoalRemaining": "{value} to go",
+  "@bodyStatsGoalRemaining": {
+    "placeholders": {
+      "value": { "type": "String" }
+    }
+  },
+  "bodyStatsGoalReached": "Target reached",
+  "bodyStatsGoalEta": "On pace for {date}",
+  "@bodyStatsGoalEta": {
+    "placeholders": {
+      "date": { "type": "String" }
+    }
+  },
+  "bodyStatsGoalOffTrack": "The current trend is not moving toward the target",
+  "bodyStatsGoalPhase": "Phase: {phase}",
+  "@bodyStatsGoalPhase": {
+    "placeholders": {
+      "phase": { "type": "String" }
+    }
+  },
+  "bodyStatsGoalStart": "Start",
+  "bodyStatsGoalCurrent": "Now",
+  "bodyStatsConsistencyWeeks": "Weeks logged",
+  "bodyStatsStreak": "Streak",
+  "bodyStatsStreakWeeks": "{count} wk",
+  "@bodyStatsStreakWeeks": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "bodyStatsEntriesPerWeek": "Per week",
+  "bodyStatsDaysSinceLast": "Since last",
+  "bodyStatsEntries": "Entries",
+  "bodyStatsToday": "Today",
+  "bodyStatsBmi": "BMI",
+  "bodyStatsBmiUnder": "Underweight",
+  "bodyStatsBmiNormal": "Normal",
+  "bodyStatsBmiOver": "Overweight",
+  "bodyStatsBmiObese": "Obese",
+  "bodyStatsMonthEntries": "{count, plural, =1{1 entry} other{{count} entries}}",
+  "@bodyStatsMonthEntries": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  }
 }

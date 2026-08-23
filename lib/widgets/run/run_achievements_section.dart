@@ -48,11 +48,16 @@ class RunAchievementsSection extends StatelessWidget {
   final void Function(String activityId) onOpenActivity;
   final int limit;
 
+  /// The stats dashboard already labels the card with a section header, so it
+  /// hides the inner title and subtitle to avoid repeating them.
+  final bool showTitle;
+
   const RunAchievementsSection({
     super.key,
     required this.board,
     required this.onOpenActivity,
     this.limit = 5,
+    this.showTitle = true,
   });
 
   @override
@@ -66,20 +71,22 @@ class RunAchievementsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          loc.runAchievementBoardTitle,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
+        if (showTitle) ...[
+          Text(
+            loc.runAchievementBoardTitle,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          loc.runAchievementRecentSubtitle,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: colors.onSurfaceVariant,
+          const SizedBox(height: 2),
+          Text(
+            loc.runAchievementRecentSubtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
+          const SizedBox(height: 12),
+        ],
         if (recent.isEmpty)
           Text(
             loc.runAchievementEmpty,

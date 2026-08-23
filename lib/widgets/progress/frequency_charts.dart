@@ -48,7 +48,7 @@ class FrequencyCharts extends StatelessWidget {
               Row(
                 children: [
                   const Spacer(),
-                  _buildLegend(theme),
+                  _buildLegend(theme, loc),
                 ],
               ),
             ],
@@ -75,22 +75,23 @@ class FrequencyCharts extends StatelessWidget {
     );
   }
 
-  Widget _buildLegend(ThemeData theme) {
+  Widget _buildLegend(ThemeData theme, AppLocalizations loc) {
+    final style = theme.textTheme.bodySmall?.copyWith(
+      fontSize: 10,
+      color: theme.colorScheme.onSurfaceVariant,
+    );
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          '+ volume',
-          style: theme.textTheme.bodySmall?.copyWith(
-            fontSize: 10,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
+        Text(loc.progressHeatmapLess, style: style),
         const SizedBox(width: 6),
+        _legendDot(theme.colorScheme.surfaceContainerHighest.withAlpha(120)),
         _legendDot(Colors.green.shade200),
         _legendDot(Colors.green.shade400),
         _legendDot(Colors.green.shade600),
         _legendDot(Colors.green.shade800),
+        const SizedBox(width: 6),
+        Text(loc.progressHeatmapMore, style: style),
       ],
     );
   }
@@ -151,7 +152,7 @@ class _WeeklyFrequencyChart extends StatelessWidget {
         children: [
           ProgressSectionHeader(
             title: loc.progressWeeklyFrequency,
-            subtitle: loc.progressAverage(avg.toStringAsFixed(1)),
+            subtitle: loc.progressAverageWorkouts(avg.toStringAsFixed(1)),
             accent: theme.colorScheme.primary,
           ),
           const SizedBox(height: 12),

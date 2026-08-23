@@ -8,6 +8,7 @@ enum RunStepEventKind {
   stepStarted,
   stepCompleted,
   timeRemainingCue,
+  distanceRemainingCue,
   paceTooSlow,
   paceTooFast,
   workoutCompleted,
@@ -27,6 +28,7 @@ class RunStepEvent {
   final RunIntervalMetric metric;
   final int target;
   final int? remainingSeconds;
+  final int? remainingMeters;
   final double? paceSecPerKm;
 
   const RunStepEvent({
@@ -39,6 +41,7 @@ class RunStepEvent {
     required this.metric,
     required this.target,
     this.remainingSeconds,
+    this.remainingMeters,
     this.paceSecPerKm,
   });
 }
@@ -249,19 +252,35 @@ class RunWorkoutStepEngine {
         ? distanceDelta
         : timeDelta.toDouble();
 
-    // 30 s heads-up on time steps, but never on the tick that finishes them.
+    // One brief heads-up before a transition. Short time steps use 10 seconds;
+    // longer ones use 30. Distance steps use 100 m when there is enough room.
     final target = current.step.value.toDouble();
     if (current.step.metric == RunIntervalMetric.time &&
         !_remainingCueSpoken &&
-        target > 30) {
+        target > 15) {
+      final cueAt = target <= 120 ? 10 : 30;
       final remaining = target - _accum;
-      if (remaining <= 30 && remaining > 0) {
+      if (remaining <= cueAt && remaining > 0) {
         _remainingCueSpoken = true;
         events.add(
           _event(
             RunStepEventKind.timeRemainingCue,
             current,
-            remainingSeconds: 30,
+            remainingSeconds: cueAt,
+          ),
+        );
+      }
+    } else if (current.step.metric == RunIntervalMetric.distance &&
+        !_remainingCueSpoken &&
+        target >= 300) {
+      final remaining = target - _accum;
+      if (remaining <= 100 && remaining > 0) {
+        _remainingCueSpoken = true;
+        events.add(
+          _event(
+            RunStepEventKind.distanceRemainingCue,
+            current,
+            remainingMeters: 100,
           ),
         );
       }
@@ -362,6 +381,7 @@ class RunWorkoutStepEngine {
     RunStepEventKind kind,
     RunExpandedStep expanded, {
     int? remainingSeconds,
+    int? remainingMeters,
     double? paceSecPerKm,
   }) => RunStepEvent(
     kind: kind,
@@ -373,6 +393,7 @@ class RunWorkoutStepEngine {
     metric: expanded.step.metric,
     target: expanded.step.value,
     remainingSeconds: remainingSeconds,
+    remainingMeters: remainingMeters,
     paceSecPerKm: paceSecPerKm,
   );
 }
@@ -400,8 +421,7 @@ class RunStepResult {
     required this.durationSeconds,
   });
 
-  double? get actualPaceSecPerKm =>
-      distanceMeters < 1 || durationSeconds <= 0
+  double? get actualPaceSecPerKm => distanceMeters < 1 || durationSeconds <= 0
       ? null
       : durationSeconds / (distanceMeters / 1000.0);
 }

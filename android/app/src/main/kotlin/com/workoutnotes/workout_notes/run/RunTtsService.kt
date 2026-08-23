@@ -106,7 +106,7 @@ class RunTtsService(private val context: Context) : TextToSpeech.OnInitListener 
             val params = Bundle().apply {
                 putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
             }
-            engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, "run_${System.currentTimeMillis()}")
+            engine.speak(text, TextToSpeech.QUEUE_ADD, params, "run_${System.currentTimeMillis()}")
             Log.i("RunTts", "speak: $text")
         } catch (e: Throwable) {
             Log.w("RunTts", "speak failed: ${e.message}")

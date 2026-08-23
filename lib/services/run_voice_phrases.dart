@@ -1,7 +1,10 @@
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 
-/// English-only spoken phrases for the run voice coach.
+/// English-only, intentionally brief spoken phrases for the run voice coach.
+///
+/// A runner may be listening to music or a podcast. Every phrase should convey
+/// one actionable idea and normally finish in under three seconds.
 class RunVoicePhrases {
   const RunVoicePhrases._();
 
@@ -10,14 +13,11 @@ class RunVoicePhrases {
     required int durationSeconds,
     required double? avgPaceSecPerKm,
   }) {
-    final buf = StringBuffer('$km ${_kilometersWord(km)}. ');
-    buf.write('Time ${_durationSpeech(durationSeconds)}.');
+    final buf = StringBuffer('$km ${_kilometersWord(km)}.');
     if (avgPaceSecPerKm != null &&
         avgPaceSecPerKm > 0 &&
         avgPaceSecPerKm.isFinite) {
-      buf.write(
-        ' Average pace ${_paceSpeech(avgPaceSecPerKm)} per kilometer.',
-      );
+      buf.write(' Average ${_paceSpeech(avgPaceSecPerKm)}.');
     }
     return buf.toString();
   }
@@ -26,42 +26,55 @@ class RunVoicePhrases {
     required int km,
     required double? paceSecPerKm,
   }) {
-    final pace = paceSecPerKm != null &&
-            paceSecPerKm > 0 &&
-            paceSecPerKm.isFinite
-        ? ' Pace ${_paceSpeech(paceSecPerKm)}.'
+    final pace =
+        paceSecPerKm != null && paceSecPerKm > 0 && paceSecPerKm.isFinite
+        ? ' ${_paceSpeech(paceSecPerKm)}.'
         : '';
     return 'Kilometer $km.$pace';
   }
 
-  static String paceTooFast() => 'Pace too fast.';
+  static String splitSummary({
+    required int km,
+    required double? splitPaceSecPerKm,
+    required double? avgPaceSecPerKm,
+  }) {
+    final split = _validPace(splitPaceSecPerKm)
+        ? ' ${_paceSpeech(splitPaceSecPerKm!)}.'
+        : '';
+    final average = _validPace(avgPaceSecPerKm)
+        ? ' Average ${_paceSpeech(avgPaceSecPerKm!)}.'
+        : '';
+    return 'Kilometer $km.$split$average';
+  }
 
-  static String paceTooSlow() => 'Pace too slow.';
+  static String paceTooFast() => 'Ease off.';
+
+  static String paceTooSlow() => 'Pick it up.';
+
+  static String paceOnTarget() => 'Pace on target.';
 
   static String weakGps() => 'Weak GPS signal.';
 
   static String gpsRestored() => 'GPS signal restored.';
 
-  static String workIntervalStart({
-    required int index,
-    required int total,
-  }) =>
-      'Work interval $index of $total. Go.';
+  static String workIntervalStart({required int index, required int total}) =>
+      'Rep $index of $total. Go.';
 
   static String restIntervalStart({
     required RunIntervalMetric metric,
     required int value,
   }) {
     if (metric == RunIntervalMetric.time) {
-      return 'Rest. ${_durationSpeech(value)}.';
+      return 'Recover. ${_durationSpeech(value)}.';
     }
-    return 'Rest. ${_distanceSpeech(value)}.';
+    return 'Recover. ${_distanceSpeech(value)}.';
   }
 
   static String intervalsComplete() => 'Intervals complete.';
 
-  static String timeRemaining(int seconds) =>
-      '${_durationSpeech(seconds)} remaining.';
+  static String timeRemaining(int seconds) => '$seconds seconds.';
+
+  static String distanceRemaining(int meters) => '$meters meters.';
 
   // ---- Structured plan sessions (RunWorkoutStepEngine) ----
   // Mirrors RunVoicePhrases.kt so the Dart and native cues read the same.
@@ -83,13 +96,15 @@ class RunVoicePhrases {
       RunStepRole.recovery => 'Recover. $amount.',
       RunStepRole.steady => 'Steady. $amount.',
       RunStepRole.work =>
-        repTotal > 1 ? 'Rep $repIndex of $repTotal. $amount.' : 'Effort. $amount.',
+        repTotal > 1
+            ? 'Rep $repIndex of $repTotal. $amount.'
+            : 'Effort. $amount.',
     };
     if (role.isEffort &&
         targetPaceSecPerKm != null &&
         targetPaceSecPerKm > 0 &&
         targetPaceSecPerKm.isFinite) {
-      return '$head Target pace ${_paceSpeech(targetPaceSecPerKm)} per kilometer.';
+      return '$head Target ${_paceSpeech(targetPaceSecPerKm)}.';
     }
     return head;
   }
@@ -98,17 +113,17 @@ class RunVoicePhrases {
     if (paceSecPerKm == null || paceSecPerKm <= 0 || !paceSecPerKm.isFinite) {
       return 'Pick it up.';
     }
-    return 'Pick it up. Current pace ${_paceSpeech(paceSecPerKm)}.';
+    return 'Pick it up. ${_paceSpeech(paceSecPerKm)}.';
   }
 
   static String stepPaceTooFast(double? paceSecPerKm) {
     if (paceSecPerKm == null || paceSecPerKm <= 0 || !paceSecPerKm.isFinite) {
       return 'Ease off.';
     }
-    return 'Ease off. Current pace ${_paceSpeech(paceSecPerKm)}.';
+    return 'Ease off. ${_paceSpeech(paceSecPerKm)}.';
   }
 
-  static String workoutComplete() => 'Workout complete. Well done.';
+  static String workoutComplete() => 'Workout complete.';
 
   static String goalComplete({
     required RunIntervalMetric metric,
@@ -119,6 +134,17 @@ class RunVoicePhrases {
     }
     return 'Goal complete. ${_distanceSpeech(value)}.';
   }
+
+  static String goalRemaining({
+    required RunIntervalMetric metric,
+    required int value,
+  }) => metric == RunIntervalMetric.time
+      ? '${_durationSpeech(value)} left.'
+      : '${_distanceSpeech(value)} left.';
+
+  static String paused() => 'Paused.';
+
+  static String resumed() => 'Resumed.';
 
   static String _kilometersWord(int km) => km == 1 ? 'kilometer' : 'kilometers';
 
@@ -145,13 +171,20 @@ class RunVoicePhrases {
     final total = secPerKm.round().clamp(0, 99 * 60 + 59);
     final minutes = total ~/ 60;
     final seconds = total % 60;
-    return '$minutes minutes $seconds seconds';
+    return '$minutes ${seconds.toString().padLeft(2, '0')} per kilometer';
   }
 
+  static bool _validPace(double? pace) =>
+      pace != null && pace > 0 && pace.isFinite;
+
   static String _distanceSpeech(int meters) {
-    if (meters >= 1000 && meters % 1000 == 0) {
-      final km = meters ~/ 1000;
-      return '$km ${_kilometersWord(km)}';
+    if (meters >= 1000) {
+      if (meters % 1000 == 0) {
+        final km = meters ~/ 1000;
+        return '$km ${_kilometersWord(km)}';
+      }
+      final km = (meters / 1000).toStringAsFixed(1);
+      return '$km kilometers';
     }
     return '$meters meters';
   }

@@ -279,6 +279,41 @@ void main() {
       expect(find.text('Nenhum treino nesta semana'), findsOneWidget);
     });
 
+    testWidgets('long-press drag moves a session to another weekday', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      late RunPlanWorkout session;
+      final planId = await real(tester, () async {
+        final plan = await repo.createPlan(name: 'Base', weeks: 1);
+        session = await repo.addWorkout(
+          planId: plan.id,
+          weekIndex: 0,
+          name: 'Rodagem leve',
+          dayOfWeek: DateTime.tuesday,
+        );
+        return plan.id;
+      });
+
+      await pumpScreen(tester, RunPlanDetailScreen(planId: planId));
+
+      final source = find.byKey(ValueKey('run-plan-session-${session.id}'));
+      final target = find.byKey(const ValueKey('run-plan-day-4'));
+      final gesture = await tester.startGesture(tester.getCenter(source));
+      await tester.pump(const Duration(milliseconds: 600));
+      await gesture.moveTo(tester.getCenter(target));
+      await tester.pump();
+      await gesture.up();
+      await tester.runAsync(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        await tester.pump();
+      });
+
+      final moved = await real(tester, () => repo.getWorkout(session.id));
+      expect(moved!.dayOfWeek, DateTime.thursday);
+    });
+
     testWidgets('completed sessions are marked inside the training week', (
       tester,
     ) async {

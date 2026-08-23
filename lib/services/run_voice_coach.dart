@@ -11,6 +11,7 @@ import 'package:workout_notes/services/run_native_voice_service.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/services/run_tts_service.dart';
 import 'package:workout_notes/services/run_voice_phrases.dart';
+import 'package:workout_notes/services/run_voice_cue_arbiter.dart';
 import 'package:workout_notes/services/run_voice_settings_store.dart';
 
 typedef RunVoiceSpeakFn = Future<void> Function(String text);
@@ -27,17 +28,18 @@ class RunVoiceCoach extends ChangeNotifier {
     Future<void> Function()? ensureTtsReady,
     Future<void> Function()? stopTts,
     bool? useNativeVoice,
-  })  : _settingsStore = settingsStore ?? RunVoiceSettingsStore.instance,
-        _intervalEngine = intervalEngine ?? RunIntervalEngine(),
-        _stepEngine = stepEngine ?? RunWorkoutStepEngine(),
-        _speak = speak ?? ((text) => RunTtsService.instance.speak(text)),
-        _audioCaps =
-            audioCaps ?? (() => RunAudioGateService.instance.getCapabilities()),
-        _ensureTtsReady =
-            ensureTtsReady ?? (() => RunTtsService.instance.ensureReady()),
-        _stopTts = stopTts ?? (() => RunTtsService.instance.stop()),
-        _useNativeVoiceOverride = useNativeVoice,
-        _isCustomSpeak = speak != null || ensureTtsReady != null || stopTts != null;
+  }) : _settingsStore = settingsStore ?? RunVoiceSettingsStore.instance,
+       _intervalEngine = intervalEngine ?? RunIntervalEngine(),
+       _stepEngine = stepEngine ?? RunWorkoutStepEngine(),
+       _speak = speak ?? ((text) => RunTtsService.instance.speak(text)),
+       _audioCaps =
+           audioCaps ?? (() => RunAudioGateService.instance.getCapabilities()),
+       _ensureTtsReady =
+           ensureTtsReady ?? (() => RunTtsService.instance.ensureReady()),
+       _stopTts = stopTts ?? (() => RunTtsService.instance.stop()),
+       _useNativeVoiceOverride = useNativeVoice,
+       _isCustomSpeak =
+           speak != null || ensureTtsReady != null || stopTts != null;
 
   final RunVoiceSettingsStore _settingsStore;
   final RunIntervalEngine _intervalEngine;
@@ -50,6 +52,7 @@ class RunVoiceCoach extends ChangeNotifier {
   final Future<void> Function() _stopTts;
   final bool? _useNativeVoiceOverride;
   final bool _isCustomSpeak;
+  final RunVoiceCueArbiter _arbiter = RunVoiceCueArbiter();
 
   RunVoiceSettings _settings = const RunVoiceSettings.defaults();
   RunSessionGoal _goal = const RunSessionGoal.defaults();
@@ -64,6 +67,13 @@ class RunVoiceCoach extends ChangeNotifier {
   DateTime? _lastGpsAnnounceAt;
   DateTime? _lastPaceAnnounceAt;
   bool _busy = false;
+  final Set<int> _goalProgressCues = {};
+  final List<({DateTime at, double distance, int movingSeconds})> _paceSamples =
+      [];
+  DateTime? _paceDeviationSince;
+  int _paceDeviationDirection = 0;
+  bool _paceCorrectionSpoken = false;
+  bool? _wasPaused;
 
   /// When set (tests), [prepare]/[reloadSettings] skip the DB store.
   RunVoiceSettings? settingsOverride;
@@ -101,9 +111,13 @@ class RunVoiceCoach extends ChangeNotifier {
 
   bool get _useNativeVoice {
     if (_useNativeVoiceOverride != null) return _useNativeVoiceOverride;
-    if (_isCustomSpeak) return false; // Tests inject fake TTS -> stay on Dart path
+    if (_isCustomSpeak) {
+      return false; // Tests inject fake TTS -> stay on Dart path
+    }
     if (RunTrackingService.instance.isDebugSimulating) return false;
-    if (_bypassHeadphonesGate) return false; // Debug sim uses Dart TTS (emulator, no headset)
+    if (_bypassHeadphonesGate) {
+      return false; // Debug sim uses Dart TTS (emulator, no headset)
+    }
     return !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
   }
 
@@ -126,6 +140,19 @@ class RunVoiceCoach extends ChangeNotifier {
       _settings = await _settingsStore.load();
     }
     _intervalEngine.configure(_settings.interval);
+    if (_active && _useNativeVoice) {
+      await RunNativeVoiceService.instance.syncSettings(
+        settings: _settings.toJson(),
+        goal: {
+          'enabled': _goal.enabled,
+          'metric': _goal.metric.name,
+          'value': _goal.value,
+        },
+        intervalsOn: _intervalsOn,
+        bypassHeadphonesGate: _bypassHeadphonesGate,
+        plan: _planWorkout?.stepsJson(),
+      );
+    }
     notifyListeners();
   }
 
@@ -177,6 +204,13 @@ class RunVoiceCoach extends ChangeNotifier {
     _lastWeakGps = null;
     _lastGpsAnnounceAt = null;
     _lastPaceAnnounceAt = null;
+    _goalProgressCues.clear();
+    _paceSamples.clear();
+    _paceDeviationSince = null;
+    _paceDeviationDirection = 0;
+    _paceCorrectionSpoken = false;
+    _wasPaused = null;
+    _arbiter.reset();
     _intervalEngine.reset();
     _intervalEngine.configure(_settings.interval);
     _stepEngine.reset();
@@ -213,20 +247,35 @@ class RunVoiceCoach extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// A deliberately minimal acknowledgement after the tracker has stopped.
+  /// Planned sessions already announce their final step and do not repeat it.
+  Future<void> announceManualCompletion() async {
+    if (!_settings.enabled || hasPlan) return;
+    await _ensureTtsReady();
+    await _speakIfAllowed(RunVoicePhrases.workoutComplete());
+  }
+
   Future<void> onTrackingUpdate(RunTrackingState state) async {
     if (!_active) return;
     if (_busy) return;
     _busy = true;
     try {
-      final phrases = <String>[];
+      final cues = <RunVoiceCue>[];
+
+      final statusCue = _statusCue(state);
+      if (statusCue != null) cues.add(statusCue);
 
       // Goal completion always wins over other cues in the same tick.
       final goalJustCompleted = _checkGoalCompletion(state);
       if (goalJustCompleted) {
-        phrases.add(
-          RunVoicePhrases.goalComplete(
-            metric: _goal.metric,
-            value: _goal.value,
+        cues.add(
+          RunVoiceCue(
+            text: RunVoicePhrases.goalComplete(
+              metric: _goal.metric,
+              value: _goal.value,
+            ),
+            priority: RunVoiceCuePriority.achievement,
+            key: 'goal-complete',
           ),
         );
         // Keep the structured/preset counters in sync without speaking them.
@@ -243,14 +292,12 @@ class RunVoiceCoach extends ChangeNotifier {
             movingTimeSeconds: state.movingTimeSeconds,
           );
         }
-        _collectFreeRunPhrases(state);
+        _collectFreeRunCues(state);
       } else if (hasPlan) {
         // A planned session replaces the quick interval preset.
-        phrases.addAll(
-          _advanceStepEngine(state, speak: _settings.announceIntervals),
-        );
+        cues.addAll(_advanceStepEngine(state, speak: true));
         if (state.isRecording || state.isPaused) {
-          phrases.addAll(_collectFreeRunPhrases(state));
+          cues.addAll(_collectFreeRunCues(state));
         }
       } else {
         if (_intervalsOn &&
@@ -259,8 +306,8 @@ class RunVoiceCoach extends ChangeNotifier {
             _intervalEngine.snapshot.phase == RunIntervalPhase.idle) {
           final startEvents = _intervalEngine.start();
           for (final event in startEvents) {
-            final phrase = _phraseForInterval(event);
-            if (phrase != null) phrases.add(phrase);
+            final cue = _cueForInterval(event);
+            if (cue != null) cues.add(cue);
           }
         }
 
@@ -271,13 +318,13 @@ class RunVoiceCoach extends ChangeNotifier {
             movingTimeSeconds: state.movingTimeSeconds,
           );
           for (final event in intervalEvents) {
-            final phrase = _phraseForInterval(event);
-            if (phrase != null) phrases.add(phrase);
+            final cue = _cueForInterval(event);
+            if (cue != null) cues.add(cue);
           }
         }
 
         if (state.isRecording || state.isPaused) {
-          phrases.addAll(_collectFreeRunPhrases(state));
+          cues.addAll(_collectFreeRunCues(state));
         }
       }
 
@@ -288,10 +335,8 @@ class RunVoiceCoach extends ChangeNotifier {
       // double announcements; native controller is fed from RunTrackingService ticks.
       if (_useNativeVoice) return;
 
-      for (final phrase in phrases) {
-        final spoken = await _speakIfAllowed(phrase);
-        if (!spoken) break;
-      }
+      final cue = _arbiter.choose(cues);
+      if (cue != null) await _speakIfAllowed(cue.text);
     } finally {
       _busy = false;
     }
@@ -309,41 +354,59 @@ class RunVoiceCoach extends ChangeNotifier {
     return true;
   }
 
-  List<String> _collectFreeRunPhrases(RunTrackingState state) {
-    final out = <String>[];
+  List<RunVoiceCue> _collectFreeRunCues(RunTrackingState state) {
+    final out = <RunVoiceCue>[];
+    final avgPace = state.distanceMeters > 0
+        ? state.movingTimeSeconds / (state.distanceMeters / 1000.0)
+        : null;
+    final every = _settings.distanceEveryKm.clamp(1, 5);
+    final milestone = ((state.distanceMeters / 1000).floor() ~/ every) * every;
+    final hasNewMilestone =
+        _settings.announceDistance &&
+        milestone > 0 &&
+        milestone > _lastAnnouncedKm;
+    final hasNewSplit =
+        _settings.announceSplit && state.splits.length > _lastSplitCount;
 
-    if (_settings.announceDistance) {
-      final every = _settings.distanceEveryKm.clamp(1, 5);
-      final kmFloor = (state.distanceMeters / 1000.0).floor();
-      final milestone = (kmFloor ~/ every) * every;
-      if (milestone > 0 && milestone > _lastAnnouncedKm) {
-        _lastAnnouncedKm = milestone;
-        final avgPace = state.distanceMeters > 0
-            ? state.movingTimeSeconds / (state.distanceMeters / 1000.0)
-            : null;
-        out.add(
-          RunVoicePhrases.distanceMilestone(
+    // A kilometer boundary creates one compact report, never separate distance
+    // and split announcements.
+    if (hasNewSplit) {
+      final split = state.splits.last;
+      _lastSplitCount = state.splits.length;
+      if (hasNewMilestone) _lastAnnouncedKm = milestone;
+      out.add(
+        RunVoiceCue(
+          text: hasNewMilestone
+              ? RunVoicePhrases.splitSummary(
+                  km: split.km,
+                  splitPaceSecPerKm: split.paceSecPerKm,
+                  avgPaceSecPerKm: avgPace,
+                )
+              : RunVoicePhrases.splitComplete(
+                  km: split.km,
+                  paceSecPerKm: split.paceSecPerKm,
+                ),
+          priority: RunVoiceCuePriority.progress,
+          key: 'split-${split.km}',
+        ),
+      );
+    } else if (hasNewMilestone) {
+      _lastAnnouncedKm = milestone;
+      out.add(
+        RunVoiceCue(
+          text: RunVoicePhrases.distanceMilestone(
             km: milestone,
             durationSeconds: state.durationSeconds,
             avgPaceSecPerKm: avgPace,
           ),
-        );
-      }
+          priority: RunVoiceCuePriority.progress,
+          key: 'distance-$milestone',
+        ),
+      );
     }
 
-    if (_settings.announceSplit) {
-      final completed = state.splits.length;
-      if (completed > _lastSplitCount) {
-        final split = state.splits.last;
-        _lastSplitCount = completed;
-        out.add(
-          RunVoicePhrases.splitComplete(
-            km: split.km,
-            paceSecPerKm: split.paceSecPerKm,
-          ),
-        );
-      }
-    }
+    final goalProgress = _goalProgressCue(state);
+    if (goalProgress != null) out.add(goalProgress);
 
     if (_settings.announceGpsStatus && state.isRecording) {
       final weak = state.hasWeakGps || state.lat == null;
@@ -351,53 +414,141 @@ class RunVoiceCoach extends ChangeNotifier {
         _lastWeakGps = weak;
       } else if (weak != _lastWeakGps) {
         final now = DateTime.now();
-        final cooled = _lastGpsAnnounceAt == null ||
-            now.difference(_lastGpsAnnounceAt!) >= const Duration(seconds: 20);
+        final cooled =
+            _lastGpsAnnounceAt == null ||
+            now.difference(_lastGpsAnnounceAt!) >= const Duration(seconds: 30);
         if (cooled) {
           _lastWeakGps = weak;
           _lastGpsAnnounceAt = now;
-          out.add(weak ? RunVoicePhrases.weakGps() : RunVoicePhrases.gpsRestored());
+          out.add(
+            RunVoiceCue(
+              text: weak
+                  ? RunVoicePhrases.weakGps()
+                  : RunVoicePhrases.gpsRestored(),
+              priority: RunVoiceCuePriority.safety,
+              key: weak ? 'gps-weak' : 'gps-restored',
+            ),
+          );
         }
       }
     }
 
-    if (_settings.announcePaceWarning &&
+    // A plan owns its pace target. Never let the global free-run target argue
+    // with the current planned step.
+    if (!hasPlan &&
+        _settings.announcePaceWarning &&
         _settings.targetPaceSecPerKm != null &&
         state.isRecording) {
-      final pace = state.currentPaceSecPerKm;
-      final target = _settings.targetPaceSecPerKm!;
-      if (pace != null &&
-          pace > 0 &&
-          pace.isFinite &&
-          state.distanceMeters >= 200) {
-        final tol = _settings.paceTolerancePercent / 100.0;
-        final fastLimit = target * (1 - tol);
-        final slowLimit = target * (1 + tol);
-        String? warning;
-        if (pace < fastLimit) {
-          warning = RunVoicePhrases.paceTooFast();
-        } else if (pace > slowLimit) {
-          warning = RunVoicePhrases.paceTooSlow();
-        }
-        if (warning != null) {
-          final now = DateTime.now();
-          final cooled = _lastPaceAnnounceAt == null ||
-              now.difference(_lastPaceAnnounceAt!) >=
-                  const Duration(seconds: 45);
-          if (cooled) {
-            _lastPaceAnnounceAt = now;
-            out.add(warning);
-          }
-        }
-      }
+      final paceCue = _stablePaceCue(state);
+      if (paceCue != null) out.add(paceCue);
     }
-
     return out;
+  }
+
+  RunVoiceCue? _goalProgressCue(RunTrackingState state) {
+    if (!_goal.enabled || _goalCompleted || !state.isRecording) return null;
+    final progress = _goal.progressFor(
+      distanceMeters: state.distanceMeters,
+      movingTimeSeconds: state.movingTimeSeconds,
+    );
+    final threshold = progress >= .8 ? 80 : (progress >= .5 ? 50 : 0);
+    if (threshold == 0 || _goalProgressCues.contains(threshold)) return null;
+    // Short goals only need the final approach cue.
+    if (threshold == 50 &&
+        ((_goal.metric == RunIntervalMetric.distance && _goal.value < 5000) ||
+            (_goal.metric == RunIntervalMetric.time && _goal.value < 1800))) {
+      return null;
+    }
+    _goalProgressCues.add(threshold);
+    return RunVoiceCue(
+      text: RunVoicePhrases.goalRemaining(
+        metric: _goal.metric,
+        value: _goal
+            .remaining(
+              distanceMeters: state.distanceMeters,
+              movingTimeSeconds: state.movingTimeSeconds,
+            )
+            .round(),
+      ),
+      priority: RunVoiceCuePriority.coaching,
+      key: 'goal-$threshold',
+    );
+  }
+
+  RunVoiceCue? _stablePaceCue(RunTrackingState state) {
+    final now = DateTime.now();
+    _paceSamples.add((
+      at: now,
+      distance: state.distanceMeters,
+      movingSeconds: state.movingTimeSeconds,
+    ));
+    _paceSamples.removeWhere(
+      (sample) => now.difference(sample.at) > const Duration(seconds: 25),
+    );
+    if (_paceSamples.length < 2 || state.distanceMeters < 200) return null;
+    final first = _paceSamples.first;
+    final elapsed = state.movingTimeSeconds - first.movingSeconds;
+    final distance = state.distanceMeters - first.distance;
+    if (elapsed < 12 || distance < 40) return null;
+    final pace = elapsed / (distance / 1000);
+    final target = _settings.targetPaceSecPerKm!;
+    final tolerance = _settings.paceTolerancePercent / 100;
+    final direction = pace < target * (1 - tolerance)
+        ? -1
+        : (pace > target * (1 + tolerance) ? 1 : 0);
+    if (direction == 0) {
+      _paceDeviationSince = null;
+      _paceDeviationDirection = 0;
+      if (_paceCorrectionSpoken) {
+        _paceCorrectionSpoken = false;
+        return RunVoiceCue(
+          text: RunVoicePhrases.paceOnTarget(),
+          priority: RunVoiceCuePriority.coaching,
+          key: 'pace-on-target',
+        );
+      }
+      return null;
+    }
+    if (_paceDeviationDirection != direction) {
+      _paceDeviationDirection = direction;
+      _paceDeviationSince = now;
+      return null;
+    }
+    if (_paceDeviationSince == null ||
+        now.difference(_paceDeviationSince!) < const Duration(seconds: 10)) {
+      return null;
+    }
+    final cooled =
+        _lastPaceAnnounceAt == null ||
+        now.difference(_lastPaceAnnounceAt!) >= const Duration(seconds: 60);
+    if (!cooled || _paceCorrectionSpoken) return null;
+    _lastPaceAnnounceAt = now;
+    _paceCorrectionSpoken = true;
+    return RunVoiceCue(
+      text: direction < 0
+          ? RunVoicePhrases.paceTooFast()
+          : RunVoicePhrases.paceTooSlow(),
+      priority: RunVoiceCuePriority.coaching,
+      key: direction < 0 ? 'pace-fast' : 'pace-slow',
+    );
+  }
+
+  RunVoiceCue? _statusCue(RunTrackingState state) {
+    if (!state.isRecording && !state.isPaused) return null;
+    final paused = state.isPaused;
+    final previous = _wasPaused;
+    _wasPaused = paused;
+    if (previous == null || previous == paused) return null;
+    return RunVoiceCue(
+      text: paused ? RunVoicePhrases.paused() : RunVoicePhrases.resumed(),
+      priority: RunVoiceCuePriority.transition,
+      key: paused ? 'paused' : 'resumed',
+    );
   }
 
   /// Starts the plan on the first recording tick and drains its events.
   /// Returns the phrases to speak (empty when [speak] is false).
-  List<String> _advanceStepEngine(
+  List<RunVoiceCue> _advanceStepEngine(
     RunTrackingState state, {
     required bool speak,
   }) {
@@ -414,21 +565,40 @@ class RunVoiceCoach extends ChangeNotifier {
       ),
     );
     if (!speak) return const [];
-    final phrases = <String>[];
+    final cues = <RunVoiceCue>[];
     for (final event in events) {
       final phrase = _phraseForStep(event);
-      if (phrase != null) phrases.add(phrase);
+      if (phrase != null) {
+        cues.add(
+          RunVoiceCue(
+            text: phrase,
+            priority:
+                event.kind == RunStepEventKind.paceTooFast ||
+                    event.kind == RunStepEventKind.paceTooSlow
+                ? RunVoiceCuePriority.coaching
+                : event.kind == RunStepEventKind.workoutCompleted
+                ? RunVoiceCuePriority.achievement
+                : RunVoiceCuePriority.transition,
+            key: 'step-${event.kind.name}-${event.stepIndex}',
+          ),
+        );
+      }
     }
-    return phrases;
+    return cues;
   }
 
   String? _phraseForStep(RunStepEvent event) {
     switch (event.kind) {
       case RunStepEventKind.stepStarted:
         final expanded = _stepEngine.steps;
-        final target = event.stepIndex >= 0 && event.stepIndex < expanded.length
-            ? expanded[event.stepIndex].step.targetPaceMinSecPerKm
+        final step = event.stepIndex >= 0 && event.stepIndex < expanded.length
+            ? expanded[event.stepIndex].step
             : null;
+        final min = step?.targetPaceMinSecPerKm;
+        final max = step?.targetPaceMaxSecPerKm;
+        final target = min != null && max != null
+            ? (min + max) / 2
+            : min ?? max;
         return RunVoicePhrases.stepStart(
           role: event.role,
           repIndex: event.repIndex,
@@ -439,6 +609,8 @@ class RunVoiceCoach extends ChangeNotifier {
         );
       case RunStepEventKind.timeRemainingCue:
         return RunVoicePhrases.timeRemaining(event.remainingSeconds ?? 30);
+      case RunStepEventKind.distanceRemainingCue:
+        return RunVoicePhrases.distanceRemaining(event.remainingMeters ?? 100);
       case RunStepEventKind.paceTooSlow:
         return RunVoicePhrases.stepPaceTooSlow(event.paceSecPerKm);
       case RunStepEventKind.paceTooFast:
@@ -479,6 +651,18 @@ class RunVoiceCoach extends ChangeNotifier {
         distanceMeters: (row['distanceMeters'] as num?)?.toDouble() ?? 0,
         durationSeconds: (row['durationSeconds'] as num?)?.toInt() ?? 0,
       );
+
+  RunVoiceCue? _cueForInterval(RunIntervalEvent event) {
+    final text = _phraseForInterval(event);
+    if (text == null) return null;
+    return RunVoiceCue(
+      text: text,
+      priority: event.kind == RunIntervalEventKind.completed
+          ? RunVoiceCuePriority.achievement
+          : RunVoiceCuePriority.transition,
+      key: 'interval-${event.kind.name}-${event.workIndex}',
+    );
+  }
 
   String? _phraseForInterval(RunIntervalEvent event) {
     switch (event.kind) {
@@ -539,8 +723,7 @@ class RunVoiceCoach extends ChangeNotifier {
       // Fallback to Dart TTS if native not available (service not bound)
     }
     await _ensureTtsReady();
-    const phrase =
-        'Voice alerts are working. One kilometer. Pace 5 minutes 30 seconds.';
+    const phrase = 'Voice cues ready. Pace 5 30 per kilometer.';
     if (kDebugMode) {
       debugPrint('RunVoiceCoach: test speak');
     }

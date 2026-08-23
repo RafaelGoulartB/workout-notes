@@ -12,12 +12,17 @@ class GoalContributingWorkouts extends StatelessWidget {
   final bool isKm;
   final void Function(String workoutId) onTapWorkout;
 
+  /// The goal detail screen labels the card with its own section header, so it
+  /// hides the inner title row.
+  final bool showHeader;
+
   const GoalContributingWorkouts({
     super.key,
     required this.workouts,
     required this.goal,
     required this.isKm,
     required this.onTapWorkout,
+    this.showHeader = true,
   });
 
   @override
@@ -27,37 +32,48 @@ class GoalContributingWorkouts extends StatelessWidget {
     final isPortuguese = Localizations.localeOf(context).languageCode == 'pt';
 
     if (workouts.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          children: [
-            Icon(Icons.fitness_center,
-                size: 36, color: theme.colorScheme.onSurfaceVariant.withAlpha(100)),
-            const SizedBox(height: 8),
-            Text(
-              loc.goalNoContributors,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+      return Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side:
+              BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: Column(
+            children: [
+              Icon(Icons.fitness_center,
+                  size: 36,
+                  color: theme.colorScheme.onSurfaceVariant.withAlpha(100)),
+              const SizedBox(height: 8),
+              Text(
+                loc.goalNoContributors,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
 
     return Card(
       elevation: 0,
+      margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        padding: EdgeInsets.fromLTRB(14, showHeader ? 12 : 4, 14, 4),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            if (showHeader) Row(
               children: [
                 Icon(Icons.list_alt, size: 18, color: theme.colorScheme.onSurface),
                 const SizedBox(width: 8),
@@ -85,14 +101,21 @@ class GoalContributingWorkouts extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            ...workouts.map((w) => _WorkoutTile(
-                  workout: w,
-                  goal: goal,
-                  isKm: isKm,
-                  isPortuguese: isPortuguese,
-                  onTap: () => onTapWorkout(w.workoutId),
-                )),
+            if (showHeader) const SizedBox(height: 8),
+            for (var i = 0; i < workouts.length; i++) ...[
+              if (i > 0)
+                Divider(
+                  height: 1,
+                  color: theme.colorScheme.outlineVariant.withAlpha(60),
+                ),
+              _WorkoutTile(
+                workout: workouts[i],
+                goal: goal,
+                isKm: isKm,
+                isPortuguese: isPortuguese,
+                onTap: () => onTapWorkout(workouts[i].workoutId),
+              ),
+            ],
           ],
         ),
       ),
@@ -118,6 +141,7 @@ class _WorkoutTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
     final date = DateTime.parse(workout.date);
     final dateStr = isPortuguese
         ? DateFormat("d 'de' MMM", 'pt_BR').format(date)
@@ -178,7 +202,7 @@ class _WorkoutTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _subtitle(),
+                    _subtitle(loc),
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontSize: 11,
                       color: theme.colorScheme.onSurfaceVariant,
@@ -190,16 +214,24 @@ class _WorkoutTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            // Contribution
-            Text(
-              GoalFormatters.formatValueShort(
-                  goal.metric, workout.contributedValue, isKm: isKm),
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
+            // Contribution — a day-count goal always contributes exactly one
+            // day, so a check reads better than "1d".
+            if (goal.metric == GoalMetric.days)
+              Icon(
+                Icons.check_circle_rounded,
+                size: 18,
                 color: theme.colorScheme.primary,
+              )
+            else
+              Text(
+                GoalFormatters.formatValueShort(
+                    goal.metric, workout.contributedValue, isKm: isKm),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: theme.colorScheme.primary,
+                ),
               ),
-            ),
             const SizedBox(width: 4),
             Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
           ],
@@ -208,13 +240,13 @@ class _WorkoutTile extends StatelessWidget {
     );
   }
 
-  String _subtitle() {
+  String _subtitle(AppLocalizations loc) {
     if (goal.metric == GoalMetric.days) {
-      return 'Treino concluído';
+      return loc.goalWorkoutCompletedLabel;
     }
     if (workout.setCount > 0) {
-      return '${workout.setCount} ${workout.setCount == 1 ? 'série' : 'séries'}';
+      return loc.goalWorkoutSets(workout.setCount);
     }
-    return 'Treino';
+    return loc.goalWorkoutLabel;
   }
 }

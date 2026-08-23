@@ -117,6 +117,43 @@ void main() {
   });
 
   group('engine execution', () {
+    test('executes a continuous 2.8 km planned run without stored steps', () {
+      final continuous = RunPlanWorkout(
+        id: 'easy-2.8k',
+        runPlanId: 'p1',
+        weekIndex: 0,
+        orderIndex: 0,
+        kind: RunWorkoutKind.easy,
+        name: 'Easy run',
+        targetDistanceMeters: 2800,
+        targetPaceSecPerKm: 360,
+        createdAt: DateTime(2026, 1, 1),
+      );
+      final engine = RunWorkoutStepEngine()..configure(continuous);
+
+      expect(continuous.executionSteps, hasLength(1));
+      expect(continuous.executionSteps.single.role, RunStepRole.steady);
+      expect(continuous.executionSteps.single.value, 2800);
+      expect(engine.totalSteps, 1);
+      expect(engine.start().single.kind, RunStepEventKind.stepStarted);
+
+      final nearFinish = engine.tick(
+        recording: true,
+        distanceMeters: 2700,
+        movingTimeSeconds: 972,
+      );
+      expect(nearFinish.single.kind, RunStepEventKind.distanceRemainingCue);
+      expect(nearFinish.single.remainingMeters, 100);
+
+      final completed = engine.tick(
+        recording: true,
+        distanceMeters: 2800,
+        movingTimeSeconds: 1008,
+      );
+      expect(completed.last.kind, RunStepEventKind.workoutCompleted);
+      expect(engine.snapshot.isDone, isTrue);
+    });
+
     test('walks a distance-only session step by step', () {
       final engine = RunWorkoutStepEngine()
         ..configure(
@@ -242,6 +279,27 @@ void main() {
       expect(events, isEmpty);
     });
 
+    test('emits one 100m heads-up on distance steps', () {
+      final engine = RunWorkoutStepEngine()
+        ..configure(
+          workout([step(order: 0, role: RunStepRole.work, value: 400)]),
+        );
+      engine.start();
+      final events = engine.tick(
+        recording: true,
+        distanceMeters: 300,
+        movingTimeSeconds: 70,
+      );
+      expect(events.single.kind, RunStepEventKind.distanceRemainingCue);
+      expect(events.single.remainingMeters, 100);
+      expect(
+        engine
+            .tick(recording: true, distanceMeters: 320, movingTimeSeconds: 75)
+            .where((e) => e.kind == RunStepEventKind.distanceRemainingCue),
+        isEmpty,
+      );
+    });
+
     test('warns once when an effort step runs slower than the target pace', () {
       final engine = RunWorkoutStepEngine()
         ..configure(
@@ -322,7 +380,11 @@ void main() {
           workout([step(order: 0, role: RunStepRole.work, value: 5000)]),
         );
       engine.start();
-      engine.tick(recording: true, distanceMeters: 1200, movingTimeSeconds: 300);
+      engine.tick(
+        recording: true,
+        distanceMeters: 1200,
+        movingTimeSeconds: 300,
+      );
       engine.finish();
       expect(engine.results.length, 1);
       expect(engine.results.single.distanceMeters, closeTo(1200, 0.001));
