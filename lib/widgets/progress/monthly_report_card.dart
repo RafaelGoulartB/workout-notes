@@ -29,7 +29,8 @@ class MonthlyReportCard extends StatelessWidget {
     final avgFeeling = report!['avg_feeling'] as double?;
 
     final deltaW = comparison?['delta_workouts'] as int? ?? 0;
-    final deltaV = (comparison?['delta_volume'] as double?)?.round() ?? 0;
+    final deltaV = (comparison?['delta_volume'] as double?) ?? 0;
+    final deltaS = comparison?['delta_sets'] as int? ?? 0;
 
     final now = DateTime.now();
     final monthName = DateFormat('MMMM', Intl.defaultLocale).format(now);
@@ -67,7 +68,8 @@ class MonthlyReportCard extends StatelessWidget {
                   value: '$wc',
                   icon: Icons.fitness_center,
                   color: theme.colorScheme.primary,
-                  delta: deltaW == 0 ? null : deltaW,
+                  delta: deltaW,
+                  deltaLabel: _signed(deltaW, '${deltaW.abs()}'),
                 ),
               ),
               const _HeroDivider(),
@@ -78,7 +80,10 @@ class MonthlyReportCard extends StatelessWidget {
                   unit: 'kg',
                   icon: Icons.auto_graph,
                   color: theme.colorScheme.secondary,
-                  delta: deltaV == 0 ? null : deltaV,
+                  delta: deltaV.round(),
+                  // Volume deltas are large; keep the same compact format as
+                  // the value itself instead of a raw kilogram count.
+                  deltaLabel: _signed(deltaV, '${formatVolume(deltaV.abs())} kg'),
                 ),
               ),
               const _HeroDivider(),
@@ -88,6 +93,8 @@ class MonthlyReportCard extends StatelessWidget {
                   value: '$sets',
                   icon: Icons.repeat,
                   color: Colors.teal,
+                  delta: deltaS,
+                  deltaLabel: _signed(deltaS, '${deltaS.abs()}'),
                 ),
               ),
             ],
@@ -131,39 +138,6 @@ class MonthlyReportCard extends StatelessWidget {
                   ),
                 ),
               ],
-              const Spacer(),
-              if (deltaW != 0)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: (deltaW > 0 ? Colors.green : Colors.red).withAlpha(28),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        deltaW > 0
-                            ? Icons.trending_up_rounded
-                            : Icons.trending_down_rounded,
-                        size: 14,
-                        color: deltaW > 0 ? Colors.green : Colors.red,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        loc.progressVsLastMonth(
-                          '${deltaW > 0 ? '+' : ''}$deltaW',
-                        ),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: deltaW > 0 ? Colors.green : Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
             ],
           ),
         ],
@@ -171,6 +145,10 @@ class MonthlyReportCard extends StatelessWidget {
     );
   }
 }
+
+/// Prefixes an already formatted magnitude with the sign of [delta].
+String _signed(num delta, String magnitude) =>
+    '${delta < 0 ? '-' : '+'}$magnitude';
 
 class _HeroDivider extends StatelessWidget {
   const _HeroDivider();
@@ -194,6 +172,7 @@ class _HeroStat extends StatelessWidget {
   final IconData icon;
   final Color color;
   final int? delta;
+  final String? deltaLabel;
 
   const _HeroStat({
     required this.label,
@@ -202,6 +181,7 @@ class _HeroStat extends StatelessWidget {
     required this.color,
     this.unit,
     this.delta,
+    this.deltaLabel,
   });
 
   @override
@@ -253,18 +233,52 @@ class _HeroStat extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        if (delta != null) ...[
-          const SizedBox(height: 2),
+        if (delta != null && delta != 0 && deltaLabel != null) ...[
+          const SizedBox(height: 4),
+          _DeltaPill(label: deltaLabel!, positive: delta! > 0),
+        ],
+      ],
+    );
+  }
+}
+
+/// Signed month-over-month delta shown under a hero stat.
+class _DeltaPill extends StatelessWidget {
+  final String label;
+  final bool positive;
+
+  const _DeltaPill({required this.label, required this.positive});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = positive ? Colors.green : Colors.red;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withAlpha(28),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            positive
+                ? Icons.trending_up_rounded
+                : Icons.trending_down_rounded,
+            size: 11,
+            color: color,
+          ),
+          const SizedBox(width: 2),
           Text(
-            '${delta! > 0 ? '+' : ''}$delta',
+            label,
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w700,
-              color: delta! > 0 ? Colors.green : Colors.red,
+              color: color,
             ),
           ),
         ],
-      ],
+      ),
     );
   }
 }

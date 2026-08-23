@@ -17,11 +17,16 @@ class GoalsSection extends StatefulWidget {
   /// sheet is restricted to the same scopes.
   final List<GoalScope> allowedScopes;
 
+  /// Reports how many of the listed goals are already complete, so the host
+  /// screen can show a summary next to its section header.
+  final void Function(int achieved, int total)? onSummaryChanged;
+
   const GoalsSection({
     super.key,
     required this.db,
     required this.settingsRepo,
     this.allowedScopes = const [GoalScope.anaerobic, GoalScope.aerobic],
+    this.onSummaryChanged,
   });
 
   @override
@@ -83,6 +88,10 @@ class _GoalsSectionState extends State<GoalsSection> {
           ..addEntries(progressEntries);
         _isLoading = false;
       });
+      widget.onSummaryChanged?.call(
+        progressEntries.where((e) => e.value.isComplete).length,
+        goals.length,
+      );
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
