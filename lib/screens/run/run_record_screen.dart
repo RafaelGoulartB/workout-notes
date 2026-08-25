@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_session_goal.dart';
+import 'package:workout_notes/models/run_session_context.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/services/run_workout_step_engine.dart';
@@ -57,14 +58,28 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   RunAudioCapabilities _audioCapabilities =
       const RunAudioCapabilities.unknown();
   final _planRepo = RunPlanRepository();
+  RunPlanWorkout? _resolvedPlanWorkout;
+  ScheduledRun? _resolvedScheduledRun;
+  bool _gpsPreparing = false;
+  int _stableGpsFixes = 0;
+  DateTime? _lastStableFixAt;
+  int? _countdown;
+  bool _allowPop = false;
 
   /// The planned session, either passed directly or carried by a scheduled run.
   RunPlanWorkout? get _planWorkout =>
-      widget.planWorkout ?? widget.scheduledRun?.workout;
+      _resolvedPlanWorkout ??
+      widget.planWorkout ??
+      widget.scheduledRun?.workout;
+
+  ScheduledRun? get _scheduledRun =>
+      _resolvedScheduledRun ?? widget.scheduledRun;
 
   @override
   void initState() {
     super.initState();
+    _resolvedPlanWorkout = widget.planWorkout ?? widget.scheduledRun?.workout;
+    _resolvedScheduledRun = widget.scheduledRun;
     _service.addListener(_onChanged);
     _coach.addListener(_onCoachChanged);
     _service.initialize();
@@ -79,24 +94,54 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   }
 
   Future<void> _prepareCoach() async {
+    await _service.initialize();
     await _coach.prepare();
     final audioCapabilities = await RunAudioGateService.instance
         .getCapabilities();
+    final activeState = _service.state;
+    final context = activeState.sessionContext;
+    if (context?.planWorkoutId != null && _planWorkout == null) {
+      _resolvedPlanWorkout = await _planRepo.getWorkout(
+        context!.planWorkoutId!,
+      );
+    }
+    if (context?.scheduledRunId != null && _scheduledRun == null) {
+      _resolvedScheduledRun = await _planRepo.getScheduledRun(
+        context!.scheduledRunId!,
+      );
+    }
     final plan = _planWorkout;
     if (plan != null) _coach.setPlanWorkout(plan);
+    if (activeState.isActive && context != null) {
+      _goal = context.goal;
+      await _coach.attachToActiveSession(
+        intervalsOn: context.intervalsOn,
+        goal: context.goal,
+        planWorkout: plan,
+      );
+    }
     if (!mounted) return;
     // A planned session replaces the quick interval preset.
     setState(() {
-      _intervalsOn = plan != null ? false : _coach.intervalsOn;
+      _intervalsOn = activeState.isActive && context != null
+          ? context.intervalsOn
+          : plan != null
+          ? false
+          : _coach.intervalsOn;
       _audioCapabilities = audioCapabilities;
     });
+    if (!activeState.isActive && activeState.locationGranted) {
+      await _prepareGps();
+    }
   }
 
   @override
   void dispose() {
     _service.removeListener(_onChanged);
     _coach.removeListener(_onCoachChanged);
-    _coach.endSession();
+    if (!_service.state.isActive) {
+      _coach.endSession();
+    }
     super.dispose();
   }
 
@@ -110,10 +155,14 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     setState(() {});
     final state = _service.state;
     if (state.lat != null && state.lng != null) {
-      _mapController.move(
-        LatLng(state.lat!, state.lng!),
-        _mapController.camera.zoom,
-      );
+      try {
+        _mapController.move(
+          LatLng(state.lat!, state.lng!),
+          _mapController.camera.zoom,
+        );
+      } catch (_) {
+        // The neutral preflight map has not mounted FlutterMap yet.
+      }
     }
     _coach.onTrackingUpdate(state);
   }
@@ -157,9 +206,74 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     _coach.setIntervalsOn(value);
   }
 
+  Future<RunGpsFix?> _prepareGps() async {
+    if (_gpsPreparing || _service.state.isActive) return null;
+    setState(() => _gpsPreparing = true);
+    try {
+      final fix = await _service.prepareLocation();
+      if (!mounted) return fix;
+      setState(() {
+        if (fix?.isReady == true) {
+          final fixAt = fix?.recordedAt;
+          final isFresh = fixAt == null || fixAt != _lastStableFixAt;
+          if (isFresh) {
+            _stableGpsFixes = (_stableGpsFixes + 1).clamp(0, 3);
+            _lastStableFixAt = fixAt;
+          }
+        } else if (fix?.isRegular != true) {
+          _stableGpsFixes = 0;
+          _lastStableFixAt = null;
+        }
+      });
+      return fix;
+    } finally {
+      if (mounted) setState(() => _gpsPreparing = false);
+    }
+  }
+
+  Future<void> _runCountdown() async {
+    for (var value = 3; value >= 1; value--) {
+      if (!mounted) return;
+      setState(() => _countdown = value);
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    if (mounted) setState(() => _countdown = null);
+  }
+
+  Future<bool> _confirmStartWithoutGps() async {
+    final loc = AppLocalizations.of(context)!;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.runRecordGpsNotReadyTitle),
+        content: Text(loc.runRecordGpsNotReadyBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(loc.runRecordWaitForGps),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(loc.runRecordStartAnyway),
+          ),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
   Future<void> _startDebugSimulation() async {
     setState(() => _busy = true);
     try {
+      await _service.setSessionContext(
+        RunSessionContext(
+          planWorkoutId: _planWorkout?.id,
+          scheduledRunId: _scheduledRun?.id,
+          goal: _goal,
+          intervalsOn: _intervalsOn,
+          planSteps: _planWorkout?.stepsJson() ?? const [],
+        ),
+      );
       var startLat = -23.5505;
       var startLng = -46.6333;
       try {
@@ -197,6 +311,40 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     }
     setState(() => _busy = true);
     try {
+      if (!_service.state.locationGranted) {
+        final granted = await _service.requestPermissions();
+        if (!granted) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(loc.runRecordPermissionNeeded)),
+            );
+          }
+          return;
+        }
+      }
+      var attempts = 0;
+      while (_stableGpsFixes < 2 && mounted && attempts < 3) {
+        attempts += 1;
+        final fix = await _prepareGps();
+        if (fix == null || !fix.isReady) break;
+      }
+      if (!mounted) return;
+      if (_stableGpsFixes < 2 && !await _confirmStartWithoutGps()) {
+        await _prepareGps();
+        return;
+      }
+
+      await _service.setSessionContext(
+        RunSessionContext(
+          planWorkoutId: _planWorkout?.id,
+          scheduledRunId: _scheduledRun?.id,
+          goal: _goal,
+          intervalsOn: _intervalsOn,
+          planSteps: _planWorkout?.stepsJson() ?? const [],
+        ),
+      );
+      await _runCountdown();
+      if (!mounted) return;
       final ok = await _service.start();
       if (!ok && mounted) {
         final msg =
@@ -244,7 +392,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
             ),
         ]);
       }
-      final scheduled = widget.scheduledRun;
+      final scheduled = _scheduledRun;
       if (scheduled != null) {
         await _planRepo.attachActivity(
           scheduledRunId: scheduled.id,
@@ -311,25 +459,27 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     }
   }
 
-  Future<void> _discard() async {
+  Future<void> _discard({bool confirm = true}) async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.runRecordDiscardConfirm),
-        content: Text(loc.runRecordDiscardConfirmBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.runRecordDiscard),
-          ),
-        ],
-      ),
-    );
+    final confirmed = !confirm
+        ? true
+        : await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text(loc.runRecordDiscardConfirm),
+              content: Text(loc.runRecordDiscardConfirmBody),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: Text(loc.runRecordDiscard),
+                ),
+              ],
+            ),
+          );
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
     try {
@@ -341,260 +491,384 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     }
   }
 
+  Future<void> _handleLeaveRequested() async {
+    if (!_service.state.isActive || _busy) return;
+    final loc = AppLocalizations.of(context)!;
+    final action = await showDialog<_RunLeaveAction>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.runRecordLeaveTitle),
+        content: Text(loc.runRecordLeaveBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _RunLeaveAction.stay),
+            child: Text(loc.runRecordStay),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _RunLeaveAction.discard),
+            child: Text(loc.runRecordDiscard),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, _RunLeaveAction.background),
+            child: Text(loc.runRecordKeepRunning),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || action == null || action == _RunLeaveAction.stay) return;
+    if (action == _RunLeaveAction.discard) {
+      await _discard(confirm: false);
+      return;
+    }
+    setState(() => _allowPop = true);
+    Navigator.pop(context);
+  }
+
+  String _gpsStatusLabel(AppLocalizations loc, RunTrackingState state) {
+    if (_gpsPreparing) return loc.runRecordGpsSearching;
+    final accuracy = state.accuracyMeters;
+    if (state.lat == null || state.lng == null || accuracy == null) {
+      return loc.runRecordGpsNoFix;
+    }
+    final quality = accuracy <= 20
+        ? loc.runRecordGpsReady
+        : accuracy <= 35
+        ? loc.runRecordGpsRegular
+        : loc.runRecordGpsWeak;
+    return '$quality · ${accuracy.round()} m';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
     final state = _service.state;
-    final center = state.lat != null && state.lng != null
-        ? LatLng(state.lat!, state.lng!)
-        : const LatLng(-23.5505, -46.6333);
+    final hasLocation = state.lat != null && state.lng != null;
+    final center = hasLocation ? LatLng(state.lat!, state.lng!) : null;
     final trail = state.trail
         .map((p) => LatLng(p.lat, p.lng))
         .toList(growable: false);
     final interval = _coach.intervalSnapshot;
     final goalSnap = _coach.goalSnapshotFor(state);
+    final nativeStep = state.nativeStepSnapshot;
+    final stepSnapshot = nativeStep == null
+        ? _coach.stepSnapshot
+        : RunStepSnapshot.fromMap(nativeStep);
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: center,
-              initialZoom: 16,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-              ),
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.workoutnotes.workout_notes',
-              ),
-              if (trail.length >= 2)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: trail,
-                      color: theme.colorScheme.primary,
-                      strokeWidth: 5,
-                    ),
-                  ],
-                ),
-              if (state.lat != null && state.lng != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: LatLng(state.lat!, state.lng!),
-                      width: 22,
-                      height: 22,
-                      child: Container(
-                        decoration: BoxDecoration(
+    return PopScope(
+      canPop: !state.isActive || _allowPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleLeaveRequested();
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            if (center == null)
+              ColoredBox(
+                color: theme.colorScheme.surfaceContainerLow,
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 240),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.location_searching_rounded,
+                          size: 48,
                           color: theme.colorScheme.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
                         ),
-                      ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _gpsStatusLabel(loc, state),
+                          style: theme.textTheme.titleMedium,
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-            ],
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
+              )
+            else
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: center,
+                  initialZoom: 16,
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                  ),
+                ),
                 children: [
-                  Material(
-                    color: theme.colorScheme.surface.withValues(alpha: 0.92),
-                    shape: const CircleBorder(),
-                    child: IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: state.isActive
-                          ? _discard
-                          : () => Navigator.pop(context),
-                    ),
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.workoutnotes.workout_notes',
                   ),
-                  const Spacer(),
-                  Material(
-                    color: theme.colorScheme.surface.withValues(alpha: 0.92),
-                    shape: const CircleBorder(),
-                    child: IconButton(
-                      icon: const Icon(Icons.settings_outlined),
-                      tooltip: loc.runRecordSettings,
-                      onPressed: _openVoiceSettings,
+                  if (trail.length >= 2)
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: trail,
+                          color: theme.colorScheme.primary,
+                          strokeWidth: 5,
+                        ),
+                      ],
                     ),
-                  ),
-                  if (_service.isDebugSimulating)
-                    Container(
-                      margin: const EdgeInsets.only(left: 8),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.tertiaryContainer,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        loc.runRecordDebugSimulating,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onTertiaryContainer,
-                          fontWeight: FontWeight.w700,
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        point: center,
+                        width: 22,
+                        height: 22,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                          ),
                         ),
                       ),
-                    ),
-                  if (state.hasWeakGps ||
-                      (state.isRecording &&
-                          state.lat == null &&
-                          !_service.isDebugSimulating))
-                    Container(
-                      margin: const EdgeInsets.only(left: 8),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.errorContainer,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        state.lat == null
-                            ? loc.runRecordWaitingGps
-                            : loc.runRecordWeakGps,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: theme.colorScheme.onErrorContainer,
-                        ),
-                      ),
-                    ),
+                    ],
+                  ),
                 ],
               ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Material(
+                      color: theme.colorScheme.surface.withValues(alpha: 0.92),
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: state.isActive
+                            ? _handleLeaveRequested
+                            : () => Navigator.pop(context),
+                      ),
+                    ),
+                    const Spacer(),
+                    Material(
+                      color: theme.colorScheme.surface.withValues(alpha: 0.92),
+                      shape: const CircleBorder(),
+                      child: IconButton(
+                        icon: const Icon(Icons.settings_outlined),
+                        tooltip: loc.runRecordSettings,
+                        onPressed: _openVoiceSettings,
+                      ),
+                    ),
+                    if (_service.isDebugSimulating)
+                      Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.tertiaryContainer,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          loc.runRecordDebugSimulating,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onTertiaryContainer,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    if (!state.isActive && !_service.isDebugSimulating)
+                      Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surface.withValues(
+                            alpha: 0.92,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _gpsStatusLabel(loc, state),
+                          style: theme.textTheme.labelMedium,
+                        ),
+                      ),
+                    if (state.isActive &&
+                        (state.hasWeakGps ||
+                            (state.isRecording &&
+                                state.lat == null &&
+                                !_service.isDebugSimulating)))
+                      Container(
+                        margin: const EdgeInsets.only(left: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.errorContainer,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          state.lat == null
+                              ? loc.runRecordWaitingGps
+                              : loc.runRecordWeakGps,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          NotificationListener<DraggableScrollableNotification>(
-            onNotification: (notification) {
-              // Evita trocar o conteúdo (altura) no meio do gesto — isso
-              // causava o "para no meio" porque o SingleChildScrollView
-              // mudava de tamanho enquanto o usuário arrastava. Só atualiza
-              // quando o sheet já assentou num snap.
-              final nearCollapsed =
-                  (notification.extent - _lastCollapsedSize).abs() < 0.03;
-              final nearExpanded = (notification.extent - 0.90).abs() < 0.03;
-              if (!nearCollapsed && !nearExpanded) return false;
-              final expanded = notification.extent >= 0.75;
-              if (expanded != _sheetExpanded && mounted) {
-                setState(() => _sheetExpanded = expanded);
-              }
-              return false;
-            },
-            child: Builder(
-              builder: (context) {
-                final hasSplitSummary = state.splits.isNotEmpty;
-                final showDebug =
-                    kDebugMode && !state.isActive && _service.canDebugSimulate;
-                final hasIntervalStatus = state.isActive && _intervalsOn;
-                final media = MediaQuery.of(context);
-                final systemBottom = media.viewPadding.bottom;
-                final bottomPad =
-                    (systemBottom > 0 ? systemBottom : 16.0) + 16.0;
-                // Sheet height tracks only the widgets that are on screen —
-                // no reserved empty slots for hidden intervals/splits.
-                var contentH = 23.0; // handle
-                if (!state.locationGranted && state.supported) {
-                  contentH += 68;
+            NotificationListener<DraggableScrollableNotification>(
+              onNotification: (notification) {
+                // Evita trocar o conteúdo (altura) no meio do gesto — isso
+                // causava o "para no meio" porque o SingleChildScrollView
+                // mudava de tamanho enquanto o usuário arrastava. Só atualiza
+                // quando o sheet já assentou num snap.
+                final nearCollapsed =
+                    (notification.extent - _lastCollapsedSize).abs() < 0.03;
+                final nearExpanded = (notification.extent - 0.90).abs() < 0.03;
+                if (!nearCollapsed && !nearExpanded) return false;
+                final expanded = notification.extent >= 0.75;
+                if (expanded != _sheetExpanded && mounted) {
+                  setState(() => _sheetExpanded = expanded);
                 }
-                contentH += 72; // metrics
-                contentH += 12;
-                contentH += 22; // section label
-                contentH += _goal.enabled && state.isActive ? 64.0 : 52.0;
-                if (hasIntervalStatus) {
-                  contentH += interval.isActive ? 64.0 : 52.0;
-                }
-                if (hasSplitSummary) {
-                  contentH += 10 + 72;
-                  if (state.splits.length > 1) contentH += 20;
-                }
-                contentH += 12 + 52; // gap + primary actions
-                if (showDebug) contentH += 38;
-                contentH += bottomPad;
-                // Once the sheet has been laid out, trust the measurement over
-                // the estimate — that is what keeps the buttons on screen no
-                // matter which rows the session happens to show.
-                final wanted = _measuredSheetH > 0 ? _measuredSheetH : contentH;
-                const maxSize = 0.90;
-                final collapsedSize = (wanted / media.size.height).clamp(
-                  0.28,
-                  maxSize,
-                );
-                _lastCollapsedSize = collapsedSize;
-                final canExpand = maxSize - collapsedSize > 0.01;
-                // Recreating the sheet is the only way to change its min size,
-                // so the key carries just that. It used to also carry
-                // isActive/splits/intervals, which recreated the sheet mid-run
-                // (first split completing) and dropped it back to the collapsed
-                // extent while the expanded content was still on screen —
-                // pushing the action buttons below the fold.
-                final sheetKey =
-                    'run-sheet-${collapsedSize.toStringAsFixed(3)}';
-                if (_lastSheetKey != null &&
-                    _lastSheetKey != sheetKey &&
-                    _sheetExpanded) {
-                  // A recreated sheet starts collapsed; bring the content back
-                  // in sync so it always fits the extent it lands on.
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted && _sheetExpanded) {
-                      setState(() => _sheetExpanded = false);
-                    }
-                  });
-                }
-                _lastSheetKey = sheetKey;
-                return DraggableScrollableSheet(
-                  key: ValueKey(sheetKey),
-                  initialChildSize: collapsedSize,
-                  minChildSize: collapsedSize,
-                  maxChildSize: maxSize,
-                  snap: true,
-                  snapSizes: canExpand ? [collapsedSize, maxSize] : null,
-                  builder: (context, scrollController) {
-                    return _MetricsSheet(
-                      scrollController: scrollController,
-                      onContentHeight: _onSheetContentHeight,
-                      state: state,
-                      busy: _busy,
-                      expanded: _sheetExpanded,
-                      showDebugSimulate: showDebug,
-                      intervalsOn: _intervalsOn,
-                      intervalSnapshot: interval,
-                      intervalPreset: _coach.settings.interval,
-                      planWorkout: _planWorkout,
-                      stepSnapshot: _coach.stepSnapshot,
-                      goal: _goal,
-                      goalSnapshot: goalSnap,
-                      onGoalChanged: state.isActive ? null : _setGoal,
-                      onIntervalsChanged: state.isActive || _planWorkout != null
-                          ? null
-                          : _setIntervals,
-                      voiceEnabled: _coach.settings.enabled,
-                      headphonesOnly: _coach.settings.headphonesOnly,
-                      headsetConnected: _audioCapabilities.headsetConnected,
-                      onOpenVoiceSettings: _openVoiceSettings,
-                      onStart: _ensurePermissionAndStart,
-                      onDebugSimulate: _startDebugSimulation,
-                      onPause: () => _service.pause(),
-                      onResume: () => _service.resume(),
-                      onFinish: _finish,
-                    );
-                  },
-                );
+                return false;
               },
+              child: Builder(
+                builder: (context) {
+                  final hasSplitSummary = state.splits.isNotEmpty;
+                  final showDebug =
+                      kDebugMode &&
+                      !state.isActive &&
+                      _service.canDebugSimulate;
+                  final hasIntervalStatus = state.isActive && _intervalsOn;
+                  final media = MediaQuery.of(context);
+                  final systemBottom = media.viewPadding.bottom;
+                  final bottomPad =
+                      (systemBottom > 0 ? systemBottom : 16.0) + 16.0;
+                  // Sheet height tracks only the widgets that are on screen —
+                  // no reserved empty slots for hidden intervals/splits.
+                  var contentH = 23.0; // handle
+                  if (!state.locationGranted && state.supported) {
+                    contentH += 68;
+                  }
+                  contentH += 72; // metrics
+                  contentH += 12;
+                  contentH += 22; // section label
+                  contentH += _goal.enabled && state.isActive ? 64.0 : 52.0;
+                  if (hasIntervalStatus) {
+                    contentH += interval.isActive ? 64.0 : 52.0;
+                  }
+                  if (hasSplitSummary) {
+                    contentH += 10 + 72;
+                    if (state.splits.length > 1) contentH += 20;
+                  }
+                  contentH += 12 + 52; // gap + primary actions
+                  if (showDebug) contentH += 38;
+                  contentH += bottomPad;
+                  // Once the sheet has been laid out, trust the measurement over
+                  // the estimate — that is what keeps the buttons on screen no
+                  // matter which rows the session happens to show.
+                  final wanted = _measuredSheetH > 0
+                      ? _measuredSheetH
+                      : contentH;
+                  const maxSize = 0.90;
+                  final collapsedSize = (wanted / media.size.height).clamp(
+                    0.28,
+                    maxSize,
+                  );
+                  _lastCollapsedSize = collapsedSize;
+                  final canExpand = maxSize - collapsedSize > 0.01;
+                  // Recreating the sheet is the only way to change its min size,
+                  // so the key carries just that. It used to also carry
+                  // isActive/splits/intervals, which recreated the sheet mid-run
+                  // (first split completing) and dropped it back to the collapsed
+                  // extent while the expanded content was still on screen —
+                  // pushing the action buttons below the fold.
+                  final sheetKey =
+                      'run-sheet-${collapsedSize.toStringAsFixed(3)}';
+                  if (_lastSheetKey != null &&
+                      _lastSheetKey != sheetKey &&
+                      _sheetExpanded) {
+                    // A recreated sheet starts collapsed; bring the content back
+                    // in sync so it always fits the extent it lands on.
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted && _sheetExpanded) {
+                        setState(() => _sheetExpanded = false);
+                      }
+                    });
+                  }
+                  _lastSheetKey = sheetKey;
+                  return DraggableScrollableSheet(
+                    key: ValueKey(sheetKey),
+                    initialChildSize: collapsedSize,
+                    minChildSize: collapsedSize,
+                    maxChildSize: maxSize,
+                    snap: true,
+                    snapSizes: canExpand ? [collapsedSize, maxSize] : null,
+                    builder: (context, scrollController) {
+                      return _MetricsSheet(
+                        scrollController: scrollController,
+                        onContentHeight: _onSheetContentHeight,
+                        state: state,
+                        busy: _busy || _gpsPreparing,
+                        expanded: _sheetExpanded,
+                        showDebugSimulate: showDebug,
+                        intervalsOn: _intervalsOn,
+                        intervalSnapshot: interval,
+                        intervalPreset: _coach.settings.interval,
+                        planWorkout: _planWorkout,
+                        stepSnapshot: stepSnapshot,
+                        goal: _goal,
+                        goalSnapshot: goalSnap,
+                        onGoalChanged: state.isActive ? null : _setGoal,
+                        onIntervalsChanged:
+                            state.isActive || _planWorkout != null
+                            ? null
+                            : _setIntervals,
+                        voiceEnabled: _coach.settings.enabled,
+                        headphonesOnly: _coach.settings.headphonesOnly,
+                        headsetConnected: _audioCapabilities.headsetConnected,
+                        onOpenVoiceSettings: _openVoiceSettings,
+                        onStart: _ensurePermissionAndStart,
+                        onDebugSimulate: _startDebugSimulation,
+                        onPause: () => _service.pause(),
+                        onResume: () => _service.resume(),
+                        onFinish: _finish,
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+            if (_countdown != null)
+              Positioned.fill(
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: 0.52),
+                  child: Center(
+                    child: Text(
+                      '$_countdown',
+                      semanticsLabel: loc.runRecordCountdown('$_countdown'),
+                      style: theme.textTheme.displayLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 104,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 }
+
+enum _RunLeaveAction { stay, background, discard }
 
 class _MetricsSheet extends StatelessWidget {
   final ScrollController scrollController;

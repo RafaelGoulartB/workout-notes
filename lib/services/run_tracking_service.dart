@@ -3,10 +3,30 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/models/run_session_context.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
+import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/services/run_debug_simulator.dart';
 import 'package:workout_notes/utils/run_spool_recovery.dart';
+
+class RunGpsFix {
+  final double lat;
+  final double lng;
+  final double? accuracyMeters;
+  final DateTime? recordedAt;
+
+  const RunGpsFix({
+    required this.lat,
+    required this.lng,
+    this.accuracyMeters,
+    this.recordedAt,
+  });
+
+  bool get isReady => accuracyMeters != null && accuracyMeters! <= 20;
+  bool get isRegular => accuracyMeters != null && accuracyMeters! <= 35;
+}
 
 /// Flutter facade for the Android foreground GPS run tracker.
 ///
@@ -25,6 +45,7 @@ class RunTrackingService extends ChangeNotifier {
   static const events = EventChannel('workout_notes/run_tracking/events');
 
   final RunRepository _repository = RunRepository();
+  final RunPlanRepository _planRepository = RunPlanRepository();
   RunTrackingState _state = RunTrackingState.initial(
     supported: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
   );
@@ -39,6 +60,7 @@ class RunTrackingService extends ChangeNotifier {
   bool _debugPaused = false;
   bool _nativeDebugSim = false;
   bool _askedBackgroundPermission = false;
+  RunSessionContext? _sessionContext;
 
   RunTrackingState get state => _state;
   bool get isSupported => _state.supported;
@@ -75,7 +97,28 @@ class RunTrackingService extends ChangeNotifier {
     }
     await getCapabilities();
     await getState();
+    await _recoverActiveNativeSession();
+    _sessionContext = _state.sessionContext;
     await recoverPendingSessions();
+  }
+
+  Future<void> _recoverActiveNativeSession() async {
+    if (!_isAndroid || _state.isActive) return;
+    try {
+      final requested =
+          await methods.invokeMethod<bool>('recoverActive') ?? false;
+      if (!requested) return;
+      await _awaitStatus({
+        RunTrackingState.recording,
+        RunTrackingState.paused,
+        RunTrackingState.completed,
+        RunTrackingState.discarded,
+      }, timeout: const Duration(seconds: 8));
+    } on MissingPluginException {
+      // Older debug builds and tests.
+    } catch (error) {
+      _setError('active_recovery_error', error.toString());
+    }
   }
 
   Future<Map<String, dynamic>> getCapabilities() async {
@@ -139,10 +182,7 @@ class RunTrackingService extends ChangeNotifier {
           await methods.invokeMethod<bool>('requestPermissions') ?? false;
       _state = _state.copyWith(locationGranted: granted, clearError: true);
       if (!granted) {
-        _setError(
-          'location_denied',
-          'Precise location permission is required',
-        );
+        _setError('location_denied', 'Precise location permission is required');
       }
       notifyListeners();
       return granted;
@@ -162,7 +202,7 @@ class RunTrackingService extends ChangeNotifier {
     try {
       final granted =
           await methods.invokeMethod<bool>('requestBackgroundPermission') ??
-              false;
+          false;
       return granted;
     } on MissingPluginException {
       return true;
@@ -170,6 +210,70 @@ class RunTrackingService extends ChangeNotifier {
       return false;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Persists the logical session identity before the foreground tracker starts.
+  Future<void> setSessionContext(RunSessionContext context) async {
+    _sessionContext = context;
+    _state = _state.copyWith(sessionContext: context);
+    notifyListeners();
+    if (!_isAndroid) return;
+    try {
+      await methods.invokeMethod<void>('setSessionContext', context.toMap());
+    } on MissingPluginException {
+      // Desktop/tests.
+    } catch (error) {
+      _setError('session_context_error', error.toString());
+    }
+  }
+
+  /// Fetches one visible-activity GPS fix without starting the run timer.
+  Future<RunGpsFix?> prepareLocation() async {
+    if (kDebugMode && !_isAndroid) {
+      const fix = RunGpsFix(lat: -23.5505, lng: -46.6333, accuracyMeters: 5);
+      _state = _state.copyWith(
+        locationGranted: true,
+        lat: fix.lat,
+        lng: fix.lng,
+        accuracyMeters: fix.accuracyMeters,
+        clearError: true,
+      );
+      notifyListeners();
+      return fix;
+    }
+    if (!_isAndroid || !_state.locationGranted) return null;
+    try {
+      final result = await methods.invokeMapMethod<String, dynamic>(
+        'getCurrentLocation',
+      );
+      if (result == null) return null;
+      final lat = (result['lat'] as num?)?.toDouble();
+      final lng = (result['lng'] as num?)?.toDouble();
+      if (lat == null || lng == null) return null;
+      final millis = (result['recorded_at_millis'] as num?)?.toInt();
+      final fix = RunGpsFix(
+        lat: lat,
+        lng: lng,
+        accuracyMeters: (result['accuracy_meters'] as num?)?.toDouble(),
+        recordedAt: millis == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(millis),
+      );
+      _state = _state.copyWith(
+        lat: lat,
+        lng: lng,
+        accuracyMeters: fix.accuracyMeters,
+        clearError: true,
+      );
+      notifyListeners();
+      return fix;
+    } on PlatformException catch (error) {
+      _setError(error.code, error.message ?? error.toString());
+      return null;
+    } catch (error) {
+      _setError('gps_prepare_error', error.toString());
+      return null;
     }
   }
 
@@ -220,13 +324,10 @@ class RunTrackingService extends ChangeNotifier {
       if (result != null) {
         _applyNativeState(result);
       }
-      final ready = await _awaitStatus(
-        {
-          RunTrackingState.recording,
-          RunTrackingState.paused,
-        },
-        timeout: const Duration(seconds: 8),
-      );
+      final ready = await _awaitStatus({
+        RunTrackingState.recording,
+        RunTrackingState.paused,
+      }, timeout: const Duration(seconds: 8));
       if (!ready) {
         if (_state.errorCode == null) {
           _setError('start_timeout', 'Run service did not start in time');
@@ -247,8 +348,9 @@ class RunTrackingService extends ChangeNotifier {
     if (_debugSim != null) {
       if (_nativeDebugSim && _isAndroid) {
         try {
-          final result =
-              await methods.invokeMapMethod<String, dynamic>('pause');
+          final result = await methods.invokeMapMethod<String, dynamic>(
+            'pause',
+          );
           if (result != null) _applyNativeState(result);
         } catch (_) {}
         return;
@@ -274,8 +376,9 @@ class RunTrackingService extends ChangeNotifier {
     if (_debugSim != null) {
       if (_nativeDebugSim && _isAndroid) {
         try {
-          final result =
-              await methods.invokeMapMethod<String, dynamic>('resume');
+          final result = await methods.invokeMapMethod<String, dynamic>(
+            'resume',
+          );
           if (result != null) _applyNativeState(result);
         } catch (_) {}
         return;
@@ -301,11 +404,19 @@ class RunTrackingService extends ChangeNotifier {
       _stopDebugTimer();
       _debugSim = null;
       _debugPaused = false;
-      final imported = await _repository.importNativeSpool(sim.toSpoolPayload());
-      _trail.clear();
-      _state = RunTrackingState.initial(supported: true).copyWith(
-        locationGranted: true,
+      final payload = sim.toSpoolPayload();
+      final activity = Map<String, dynamic>.from(
+        payload['activity'] as Map? ?? const {},
       );
+      _writeContextToActivity(activity, _sessionContext);
+      payload['activity'] = activity;
+      final imported = await _repository.importNativeSpool(payload);
+      await _reconcilePlanContext(imported.id, activity);
+      _trail.clear();
+      _sessionContext = null;
+      _state = RunTrackingState.initial(
+        supported: true,
+      ).copyWith(locationGranted: true);
       notifyListeners();
       return imported;
     }
@@ -326,14 +437,11 @@ class RunTrackingService extends ChangeNotifier {
       _setError('stop_error', error.toString());
     }
 
-    await _awaitStatus(
-      {
-        RunTrackingState.completed,
-        RunTrackingState.idle,
-        RunTrackingState.discarded,
-      },
-      timeout: const Duration(seconds: 5),
-    );
+    await _awaitStatus({
+      RunTrackingState.completed,
+      RunTrackingState.idle,
+      RunTrackingState.discarded,
+    }, timeout: const Duration(seconds: 5));
 
     final resolvedId = activityId ?? _state.activityId;
     RunActivity? imported;
@@ -344,9 +452,10 @@ class RunTrackingService extends ChangeNotifier {
     }
 
     _trail.clear();
-    _state = RunTrackingState.initial(supported: true).copyWith(
-      locationGranted: _state.locationGranted,
-    );
+    _sessionContext = null;
+    _state = RunTrackingState.initial(
+      supported: true,
+    ).copyWith(locationGranted: _state.locationGranted);
     notifyListeners();
     return imported;
   }
@@ -357,9 +466,10 @@ class RunTrackingService extends ChangeNotifier {
       _debugSim = null;
       _debugPaused = false;
       _trail.clear();
-      _state = RunTrackingState.initial(supported: true).copyWith(
-        locationGranted: true,
-      );
+      _sessionContext = null;
+      _state = RunTrackingState.initial(
+        supported: true,
+      ).copyWith(locationGranted: true);
       notifyListeners();
       return;
     }
@@ -384,9 +494,10 @@ class RunTrackingService extends ChangeNotifier {
       } catch (_) {}
     }
     _trail.clear();
-    _state = RunTrackingState.initial(supported: true).copyWith(
-      locationGranted: _state.locationGranted,
-    );
+    _sessionContext = null;
+    _state = RunTrackingState.initial(
+      supported: true,
+    ).copyWith(locationGranted: _state.locationGranted);
     notifyListeners();
   }
 
@@ -400,13 +511,13 @@ class RunTrackingService extends ChangeNotifier {
     var count = 0;
     try {
       final liveStatus = _state.status;
-      final serviceAlive = liveStatus == RunTrackingState.recording ||
+      final serviceAlive =
+          liveStatus == RunTrackingState.recording ||
           liveStatus == RunTrackingState.paused ||
           liveStatus == RunTrackingState.starting ||
           liveStatus == RunTrackingState.stopping;
-      final pending = await methods.invokeListMethod<dynamic>(
-            'listPendingSpools',
-          ) ??
+      final pending =
+          await methods.invokeListMethod<dynamic>('listPendingSpools') ??
           const [];
       for (final row in pending) {
         if (row is! Map) continue;
@@ -417,6 +528,16 @@ class RunTrackingService extends ChangeNotifier {
         if (id == null) continue;
         if (status == 'discarded') {
           await methods.invokeMethod<dynamic>('deleteSpool', id);
+          continue;
+        }
+        if (!serviceAlive &&
+            (status == 'recording' ||
+                status == 'paused' ||
+                status == 'starting' ||
+                status == 'stopping')) {
+          // Never convert a live-looking spool to completed merely because
+          // Flutter won a race with the native service restart. The explicit
+          // recoverActive call above owns that transition.
           continue;
         }
         if (serviceAlive &&
@@ -483,11 +604,92 @@ class RunTrackingService extends ChangeNotifier {
       final imported = await _repository.importNativeSpool(
         Map<String, dynamic>.from(raw),
       );
-      await methods.invokeMethod<dynamic>('deleteSpool', id);
+      final reconciled = await _reconcilePlanContext(imported.id, activityMap);
+      // Keep the native envelope as a retry ledger when the activity itself
+      // imported but the plan/schedule reconciliation failed.
+      if (reconciled) {
+        await methods.invokeMethod<dynamic>('deleteSpool', id);
+      }
       return imported;
     } catch (error) {
       _setError('import_error', error.toString());
       return null;
+    }
+  }
+
+  static void _writeContextToActivity(
+    Map<String, dynamic> activity,
+    RunSessionContext? context,
+  ) {
+    if (context == null) return;
+    activity['plan_workout_id'] = context.planWorkoutId;
+    activity['scheduled_run_id'] = context.scheduledRunId;
+    activity['session_goal'] = context.toMap()['goal'];
+    activity['session_intervals_on'] = context.intervalsOn;
+  }
+
+  /// Idempotently repairs the plan ledger after either a normal stop or spool
+  /// recovery. Re-running it only replaces the same step rows and links.
+  Future<bool> _reconcilePlanContext(
+    String activityId,
+    Map<String, dynamic> activity,
+  ) async {
+    final planWorkoutId = activity['plan_workout_id'] as String?;
+    if (planWorkoutId == null || planWorkoutId.isEmpty) return true;
+    try {
+      await _planRepository.setActivityPlanWorkout(
+        activityId: activityId,
+        planWorkoutId: planWorkoutId,
+      );
+      final rawResults = activity['voice_step_results'];
+      if (rawResults is List && rawResults.isNotEmpty) {
+        final steps = <RunActivityStep>[];
+        for (final raw in rawResults.whereType<Map>()) {
+          final row = Map<String, dynamic>.from(raw);
+          steps.add(
+            RunActivityStep(
+              id: '',
+              runActivityId: activityId,
+              orderIndex: (row['sequence'] as num?)?.toInt() ?? steps.length,
+              role: row['role'] as String? ?? 'work',
+              repIndex: (row['repIndex'] as num?)?.toInt() ?? 1,
+              plannedMetric: row['plannedMetric'] as String?,
+              plannedValue: (row['plannedValue'] as num?)?.toInt(),
+              plannedPaceSecPerKm: (row['plannedPaceSecPerKm'] as num?)
+                  ?.toDouble(),
+              actualDistanceMeters: (row['distanceMeters'] as num?)?.toDouble(),
+              actualDurationSeconds: (row['durationSeconds'] as num?)?.toInt(),
+              actualPaceSecPerKm: (row['actualPaceSecPerKm'] as num?)
+                  ?.toDouble(),
+            ),
+          );
+        }
+        await _planRepository.saveActivitySteps(activityId, steps);
+      }
+
+      final scheduledRunId = activity['scheduled_run_id'] as String?;
+      final scheduled = scheduledRunId == null
+          ? null
+          : await _planRepository.getScheduledRun(scheduledRunId);
+      if (scheduled != null) {
+        await _planRepository.attachActivity(
+          scheduledRunId: scheduled.id,
+          runActivityId: activityId,
+        );
+      } else {
+        final startedAt = DateTime.tryParse(
+          activity['started_at'] as String? ?? '',
+        );
+        await _planRepository.markPlanWorkoutCompleted(
+          planWorkoutId: planWorkoutId,
+          date: startedAt?.toLocal() ?? DateTime.now(),
+          runActivityId: activityId,
+        );
+      }
+      return true;
+    } catch (error) {
+      _setError('plan_reconcile_error', error.toString());
+      return false;
     }
   }
 
@@ -538,6 +740,9 @@ class RunTrackingService extends ChangeNotifier {
     _state = _debugPaused
         ? sim.toPausedState(locationGranted: true)
         : sim.toState(locationGranted: true);
+    if (_sessionContext != null) {
+      _state = _state.copyWith(sessionContext: _sessionContext);
+    }
     notifyListeners();
   }
 

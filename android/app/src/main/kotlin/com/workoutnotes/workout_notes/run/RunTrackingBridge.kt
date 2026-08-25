@@ -5,7 +5,12 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.os.Build
+import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
@@ -13,6 +18,7 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 class RunTrackingBridge(private val context: Context) :
@@ -21,6 +27,9 @@ class RunTrackingBridge(private val context: Context) :
     companion object {
         const val PERMISSION_REQUEST_CODE = 8461
         const val BACKGROUND_PERMISSION_REQUEST_CODE = 8462
+
+        /** Context waiting for the foreground service to create its spool. */
+        @Volatile var pendingSessionContext: Map<String, Any?>? = null
     }
 
     private var activity: Activity? = null
@@ -52,6 +61,9 @@ class RunTrackingBridge(private val context: Context) :
             "getState" -> result.success(RunTrackingService.currentState(context))
             "requestPermissions" -> requestLocationPermission(result)
             "requestBackgroundPermission" -> requestBackgroundLocationPermission(result)
+            "getCurrentLocation" -> getCurrentLocation(result)
+            "setSessionContext" -> setSessionContext(call, result)
+            "recoverActive" -> recoverActive(result)
             "start" -> start(result)
             "startDebugSimulation" -> startDebugSimulation(call, result)
             "pause" -> result.success(RunTrackingService.pauseCurrent())
@@ -87,6 +99,134 @@ class RunTrackingBridge(private val context: Context) :
                 result.success(null)
             }
             else -> result.notImplemented()
+        }
+    }
+
+    private fun setSessionContext(call: MethodCall, result: MethodChannel.Result) {
+        @Suppress("UNCHECKED_CAST")
+        val value = call.arguments as? Map<String, Any?> ?: emptyMap()
+        pendingSessionContext = value
+        RunTrackingService.activeInstanceForVoice()?.persistSessionContext(value)
+        result.success(null)
+    }
+
+    /** Proactively reattaches an active spool when Flutter opens before the
+     * system has delivered the service's START_STICKY restart. */
+    private fun recoverActive(result: MethodChannel.Result) {
+        if (RunTrackingService.activeInstanceForVoice() != null) {
+            result.success(true)
+            return
+        }
+        val hasActiveSpool = spool.listPending().any {
+            when (it["status"] as? String) {
+                "starting", "recording", "paused", "stopping" -> true
+                else -> false
+            }
+        }
+        if (!hasActiveSpool) {
+            result.success(false)
+            return
+        }
+        val intent = Intent(context, RunTrackingService::class.java).apply {
+            action = RunTrackingService.ACTION_RESTORE
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+            result.success(true)
+        } catch (error: Throwable) {
+            result.error("restore_failed", error.message, null)
+        }
+    }
+
+    /** One high-accuracy fix while the run screen is visible, before timing. */
+    private fun getCurrentLocation(result: MethodChannel.Result) {
+        if (!RunTrackingService.locationGranted(context)) {
+            result.error("location_denied", "Precise location permission denied", null)
+            return
+        }
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val provider = when {
+            manager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+            manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+            else -> {
+                result.error("location_disabled", "Location services are disabled", null)
+                return
+            }
+        }
+        val delivered = AtomicBoolean(false)
+        val handler = Handler(Looper.getMainLooper())
+        var fallback: Location? = null
+        try {
+            fallback = manager.getLastKnownLocation(provider)
+        } catch (_: SecurityException) {
+        }
+
+        fun locationMap(location: Location): Map<String, Any?> = mapOf(
+            "lat" to location.latitude,
+            "lng" to location.longitude,
+            "accuracy_meters" to if (location.hasAccuracy()) location.accuracy.toDouble() else null,
+            "recorded_at_millis" to location.time,
+        )
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val cancellation = CancellationSignal()
+            handler.postDelayed({
+                if (delivered.compareAndSet(false, true)) {
+                    cancellation.cancel()
+                    val last = fallback
+                    if (last != null) result.success(locationMap(last))
+                    else result.error("gps_timeout", "No GPS fix available", null)
+                }
+            }, 8_000L)
+            try {
+                manager.getCurrentLocation(provider, cancellation, context.mainExecutor) { location ->
+                    if (location != null && delivered.compareAndSet(false, true)) {
+                        result.success(locationMap(location))
+                    }
+                }
+            } catch (error: SecurityException) {
+                if (delivered.compareAndSet(false, true)) {
+                    result.error("location_denied", error.message, null)
+                }
+            }
+            return
+        }
+
+        @Suppress("DEPRECATION")
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                manager.removeUpdates(this)
+                if (delivered.compareAndSet(false, true)) {
+                    result.success(locationMap(location))
+                }
+            }
+            @Deprecated("Deprecated in Java")
+            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+            override fun onProviderEnabled(provider: String) {}
+            override fun onProviderDisabled(provider: String) {}
+        }
+        handler.postDelayed({
+            try {
+                manager.removeUpdates(listener)
+            } catch (_: SecurityException) {
+            }
+            if (delivered.compareAndSet(false, true)) {
+                val last = fallback
+                if (last != null) result.success(locationMap(last))
+                else result.error("gps_timeout", "No GPS fix available", null)
+            }
+        }, 8_000L)
+        try {
+            @Suppress("DEPRECATION")
+            manager.requestSingleUpdate(provider, listener, Looper.getMainLooper())
+        } catch (error: SecurityException) {
+            if (delivered.compareAndSet(false, true)) {
+                result.error("location_denied", error.message, null)
+            }
         }
     }
 

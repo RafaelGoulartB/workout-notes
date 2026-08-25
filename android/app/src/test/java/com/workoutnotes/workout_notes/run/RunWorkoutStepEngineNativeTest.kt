@@ -215,6 +215,33 @@ class RunWorkoutStepEngineNativeTest {
     }
 
     @Test
+    fun executionSnapshotResumesCurrentStepAndCompletedResults() {
+        val plan = listOf(
+            step(RunStepRole.warmup, 1000),
+            step(RunStepRole.work, 400, repeatGroup = 1, repeatCount = 2),
+            step(RunStepRole.recovery, 60, RunIntervalMetric.time, repeatGroup = 1, repeatCount = 2),
+        )
+        val original = RunWorkoutStepEngineNative()
+        original.configure(plan)
+        original.start()
+        original.tick(true, 1000.0, 300)
+        original.tick(true, 1200.0, 350)
+
+        val restored = RunWorkoutStepEngineNative()
+        restored.configure(plan)
+        assertTrue(restored.restoreStateJson(original.stateJson()))
+
+        assertEquals(RunStepRole.work, restored.snapshot.role)
+        assertEquals(0.5, restored.snapshot.progress, 0.001)
+        assertEquals(1, restored.results.size)
+        assertEquals(1000.0, restored.results.first().distanceMeters, 0.001)
+
+        restored.tick(true, 1400.0, 400)
+        assertEquals(RunStepRole.recovery, restored.snapshot.role)
+        assertEquals(2, restored.results.size)
+    }
+
+    @Test
     fun parsesPlanComingFromTheMethodChannel() {
         val raw = listOf(
             mapOf(
