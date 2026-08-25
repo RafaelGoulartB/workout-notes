@@ -8,7 +8,10 @@ import 'package:workout_notes/utils/run_effort_analytics.dart';
 class RunRepository extends BaseRepository {
   static const _uuid = Uuid();
 
-  Future<List<RunActivity>> listActivities({int limit = 50, int offset = 0}) async {
+  Future<List<RunActivity>> listActivities({
+    int limit = 50,
+    int offset = 0,
+  }) async {
     final database = await db;
     final rows = await database.query(
       'run_activities',
@@ -48,6 +51,8 @@ class RunRepository extends BaseRepository {
     required String id,
     String? title,
     String? notes,
+    double? rpe,
+    int? feelingRating,
   }) async {
     final database = await db;
     await database.update(
@@ -55,6 +60,8 @@ class RunRepository extends BaseRepository {
       {
         'title': ?title,
         'notes': ?notes,
+        'rpe': ?rpe,
+        'feeling_rating': ?feelingRating,
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',
@@ -163,6 +170,8 @@ class RunRepository extends BaseRepository {
       calories: activity.calories,
       title: activity.title,
       notes: activity.notes,
+      rpe: activity.rpe,
+      feelingRating: activity.feelingRating,
       status: activity.status,
       polylineSummary: activity.polylineSummary,
       createdAt: activity.createdAt,
@@ -227,18 +236,50 @@ class RunRepository extends BaseRepository {
     final rawActivity = Map<String, dynamic>.from(
       spool['activity'] as Map? ?? const {},
     );
+    final id = rawActivity['id'] as String? ?? _uuid.v4();
+    final existing = await getActivity(id);
+    if (existing != null) return existing;
+
+    final decoded = _decodeNativeSpool(spool, id: id);
+    final activity = decoded.activity;
+    final points = decoded.points;
+
+    final database = await db;
+    await database.transaction((txn) async {
+      await txn.insert('run_activities', activity.toMap());
+      for (final point in points) {
+        await txn.insert('run_track_points', point.toMap());
+      }
+    });
+
+    return activity;
+  }
+
+  /// Builds the exact activity that would be imported, without touching
+  /// SQLite. Used by the post-run review and achievement preview.
+  RunActivity previewNativeSpool(Map<String, dynamic> spool) {
+    final rawActivity = Map<String, dynamic>.from(
+      spool['activity'] as Map? ?? const {},
+    );
+    final id = rawActivity['id'] as String? ?? _uuid.v4();
+    return _decodeNativeSpool(spool, id: id).activity;
+  }
+
+  ({RunActivity activity, List<RunTrackPoint> points}) _decodeNativeSpool(
+    Map<String, dynamic> spool, {
+    required String id,
+  }) {
+    final rawActivity = Map<String, dynamic>.from(
+      spool['activity'] as Map? ?? const {},
+    );
     final rawPoints = (spool['points'] as List? ?? const [])
         .whereType<Map>()
         .map((row) => Map<String, dynamic>.from(row))
         .toList();
 
-    final id = rawActivity['id'] as String? ?? _uuid.v4();
-    final existing = await getActivity(id);
-    if (existing != null) return existing;
-
     final now = DateTime.now();
-    final startedAt = DateTime.tryParse(rawActivity['started_at'] as String? ?? '') ??
-        now;
+    final startedAt =
+        DateTime.tryParse(rawActivity['started_at'] as String? ?? '') ?? now;
     final endedAt = DateTime.tryParse(rawActivity['ended_at'] as String? ?? '');
     final status = rawActivity['status'] as String? ?? 'completed';
     if (status == 'discarded') {
@@ -250,14 +291,19 @@ class RunRepository extends BaseRepository {
     final durationSeconds =
         (rawActivity['duration_seconds'] as num?)?.toInt() ?? 0;
     final movingTimeSeconds =
-        (rawActivity['moving_time_seconds'] as num?)?.toInt() ?? durationSeconds;
+        (rawActivity['moving_time_seconds'] as num?)?.toInt() ??
+        durationSeconds;
     final avgPace = (rawActivity['avg_pace_sec_per_km'] as num?)?.toDouble();
     final maxPace = (rawActivity['max_pace_sec_per_km'] as num?)?.toDouble();
-    final calories = (rawActivity['calories'] as num?)?.toInt() ??
+    final calories =
+        (rawActivity['calories'] as num?)?.toInt() ??
         _estimateCalories(distanceMeters);
     final title = rawActivity['title'] as String?;
     final notes = rawActivity['notes'] as String?;
-    final polyline = rawActivity['polyline_summary'] as String? ??
+    final rpe = (rawActivity['rpe'] as num?)?.toDouble();
+    final feelingRating = (rawActivity['feeling_rating'] as num?)?.toInt();
+    final polyline =
+        rawActivity['polyline_summary'] as String? ??
         _buildPolylineSummary(rawPoints);
 
     final points = <RunTrackPoint>[];
@@ -276,7 +322,8 @@ class RunRepository extends BaseRepository {
           altitude: (row['altitude'] as num?)?.toDouble(),
           accuracy: (row['accuracy'] as num?)?.toDouble(),
           speed: (row['speed'] as num?)?.toDouble(),
-          recordedAt: DateTime.tryParse(row['recorded_at'] as String? ?? '') ??
+          recordedAt:
+              DateTime.tryParse(row['recorded_at'] as String? ?? '') ??
               startedAt.add(Duration(seconds: i)),
         ),
       );
@@ -296,6 +343,8 @@ class RunRepository extends BaseRepository {
       calories: calories,
       title: title,
       notes: notes,
+      rpe: rpe,
+      feelingRating: feelingRating,
       status: 'completed',
       polylineSummary: polyline,
       createdAt: now,
@@ -310,15 +359,7 @@ class RunRepository extends BaseRepository {
       effortsComputed: true,
     );
 
-    final database = await db;
-    await database.transaction((txn) async {
-      await txn.insert('run_activities', activity.toMap());
-      for (final point in points) {
-        await txn.insert('run_track_points', point.toMap());
-      }
-    });
-
-    return activity;
+    return (activity: activity, points: points);
   }
 
   static int _estimateCalories(double distanceMeters) {

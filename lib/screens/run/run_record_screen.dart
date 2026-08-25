@@ -16,7 +16,7 @@ import 'package:workout_notes/widgets/run/run_permission_onboarding_sheet.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
-import 'package:workout_notes/screens/run/run_detail_screen.dart';
+import 'package:workout_notes/screens/run/run_post_run_review_screen.dart';
 import 'package:workout_notes/screens/run/run_voice_settings_screen.dart';
 import 'package:workout_notes/services/run_interval_engine.dart';
 import 'package:workout_notes/services/run_audio_gate_service.dart';
@@ -402,58 +402,6 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     }
   }
 
-  /// Links the recorded activity back to the plan and stores the per-step
-  /// planned-vs-actual rows. Best-effort: a failure here must not cost the run.
-  Future<void> _persistPlanResults(
-    String activityId,
-    List<RunStepResult> results,
-  ) async {
-    final plan = _planWorkout;
-    if (plan == null) return;
-    try {
-      await _planRepo.setActivityPlanWorkout(
-        activityId: activityId,
-        planWorkoutId: plan.id,
-      );
-      if (results.isNotEmpty) {
-        await _planRepo.saveActivitySteps(activityId, [
-          for (final result in results)
-            RunActivityStep(
-              id: '',
-              runActivityId: activityId,
-              orderIndex: result.sequence,
-              role: result.role.value,
-              repIndex: result.repIndex,
-              plannedMetric: result.plannedMetric.name,
-              plannedValue: result.plannedValue,
-              plannedPaceSecPerKm: result.plannedPaceSecPerKm,
-              actualDistanceMeters: result.distanceMeters,
-              actualDurationSeconds: result.durationSeconds,
-              actualPaceSecPerKm: result.actualPaceSecPerKm,
-            ),
-        ]);
-      }
-      final scheduled = _scheduledRun;
-      if (scheduled != null) {
-        await _planRepo.attachActivity(
-          scheduledRunId: scheduled.id,
-          runActivityId: activityId,
-        );
-      } else {
-        // Started from the plan or the planning screen rather than from the
-        // calendar: without this the session would stay "planned" forever and
-        // the plan's progress would never move.
-        await _planRepo.markPlanWorkoutCompleted(
-          planWorkoutId: plan.id,
-          date: DateTime.now(),
-          runActivityId: activityId,
-        );
-      }
-    } catch (_) {
-      // The run itself is already saved; the plan link can be redone later.
-    }
-  }
-
   Future<void> _finish() async {
     final loc = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
@@ -479,17 +427,14 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     try {
       await _coach.endSession();
       final stepResults = await _coach.collectStepResults();
-      final activity = await _service.stop();
+      final draft = await _service.stopForReview(stepResults: stepResults);
       await _coach.announceManualCompletion();
-      if (activity != null) {
-        await _persistPlanResults(activity.id, stepResults);
-      }
       if (!mounted) return;
-      if (activity != null) {
+      if (draft != null) {
         await Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => RunDetailScreen(activityId: activity.id),
+            builder: (_) => RunPostRunReviewScreen(draft: draft),
           ),
         );
       } else {

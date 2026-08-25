@@ -10,6 +10,8 @@ class RunActivity {
   final int? calories;
   final String? title;
   final String? notes;
+  final double? rpe;
+  final int? feelingRating;
   final String status;
   final String? polylineSummary;
   final DateTime createdAt;
@@ -41,6 +43,8 @@ class RunActivity {
     required this.calories,
     required this.title,
     required this.notes,
+    this.rpe,
+    this.feelingRating,
     required this.status,
     required this.polylineSummary,
     required this.createdAt,
@@ -72,52 +76,57 @@ class RunActivity {
       calories: (map['calories'] as num?)?.toInt(),
       title: map['title'] as String?,
       notes: map['notes'] as String?,
+      rpe: (map['rpe'] as num?)?.toDouble(),
+      feelingRating: (map['feeling_rating'] as num?)?.toInt(),
       status: map['status'] as String? ?? 'completed',
       polylineSummary: map['polyline_summary'] as String?,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
-      bestSplitPaceSecPerKm:
-          (map['best_split_pace_sec_per_km'] as num?)?.toDouble(),
+      bestSplitPaceSecPerKm: (map['best_split_pace_sec_per_km'] as num?)
+          ?.toDouble(),
       bestEffort1kSec: (map['best_effort_1k_sec'] as num?)?.toInt(),
       bestEffort3kSec: (map['best_effort_3k_sec'] as num?)?.toInt(),
       bestEffort5kSec: (map['best_effort_5k_sec'] as num?)?.toInt(),
       bestEffort10kSec: (map['best_effort_10k_sec'] as num?)?.toInt(),
       bestEffortHalfSec: (map['best_effort_half_sec'] as num?)?.toInt(),
-      bestEffortMarathonSec:
-          (map['best_effort_marathon_sec'] as num?)?.toInt(),
+      bestEffortMarathonSec: (map['best_effort_marathon_sec'] as num?)?.toInt(),
       effortsComputed: (map['efforts_computed'] as num?)?.toInt() == 1,
     );
   }
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'started_at': startedAt.toIso8601String(),
-        'ended_at': endedAt?.toIso8601String(),
-        'duration_seconds': durationSeconds,
-        'moving_time_seconds': movingTimeSeconds,
-        'distance_meters': distanceMeters,
-        'avg_pace_sec_per_km': avgPaceSecPerKm,
-        'max_pace_sec_per_km': maxPaceSecPerKm,
-        'calories': calories,
-        'title': title,
-        'notes': notes,
-        'status': status,
-        'polyline_summary': polylineSummary,
-        'created_at': createdAt.toIso8601String(),
-        'updated_at': updatedAt.toIso8601String(),
-        'best_split_pace_sec_per_km': bestSplitPaceSecPerKm,
-        'best_effort_1k_sec': bestEffort1kSec,
-        'best_effort_3k_sec': bestEffort3kSec,
-        'best_effort_5k_sec': bestEffort5kSec,
-        'best_effort_10k_sec': bestEffort10kSec,
-        'best_effort_half_sec': bestEffortHalfSec,
-        'best_effort_marathon_sec': bestEffortMarathonSec,
-        'efforts_computed': effortsComputed ? 1 : 0,
-      };
+    'id': id,
+    'started_at': startedAt.toIso8601String(),
+    'ended_at': endedAt?.toIso8601String(),
+    'duration_seconds': durationSeconds,
+    'moving_time_seconds': movingTimeSeconds,
+    'distance_meters': distanceMeters,
+    'avg_pace_sec_per_km': avgPaceSecPerKm,
+    'max_pace_sec_per_km': maxPaceSecPerKm,
+    'calories': calories,
+    'title': title,
+    'notes': notes,
+    'rpe': rpe,
+    'feeling_rating': feelingRating,
+    'status': status,
+    'polyline_summary': polylineSummary,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+    'best_split_pace_sec_per_km': bestSplitPaceSecPerKm,
+    'best_effort_1k_sec': bestEffort1kSec,
+    'best_effort_3k_sec': bestEffort3kSec,
+    'best_effort_5k_sec': bestEffort5kSec,
+    'best_effort_10k_sec': bestEffort10kSec,
+    'best_effort_half_sec': bestEffortHalfSec,
+    'best_effort_marathon_sec': bestEffortMarathonSec,
+    'efforts_computed': effortsComputed ? 1 : 0,
+  };
 
   RunActivity copyWith({
     String? title,
     String? notes,
+    double? rpe,
+    int? feelingRating,
     DateTime? updatedAt,
     double? bestSplitPaceSecPerKm,
     int? bestEffort1kSec,
@@ -140,6 +149,8 @@ class RunActivity {
       calories: calories,
       title: title ?? this.title,
       notes: notes ?? this.notes,
+      rpe: rpe ?? this.rpe,
+      feelingRating: feelingRating ?? this.feelingRating,
       status: status,
       polylineSummary: polylineSummary,
       createdAt: createdAt,

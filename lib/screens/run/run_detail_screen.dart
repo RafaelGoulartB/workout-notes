@@ -50,7 +50,8 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final activity = await _repo.ensureEffortMetrics(widget.activityId) ??
+    final activity =
+        await _repo.ensureEffortMetrics(widget.activityId) ??
         await _repo.getActivity(widget.activityId);
     final planSteps = await _planRepo.getActivitySteps(widget.activityId);
     final points = activity == null
@@ -75,9 +76,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
       _points = points;
       _planSteps = planSteps;
       _analytics = analytics;
-      _medals = activity == null
-          ? const []
-          : board.forActivity(activity.id);
+      _medals = activity == null ? const [] : board.forActivity(activity.id);
       _loading = false;
     });
   }
@@ -106,7 +105,10 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(loc.runDetailEdit, style: Theme.of(ctx).textTheme.titleLarge),
+              Text(
+                loc.runDetailEdit,
+                style: Theme.of(ctx).textTheme.titleLarge,
+              ),
               const SizedBox(height: 16),
               TextField(
                 controller: titleController,
@@ -349,9 +351,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final theme = Theme.of(context);
     return Text(
       text,
-      style: theme.textTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.w700,
-      ),
+      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
     );
   }
 
@@ -408,10 +408,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: SizedBox(
-              height: 240,
-              child: _buildMap(theme, trail),
-            ),
+            child: SizedBox(height: 240, child: _buildMap(theme, trail)),
           ),
           const SizedBox(height: 12),
           _sectionCard(
@@ -459,6 +456,22 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                       label: loc.runDetailCalories,
                       value: '${activity.calories ?? 0} kcal',
                     ),
+                    if (activity.rpe != null)
+                      _MetricItem(
+                        label: loc.runDetailRpe,
+                        value: '${activity.rpe!.round()}/10',
+                      ),
+                    if (activity.feelingRating != null)
+                      _MetricItem(
+                        label: loc.runDetailFeeling,
+                        value: switch (activity.feelingRating) {
+                          1 => loc.runReviewFeelingVeryBad,
+                          2 => loc.runReviewFeelingBad,
+                          4 => loc.runReviewFeelingGood,
+                          5 => loc.runReviewFeelingGreat,
+                          _ => loc.runReviewFeelingNeutral,
+                        },
+                      ),
                     if (bestPace != null)
                       _MetricItem(
                         label: loc.runDetailBestPace,
@@ -588,7 +601,9 @@ class _StatChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.55,
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(

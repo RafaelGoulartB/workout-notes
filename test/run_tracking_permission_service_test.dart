@@ -32,6 +32,26 @@ void main() {
           return false;
         case 'openAppSettings':
           return true;
+        case 'listPendingSpools':
+          return <Map<String, Object?>>[
+            <String, Object?>{
+              'id': 'review-pending',
+              'status': 'pending_review',
+            },
+          ];
+        case 'readSpool':
+          return <String, Object?>{
+            'activity': <String, Object?>{
+              'id': 'review-pending',
+              'status': 'pending_review',
+              'started_at': '2026-08-25T10:00:00.000Z',
+              'ended_at': '2026-08-25T10:10:00.000Z',
+              'duration_seconds': 600,
+              'moving_time_seconds': 590,
+              'distance_meters': 1500.0,
+            },
+            'points': <Object?>[],
+          };
       }
       return null;
     });
@@ -71,5 +91,14 @@ void main() {
 
     expect(await service.start(), isFalse);
     expect(calls.where((call) => call.method.startsWith('request')), isEmpty);
+  });
+
+  test('keeps a completed spool available as a pending review', () async {
+    final reviews = await RunTrackingService.instance.listPendingReviews();
+
+    expect(reviews, hasLength(1));
+    expect(reviews.single.id, 'review-pending');
+    expect(reviews.single.activity.distanceMeters, 1500);
+    expect(calls.map((call) => call.method), contains('readSpool'));
   });
 }

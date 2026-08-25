@@ -4,12 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_permission_state.dart';
+import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/run_session_context.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/services/run_debug_simulator.dart';
+import 'package:workout_notes/services/run_workout_step_engine.dart';
 import 'package:workout_notes/utils/run_spool_recovery.dart';
 
 class RunGpsFix {
@@ -55,6 +57,7 @@ class RunTrackingService extends ChangeNotifier {
   bool _recovering = false;
   int _recoveredCount = 0;
   final List<RunLatLng> _trail = [];
+  final Map<String, Map<String, dynamic>> _memoryReviewSpools = {};
 
   RunDebugSimulator? _debugSim;
   Timer? _debugTimer;
@@ -433,8 +436,11 @@ class RunTrackingService extends ChangeNotifier {
     }
   }
 
-  /// Stops tracking, imports the spool into SQLite, and deletes the spool.
-  Future<RunActivity?> stop() async {
+  /// Stops tracking but keeps the completed spool outside SQLite until the
+  /// athlete accepts the post-run review.
+  Future<RunReviewDraft?> stopForReview({
+    List<RunStepResult> stepResults = const [],
+  }) async {
     if (_debugSim != null && !_nativeDebugSim) {
       final sim = _debugSim!;
       _stopDebugTimer();
@@ -445,16 +451,29 @@ class RunTrackingService extends ChangeNotifier {
         payload['activity'] as Map? ?? const {},
       );
       _writeContextToActivity(activity, _sessionContext);
+      activity['status'] = 'pending_review';
+      activity['splits'] = [
+        for (final split in _state.splits)
+          {
+            'km': split.km,
+            'distance_meters': split.distanceMeters,
+            'duration_seconds': split.durationSeconds,
+            'pace_sec_per_km': split.paceSecPerKm,
+            'is_partial': split.isPartial,
+          },
+      ];
+      activity['voice_step_results'] = _stepResultsJson(stepResults);
       payload['activity'] = activity;
-      final imported = await _repository.importNativeSpool(payload);
-      await _reconcilePlanContext(imported.id, activity);
+      final typedPayload = Map<String, dynamic>.from(payload);
+      final preview = _repository.previewNativeSpool(typedPayload);
+      _memoryReviewSpools[preview.id] = typedPayload;
       _trail.clear();
       _sessionContext = null;
       _state = RunTrackingState.initial(
         supported: true,
       ).copyWith(locationGranted: true);
       notifyListeners();
-      return imported;
+      return RunReviewDraft.fromSpool(activity: preview, spool: typedPayload);
     }
     if (_nativeDebugSim) {
       _stopDebugTimer();
@@ -480,11 +499,29 @@ class RunTrackingService extends ChangeNotifier {
     }, timeout: const Duration(seconds: 5));
 
     final resolvedId = activityId ?? _state.activityId;
-    RunActivity? imported;
+    RunReviewDraft? draft;
     if (resolvedId != null) {
-      imported = await _importSpool(resolvedId);
-    } else {
-      await recoverPendingSessions();
+      try {
+        final raw = await methods.invokeMapMethod<String, dynamic>(
+          'markPendingReview',
+          resolvedId,
+        );
+        if (raw != null) {
+          final payload = Map<String, dynamic>.from(raw);
+          final activity = Map<String, dynamic>.from(
+            payload['activity'] as Map? ?? const {},
+          );
+          _writeContextToActivity(activity, _sessionContext);
+          if (stepResults.isNotEmpty) {
+            activity['voice_step_results'] = _stepResultsJson(stepResults);
+          }
+          payload['activity'] = activity;
+          final preview = _repository.previewNativeSpool(payload);
+          draft = RunReviewDraft.fromSpool(activity: preview, spool: payload);
+        }
+      } catch (error) {
+        _setError('review_error', error.toString());
+      }
     }
 
     _trail.clear();
@@ -493,8 +530,130 @@ class RunTrackingService extends ChangeNotifier {
       supported: true,
     ).copyWith(locationGranted: _state.locationGranted);
     notifyListeners();
-    return imported;
+    return draft;
   }
+
+  /// Backward-compatible immediate save for non-UI callers.
+  Future<RunActivity?> stop() async {
+    final draft = await stopForReview();
+    if (draft == null) return null;
+    return saveReviewedRun(draft: draft, completePlannedWorkout: true);
+  }
+
+  Future<List<RunReviewDraft>> listPendingReviews() async {
+    final drafts = <RunReviewDraft>[];
+    final seen = <String>{};
+    for (final payload in _memoryReviewSpools.values) {
+      final preview = _repository.previewNativeSpool(payload);
+      drafts.add(RunReviewDraft.fromSpool(activity: preview, spool: payload));
+      seen.add(preview.id);
+    }
+    if (!_isAndroid) return drafts;
+    try {
+      final pending =
+          await methods.invokeListMethod<dynamic>('listPendingSpools') ??
+          const [];
+      for (final row in pending.whereType<Map>()) {
+        final summary = Map<String, dynamic>.from(row);
+        if (summary['status'] != 'pending_review') continue;
+        final id = summary['id'] as String?;
+        if (id == null || seen.contains(id)) continue;
+        final raw = await methods.invokeMapMethod<String, dynamic>(
+          'readSpool',
+          id,
+        );
+        if (raw == null) continue;
+        final payload = Map<String, dynamic>.from(raw);
+        final preview = _repository.previewNativeSpool(payload);
+        drafts.add(RunReviewDraft.fromSpool(activity: preview, spool: payload));
+        seen.add(id);
+      }
+    } on MissingPluginException {
+      // Tests and older desktop runners.
+    } catch (error) {
+      _setError('review_recovery_error', error.toString());
+    }
+    drafts.sort((a, b) => b.activity.startedAt.compareTo(a.activity.startedAt));
+    return drafts;
+  }
+
+  Future<RunActivity?> saveReviewedRun({
+    required RunReviewDraft draft,
+    required bool completePlannedWorkout,
+    String? title,
+    String? notes,
+    double? rpe,
+    int? feelingRating,
+  }) async {
+    try {
+      final payload = Map<String, dynamic>.from(draft.spool);
+      final activity = Map<String, dynamic>.from(
+        payload['activity'] as Map? ?? const {},
+      );
+      activity['status'] = 'completed';
+      activity['title'] = title?.trim().isEmpty == true ? null : title?.trim();
+      activity['notes'] = notes?.trim().isEmpty == true ? null : notes?.trim();
+      activity['rpe'] = rpe;
+      activity['feeling_rating'] = feelingRating;
+      payload['activity'] = activity;
+
+      final imported = await _repository.importNativeSpool(payload);
+      await _repository.updateActivityMeta(
+        id: imported.id,
+        title: title?.trim(),
+        notes: notes?.trim(),
+        rpe: rpe,
+        feelingRating: feelingRating,
+      );
+      final reconciled = await _reconcilePlanContext(
+        imported.id,
+        activity,
+        completePlannedWorkout: completePlannedWorkout,
+      );
+      if (!reconciled) return null;
+      _memoryReviewSpools.remove(imported.id);
+      if (_isAndroid) {
+        await methods.invokeMethod<dynamic>('deleteSpool', imported.id);
+      }
+      return await _repository.getActivity(imported.id) ?? imported;
+    } catch (error) {
+      _setError('review_save_error', error.toString());
+      return null;
+    }
+  }
+
+  Future<void> discardReview(RunReviewDraft draft) async {
+    try {
+      await _repository.deleteActivity(draft.id);
+    } catch (_) {
+      // The usual case is that the review was never imported.
+    }
+    _memoryReviewSpools.remove(draft.id);
+    if (_isAndroid) {
+      try {
+        await methods.invokeMethod<dynamic>('deleteSpool', draft.id);
+      } catch (error) {
+        _setError('review_discard_error', error.toString());
+      }
+    }
+  }
+
+  static List<Map<String, dynamic>> _stepResultsJson(
+    List<RunStepResult> results,
+  ) => [
+    for (final result in results)
+      {
+        'sequence': result.sequence,
+        'role': result.role.value,
+        'repIndex': result.repIndex,
+        'plannedMetric': result.plannedMetric.name,
+        'plannedValue': result.plannedValue,
+        'plannedPaceSecPerKm': result.plannedPaceSecPerKm,
+        'distanceMeters': result.distanceMeters,
+        'durationSeconds': result.durationSeconds,
+        'actualPaceSecPerKm': result.actualPaceSecPerKm,
+      },
+  ];
 
   Future<void> discard() async {
     if (_debugSim != null && !_nativeDebugSim) {
@@ -564,6 +723,11 @@ class RunTrackingService extends ChangeNotifier {
         if (id == null) continue;
         if (status == 'discarded') {
           await methods.invokeMethod<dynamic>('deleteSpool', id);
+          continue;
+        }
+        if (status == 'pending_review') {
+          // The athlete has not accepted this activity yet. The run hub owns
+          // reopening it; recovery must never silently import it.
           continue;
         }
         if (!serviceAlive &&
@@ -668,8 +832,9 @@ class RunTrackingService extends ChangeNotifier {
   /// recovery. Re-running it only replaces the same step rows and links.
   Future<bool> _reconcilePlanContext(
     String activityId,
-    Map<String, dynamic> activity,
-  ) async {
+    Map<String, dynamic> activity, {
+    bool completePlannedWorkout = true,
+  }) async {
     final planWorkoutId = activity['plan_workout_id'] as String?;
     if (planWorkoutId == null || planWorkoutId.isEmpty) return true;
     try {
@@ -702,6 +867,8 @@ class RunTrackingService extends ChangeNotifier {
         }
         await _planRepository.saveActivitySteps(activityId, steps);
       }
+
+      if (!completePlannedWorkout) return true;
 
       final scheduledRunId = activity['scheduled_run_id'] as String?;
       final scheduled = scheduledRunId == null

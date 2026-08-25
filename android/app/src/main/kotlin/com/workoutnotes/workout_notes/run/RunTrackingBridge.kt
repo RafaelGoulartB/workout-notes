@@ -98,6 +98,26 @@ class RunTrackingBridge(private val context: Context) :
                     }
                 }
             }
+            "markPendingReview" -> {
+                val id = call.arguments as? String
+                if (id == null) {
+                    result.error("invalid_id", "Missing activity id", null)
+                } else {
+                    try {
+                        val raw = spool.read(id)
+                        @Suppress("UNCHECKED_CAST")
+                        val activity = (raw["activity"] as? Map<String, Any?>)
+                            ?.toMutableMap()
+                            ?: mutableMapOf()
+                        activity["id"] = id
+                        activity["status"] = "pending_review"
+                        spool.updateActivity(activity)
+                        result.success(mapOf("activity" to activity, "points" to raw["points"]))
+                    } catch (error: Throwable) {
+                        result.error("review_failed", error.message, null)
+                    }
+                }
+            }
             "deleteSpool" -> {
                 val id = call.arguments as? String
                 if (id != null) spool.delete(id)

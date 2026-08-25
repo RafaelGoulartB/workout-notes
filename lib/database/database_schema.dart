@@ -369,6 +369,8 @@ abstract final class DatabaseSchema {
         calories INTEGER,
         title TEXT,
         notes TEXT,
+        rpe REAL,
+        feeling_rating INTEGER,
         status TEXT NOT NULL DEFAULT 'completed',
         polyline_summary TEXT,
         created_at TEXT NOT NULL,

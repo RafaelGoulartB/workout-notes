@@ -35,6 +35,8 @@ void main() {
               calories INTEGER,
               title TEXT,
               notes TEXT,
+              rpe REAL,
+              feeling_rating INTEGER,
               status TEXT NOT NULL DEFAULT 'completed',
               polyline_summary TEXT,
               created_at TEXT NOT NULL,
@@ -122,10 +124,14 @@ void main() {
       id: 'run-1',
       title: 'Evening Run',
       notes: 'Felt good',
+      rpe: 7,
+      feelingRating: 4,
     );
     final updated = await repository.getActivity('run-1');
     expect(updated!.title, 'Evening Run');
     expect(updated.notes, 'Felt good');
+    expect(updated.rpe, 7);
+    expect(updated.feelingRating, 4);
 
     await repository.deleteActivity('run-1');
     expect(await repository.listActivities(), isEmpty);
