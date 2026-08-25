@@ -15,6 +15,7 @@ import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
+import 'package:workout_notes/utils/run_route_pace_style.dart';
 import 'package:workout_notes/widgets/run/run_achievements_section.dart';
 import 'package:workout_notes/widgets/run/run_pace_chart.dart';
 import 'package:workout_notes/widgets/run/run_splits_list.dart';
@@ -287,6 +288,12 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
 
   Widget _buildMap(ThemeData theme, AppLocalizations loc, List<LatLng> trail) {
     final bounds = _boundsFor(trail);
+    final averagePace =
+        _analytics.avgPaceSecPerKm ?? _activity?.avgPaceSecPerKm;
+    final segmentPaces = RunRoutePaceStyle.segmentPaces(
+      _points,
+      averagePaceSecPerKm: averagePace,
+    );
     final center = trail.isNotEmpty
         ? trail[trail.length ~/ 2]
         : const LatLng(-23.5505, -46.6333);
@@ -318,11 +325,16 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
             if (trail.length >= 2)
               PolylineLayer(
                 polylines: [
-                  Polyline(
-                    points: trail,
-                    color: theme.colorScheme.primary,
-                    strokeWidth: 4,
-                  ),
+                  for (var index = 0; index < trail.length - 1; index++)
+                    Polyline(
+                      points: [trail[index], trail[index + 1]],
+                      color: RunRoutePaceStyle.colorForPace(
+                        paceSecPerKm: segmentPaces[index],
+                        averagePaceSecPerKm: averagePace,
+                      ),
+                      strokeWidth: RunRoutePaceStyle.routeStrokeWidth,
+                      strokeCap: StrokeCap.butt,
+                    ),
                 ],
               ),
             if (trail.length == 1)

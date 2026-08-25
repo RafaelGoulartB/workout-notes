@@ -6,6 +6,7 @@ import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
+import 'package:workout_notes/utils/run_route_pace_style.dart';
 
 /// A short, accelerated playback of a completed run's GPS trail.
 class RunReplayScreen extends StatefulWidget {
@@ -37,6 +38,7 @@ class _RunReplayScreenState extends State<RunReplayScreen>
   late final List<RunTrackPoint> _points;
   late final List<double> _timeline;
   late final List<double> _cumulativeDistance;
+  late final List<double?> _segmentPaces;
 
   @override
   void initState() {
@@ -45,6 +47,10 @@ class _RunReplayScreenState extends State<RunReplayScreen>
       ..sort((a, b) => a.seq.compareTo(b.seq));
     _timeline = _buildTimeline(_points);
     _cumulativeDistance = _buildCumulativeDistance(_points);
+    _segmentPaces = RunRoutePaceStyle.segmentPaces(
+      _points,
+      averagePaceSecPerKm: widget.activity.avgPaceSecPerKm,
+    );
     _controller = AnimationController(
       vsync: this,
       duration: RunReplayScreen.replayDurationFor(
@@ -216,9 +222,30 @@ class _RunReplayScreenState extends State<RunReplayScreen>
     final index = _pointIndexAt(progress);
     final fraction = _segmentFraction(index, progress);
     final position = _interpolatedPosition(index, fraction);
-    final revealedTrail = <LatLng>[
-      for (var i = 0; i <= index; i++) LatLng(_points[i].lat, _points[i].lng),
-      if (index < _points.length - 1) position,
+    final revealedSegments = <Polyline>[
+      for (var segment = 0; segment < index; segment++)
+        Polyline(
+          points: [
+            LatLng(_points[segment].lat, _points[segment].lng),
+            LatLng(_points[segment + 1].lat, _points[segment + 1].lng),
+          ],
+          color: RunRoutePaceStyle.colorForPace(
+            paceSecPerKm: _segmentPaces[segment],
+            averagePaceSecPerKm: widget.activity.avgPaceSecPerKm,
+          ),
+          strokeWidth: RunRoutePaceStyle.routeStrokeWidth,
+          strokeCap: StrokeCap.butt,
+        ),
+      if (index < _points.length - 1 && fraction > 0)
+        Polyline(
+          points: [LatLng(_points[index].lat, _points[index].lng), position],
+          color: RunRoutePaceStyle.colorForPace(
+            paceSecPerKm: _segmentPaces[index],
+            averagePaceSecPerKm: widget.activity.avgPaceSecPerKm,
+          ),
+          strokeWidth: RunRoutePaceStyle.routeStrokeWidth,
+          strokeCap: StrokeCap.butt,
+        ),
     ];
     final bounds = _routeBounds();
     final elapsedSeconds = (widget.activity.durationSeconds * progress).round();
@@ -252,16 +279,8 @@ class _RunReplayScreenState extends State<RunReplayScreen>
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.workoutnotes.workout_notes',
                 ),
-              if (revealedTrail.length >= 2)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: revealedTrail,
-                      color: theme.colorScheme.primary,
-                      strokeWidth: 5,
-                    ),
-                  ],
-                ),
+              if (revealedSegments.isNotEmpty)
+                PolylineLayer(polylines: revealedSegments),
               MarkerLayer(
                 markers: [
                   Marker(
