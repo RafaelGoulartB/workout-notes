@@ -92,8 +92,13 @@ void main() {
     expect(find.text('COMO VOCÊ SE SENTIU?'), findsOneWidget);
     expect(find.text('Salvar'), findsOneWidget);
     expect(find.text('Descartar'), findsOneWidget);
-    expect(find.byIcon(Icons.star_outline_rounded), findsNWidgets(5));
     final thirdStar = find.byKey(const ValueKey('run-review-feeling-3'));
+    await tester.scrollUntilVisible(
+      thirdStar,
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byIcon(Icons.star_outline_rounded), findsNWidgets(5));
     await tester.ensureVisible(thirdStar);
     await tester.pumpAndSettle();
     await tester.tap(thirdStar);
