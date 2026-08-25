@@ -5,6 +5,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'package:workout_notes/screens/run/run_achievements_screen.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_history_screen.dart';
 import 'package:workout_notes/screens/run/run_plans_screen.dart';
@@ -67,6 +68,14 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const RunHistoryScreen()),
+    );
+    if (mounted) _load();
+  }
+
+  Future<void> _openAchievements() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RunAchievementsScreen()),
     );
     if (mounted) _load();
   }
@@ -757,11 +766,19 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
                   _sectionHeader(loc.runStatsSectionTrends),
                   _buildTrends(loc, analytics),
                   _sectionHeader(loc.runStatsSectionRecords),
-                  _sectionCard(
-                    child: RunAchievementsSection(
-                      board: _board,
-                      onOpenActivity: _openDetail,
-                      showTitle: false,
+                  Semantics(
+                    button: true,
+                    label: loc.runAchievementsOpenBoard,
+                    child: InkWell(
+                      onTap: _openAchievements,
+                      borderRadius: BorderRadius.circular(16),
+                      child: _sectionCard(
+                        child: RunAchievementsSection(
+                          board: _board,
+                          onOpenActivity: (_) => _openAchievements(),
+                          showTitle: false,
+                        ),
+                      ),
                     ),
                   ),
                   if (analytics.activities.isNotEmpty) ...[

@@ -2181,6 +2181,26 @@
   "runAchievementShort10k": "10K",
   "runAchievementShortHalf": "Meia",
   "runAchievementShortMarathon": "Maratona",
+  "runAchievementsTitle": "Conquistas de corrida",
+  "runAchievementsHeroTitle": "Seu quadro de recordes",
+  "runAchievementsHeroSubtitle": "Suas 3 melhores marcas de todos os tempos",
+  "runAchievementsProgress": "de {total} recordes estabelecidos",
+  "@runAchievementsProgress": {
+    "placeholders": { "total": { "type": "int" } }
+  },
+  "runAchievementsRecords": "TODOS OS RECORDES",
+  "runAchievementsGold": "Ouro",
+  "runAchievementsSilver": "Prata",
+  "runAchievementsBronze": "Bronze",
+  "runAchievementsOpenBoard": "Abrir todas as conquistas de corrida",
+  "runAchievementsUnlockDistance": "Registre uma corrida com distância para estabelecer este recorde.",
+  "runAchievementsUnlockDuration": "Conclua uma corrida cronometrada para estabelecer este recorde.",
+  "runAchievementsUnlockPace": "Corra pelo menos 1 km para registrar um pace médio válido.",
+  "runAchievementsUnlockGpsKilometer": "Complete 1 km com GPS para calcular sua parcial mais rápida.",
+  "runAchievementsUnlockEffort": "Complete {distance} contínuos com GPS para desbloquear esta marca.",
+  "@runAchievementsUnlockEffort": {
+    "placeholders": { "distance": { "type": "String" } }
+  },
   "runVoiceSettingsTitle": "Alertas de voz",
   "runVoiceEnglishOnlyHint": "Os anúncios falados são sempre em inglês.",
   "runVoiceSectionGeneral": "Geral",

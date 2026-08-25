@@ -2201,6 +2201,26 @@
   "runAchievementShort10k": "10K",
   "runAchievementShortHalf": "Half",
   "runAchievementShortMarathon": "Marathon",
+  "runAchievementsTitle": "Running achievements",
+  "runAchievementsHeroTitle": "Your record board",
+  "runAchievementsHeroSubtitle": "Your top 3 all-time marks in every category",
+  "runAchievementsProgress": "of {total} records established",
+  "@runAchievementsProgress": {
+    "placeholders": { "total": { "type": "int" } }
+  },
+  "runAchievementsRecords": "ALL RECORDS",
+  "runAchievementsGold": "Gold",
+  "runAchievementsSilver": "Silver",
+  "runAchievementsBronze": "Bronze",
+  "runAchievementsOpenBoard": "Open all running achievements",
+  "runAchievementsUnlockDistance": "Record a run with distance to establish this record.",
+  "runAchievementsUnlockDuration": "Complete a timed run to establish this record.",
+  "runAchievementsUnlockPace": "Run at least 1 km to record a valid average pace.",
+  "runAchievementsUnlockGpsKilometer": "Complete 1 km with GPS to calculate your fastest split.",
+  "runAchievementsUnlockEffort": "Complete a continuous {distance} with GPS to unlock this mark.",
+  "@runAchievementsUnlockEffort": {
+    "placeholders": { "distance": { "type": "String" } }
+  },
   "runVoiceSettingsTitle": "Voice alerts",
   "runVoiceEnglishOnlyHint": "Spoken cues are always in English.",
   "runVoiceSectionGeneral": "General",
