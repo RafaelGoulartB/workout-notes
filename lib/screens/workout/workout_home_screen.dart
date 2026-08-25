@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
@@ -41,7 +43,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _activeWorkouts = [];
   List<Map<String, dynamic>> _upcomingWorkouts = [];
-  List<Map<String, dynamic>> _completedWorkouts = [];
+  List<_CompletedActivity> _completedActivities = [];
   bool _showCompleted = true;
   bool _showUpcoming = true;
 
@@ -113,6 +115,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         _analyticsRepo.getCurrentWorkoutStreak(),
         _workoutRepo.getActiveWorkouts(),
         _runRepo.getMonthlyRunSummary(now),
+        _runRepo.listActivities(limit: 50),
       ]);
       final allWorkouts = results[0] as List<Map<String, dynamic>>;
       final futureWorkouts = results[1] as List<Map<String, dynamic>>;
@@ -120,18 +123,24 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       final currentStreak = results[3] as int;
       final active = results[4] as List<Map<String, dynamic>>;
       final runMonthly = results[5] as Map<String, dynamic>;
+      final recentRuns = results[6] as List<RunActivity>;
       final completed = <Map<String, dynamic>>[];
       for (final w in allWorkouts) {
         if ((w['end_time'] as String?) != null) {
           completed.add(w);
         }
       }
+      final completedActivities = <_CompletedActivity>[
+        for (final workout in completed)
+          _CompletedActivity.fromWorkout(workout),
+        for (final run in recentRuns) _CompletedActivity.fromRun(run),
+      ]..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
 
       if (mounted) {
         setState(() {
           _activeWorkouts = active;
           _upcomingWorkouts = futureWorkouts.take(5).toList();
-          _completedWorkouts = completed.take(5).toList();
+          _completedActivities = completedActivities.take(8).toList();
           _currentStreak = currentStreak;
           _monthWorkouts = (monthly['workout_count'] as num?)?.toInt() ?? 0;
           _monthVolume = (monthly['total_volume'] as num?)?.toDouble() ?? 0;
@@ -220,10 +229,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   /// Returns a friendly "Last workout: `<when>`" string. Empty when there is
   /// no completed workout yet.
   String _lastWorkoutLabel(AppLocalizations loc) {
-    if (_completedWorkouts.isEmpty) return '';
-    final raw = _completedWorkouts.first['date'] as String?;
-    if (raw == null || raw.isEmpty) return '';
-    final workoutDate = DateTime.parse(raw);
+    if (_completedActivities.isEmpty) return '';
+    final workoutDate = _completedActivities.first.occurredAt.toLocal();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final wd = DateTime(workoutDate.year, workoutDate.month, workoutDate.day);
@@ -254,7 +261,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
 
   bool get _hasAnyHistory =>
       _activeWorkouts.isNotEmpty ||
-      _completedWorkouts.isNotEmpty ||
+      _completedActivities.isNotEmpty ||
       _runTrackingService.state.isActive;
 
   // ===================== BUILD =====================
@@ -321,7 +328,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                     SliverToBoxAdapter(
                       child: _buildUpcomingSection(theme, loc),
                     ),
-                  if (_completedWorkouts.isNotEmpty)
+                  if (_completedActivities.isNotEmpty)
                     SliverToBoxAdapter(
                       child: _buildCompletedSection(theme, loc),
                     ),
@@ -824,14 +831,14 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
             iconBg: theme.colorScheme.primaryContainer,
             iconFg: theme.colorScheme.onPrimaryContainer,
             title: loc.workoutHomeCompleted,
-            count: _completedWorkouts.length,
+            count: _completedActivities.length,
             expanded: _showCompleted,
             onTap: () => setState(() => _showCompleted = !_showCompleted),
           ),
           if (_showCompleted) ...[
             const SizedBox(height: 8),
-            ...(_completedWorkouts.map(
-              (w) => _buildWorkoutCard(w, theme, isActive: false),
+            ...(_completedActivities.map(
+              (activity) => _buildCompletedActivityCard(activity, theme),
             )),
           ],
         ],
@@ -892,6 +899,114 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   }
 
   // ===================== WORKOUT CARD =====================
+  Widget _buildCompletedActivityCard(
+    _CompletedActivity activity,
+    ThemeData theme,
+  ) {
+    final formatted = DateFormat(
+      Intl.defaultLocale?.startsWith('pt') == true
+          ? "d 'de' MMMM yyyy"
+          : 'MMMM d, yyyy',
+      Intl.defaultLocale,
+    ).format(activity.occurredAt.toLocal());
+    final duration = activity.durationSeconds;
+    final durationLabel = duration > 0
+        ? AppLocalizations.of(
+            context,
+          )!.workoutDetailDuration(duration ~/ 60, duration % 60)
+        : '--';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: theme.colorScheme.outlineVariant.withAlpha(80),
+          ),
+        ),
+        child: InkWell(
+          key: ValueKey('completed-${activity.kind.name}-${activity.id}'),
+          borderRadius: BorderRadius.circular(12),
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => activity.kind == _CompletedActivityKind.run
+                    ? RunDetailScreen(activityId: activity.id)
+                    : WorkoutDetailScreen(workoutId: activity.id),
+              ),
+            );
+            _loadData();
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    activity.kind == _CompletedActivityKind.run
+                        ? Icons.directions_run_rounded
+                        : Icons.fitness_center,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        formatted,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        durationLabel,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (activity.feelingRating > 0)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(
+                      5,
+                      (index) => Icon(
+                        index < activity.feelingRating
+                            ? Icons.star
+                            : Icons.star_border,
+                        size: 14,
+                        color: Colors.amber,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right,
+                  color: theme.colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildWorkoutCard(
     Map<String, dynamic> workout,
     ThemeData theme, {
@@ -1004,6 +1119,48 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+enum _CompletedActivityKind { workout, run }
+
+class _CompletedActivity {
+  final String id;
+  final _CompletedActivityKind kind;
+  final DateTime occurredAt;
+  final int durationSeconds;
+  final int feelingRating;
+
+  const _CompletedActivity({
+    required this.id,
+    required this.kind,
+    required this.occurredAt,
+    required this.durationSeconds,
+    required this.feelingRating,
+  });
+
+  factory _CompletedActivity.fromWorkout(Map<String, dynamic> workout) {
+    final endTime = DateTime.tryParse(workout['end_time'] as String? ?? '');
+    final date = DateTime.tryParse(workout['date'] as String? ?? '');
+    return _CompletedActivity(
+      id: workout['id'] as String,
+      kind: _CompletedActivityKind.workout,
+      occurredAt: endTime ?? date ?? DateTime.fromMillisecondsSinceEpoch(0),
+      durationSeconds: (workout['duration_seconds'] as num?)?.toInt() ?? 0,
+      feelingRating: (workout['feeling_rating'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  factory _CompletedActivity.fromRun(RunActivity run) {
+    return _CompletedActivity(
+      id: run.id,
+      kind: _CompletedActivityKind.run,
+      occurredAt: run.endedAt ?? run.startedAt,
+      durationSeconds: run.movingTimeSeconds > 0
+          ? run.movingTimeSeconds
+          : run.durationSeconds,
+      feelingRating: run.feelingRating ?? 0,
     );
   }
 }
