@@ -96,9 +96,7 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withAlpha(80),
-        ),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
       ),
       child: Padding(
         padding: padding ?? const EdgeInsets.all(16),
@@ -167,10 +165,7 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
                 width: double.infinity,
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
-                  child: Text(
-                    _periodLabel(loc, period),
-                    maxLines: 1,
-                  ),
+                  child: Text(_periodLabel(loc, period), maxLines: 1),
                 ),
               ),
               labelStyle: Theme.of(context).textTheme.labelMedium,
@@ -287,7 +282,8 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: _TrendPill(
-                    label: '${ratio >= 0 ? '+' : '-'}'
+                    label:
+                        '${ratio >= 0 ? '+' : '-'}'
                         '${(ratio.abs() * 100).round()}%',
                     icon: ratio >= 0
                         ? Icons.trending_up_rounded
@@ -387,8 +383,8 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
                   paceDelta.abs() < 3
                       ? Icons.trending_flat_rounded
                       : paceDelta < 0
-                          ? Icons.trending_up_rounded
-                          : Icons.trending_down_rounded,
+                      ? Icons.trending_up_rounded
+                      : Icons.trending_down_rounded,
                   size: 16,
                   color: colors.onSurfaceVariant,
                 ),
@@ -398,12 +394,12 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
                     paceDelta.abs() < 3
                         ? loc.runStatsPaceStable
                         : paceDelta < 0
-                            ? loc.runStatsPaceFaster(
-                                '${paceDelta.abs().round()} s/km',
-                              )
-                            : loc.runStatsPaceSlower(
-                                '${paceDelta.abs().round()} s/km',
-                              ),
+                        ? loc.runStatsPaceFaster(
+                            '${paceDelta.abs().round()} s/km',
+                          )
+                        : loc.runStatsPaceSlower(
+                            '${paceDelta.abs().round()} s/km',
+                          ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colors.onSurfaceVariant,
                     ),
@@ -461,7 +457,7 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
                       analytics.thisWeekRunCount == 0
                           ? loc.runStatsWeekNoRuns
                           : '${analytics.thisWeekRunCount} '
-                              '${loc.runStatsRunCount.toLowerCase()}',
+                                '${loc.runStatsRunCount.toLowerCase()}',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colors.onSurfaceVariant,
                       ),
@@ -478,10 +474,7 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          RunWeekStrip(
-            days: analytics.thisWeekDays,
-            today: analytics.now,
-          ),
+          RunWeekStrip(days: analytics.thisWeekDays, today: analytics.now),
           if (ratio != null) ...[
             const SizedBox(height: 16),
             ClipRRect(
@@ -513,7 +506,9 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
                 Text(
                   loc.runStatsVsWeeklyAverage((ratio * 100).round()),
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: ratio >= 1 ? colors.primary : colors.onSurfaceVariant,
+                    color: ratio >= 1
+                        ? colors.primary
+                        : colors.onSurfaceVariant,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -598,28 +593,28 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
 
     final caption = switch (_chartTab) {
       _RunChartTab.volume => loc.runStatsChartAverageLegend(
-          RunFormatters.distanceWithUnit(analytics.avgWeeklyDistanceMeters),
-        ),
+        RunFormatters.distanceWithUnit(analytics.avgWeeklyDistanceMeters),
+      ),
       _RunChartTab.pace => loc.runStatsPaceTrendHint,
       _RunChartTab.frequency => loc.runStatsChartAverageLegend(
-          analytics.avgRunsPerWeek.toStringAsFixed(1),
-        ),
+        analytics.avgRunsPerWeek.toStringAsFixed(1),
+      ),
     };
 
     final chart = switch (_chartTab) {
       _RunChartTab.volume => RunWeeklyDistanceChart(
-          buckets: analytics.weeklyBuckets,
-          emptyLabel: loc.runStatsChartEmpty,
-          averageMeters: analytics.avgWeeklyDistanceMeters,
-        ),
+        buckets: analytics.weeklyBuckets,
+        emptyLabel: loc.runStatsChartEmpty,
+        averageMeters: analytics.avgWeeklyDistanceMeters,
+      ),
       _RunChartTab.pace => RunPaceTrendChart(
-          points: analytics.paceTrend,
-          emptyLabel: loc.runStatsPaceChartEmpty,
-        ),
+        points: analytics.paceTrend,
+        emptyLabel: loc.runStatsPaceChartEmpty,
+      ),
       _RunChartTab.frequency => RunWeeklyFrequencyChart(
-          buckets: analytics.weeklyBuckets,
-          emptyLabel: loc.runStatsChartEmpty,
-        ),
+        buckets: analytics.weeklyBuckets,
+        emptyLabel: loc.runStatsChartEmpty,
+      ),
     };
 
     return _sectionCard(
@@ -701,7 +696,6 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.runStatsTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.record_voice_over_outlined),
@@ -735,59 +729,58 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _activities.isEmpty
-              ? EmptyStatePlaceholder(
-                  icon: Icons.directions_run,
-                  title: loc.runHistoryEmptyTitle,
-                  subtitle: loc.runHistoryEmptySubtitle,
-                  actionLabel: loc.runHistoryEmptyCta,
-                  onAction: _openRecord,
-                )
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
-                    children: [
-                      _buildPeriodSelector(loc),
-                      const SizedBox(height: 14),
-                      _buildHero(loc, analytics)
-                          .animate()
-                          .fadeIn(duration: 300.ms)
-                          .slideY(begin: 0.04),
-                      _sectionHeader(loc.runStatsSectionThisWeek),
-                      _buildWeekCard(loc, analytics)
-                          .animate()
-                          .fadeIn(duration: 300.ms, delay: 80.ms),
-                      _sectionHeader(loc.runStatsSectionHighlights),
-                      _buildHighlights(loc, analytics),
-                      _sectionHeader(loc.runStatsSectionTrends),
-                      _buildTrends(loc, analytics),
-                      _sectionHeader(loc.runStatsSectionRecords),
-                      _sectionCard(
-                        child: RunAchievementsSection(
-                          board: _board,
-                          onOpenActivity: _openDetail,
-                          showTitle: false,
-                        ),
-                      ),
-                      if (analytics.activities.isNotEmpty) ...[
-                        _sectionHeader(
-                          loc.runStatsSectionRecent,
-                          trailing: TextButton(
-                            style: TextButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                              ),
-                            ),
-                            onPressed: _openHistory,
-                            child: Text(loc.runStatsSeeAll),
-                          ),
-                        ),
-                        _buildRecentRuns(analytics),
-                      ],
-                    ],
+          ? EmptyStatePlaceholder(
+              icon: Icons.directions_run,
+              title: loc.runHistoryEmptyTitle,
+              subtitle: loc.runHistoryEmptySubtitle,
+              actionLabel: loc.runHistoryEmptyCta,
+              onAction: _openRecord,
+            )
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
+                children: [
+                  _buildPeriodSelector(loc),
+                  const SizedBox(height: 14),
+                  _buildHero(
+                    loc,
+                    analytics,
+                  ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.04),
+                  _sectionHeader(loc.runStatsSectionThisWeek),
+                  _buildWeekCard(
+                    loc,
+                    analytics,
+                  ).animate().fadeIn(duration: 300.ms, delay: 80.ms),
+                  _sectionHeader(loc.runStatsSectionHighlights),
+                  _buildHighlights(loc, analytics),
+                  _sectionHeader(loc.runStatsSectionTrends),
+                  _buildTrends(loc, analytics),
+                  _sectionHeader(loc.runStatsSectionRecords),
+                  _sectionCard(
+                    child: RunAchievementsSection(
+                      board: _board,
+                      onOpenActivity: _openDetail,
+                      showTitle: false,
+                    ),
                   ),
-                ),
+                  if (analytics.activities.isNotEmpty) ...[
+                    _sectionHeader(
+                      loc.runStatsSectionRecent,
+                      trailing: TextButton(
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        onPressed: _openHistory,
+                        child: Text(loc.runStatsSeeAll),
+                      ),
+                    ),
+                    _buildRecentRuns(analytics),
+                  ],
+                ],
+              ),
+            ),
     );
   }
 }
@@ -961,8 +954,9 @@ class _ChartTabBar extends StatelessWidget {
                     child: Text(
                       labels[tab] ?? '',
                       style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight:
-                            tab == selected ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: tab == selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
                         color: tab == selected
                             ? colors.primary
                             : colors.onSurfaceVariant,
@@ -1048,10 +1042,7 @@ class _HighlightRow extends StatelessWidget {
               ),
             ),
             if (onTap != null)
-              Icon(
-                Icons.chevron_right_rounded,
-                color: colors.onSurfaceVariant,
-              )
+              Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant)
             else
               const SizedBox(width: 24),
           ],
@@ -1157,10 +1148,7 @@ class _RecentRunTile extends StatelessWidget {
                 ),
               ],
             ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: colors.onSurfaceVariant,
-            ),
+            Icon(Icons.chevron_right_rounded, color: colors.onSurfaceVariant),
           ],
         ),
       ),

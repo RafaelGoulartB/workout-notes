@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/utils/run_effort_analytics.dart';
 
 class RunRepository extends BaseRepository {
@@ -240,7 +241,12 @@ class RunRepository extends BaseRepository {
     final existing = await getActivity(id);
     if (existing != null) return existing;
 
-    final decoded = _decodeNativeSpool(spool, id: id);
+    final bodyWeightKg = await _latestBodyWeightKg();
+    final decoded = _decodeNativeSpool(
+      spool,
+      id: id,
+      bodyWeightKg: bodyWeightKg,
+    );
     final activity = decoded.activity;
     final points = decoded.points;
 
@@ -265,9 +271,28 @@ class RunRepository extends BaseRepository {
     return _decodeNativeSpool(spool, id: id).activity;
   }
 
+  /// Builds a preview using the latest registered body weight. The pure,
+  /// synchronous [previewNativeSpool] remains available for callers that do
+  /// not have database access and uses the 70 kg fallback.
+  Future<RunActivity> previewNativeSpoolUsingLatestWeight(
+    Map<String, dynamic> spool,
+  ) async {
+    final rawActivity = Map<String, dynamic>.from(
+      spool['activity'] as Map? ?? const {},
+    );
+    final id = rawActivity['id'] as String? ?? _uuid.v4();
+    final bodyWeightKg = await _latestBodyWeightKg();
+    return _decodeNativeSpool(
+      spool,
+      id: id,
+      bodyWeightKg: bodyWeightKg,
+    ).activity;
+  }
+
   ({RunActivity activity, List<RunTrackPoint> points}) _decodeNativeSpool(
     Map<String, dynamic> spool, {
     required String id,
+    double bodyWeightKg = 70,
   }) {
     final rawActivity = Map<String, dynamic>.from(
       spool['activity'] as Map? ?? const {},
@@ -297,7 +322,7 @@ class RunRepository extends BaseRepository {
     final maxPace = (rawActivity['max_pace_sec_per_km'] as num?)?.toDouble();
     final calories =
         (rawActivity['calories'] as num?)?.toInt() ??
-        _estimateCalories(distanceMeters);
+        _estimateCalories(distanceMeters, bodyWeightKg: bodyWeightKg);
     final title = rawActivity['title'] as String?;
     final notes = rawActivity['notes'] as String?;
     final rpe = (rawActivity['rpe'] as num?)?.toDouble();
@@ -362,10 +387,18 @@ class RunRepository extends BaseRepository {
     return (activity: activity, points: points);
   }
 
-  static int _estimateCalories(double distanceMeters) {
-    // ~1 kcal per kg per km; assume 70 kg default body weight.
+  Future<double> _latestBodyWeightKg() async {
+    final latest = await BodyMeasurementRepository().getLatestWeightKg();
+    return latest ?? 70;
+  }
+
+  static int _estimateCalories(
+    double distanceMeters, {
+    required double bodyWeightKg,
+  }) {
+    // Running costs approximately 1 kcal per kg per kilometer.
     final km = distanceMeters / 1000.0;
-    return (km * 70).round().clamp(0, 100000);
+    return (km * bodyWeightKg).round().clamp(0, 100000);
   }
 
   static double? _avgPace(double distanceMeters, int movingTimeSeconds) {

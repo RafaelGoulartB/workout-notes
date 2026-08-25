@@ -465,7 +465,9 @@ class RunTrackingService extends ChangeNotifier {
       activity['voice_step_results'] = _stepResultsJson(stepResults);
       payload['activity'] = activity;
       final typedPayload = Map<String, dynamic>.from(payload);
-      final preview = _repository.previewNativeSpool(typedPayload);
+      final preview = await _repository.previewNativeSpoolUsingLatestWeight(
+        typedPayload,
+      );
       _memoryReviewSpools[preview.id] = typedPayload;
       _trail.clear();
       _sessionContext = null;
@@ -516,7 +518,9 @@ class RunTrackingService extends ChangeNotifier {
             activity['voice_step_results'] = _stepResultsJson(stepResults);
           }
           payload['activity'] = activity;
-          final preview = _repository.previewNativeSpool(payload);
+          final preview = await _repository.previewNativeSpoolUsingLatestWeight(
+            payload,
+          );
           draft = RunReviewDraft.fromSpool(activity: preview, spool: payload);
         }
       } catch (error) {
@@ -544,7 +548,9 @@ class RunTrackingService extends ChangeNotifier {
     final drafts = <RunReviewDraft>[];
     final seen = <String>{};
     for (final payload in _memoryReviewSpools.values) {
-      final preview = _repository.previewNativeSpool(payload);
+      final preview = await _repository.previewNativeSpoolUsingLatestWeight(
+        payload,
+      );
       drafts.add(RunReviewDraft.fromSpool(activity: preview, spool: payload));
       seen.add(preview.id);
     }
@@ -564,7 +570,9 @@ class RunTrackingService extends ChangeNotifier {
         );
         if (raw == null) continue;
         final payload = Map<String, dynamic>.from(raw);
-        final preview = _repository.previewNativeSpool(payload);
+        final preview = await _repository.previewNativeSpoolUsingLatestWeight(
+          payload,
+        );
         drafts.add(RunReviewDraft.fromSpool(activity: preview, spool: payload));
         seen.add(id);
       }
