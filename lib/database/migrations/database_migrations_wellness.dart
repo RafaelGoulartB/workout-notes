@@ -516,5 +516,19 @@ abstract final class DatabaseWellnessMigrations {
         } catch (_) {}
       }
     }
+    if (oldVersion < 49) {
+      // Cardio activities share the existing durable activity envelope while
+      // retaining run-only GPS points, pace records and plan semantics.
+      try {
+        await db.execute(
+          "ALTER TABLE run_activities ADD COLUMN activity_type TEXT NOT NULL DEFAULT 'running'",
+        );
+      } catch (_) {}
+      try {
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_run_activities_type_started ON run_activities(activity_type, started_at DESC)',
+        );
+      } catch (_) {}
+    }
   }
 }

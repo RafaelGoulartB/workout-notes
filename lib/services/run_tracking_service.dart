@@ -592,6 +592,7 @@ class RunTrackingService extends ChangeNotifier {
     String? notes,
     double? rpe,
     int? feelingRating,
+    double? distanceMeters,
   }) async {
     try {
       final payload = Map<String, dynamic>.from(draft.spool);
@@ -603,6 +604,11 @@ class RunTrackingService extends ChangeNotifier {
       activity['notes'] = notes?.trim().isEmpty == true ? null : notes?.trim();
       activity['rpe'] = rpe;
       activity['feeling_rating'] = feelingRating;
+      if (distanceMeters != null) {
+        activity['distance_meters'] = distanceMeters.clamp(0, 1000000);
+        // Recalculate the estimate from the reviewed metrics.
+        activity.remove('calories');
+      }
       payload['activity'] = activity;
 
       final imported = await _repository.importNativeSpool(payload);

@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
+import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import '../../navigation/ai_coach_navigation.dart';
@@ -40,6 +42,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   final _runRepo = RunRepository();
   final _timerService = RestTimerService.instance;
   final _runTrackingService = RunTrackingService.instance;
+  final _bikeTrackingService = StationaryBikeTrackingService.instance;
   bool _isLoading = true;
   List<Map<String, dynamic>> _activeWorkouts = [];
   List<Map<String, dynamic>> _upcomingWorkouts = [];
@@ -62,6 +65,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     super.initState();
     widget.selectedTab?.addListener(_onTabSelectionChanged);
     _runTrackingService.addListener(_onRunTrackingChanged);
+    _bikeTrackingService.addListener(_onRunTrackingChanged);
     _runTrackingService.initialize();
     _loadData();
   }
@@ -70,6 +74,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   void dispose() {
     widget.selectedTab?.removeListener(_onTabSelectionChanged);
     _runTrackingService.removeListener(_onRunTrackingChanged);
+    _bikeTrackingService.removeListener(_onRunTrackingChanged);
     _elapsedTimer?.cancel();
     super.dispose();
   }
@@ -114,8 +119,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         _workoutRepo.getMonthlySummary(now),
         _analyticsRepo.getCurrentWorkoutStreak(),
         _workoutRepo.getActiveWorkouts(),
-        _runRepo.getMonthlyRunSummary(now),
-        _runRepo.listActivities(limit: 50),
+        _runRepo.getMonthlyRunSummary(now, activityType: null),
+        _runRepo.listActivities(limit: 50, activityType: null),
       ]);
       final allWorkouts = results[0] as List<Map<String, dynamic>>;
       final futureWorkouts = results[1] as List<Map<String, dynamic>>;
@@ -200,6 +205,18 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     _loadData();
   }
 
+  Future<void> _openActiveBike() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const RunRecordScreen(
+          initialActivityType: CardioActivityType.stationaryBike,
+        ),
+      ),
+    );
+    _loadData();
+  }
+
   // ===================== HELPERS =====================
   String _formatVolume(double v) {
     if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
@@ -262,7 +279,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   bool get _hasAnyHistory =>
       _activeWorkouts.isNotEmpty ||
       _completedActivities.isNotEmpty ||
-      _runTrackingService.state.isActive;
+      _runTrackingService.state.isActive ||
+      _bikeTrackingService.state.isActive;
 
   // ===================== BUILD =====================
   @override
@@ -309,6 +327,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                   if (_runTrackingService.state.isActive)
                     SliverToBoxAdapter(
                       child: _buildActiveRunBanner(theme, loc),
+                    ),
+                  if (_bikeTrackingService.state.isActive)
+                    SliverToBoxAdapter(
+                      child: _buildActiveBikeBanner(theme, loc),
                     ),
                   SliverToBoxAdapter(
                     child: _buildSectionHeader(
@@ -511,6 +533,65 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                 const SizedBox(width: 8),
                 FilledButton.tonalIcon(
                   onPressed: _startRun,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: Text(loc.workoutHomeActiveBannerAction),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05);
+  }
+
+  Widget _buildActiveBikeBanner(ThemeData theme, AppLocalizations loc) {
+    final state = _bikeTrackingService.state;
+    final time = RunFormatters.duration(state.durationSeconds);
+    final subtitle = state.isPaused
+        ? '${loc.workoutHomeRunPaused} · $time'
+        : '$time · ${loc.cardioActivityStationaryBikeSubtitle}';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Material(
+        color: theme.colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _openActiveBike,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
+            child: Row(
+              children: [
+                _PulsingDot(color: theme.colorScheme.onSecondaryContainer),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        loc.cardioActivityStationaryBike,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.onSecondaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSecondaryContainer
+                              .withAlpha(220),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _openActiveBike,
                   icon: const Icon(Icons.play_arrow_rounded, size: 18),
                   label: Text(loc.workoutHomeActiveBannerAction),
                 ),
@@ -952,7 +1033,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                   ),
                   child: Icon(
                     activity.kind == _CompletedActivityKind.run
-                        ? Icons.directions_run_rounded
+                        ? activity.activityType ==
+                                  CardioActivityType.stationaryBike
+                              ? Icons.pedal_bike_rounded
+                              : Icons.directions_run_rounded
                         : Icons.fitness_center,
                     color: theme.colorScheme.onSurfaceVariant,
                     size: 22,
@@ -1131,6 +1215,7 @@ class _CompletedActivity {
   final DateTime occurredAt;
   final int durationSeconds;
   final int feelingRating;
+  final CardioActivityType? activityType;
 
   const _CompletedActivity({
     required this.id,
@@ -1138,6 +1223,7 @@ class _CompletedActivity {
     required this.occurredAt,
     required this.durationSeconds,
     required this.feelingRating,
+    this.activityType,
   });
 
   factory _CompletedActivity.fromWorkout(Map<String, dynamic> workout) {
@@ -1149,6 +1235,7 @@ class _CompletedActivity {
       occurredAt: endTime ?? date ?? DateTime.fromMillisecondsSinceEpoch(0),
       durationSeconds: (workout['duration_seconds'] as num?)?.toInt() ?? 0,
       feelingRating: (workout['feeling_rating'] as num?)?.toInt() ?? 0,
+      activityType: null,
     );
   }
 
@@ -1161,6 +1248,7 @@ class _CompletedActivity {
           ? run.movingTimeSeconds
           : run.durationSeconds,
       feelingRating: run.feelingRating ?? 0,
+      activityType: run.activityType,
     );
   }
 }

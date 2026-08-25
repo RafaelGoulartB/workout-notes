@@ -359,6 +359,7 @@ abstract final class DatabaseSchema {
     await db.execute('''
       CREATE TABLE run_activities (
         id TEXT PRIMARY KEY,
+        activity_type TEXT NOT NULL DEFAULT 'running',
         started_at TEXT NOT NULL,
         ended_at TEXT,
         duration_seconds INTEGER NOT NULL DEFAULT 0,
@@ -461,6 +462,9 @@ abstract final class DatabaseSchema {
     );
     await db.execute(
       'CREATE INDEX idx_run_activities_started ON run_activities(started_at DESC)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_run_activities_type_started ON run_activities(activity_type, started_at DESC)',
     );
     await db.execute(
       'CREATE INDEX idx_run_track_points_activity_seq ON run_track_points(activity_id, seq ASC)',

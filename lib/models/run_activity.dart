@@ -1,5 +1,8 @@
+import 'package:workout_notes/models/cardio_activity_type.dart';
+
 class RunActivity {
   final String id;
+  final CardioActivityType activityType;
   final DateTime startedAt;
   final DateTime? endedAt;
   final int durationSeconds;
@@ -33,6 +36,7 @@ class RunActivity {
 
   const RunActivity({
     required this.id,
+    this.activityType = CardioActivityType.running,
     required this.startedAt,
     required this.endedAt,
     required this.durationSeconds,
@@ -61,9 +65,20 @@ class RunActivity {
 
   bool get isCompleted => status == 'completed';
 
+  bool get isRun => activityType == CardioActivityType.running;
+
+  bool get isStationaryBike =>
+      activityType == CardioActivityType.stationaryBike;
+
+  double? get averageSpeedKmh {
+    if (distanceMeters <= 0 || movingTimeSeconds <= 0) return null;
+    return (distanceMeters / 1000) / (movingTimeSeconds / 3600);
+  }
+
   factory RunActivity.fromMap(Map<String, dynamic> map) {
     return RunActivity(
       id: map['id'] as String,
+      activityType: CardioActivityType.fromDatabase(map['activity_type']),
       startedAt: DateTime.parse(map['started_at'] as String),
       endedAt: map['ended_at'] != null
           ? DateTime.parse(map['ended_at'] as String)
@@ -96,6 +111,7 @@ class RunActivity {
 
   Map<String, dynamic> toMap() => {
     'id': id,
+    'activity_type': activityType.databaseValue,
     'started_at': startedAt.toIso8601String(),
     'ended_at': endedAt?.toIso8601String(),
     'duration_seconds': durationSeconds,
@@ -139,6 +155,7 @@ class RunActivity {
   }) {
     return RunActivity(
       id: id,
+      activityType: activityType,
       startedAt: startedAt,
       endedAt: endedAt,
       durationSeconds: durationSeconds,

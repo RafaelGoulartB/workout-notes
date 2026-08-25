@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_achievement.dart';
+import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
@@ -36,6 +38,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
   final _trackingService = RunTrackingService.instance;
   late final TextEditingController _titleController;
   late final TextEditingController _notesController;
+  late final TextEditingController _distanceController;
   late final List<Offset> _route;
 
   RunPlanWorkout? _planWorkout;
@@ -48,6 +51,16 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
 
   bool get _hasPlannedWorkout => widget.draft.planWorkoutId != null;
   bool get _isTooShort => RunCompletionPolicy.isTooShort(widget.draft.activity);
+  bool get _isStationaryBike =>
+      widget.draft.activity.activityType == CardioActivityType.stationaryBike;
+
+  double get _reviewedDistanceMeters {
+    if (!_isStationaryBike) return widget.draft.activity.distanceMeters;
+    final kilometers = double.tryParse(
+      _distanceController.text.trim().replaceAll(',', '.'),
+    );
+    return (kilometers ?? 0).clamp(0, 1000) * 1000;
+  }
 
   @override
   void initState() {
@@ -58,6 +71,12 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     _notesController = TextEditingController(
       text: widget.draft.activity.notes ?? '',
     );
+    _distanceController = TextEditingController(
+      text: widget.draft.activity.distanceMeters > 0
+          ? (widget.draft.activity.distanceMeters / 1000).toStringAsFixed(2)
+          : '',
+    );
+    _distanceController.addListener(_onDistanceChanged);
     _rpe = widget.draft.activity.rpe;
     _feelingRating = widget.draft.activity.feelingRating;
     _completePlannedWorkout = _hasPlannedWorkout && !_isTooShort;
@@ -69,7 +88,14 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
   void dispose() {
     _titleController.dispose();
     _notesController.dispose();
+    _distanceController
+      ..removeListener(_onDistanceChanged)
+      ..dispose();
     super.dispose();
+  }
+
+  void _onDistanceChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadContext() async {
@@ -84,11 +110,17 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     if (workout == null && workoutId != null) {
       workout = await _planRepository.getWorkout(workoutId);
     }
-    final existing = await _runRepository.listActivities(limit: 500);
-    final board = RunAchievementEngine.build([
-      ...existing.where((item) => item.id != widget.draft.id),
-      widget.draft.activity,
-    ]);
+    final existing = _isStationaryBike
+        ? <RunActivity>[]
+        : await _runRepository.listActivities(limit: 500);
+    final board = RunAchievementEngine.build(
+      _isStationaryBike
+          ? existing
+          : [
+              ...existing.where((item) => item.id != widget.draft.id),
+              widget.draft.activity,
+            ],
+    );
     if (!mounted) return;
     setState(() {
       _planWorkout = workout;
@@ -111,13 +143,18 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
       notes: _notesController.text,
       rpe: _rpe,
       feelingRating: _feelingRating,
+      distanceMeters: _isStationaryBike ? _reviewedDistanceMeters : null,
     );
     if (!mounted) return;
     if (saved == null) {
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(context)!.runReviewSaveError),
+          content: Text(
+            _isStationaryBike
+                ? AppLocalizations.of(context)!.stationaryBikeReviewSaveError
+                : AppLocalizations.of(context)!.runReviewSaveError,
+          ),
         ),
       );
       return;
@@ -133,8 +170,16 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(loc.runReviewDiscardTitle),
-        content: Text(loc.runReviewDiscardBody),
+        title: Text(
+          _isStationaryBike
+              ? loc.stationaryBikeReviewDiscardTitle
+              : loc.runReviewDiscardTitle,
+        ),
+        content: Text(
+          _isStationaryBike
+              ? loc.stationaryBikeReviewDiscardBody
+              : loc.runReviewDiscardBody,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -201,6 +246,11 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final activity = widget.draft.activity;
+    final distanceMeters = _reviewedDistanceMeters;
+    final averageSpeedKmh =
+        distanceMeters <= 0 || activity.movingTimeSeconds <= 0
+        ? null
+        : (distanceMeters / 1000) / (activity.movingTimeSeconds / 3600);
     final dateLabel = DateFormat.MMMEd(
       Localizations.localeOf(context).toString(),
     ).add_Hm().format(activity.startedAt.toLocal());
@@ -234,7 +284,9 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.directions_run_rounded,
+                  _isStationaryBike
+                      ? Icons.pedal_bike_rounded
+                      : Icons.directions_run_rounded,
                   size: 20,
                   color: colors.primary,
                 ),
@@ -245,7 +297,9 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      loc.runReviewHeroHeadline,
+                      _isStationaryBike
+                          ? loc.stationaryBikeReviewHeroHeadline
+                          : loc.runReviewHeroHeadline,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -283,7 +337,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        RunFormatters.distanceWithUnit(activity.distanceMeters),
+                        RunFormatters.distanceWithUnit(distanceMeters),
                         maxLines: 1,
                         style: theme.textTheme.displaySmall?.copyWith(
                           fontWeight: FontWeight.w800,
@@ -333,8 +387,12 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
                 Expanded(
                   child: _HeroMetric(
                     icon: Icons.speed_rounded,
-                    label: loc.runReviewPace,
-                    value: RunFormatters.paceWithUnit(activity.avgPaceSecPerKm),
+                    label: _isStationaryBike
+                        ? loc.stationaryBikeAverageSpeed
+                        : loc.runReviewPace,
+                    value: _isStationaryBike
+                        ? '${averageSpeedKmh?.toStringAsFixed(1) ?? '--'} ${loc.stationaryBikeSpeedUnit}'
+                        : RunFormatters.paceWithUnit(activity.avgPaceSecPerKm),
                   ),
                 ),
                 _HeroDivider(color: colors.outlineVariant),
@@ -348,7 +406,7 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
               ],
             ),
           ),
-          if (activity.bestSplitPaceSecPerKm != null) ...[
+          if (!_isStationaryBike && activity.bestSplitPaceSecPerKm != null) ...[
             const SizedBox(height: 12),
             Row(
               children: [
@@ -490,6 +548,21 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
   }
 
   // ---------------------------------------------------------------- effort
+
+  Widget _bikeDistance(AppLocalizations loc) => _card(
+    TextField(
+      key: const ValueKey('stationary-bike-distance'),
+      controller: _distanceController,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]'))],
+      decoration: InputDecoration(
+        labelText: loc.stationaryBikeReviewDistanceLabel,
+        hintText: loc.stationaryBikeReviewDistanceHint,
+        prefixIcon: const Icon(Icons.straighten_rounded),
+        suffixText: 'km',
+      ),
+    ),
+  );
 
   Widget _effort(AppLocalizations loc) {
     final theme = Theme.of(context);
@@ -705,7 +778,9 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
           textInputAction: TextInputAction.next,
           decoration: InputDecoration(
             labelText: loc.runDetailTitleLabel,
-            hintText: loc.runReviewTitleHint,
+            hintText: _isStationaryBike
+                ? loc.stationaryBikeReviewTitleHint
+                : loc.runReviewTitleHint,
             prefixIcon: const Icon(Icons.edit_outlined, size: 20),
           ),
         ),
@@ -717,7 +792,9 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
           maxLines: 6,
           decoration: InputDecoration(
             labelText: loc.runDetailNotes,
-            hintText: loc.runReviewNotesHint,
+            hintText: _isStationaryBike
+                ? loc.stationaryBikeReviewNotesHint
+                : loc.runReviewNotesHint,
             alignLabelWithHint: true,
           ),
         ),
@@ -780,7 +857,11 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     final loc = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.runReviewTitle),
+        title: Text(
+          _isStationaryBike
+              ? loc.stationaryBikeReviewTitle
+              : loc.runReviewTitle,
+        ),
         actions: [
           IconButton(
             onPressed: null,
@@ -793,6 +874,13 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           _hero(loc),
+          if (_isStationaryBike) ...[
+            _sectionLabel(
+              Icons.pedal_bike_rounded,
+              loc.stationaryBikeReviewDistanceSection,
+            ),
+            _bikeDistance(loc),
+          ],
           if (_hasPlannedWorkout && _planWorkout != null) ...[
             _sectionLabel(Icons.flag_outlined, loc.runReviewPlanComparison),
             _planComparison(loc),
@@ -810,11 +898,13 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
           _feeling(loc),
           _sectionLabel(Icons.notes_rounded, loc.runReviewDetailsTitle),
           _details(loc),
-          _sectionLabel(
-            Icons.emoji_events_outlined,
-            loc.runReviewAchievementsTitle,
-          ),
-          _achievements(loc),
+          if (!_isStationaryBike) ...[
+            _sectionLabel(
+              Icons.emoji_events_outlined,
+              loc.runReviewAchievementsTitle,
+            ),
+            _achievements(loc),
+          ],
         ],
       ),
       bottomNavigationBar: Container(

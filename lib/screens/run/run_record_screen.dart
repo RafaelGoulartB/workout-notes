@@ -5,7 +5,9 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
+import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/run_session_goal.dart';
 import 'package:workout_notes/models/run_session_context.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
@@ -22,6 +24,7 @@ import 'package:workout_notes/services/run_interval_engine.dart';
 import 'package:workout_notes/services/run_audio_gate_service.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/services/run_voice_coach.dart';
+import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 
 class RunRecordScreen extends StatefulWidget {
@@ -31,8 +34,14 @@ class RunRecordScreen extends StatefulWidget {
 
   /// Scheduled row this run fulfils. Linked to the activity once it is saved.
   final ScheduledRun? scheduledRun;
+  final CardioActivityType initialActivityType;
 
-  const RunRecordScreen({super.key, this.planWorkout, this.scheduledRun});
+  const RunRecordScreen({
+    super.key,
+    this.planWorkout,
+    this.scheduledRun,
+    this.initialActivityType = CardioActivityType.running,
+  });
 
   @override
   State<RunRecordScreen> createState() => _RunRecordScreenState();
@@ -43,6 +52,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       'run_permission_onboarding_seen_v1';
 
   final _service = RunTrackingService.instance;
+  final _bikeService = StationaryBikeTrackingService.instance;
   final _mapController = MapController();
   final _coach = RunVoiceCoach();
   bool _busy = false;
@@ -70,6 +80,13 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   DateTime? _lastStableFixAt;
   int? _countdown;
   bool _allowPop = false;
+  late CardioActivityType _activityType;
+
+  bool get _isStationaryBike =>
+      _activityType == CardioActivityType.stationaryBike;
+
+  RunTrackingState get _trackingState =>
+      _isStationaryBike ? _bikeService.state : _service.state;
 
   /// The planned session, either passed directly or carried by a scheduled run.
   RunPlanWorkout? get _planWorkout =>
@@ -83,9 +100,15 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   @override
   void initState() {
     super.initState();
+    _activityType = _bikeService.isActive
+        ? CardioActivityType.stationaryBike
+        : widget.planWorkout != null || widget.scheduledRun != null
+        ? CardioActivityType.running
+        : widget.initialActivityType;
     _resolvedPlanWorkout = widget.planWorkout ?? widget.scheduledRun?.workout;
     _resolvedScheduledRun = widget.scheduledRun;
     _service.addListener(_onChanged);
+    _bikeService.addListener(_onBikeChanged);
     _coach.addListener(_onCoachChanged);
     _service.initialize();
     _prepareCoach();
@@ -135,7 +158,9 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
           : _coach.intervalsOn;
       _audioCapabilities = audioCapabilities;
     });
-    if (!activeState.isActive && activeState.locationGranted) {
+    if (!_isStationaryBike &&
+        !activeState.isActive &&
+        activeState.locationGranted) {
       await _prepareGps();
     }
   }
@@ -143,6 +168,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   @override
   void dispose() {
     _service.removeListener(_onChanged);
+    _bikeService.removeListener(_onBikeChanged);
     _coach.removeListener(_onCoachChanged);
     if (!_service.state.isActive) {
       _coach.endSession();
@@ -158,6 +184,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   void _onChanged() {
     if (!mounted) return;
     setState(() {});
+    if (_isStationaryBike) return;
     final state = _service.state;
     if (state.lat != null && state.lng != null) {
       try {
@@ -170,6 +197,23 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       }
     }
     _coach.onTrackingUpdate(state);
+  }
+
+  void _onBikeChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _setActivityType(CardioActivityType value) {
+    if (_trackingState.isActive || _planWorkout != null) return;
+    setState(() {
+      _activityType = value;
+      _measuredSheetH = 0;
+      _sheetExpanded = false;
+    });
+    if (value == CardioActivityType.running && _service.state.locationGranted) {
+      _prepareGps();
+    }
   }
 
   Future<void> _openVoiceSettings() async {
@@ -402,13 +446,37 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     }
   }
 
+  Future<void> _startSelectedActivity() async {
+    if (!_isStationaryBike) {
+      await _ensurePermissionAndStart();
+      return;
+    }
+    if (_service.state.isActive) return;
+    setState(() => _busy = true);
+    try {
+      await _runCountdown();
+      if (!mounted) return;
+      await _bikeService.start();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _finish() async {
     final loc = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.runRecordFinishConfirm),
-        content: Text(loc.runRecordFinishConfirmBody),
+        title: Text(
+          _isStationaryBike
+              ? loc.stationaryBikeFinishConfirm
+              : loc.runRecordFinishConfirm,
+        ),
+        content: Text(
+          _isStationaryBike
+              ? loc.stationaryBikeFinishConfirmBody
+              : loc.runRecordFinishConfirmBody,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -425,10 +493,9 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
 
     setState(() => _busy = true);
     try {
-      await _coach.endSession();
-      final stepResults = await _coach.collectStepResults();
-      final draft = await _service.stopForReview(stepResults: stepResults);
-      await _coach.announceManualCompletion();
+      final draft = _isStationaryBike
+          ? await _bikeService.stopForReview()
+          : await _finishRunForReview();
       if (!mounted) return;
       if (draft != null) {
         await Navigator.pushReplacement(
@@ -445,6 +512,14 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     }
   }
 
+  Future<RunReviewDraft?> _finishRunForReview() async {
+    await _coach.endSession();
+    final stepResults = await _coach.collectStepResults();
+    final draft = await _service.stopForReview(stepResults: stepResults);
+    await _coach.announceManualCompletion();
+    return draft;
+  }
+
   Future<void> _discard({bool confirm = true}) async {
     final loc = AppLocalizations.of(context)!;
     final confirmed = !confirm
@@ -452,8 +527,16 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
         : await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: Text(loc.runRecordDiscardConfirm),
-              content: Text(loc.runRecordDiscardConfirmBody),
+              title: Text(
+                _isStationaryBike
+                    ? loc.stationaryBikeReviewDiscardTitle
+                    : loc.runRecordDiscardConfirm,
+              ),
+              content: Text(
+                _isStationaryBike
+                    ? loc.stationaryBikeReviewDiscardBody
+                    : loc.runRecordDiscardConfirmBody,
+              ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
@@ -469,8 +552,12 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
     try {
-      await _coach.endSession();
-      await _service.discard();
+      if (_isStationaryBike) {
+        await _bikeService.discard();
+      } else {
+        await _coach.endSession();
+        await _service.discard();
+      }
       if (mounted) Navigator.pop(context);
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -478,13 +565,21 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   }
 
   Future<void> _handleLeaveRequested() async {
-    if (!_service.state.isActive || _busy) return;
+    if (!_trackingState.isActive || _busy) return;
     final loc = AppLocalizations.of(context)!;
     final action = await showDialog<_RunLeaveAction>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.runRecordLeaveTitle),
-        content: Text(loc.runRecordLeaveBody),
+        title: Text(
+          _isStationaryBike
+              ? loc.stationaryBikeLeaveTitle
+              : loc.runRecordLeaveTitle,
+        ),
+        content: Text(
+          _isStationaryBike
+              ? loc.stationaryBikeLeaveBody
+              : loc.runRecordLeaveBody,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, _RunLeaveAction.stay),
@@ -496,7 +591,11 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, _RunLeaveAction.background),
-            child: Text(loc.runRecordKeepRunning),
+            child: Text(
+              _isStationaryBike
+                  ? loc.stationaryBikeKeepActive
+                  : loc.runRecordKeepRunning,
+            ),
           ),
         ],
       ),
@@ -528,7 +627,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
-    final state = _service.state;
+    final state = _trackingState;
     final hasLocation = state.lat != null && state.lng != null;
     final center = hasLocation ? LatLng(state.lat!, state.lng!) : null;
     final trail = state.trail
@@ -549,7 +648,12 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       child: Scaffold(
         body: Stack(
           children: [
-            if (center == null)
+            if (_isStationaryBike)
+              _StationaryBikeBackdrop(
+                active: state.isActive,
+                paused: state.isPaused,
+              )
+            else if (center == null)
               ColoredBox(
                 color: theme.colorScheme.surfaceContainerLow,
                 child: Center(
@@ -633,16 +737,19 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                       ),
                     ),
                     const Spacer(),
-                    Material(
-                      color: theme.colorScheme.surface.withValues(alpha: 0.92),
-                      shape: const CircleBorder(),
-                      child: IconButton(
-                        icon: const Icon(Icons.settings_outlined),
-                        tooltip: loc.runRecordSettings,
-                        onPressed: _openVoiceSettings,
+                    if (!_isStationaryBike)
+                      Material(
+                        color: theme.colorScheme.surface.withValues(
+                          alpha: 0.92,
+                        ),
+                        shape: const CircleBorder(),
+                        child: IconButton(
+                          icon: const Icon(Icons.settings_outlined),
+                          tooltip: loc.runRecordSettings,
+                          onPressed: _openVoiceSettings,
+                        ),
                       ),
-                    ),
-                    if (_service.isDebugSimulating)
+                    if (!_isStationaryBike && _service.isDebugSimulating)
                       Container(
                         margin: const EdgeInsets.only(left: 8),
                         padding: const EdgeInsets.symmetric(
@@ -661,7 +768,9 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                           ),
                         ),
                       ),
-                    if (!state.isActive && !_service.isDebugSimulating)
+                    if (!_isStationaryBike &&
+                        !state.isActive &&
+                        !_service.isDebugSimulating)
                       Container(
                         margin: const EdgeInsets.only(left: 8),
                         padding: const EdgeInsets.symmetric(
@@ -679,7 +788,8 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                           style: theme.textTheme.labelMedium,
                         ),
                       ),
-                    if (state.isActive &&
+                    if (!_isStationaryBike &&
+                        state.isActive &&
                         (state.hasWeakGps ||
                             (state.isRecording &&
                                 state.lat == null &&
@@ -728,15 +838,18 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                   final hasSplitSummary = state.splits.isNotEmpty;
                   final showDebug =
                       kDebugMode &&
+                      !_isStationaryBike &&
                       !state.isActive &&
                       _service.canDebugSimulate;
                   final notificationsNeedAttention =
                       _service.permissionState.notificationsNeedAttention;
                   final showPermissionBanner =
+                      !_isStationaryBike &&
                       !state.isActive &&
                       state.supported &&
                       (!state.locationGranted || notificationsNeedAttention);
-                  final hasIntervalStatus = state.isActive && _intervalsOn;
+                  final hasIntervalStatus =
+                      !_isStationaryBike && state.isActive && _intervalsOn;
                   final media = MediaQuery.of(context);
                   final systemBottom = media.viewPadding.bottom;
                   final bottomPad =
@@ -806,17 +919,20 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                         scrollController: scrollController,
                         onContentHeight: _onSheetContentHeight,
                         state: state,
+                        activityType: _activityType,
                         busy: _busy || _gpsPreparing,
                         expanded: _sheetExpanded,
                         showDebugSimulate: showDebug,
-                        intervalsOn: _intervalsOn,
+                        intervalsOn: !_isStationaryBike && _intervalsOn,
                         intervalSnapshot: interval,
                         intervalPreset: _coach.settings.interval,
-                        planWorkout: _planWorkout,
+                        planWorkout: _isStationaryBike ? null : _planWorkout,
                         stepSnapshot: stepSnapshot,
                         goal: _goal,
                         goalSnapshot: goalSnap,
-                        onGoalChanged: state.isActive ? null : _setGoal,
+                        onGoalChanged: _isStationaryBike || state.isActive
+                            ? null
+                            : _setGoal,
                         onIntervalsChanged:
                             state.isActive || _planWorkout != null
                             ? null
@@ -825,12 +941,20 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                         headphonesOnly: _coach.settings.headphonesOnly,
                         headsetConnected: _audioCapabilities.headsetConnected,
                         notificationsNeedAttention: notificationsNeedAttention,
+                        onActivityTypeChanged:
+                            state.isActive || _planWorkout != null
+                            ? null
+                            : _setActivityType,
                         onOpenVoiceSettings: _openVoiceSettings,
                         onOpenPermissions: _showPermissionOnboarding,
-                        onStart: _ensurePermissionAndStart,
+                        onStart: _startSelectedActivity,
                         onDebugSimulate: _startDebugSimulation,
-                        onPause: () => _service.pause(),
-                        onResume: () => _service.resume(),
+                        onPause: () => _isStationaryBike
+                            ? _bikeService.pause()
+                            : _service.pause(),
+                        onResume: () => _isStationaryBike
+                            ? _bikeService.resume()
+                            : _service.resume(),
                         onFinish: _finish,
                       );
                     },
@@ -864,12 +988,262 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
 
 enum _RunLeaveAction { stay, background, discard }
 
+class _StationaryBikeBackdrop extends StatelessWidget {
+  final bool active;
+  final bool paused;
+
+  const _StationaryBikeBackdrop({required this.active, required this.paused});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.secondaryContainer,
+            theme.colorScheme.surfaceContainerLow,
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Align(
+        alignment: const Alignment(0, -0.42),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 116,
+                height: 116,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondary.withValues(alpha: 0.16),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.pedal_bike_rounded,
+                  size: 62,
+                  color: theme.colorScheme.secondary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                loc.stationaryBikeIndoorHeadline,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                active
+                    ? (paused
+                          ? loc.stationaryBikePaused
+                          : loc.stationaryBikeTiming)
+                    : loc.cardioActivityStationaryBikeSubtitle,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityTypeSelector extends StatelessWidget {
+  final CardioActivityType value;
+  final ValueChanged<CardioActivityType>? onChanged;
+
+  const _ActivityTypeSelector({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    final isBike = value == CardioActivityType.stationaryBike;
+    return Material(
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        key: const ValueKey('cardio-activity-selector'),
+        onTap: onChanged == null ? null : () => _openPicker(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          child: Row(
+            children: [
+              Icon(
+                isBike
+                    ? Icons.pedal_bike_rounded
+                    : Icons.directions_run_rounded,
+                size: 21,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loc.cardioActivityPickerLabel.toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isBike
+                          ? loc.cardioActivityStationaryBike
+                          : loc.cardioActivityRunning,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (onChanged != null)
+                Icon(
+                  Icons.unfold_more_rounded,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openPicker(BuildContext context) async {
+    final loc = AppLocalizations.of(context)!;
+    final selected = await showModalBottomSheet<CardioActivityType>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                loc.cardioActivityPickerTitle,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              _ActivityChoiceTile(
+                icon: Icons.directions_run_rounded,
+                title: loc.cardioActivityRunning,
+                subtitle: loc.cardioActivityRunningSubtitle,
+                selected: value == CardioActivityType.running,
+                onTap: () => Navigator.pop(context, CardioActivityType.running),
+              ),
+              const SizedBox(height: 8),
+              _ActivityChoiceTile(
+                icon: Icons.pedal_bike_rounded,
+                title: loc.cardioActivityStationaryBike,
+                subtitle: loc.cardioActivityStationaryBikeSubtitle,
+                selected: value == CardioActivityType.stationaryBike,
+                onTap: () =>
+                    Navigator.pop(context, CardioActivityType.stationaryBike),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected != null && selected != value) onChanged?.call(selected);
+  }
+}
+
+class _ActivityChoiceTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ActivityChoiceTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: selected
+          ? theme.colorScheme.primaryContainer
+          : theme.colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+        onTap: onTap,
+        leading: Icon(icon),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text(subtitle),
+        trailing: selected ? const Icon(Icons.check_circle_rounded) : null,
+      ),
+    );
+  }
+}
+
+class _IndoorInfoCard extends StatelessWidget {
+  const _IndoorInfoCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.location_off_outlined,
+            size: 20,
+            color: theme.colorScheme.onSecondaryContainer,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              loc.stationaryBikeIndoorBody,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSecondaryContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MetricsSheet extends StatelessWidget {
   final ScrollController scrollController;
 
   /// Reports the height of the collapsed content so the sheet can hug it.
   final ValueChanged<double> onContentHeight;
   final RunTrackingState state;
+  final CardioActivityType activityType;
   final bool busy;
   final bool expanded;
   final bool showDebugSimulate;
@@ -886,6 +1260,7 @@ class _MetricsSheet extends StatelessWidget {
   final bool headphonesOnly;
   final bool headsetConnected;
   final bool notificationsNeedAttention;
+  final ValueChanged<CardioActivityType>? onActivityTypeChanged;
   final VoidCallback onOpenVoiceSettings;
   final VoidCallback onOpenPermissions;
   final VoidCallback onStart;
@@ -898,6 +1273,7 @@ class _MetricsSheet extends StatelessWidget {
     required this.scrollController,
     required this.onContentHeight,
     required this.state,
+    required this.activityType,
     required this.busy,
     required this.expanded,
     required this.showDebugSimulate,
@@ -914,6 +1290,7 @@ class _MetricsSheet extends StatelessWidget {
     required this.headphonesOnly,
     required this.headsetConnected,
     required this.notificationsNeedAttention,
+    required this.onActivityTypeChanged,
     required this.onOpenVoiceSettings,
     required this.onOpenPermissions,
     required this.onStart,
@@ -952,6 +1329,7 @@ class _MetricsSheet extends StatelessWidget {
     final allSplits = state.displaySplits;
     final last = _lastCompleted;
     final best = _bestCompleted;
+    final isStationaryBike = activityType == CardioActivityType.stationaryBike;
 
     final actionButtonStyle = FilledButton.styleFrom(
       minimumSize: const Size.fromHeight(52),
@@ -1056,6 +1434,7 @@ class _MetricsSheet extends StatelessWidget {
     }
 
     Widget buildPermissionBanner() {
+      if (isStationaryBike) return const SizedBox.shrink();
       final locationMissing = !state.locationGranted;
       if (state.isActive ||
           !state.supported ||
@@ -1131,9 +1510,15 @@ class _MetricsSheet extends StatelessWidget {
           ),
           Expanded(
             child: _Metric(
-              label: loc.runRecordPace,
-              value: RunFormatters.pace(pace),
-              unit: loc.runRecordPaceUnit,
+              label: isStationaryBike
+                  ? loc.stationaryBikeAverageSpeed
+                  : loc.runRecordPace,
+              value: isStationaryBike
+                  ? _formatSpeed(state.distanceMeters, state.movingTimeSeconds)
+                  : RunFormatters.pace(pace),
+              unit: isStationaryBike
+                  ? loc.stationaryBikeSpeedUnit
+                  : loc.runRecordPaceUnit,
               emphasize: state.isActive,
             ),
           ),
@@ -1150,22 +1535,32 @@ class _MetricsSheet extends StatelessWidget {
           buildPermissionBanner(),
           buildMetrics(),
           const SizedBox(height: 12),
-          _RunPlanCard(
-            goal: goal,
-            goalSnapshot: goalSnapshot,
-            intervalsOn: intervalsOn,
-            intervalSnapshot: intervalSnapshot,
-            intervalPreset: intervalPreset,
-            planWorkout: planWorkout,
-            stepSnapshot: stepSnapshot,
-            active: state.isActive,
-            onGoalChanged: onGoalChanged,
-            onIntervalsChanged: onIntervalsChanged,
-            voiceEnabled: voiceEnabled,
-            headphonesOnly: headphonesOnly,
-            headsetConnected: headsetConnected,
-            onOpenVoiceSettings: onOpenVoiceSettings,
+          _ActivityTypeSelector(
+            value: activityType,
+            onChanged: onActivityTypeChanged,
           ),
+          if (isStationaryBike) ...[
+            const SizedBox(height: 10),
+            const _IndoorInfoCard(),
+          ] else ...[
+            const SizedBox(height: 12),
+            _RunPlanCard(
+              goal: goal,
+              goalSnapshot: goalSnapshot,
+              intervalsOn: intervalsOn,
+              intervalSnapshot: intervalSnapshot,
+              intervalPreset: intervalPreset,
+              planWorkout: planWorkout,
+              stepSnapshot: stepSnapshot,
+              active: state.isActive,
+              onGoalChanged: onGoalChanged,
+              onIntervalsChanged: onIntervalsChanged,
+              voiceEnabled: voiceEnabled,
+              headphonesOnly: headphonesOnly,
+              headsetConnected: headsetConnected,
+              onOpenVoiceSettings: onOpenVoiceSettings,
+            ),
+          ],
         ],
       );
     }
@@ -1267,7 +1662,7 @@ class _MetricsSheet extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 buildHeader(),
-                if (expanded) ...[
+                if (expanded && !isStationaryBike) ...[
                   splitsHeader,
                   if (allSplits.isEmpty)
                     Text(
@@ -1293,6 +1688,12 @@ class _MetricsSheet extends StatelessWidget {
     );
 
     return sheet;
+  }
+
+  String _formatSpeed(double distanceMeters, int movingSeconds) {
+    if (distanceMeters <= 0 || movingSeconds <= 0) return '--';
+    final speed = (distanceMeters / 1000) / (movingSeconds / 3600);
+    return speed.toStringAsFixed(1);
   }
 }
 

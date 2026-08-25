@@ -78,7 +78,9 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
       _points = points;
       _planSteps = planSteps;
       _analytics = analytics;
-      _medals = activity == null ? const [] : board.forActivity(activity.id);
+      _medals = activity == null || !activity.isRun
+          ? const []
+          : board.forActivity(activity.id);
       _loading = false;
     });
   }
@@ -88,7 +90,11 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     if (activity == null) return;
     final loc = AppLocalizations.of(context)!;
     final titleController = TextEditingController(
-      text: activity.title ?? loc.runDetailDefaultTitle,
+      text:
+          activity.title ??
+          (activity.isStationaryBike
+              ? loc.stationaryBikeDetailDefaultTitle
+              : loc.runDetailDefaultTitle),
     );
     final notesController = TextEditingController(text: activity.notes ?? '');
 
@@ -149,12 +155,22 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
   }
 
   Future<void> _delete() async {
+    final activity = _activity;
+    if (activity == null) return;
     final loc = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.runDetailDeleteConfirm),
-        content: Text(loc.runDetailDeleteConfirmBody),
+        title: Text(
+          activity.isStationaryBike
+              ? loc.stationaryBikeDeleteConfirm
+              : loc.runDetailDeleteConfirm,
+        ),
+        content: Text(
+          activity.isStationaryBike
+              ? loc.stationaryBikeDeleteConfirmBody
+              : loc.runDetailDeleteConfirmBody,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -162,7 +178,11 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.runDetailDelete),
+            child: Text(
+              activity.isStationaryBike
+                  ? loc.stationaryBikeDelete
+                  : loc.runDetailDelete,
+            ),
           ),
         ],
       ),
@@ -410,6 +430,47 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     );
   }
 
+  Widget _buildStationaryBikeHero(ThemeData theme, AppLocalizations loc) {
+    return Container(
+      height: 176,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.secondaryContainer,
+            theme.colorScheme.surfaceContainerLow,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.pedal_bike_rounded,
+            size: 62,
+            color: theme.colorScheme.secondary,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            loc.stationaryBikeIndoorHeadline,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            loc.cardioActivityStationaryBikeSubtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -437,12 +498,15 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final avgPace = _analytics.avgPaceSecPerKm ?? activity.avgPaceSecPerKm;
     final bestPace =
         _analytics.bestSplitPaceSecPerKm ?? activity.maxPaceSecPerKm;
+    final averageSpeed = activity.averageSpeedKmh;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           activity.title?.isNotEmpty == true
               ? activity.title!
+              : activity.isStationaryBike
+              ? loc.stationaryBikeDetailUntitled
               : loc.runDetailUntitled,
         ),
         actions: [
@@ -453,7 +517,9 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
-            tooltip: loc.runDetailDelete,
+            tooltip: activity.isStationaryBike
+                ? loc.stationaryBikeDelete
+                : loc.runDetailDelete,
             onPressed: _delete,
           ),
         ],
@@ -461,10 +527,13 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(14),
-            child: SizedBox(height: 240, child: _buildMap(theme, loc, trail)),
-          ),
+          if (activity.isStationaryBike)
+            _buildStationaryBikeHero(theme, loc)
+          else
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: SizedBox(height: 240, child: _buildMap(theme, loc, trail)),
+            ),
           const SizedBox(height: 12),
           _sectionCard(
             child: Column(
@@ -537,8 +606,12 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                     ),
                     _MetricItem(
                       icon: Icons.speed_rounded,
-                      label: loc.runDetailAvgPace,
-                      value: RunFormatters.paceWithUnit(avgPace),
+                      label: activity.isStationaryBike
+                          ? loc.stationaryBikeAverageSpeed
+                          : loc.runDetailAvgPace,
+                      value: activity.isStationaryBike
+                          ? '${averageSpeed?.toStringAsFixed(1) ?? '--'} ${loc.stationaryBikeSpeedUnit}'
+                          : RunFormatters.paceWithUnit(avgPace),
                     ),
                     _MetricItem(
                       icon: Icons.timer_outlined,
@@ -555,7 +628,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
                       label: loc.runDetailCalories,
                       value: '${activity.calories ?? 0} kcal',
                     ),
-                    if (bestPace != null)
+                    if (activity.isRun && bestPace != null)
                       _MetricItem(
                         icon: Icons.bolt_rounded,
                         label: loc.runDetailBestPace,
@@ -566,13 +639,13 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               ],
             ),
           ),
-          if (_medals.isNotEmpty) ...[
+          if (activity.isRun && _medals.isNotEmpty) ...[
             const SizedBox(height: 12),
             _sectionCard(
               child: RunActivityAchievementsBlock(placements: _medals),
             ),
           ],
-          if (_analytics.hasChart) ...[
+          if (activity.isRun && _analytics.hasChart) ...[
             const SizedBox(height: 12),
             _sectionCard(
               child: Column(
@@ -608,7 +681,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               ),
             ),
           ],
-          if (_planSteps.isNotEmpty) ...[
+          if (activity.isRun && _planSteps.isNotEmpty) ...[
             const SizedBox(height: 12),
             _sectionCard(
               child: Column(
@@ -621,7 +694,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
               ),
             ),
           ],
-          if (_analytics.hasSplits) ...[
+          if (activity.isRun && _analytics.hasSplits) ...[
             const SizedBox(height: 12),
             _sectionCard(
               child: Column(
