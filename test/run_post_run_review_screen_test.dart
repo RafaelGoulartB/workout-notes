@@ -5,6 +5,7 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_post_run_review_screen.dart';
 
@@ -41,6 +42,20 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    late String plannedWorkoutId;
+    await tester.runAsync(() async {
+      final planRepository = RunPlanRepository();
+      final plan = await planRepository.createPlan(name: 'Base', weeks: 1);
+      final plannedWorkout = await planRepository.addWorkout(
+        planId: plan.id,
+        weekIndex: 0,
+        name: 'Rodagem planejada',
+        targetDistanceMeters: 5000,
+        targetDurationSeconds: 1800,
+        targetPaceSecPerKm: 360,
+      );
+      plannedWorkoutId = plannedWorkout.id;
+    });
     final spool = <String, dynamic>{
       'activity': <String, dynamic>{
         'id': 'review-widget',
@@ -51,6 +66,7 @@ void main() {
         'moving_time_seconds': 1750,
         'distance_meters': 5000.0,
         'avg_pace_sec_per_km': 350.0,
+        'plan_workout_id': plannedWorkoutId,
         'splits': <Map<String, dynamic>>[
           <String, dynamic>{
             'km': 1,
@@ -82,7 +98,12 @@ void main() {
     });
 
     expect(find.text('Revisar corrida'), findsOneWidget);
-    expect(find.text('5.00 km'), findsOneWidget);
+    expect(find.text('5.00 km'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.text('ESFORÇO PERCEBIDO'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('ESFORÇO PERCEBIDO'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('COMO VOCÊ SE SENTIU?'),
