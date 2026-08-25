@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/models/run_permission_state.dart';
 import 'package:workout_notes/models/run_session_context.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
@@ -59,7 +60,8 @@ class RunTrackingService extends ChangeNotifier {
   Timer? _debugTimer;
   bool _debugPaused = false;
   bool _nativeDebugSim = false;
-  bool _askedBackgroundPermission = false;
+  bool _notificationsGranted = false;
+  bool _notificationsPermissionRequired = false;
   RunSessionContext? _sessionContext;
 
   RunTrackingState get state => _state;
@@ -68,6 +70,13 @@ class RunTrackingService extends ChangeNotifier {
   int get recoveredCount => _recoveredCount;
   bool get isDebugSimulating => _debugSim != null;
   bool get canDebugSimulate => kDebugMode;
+  bool get notificationsGranted => _notificationsGranted;
+  bool get notificationsPermissionRequired => _notificationsPermissionRequired;
+  RunPermissionState get permissionState => RunPermissionState(
+    locationGranted: _state.locationGranted,
+    notificationsGranted: _notificationsGranted,
+    notificationsPermissionRequired: _notificationsPermissionRequired,
+  );
 
   bool get _isAndroid =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
@@ -77,6 +86,7 @@ class RunTrackingService extends ChangeNotifier {
       if (kDebugMode) {
         _state = _state.copyWith(supported: true, locationGranted: true);
       }
+      _notificationsGranted = true;
       _initialized = true;
       notifyListeners();
       return;
@@ -138,6 +148,10 @@ class RunTrackingService extends ChangeNotifier {
         locationGranted:
             capabilities['location_granted'] as bool? ?? _state.locationGranted,
       );
+      _notificationsGranted =
+          capabilities['notifications_granted'] as bool? ?? true;
+      _notificationsPermissionRequired =
+          capabilities['notifications_permission_required'] as bool? ?? false;
       notifyListeners();
       return capabilities;
     } on MissingPluginException {
@@ -145,6 +159,8 @@ class RunTrackingService extends ChangeNotifier {
         supported: kDebugMode,
         locationGranted: kDebugMode,
       );
+      _notificationsGranted = kDebugMode;
+      _notificationsPermissionRequired = false;
       notifyListeners();
       return {'supported': kDebugMode};
     } catch (error) {
@@ -170,7 +186,7 @@ class RunTrackingService extends ChangeNotifier {
     return _state;
   }
 
-  Future<bool> requestPermissions() async {
+  Future<bool> requestLocationPermission() async {
     if (kDebugMode && !_isAndroid) {
       _state = _state.copyWith(locationGranted: true, clearError: true);
       notifyListeners();
@@ -179,7 +195,8 @@ class RunTrackingService extends ChangeNotifier {
     if (!_isAndroid) return false;
     try {
       final granted =
-          await methods.invokeMethod<bool>('requestPermissions') ?? false;
+          await methods.invokeMethod<bool>('requestLocationPermission') ??
+          false;
       _state = _state.copyWith(locationGranted: granted, clearError: true);
       if (!granted) {
         _setError('location_denied', 'Precise location permission is required');
@@ -195,17 +212,42 @@ class RunTrackingService extends ChangeNotifier {
     }
   }
 
-  /// Android 10+: best-effort background location for screen-off tracking.
-  /// Denial does not block starting a run (foreground service still works).
-  Future<bool> requestBackgroundPermission() async {
+  /// Android 13+: optional permission that keeps foreground-run controls in the
+  /// notification drawer. A denial never blocks GPS recording.
+  Future<bool> requestNotificationPermission() async {
     if (!_isAndroid) return true;
+    if (!_notificationsPermissionRequired) {
+      _notificationsGranted = true;
+      notifyListeners();
+      return true;
+    }
     try {
       final granted =
-          await methods.invokeMethod<bool>('requestBackgroundPermission') ??
+          await methods.invokeMethod<bool>('requestNotificationPermission') ??
           false;
+      _notificationsGranted = granted;
+      notifyListeners();
       return granted;
     } on MissingPluginException {
-      return true;
+      _notificationsGranted = kDebugMode;
+      notifyListeners();
+      return _notificationsGranted;
+    } on PlatformException {
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<RunPermissionState> refreshPermissions() async {
+    await getCapabilities();
+    return permissionState;
+  }
+
+  Future<bool> openAppSettings() async {
+    if (!_isAndroid) return false;
+    try {
+      return await methods.invokeMethod<bool>('openAppSettings') ?? false;
     } on PlatformException {
       return false;
     } catch (_) {
@@ -309,14 +351,8 @@ class RunTrackingService extends ChangeNotifier {
     }
     if (_state.isActive) return true;
     if (!_state.locationGranted) {
-      final granted = await requestPermissions();
-      if (!granted) return false;
-    }
-    // Background is optional; FGS location works with while-in-use on most OEMs.
-    // Prompt at most once per process so a denial does not spam the system dialog.
-    if (!_askedBackgroundPermission) {
-      _askedBackgroundPermission = true;
-      await requestBackgroundPermission();
+      _setError('location_denied', 'Precise location permission is required');
+      return false;
     }
     try {
       _trail.clear();

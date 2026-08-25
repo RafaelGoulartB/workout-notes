@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_session_goal.dart';
@@ -11,6 +12,7 @@ import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/services/run_workout_step_engine.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
+import 'package:workout_notes/widgets/run/run_permission_onboarding_sheet.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
@@ -37,6 +39,9 @@ class RunRecordScreen extends StatefulWidget {
 }
 
 class _RunRecordScreenState extends State<RunRecordScreen> {
+  static const _permissionOnboardingSeenKey =
+      'run_permission_onboarding_seen_v1';
+
   final _service = RunTrackingService.instance;
   final _mapController = MapController();
   final _coach = RunVoiceCoach();
@@ -262,6 +267,44 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     return result == true;
   }
 
+  Future<bool> _showPermissionOnboarding() async {
+    final initialState = await _service.refreshPermissions();
+    if (!mounted) return false;
+    final shouldContinue = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: false,
+      builder: (context) => RunPermissionOnboardingSheet(
+        initialState: initialState,
+        onRefresh: _service.refreshPermissions,
+        onRequestLocation: _service.requestLocationPermission,
+        onRequestNotifications: _service.requestNotificationPermission,
+        onOpenSettings: _service.openAppSettings,
+      ),
+    );
+    final refreshed = await _service.refreshPermissions();
+    if (shouldContinue == true && refreshed.locationGranted) {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setBool(_permissionOnboardingSeenKey, true);
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> _ensurePermissionOnboardingForStart() async {
+    final permissionState = await _service.refreshPermissions();
+    if (!mounted) return false;
+    final preferences = await SharedPreferences.getInstance();
+    final hasSeenOnboarding =
+        preferences.getBool(_permissionOnboardingSeenKey) ?? false;
+    final shouldShow =
+        !permissionState.locationGranted ||
+        (permissionState.notificationsNeedAttention && !hasSeenOnboarding);
+    if (!shouldShow) return permissionState.locationGranted;
+    return _showPermissionOnboarding();
+  }
+
   Future<void> _startDebugSimulation() async {
     setState(() => _busy = true);
     try {
@@ -309,19 +352,17 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       ).showSnackBar(SnackBar(content: Text(loc.runRecordUnsupported)));
       return;
     }
+    if (!await _ensurePermissionOnboardingForStart()) {
+      if (mounted && !_service.state.locationGranted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(loc.runRecordPermissionNeeded)));
+      }
+      return;
+    }
+    if (!mounted) return;
     setState(() => _busy = true);
     try {
-      if (!_service.state.locationGranted) {
-        final granted = await _service.requestPermissions();
-        if (!granted) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(loc.runRecordPermissionNeeded)),
-            );
-          }
-          return;
-        }
-      }
       var attempts = 0;
       while (_stableGpsFixes < 2 && mounted && attempts < 3) {
         attempts += 1;
@@ -744,6 +785,12 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                       kDebugMode &&
                       !state.isActive &&
                       _service.canDebugSimulate;
+                  final notificationsNeedAttention =
+                      _service.permissionState.notificationsNeedAttention;
+                  final showPermissionBanner =
+                      !state.isActive &&
+                      state.supported &&
+                      (!state.locationGranted || notificationsNeedAttention);
                   final hasIntervalStatus = state.isActive && _intervalsOn;
                   final media = MediaQuery.of(context);
                   final systemBottom = media.viewPadding.bottom;
@@ -752,8 +799,8 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                   // Sheet height tracks only the widgets that are on screen —
                   // no reserved empty slots for hidden intervals/splits.
                   var contentH = 23.0; // handle
-                  if (!state.locationGranted && state.supported) {
-                    contentH += 68;
+                  if (showPermissionBanner) {
+                    contentH += 100;
                   }
                   contentH += 72; // metrics
                   contentH += 12;
@@ -832,7 +879,9 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
                         voiceEnabled: _coach.settings.enabled,
                         headphonesOnly: _coach.settings.headphonesOnly,
                         headsetConnected: _audioCapabilities.headsetConnected,
+                        notificationsNeedAttention: notificationsNeedAttention,
                         onOpenVoiceSettings: _openVoiceSettings,
+                        onOpenPermissions: _showPermissionOnboarding,
                         onStart: _ensurePermissionAndStart,
                         onDebugSimulate: _startDebugSimulation,
                         onPause: () => _service.pause(),
@@ -891,7 +940,9 @@ class _MetricsSheet extends StatelessWidget {
   final bool voiceEnabled;
   final bool headphonesOnly;
   final bool headsetConnected;
+  final bool notificationsNeedAttention;
   final VoidCallback onOpenVoiceSettings;
+  final VoidCallback onOpenPermissions;
   final VoidCallback onStart;
   final VoidCallback onDebugSimulate;
   final VoidCallback onPause;
@@ -917,7 +968,9 @@ class _MetricsSheet extends StatelessWidget {
     required this.voiceEnabled,
     required this.headphonesOnly,
     required this.headsetConnected,
+    required this.notificationsNeedAttention,
     required this.onOpenVoiceSettings,
+    required this.onOpenPermissions,
     required this.onStart,
     required this.onDebugSimulate,
     required this.onPause,
@@ -1058,24 +1111,46 @@ class _MetricsSheet extends StatelessWidget {
     }
 
     Widget buildPermissionBanner() {
-      if (state.locationGranted || !state.supported) {
+      final locationMissing = !state.locationGranted;
+      if (state.isActive ||
+          !state.supported ||
+          (!locationMissing && !notificationsNeedAttention)) {
         return const SizedBox.shrink();
       }
+      final backgroundColor = locationMissing
+          ? theme.colorScheme.errorContainer
+          : theme.colorScheme.secondaryContainer;
+      final foregroundColor = locationMissing
+          ? theme.colorScheme.onErrorContainer
+          : theme.colorScheme.onSecondaryContainer;
       return Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: theme.colorScheme.errorContainer.withValues(alpha: 0.7),
+            color: backgroundColor.withValues(alpha: 0.7),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: Text(
-            loc.runRecordPermissionNeeded,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onErrorContainer,
-              fontWeight: FontWeight.w600,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                locationMissing
+                    ? loc.runRecordPermissionNeeded
+                    : loc.runPermissionsNotificationsBanner,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: foregroundColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextButton(
+                onPressed: onOpenPermissions,
+                style: TextButton.styleFrom(foregroundColor: foregroundColor),
+                child: Text(loc.runPermissionsSetupAction),
+              ),
+            ],
           ),
         ),
       );

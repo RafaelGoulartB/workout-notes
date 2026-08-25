@@ -8,11 +8,13 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -25,16 +27,16 @@ class RunTrackingBridge(private val context: Context) :
     MethodChannel.MethodCallHandler,
     EventChannel.StreamHandler {
     companion object {
-        const val PERMISSION_REQUEST_CODE = 8461
-        const val BACKGROUND_PERMISSION_REQUEST_CODE = 8462
+        const val LOCATION_PERMISSION_REQUEST_CODE = 8461
+        const val NOTIFICATION_PERMISSION_REQUEST_CODE = 8462
 
         /** Context waiting for the foreground service to create its spool. */
         @Volatile var pendingSessionContext: Map<String, Any?>? = null
     }
 
     private var activity: Activity? = null
-    private val pendingPermission = AtomicReference<MethodChannel.Result?>(null)
-    private val pendingBackgroundPermission = AtomicReference<MethodChannel.Result?>(null)
+    private val pendingLocationPermission = AtomicReference<MethodChannel.Result?>(null)
+    private val pendingNotificationPermission = AtomicReference<MethodChannel.Result?>(null)
     private val spool by lazy { RunActivitySpool(context.applicationContext) }
 
     fun attachActivity(value: Activity) {
@@ -51,16 +53,19 @@ class RunTrackingBridge(private val context: Context) :
                 mapOf(
                     "supported" to true,
                     "location_granted" to RunTrackingService.locationGranted(context),
-                    "background_location_granted" to
-                        RunTrackingService.backgroundLocationGranted(context),
+                    "notifications_granted" to notificationPermissionGranted(),
                     "notifications_permission_required" to (Build.VERSION.SDK_INT >= 33),
-                    "background_location_required" to (Build.VERSION.SDK_INT >= 29),
+                    // A run is started while the Activity is visible and then kept
+                    // alive by a location foreground service. Background location
+                    // is therefore neither declared nor requested.
+                    "background_location_required" to false,
                     "android_sdk_int" to Build.VERSION.SDK_INT,
                 ),
             )
             "getState" -> result.success(RunTrackingService.currentState(context))
-            "requestPermissions" -> requestLocationPermission(result)
-            "requestBackgroundPermission" -> requestBackgroundLocationPermission(result)
+            "requestLocationPermission" -> requestLocationPermission(result)
+            "requestNotificationPermission" -> requestNotificationPermission(result)
+            "openAppSettings" -> openAppSettings(result)
             "getCurrentLocation" -> getCurrentLocation(result)
             "setSessionContext" -> setSessionContext(call, result)
             "recoverActive" -> recoverActive(result)
@@ -313,38 +318,30 @@ class RunTrackingBridge(private val context: Context) :
             result.error("activity_unavailable", "A visible Activity is required", null)
             return
         }
-        if (!pendingPermission.compareAndSet(null, result)) {
+        if (!pendingLocationPermission.compareAndSet(null, result)) {
             result.error("permission_pending", "Permission request already pending", null)
             return
         }
-        val permissions = mutableListOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-        )
-        if (Build.VERSION.SDK_INT >= 33) {
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
         visibleActivity.requestPermissions(
-            permissions.toTypedArray(),
-            PERMISSION_REQUEST_CODE,
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            ),
+            LOCATION_PERMISSION_REQUEST_CODE,
         )
     }
 
-    private fun requestBackgroundLocationPermission(result: MethodChannel.Result) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+    private fun notificationPermissionGranted(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestNotificationPermission(result: MethodChannel.Result) {
+        if (notificationPermissionGranted()) {
             result.success(true)
-            return
-        }
-        if (RunTrackingService.backgroundLocationGranted(context)) {
-            result.success(true)
-            return
-        }
-        if (!RunTrackingService.locationGranted(context)) {
-            result.error(
-                "location_denied",
-                "Precise location must be granted before background access",
-                null,
-            )
             return
         }
         val visibleActivity = activity
@@ -352,20 +349,33 @@ class RunTrackingBridge(private val context: Context) :
             result.error("activity_unavailable", "A visible Activity is required", null)
             return
         }
-        if (!pendingBackgroundPermission.compareAndSet(null, result)) {
+        if (!pendingNotificationPermission.compareAndSet(null, result)) {
             result.error("permission_pending", "Permission request already pending", null)
             return
         }
         visibleActivity.requestPermissions(
-            arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
-            BACKGROUND_PERMISSION_REQUEST_CODE,
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            NOTIFICATION_PERMISSION_REQUEST_CODE,
         )
+    }
+
+    private fun openAppSettings(result: MethodChannel.Result) {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", context.packageName, null),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(intent)
+            result.success(true)
+        } catch (error: Throwable) {
+            result.error("settings_unavailable", error.message, null)
+        }
     }
 
     fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray): Boolean {
         when (requestCode) {
-            PERMISSION_REQUEST_CODE -> {
-                val result = pendingPermission.getAndSet(null)
+            LOCATION_PERMISSION_REQUEST_CODE -> {
+                val result = pendingLocationPermission.getAndSet(null)
                 // Fine location is required; coarse-only is treated as denied.
                 val granted = grantResults.isNotEmpty() &&
                     ContextCompat.checkSelfPermission(
@@ -375,9 +385,9 @@ class RunTrackingBridge(private val context: Context) :
                 result?.success(granted)
                 return true
             }
-            BACKGROUND_PERMISSION_REQUEST_CODE -> {
-                val result = pendingBackgroundPermission.getAndSet(null)
-                val granted = RunTrackingService.backgroundLocationGranted(context)
+            NOTIFICATION_PERMISSION_REQUEST_CODE -> {
+                val result = pendingNotificationPermission.getAndSet(null)
+                val granted = notificationPermissionGranted()
                 result?.success(granted)
                 return true
             }
