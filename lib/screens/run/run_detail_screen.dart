@@ -470,65 +470,94 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  dateLabel,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 7),
+                    Text(
+                      dateLabel,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
                 if (activity.notes?.isNotEmpty == true) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    activity.notes!,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontStyle: FontStyle.italic,
-                    ),
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.notes_rounded,
+                        size: 17,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          activity.notes!,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-                const SizedBox(height: 14),
+                if (activity.feelingRating != null || activity.rpe != null) ...[
+                  const SizedBox(height: 12),
+                  _RunFeedbackStrip(
+                    feelingRating: activity.feelingRating,
+                    rpe: activity.rpe,
+                    feelingLabel: loc.runDetailFeeling,
+                    rpeLabel: loc.runDetailRpe,
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Divider(
+                  height: 1,
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.55,
+                  ),
+                ),
+                const SizedBox(height: 12),
                 _MetricsGrid(
                   items: [
                     _MetricItem(
+                      icon: Icons.route_outlined,
                       label: loc.runRecordDistance,
                       value: RunFormatters.distanceWithUnit(
                         activity.distanceMeters,
                       ),
                     ),
                     _MetricItem(
+                      icon: Icons.speed_rounded,
                       label: loc.runDetailAvgPace,
                       value: RunFormatters.paceWithUnit(avgPace),
                     ),
                     _MetricItem(
+                      icon: Icons.timer_outlined,
                       label: loc.runDetailMovingTime,
                       value: RunFormatters.duration(activity.movingTimeSeconds),
                     ),
                     _MetricItem(
+                      icon: Icons.schedule_rounded,
                       label: loc.runDetailElapsedTime,
                       value: RunFormatters.duration(activity.durationSeconds),
                     ),
                     _MetricItem(
+                      icon: Icons.local_fire_department_outlined,
                       label: loc.runDetailCalories,
                       value: '${activity.calories ?? 0} kcal',
                     ),
-                    if (activity.rpe != null)
-                      _MetricItem(
-                        label: loc.runDetailRpe,
-                        value: '${activity.rpe!.round()}/10',
-                      ),
-                    if (activity.feelingRating != null)
-                      _MetricItem(
-                        label: loc.runDetailFeeling,
-                        value: switch (activity.feelingRating) {
-                          1 => loc.runReviewFeelingVeryBad,
-                          2 => loc.runReviewFeelingBad,
-                          4 => loc.runReviewFeelingGood,
-                          5 => loc.runReviewFeelingGreat,
-                          _ => loc.runReviewFeelingNeutral,
-                        },
-                      ),
                     if (bestPace != null)
                       _MetricItem(
+                        icon: Icons.bolt_rounded,
                         label: loc.runDetailBestPace,
                         value: RunFormatters.paceWithUnit(bestPace),
                       ),
@@ -611,11 +640,144 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
   }
 }
 
+class _RunFeedbackStrip extends StatelessWidget {
+  final int? feelingRating;
+  final double? rpe;
+  final String feelingLabel;
+  final String rpeLabel;
+
+  const _RunFeedbackStrip({
+    required this.feelingRating,
+    required this.rpe,
+    required this.feelingLabel,
+    required this.rpeLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final rating = feelingRating?.clamp(1, 5);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.14),
+        ),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            if (rating != null)
+              Expanded(
+                child: Semantics(
+                  label: '$feelingLabel: $rating/5',
+                  child: ExcludeSemantics(
+                    child: _FeedbackValue(
+                      label: feelingLabel,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (var star = 1; star <= 5; star++)
+                            Icon(
+                              star <= rating
+                                  ? Icons.star_rounded
+                                  : Icons.star_border_rounded,
+                              size: 17,
+                              color: star <= rating
+                                  ? Colors.amber.shade700
+                                  : theme.colorScheme.outline,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (rating != null && rpe != null)
+              VerticalDivider(
+                width: 18,
+                thickness: 1,
+                color: theme.colorScheme.outlineVariant,
+              ),
+            if (rpe != null)
+              Expanded(
+                child: Semantics(
+                  label: '$rpeLabel: ${rpe!.round()}/10',
+                  child: ExcludeSemantics(
+                    child: _FeedbackValue(
+                      label: rpeLabel,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.monitor_heart_outlined,
+                            size: 17,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '${rpe!.round()}/10',
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FeedbackValue extends StatelessWidget {
+  final String label;
+  final Widget child;
+
+  const _FeedbackValue({required this.label, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        child,
+      ],
+    );
+  }
+}
+
 class _MetricItem {
+  final IconData icon;
   final String label;
   final String value;
 
-  const _MetricItem({required this.label, required this.value});
+  const _MetricItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 }
 
 class _MetricsGrid extends StatelessWidget {
@@ -635,7 +797,11 @@ class _MetricsGrid extends StatelessWidget {
             for (final item in items)
               SizedBox(
                 width: colWidth,
-                child: _StatChip(label: item.label, value: item.value),
+                child: _StatChip(
+                  icon: item.icon,
+                  label: item.label,
+                  value: item.value,
+                ),
               ),
           ],
         );
@@ -645,37 +811,64 @@ class _MetricsGrid extends StatelessWidget {
 }
 
 class _StatChip extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
 
-  const _StatChip({required this.label, required this.value});
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      constraints: const BoxConstraints(minHeight: 72),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest.withValues(
           alpha: 0.55,
         ),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(9),
             ),
+            child: Icon(icon, size: 17, color: theme.colorScheme.primary),
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontFeatures: const [FontFeature.tabularFigures()],
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
