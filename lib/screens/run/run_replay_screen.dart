@@ -20,13 +20,11 @@ class RunReplayScreen extends StatefulWidget {
     this.showMapTiles = true,
   }) : assert(points.length >= 2);
 
-  /// Keeps short activities readable and progressively gives longer routes
-  /// more screen time. A 10-minute run takes 8 seconds, a one-hour run takes
-  /// 16 seconds, and very long activities are capped at 30 seconds.
+  /// Replays the activity at 60x speed: every real minute takes one second.
   @visibleForTesting
   static Duration replayDurationFor(int movingTimeSeconds) {
-    final seconds = (6 + movingTimeSeconds / 360).round().clamp(8, 30);
-    return Duration(seconds: seconds);
+    final milliseconds = (movingTimeSeconds * 1000 / 60).round();
+    return Duration(milliseconds: milliseconds < 1 ? 1 : milliseconds);
   }
 
   @override

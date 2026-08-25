@@ -6,22 +6,22 @@ import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/screens/run/run_replay_screen.dart';
 
 void main() {
-  test('scales replay duration to the length of the run', () {
+  test('replays each real minute in one second', () {
     expect(
       RunReplayScreen.replayDurationFor(10 * 60),
-      const Duration(seconds: 8),
+      const Duration(seconds: 10),
     );
     expect(
       RunReplayScreen.replayDurationFor(60 * 60),
-      const Duration(seconds: 16),
+      const Duration(minutes: 1),
     );
     expect(
       RunReplayScreen.replayDurationFor(2 * 60 * 60),
-      const Duration(seconds: 26),
+      const Duration(minutes: 2),
     );
     expect(
-      RunReplayScreen.replayDurationFor(5 * 60 * 60),
-      const Duration(seconds: 30),
+      RunReplayScreen.replayDurationFor(90),
+      const Duration(milliseconds: 1500),
     );
   });
 
