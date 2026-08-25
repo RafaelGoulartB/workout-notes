@@ -10,6 +10,7 @@ import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'package:workout_notes/screens/run/run_replay_screen.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
@@ -274,59 +275,101 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     );
   }
 
-  Widget _buildMap(ThemeData theme, List<LatLng> trail) {
+  Future<void> _openReplay() async {
+    final activity = _activity;
+    if (activity == null || _points.length < 2) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => RunReplayScreen(activity: activity, points: _points),
+      ),
+    );
+  }
+
+  Widget _buildMap(ThemeData theme, AppLocalizations loc, List<LatLng> trail) {
     final bounds = _boundsFor(trail);
     final center = trail.isNotEmpty
         ? trail[trail.length ~/ 2]
         : const LatLng(-23.5505, -46.6333);
 
-    return FlutterMap(
-      options: MapOptions(
-        initialCenter: center,
-        initialZoom: bounds == null ? 15 : 14,
-        initialCameraFit: bounds == null
-            ? null
-            : CameraFit.bounds(
-                bounds: bounds,
-                padding: const EdgeInsets.all(28),
-                maxZoom: 17,
-                minZoom: 3,
-              ),
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-        ),
-      ),
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.workoutnotes.workout_notes',
+        FlutterMap(
+          options: MapOptions(
+            initialCenter: center,
+            initialZoom: bounds == null ? 15 : 14,
+            initialCameraFit: bounds == null
+                ? null
+                : CameraFit.bounds(
+                    bounds: bounds,
+                    padding: const EdgeInsets.all(28),
+                    maxZoom: 17,
+                    minZoom: 3,
+                  ),
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+            ),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.workoutnotes.workout_notes',
+            ),
+            if (trail.length >= 2)
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: trail,
+                    color: theme.colorScheme.primary,
+                    strokeWidth: 4,
+                  ),
+                ],
+              ),
+            if (trail.length == 1)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: trail.first,
+                    width: 18,
+                    height: 18,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+          ],
         ),
         if (trail.length >= 2)
-          PolylineLayer(
-            polylines: [
-              Polyline(
-                points: trail,
-                color: theme.colorScheme.primary,
-                strokeWidth: 4,
-              ),
-            ],
-          ),
-        if (trail.length == 1)
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: trail.first,
-                width: 18,
-                height: 18,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+          Positioned(
+            right: 12,
+            bottom: 12,
+            child: Semantics(
+              button: true,
+              label: loc.runReplayPlay,
+              child: Material(
+                color: theme.colorScheme.primary.withValues(alpha: 0.92),
+                shape: const CircleBorder(),
+                elevation: 6,
+                child: InkWell(
+                  key: const ValueKey('run-detail-replay-button'),
+                  customBorder: const CircleBorder(),
+                  onTap: _openReplay,
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Icon(
+                      Icons.play_arrow_rounded,
+                      size: 26,
+                      color: theme.colorScheme.onPrimary,
+                    ),
                   ),
                 ),
               ),
-            ],
+            ),
           ),
       ],
     );
@@ -408,7 +451,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(14),
-            child: SizedBox(height: 240, child: _buildMap(theme, trail)),
+            child: SizedBox(height: 240, child: _buildMap(theme, loc, trail)),
           ),
           const SizedBox(height: 12),
           _sectionCard(
