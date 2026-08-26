@@ -234,6 +234,23 @@ class RunVoiceCoach extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Reattaches Flutter UI to a session already owned by the native service.
+  /// Unlike [beginSession], this never sends `begin` over the platform channel,
+  /// because doing so would reset the native structured-workout engine.
+  Future<void> attachToActiveSession({
+    required bool intervalsOn,
+    required RunSessionGoal goal,
+    RunPlanWorkout? planWorkout,
+  }) async {
+    await prepare();
+    _active = true;
+    if (planWorkout != null) setPlanWorkout(planWorkout);
+    _intervalsOn = hasPlan ? false : intervalsOn;
+    _goal = goal;
+    _goalCompleted = false;
+    notifyListeners();
+  }
+
   Future<void> endSession() async {
     _active = false;
     _goalCompleted = false;

@@ -102,6 +102,32 @@ class RunStepSnapshot {
         workRepsTotal: 0,
       );
 
+  factory RunStepSnapshot.fromMap(Map<String, dynamic> map) {
+    final phase = switch (map['phase']) {
+      'running' => RunStepEnginePhase.running,
+      'done' => RunStepEnginePhase.done,
+      _ => RunStepEnginePhase.idle,
+    };
+    return RunStepSnapshot(
+      phase: phase,
+      stepIndex: (map['stepIndex'] as num?)?.toInt() ?? 0,
+      totalSteps: (map['totalSteps'] as num?)?.toInt() ?? 0,
+      role: RunStepRole.fromString(map['role'] as String?),
+      repIndex: (map['repIndex'] as num?)?.toInt() ?? 0,
+      repTotal: (map['repTotal'] as num?)?.toInt() ?? 0,
+      metric: map['metric'] == 'time'
+          ? RunIntervalMetric.time
+          : RunIntervalMetric.distance,
+      target: (map['target'] as num?)?.toInt() ?? 0,
+      progress: (map['progress'] as num?)?.toDouble() ?? 0,
+      remaining: (map['remaining'] as num?)?.toDouble() ?? 0,
+      targetPaceMinSecPerKm: (map['targetPaceMinSecPerKm'] as num?)?.toDouble(),
+      targetPaceMaxSecPerKm: (map['targetPaceMaxSecPerKm'] as num?)?.toDouble(),
+      workRepsDone: (map['workRepsDone'] as num?)?.toInt() ?? 0,
+      workRepsTotal: (map['workRepsTotal'] as num?)?.toInt() ?? 0,
+    );
+  }
+
   bool get isActive => phase == RunStepEnginePhase.running;
   bool get isDone => phase == RunStepEnginePhase.done;
 }

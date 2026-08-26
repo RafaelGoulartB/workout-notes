@@ -3,10 +3,33 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/models/run_permission_state.dart';
+import 'package:workout_notes/models/run_review_draft.dart';
+import 'package:workout_notes/models/run_session_context.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
+import 'package:workout_notes/models/scheduled_run.dart';
+import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/services/run_debug_simulator.dart';
+import 'package:workout_notes/services/run_workout_step_engine.dart';
 import 'package:workout_notes/utils/run_spool_recovery.dart';
+
+class RunGpsFix {
+  final double lat;
+  final double lng;
+  final double? accuracyMeters;
+  final DateTime? recordedAt;
+
+  const RunGpsFix({
+    required this.lat,
+    required this.lng,
+    this.accuracyMeters,
+    this.recordedAt,
+  });
+
+  bool get isReady => accuracyMeters != null && accuracyMeters! <= 20;
+  bool get isRegular => accuracyMeters != null && accuracyMeters! <= 35;
+}
 
 /// Flutter facade for the Android foreground GPS run tracker.
 ///
@@ -25,6 +48,7 @@ class RunTrackingService extends ChangeNotifier {
   static const events = EventChannel('workout_notes/run_tracking/events');
 
   final RunRepository _repository = RunRepository();
+  final RunPlanRepository _planRepository = RunPlanRepository();
   RunTrackingState _state = RunTrackingState.initial(
     supported: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
   );
@@ -33,12 +57,15 @@ class RunTrackingService extends ChangeNotifier {
   bool _recovering = false;
   int _recoveredCount = 0;
   final List<RunLatLng> _trail = [];
+  final Map<String, Map<String, dynamic>> _memoryReviewSpools = {};
 
   RunDebugSimulator? _debugSim;
   Timer? _debugTimer;
   bool _debugPaused = false;
   bool _nativeDebugSim = false;
-  bool _askedBackgroundPermission = false;
+  bool _notificationsGranted = false;
+  bool _notificationsPermissionRequired = false;
+  RunSessionContext? _sessionContext;
 
   RunTrackingState get state => _state;
   bool get isSupported => _state.supported;
@@ -46,6 +73,13 @@ class RunTrackingService extends ChangeNotifier {
   int get recoveredCount => _recoveredCount;
   bool get isDebugSimulating => _debugSim != null;
   bool get canDebugSimulate => kDebugMode;
+  bool get notificationsGranted => _notificationsGranted;
+  bool get notificationsPermissionRequired => _notificationsPermissionRequired;
+  RunPermissionState get permissionState => RunPermissionState(
+    locationGranted: _state.locationGranted,
+    notificationsGranted: _notificationsGranted,
+    notificationsPermissionRequired: _notificationsPermissionRequired,
+  );
 
   bool get _isAndroid =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
@@ -55,6 +89,7 @@ class RunTrackingService extends ChangeNotifier {
       if (kDebugMode) {
         _state = _state.copyWith(supported: true, locationGranted: true);
       }
+      _notificationsGranted = true;
       _initialized = true;
       notifyListeners();
       return;
@@ -75,7 +110,28 @@ class RunTrackingService extends ChangeNotifier {
     }
     await getCapabilities();
     await getState();
+    await _recoverActiveNativeSession();
+    _sessionContext = _state.sessionContext;
     await recoverPendingSessions();
+  }
+
+  Future<void> _recoverActiveNativeSession() async {
+    if (!_isAndroid || _state.isActive) return;
+    try {
+      final requested =
+          await methods.invokeMethod<bool>('recoverActive') ?? false;
+      if (!requested) return;
+      await _awaitStatus({
+        RunTrackingState.recording,
+        RunTrackingState.paused,
+        RunTrackingState.completed,
+        RunTrackingState.discarded,
+      }, timeout: const Duration(seconds: 8));
+    } on MissingPluginException {
+      // Older debug builds and tests.
+    } catch (error) {
+      _setError('active_recovery_error', error.toString());
+    }
   }
 
   Future<Map<String, dynamic>> getCapabilities() async {
@@ -95,6 +151,10 @@ class RunTrackingService extends ChangeNotifier {
         locationGranted:
             capabilities['location_granted'] as bool? ?? _state.locationGranted,
       );
+      _notificationsGranted =
+          capabilities['notifications_granted'] as bool? ?? true;
+      _notificationsPermissionRequired =
+          capabilities['notifications_permission_required'] as bool? ?? false;
       notifyListeners();
       return capabilities;
     } on MissingPluginException {
@@ -102,6 +162,8 @@ class RunTrackingService extends ChangeNotifier {
         supported: kDebugMode,
         locationGranted: kDebugMode,
       );
+      _notificationsGranted = kDebugMode;
+      _notificationsPermissionRequired = false;
       notifyListeners();
       return {'supported': kDebugMode};
     } catch (error) {
@@ -127,7 +189,7 @@ class RunTrackingService extends ChangeNotifier {
     return _state;
   }
 
-  Future<bool> requestPermissions() async {
+  Future<bool> requestLocationPermission() async {
     if (kDebugMode && !_isAndroid) {
       _state = _state.copyWith(locationGranted: true, clearError: true);
       notifyListeners();
@@ -136,13 +198,11 @@ class RunTrackingService extends ChangeNotifier {
     if (!_isAndroid) return false;
     try {
       final granted =
-          await methods.invokeMethod<bool>('requestPermissions') ?? false;
+          await methods.invokeMethod<bool>('requestLocationPermission') ??
+          false;
       _state = _state.copyWith(locationGranted: granted, clearError: true);
       if (!granted) {
-        _setError(
-          'location_denied',
-          'Precise location permission is required',
-        );
+        _setError('location_denied', 'Precise location permission is required');
       }
       notifyListeners();
       return granted;
@@ -155,21 +215,110 @@ class RunTrackingService extends ChangeNotifier {
     }
   }
 
-  /// Android 10+: best-effort background location for screen-off tracking.
-  /// Denial does not block starting a run (foreground service still works).
-  Future<bool> requestBackgroundPermission() async {
+  /// Android 13+: optional permission that keeps foreground-run controls in the
+  /// notification drawer. A denial never blocks GPS recording.
+  Future<bool> requestNotificationPermission() async {
     if (!_isAndroid) return true;
+    if (!_notificationsPermissionRequired) {
+      _notificationsGranted = true;
+      notifyListeners();
+      return true;
+    }
     try {
       final granted =
-          await methods.invokeMethod<bool>('requestBackgroundPermission') ??
-              false;
+          await methods.invokeMethod<bool>('requestNotificationPermission') ??
+          false;
+      _notificationsGranted = granted;
+      notifyListeners();
       return granted;
     } on MissingPluginException {
-      return true;
+      _notificationsGranted = kDebugMode;
+      notifyListeners();
+      return _notificationsGranted;
     } on PlatformException {
       return false;
     } catch (_) {
       return false;
+    }
+  }
+
+  Future<RunPermissionState> refreshPermissions() async {
+    await getCapabilities();
+    return permissionState;
+  }
+
+  Future<bool> openAppSettings() async {
+    if (!_isAndroid) return false;
+    try {
+      return await methods.invokeMethod<bool>('openAppSettings') ?? false;
+    } on PlatformException {
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Persists the logical session identity before the foreground tracker starts.
+  Future<void> setSessionContext(RunSessionContext context) async {
+    _sessionContext = context;
+    _state = _state.copyWith(sessionContext: context);
+    notifyListeners();
+    if (!_isAndroid) return;
+    try {
+      await methods.invokeMethod<void>('setSessionContext', context.toMap());
+    } on MissingPluginException {
+      // Desktop/tests.
+    } catch (error) {
+      _setError('session_context_error', error.toString());
+    }
+  }
+
+  /// Fetches one visible-activity GPS fix without starting the run timer.
+  Future<RunGpsFix?> prepareLocation() async {
+    if (kDebugMode && !_isAndroid) {
+      const fix = RunGpsFix(lat: -23.5505, lng: -46.6333, accuracyMeters: 5);
+      _state = _state.copyWith(
+        locationGranted: true,
+        lat: fix.lat,
+        lng: fix.lng,
+        accuracyMeters: fix.accuracyMeters,
+        clearError: true,
+      );
+      notifyListeners();
+      return fix;
+    }
+    if (!_isAndroid || !_state.locationGranted) return null;
+    try {
+      final result = await methods.invokeMapMethod<String, dynamic>(
+        'getCurrentLocation',
+      );
+      if (result == null) return null;
+      final lat = (result['lat'] as num?)?.toDouble();
+      final lng = (result['lng'] as num?)?.toDouble();
+      if (lat == null || lng == null) return null;
+      final millis = (result['recorded_at_millis'] as num?)?.toInt();
+      final fix = RunGpsFix(
+        lat: lat,
+        lng: lng,
+        accuracyMeters: (result['accuracy_meters'] as num?)?.toDouble(),
+        recordedAt: millis == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(millis),
+      );
+      _state = _state.copyWith(
+        lat: lat,
+        lng: lng,
+        accuracyMeters: fix.accuracyMeters,
+        clearError: true,
+      );
+      notifyListeners();
+      return fix;
+    } on PlatformException catch (error) {
+      _setError(error.code, error.message ?? error.toString());
+      return null;
+    } catch (error) {
+      _setError('gps_prepare_error', error.toString());
+      return null;
     }
   }
 
@@ -205,14 +354,8 @@ class RunTrackingService extends ChangeNotifier {
     }
     if (_state.isActive) return true;
     if (!_state.locationGranted) {
-      final granted = await requestPermissions();
-      if (!granted) return false;
-    }
-    // Background is optional; FGS location works with while-in-use on most OEMs.
-    // Prompt at most once per process so a denial does not spam the system dialog.
-    if (!_askedBackgroundPermission) {
-      _askedBackgroundPermission = true;
-      await requestBackgroundPermission();
+      _setError('location_denied', 'Precise location permission is required');
+      return false;
     }
     try {
       _trail.clear();
@@ -220,13 +363,10 @@ class RunTrackingService extends ChangeNotifier {
       if (result != null) {
         _applyNativeState(result);
       }
-      final ready = await _awaitStatus(
-        {
-          RunTrackingState.recording,
-          RunTrackingState.paused,
-        },
-        timeout: const Duration(seconds: 8),
-      );
+      final ready = await _awaitStatus({
+        RunTrackingState.recording,
+        RunTrackingState.paused,
+      }, timeout: const Duration(seconds: 8));
       if (!ready) {
         if (_state.errorCode == null) {
           _setError('start_timeout', 'Run service did not start in time');
@@ -247,8 +387,9 @@ class RunTrackingService extends ChangeNotifier {
     if (_debugSim != null) {
       if (_nativeDebugSim && _isAndroid) {
         try {
-          final result =
-              await methods.invokeMapMethod<String, dynamic>('pause');
+          final result = await methods.invokeMapMethod<String, dynamic>(
+            'pause',
+          );
           if (result != null) _applyNativeState(result);
         } catch (_) {}
         return;
@@ -274,8 +415,9 @@ class RunTrackingService extends ChangeNotifier {
     if (_debugSim != null) {
       if (_nativeDebugSim && _isAndroid) {
         try {
-          final result =
-              await methods.invokeMapMethod<String, dynamic>('resume');
+          final result = await methods.invokeMapMethod<String, dynamic>(
+            'resume',
+          );
           if (result != null) _applyNativeState(result);
         } catch (_) {}
         return;
@@ -294,20 +436,46 @@ class RunTrackingService extends ChangeNotifier {
     }
   }
 
-  /// Stops tracking, imports the spool into SQLite, and deletes the spool.
-  Future<RunActivity?> stop() async {
+  /// Stops tracking but keeps the completed spool outside SQLite until the
+  /// athlete accepts the post-run review.
+  Future<RunReviewDraft?> stopForReview({
+    List<RunStepResult> stepResults = const [],
+  }) async {
     if (_debugSim != null && !_nativeDebugSim) {
       final sim = _debugSim!;
       _stopDebugTimer();
       _debugSim = null;
       _debugPaused = false;
-      final imported = await _repository.importNativeSpool(sim.toSpoolPayload());
-      _trail.clear();
-      _state = RunTrackingState.initial(supported: true).copyWith(
-        locationGranted: true,
+      final payload = sim.toSpoolPayload();
+      final activity = Map<String, dynamic>.from(
+        payload['activity'] as Map? ?? const {},
       );
+      _writeContextToActivity(activity, _sessionContext);
+      activity['status'] = 'pending_review';
+      activity['splits'] = [
+        for (final split in _state.splits)
+          {
+            'km': split.km,
+            'distance_meters': split.distanceMeters,
+            'duration_seconds': split.durationSeconds,
+            'pace_sec_per_km': split.paceSecPerKm,
+            'is_partial': split.isPartial,
+          },
+      ];
+      activity['voice_step_results'] = _stepResultsJson(stepResults);
+      payload['activity'] = activity;
+      final typedPayload = Map<String, dynamic>.from(payload);
+      final preview = await _repository.previewNativeSpoolUsingLatestWeight(
+        typedPayload,
+      );
+      _memoryReviewSpools[preview.id] = typedPayload;
+      _trail.clear();
+      _sessionContext = null;
+      _state = RunTrackingState.initial(
+        supported: true,
+      ).copyWith(locationGranted: true);
       notifyListeners();
-      return imported;
+      return RunReviewDraft.fromSpool(activity: preview, spool: typedPayload);
     }
     if (_nativeDebugSim) {
       _stopDebugTimer();
@@ -326,30 +494,180 @@ class RunTrackingService extends ChangeNotifier {
       _setError('stop_error', error.toString());
     }
 
-    await _awaitStatus(
-      {
-        RunTrackingState.completed,
-        RunTrackingState.idle,
-        RunTrackingState.discarded,
-      },
-      timeout: const Duration(seconds: 5),
-    );
+    await _awaitStatus({
+      RunTrackingState.completed,
+      RunTrackingState.idle,
+      RunTrackingState.discarded,
+    }, timeout: const Duration(seconds: 5));
 
     final resolvedId = activityId ?? _state.activityId;
-    RunActivity? imported;
+    RunReviewDraft? draft;
     if (resolvedId != null) {
-      imported = await _importSpool(resolvedId);
-    } else {
-      await recoverPendingSessions();
+      try {
+        final raw = await methods.invokeMapMethod<String, dynamic>(
+          'markPendingReview',
+          resolvedId,
+        );
+        if (raw != null) {
+          final payload = Map<String, dynamic>.from(raw);
+          final activity = Map<String, dynamic>.from(
+            payload['activity'] as Map? ?? const {},
+          );
+          _writeContextToActivity(activity, _sessionContext);
+          if (stepResults.isNotEmpty) {
+            activity['voice_step_results'] = _stepResultsJson(stepResults);
+          }
+          payload['activity'] = activity;
+          final preview = await _repository.previewNativeSpoolUsingLatestWeight(
+            payload,
+          );
+          draft = RunReviewDraft.fromSpool(activity: preview, spool: payload);
+        }
+      } catch (error) {
+        _setError('review_error', error.toString());
+      }
     }
 
     _trail.clear();
-    _state = RunTrackingState.initial(supported: true).copyWith(
-      locationGranted: _state.locationGranted,
-    );
+    _sessionContext = null;
+    _state = RunTrackingState.initial(
+      supported: true,
+    ).copyWith(locationGranted: _state.locationGranted);
     notifyListeners();
-    return imported;
+    return draft;
   }
+
+  /// Backward-compatible immediate save for non-UI callers.
+  Future<RunActivity?> stop() async {
+    final draft = await stopForReview();
+    if (draft == null) return null;
+    return saveReviewedRun(draft: draft, completePlannedWorkout: true);
+  }
+
+  Future<List<RunReviewDraft>> listPendingReviews() async {
+    final drafts = <RunReviewDraft>[];
+    final seen = <String>{};
+    for (final payload in _memoryReviewSpools.values) {
+      final preview = await _repository.previewNativeSpoolUsingLatestWeight(
+        payload,
+      );
+      drafts.add(RunReviewDraft.fromSpool(activity: preview, spool: payload));
+      seen.add(preview.id);
+    }
+    if (!_isAndroid) return drafts;
+    try {
+      final pending =
+          await methods.invokeListMethod<dynamic>('listPendingSpools') ??
+          const [];
+      for (final row in pending.whereType<Map>()) {
+        final summary = Map<String, dynamic>.from(row);
+        if (summary['status'] != 'pending_review') continue;
+        final id = summary['id'] as String?;
+        if (id == null || seen.contains(id)) continue;
+        final raw = await methods.invokeMapMethod<String, dynamic>(
+          'readSpool',
+          id,
+        );
+        if (raw == null) continue;
+        final payload = Map<String, dynamic>.from(raw);
+        final preview = await _repository.previewNativeSpoolUsingLatestWeight(
+          payload,
+        );
+        drafts.add(RunReviewDraft.fromSpool(activity: preview, spool: payload));
+        seen.add(id);
+      }
+    } on MissingPluginException {
+      // Tests and older desktop runners.
+    } catch (error) {
+      _setError('review_recovery_error', error.toString());
+    }
+    drafts.sort((a, b) => b.activity.startedAt.compareTo(a.activity.startedAt));
+    return drafts;
+  }
+
+  Future<RunActivity?> saveReviewedRun({
+    required RunReviewDraft draft,
+    required bool completePlannedWorkout,
+    String? title,
+    String? notes,
+    double? rpe,
+    int? feelingRating,
+    double? distanceMeters,
+  }) async {
+    try {
+      final payload = Map<String, dynamic>.from(draft.spool);
+      final activity = Map<String, dynamic>.from(
+        payload['activity'] as Map? ?? const {},
+      );
+      activity['status'] = 'completed';
+      activity['title'] = title?.trim().isEmpty == true ? null : title?.trim();
+      activity['notes'] = notes?.trim().isEmpty == true ? null : notes?.trim();
+      activity['rpe'] = rpe;
+      activity['feeling_rating'] = feelingRating;
+      if (distanceMeters != null) {
+        activity['distance_meters'] = distanceMeters.clamp(0, 1000000);
+        // Recalculate the estimate from the reviewed metrics.
+        activity.remove('calories');
+      }
+      payload['activity'] = activity;
+
+      final imported = await _repository.importNativeSpool(payload);
+      await _repository.updateActivityMeta(
+        id: imported.id,
+        title: title?.trim(),
+        notes: notes?.trim(),
+        rpe: rpe,
+        feelingRating: feelingRating,
+      );
+      final reconciled = await _reconcilePlanContext(
+        imported.id,
+        activity,
+        completePlannedWorkout: completePlannedWorkout,
+      );
+      if (!reconciled) return null;
+      _memoryReviewSpools.remove(imported.id);
+      if (_isAndroid) {
+        await methods.invokeMethod<dynamic>('deleteSpool', imported.id);
+      }
+      return await _repository.getActivity(imported.id) ?? imported;
+    } catch (error) {
+      _setError('review_save_error', error.toString());
+      return null;
+    }
+  }
+
+  Future<void> discardReview(RunReviewDraft draft) async {
+    try {
+      await _repository.deleteActivity(draft.id);
+    } catch (_) {
+      // The usual case is that the review was never imported.
+    }
+    _memoryReviewSpools.remove(draft.id);
+    if (_isAndroid) {
+      try {
+        await methods.invokeMethod<dynamic>('deleteSpool', draft.id);
+      } catch (error) {
+        _setError('review_discard_error', error.toString());
+      }
+    }
+  }
+
+  static List<Map<String, dynamic>> _stepResultsJson(
+    List<RunStepResult> results,
+  ) => [
+    for (final result in results)
+      {
+        'sequence': result.sequence,
+        'role': result.role.value,
+        'repIndex': result.repIndex,
+        'plannedMetric': result.plannedMetric.name,
+        'plannedValue': result.plannedValue,
+        'plannedPaceSecPerKm': result.plannedPaceSecPerKm,
+        'distanceMeters': result.distanceMeters,
+        'durationSeconds': result.durationSeconds,
+        'actualPaceSecPerKm': result.actualPaceSecPerKm,
+      },
+  ];
 
   Future<void> discard() async {
     if (_debugSim != null && !_nativeDebugSim) {
@@ -357,9 +675,10 @@ class RunTrackingService extends ChangeNotifier {
       _debugSim = null;
       _debugPaused = false;
       _trail.clear();
-      _state = RunTrackingState.initial(supported: true).copyWith(
-        locationGranted: true,
-      );
+      _sessionContext = null;
+      _state = RunTrackingState.initial(
+        supported: true,
+      ).copyWith(locationGranted: true);
       notifyListeners();
       return;
     }
@@ -384,9 +703,10 @@ class RunTrackingService extends ChangeNotifier {
       } catch (_) {}
     }
     _trail.clear();
-    _state = RunTrackingState.initial(supported: true).copyWith(
-      locationGranted: _state.locationGranted,
-    );
+    _sessionContext = null;
+    _state = RunTrackingState.initial(
+      supported: true,
+    ).copyWith(locationGranted: _state.locationGranted);
     notifyListeners();
   }
 
@@ -400,13 +720,13 @@ class RunTrackingService extends ChangeNotifier {
     var count = 0;
     try {
       final liveStatus = _state.status;
-      final serviceAlive = liveStatus == RunTrackingState.recording ||
+      final serviceAlive =
+          liveStatus == RunTrackingState.recording ||
           liveStatus == RunTrackingState.paused ||
           liveStatus == RunTrackingState.starting ||
           liveStatus == RunTrackingState.stopping;
-      final pending = await methods.invokeListMethod<dynamic>(
-            'listPendingSpools',
-          ) ??
+      final pending =
+          await methods.invokeListMethod<dynamic>('listPendingSpools') ??
           const [];
       for (final row in pending) {
         if (row is! Map) continue;
@@ -417,6 +737,21 @@ class RunTrackingService extends ChangeNotifier {
         if (id == null) continue;
         if (status == 'discarded') {
           await methods.invokeMethod<dynamic>('deleteSpool', id);
+          continue;
+        }
+        if (status == 'pending_review') {
+          // The athlete has not accepted this activity yet. The run hub owns
+          // reopening it; recovery must never silently import it.
+          continue;
+        }
+        if (!serviceAlive &&
+            (status == 'recording' ||
+                status == 'paused' ||
+                status == 'starting' ||
+                status == 'stopping')) {
+          // Never convert a live-looking spool to completed merely because
+          // Flutter won a race with the native service restart. The explicit
+          // recoverActive call above owns that transition.
           continue;
         }
         if (serviceAlive &&
@@ -483,11 +818,95 @@ class RunTrackingService extends ChangeNotifier {
       final imported = await _repository.importNativeSpool(
         Map<String, dynamic>.from(raw),
       );
-      await methods.invokeMethod<dynamic>('deleteSpool', id);
+      final reconciled = await _reconcilePlanContext(imported.id, activityMap);
+      // Keep the native envelope as a retry ledger when the activity itself
+      // imported but the plan/schedule reconciliation failed.
+      if (reconciled) {
+        await methods.invokeMethod<dynamic>('deleteSpool', id);
+      }
       return imported;
     } catch (error) {
       _setError('import_error', error.toString());
       return null;
+    }
+  }
+
+  static void _writeContextToActivity(
+    Map<String, dynamic> activity,
+    RunSessionContext? context,
+  ) {
+    if (context == null) return;
+    activity['plan_workout_id'] = context.planWorkoutId;
+    activity['scheduled_run_id'] = context.scheduledRunId;
+    activity['session_goal'] = context.toMap()['goal'];
+    activity['session_intervals_on'] = context.intervalsOn;
+  }
+
+  /// Idempotently repairs the plan ledger after either a normal stop or spool
+  /// recovery. Re-running it only replaces the same step rows and links.
+  Future<bool> _reconcilePlanContext(
+    String activityId,
+    Map<String, dynamic> activity, {
+    bool completePlannedWorkout = true,
+  }) async {
+    final planWorkoutId = activity['plan_workout_id'] as String?;
+    if (planWorkoutId == null || planWorkoutId.isEmpty) return true;
+    try {
+      await _planRepository.setActivityPlanWorkout(
+        activityId: activityId,
+        planWorkoutId: planWorkoutId,
+      );
+      final rawResults = activity['voice_step_results'];
+      if (rawResults is List && rawResults.isNotEmpty) {
+        final steps = <RunActivityStep>[];
+        for (final raw in rawResults.whereType<Map>()) {
+          final row = Map<String, dynamic>.from(raw);
+          steps.add(
+            RunActivityStep(
+              id: '',
+              runActivityId: activityId,
+              orderIndex: (row['sequence'] as num?)?.toInt() ?? steps.length,
+              role: row['role'] as String? ?? 'work',
+              repIndex: (row['repIndex'] as num?)?.toInt() ?? 1,
+              plannedMetric: row['plannedMetric'] as String?,
+              plannedValue: (row['plannedValue'] as num?)?.toInt(),
+              plannedPaceSecPerKm: (row['plannedPaceSecPerKm'] as num?)
+                  ?.toDouble(),
+              actualDistanceMeters: (row['distanceMeters'] as num?)?.toDouble(),
+              actualDurationSeconds: (row['durationSeconds'] as num?)?.toInt(),
+              actualPaceSecPerKm: (row['actualPaceSecPerKm'] as num?)
+                  ?.toDouble(),
+            ),
+          );
+        }
+        await _planRepository.saveActivitySteps(activityId, steps);
+      }
+
+      if (!completePlannedWorkout) return true;
+
+      final scheduledRunId = activity['scheduled_run_id'] as String?;
+      final scheduled = scheduledRunId == null
+          ? null
+          : await _planRepository.getScheduledRun(scheduledRunId);
+      if (scheduled != null) {
+        await _planRepository.attachActivity(
+          scheduledRunId: scheduled.id,
+          runActivityId: activityId,
+        );
+      } else {
+        final startedAt = DateTime.tryParse(
+          activity['started_at'] as String? ?? '',
+        );
+        await _planRepository.markPlanWorkoutCompleted(
+          planWorkoutId: planWorkoutId,
+          date: startedAt?.toLocal() ?? DateTime.now(),
+          runActivityId: activityId,
+        );
+      }
+      return true;
+    } catch (error) {
+      _setError('plan_reconcile_error', error.toString());
+      return false;
     }
   }
 
@@ -538,6 +957,9 @@ class RunTrackingService extends ChangeNotifier {
     _state = _debugPaused
         ? sim.toPausedState(locationGranted: true)
         : sim.toState(locationGranted: true);
+    if (_sessionContext != null) {
+      _state = _state.copyWith(sessionContext: _sessionContext);
+    }
     notifyListeners();
   }
 

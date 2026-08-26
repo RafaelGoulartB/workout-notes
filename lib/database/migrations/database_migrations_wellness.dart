@@ -504,5 +504,31 @@ abstract final class DatabaseWellnessMigrations {
         );
       } catch (_) {}
     }
+    if (oldVersion < 48) {
+      // Subjective post-run review. Kept on the activity so it survives plan
+      // changes and remains available in history/export.
+      for (final sql in const [
+        'ALTER TABLE run_activities ADD COLUMN rpe REAL',
+        'ALTER TABLE run_activities ADD COLUMN feeling_rating INTEGER',
+      ]) {
+        try {
+          await db.execute(sql);
+        } catch (_) {}
+      }
+    }
+    if (oldVersion < 49) {
+      // Cardio activities share the existing durable activity envelope while
+      // retaining run-only GPS points, pace records and plan semantics.
+      try {
+        await db.execute(
+          "ALTER TABLE run_activities ADD COLUMN activity_type TEXT NOT NULL DEFAULT 'running'",
+        );
+      } catch (_) {}
+      try {
+        await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_run_activities_type_started ON run_activities(activity_type, started_at DESC)',
+        );
+      } catch (_) {}
+    }
   }
 }

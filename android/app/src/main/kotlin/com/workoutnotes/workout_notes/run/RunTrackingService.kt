@@ -25,6 +25,7 @@ class RunTrackingService : Service(), LocationListener {
         const val ACTION_START = "com.workoutnotes.workout_notes.run.START"
         const val ACTION_PAUSE = "com.workoutnotes.workout_notes.run.PAUSE"
         const val ACTION_RESUME = "com.workoutnotes.workout_notes.run.RESUME"
+        const val ACTION_RESTORE = "com.workoutnotes.workout_notes.run.RESTORE"
         const val ACTION_STOP = "com.workoutnotes.workout_notes.run.STOP"
         const val ACTION_DISCARD = "com.workoutnotes.workout_notes.run.DISCARD"
 
@@ -89,14 +90,6 @@ class RunTrackingService : Service(), LocationListener {
                 context,
                 Manifest.permission.ACCESS_FINE_LOCATION,
             ) == PackageManager.PERMISSION_GRANTED
-
-        fun backgroundLocationGranted(context: Context): Boolean {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return true
-            return ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
-            ) == PackageManager.PERMISSION_GRANTED
-        }
 
         private fun isActiveSpoolStatus(status: String?): Boolean =
             status == "starting" ||
@@ -226,6 +219,53 @@ class RunTrackingService : Service(), LocationListener {
         }
     }
 
+    /** Writes IDs and per-session options without resetting the live tracker. */
+    fun persistSessionContext(context: Map<String, Any?>) {
+        val session = activity ?: return
+        session["plan_workout_id"] = context["plan_workout_id"]
+        session["scheduled_run_id"] = context["scheduled_run_id"]
+        session["session_goal"] = context["goal"]
+        session["session_intervals_on"] = context["intervals_on"] as? Boolean ?: false
+        val plan = RunWorkoutStepNative.listFromAny(context["plan_steps"])
+        if (plan.isNotEmpty()) {
+            session["voice_plan_json"] = RunWorkoutStepNative.listToJsonString(plan)
+        }
+        spool.updateActivity(session)
+        publishState()
+    }
+
+    private fun applyPendingSessionContext(session: MutableMap<String, Any?>) {
+        val context = RunTrackingBridge.pendingSessionContext ?: return
+        session["plan_workout_id"] = context["plan_workout_id"]
+        session["scheduled_run_id"] = context["scheduled_run_id"]
+        session["session_goal"] = context["goal"]
+        session["session_intervals_on"] = context["intervals_on"] as? Boolean ?: false
+        val plan = RunWorkoutStepNative.listFromAny(context["plan_steps"])
+        if (plan.isNotEmpty()) {
+            session["voice_plan_json"] = RunWorkoutStepNative.listToJsonString(plan)
+        }
+    }
+
+    private fun sessionContextMap(): Map<String, Any?>? {
+        val session = activity ?: return null
+        val planId = session["plan_workout_id"] as? String
+        val scheduledId = session["scheduled_run_id"] as? String
+        @Suppress("UNCHECKED_CAST")
+        val goal = session["session_goal"] as? Map<String, Any?>
+        val intervalsOn = session["session_intervals_on"] as? Boolean ?: false
+        if (planId == null && scheduledId == null && goal == null && !intervalsOn) return null
+        return mapOf(
+            "plan_workout_id" to planId,
+            "scheduled_run_id" to scheduledId,
+            "goal" to (goal ?: mapOf(
+                "enabled" to false,
+                "metric" to "distance",
+                "value" to 5000,
+            )),
+            "intervals_on" to intervalsOn,
+        )
+    }
+
     private fun speedForDebugTick(tick: Int): Double {
         val slowWave = 3.5 * kotlin.math.sin(tick * 0.14)
         val fastWave = 1.8 * kotlin.math.sin(tick * 0.37 + 0.6)
@@ -283,6 +323,11 @@ class RunTrackingService : Service(), LocationListener {
             }
             ACTION_PAUSE -> pauseRun()
             ACTION_RESUME -> resumeRun()
+            ACTION_RESTORE -> {
+                if (activeInstance == null || status == "idle") {
+                    restoreActiveSessionIfNeeded()
+                }
+            }
             ACTION_STOP -> finishRun("completed")
             ACTION_DISCARD -> finishRun("discarded")
             else -> {
@@ -343,6 +388,7 @@ class RunTrackingService : Service(), LocationListener {
             "title" to null,
             "notes" to null,
         )
+        applyPendingSessionContext(session)
         activity = session
         spool.create(session)
 
@@ -412,6 +458,7 @@ class RunTrackingService : Service(), LocationListener {
             "title" to "Debug Run",
             "notes" to "Simulated debug run (native - background capable)",
         )
+        applyPendingSessionContext(session)
         activity = session
         spool.create(session)
 
@@ -493,12 +540,15 @@ class RunTrackingService : Service(), LocationListener {
                 }
             }
         }
-        nextSplitAtMeters = (completedSplits.size + 1) * 1000.0
-        val storedDuration = (session["duration_seconds"] as? Number)?.toInt() ?: 0
-        val storedMoving = (session["moving_time_seconds"] as? Number)?.toInt() ?: storedDuration
-        lastSplitMovingSeconds = storedMoving
-        totalPausedMillis = max(0L, (storedDuration - storedMoving) * 1000L)
-        pausedAtMillis = 0L
+        val recovery = RunTrackingRecovery.restore(
+            session,
+            completedSplits,
+            System.currentTimeMillis(),
+        )
+        nextSplitAtMeters = recovery.nextSplitAtMeters
+        lastSplitMovingSeconds = recovery.lastSplitMovingSeconds
+        totalPausedMillis = recovery.totalPausedMillis
+        pausedAtMillis = recovery.pausedAtMillis
         tickCount = 0
 
         val restoredStatus = when (session["status"] as? String) {
@@ -520,9 +570,8 @@ class RunTrackingService : Service(), LocationListener {
                 // Fallback: check bridge pending or defaults
                 RunVoiceBridge.pendingIntervalsOn
             }
-            // We don't have persisted goal — re-hydrate as disabled; distance cues still work.
-            // Rehydrate the structured plan from the spool so a killed process
-            // keeps cueing the remaining reps.
+            // Rehydrate the goal, structured plan and execution cursor so a
+            // killed process keeps cueing the remaining reps.
             voiceController.restoreGoalJson(session["voice_goal_json"] as? String)
             val restoredPlan = session["voice_plan_json"] as? String
             voiceController.begin(
@@ -531,6 +580,9 @@ class RunTrackingService : Service(), LocationListener {
                 hasIntervals,
                 RunVoiceBridge.pendingBypassGate,
                 restoredPlan,
+            )
+            voiceController.restoreEngineSnapshot(
+                session["voice_engine_snapshot_json"] as? String,
             )
             if (restoredStatus == "paused") {
                 // voice pauses naturally via tick(recording=false)
@@ -570,8 +622,8 @@ class RunTrackingService : Service(), LocationListener {
         lastLocation = null
         activity?.let {
             it["status"] = "recording"
-            spool.updateActivity(it)
         }
+        persistLiveTotals()
         startLocationUpdates()
         updateNotification()
         publishState()
@@ -611,6 +663,7 @@ class RunTrackingService : Service(), LocationListener {
         session["max_pace_sec_per_km"] = maxPaceSecPerKm
         session["calories"] = calories
         session["splits"] = completedSplits.toList()
+        persistRuntimeSnapshot(session)
         spool.updateActivity(session)
 
         status = finalStatus
@@ -628,6 +681,7 @@ class RunTrackingService : Service(), LocationListener {
     private fun cleanupAndStop() {
         releaseWakeLock()
         activeInstance = null
+        RunTrackingBridge.pendingSessionContext = null
         try {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } catch (_: Throwable) {
@@ -829,6 +883,8 @@ class RunTrackingService : Service(), LocationListener {
             session["voice_plan_json"] = voiceController.planStepsJson()
             session["voice_goal_json"] = voiceController.goalJson()
             session["voice_intervals_on"] = voiceController.intervalsEnabled
+            session["voice_engine_snapshot_json"] = voiceController.engineSnapshotJson()
+            session["voice_step_results"] = voiceController.stepResults()
             spool.updateActivity(session)
         } catch (_: Throwable) {
             // Best-effort: a spool write failure must never abort the run.
@@ -847,7 +903,17 @@ class RunTrackingService : Service(), LocationListener {
         session["max_pace_sec_per_km"] = maxPaceSecPerKm
         session["calories"] = RunGeoMath.estimateCalories(distanceMeters)
         session["splits"] = completedSplits.toList()
+        persistRuntimeSnapshot(session)
         spool.updateActivity(session)
+    }
+
+    private fun persistRuntimeSnapshot(session: MutableMap<String, Any?>) {
+        session["paused_at_millis"] = pausedAtMillis.takeIf { it > 0L }
+        session["total_paused_millis"] = totalPausedMillis
+        session["last_split_moving_seconds"] = lastSplitMovingSeconds
+        session["next_split_at_meters"] = nextSplitAtMeters
+        session["voice_engine_snapshot_json"] = voiceController.engineSnapshotJson()
+        session["voice_step_results"] = voiceController.stepResults()
     }
 
     private fun elapsedSeconds(): Int {
@@ -887,6 +953,8 @@ class RunTrackingService : Service(), LocationListener {
             "point_count" to pointSeq,
             "splits" to splits,
             "current_split" to partial,
+            "session_context" to sessionContextMap(),
+            "step_snapshot" to voiceController.stepSnapshotMap(),
         )
     }
 

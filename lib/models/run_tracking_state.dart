@@ -1,4 +1,5 @@
 import 'package:workout_notes/models/run_split.dart';
+import 'package:workout_notes/models/run_session_context.dart';
 
 class RunLatLng {
   final double lat;
@@ -35,6 +36,13 @@ class RunTrackingState {
   final String? errorCode;
   final String? errorMessage;
 
+  /// Durable plan/goal identity mirrored by the native run spool.
+  final RunSessionContext? sessionContext;
+
+  /// Native structured-workout progress. Kept as wire data here so this model
+  /// does not depend on the step-engine service layer.
+  final Map<String, dynamic>? nativeStepSnapshot;
+
   const RunTrackingState({
     required this.supported,
     required this.locationGranted,
@@ -54,29 +62,33 @@ class RunTrackingState {
     required this.currentSplit,
     required this.errorCode,
     required this.errorMessage,
+    this.sessionContext,
+    this.nativeStepSnapshot,
   });
 
   const RunTrackingState.initial({bool supported = false})
-      : this(
-          supported: supported,
-          locationGranted: false,
-          status: idle,
-          activityId: null,
-          startedAt: null,
-          updatedAt: null,
-          distanceMeters: 0,
-          durationSeconds: 0,
-          movingTimeSeconds: 0,
-          currentPaceSecPerKm: null,
-          lat: null,
-          lng: null,
-          accuracyMeters: null,
-          trail: const [],
-          splits: const [],
-          currentSplit: null,
-          errorCode: null,
-          errorMessage: null,
-        );
+    : this(
+        supported: supported,
+        locationGranted: false,
+        status: idle,
+        activityId: null,
+        startedAt: null,
+        updatedAt: null,
+        distanceMeters: 0,
+        durationSeconds: 0,
+        movingTimeSeconds: 0,
+        currentPaceSecPerKm: null,
+        lat: null,
+        lng: null,
+        accuracyMeters: null,
+        trail: const [],
+        splits: const [],
+        currentSplit: null,
+        errorCode: null,
+        errorMessage: null,
+        sessionContext: null,
+        nativeStepSnapshot: null,
+      );
 
   bool get isActive =>
       status == starting || status == recording || status == paused;
@@ -85,8 +97,7 @@ class RunTrackingState {
 
   bool get isPaused => status == paused;
 
-  bool get hasWeakGps =>
-      accuracyMeters != null && accuracyMeters! > 30;
+  bool get hasWeakGps => accuracyMeters != null && accuracyMeters! > 30;
 
   /// Completed km splits plus the in-progress partial (newest last).
   List<RunSplit> get displaySplits {
@@ -107,6 +118,8 @@ class RunTrackingState {
     if (rawCurrent is Map) {
       current = RunSplit.fromMap(Map<String, dynamic>.from(rawCurrent));
     }
+    final rawContext = map['session_context'];
+    final rawStepSnapshot = map['step_snapshot'];
     return RunTrackingState(
       supported: map['supported'] as bool? ?? true,
       locationGranted: map['location_granted'] as bool? ?? false,
@@ -126,6 +139,12 @@ class RunTrackingState {
       currentSplit: current,
       errorCode: map['error_code'] as String?,
       errorMessage: map['error_message'] as String?,
+      sessionContext: rawContext is Map
+          ? RunSessionContext.fromMap(Map<String, dynamic>.from(rawContext))
+          : null,
+      nativeStepSnapshot: rawStepSnapshot is Map
+          ? Map<String, dynamic>.from(rawStepSnapshot)
+          : null,
     );
   }
 
@@ -148,6 +167,8 @@ class RunTrackingState {
     RunSplit? currentSplit,
     String? errorCode,
     String? errorMessage,
+    RunSessionContext? sessionContext,
+    Map<String, dynamic>? nativeStepSnapshot,
     bool clearError = false,
   }) {
     return RunTrackingState(
@@ -169,6 +190,8 @@ class RunTrackingState {
       currentSplit: currentSplit ?? this.currentSplit,
       errorCode: clearError ? null : (errorCode ?? this.errorCode),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      sessionContext: sessionContext ?? this.sessionContext,
+      nativeStepSnapshot: nativeStepSnapshot ?? this.nativeStepSnapshot,
     );
   }
 

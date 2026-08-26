@@ -5,27 +5,38 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.net.Uri
 import android.os.Build
+import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 class RunTrackingBridge(private val context: Context) :
     MethodChannel.MethodCallHandler,
     EventChannel.StreamHandler {
     companion object {
-        const val PERMISSION_REQUEST_CODE = 8461
-        const val BACKGROUND_PERMISSION_REQUEST_CODE = 8462
+        const val LOCATION_PERMISSION_REQUEST_CODE = 8461
+        const val NOTIFICATION_PERMISSION_REQUEST_CODE = 8462
+
+        /** Context waiting for the foreground service to create its spool. */
+        @Volatile var pendingSessionContext: Map<String, Any?>? = null
     }
 
     private var activity: Activity? = null
-    private val pendingPermission = AtomicReference<MethodChannel.Result?>(null)
-    private val pendingBackgroundPermission = AtomicReference<MethodChannel.Result?>(null)
+    private val pendingLocationPermission = AtomicReference<MethodChannel.Result?>(null)
+    private val pendingNotificationPermission = AtomicReference<MethodChannel.Result?>(null)
     private val spool by lazy { RunActivitySpool(context.applicationContext) }
 
     fun attachActivity(value: Activity) {
@@ -42,16 +53,22 @@ class RunTrackingBridge(private val context: Context) :
                 mapOf(
                     "supported" to true,
                     "location_granted" to RunTrackingService.locationGranted(context),
-                    "background_location_granted" to
-                        RunTrackingService.backgroundLocationGranted(context),
+                    "notifications_granted" to notificationPermissionGranted(),
                     "notifications_permission_required" to (Build.VERSION.SDK_INT >= 33),
-                    "background_location_required" to (Build.VERSION.SDK_INT >= 29),
+                    // A run is started while the Activity is visible and then kept
+                    // alive by a location foreground service. Background location
+                    // is therefore neither declared nor requested.
+                    "background_location_required" to false,
                     "android_sdk_int" to Build.VERSION.SDK_INT,
                 ),
             )
             "getState" -> result.success(RunTrackingService.currentState(context))
-            "requestPermissions" -> requestLocationPermission(result)
-            "requestBackgroundPermission" -> requestBackgroundLocationPermission(result)
+            "requestLocationPermission" -> requestLocationPermission(result)
+            "requestNotificationPermission" -> requestNotificationPermission(result)
+            "openAppSettings" -> openAppSettings(result)
+            "getCurrentLocation" -> getCurrentLocation(result)
+            "setSessionContext" -> setSessionContext(call, result)
+            "recoverActive" -> recoverActive(result)
             "start" -> start(result)
             "startDebugSimulation" -> startDebugSimulation(call, result)
             "pause" -> result.success(RunTrackingService.pauseCurrent())
@@ -81,12 +98,160 @@ class RunTrackingBridge(private val context: Context) :
                     }
                 }
             }
+            "markPendingReview" -> {
+                val id = call.arguments as? String
+                if (id == null) {
+                    result.error("invalid_id", "Missing activity id", null)
+                } else {
+                    try {
+                        val raw = spool.read(id)
+                        @Suppress("UNCHECKED_CAST")
+                        val activity = (raw["activity"] as? Map<String, Any?>)
+                            ?.toMutableMap()
+                            ?: mutableMapOf()
+                        activity["id"] = id
+                        activity["status"] = "pending_review"
+                        spool.updateActivity(activity)
+                        result.success(mapOf("activity" to activity, "points" to raw["points"]))
+                    } catch (error: Throwable) {
+                        result.error("review_failed", error.message, null)
+                    }
+                }
+            }
             "deleteSpool" -> {
                 val id = call.arguments as? String
                 if (id != null) spool.delete(id)
                 result.success(null)
             }
             else -> result.notImplemented()
+        }
+    }
+
+    private fun setSessionContext(call: MethodCall, result: MethodChannel.Result) {
+        @Suppress("UNCHECKED_CAST")
+        val value = call.arguments as? Map<String, Any?> ?: emptyMap()
+        pendingSessionContext = value
+        RunTrackingService.activeInstanceForVoice()?.persistSessionContext(value)
+        result.success(null)
+    }
+
+    /** Proactively reattaches an active spool when Flutter opens before the
+     * system has delivered the service's START_STICKY restart. */
+    private fun recoverActive(result: MethodChannel.Result) {
+        if (RunTrackingService.activeInstanceForVoice() != null) {
+            result.success(true)
+            return
+        }
+        val hasActiveSpool = spool.listPending().any {
+            when (it["status"] as? String) {
+                "starting", "recording", "paused", "stopping" -> true
+                else -> false
+            }
+        }
+        if (!hasActiveSpool) {
+            result.success(false)
+            return
+        }
+        val intent = Intent(context, RunTrackingService::class.java).apply {
+            action = RunTrackingService.ACTION_RESTORE
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+            result.success(true)
+        } catch (error: Throwable) {
+            result.error("restore_failed", error.message, null)
+        }
+    }
+
+    /** One high-accuracy fix while the run screen is visible, before timing. */
+    private fun getCurrentLocation(result: MethodChannel.Result) {
+        if (!RunTrackingService.locationGranted(context)) {
+            result.error("location_denied", "Precise location permission denied", null)
+            return
+        }
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val provider = when {
+            manager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
+            manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+            else -> {
+                result.error("location_disabled", "Location services are disabled", null)
+                return
+            }
+        }
+        val delivered = AtomicBoolean(false)
+        val handler = Handler(Looper.getMainLooper())
+        var fallback: Location? = null
+        try {
+            fallback = manager.getLastKnownLocation(provider)
+        } catch (_: SecurityException) {
+        }
+
+        fun locationMap(location: Location): Map<String, Any?> = mapOf(
+            "lat" to location.latitude,
+            "lng" to location.longitude,
+            "accuracy_meters" to if (location.hasAccuracy()) location.accuracy.toDouble() else null,
+            "recorded_at_millis" to location.time,
+        )
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val cancellation = CancellationSignal()
+            handler.postDelayed({
+                if (delivered.compareAndSet(false, true)) {
+                    cancellation.cancel()
+                    val last = fallback
+                    if (last != null) result.success(locationMap(last))
+                    else result.error("gps_timeout", "No GPS fix available", null)
+                }
+            }, 8_000L)
+            try {
+                manager.getCurrentLocation(provider, cancellation, context.mainExecutor) { location ->
+                    if (location != null && delivered.compareAndSet(false, true)) {
+                        result.success(locationMap(location))
+                    }
+                }
+            } catch (error: SecurityException) {
+                if (delivered.compareAndSet(false, true)) {
+                    result.error("location_denied", error.message, null)
+                }
+            }
+            return
+        }
+
+        @Suppress("DEPRECATION")
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                manager.removeUpdates(this)
+                if (delivered.compareAndSet(false, true)) {
+                    result.success(locationMap(location))
+                }
+            }
+            @Deprecated("Deprecated in Java")
+            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+            override fun onProviderEnabled(provider: String) {}
+            override fun onProviderDisabled(provider: String) {}
+        }
+        handler.postDelayed({
+            try {
+                manager.removeUpdates(listener)
+            } catch (_: SecurityException) {
+            }
+            if (delivered.compareAndSet(false, true)) {
+                val last = fallback
+                if (last != null) result.success(locationMap(last))
+                else result.error("gps_timeout", "No GPS fix available", null)
+            }
+        }, 8_000L)
+        try {
+            @Suppress("DEPRECATION")
+            manager.requestSingleUpdate(provider, listener, Looper.getMainLooper())
+        } catch (error: SecurityException) {
+            if (delivered.compareAndSet(false, true)) {
+                result.error("location_denied", error.message, null)
+            }
         }
     }
 
@@ -173,38 +338,30 @@ class RunTrackingBridge(private val context: Context) :
             result.error("activity_unavailable", "A visible Activity is required", null)
             return
         }
-        if (!pendingPermission.compareAndSet(null, result)) {
+        if (!pendingLocationPermission.compareAndSet(null, result)) {
             result.error("permission_pending", "Permission request already pending", null)
             return
         }
-        val permissions = mutableListOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-        )
-        if (Build.VERSION.SDK_INT >= 33) {
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
         visibleActivity.requestPermissions(
-            permissions.toTypedArray(),
-            PERMISSION_REQUEST_CODE,
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            ),
+            LOCATION_PERMISSION_REQUEST_CODE,
         )
     }
 
-    private fun requestBackgroundLocationPermission(result: MethodChannel.Result) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+    private fun notificationPermissionGranted(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestNotificationPermission(result: MethodChannel.Result) {
+        if (notificationPermissionGranted()) {
             result.success(true)
-            return
-        }
-        if (RunTrackingService.backgroundLocationGranted(context)) {
-            result.success(true)
-            return
-        }
-        if (!RunTrackingService.locationGranted(context)) {
-            result.error(
-                "location_denied",
-                "Precise location must be granted before background access",
-                null,
-            )
             return
         }
         val visibleActivity = activity
@@ -212,20 +369,33 @@ class RunTrackingBridge(private val context: Context) :
             result.error("activity_unavailable", "A visible Activity is required", null)
             return
         }
-        if (!pendingBackgroundPermission.compareAndSet(null, result)) {
+        if (!pendingNotificationPermission.compareAndSet(null, result)) {
             result.error("permission_pending", "Permission request already pending", null)
             return
         }
         visibleActivity.requestPermissions(
-            arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
-            BACKGROUND_PERMISSION_REQUEST_CODE,
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+            NOTIFICATION_PERMISSION_REQUEST_CODE,
         )
+    }
+
+    private fun openAppSettings(result: MethodChannel.Result) {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", context.packageName, null),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(intent)
+            result.success(true)
+        } catch (error: Throwable) {
+            result.error("settings_unavailable", error.message, null)
+        }
     }
 
     fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray): Boolean {
         when (requestCode) {
-            PERMISSION_REQUEST_CODE -> {
-                val result = pendingPermission.getAndSet(null)
+            LOCATION_PERMISSION_REQUEST_CODE -> {
+                val result = pendingLocationPermission.getAndSet(null)
                 // Fine location is required; coarse-only is treated as denied.
                 val granted = grantResults.isNotEmpty() &&
                     ContextCompat.checkSelfPermission(
@@ -235,9 +405,9 @@ class RunTrackingBridge(private val context: Context) :
                 result?.success(granted)
                 return true
             }
-            BACKGROUND_PERMISSION_REQUEST_CODE -> {
-                val result = pendingBackgroundPermission.getAndSet(null)
-                val granted = RunTrackingService.backgroundLocationGranted(context)
+            NOTIFICATION_PERMISSION_REQUEST_CODE -> {
+                val result = pendingNotificationPermission.getAndSet(null)
+                val granted = notificationPermissionGranted()
                 result?.success(granted)
                 return true
             }

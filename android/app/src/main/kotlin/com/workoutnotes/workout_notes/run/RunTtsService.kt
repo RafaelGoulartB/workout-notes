@@ -53,7 +53,11 @@ class RunTtsService(private val context: Context) : TextToSpeech.OnInitListener 
             } else {
                 engine.language = Locale.US
             }
-            engine.setSpeechRate(0.48f)
+            // flutter_tts normalizes its 0.48 setting to 0.96 on Android
+            // (the plugin multiplies the Dart value by 2). This native path
+            // must use the Android TextToSpeech scale directly, where 1.0 is
+            // the normal rate, so both execution paths sound the same.
+            engine.setSpeechRate(0.96f)
             engine.setPitch(1.0f)
             // Ensure we play on music stream and duck other audio briefly.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {

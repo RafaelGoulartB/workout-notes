@@ -1,19 +1,29 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
+import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/repositories/base_repository.dart';
+import 'package:workout_notes/repositories/body_measurement_repository.dart';
 import 'package:workout_notes/utils/run_effort_analytics.dart';
 
 class RunRepository extends BaseRepository {
   static const _uuid = Uuid();
 
-  Future<List<RunActivity>> listActivities({int limit = 50, int offset = 0}) async {
+  Future<List<RunActivity>> listActivities({
+    int limit = 50,
+    int offset = 0,
+    CardioActivityType? activityType = CardioActivityType.running,
+  }) async {
     final database = await db;
     final rows = await database.query(
       'run_activities',
-      where: "status = ?",
-      whereArgs: ['completed'],
+      where: activityType == null
+          ? 'status = ?'
+          : 'status = ? AND activity_type = ?',
+      whereArgs: activityType == null
+          ? ['completed']
+          : ['completed', activityType.databaseValue],
       orderBy: 'started_at DESC',
       limit: limit,
       offset: offset,
@@ -48,6 +58,8 @@ class RunRepository extends BaseRepository {
     required String id,
     String? title,
     String? notes,
+    double? rpe,
+    int? feelingRating,
   }) async {
     final database = await db;
     await database.update(
@@ -55,6 +67,8 @@ class RunRepository extends BaseRepository {
       {
         'title': ?title,
         'notes': ?notes,
+        'rpe': ?rpe,
+        'feeling_rating': ?feelingRating,
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',
@@ -98,7 +112,10 @@ class RunRepository extends BaseRepository {
   /// and `run_count` for the calendar month of [month].
   /// Uses `started_at` range so it matches the `run_activities` storage
   /// format (ISO-8601 with `T` separator).
-  Future<Map<String, dynamic>> getMonthlyRunSummary(DateTime month) async {
+  Future<Map<String, dynamic>> getMonthlyRunSummary(
+    DateTime month, {
+    CardioActivityType? activityType = CardioActivityType.running,
+  }) async {
     final database = await db;
     final start = DateTime(month.year, month.month, 1);
     final end = DateTime(month.year, month.month + 1, 1);
@@ -111,8 +128,13 @@ class RunRepository extends BaseRepository {
         COUNT(*) AS run_count
       FROM run_activities
       WHERE status = 'completed' AND started_at >= ? AND started_at < ?
+        ${activityType == null ? '' : 'AND activity_type = ?'}
       ''',
-      [start.toIso8601String(), end.toIso8601String()],
+      [
+        start.toIso8601String(),
+        end.toIso8601String(),
+        if (activityType != null) activityType.databaseValue,
+      ],
     );
     return rows.first;
   }
@@ -146,6 +168,7 @@ class RunRepository extends BaseRepository {
   Future<RunActivity?> ensureEffortMetrics(String activityId) async {
     final activity = await getActivity(activityId);
     if (activity == null) return null;
+    if (!activity.isRun) return activity;
     if (activity.effortsComputed) return activity;
 
     final points = await getTrackPoints(activityId);
@@ -163,6 +186,8 @@ class RunRepository extends BaseRepository {
       calories: activity.calories,
       title: activity.title,
       notes: activity.notes,
+      rpe: activity.rpe,
+      feelingRating: activity.feelingRating,
       status: activity.status,
       polylineSummary: activity.polylineSummary,
       createdAt: activity.createdAt,
@@ -187,8 +212,9 @@ class RunRepository extends BaseRepository {
     final rows = await database.query(
       'run_activities',
       columns: ['id'],
-      where: "status = ? AND IFNULL(efforts_computed, 0) = 0",
-      whereArgs: ['completed'],
+      where:
+          "status = ? AND activity_type = ? AND IFNULL(efforts_computed, 0) = 0",
+      whereArgs: ['completed', CardioActivityType.running.databaseValue],
       orderBy: 'started_at DESC',
       limit: limit,
     );
@@ -227,20 +253,79 @@ class RunRepository extends BaseRepository {
     final rawActivity = Map<String, dynamic>.from(
       spool['activity'] as Map? ?? const {},
     );
+    final id = rawActivity['id'] as String? ?? _uuid.v4();
+    final existing = await getActivity(id);
+    if (existing != null) return existing;
+
+    final bodyWeightKg = await _latestBodyWeightKg();
+    final decoded = _decodeNativeSpool(
+      spool,
+      id: id,
+      bodyWeightKg: bodyWeightKg,
+    );
+    final activity = decoded.activity;
+    final points = decoded.points;
+
+    final database = await db;
+    await database.transaction((txn) async {
+      await txn.insert('run_activities', activity.toMap());
+      for (final point in points) {
+        await txn.insert('run_track_points', point.toMap());
+      }
+    });
+
+    return activity;
+  }
+
+  /// Builds the exact activity that would be imported, without touching
+  /// SQLite. Used by the post-run review and achievement preview.
+  RunActivity previewNativeSpool(Map<String, dynamic> spool) {
+    final rawActivity = Map<String, dynamic>.from(
+      spool['activity'] as Map? ?? const {},
+    );
+    final id = rawActivity['id'] as String? ?? _uuid.v4();
+    return _decodeNativeSpool(spool, id: id).activity;
+  }
+
+  /// Builds a preview using the latest registered body weight. The pure,
+  /// synchronous [previewNativeSpool] remains available for callers that do
+  /// not have database access and uses the 70 kg fallback.
+  Future<RunActivity> previewNativeSpoolUsingLatestWeight(
+    Map<String, dynamic> spool,
+  ) async {
+    final rawActivity = Map<String, dynamic>.from(
+      spool['activity'] as Map? ?? const {},
+    );
+    final id = rawActivity['id'] as String? ?? _uuid.v4();
+    final bodyWeightKg = await _latestBodyWeightKg();
+    return _decodeNativeSpool(
+      spool,
+      id: id,
+      bodyWeightKg: bodyWeightKg,
+    ).activity;
+  }
+
+  ({RunActivity activity, List<RunTrackPoint> points}) _decodeNativeSpool(
+    Map<String, dynamic> spool, {
+    required String id,
+    double bodyWeightKg = 70,
+  }) {
+    final rawActivity = Map<String, dynamic>.from(
+      spool['activity'] as Map? ?? const {},
+    );
     final rawPoints = (spool['points'] as List? ?? const [])
         .whereType<Map>()
         .map((row) => Map<String, dynamic>.from(row))
         .toList();
 
-    final id = rawActivity['id'] as String? ?? _uuid.v4();
-    final existing = await getActivity(id);
-    if (existing != null) return existing;
-
     final now = DateTime.now();
-    final startedAt = DateTime.tryParse(rawActivity['started_at'] as String? ?? '') ??
-        now;
+    final startedAt =
+        DateTime.tryParse(rawActivity['started_at'] as String? ?? '') ?? now;
     final endedAt = DateTime.tryParse(rawActivity['ended_at'] as String? ?? '');
     final status = rawActivity['status'] as String? ?? 'completed';
+    final activityType = CardioActivityType.fromDatabase(
+      rawActivity['activity_type'],
+    );
     if (status == 'discarded') {
       throw StateError('discarded_spool');
     }
@@ -250,14 +335,24 @@ class RunRepository extends BaseRepository {
     final durationSeconds =
         (rawActivity['duration_seconds'] as num?)?.toInt() ?? 0;
     final movingTimeSeconds =
-        (rawActivity['moving_time_seconds'] as num?)?.toInt() ?? durationSeconds;
+        (rawActivity['moving_time_seconds'] as num?)?.toInt() ??
+        durationSeconds;
     final avgPace = (rawActivity['avg_pace_sec_per_km'] as num?)?.toDouble();
     final maxPace = (rawActivity['max_pace_sec_per_km'] as num?)?.toDouble();
-    final calories = (rawActivity['calories'] as num?)?.toInt() ??
-        _estimateCalories(distanceMeters);
+    final calories =
+        (rawActivity['calories'] as num?)?.toInt() ??
+        _estimateCalories(
+          activityType: activityType,
+          distanceMeters: distanceMeters,
+          durationSeconds: movingTimeSeconds,
+          bodyWeightKg: bodyWeightKg,
+        );
     final title = rawActivity['title'] as String?;
     final notes = rawActivity['notes'] as String?;
-    final polyline = rawActivity['polyline_summary'] as String? ??
+    final rpe = (rawActivity['rpe'] as num?)?.toDouble();
+    final feelingRating = (rawActivity['feeling_rating'] as num?)?.toInt();
+    final polyline =
+        rawActivity['polyline_summary'] as String? ??
         _buildPolylineSummary(rawPoints);
 
     final points = <RunTrackPoint>[];
@@ -276,26 +371,36 @@ class RunRepository extends BaseRepository {
           altitude: (row['altitude'] as num?)?.toDouble(),
           accuracy: (row['accuracy'] as num?)?.toDouble(),
           speed: (row['speed'] as num?)?.toDouble(),
-          recordedAt: DateTime.tryParse(row['recorded_at'] as String? ?? '') ??
+          recordedAt:
+              DateTime.tryParse(row['recorded_at'] as String? ?? '') ??
               startedAt.add(Duration(seconds: i)),
         ),
       );
     }
 
-    final efforts = RunEffortAnalytics.fromTrackPoints(points);
+    final efforts = activityType == CardioActivityType.running
+        ? RunEffortAnalytics.fromTrackPoints(points)
+        : const RunEffortMetrics();
 
     final activity = RunActivity(
       id: id,
+      activityType: activityType,
       startedAt: startedAt,
       endedAt: endedAt ?? now,
       durationSeconds: durationSeconds,
       movingTimeSeconds: movingTimeSeconds,
       distanceMeters: distanceMeters,
-      avgPaceSecPerKm: avgPace ?? _avgPace(distanceMeters, movingTimeSeconds),
-      maxPaceSecPerKm: maxPace,
+      avgPaceSecPerKm: activityType == CardioActivityType.running
+          ? avgPace ?? _avgPace(distanceMeters, movingTimeSeconds)
+          : null,
+      maxPaceSecPerKm: activityType == CardioActivityType.running
+          ? maxPace
+          : null,
       calories: calories,
       title: title,
       notes: notes,
+      rpe: rpe,
+      feelingRating: feelingRating,
       status: 'completed',
       polylineSummary: polyline,
       createdAt: now,
@@ -310,21 +415,38 @@ class RunRepository extends BaseRepository {
       effortsComputed: true,
     );
 
-    final database = await db;
-    await database.transaction((txn) async {
-      await txn.insert('run_activities', activity.toMap());
-      for (final point in points) {
-        await txn.insert('run_track_points', point.toMap());
-      }
-    });
-
-    return activity;
+    return (activity: activity, points: points);
   }
 
-  static int _estimateCalories(double distanceMeters) {
-    // ~1 kcal per kg per km; assume 70 kg default body weight.
+  Future<double> _latestBodyWeightKg() async {
+    try {
+      final latest = await BodyMeasurementRepository().getLatestWeightKg();
+      return latest ?? 70;
+    } catch (_) {
+      // Lightweight repository tests and partially recovered databases may not
+      // have the optional body-measurement table yet.
+      return 70;
+    }
+  }
+
+  static int _estimateCalories({
+    required CardioActivityType activityType,
+    required double distanceMeters,
+    required int durationSeconds,
+    required double bodyWeightKg,
+  }) {
+    if (activityType == CardioActivityType.stationaryBike) {
+      // Moderate stationary cycling is approximately 7 MET. This is an
+      // estimate until heart-rate or machine power data is available.
+      final minutes = durationSeconds / 60.0;
+      return (7.0 * 3.5 * bodyWeightKg / 200 * minutes).round().clamp(
+        0,
+        100000,
+      );
+    }
+    // Running costs approximately 1 kcal per kg per kilometer.
     final km = distanceMeters / 1000.0;
-    return (km * 70).round().clamp(0, 100000);
+    return (km * bodyWeightKg).round().clamp(0, 100000);
   }
 
   static double? _avgPace(double distanceMeters, int movingTimeSeconds) {

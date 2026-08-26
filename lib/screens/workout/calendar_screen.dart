@@ -455,13 +455,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
-            Icons.directions_run,
+            activity.isStationaryBike
+                ? Icons.pedal_bike_rounded
+                : Icons.directions_run,
             color: theme.colorScheme.onSecondaryContainer,
             size: 20,
           ),
         ),
         title: Text(
-          activity.title ?? DateFormat('HH:mm').format(activity.startedAt),
+          activity.title ??
+              (activity.isStationaryBike
+                  ? AppLocalizations.of(context)!
+                      .cardioActivityStationaryBike
+                  : DateFormat('HH:mm').format(activity.startedAt)),
         ),
         subtitle: Text(
           '${RunPlanUi.distanceLabel(activity.distanceMeters)} · '

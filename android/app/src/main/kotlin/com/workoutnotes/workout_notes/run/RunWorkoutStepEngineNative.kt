@@ -174,6 +174,29 @@ data class RunStepResultNative(
         "durationSeconds" to durationSeconds,
         "actualPaceSecPerKm" to actualPaceSecPerKm,
     )
+
+    fun toJson(): JSONObject = JSONObject(toMap())
+
+    companion object {
+        fun fromJson(value: JSONObject): RunStepResultNative = RunStepResultNative(
+            sequence = value.optInt("sequence", 0),
+            role = RunStepRole.fromString(value.optString("role", "work")),
+            repIndex = value.optInt("repIndex", 1),
+            plannedMetric = if (value.optString("plannedMetric") == "time") {
+                RunIntervalMetric.time
+            } else {
+                RunIntervalMetric.distance
+            },
+            plannedValue = value.optInt("plannedValue", 0),
+            plannedPaceSecPerKm = if (value.isNull("plannedPaceSecPerKm")) {
+                null
+            } else {
+                value.optDouble("plannedPaceSecPerKm").takeIf { !it.isNaN() }
+            },
+            distanceMeters = value.optDouble("distanceMeters", 0.0),
+            durationSeconds = value.optInt("durationSeconds", 0),
+        )
+    }
 }
 
 /**
@@ -200,6 +223,86 @@ class RunWorkoutStepEngineNative {
     val hasPlan: Boolean get() = steps.isNotEmpty()
 
     val results: List<RunStepResultNative> get() = stepResults.toList()
+
+    /** Full durable execution state, excluding the plan definition itself. */
+    fun stateJson(): String = JSONObject().apply {
+        put("version", 1)
+        put("phase", phase.name)
+        put("index", index)
+        put("accum", accum)
+        put("remainingCueSpoken", remainingCueSpoken)
+        put("paceCueSpoken", paceCueSpoken)
+        put("lastDistance", lastDistance)
+        put("lastMovingSeconds", lastMovingSeconds)
+        put("stepDistance", stepDistance)
+        put("stepSeconds", stepSeconds)
+        put("results", JSONArray().apply {
+            for (result in stepResults) put(result.toJson())
+        })
+    }.toString()
+
+    /** Restores a snapshot after [configure] has loaded the same plan steps. */
+    fun restoreStateJson(raw: String?): Boolean {
+        if (raw.isNullOrBlank() || steps.isEmpty()) return false
+        return try {
+            val json = JSONObject(raw)
+            val restoredPhase = when (json.optString("phase")) {
+                "running" -> RunStepEnginePhase.running
+                "done" -> RunStepEnginePhase.done
+                else -> RunStepEnginePhase.idle
+            }
+            val restoredIndex = json.optInt("index", 0)
+            if (restoredPhase == RunStepEnginePhase.running &&
+                restoredIndex !in steps.indices
+            ) {
+                return false
+            }
+            phase = restoredPhase
+            index = when (restoredPhase) {
+                RunStepEnginePhase.done -> steps.size
+                else -> restoredIndex.coerceIn(0, steps.lastIndex)
+            }
+            accum = json.optDouble("accum", 0.0).coerceAtLeast(0.0)
+            remainingCueSpoken = json.optBoolean("remainingCueSpoken", false)
+            paceCueSpoken = json.optBoolean("paceCueSpoken", false)
+            lastDistance = json.optDouble("lastDistance", 0.0).coerceAtLeast(0.0)
+            lastMovingSeconds = json.optInt("lastMovingSeconds", 0).coerceAtLeast(0)
+            stepDistance = json.optDouble("stepDistance", 0.0).coerceAtLeast(0.0)
+            stepSeconds = json.optInt("stepSeconds", 0).coerceAtLeast(0)
+            stepResults.clear()
+            val results = json.optJSONArray("results") ?: JSONArray()
+            for (i in 0 until results.length()) {
+                results.optJSONObject(i)?.let {
+                    stepResults.add(RunStepResultNative.fromJson(it))
+                }
+            }
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    /** Method-channel friendly live view used after Flutter reattaches. */
+    fun snapshotMap(): Map<String, Any?> {
+        val snap = snapshot
+        val current = steps.getOrNull(snap.stepIndex)?.step
+        return mapOf(
+            "phase" to snap.phase.name,
+            "stepIndex" to snap.stepIndex,
+            "totalSteps" to snap.totalSteps,
+            "role" to snap.role.name,
+            "repIndex" to snap.repIndex,
+            "repTotal" to snap.repTotal,
+            "metric" to snap.metric.name,
+            "target" to snap.target,
+            "progress" to snap.progress,
+            "remaining" to snap.remaining,
+            "targetPaceMinSecPerKm" to current?.targetPaceMinSecPerKm,
+            "targetPaceMaxSecPerKm" to current?.targetPaceMaxSecPerKm,
+            "workRepsDone" to snap.workRepsDone,
+            "workRepsTotal" to snap.workRepsTotal,
+        )
+    }
 
     val workRepsTotal: Int get() = steps.count { it.step.role == RunStepRole.work }
 

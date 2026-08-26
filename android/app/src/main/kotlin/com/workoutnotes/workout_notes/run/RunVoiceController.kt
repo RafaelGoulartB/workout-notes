@@ -122,6 +122,17 @@ class RunVoiceController(private val context: Context) {
     /** Per-step results collected during the session, for Dart to persist. */
     fun stepResults(): List<Map<String, Any?>> = stepEngine.results.map { it.toMap() }
 
+    /** Durable execution snapshot mirrored into the run spool. */
+    fun engineSnapshotJson(): String? =
+        if (stepEngine.hasPlan) stepEngine.stateJson() else null
+
+    /** Live structured-workout progress for a reattached Flutter screen. */
+    fun stepSnapshotMap(): Map<String, Any?>? =
+        if (stepEngine.hasPlan) stepEngine.snapshotMap() else null
+
+    fun restoreEngineSnapshot(raw: String?): Boolean =
+        stepEngine.restoreStateJson(raw)
+
     val hasPlan: Boolean get() = stepEngine.hasPlan
     val intervalsEnabled: Boolean get() = intervalsOn
 

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 
 void main() {
@@ -25,6 +26,7 @@ void main() {
           await db.execute('''
             CREATE TABLE run_activities (
               id TEXT PRIMARY KEY,
+              activity_type TEXT NOT NULL DEFAULT 'running',
               started_at TEXT NOT NULL,
               ended_at TEXT,
               duration_seconds INTEGER NOT NULL DEFAULT 0,
@@ -35,6 +37,8 @@ void main() {
               calories INTEGER,
               title TEXT,
               notes TEXT,
+              rpe REAL,
+              feeling_rating INTEGER,
               status TEXT NOT NULL DEFAULT 'completed',
               polyline_summary TEXT,
               created_at TEXT NOT NULL,
@@ -122,12 +126,39 @@ void main() {
       id: 'run-1',
       title: 'Evening Run',
       notes: 'Felt good',
+      rpe: 7,
+      feelingRating: 4,
     );
     final updated = await repository.getActivity('run-1');
     expect(updated!.title, 'Evening Run');
     expect(updated.notes, 'Felt good');
+    expect(updated.rpe, 7);
+    expect(updated.feelingRating, 4);
 
     await repository.deleteActivity('run-1');
     expect(await repository.listActivities(), isEmpty);
+  });
+
+  test('keeps stationary bike sessions out of run-only queries', () async {
+    final bike = await repository.importNativeSpool({
+      'activity': {
+        'id': 'bike-1',
+        'activity_type': 'stationary_bike',
+        'status': 'completed',
+        'started_at': '2026-08-18T10:00:00.000Z',
+        'ended_at': '2026-08-18T10:40:00.000Z',
+        'duration_seconds': 2400,
+        'moving_time_seconds': 2400,
+        'distance_meters': 15000.0,
+      },
+      'points': <Map<String, dynamic>>[],
+    });
+
+    expect(bike.activityType, CardioActivityType.stationaryBike);
+    expect(bike.avgPaceSecPerKm, isNull);
+    expect(bike.averageSpeedKmh, closeTo(22.5, 0.001));
+    expect(bike.calories, greaterThan(0));
+    expect(await repository.listActivities(), isEmpty);
+    expect(await repository.listActivities(activityType: null), hasLength(1));
   });
 }

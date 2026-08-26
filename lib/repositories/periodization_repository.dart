@@ -1116,11 +1116,17 @@ class PeriodizationRepository extends BaseRepository {
   Future<int> _completedRunsBetween(DateTime start, DateTime end) async {
     final database = await db;
     if (!await _tableExists(database, 'run_activities')) return 0;
+    final hasActivityType = await _columnExists(
+      database,
+      'run_activities',
+      'activity_type',
+    );
     return Sqflite.firstIntValue(
           await database.rawQuery(
             '''
             SELECT COUNT(*) FROM run_activities
             WHERE status = 'completed'
+              ${hasActivityType ? "AND activity_type = 'running'" : ''}
               AND date(started_at) BETWEEN ? AND ?
             ''',
             [_date(start), _date(end)],
@@ -1284,6 +1290,9 @@ class PeriodizationRepository extends BaseRepository {
     // Devices that predate the run tables (or a failed migration) must still
     // render the phase — the same guard the sleep repository uses.
     final hasRunActivities = await _tableExists(database, 'run_activities');
+    final hasRunActivityType =
+        hasRunActivities &&
+        await _columnExists(database, 'run_activities', 'activity_type');
     final run = hasRunActivities
         ? (await database.rawQuery(
             '''
@@ -1293,6 +1302,7 @@ class PeriodizationRepository extends BaseRepository {
                    COALESCE(MAX(distance_meters), 0) AS longest_run_meters
             FROM run_activities
             WHERE status = 'completed'
+              ${hasRunActivityType ? "AND activity_type = 'running'" : ''}
               AND date(started_at) BETWEEN ? AND ?
             ''',
             [startText, endText],
@@ -1313,6 +1323,7 @@ class PeriodizationRepository extends BaseRepository {
                   JOIN run_plan_workouts session
                     ON session.id = activity.plan_workout_id
                   WHERE activity.status = 'completed'
+                    ${hasRunActivityType ? "AND activity.activity_type = 'running'" : ''}
                     AND date(activity.started_at) BETWEEN ? AND ?
                     AND session.kind IN
                         ('tempo', 'interval', 'fartlek', 'hills', 'race')
@@ -1617,8 +1628,7 @@ class PeriodizationRepository extends BaseRepository {
           : rpeSetsLogged / rpeExpectedSets * 100,
       runCount: (run['run_count'] as num?)?.toInt() ?? 0,
       runDistanceMeters: (run['distance_meters'] as num?)?.toDouble() ?? 0,
-      runMovingTimeSeconds:
-          (run['moving_time_seconds'] as num?)?.toInt() ?? 0,
+      runMovingTimeSeconds: (run['moving_time_seconds'] as num?)?.toInt() ?? 0,
       longestRunMeters: (run['longest_run_meters'] as num?)?.toDouble() ?? 0,
       qualityRunCount: qualityRunCount,
       plannedRunSessions: hasRunTarget ? plannedRunSessions : null,

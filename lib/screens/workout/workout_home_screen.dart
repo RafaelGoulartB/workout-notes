@@ -4,6 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/models/cardio_activity_type.dart';
+import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/screens/run/run_detail_screen.dart';
+import 'package:workout_notes/services/run_tracking_service.dart';
+import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import '../../navigation/ai_coach_navigation.dart';
 import '../../repositories/workout_repository.dart';
@@ -35,10 +41,12 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   final _analyticsRepo = AnalyticsRepository();
   final _runRepo = RunRepository();
   final _timerService = RestTimerService.instance;
+  final _runTrackingService = RunTrackingService.instance;
+  final _bikeTrackingService = StationaryBikeTrackingService.instance;
   bool _isLoading = true;
   List<Map<String, dynamic>> _activeWorkouts = [];
   List<Map<String, dynamic>> _upcomingWorkouts = [];
-  List<Map<String, dynamic>> _completedWorkouts = [];
+  List<_CompletedActivity> _completedActivities = [];
   bool _showCompleted = true;
   bool _showUpcoming = true;
 
@@ -56,14 +64,23 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   void initState() {
     super.initState();
     widget.selectedTab?.addListener(_onTabSelectionChanged);
+    _runTrackingService.addListener(_onRunTrackingChanged);
+    _bikeTrackingService.addListener(_onRunTrackingChanged);
+    _runTrackingService.initialize();
     _loadData();
   }
 
   @override
   void dispose() {
     widget.selectedTab?.removeListener(_onTabSelectionChanged);
+    _runTrackingService.removeListener(_onRunTrackingChanged);
+    _bikeTrackingService.removeListener(_onRunTrackingChanged);
     _elapsedTimer?.cancel();
     super.dispose();
+  }
+
+  void _onRunTrackingChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onTabSelectionChanged() {
@@ -102,7 +119,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         _workoutRepo.getMonthlySummary(now),
         _analyticsRepo.getCurrentWorkoutStreak(),
         _workoutRepo.getActiveWorkouts(),
-        _runRepo.getMonthlyRunSummary(now),
+        _runRepo.getMonthlyRunSummary(now, activityType: null),
+        _runRepo.listActivities(limit: 50, activityType: null),
       ]);
       final allWorkouts = results[0] as List<Map<String, dynamic>>;
       final futureWorkouts = results[1] as List<Map<String, dynamic>>;
@@ -110,18 +128,24 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       final currentStreak = results[3] as int;
       final active = results[4] as List<Map<String, dynamic>>;
       final runMonthly = results[5] as Map<String, dynamic>;
+      final recentRuns = results[6] as List<RunActivity>;
       final completed = <Map<String, dynamic>>[];
       for (final w in allWorkouts) {
         if ((w['end_time'] as String?) != null) {
           completed.add(w);
         }
       }
+      final completedActivities = <_CompletedActivity>[
+        for (final workout in completed)
+          _CompletedActivity.fromWorkout(workout),
+        for (final run in recentRuns) _CompletedActivity.fromRun(run),
+      ]..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
 
       if (mounted) {
         setState(() {
           _activeWorkouts = active;
           _upcomingWorkouts = futureWorkouts.take(5).toList();
-          _completedWorkouts = completed.take(5).toList();
+          _completedActivities = completedActivities.take(8).toList();
           _currentStreak = currentStreak;
           _monthWorkouts = (monthly['workout_count'] as num?)?.toInt() ?? 0;
           _monthVolume = (monthly['total_volume'] as num?)?.toDouble() ?? 0;
@@ -181,6 +205,18 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     _loadData();
   }
 
+  Future<void> _openActiveBike() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const RunRecordScreen(
+          initialActivityType: CardioActivityType.stationaryBike,
+        ),
+      ),
+    );
+    _loadData();
+  }
+
   // ===================== HELPERS =====================
   String _formatVolume(double v) {
     if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
@@ -210,10 +246,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   /// Returns a friendly "Last workout: `<when>`" string. Empty when there is
   /// no completed workout yet.
   String _lastWorkoutLabel(AppLocalizations loc) {
-    if (_completedWorkouts.isEmpty) return '';
-    final raw = _completedWorkouts.first['date'] as String?;
-    if (raw == null || raw.isEmpty) return '';
-    final workoutDate = DateTime.parse(raw);
+    if (_completedActivities.isEmpty) return '';
+    final workoutDate = _completedActivities.first.occurredAt.toLocal();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final wd = DateTime(workoutDate.year, workoutDate.month, workoutDate.day);
@@ -243,7 +277,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   }
 
   bool get _hasAnyHistory =>
-      _activeWorkouts.isNotEmpty || _completedWorkouts.isNotEmpty;
+      _activeWorkouts.isNotEmpty ||
+      _completedActivities.isNotEmpty ||
+      _runTrackingService.state.isActive ||
+      _bikeTrackingService.state.isActive;
 
   // ===================== BUILD =====================
   @override
@@ -287,6 +324,14 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                         _activeWorkouts.first,
                       ),
                     ),
+                  if (_runTrackingService.state.isActive)
+                    SliverToBoxAdapter(
+                      child: _buildActiveRunBanner(theme, loc),
+                    ),
+                  if (_bikeTrackingService.state.isActive)
+                    SliverToBoxAdapter(
+                      child: _buildActiveBikeBanner(theme, loc),
+                    ),
                   SliverToBoxAdapter(
                     child: _buildSectionHeader(
                       loc.workoutHomeSectionQuickActions,
@@ -305,7 +350,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                     SliverToBoxAdapter(
                       child: _buildUpcomingSection(theme, loc),
                     ),
-                  if (_completedWorkouts.isNotEmpty)
+                  if (_completedActivities.isNotEmpty)
                     SliverToBoxAdapter(
                       child: _buildCompletedSection(theme, loc),
                     ),
@@ -437,6 +482,127 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     ).animate().fadeIn(duration: 350.ms, delay: 60.ms).slideY(begin: 0.05);
   }
 
+  Widget _buildActiveRunBanner(ThemeData theme, AppLocalizations loc) {
+    final state = _runTrackingService.state;
+    final subtitle = loc.workoutHomeRunActiveSubtitle(
+      RunFormatters.distanceWithUnit(state.distanceMeters),
+      RunFormatters.duration(state.durationSeconds),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Material(
+        color: theme.colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _startRun,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
+            child: Row(
+              children: [
+                _PulsingDot(color: theme.colorScheme.onSecondaryContainer),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        loc.workoutHomeRunOngoing,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.onSecondaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        state.isPaused
+                            ? '${loc.workoutHomeRunPaused} · $subtitle'
+                            : subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSecondaryContainer
+                              .withAlpha(220),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.tonalIcon(
+                  onPressed: _startRun,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: Text(loc.workoutHomeActiveBannerAction),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05);
+  }
+
+  Widget _buildActiveBikeBanner(ThemeData theme, AppLocalizations loc) {
+    final state = _bikeTrackingService.state;
+    final time = RunFormatters.duration(state.durationSeconds);
+    final subtitle = state.isPaused
+        ? '${loc.workoutHomeRunPaused} · $time'
+        : '$time · ${loc.cardioActivityStationaryBikeSubtitle}';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Material(
+        color: theme.colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _openActiveBike,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
+            child: Row(
+              children: [
+                _PulsingDot(color: theme.colorScheme.onSecondaryContainer),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        loc.cardioActivityStationaryBike,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.onSecondaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSecondaryContainer
+                              .withAlpha(220),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _openActiveBike,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: Text(loc.workoutHomeActiveBannerAction),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05);
+  }
+
   // ===================== STATS =====================
   Widget _buildHeaderStats(ThemeData theme, AppLocalizations loc) {
     final lastWorkout = _lastWorkoutLabel(loc);
@@ -529,7 +695,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                       label: loc.commonTotal,
                       value: _monthCardioDistance > 0 && _monthCardioTime > 0
                           ? (_monthCardioTime / _monthCardioDistance)
-                              .toStringAsFixed(0)
+                                .toStringAsFixed(0)
                           : '--',
                       unit: '/km',
                       icon: Icons.speed,
@@ -746,14 +912,14 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
             iconBg: theme.colorScheme.primaryContainer,
             iconFg: theme.colorScheme.onPrimaryContainer,
             title: loc.workoutHomeCompleted,
-            count: _completedWorkouts.length,
+            count: _completedActivities.length,
             expanded: _showCompleted,
             onTap: () => setState(() => _showCompleted = !_showCompleted),
           ),
           if (_showCompleted) ...[
             const SizedBox(height: 8),
-            ...(_completedWorkouts.map(
-              (w) => _buildWorkoutCard(w, theme, isActive: false),
+            ...(_completedActivities.map(
+              (activity) => _buildCompletedActivityCard(activity, theme),
             )),
           ],
         ],
@@ -814,6 +980,117 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   }
 
   // ===================== WORKOUT CARD =====================
+  Widget _buildCompletedActivityCard(
+    _CompletedActivity activity,
+    ThemeData theme,
+  ) {
+    final formatted = DateFormat(
+      Intl.defaultLocale?.startsWith('pt') == true
+          ? "d 'de' MMMM yyyy"
+          : 'MMMM d, yyyy',
+      Intl.defaultLocale,
+    ).format(activity.occurredAt.toLocal());
+    final duration = activity.durationSeconds;
+    final durationLabel = duration > 0
+        ? AppLocalizations.of(
+            context,
+          )!.workoutDetailDuration(duration ~/ 60, duration % 60)
+        : '--';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: theme.colorScheme.outlineVariant.withAlpha(80),
+          ),
+        ),
+        child: InkWell(
+          key: ValueKey('completed-${activity.kind.name}-${activity.id}'),
+          borderRadius: BorderRadius.circular(12),
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => activity.kind == _CompletedActivityKind.run
+                    ? RunDetailScreen(activityId: activity.id)
+                    : WorkoutDetailScreen(workoutId: activity.id),
+              ),
+            );
+            _loadData();
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    activity.kind == _CompletedActivityKind.run
+                        ? activity.activityType ==
+                                  CardioActivityType.stationaryBike
+                              ? Icons.pedal_bike_rounded
+                              : Icons.directions_run_rounded
+                        : Icons.fitness_center,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        formatted,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        durationLabel,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (activity.feelingRating > 0)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(
+                      5,
+                      (index) => Icon(
+                        index < activity.feelingRating
+                            ? Icons.star
+                            : Icons.star_border,
+                        size: 14,
+                        color: Colors.amber,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right,
+                  color: theme.colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildWorkoutCard(
     Map<String, dynamic> workout,
     ThemeData theme, {
@@ -832,11 +1109,10 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     final durStr = isActive
         ? AppLocalizations.of(context)!.workoutHomeOngoing
         : duration > 0
-            ? AppLocalizations.of(
-                context,
-              )!
-                .workoutDetailDuration(duration ~/ 60, duration % 60)
-            : '--';
+        ? AppLocalizations.of(
+            context,
+          )!.workoutDetailDuration(duration ~/ 60, duration % 60)
+        : '--';
     final feeling = (workout['feeling_rating'] as int?) ?? 0;
 
     return Padding(
@@ -931,6 +1207,52 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   }
 }
 
+enum _CompletedActivityKind { workout, run }
+
+class _CompletedActivity {
+  final String id;
+  final _CompletedActivityKind kind;
+  final DateTime occurredAt;
+  final int durationSeconds;
+  final int feelingRating;
+  final CardioActivityType? activityType;
+
+  const _CompletedActivity({
+    required this.id,
+    required this.kind,
+    required this.occurredAt,
+    required this.durationSeconds,
+    required this.feelingRating,
+    this.activityType,
+  });
+
+  factory _CompletedActivity.fromWorkout(Map<String, dynamic> workout) {
+    final endTime = DateTime.tryParse(workout['end_time'] as String? ?? '');
+    final date = DateTime.tryParse(workout['date'] as String? ?? '');
+    return _CompletedActivity(
+      id: workout['id'] as String,
+      kind: _CompletedActivityKind.workout,
+      occurredAt: endTime ?? date ?? DateTime.fromMillisecondsSinceEpoch(0),
+      durationSeconds: (workout['duration_seconds'] as num?)?.toInt() ?? 0,
+      feelingRating: (workout['feeling_rating'] as num?)?.toInt() ?? 0,
+      activityType: null,
+    );
+  }
+
+  factory _CompletedActivity.fromRun(RunActivity run) {
+    return _CompletedActivity(
+      id: run.id,
+      kind: _CompletedActivityKind.run,
+      occurredAt: run.endedAt ?? run.startedAt,
+      durationSeconds: run.movingTimeSeconds > 0
+          ? run.movingTimeSeconds
+          : run.durationSeconds,
+      feelingRating: run.feelingRating ?? 0,
+      activityType: run.activityType,
+    );
+  }
+}
+
 // ===================== SHARED WIDGETS =====================
 
 /// Loading skeleton — keeps the layout stable so the transition into real
@@ -945,10 +1267,10 @@ class _LoadingSkeleton extends StatelessWidget {
     BoxDecoration box({double r = 8}) =>
         BoxDecoration(color: color, borderRadius: BorderRadius.circular(r));
     Widget line({required double h, double? w, double r = 8}) => Container(
-          height: h,
-          width: w,
-          decoration: box(r: r),
-        );
+      height: h,
+      width: w,
+      decoration: box(r: r),
+    );
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -995,10 +1317,10 @@ class _PulsingDot extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           Container(
-            width: 16,
-            height: 16,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          )
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              )
               .animate(onPlay: (c) => c.repeat(reverse: true))
               .scale(
                 begin: const Offset(0.6, 0.6),
