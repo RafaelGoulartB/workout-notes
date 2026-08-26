@@ -126,6 +126,81 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     return RunPlanComposer.compose(widget.template, _config).first;
   }
 
+  RunPlanReadiness? get _readiness {
+    if (!_daysValid) return null;
+    try {
+      return RunPlanComposer.assess(widget.template, _config);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String _km(double value) => value.toStringAsFixed(0);
+
+  /// Coach warnings for the current step. Days step: only the schedule smell;
+  /// preview step: everything, so the athlete sees it right before creating.
+  Widget _buildWarnings(
+    AppLocalizations loc,
+    ThemeData theme, {
+    required bool full,
+  }) {
+    final readiness = _readiness;
+    if (readiness == null) return const SizedBox.shrink();
+    final messages = <String>[
+      if (readiness.consecutiveDays) loc.runPlanCustomizeWarnConsecutiveDays,
+      if (full && readiness.volumeGap)
+        loc.runPlanCustomizeWarnVolumeGap(
+          _km(readiness.startWeeklyKm),
+          _km(readiness.currentWeeklyKm ?? 0),
+        ),
+      if (full && readiness.longRunShort)
+        loc.runPlanCustomizeWarnLongRunShort(
+          _km(readiness.peakLongKm),
+          _km(readiness.requiredLongKm),
+        ),
+    ];
+    if (messages.isEmpty) return const SizedBox.shrink();
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Card(
+        color: scheme.tertiaryContainer,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: scheme.onTertiaryContainer,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    loc.runPlanCustomizeWarnTitle,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: scheme.onTertiaryContainer,
+                    ),
+                  ),
+                ],
+              ),
+              for (final message in messages) ...[
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onTertiaryContainer,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _create() async {
     if (_creating || !_daysValid) return;
     setState(() => _creating = true);
@@ -143,9 +218,9 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
       if (!mounted) return;
       setState(() => _creating = false);
       final loc = AppLocalizations.of(context)!;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.commonError(e.toString()))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.commonError(e.toString()))));
     }
   }
 
@@ -342,6 +417,7 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
             ),
           ),
         ],
+        _buildWarnings(loc, theme, full: false),
         const SizedBox(height: 24),
         ListTile(
           contentPadding: EdgeInsets.zero,
@@ -349,7 +425,9 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
           subtitle: Text(
             _raceDate == null
                 ? loc.runPlanRaceDateNone
-                : MaterialLocalizations.of(context).formatMediumDate(_raceDate!),
+                : MaterialLocalizations.of(
+                    context,
+                  ).formatMediumDate(_raceDate!),
           ),
           trailing: IconButton(
             icon: Icon(
@@ -358,7 +436,8 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
             onPressed: () async {
               final picked = await showDatePicker(
                 context: context,
-                initialDate: _raceDate ?? DateTime.now().add(const Duration(days: 84)),
+                initialDate:
+                    _raceDate ?? DateTime.now().add(const Duration(days: 84)),
                 firstDate: DateTime.now(),
                 lastDate: DateTime.now().add(const Duration(days: 800)),
               );
@@ -493,7 +572,10 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
             onSelectionChanged: (s) => setState(() => _paceSource = s.first),
           ),
           const SizedBox(height: 16),
-          Text(loc.runPlanCustomizePaceDistance, style: theme.textTheme.titleSmall),
+          Text(
+            loc.runPlanCustomizePaceDistance,
+            style: theme.textTheme.titleSmall,
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -560,6 +642,7 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
+        _buildWarnings(loc, theme, full: true),
         const SizedBox(height: 16),
         for (final session in week)
           Card(
@@ -618,9 +701,7 @@ class _OptionCard extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                selected
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_off,
+                selected ? Icons.radio_button_checked : Icons.radio_button_off,
                 color: selected
                     ? theme.colorScheme.primary
                     : theme.colorScheme.onSurfaceVariant,

@@ -78,6 +78,11 @@ class RunPlanTemplate {
       prerequisiteEn;
   final List<List<RunPlanTemplateWorkout>> schedule;
 
+  /// Weekly volume (km) the prerequisite text assumes the athlete already
+  /// runs. When the wizard has no measured baseline the composer anchors
+  /// week 1 here instead of starting at the template's full ladder.
+  final double? prerequisiteWeeklyKm;
+
   /// Continuous / base ladders: each inner list is one week of km (last = long).
   final List<List<double>>? continuousKm;
   final bool raceFinish;
@@ -106,6 +111,7 @@ class RunPlanTemplate {
     required this.prerequisitePt,
     required this.prerequisiteEn,
     required this.schedule,
+    this.prerequisiteWeeklyKm,
     this.continuousKm,
     this.raceFinish = false,
     this.performanceLongKm,
@@ -169,6 +175,7 @@ abstract final class RunPlanTemplates {
     descriptionEn: 'Build endurance to complete 5K comfortably.',
     prerequisitePt: 'Correr ou alternar corrida e caminhada por 25 min',
     prerequisiteEn: 'Run or run-walk for 25 minutes',
+    prereqKm: 8,
     race: true,
     km: const [
       [2.5, 3, 3.5],
@@ -193,6 +200,7 @@ abstract final class RunPlanTemplates {
         'Short intervals and controlled tempo to improve pace without excess intensity.',
     prerequisitePt: 'Completar 5 km e correr 15 km ou mais por semana',
     prerequisiteEn: 'Complete 5K and run at least 15 km per week',
+    prereqKm: 15,
     longKm: const [7, 8, 9, 7, 9, 10, 11, 8, 9, 7],
     easyKm: 5,
     intervalMeters: 400,
@@ -209,6 +217,7 @@ abstract final class RunPlanTemplates {
         'Gradually extend the long run and reach 10K feeling strong.',
     prerequisitePt: 'Correr 5 km contínuos e treinar 3 vezes por semana',
     prerequisiteEn: 'Run 5K continuously and train 3 times per week',
+    prereqKm: 15,
     race: true,
     km: const [
       [4, 4, 6],
@@ -235,6 +244,7 @@ abstract final class RunPlanTemplates {
         'Threshold work, intervals and long runs to hold a faster pace.',
     prerequisitePt: 'Completar 10 km e correr 25 km ou mais por semana',
     prerequisiteEn: 'Complete 10K and run at least 25 km per week',
+    prereqKm: 25,
     longKm: const [10, 11, 12, 9, 12, 13, 14, 10, 14, 15, 11, 8],
     easyKm: 6,
     intervalMeters: 800,
@@ -251,6 +261,7 @@ abstract final class RunPlanTemplates {
     descriptionEn: 'Build endurance and practise sustainable pacing for 21.1K.',
     prerequisitePt: 'Correr 10 km e manter 25 km semanais há 1 mês',
     prerequisiteEn: 'Run 10K and sustain 25 km/week for one month',
+    prereqKm: 25,
     longKm: const [10, 12, 13, 10, 14, 15, 16, 12, 17, 18, 19, 14, 12, 8],
     easyKm: 6,
     intervalMeters: 1000,
@@ -269,6 +280,7 @@ abstract final class RunPlanTemplates {
         'Higher volume and threshold blocks for runners who know the distance.',
     prerequisitePt: 'Já ter completado 21 km e correr 40 km por semana',
     prerequisiteEn: 'Have completed 21K and run 40 km per week',
+    prereqKm: 40,
     sessions: 5,
     longKm: const [
       14,
@@ -305,6 +317,7 @@ abstract final class RunPlanTemplates {
         'Gradual long runs, planned recovery and a three-week taper.',
     prerequisitePt: 'Correr 15 km e sustentar 35 km semanais por 6 semanas',
     prerequisiteEn: 'Run 15K and sustain 35 km/week for six weeks',
+    prereqKm: 35,
     longKm: const [
       14,
       16,
@@ -343,6 +356,7 @@ abstract final class RunPlanTemplates {
         'Eight easy weeks to build consistency and volume tolerance.',
     prerequisitePt: 'Correr confortavelmente por 30 minutos',
     prerequisiteEn: 'Run comfortably for 30 minutes',
+    prereqKm: 12,
     km: const [
       [4, 5, 7],
       [4, 5, 8],
@@ -514,6 +528,7 @@ abstract final class RunPlanTemplates {
     required String prerequisitePt,
     required String prerequisiteEn,
     required List<List<double>> km,
+    double? prereqKm,
     bool race = false,
   }) {
     final weeks = <List<RunPlanTemplateWorkout>>[];
@@ -556,6 +571,7 @@ abstract final class RunPlanTemplates {
       prerequisitePt: prerequisitePt,
       prerequisiteEn: prerequisiteEn,
       schedule: weeks,
+      prerequisiteWeeklyKm: prereqKm,
       continuousKm: km,
       raceFinish: race,
     );
@@ -576,6 +592,7 @@ abstract final class RunPlanTemplates {
     required double easyKm,
     required int intervalMeters,
     required int baseReps,
+    double? prereqKm,
     int sessions = 4,
   }) {
     final weeks = <List<RunPlanTemplateWorkout>>[];
@@ -633,6 +650,7 @@ abstract final class RunPlanTemplates {
       prerequisitePt: prerequisitePt,
       prerequisiteEn: prerequisiteEn,
       schedule: weeks,
+      prerequisiteWeeklyKm: prereqKm,
       performanceLongKm: longKm,
       performanceEasyKm: easyKm,
       performanceIntervalMeters: intervalMeters,
