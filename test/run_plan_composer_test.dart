@@ -227,11 +227,51 @@ void main() {
       // or returning runner must not be offered a fifth impact day.
       for (final template in [
         RunPlanTemplates.runWalk,
+        RunPlanTemplates.walkJog,
         RunPlanTemplates.returnToRunning,
+        RunPlanTemplates.returnAfterInjury,
         RunPlanTemplates.firstFiveK,
+        RunPlanTemplates.habit,
       ]) {
         expect(template.allowedSessionsPerWeek, isNot(contains(5)));
       }
+    });
+
+    test('keep-fit expands to the chosen length with flat varied weeks', () {
+      final schedule = RunPlanComposer.compose(
+        RunPlanTemplates.keepFit,
+        const RunPlanBuildConfig(
+          sessionsPerWeek: 4,
+          availableDays: [2, 4, 5, 7],
+          intent: RunPlanIntent.finish,
+          currentWeeklyKm: 30,
+          weeks: 12,
+        ),
+      );
+      expect(schedule, hasLength(12));
+      expect(schedule.every((week) => week.length == 4), isTrue);
+
+      final buildKm = <double>[];
+      for (var i = 0; i < schedule.length; i++) {
+        if (i > 0 && i % 4 == 3) continue; // recovery
+        buildKm.add(
+          schedule[i].fold<double>(
+            0,
+            (sum, s) => sum + (s.targetDistanceMeters ?? 0) / 1000,
+          ),
+        );
+      }
+      final mean = buildKm.reduce((a, b) => a + b) / buildKm.length;
+      for (final km in buildKm) {
+        expect(km, closeTo(mean, mean * 0.12));
+      }
+
+      final kinds = schedule
+          .expand((week) => week)
+          .map((s) => s.kind)
+          .toSet();
+      expect(kinds.length, greaterThanOrEqualTo(3));
+      expect(kinds.contains(RunWorkoutKind.long), isTrue);
     });
   });
 }

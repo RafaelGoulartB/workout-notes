@@ -25,6 +25,7 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
 
   int _step = 0;
   late int _sessions;
+  late int _weeks;
   final Set<int> _days = {};
   RunPlanIntent _intent = RunPlanIntent.finish;
   RunPlanIntensity _intensity = RunPlanIntensity.standard;
@@ -35,6 +36,8 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
   DateTime? _raceDate;
   bool _creating = false;
 
+  bool get _isMaintain => widget.template.maintainFitness;
+
   @override
   void initState() {
     super.initState();
@@ -43,11 +46,15 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     final allowed = widget.template.allowedSessionsPerWeek;
     final preferred = widget.template.sessionsPerWeek.clamp(3, 5);
     _sessions = allowed.contains(preferred) ? preferred : allowed.last;
+    _weeks = widget.template.defaultSelectableWeeks;
     _paceDistanceMeters = _defaultDistance(widget.template.goalKind);
     _seedDefaultDays();
-    if (widget.template.key == 'return' ||
+    if (_isMaintain ||
+        widget.template.key == 'return' ||
+        widget.template.key == 'return_injury' ||
         widget.template.key == 'first_5k' ||
         widget.template.key == 'first_10k' ||
+        widget.template.key == 'to_half' ||
         widget.template.key == 'first_half' ||
         widget.template.key == 'first_marathon') {
       _intent = RunPlanIntent.finish;
@@ -121,9 +128,10 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     intent: _intent,
     intensity: _intensity,
     calibration: _calibration,
-    raceDate: _raceDate,
+    raceDate: _isMaintain ? null : _raceDate,
     currentWeeklyKm: _currentWeeklyKm,
     includeHills: _includeHills,
+    weeks: widget.template.selectableWeeks ? _weeks : null,
   );
 
   List<RunPlanTemplateWorkout> get _weekPreview {
@@ -440,34 +448,63 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
             ),
           ),
         ],
-        _buildWarnings(loc, theme, full: false),
-        const SizedBox(height: 24),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(loc.runPlanCustomizeRaceDate),
-          subtitle: Text(
-            _raceDate == null
-                ? loc.runPlanRaceDateNone
-                : MaterialLocalizations.of(
-                    context,
-                  ).formatMediumDate(_raceDate!),
+        if (widget.template.selectableWeeks) ...[
+          const SizedBox(height: 24),
+          Text(
+            loc.runPlanCustomizeWeeksTitle,
+            style: theme.textTheme.titleSmall,
           ),
-          trailing: IconButton(
-            icon: Icon(
-              _raceDate == null ? Icons.event_outlined : Icons.event_available,
+          const SizedBox(height: 8),
+          Text(
+            loc.runPlanCustomizeWeeksHelp,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            onPressed: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate:
-                    _raceDate ?? DateTime.now().add(const Duration(days: 84)),
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 800)),
-              );
-              if (picked != null) setState(() => _raceDate = picked);
-            },
           ),
-        ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final n in widget.template.allowedWeeks)
+                ChoiceChip(
+                  label: Text(loc.runPlanWeeksValue(n)),
+                  selected: _weeks == n,
+                  onSelected: (_) => setState(() => _weeks = n),
+                ),
+            ],
+          ),
+        ],
+        _buildWarnings(loc, theme, full: false),
+        if (!_isMaintain) ...[
+          const SizedBox(height: 24),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(loc.runPlanCustomizeRaceDate),
+            subtitle: Text(
+              _raceDate == null
+                  ? loc.runPlanRaceDateNone
+                  : MaterialLocalizations.of(
+                      context,
+                    ).formatMediumDate(_raceDate!),
+            ),
+            trailing: IconButton(
+              icon: Icon(
+                _raceDate == null ? Icons.event_outlined : Icons.event_available,
+              ),
+              onPressed: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate:
+                      _raceDate ?? DateTime.now().add(const Duration(days: 84)),
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 800)),
+                );
+                if (picked != null) setState(() => _raceDate = picked);
+              },
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -477,30 +514,36 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          loc.runPlanCustomizeIntentTitle,
+          _isMaintain
+              ? loc.runPlanCustomizeMaintainTitle
+              : loc.runPlanCustomizeIntentTitle,
           style: theme.textTheme.titleLarge,
         ),
         const SizedBox(height: 8),
         Text(
-          loc.runPlanCustomizeIntentHelp,
+          _isMaintain
+              ? loc.runPlanCustomizeMaintainHelp
+              : loc.runPlanCustomizeIntentHelp,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 16),
-        _OptionCard(
-          selected: _intent == RunPlanIntent.finish,
-          title: loc.runPlanCustomizeIntentFinish,
-          subtitle: loc.runPlanCustomizeIntentFinishHint,
-          onTap: () => setState(() => _intent = RunPlanIntent.finish),
-        ),
-        const SizedBox(height: 8),
-        _OptionCard(
-          selected: _intent == RunPlanIntent.pb,
-          title: loc.runPlanCustomizeIntentPb,
-          subtitle: loc.runPlanCustomizeIntentPbHint,
-          onTap: () => setState(() => _intent = RunPlanIntent.pb),
-        ),
+        if (!_isMaintain) ...[
+          const SizedBox(height: 16),
+          _OptionCard(
+            selected: _intent == RunPlanIntent.finish,
+            title: loc.runPlanCustomizeIntentFinish,
+            subtitle: loc.runPlanCustomizeIntentFinishHint,
+            onTap: () => setState(() => _intent = RunPlanIntent.finish),
+          ),
+          const SizedBox(height: 8),
+          _OptionCard(
+            selected: _intent == RunPlanIntent.pb,
+            title: loc.runPlanCustomizeIntentPb,
+            subtitle: loc.runPlanCustomizeIntentPbHint,
+            onTap: () => setState(() => _intent = RunPlanIntent.pb),
+          ),
+        ],
         const SizedBox(height: 24),
         Text(loc.runPlanCustomizeIntensity, style: theme.textTheme.titleSmall),
         const SizedBox(height: 8),
@@ -523,7 +566,8 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
               ),
           ],
         ),
-        if (widget.template.style == RunPlanTemplateStyle.performance) ...[
+        if (widget.template.style == RunPlanTemplateStyle.performance ||
+            _isMaintain) ...[
           const SizedBox(height: 16),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -540,7 +584,9 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          loc.runPlanCustomizeBaselineHelp,
+          _isMaintain
+              ? loc.runPlanCustomizeBaselineHelpMaintain
+              : loc.runPlanCustomizeBaselineHelp,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -670,7 +716,9 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          loc.runPlanCustomizePreviewHelp,
+          _isMaintain
+              ? loc.runPlanCustomizePreviewHelpMaintain
+              : loc.runPlanCustomizePreviewHelp,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

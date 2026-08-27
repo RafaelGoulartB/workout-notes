@@ -121,14 +121,36 @@ class RunPlanTemplate {
     this.runWalkWork,
     this.runWalkRest,
     this.runWalkReps,
+    this.allowedWeeks = const [],
   });
-  int get weeks => schedule.length;
   List<RunPlanTemplateWorkout> get week => schedule.first;
   int get sessionsPerWeek =>
       schedule.fold(0, (max, value) => value.length > max ? value.length : max);
   String title(bool pt) => pt ? titlePt : titleEn;
   String description(bool pt) => pt ? descriptionPt : descriptionEn;
   String prerequisite(bool pt) => pt ? prerequisitePt : prerequisiteEn;
+
+  /// When non-empty, the customize wizard lets the athlete pick plan length
+  /// and the composer expands the blueprint into that many varied weeks.
+  final List<int> allowedWeeks;
+
+  bool get selectableWeeks => allowedWeeks.isNotEmpty;
+
+  /// Flat-volume “keep what you have” plans — no race build or taper.
+  bool get maintainFitness => key == 'keep_fit';
+
+  /// Default length when the wizard has not picked yet (also used by tests /
+  /// catalog when [RunPlanBuildConfig.weeks] is omitted).
+  int get defaultSelectableWeeks {
+    if (!selectableWeeks) return schedule.length;
+    if (allowedWeeks.contains(8)) return 8;
+    return allowedWeeks[allowedWeeks.length ~/ 2];
+  }
+
+  /// Display / catalog week count. Selectable plans report their default
+  /// length; the composed schedule may differ once the athlete picks.
+  int get weeks =>
+      selectableWeeks ? defaultSelectableWeeks : schedule.length;
 
   /// Suggested days/week choices for the customize wizard.
   ///
@@ -138,11 +160,21 @@ class RunPlanTemplate {
   List<int> get allowedSessionsPerWeek {
     if (style == RunPlanTemplateStyle.runWalk ||
         key == 'return' ||
-        key == 'first_5k') {
+        key == 'return_injury' ||
+        key == 'walk_jog' ||
+        key == 'first_5k' ||
+        key == 'habit_3x') {
       return const [3, 4];
     }
     return const [3, 4, 5];
   }
+
+  /// Easy aerobic blocks that should not prescribe structured quality.
+  bool get aerobicOnly =>
+      key == 'base' || key == 'habit_3x' || key == 'trail_intro';
+
+  /// Return-to-running (or post-injury) progressions that stay gentler longer.
+  bool get returnStyle => key == 'return' || key == 'return_injury';
 }
 
 abstract final class RunPlanTemplates {
@@ -166,6 +198,45 @@ abstract final class RunPlanTemplates {
       [4, 4.5, 5.5],
       [4, 5, 6],
     ],
+  );
+  static final returnAfterInjury = _continuous(
+    key: 'return_injury',
+    goal: RunPlanGoalKind.base,
+    category: RunPlanTemplateCategory.gettingStarted,
+    titlePt: 'Voltar após lesão',
+    titleEn: 'Return after injury',
+    descriptionPt:
+        'Progressão mais lenta, sem tiros no início, para retomar o impacto com cuidado.',
+    descriptionEn:
+        'A slower progression with no early speed work, easing back into impact carefully.',
+    prerequisitePt:
+        'Alta médica para correr e caminhar 30 min sem dor há 1 semana',
+    prerequisiteEn:
+        'Cleared to run and able to walk 30 minutes pain-free for one week',
+    km: const [
+      [2, 2.5, 3],
+      [2.5, 3, 3.5],
+      [3, 3, 4],
+      [2.5, 3, 3.5],
+      [3, 3.5, 4.5],
+      [3.5, 4, 5],
+      [3.5, 4.5, 5.5],
+      [4, 4.5, 6],
+    ],
+  );
+  static final walkJog = _runWalk(
+    key: 'walk_jog',
+    titlePt: 'Caminhada ao trote',
+    titleEn: 'Walk to jog',
+    descriptionPt:
+        'Blocos curtos de trote com caminhada longa — o degrau antes de “Começar a correr”.',
+    descriptionEn:
+        'Short jog blocks with generous walks — the step before Start running.',
+    prerequisitePt: 'Caminhar 20 minutos em terreno plano sem desconforto',
+    prerequisiteEn: 'Walk 20 minutes on flat ground without discomfort',
+    work: const [20, 30, 45, 60, 75, 90, 120, 150],
+    rest: const [90, 90, 90, 90, 75, 75, 60, 60],
+    reps: const [10, 10, 9, 8, 8, 7, 6, 6],
   );
   static final runWalk = _runWalk();
   static final firstFiveK = _continuous(
@@ -208,6 +279,26 @@ abstract final class RunPlanTemplates {
     easyKm: 5,
     intervalMeters: 400,
     baseReps: 5,
+  );
+  static final fiveKAdvanced = _performance(
+    key: '5k_advanced',
+    goal: RunPlanGoalKind.fiveK,
+    category: RunPlanTemplateCategory.fiveK,
+    level: RunPlanTemplateLevel.advanced,
+    titlePt: '5 km avançado',
+    titleEn: 'Advanced 5K',
+    descriptionPt:
+        'Mais volume, reps e limiar para quem já tem base e busca um 5 km competitivo.',
+    descriptionEn:
+        'Higher volume, reps and threshold work for runners chasing a competitive 5K.',
+    prerequisitePt: 'Correr 5 km sob esforço e manter 30 km semanais',
+    prerequisiteEn: 'Run a hard 5K and sustain 30 km per week',
+    prereqKm: 30,
+    sessions: 5,
+    longKm: const [8, 9, 10, 8, 10, 11, 12, 9, 11, 12, 10, 7],
+    easyKm: 7,
+    intervalMeters: 400,
+    baseReps: 6,
   );
   static final firstTenK = _continuous(
     key: 'first_10k',
@@ -252,6 +343,57 @@ abstract final class RunPlanTemplates {
     easyKm: 6,
     intervalMeters: 800,
     baseReps: 4,
+  );
+  static final tenKAdvanced = _performance(
+    key: '10k_advanced',
+    goal: RunPlanGoalKind.tenK,
+    category: RunPlanTemplateCategory.tenK,
+    level: RunPlanTemplateLevel.advanced,
+    titlePt: '10 km avançado',
+    titleEn: 'Advanced 10K',
+    descriptionPt:
+        'Cinco dias, limiar e VO2 para quem já completa 10 km e quer baixar o pace.',
+    descriptionEn:
+        'Five days, threshold and VO2 work for runners who finish 10K and want a faster pace.',
+    prerequisitePt: 'Completar 10 km e correr 40 km ou mais por semana',
+    prerequisiteEn: 'Complete 10K and run at least 40 km per week',
+    prereqKm: 40,
+    sessions: 5,
+    longKm: const [12, 13, 14, 11, 14, 15, 16, 12, 16, 17, 14, 10],
+    easyKm: 8,
+    intervalMeters: 1000,
+    baseReps: 5,
+  );
+  static final toHalf = _continuous(
+    key: 'to_half',
+    goal: RunPlanGoalKind.half,
+    category: RunPlanTemplateCategory.half,
+    titlePt: 'Dos 10 km à meia',
+    titleEn: 'From 10K to half',
+    descriptionPt:
+        'Volume e longões graduais para completar a meia com conforto, sem pressão de tempo.',
+    descriptionEn:
+        'Gradual volume and long runs to finish the half comfortably, without chasing a time.',
+    prerequisitePt: 'Correr 10 km contínuos e manter 25 km semanais',
+    prerequisiteEn: 'Run 10K continuously and sustain 25 km per week',
+    prereqKm: 25,
+    race: true,
+    km: const [
+      [6, 6, 10],
+      [6, 7, 12],
+      [7, 7, 13],
+      [6, 6, 10],
+      [7, 8, 14],
+      [8, 8, 15],
+      [8, 9, 16],
+      [7, 7, 12],
+      [8, 9, 17],
+      [9, 9, 18],
+      [9, 10, 19],
+      [8, 8, 14],
+      [8, 9, 16],
+      [6, 6, 12],
+    ],
   );
   static final half = _performance(
     key: 'first_half',
@@ -347,6 +489,47 @@ abstract final class RunPlanTemplates {
     intervalMeters: 1000,
     baseReps: 3,
   );
+  static final marathonPb = _performance(
+    key: 'marathon_pb',
+    goal: RunPlanGoalKind.marathon,
+    category: RunPlanTemplateCategory.marathon,
+    level: RunPlanTemplateLevel.advanced,
+    titlePt: 'Maratona: novo recorde',
+    titleEn: 'Marathon PB',
+    descriptionPt:
+        'Mais volume, blocos no ritmo de prova e longões longos para quem já terminou 42 km.',
+    descriptionEn:
+        'Higher volume, race-pace blocks and long long-runs for runners who have finished 42K.',
+    prerequisitePt: 'Já ter completado uma maratona e correr 50 km por semana',
+    prerequisiteEn: 'Have finished a marathon and run 50 km per week',
+    prereqKm: 50,
+    sessions: 5,
+    longKm: const [
+      16,
+      18,
+      20,
+      16,
+      22,
+      24,
+      26,
+      20,
+      27,
+      29,
+      30,
+      22,
+      30,
+      32,
+      32,
+      24,
+      28,
+      20,
+      14,
+      8,
+    ],
+    easyKm: 10,
+    intervalMeters: 1000,
+    baseReps: 4,
+  );
   static final base = _continuous(
     key: 'base',
     goal: RunPlanGoalKind.base,
@@ -371,6 +554,129 @@ abstract final class RunPlanTemplates {
       [4, 5, 8],
     ],
   );
+  static final habit = _continuous(
+    key: 'habit_3x',
+    goal: RunPlanGoalKind.maintenance,
+    category: RunPlanTemplateCategory.conditioning,
+    titlePt: 'Criar o hábito de correr',
+    titleEn: 'Build the running habit',
+    descriptionPt:
+        'Oito semanas estáveis, 3–4 dias, para criar consistência sem meta de prova.',
+    descriptionEn:
+        'Eight steady weeks, 3–4 days, to build consistency without a race goal.',
+    prerequisitePt: 'Correr ou trotar com conforto por 20 minutos',
+    prerequisiteEn: 'Run or jog comfortably for 20 minutes',
+    prereqKm: 10,
+    km: const [
+      [4, 5, 7],
+      [4, 5, 7],
+      [5, 5, 8],
+      [4, 5, 7],
+      [5, 5, 8],
+      [5, 6, 8],
+      [5, 6, 9],
+      [4, 5, 7],
+    ],
+  );
+  static final trailIntro = _continuous(
+    key: 'trail_intro',
+    goal: RunPlanGoalKind.base,
+    category: RunPlanTemplateCategory.conditioning,
+    level: RunPlanTemplateLevel.intermediate,
+    titlePt: 'Introdução ao trail',
+    titleEn: 'Trail introduction',
+    descriptionPt:
+        'Volume por esforço em terreno irregular: subidas caminhadas, descidas controladas.',
+    descriptionEn:
+        'Effort-based volume on uneven terrain: hike the climbs, control the descents.',
+    prerequisitePt: 'Correr 40 minutos em asfalto e ter acesso a trilha leve',
+    prerequisiteEn: 'Run 40 minutes on road and have access to easy trails',
+    prereqKm: 18,
+    km: const [
+      [4, 5, 7],
+      [5, 5, 8],
+      [5, 6, 9],
+      [4, 5, 7],
+      [5, 6, 9],
+      [6, 6, 10],
+      [6, 7, 11],
+      [5, 6, 9],
+    ],
+  );
+  static final thresholdBlock = _performance(
+    key: 'threshold_block',
+    goal: RunPlanGoalKind.base,
+    category: RunPlanTemplateCategory.conditioning,
+    titlePt: 'Bloco de limiar',
+    titleEn: 'Threshold block',
+    descriptionPt:
+        'Seis semanas focadas em ritmo controlado e cruise intervals entre ciclos de prova.',
+    descriptionEn:
+        'Six weeks of controlled tempo and cruise intervals between race cycles.',
+    prerequisitePt: 'Correr 45 minutos contínuos e manter 25 km semanais',
+    prerequisiteEn: 'Run 45 minutes continuously and sustain 25 km per week',
+    prereqKm: 25,
+    longKm: const [10, 11, 12, 9, 12, 11],
+    easyKm: 6,
+    intervalMeters: 1000,
+    baseReps: 3,
+  );
+  static final hills = _performance(
+    key: 'hills',
+    goal: RunPlanGoalKind.base,
+    category: RunPlanTemplateCategory.conditioning,
+    titlePt: 'Força em subidas',
+    titleEn: 'Hill strength',
+    descriptionPt:
+        'Repetições em ladeira por esforço para potência e economia — sem pace de plano.',
+    descriptionEn:
+        'Effort-based hill repeats for power and economy — no flat-ground paces.',
+    prerequisitePt: 'Correr 30 minutos e ter uma subida de 60–90 s por perto',
+    prerequisiteEn: 'Run 30 minutes and have a 60–90 s hill nearby',
+    prereqKm: 20,
+    longKm: const [8, 9, 10, 8, 10, 9],
+    easyKm: 5,
+    intervalMeters: 200,
+    baseReps: 8,
+  );
+  static final raceSharpen = _performance(
+    key: 'race_sharpen',
+    goal: RunPlanGoalKind.tenK,
+    category: RunPlanTemplateCategory.conditioning,
+    titlePt: 'Polimento de prova',
+    titleEn: 'Race sharpening',
+    descriptionPt:
+        'Cinco semanas leves de qualidade e taper para chegar afiado numa prova de 5–10 km.',
+    descriptionEn:
+        'Five light weeks of quality and taper to arrive sharp for a 5–10K race.',
+    prerequisitePt: 'Já ter base recente e uma prova de 5–10 km marcada',
+    prerequisiteEn: 'Have recent base fitness and a 5–10K race on the calendar',
+    prereqKm: 28,
+    longKm: const [11, 12, 13, 9, 8],
+    easyKm: 7,
+    intervalMeters: 800,
+    baseReps: 4,
+  );
+  static final keepFit = _continuous(
+    key: 'keep_fit',
+    goal: RunPlanGoalKind.maintenance,
+    category: RunPlanTemplateCategory.conditioning,
+    level: RunPlanTemplateLevel.intermediate,
+    titlePt: 'Manter o desempenho',
+    titleEn: 'Maintain performance',
+    descriptionPt:
+        'Semanas variadas no seu volume atual — qualidade leve para não perder o que conquistou, sem buscar melhora.',
+    descriptionEn:
+        'Varied weeks at your current volume — light quality to keep what you earned, without chasing gains.',
+    prerequisitePt: 'Já ter uma rotina estável e um volume semanal conhecido',
+    prerequisiteEn: 'Have a stable routine and a known weekly volume',
+    prereqKm: 25,
+    allowedWeeks: const [4, 6, 8, 10, 12, 16],
+    // Blueprint week only — the composer expands to the chosen length.
+    km: const [
+      [5, 6, 10],
+    ],
+  );
   static final maintenance = _continuous(
     key: 'maintenance',
     goal: RunPlanGoalKind.maintenance,
@@ -390,15 +696,27 @@ abstract final class RunPlanTemplates {
 
   static final List<RunPlanTemplate> all = [
     returnToRunning,
+    returnAfterInjury,
+    walkJog,
     runWalk,
     firstFiveK,
     fiveK,
+    fiveKAdvanced,
     firstTenK,
     tenK,
+    tenKAdvanced,
+    toHalf,
     half,
     halfPerformance,
     marathon,
+    marathonPb,
     base,
+    habit,
+    trailIntro,
+    thresholdBlock,
+    hills,
+    raceSharpen,
+    keepFit,
     maintenance,
   ];
   static RunPlanTemplate? byKey(String key) {
@@ -455,20 +773,34 @@ abstract final class RunPlanTemplates {
     return (await repository.getPlan(plan.id))!;
   }
 
-  static RunPlanTemplate _runWalk() {
-    const work = [60, 90, 120, 180, 300, 480, 600, 900],
-        rest = [120, 120, 120, 120, 120, 120, 90, 60],
-        reps = [8, 8, 7, 6, 4, 3, 3, 2];
+  static RunPlanTemplate _runWalk({
+    String key = 'run_walk',
+    String titlePt = 'Começar a correr',
+    String titleEn = 'Start running',
+    String descriptionPt =
+        'Alterne corrida e caminhada até sustentar blocos de 15 minutos.',
+    String descriptionEn =
+        'Alternate running and walking up to controlled 15-minute running blocks.',
+    String prerequisitePt = 'Caminhar 30 minutos sem desconforto',
+    String prerequisiteEn = 'Walk for 30 minutes without discomfort',
+    List<int> work = const [60, 90, 120, 180, 300, 480, 600, 900],
+    List<int> rest = const [120, 120, 120, 120, 120, 120, 90, 60],
+    List<int> reps = const [8, 8, 7, 6, 4, 3, 3, 2],
+  }) {
     final weeks = <List<RunPlanTemplateWorkout>>[];
     for (var w = 0; w < work.length; w++) {
       weeks.add([
         for (final day in const [2, 4, 7])
           RunPlanTemplateWorkout(
-            name: 'Corrida e caminhada',
+            name: key == 'walk_jog'
+                ? 'Trote e caminhada'
+                : 'Corrida e caminhada',
             kind: RunWorkoutKind.easy,
             dayOfWeek: day,
             effortZone: 'RPE 3–4',
-            notes: 'Corra confortável e caminhe antes de perder a forma.',
+            notes: key == 'walk_jog'
+                ? 'Trote bem leve; caminhe antes de perder a respiração.'
+                : 'Corra confortável e caminhe antes de perder a forma.',
             steps: [
               const RunPlanTemplateStep(
                 role: RunStepRole.warmup,
@@ -499,19 +831,17 @@ abstract final class RunPlanTemplates {
       ]);
     }
     return RunPlanTemplate(
-      key: 'run_walk',
+      key: key,
       goalKind: RunPlanGoalKind.base,
       category: RunPlanTemplateCategory.gettingStarted,
       level: RunPlanTemplateLevel.beginner,
       style: RunPlanTemplateStyle.runWalk,
-      titlePt: 'Começar a correr',
-      titleEn: 'Start running',
-      descriptionPt:
-          'Alterne corrida e caminhada até sustentar blocos de 15 minutos.',
-      descriptionEn:
-          'Alternate running and walking up to controlled 15-minute running blocks.',
-      prerequisitePt: 'Caminhar 30 minutos sem desconforto',
-      prerequisiteEn: 'Walk for 30 minutes without discomfort',
+      titlePt: titlePt,
+      titleEn: titleEn,
+      descriptionPt: descriptionPt,
+      descriptionEn: descriptionEn,
+      prerequisitePt: prerequisitePt,
+      prerequisiteEn: prerequisiteEn,
       schedule: weeks,
       runWalkWork: work,
       runWalkRest: rest,
@@ -533,6 +863,7 @@ abstract final class RunPlanTemplates {
     required List<List<double>> km,
     double? prereqKm,
     bool race = false,
+    List<int> allowedWeeks = const [],
   }) {
     final weeks = <List<RunPlanTemplateWorkout>>[];
     for (var w = 0; w < km.length; w++) {
@@ -577,6 +908,7 @@ abstract final class RunPlanTemplates {
       prerequisiteWeeklyKm: prereqKm,
       continuousKm: km,
       raceFinish: race,
+      allowedWeeks: allowedWeeks,
     );
   }
 

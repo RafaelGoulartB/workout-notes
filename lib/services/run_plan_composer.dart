@@ -58,6 +58,10 @@ class RunPlanBuildConfig {
   /// anchored to it and the whole ladder shifts with it.
   final double? currentWeeklyKm;
 
+  /// Plan length override for templates with [RunPlanTemplate.selectableWeeks].
+  /// Ignored for fixed-length templates.
+  final int? weeks;
+
   const RunPlanBuildConfig({
     required this.sessionsPerWeek,
     required this.availableDays,
@@ -67,6 +71,7 @@ class RunPlanBuildConfig {
     this.raceDate,
     this.currentWeeklyKm,
     this.includeHills = true,
+    this.weeks,
   });
 
   double get volumeFactor => switch (intensity) {
@@ -85,7 +90,7 @@ class RunPlanBuildConfig {
     (RunPlanIntent.pb, _) => 1.0,
   };
 
-  void validate() {
+  void validate({RunPlanTemplate? template}) {
     if (sessionsPerWeek < 3 || sessionsPerWeek > 5) {
       throw ArgumentError('sessionsPerWeek must be 3, 4 or 5');
     }
@@ -103,6 +108,13 @@ class RunPlanBuildConfig {
     }
     if (currentWeeklyKm != null && currentWeeklyKm! < 0) {
       throw ArgumentError('currentWeeklyKm must be positive');
+    }
+    if (template != null && template.selectableWeeks) {
+      if (weeks != null && !template.allowedWeeks.contains(weeks)) {
+        throw ArgumentError(
+          'weeks must be one of ${template.allowedWeeks} for ${template.key}',
+        );
+      }
     }
   }
 }
@@ -288,7 +300,7 @@ abstract final class RunPlanComposer {
     RunPlanTemplate template,
     RunPlanBuildConfig config,
   ) {
-    config.validate();
+    config.validate(template: template);
     if (template.style == RunPlanTemplateStyle.runWalk) {
       return _composeRunWalk(template, config);
     }
@@ -306,7 +318,7 @@ abstract final class RunPlanComposer {
     RunPlanTemplate template,
     RunPlanBuildConfig config,
   ) {
-    config.validate();
+    config.validate(template: template);
     final consecutive =
         config.sessionsPerWeek <= 4 &&
         _hasThreeConsecutiveDays(config.availableDays);
@@ -474,6 +486,9 @@ abstract final class RunPlanComposer {
     _PaceBook book,
     double? goalMeters,
   ) {
+    if (template.maintainFitness) {
+      return _planMaintainWeeks(template, config, book);
+    }
     final continuous = template.continuousKm;
     final total = continuous?.length ?? template.performanceLongKm!.length;
     final templateSessions = continuous != null
@@ -612,6 +627,80 @@ abstract final class RunPlanComposer {
     return plans;
   }
 
+  /// Flat-volume maintenance: hold the athlete's current fitness with varied
+  /// weeks (quality rotation + light undulation), never a progressive ladder.
+  static List<_WeekPlan> _planMaintainWeeks(
+    RunPlanTemplate template,
+    RunPlanBuildConfig config,
+    _PaceBook book,
+  ) {
+    final continuous = template.continuousKm!;
+    final blueprint = continuous.first;
+    final total = config.weeks ?? template.defaultSelectableWeeks;
+    final templateSessions = blueprint.length;
+    final sessionScale = math
+        .sqrt(config.sessionsPerWeek / templateSessions)
+        .clamp(0.85, 1.25);
+    final maxLongShare = _maxLongShare(template, config.sessionsPerWeek);
+    final longCap = _longRunCapKm(template.goalKind, book);
+    final qualitySlots = _qualitySlotCount(template, config);
+
+    final blueprintWeek = blueprint.reduce((a, b) => a + b);
+    final blueprintLong = blueprint.last;
+    final steady =
+        (config.currentWeeklyKm ??
+            template.prerequisiteWeeklyKm ??
+            blueprintWeek) *
+        config.volumeFactor *
+        sessionScale;
+    final steadyLong = math.min(
+      math.min(blueprintLong * (steady / blueprintWeek), longCap),
+      maxLongShare * steady,
+    );
+
+    // Mild undulation keeps stimulus fresh without raising fitness demand.
+    const buildLongFactors = [1.0, 1.06, 0.94];
+    const buildWeekFactors = [1.0, 1.04, 0.96];
+
+    final plans = <_WeekPlan>[];
+    for (var w = 0; w < total; w++) {
+      final recovery = w > 0 && w % 4 == 3;
+      final phase = recovery ? _Phase.recovery : _Phase.build;
+      final cycle = w % 3;
+      final weekKm = recovery
+          ? steady * 0.75
+          : steady * buildWeekFactors[cycle];
+      final longKm = math.min(
+        recovery ? steadyLong * 0.85 : steadyLong * buildLongFactors[cycle],
+        maxLongShare * weekKm,
+      );
+      final hasQuality = _weekHasQuality(
+        template: template,
+        weekIndex: w,
+        totalWeeks: total,
+        phase: phase,
+      );
+      plans.add(
+        _WeekPlan(
+          index: w,
+          phase: phase,
+          weekKm: weekKm,
+          longKm: longKm,
+          roles: _rolesForWeek(
+            template: template,
+            config: config,
+            weekIndex: w,
+            totalWeeks: total,
+            phase: phase,
+            hasQuality: hasQuality,
+            qualitySlots: qualitySlots,
+          ),
+        ),
+      );
+    }
+    return plans;
+  }
+
   static _Phase _phaseOf({
     required int weekIndex,
     required int raceWeek,
@@ -691,7 +780,7 @@ abstract final class RunPlanComposer {
     // session is enough even when they can run four or five days.
     if (template.level == RunPlanTemplateLevel.beginner) return 1;
     // Return-to-running: ease back with one stimulus only.
-    if (template.key == 'return') return 1;
+    if (template.returnStyle) return 1;
     // Finishing an endurance race rewards aerobic consistency more than a
     // second mid-week workout. Specific long runs count as the second stimulus.
     final endurance =
@@ -712,13 +801,15 @@ abstract final class RunPlanComposer {
     if (template.style == RunPlanTemplateStyle.runWalk) return false;
     // This template promises an easy aerobic block. Strides can still be
     // attached to an easy run without turning it into structured quality.
-    if (template.key == 'base') return false;
+    if (template.aerobicOnly) return false;
     // Race week keeps a short sharpener; a taper keeps full intensity.
     if (phase == _Phase.race || phase == _Phase.taper) return true;
     if (template.style == RunPlanTemplateStyle.performance) return true;
+    // Maintain-fitness: quality from week 1 so stimulus variety starts immediately.
+    if (template.maintainFitness) return phase == _Phase.build;
 
     // Continuous: short aerobic intro, then quality. Return stays gentler longer.
-    final introWeeks = template.key == 'return'
+    final introWeeks = template.returnStyle
         ? (totalWeeks / 2).ceil().clamp(2, 4)
         : (totalWeeks / 4).ceil().clamp(1, 2);
     return weekIndex >= introWeeks;
@@ -775,7 +866,7 @@ abstract final class RunPlanComposer {
             ? _SessionRole.racePace
             : gentle
             ? _SessionRole.fartlek
-            : _primaryQuality(weekIndex, endurance),
+            : _primaryQuality(template, weekIndex, endurance),
         for (var i = 0; i < sessions - 2; i++) _SessionRole.easy,
         _SessionRole.long,
       ];
@@ -803,7 +894,7 @@ abstract final class RunPlanComposer {
     final quality = <_SessionRole>[
       gentle
           ? _gentleQuality(weekIndex)
-          : _primaryQuality(weekIndex, endurance),
+          : _primaryQuality(template, weekIndex, endurance),
     ];
     // A long run with race-pace blocks is already a load-bearing quality day.
     // Never combine it with two additional workouts in the same week.
@@ -813,7 +904,7 @@ abstract final class RunPlanComposer {
             ? _gentleQuality(weekIndex + 1)
             : specific && weekIndex.isEven
             ? _SessionRole.racePace
-            : _secondaryQuality(weekIndex, endurance),
+            : _secondaryQuality(template, weekIndex, endurance),
       );
     }
 
@@ -829,24 +920,37 @@ abstract final class RunPlanComposer {
 
   /// Primary quality rotation. Endurance goals lean threshold-first; 5K/10K
   /// goals lean VO2max-first, matching where each distance is limited.
-  static _SessionRole _primaryQuality(int weekIndex, bool endurance) =>
-      endurance
-      ? const [
-          _SessionRole.tempo,
-          _SessionRole.interval,
-          _SessionRole.tempo,
-          _SessionRole.hills,
-          _SessionRole.tempo,
-          _SessionRole.fartlek,
-        ][weekIndex % 6]
-      : const [
-          _SessionRole.interval,
-          _SessionRole.tempo,
-          _SessionRole.hills,
-          _SessionRole.interval,
-          _SessionRole.fartlek,
-          _SessionRole.tempo,
-        ][weekIndex % 6];
+  static _SessionRole _primaryQuality(
+    RunPlanTemplate template,
+    int weekIndex,
+    bool endurance,
+  ) {
+    if (template.key == 'hills') {
+      return weekIndex.isEven ? _SessionRole.hills : _SessionRole.fartlek;
+    }
+    if (template.key == 'threshold_block') {
+      return weekIndex % 3 == 2
+          ? _SessionRole.progression
+          : _SessionRole.tempo;
+    }
+    return endurance
+        ? const [
+            _SessionRole.tempo,
+            _SessionRole.interval,
+            _SessionRole.tempo,
+            _SessionRole.hills,
+            _SessionRole.tempo,
+            _SessionRole.fartlek,
+          ][weekIndex % 6]
+        : const [
+            _SessionRole.interval,
+            _SessionRole.tempo,
+            _SessionRole.hills,
+            _SessionRole.interval,
+            _SessionRole.fartlek,
+            _SessionRole.tempo,
+          ][weekIndex % 6];
+  }
 
   /// Beginner quality: alternate fartlek and progression — pace changes and a
   /// strong finish, both at controlled effort.
@@ -854,24 +958,35 @@ abstract final class RunPlanComposer {
       weekIndex.isEven ? _SessionRole.fartlek : _SessionRole.progression;
 
   /// Second quality slot (4–5 day weeks) — complementary, not duplicate.
-  static _SessionRole _secondaryQuality(int weekIndex, bool endurance) =>
-      endurance
-      ? const [
-          _SessionRole.fartlek,
-          _SessionRole.racePace,
-          _SessionRole.progression,
-          _SessionRole.tempo,
-          _SessionRole.racePace,
-          _SessionRole.progression,
-        ][weekIndex % 6]
-      : const [
-          _SessionRole.tempo,
-          _SessionRole.fartlek,
-          _SessionRole.progression,
-          _SessionRole.racePace,
-          _SessionRole.tempo,
-          _SessionRole.hills,
-        ][weekIndex % 6];
+  static _SessionRole _secondaryQuality(
+    RunPlanTemplate template,
+    int weekIndex,
+    bool endurance,
+  ) {
+    if (template.key == 'hills') {
+      return weekIndex.isEven ? _SessionRole.tempo : _SessionRole.hills;
+    }
+    if (template.key == 'threshold_block') {
+      return weekIndex.isEven ? _SessionRole.tempo : _SessionRole.racePace;
+    }
+    return endurance
+        ? const [
+            _SessionRole.fartlek,
+            _SessionRole.racePace,
+            _SessionRole.progression,
+            _SessionRole.tempo,
+            _SessionRole.racePace,
+            _SessionRole.progression,
+          ][weekIndex % 6]
+        : const [
+            _SessionRole.tempo,
+            _SessionRole.fartlek,
+            _SessionRole.progression,
+            _SessionRole.racePace,
+            _SessionRole.tempo,
+            _SessionRole.hills,
+          ][weekIndex % 6];
+  }
 
   // --- Weekday assignment --------------------------------------------------
 

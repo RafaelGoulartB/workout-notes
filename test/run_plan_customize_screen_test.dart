@@ -37,6 +37,34 @@ void main() {
     expect(find.textContaining('fartlek em terreno plano'), findsOneWidget);
   });
 
+  testWidgets('maintain plan lets the athlete pick plan length', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('pt'),
+        home: RunPlanCustomizeScreen(template: RunPlanTemplates.keepFit),
+      ),
+    );
+
+    expect(find.text('Duração do plano'), findsOneWidget);
+    expect(find.text('12 semanas'), findsOneWidget);
+
+    await tester.tap(find.text('12 semanas'));
+    await tester.pump();
+
+    expect(
+      tester
+          .widget<ChoiceChip>(
+            find.widgetWithText(ChoiceChip, '12 semanas'),
+          )
+          .selected,
+      isTrue,
+    );
+  });
+
   testWidgets('explicit zero baseline blocks plan creation', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));

@@ -75,6 +75,7 @@ Map<String, Object?> _frequencyData(
         ? 0
         : template.prerequisiteWeeklyKm,
     includeHills: includeHills,
+    weeks: template.selectableWeeks ? template.defaultSelectableWeeks : null,
   );
   final schedule = RunPlanComposer.compose(template, config);
   final readiness = RunPlanComposer.assess(template, config);
@@ -158,10 +159,16 @@ Map<String, Object?> _stepData(RunPlanTemplateStep step) => {
 RunPlanIntent _intent(RunPlanTemplate template) {
   if ({
     'return',
+    'return_injury',
+    'walk_jog',
     'first_5k',
     'first_10k',
+    'to_half',
     'first_half',
     'first_marathon',
+    'habit_3x',
+    'trail_intro',
+    'keep_fit',
   }.contains(template.key)) {
     return RunPlanIntent.finish;
   }
