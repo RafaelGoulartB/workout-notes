@@ -2235,7 +2235,11 @@
     "placeholders": { "distance": { "type": "String" } }
   },
   "runVoiceSettingsTitle": "Alertas de voz",
-  "runVoiceEnglishOnlyHint": "Os anúncios falados são sempre em inglês.",
+  "runVoiceEnglishOnlyHint": "Os avisos de voz usam o idioma selecionado abaixo.",
+  "runVoiceLanguage": "Idioma da voz",
+  "runVoiceLanguageApp": "Mesmo idioma do app",
+  "runVoiceLanguagePortuguese": "Português (Brasil)",
+  "runVoiceLanguageEnglish": "English (United States)",
   "runVoiceSectionGeneral": "Geral",
   "runVoiceEnabled": "Alertas de voz",
   "runVoiceEnabledSubtitle": "Fala distância, pace, GPS e intervalos durante a corrida",
@@ -2604,8 +2608,48 @@
     }
   },
   "runPlanCustomizePaceEstimateNote": "Estimativas para planejamento — você pode ajustar qualquer treino depois.",
-  "runPlanCustomizePreviewTitle": "Prévia da semana 1",
+  "runPlanCustomizePaceFromRun": "Usando seus {distance} em {time}",
+  "@runPlanCustomizePaceFromRun": {
+    "placeholders": {
+      "distance": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "runPlanCustomizePacePreviewRace": "Ritmo de prova {pace}/km",
+  "@runPlanCustomizePacePreviewRace": {
+    "placeholders": { "pace": { "type": "String" } }
+  },
+  "runPlanCustomizeWarnOptimisticGoal": "Esta meta é bem mais rápida que seus {distance} recentes em {time}. Ritmos leve e de tiros ficam na sua forma atual; só o trabalho no ritmo de prova usa a meta.",
+  "@runPlanCustomizeWarnOptimisticGoal": {
+    "placeholders": {
+      "distance": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "runPlanCustomizeBaselineFromHistory": "Mediana das suas últimas {count} semanas completas",
+  "@runPlanCustomizeBaselineFromHistory": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "runPlanCustomizePreviewTitle": "Seu plano",
   "runPlanCustomizePreviewHelp": "Recuperação a cada 4 semanas e polimento no final já estão incluídos.",
+  "runPlanCustomizePreviewWeek1": "Semana 1",
+  "runPlanCustomizePreviewSparkline": "Volume semanal ao longo do plano",
+  "runPlanCustomizePreviewPeak": "Pico {km} km",
+  "@runPlanCustomizePreviewPeak": {
+    "placeholders": { "km": { "type": "String" } }
+  },
+  "runPlanCustomizePreviewLong": "Longão {km} km",
+  "@runPlanCustomizePreviewLong": {
+    "placeholders": { "km": { "type": "String" } }
+  },
+  "runPlanCustomizePreviewRaceWeek": "Prova na semana {week}",
+  "@runPlanCustomizePreviewRaceWeek": {
+    "placeholders": { "week": { "type": "int" } }
+  },
+  "runPlanCustomizePhaseBuild": "Construção",
+  "runPlanCustomizePhaseRecovery": "Recuperação",
+  "runPlanCustomizePhaseTaper": "Polimento",
+  "runPlanCustomizePhaseRace": "Prova",
   "runPlanCustomizeCreate": "Criar plano",
   "runPlanCustomizeNext": "Próximo",
   "runPlanCustomizeBack": "Voltar",

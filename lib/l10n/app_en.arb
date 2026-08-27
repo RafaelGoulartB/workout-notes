@@ -2255,7 +2255,11 @@
     "placeholders": { "distance": { "type": "String" } }
   },
   "runVoiceSettingsTitle": "Voice alerts",
-  "runVoiceEnglishOnlyHint": "Spoken cues are always in English.",
+  "runVoiceEnglishOnlyHint": "Voice cues use the language selected below.",
+  "runVoiceLanguage": "Voice language",
+  "runVoiceLanguageApp": "Same as app",
+  "runVoiceLanguagePortuguese": "Português (Brasil)",
+  "runVoiceLanguageEnglish": "English (United States)",
   "runVoiceSectionGeneral": "General",
   "runVoiceEnabled": "Voice alerts",
   "runVoiceEnabledSubtitle": "Speak distance, pace, GPS, and interval cues during a run",
@@ -2624,8 +2628,48 @@
     }
   },
   "runPlanCustomizePaceEstimateNote": "Estimates for planning — adjust any session later.",
-  "runPlanCustomizePreviewTitle": "Week 1 preview",
+  "runPlanCustomizePaceFromRun": "Using your {distance} in {time}",
+  "@runPlanCustomizePaceFromRun": {
+    "placeholders": {
+      "distance": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "runPlanCustomizePacePreviewRace": "Race-pace work {pace}/km",
+  "@runPlanCustomizePacePreviewRace": {
+    "placeholders": { "pace": { "type": "String" } }
+  },
+  "runPlanCustomizeWarnOptimisticGoal": "This goal is much faster than your recent {distance} in {time}. Easy and interval paces stay at your current fitness; only race-pace work uses the goal.",
+  "@runPlanCustomizeWarnOptimisticGoal": {
+    "placeholders": {
+      "distance": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "runPlanCustomizeBaselineFromHistory": "Median of your last {count} complete weeks",
+  "@runPlanCustomizeBaselineFromHistory": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "runPlanCustomizePreviewTitle": "Your plan",
   "runPlanCustomizePreviewHelp": "Recovery every 4th week and a taper at the end are already built in.",
+  "runPlanCustomizePreviewWeek1": "Week 1",
+  "runPlanCustomizePreviewSparkline": "Weekly volume across the plan",
+  "runPlanCustomizePreviewPeak": "Peak {km} km",
+  "@runPlanCustomizePreviewPeak": {
+    "placeholders": { "km": { "type": "String" } }
+  },
+  "runPlanCustomizePreviewLong": "Longest run {km} km",
+  "@runPlanCustomizePreviewLong": {
+    "placeholders": { "km": { "type": "String" } }
+  },
+  "runPlanCustomizePreviewRaceWeek": "Race in week {week}",
+  "@runPlanCustomizePreviewRaceWeek": {
+    "placeholders": { "week": { "type": "int" } }
+  },
+  "runPlanCustomizePhaseBuild": "Build",
+  "runPlanCustomizePhaseRecovery": "Recovery",
+  "runPlanCustomizePhaseTaper": "Taper",
+  "runPlanCustomizePhaseRace": "Race",
   "runPlanCustomizeCreate": "Create plan",
   "runPlanCustomizeNext": "Next",
   "runPlanCustomizeBack": "Back",

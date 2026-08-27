@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
+import 'package:workout_notes/services/run_pace_calculator.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
 
@@ -266,12 +267,78 @@ void main() {
         expect(km, closeTo(mean, mean * 0.12));
       }
 
-      final kinds = schedule
-          .expand((week) => week)
-          .map((s) => s.kind)
-          .toSet();
+      final kinds = schedule.expand((week) => week).map((s) => s.kind).toSet();
       expect(kinds.length, greaterThanOrEqualTo(3));
       expect(kinds.contains(RunWorkoutKind.long), isTrue);
+    });
+
+    test('outline exposes build, recovery, taper and race weeks', () {
+      final outline = RunPlanComposer.outline(
+        RunPlanTemplates.marathon,
+        config(sessions: 4, days: const [2, 4, 5, 7]),
+      );
+      expect(outline.weeks, hasLength(outline.schedule.length));
+      expect(
+        outline.weeks.any((w) => w.phase == RunPlanWeekPhase.build),
+        isTrue,
+      );
+      expect(
+        outline.weeks.any((w) => w.phase == RunPlanWeekPhase.recovery),
+        isTrue,
+      );
+      expect(
+        outline.weeks.any((w) => w.phase == RunPlanWeekPhase.taper),
+        isTrue,
+      );
+      expect(outline.weeks.last.phase, RunPlanWeekPhase.race);
+      expect(outline.peakWeeklyKm, greaterThan(outline.startWeeklyKm));
+      expect(outline.peakLongKm, closeTo(outline.readiness.peakLongKm, 0.05));
+      expect(outline.raceWeekNumber, outline.weeks.length);
+    });
+
+    test('optimistic goal keeps training paces on fitness', () {
+      const fitness = RunPlanPaceCalibration(
+        distanceMeters: 5000,
+        timeSeconds: 28 * 60,
+      );
+      const goal = RunPlanPaceCalibration(
+        distanceMeters: 5000,
+        timeSeconds: 22 * 60,
+      );
+      final built = RunPlanComposer.compose(
+        RunPlanTemplates.fiveK,
+        RunPlanBuildConfig(
+          sessionsPerWeek: 4,
+          availableDays: const [2, 4, 5, 7],
+          intent: RunPlanIntent.pb,
+          calibration: goal,
+          paceSource: RunPlanPaceSource.goal,
+          fitnessCalibration: fitness,
+        ),
+      );
+      final easy = built
+          .expand((week) => week)
+          .firstWhere((s) => s.kind == RunWorkoutKind.easy);
+      expect(easy.targetPaceSecPerKm, closeTo(fitness.paces.easySecPerKm, 1));
+      expect(
+        easy.targetPaceSecPerKm,
+        isNot(closeTo(goal.paces.easySecPerKm, 8)),
+      );
+
+      final raceWork = built
+          .expand((week) => week)
+          .where(
+            (s) =>
+                s.name.startsWith('Ritmo de prova') ||
+                s.kind == RunWorkoutKind.race,
+          );
+      expect(raceWork, isNotEmpty);
+      final racePace = raceWork.first.targetPaceSecPerKm;
+      expect(racePace, isNotNull);
+      expect(
+        racePace,
+        closeTo(goal.paces.racePaceFor(RunPaceCalculator.fiveKMeters), 2),
+      );
     });
   });
 }

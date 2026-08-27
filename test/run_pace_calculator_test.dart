@@ -40,5 +40,28 @@ void main() {
         throwsArgumentError,
       );
     });
+
+    test('flags a goal far faster than current fitness', () {
+      final fitness = RunPaceCalculator.fromRace(
+        distanceMeters: RunPaceCalculator.fiveKMeters,
+        timeSeconds: 28 * 60,
+      );
+      expect(
+        RunPaceCalculator.isOptimisticGoal(
+          fitness: fitness,
+          goalDistanceMeters: RunPaceCalculator.fiveKMeters,
+          goalTimeSeconds: 22 * 60,
+        ),
+        isTrue,
+      );
+      expect(
+        RunPaceCalculator.isOptimisticGoal(
+          fitness: fitness,
+          goalDistanceMeters: RunPaceCalculator.fiveKMeters,
+          goalTimeSeconds: 27 * 60,
+        ),
+        isFalse,
+      );
+    });
   });
 }

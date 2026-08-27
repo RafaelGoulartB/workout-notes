@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
-/// Thin English TTS wrapper for the run module.
+/// Thin locale-aware TTS wrapper for the run module.
 class RunTtsService {
   RunTtsService._();
   static final RunTtsService instance = RunTtsService._();
@@ -9,13 +9,21 @@ class RunTtsService {
   final FlutterTts _tts = FlutterTts();
   bool _ready = false;
   bool _speaking = false;
+  String _languageTag = 'en-US';
 
   bool get isSpeaking => _speaking;
 
-  Future<void> ensureReady() async {
-    if (_ready) return;
+  Future<void> ensureReady({String? languageTag}) async {
+    final requestedLanguage = languageTag ?? _languageTag;
+    if (_ready && requestedLanguage == _languageTag) return;
     try {
-      await _tts.setLanguage('en-US');
+      if (_ready && _speaking) {
+        await _tts.stop();
+        _speaking = false;
+      }
+      await _tts.setLanguage(requestedLanguage);
+      _languageTag = requestedLanguage;
+      if (_ready) return;
       await _tts.setSpeechRate(0.48);
       await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);

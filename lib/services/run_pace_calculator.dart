@@ -76,7 +76,10 @@ abstract final class RunPaceCalculator {
       throw ArgumentError('distance and time must be positive');
     }
     final racePace = timeSeconds / (distanceMeters / 1000);
-    final vdot = vdotFor(distanceMeters: distanceMeters, timeSeconds: timeSeconds);
+    final vdot = vdotFor(
+      distanceMeters: distanceMeters,
+      timeSeconds: timeSeconds,
+    );
     final interval = _paceAtPercentVo2(vdot, 0.98);
     return RunPaces(
       vdot: vdot,
@@ -103,6 +106,28 @@ abstract final class RunPaceCalculator {
     distanceMeters: goalDistanceMeters,
     timeSeconds: goalTimeSeconds,
   );
+
+  /// True when [goalTimeSeconds] at [goalDistanceMeters] is substantially
+  /// faster than what [fitness] currently predicts for that distance.
+  ///
+  /// An 8% gap is about 2 minutes on a 25-minute 5K — enough that training
+  /// paces taken from the goal would be unrunnable in week 1.
+  static bool isOptimisticGoal({
+    required RunPaces fitness,
+    required double goalDistanceMeters,
+    required int goalTimeSeconds,
+    double fasterFraction = 0.08,
+  }) {
+    if (fitness.vdot <= 0 ||
+        goalDistanceMeters <= 0 ||
+        goalTimeSeconds <= 0 ||
+        fasterFraction <= 0) {
+      return false;
+    }
+    final predictedSeconds =
+        fitness.racePaceFor(goalDistanceMeters) * (goalDistanceMeters / 1000);
+    return goalTimeSeconds < predictedSeconds * (1 - fasterFraction);
+  }
 
   /// ±[pct] band around a target pace for step min/max ranges.
   ///

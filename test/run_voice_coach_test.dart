@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_session_goal.dart';
 import 'package:workout_notes/models/run_split.dart';
@@ -10,8 +11,11 @@ import 'package:workout_notes/services/run_voice_phrases.dart';
 
 void main() {
   group('RunVoicePhrases', () {
+    const english = RunVoicePhrases(RunVoiceLanguage.english);
+    const portuguese = RunVoicePhrases(RunVoiceLanguage.portuguese);
+
     test('distance milestone includes pace when present', () {
-      final text = RunVoicePhrases.distanceMilestone(
+      final text = english.distanceMilestone(
         km: 2,
         durationSeconds: 724,
         avgPaceSecPerKm: 362,
@@ -23,20 +27,30 @@ void main() {
 
     test('split and interval phrases are English', () {
       expect(
-        RunVoicePhrases.splitComplete(km: 3, paceSecPerKm: 348),
+        english.splitComplete(km: 3, paceSecPerKm: 348),
         startsWith('Kilometer 3'),
       );
+      expect(english.workIntervalStart(index: 1, total: 8), 'Rep 1 of 8. Go.');
       expect(
-        RunVoicePhrases.workIntervalStart(index: 1, total: 8),
-        'Rep 1 of 8. Go.',
-      );
-      expect(
-        RunVoicePhrases.restIntervalStart(
-          metric: RunIntervalMetric.time,
-          value: 90,
-        ),
+        english.restIntervalStart(metric: RunIntervalMetric.time, value: 90),
         contains('Recover.'),
       );
+    });
+
+    test('Portuguese phrases use natural running vocabulary', () {
+      expect(
+        portuguese.splitComplete(km: 3, paceSecPerKm: 348),
+        'Quilômetro 3. Pace 5 minutos e 48 segundos por quilômetro.',
+      );
+      expect(
+        portuguese.workIntervalStart(index: 2, total: 6),
+        'Tiro 2 de 6. Vai!',
+      );
+      expect(
+        portuguese.restIntervalStart(metric: RunIntervalMetric.time, value: 90),
+        'Recuperação. 1 minuto e 30 segundos.',
+      );
+      expect(portuguese.paceOnTarget(), 'Pace dentro da meta.');
     });
   });
 
@@ -45,11 +59,38 @@ void main() {
       const original = RunVoiceSettings.defaults();
       final restored = RunVoiceSettings.fromJson(original.toJson());
       expect(restored.enabled, original.enabled);
+      expect(restored.language, RunVoiceLanguage.app);
       expect(restored.headphonesOnly, true);
       expect(restored.distanceEveryKm, 1);
       expect(restored.interval.workValue, 400);
       expect(restored.interval.repeats, 8);
     });
+
+    test('round-trips an explicit Portuguese voice language', () {
+      final original = const RunVoiceSettings.defaults().copyWith(
+        language: RunVoiceLanguage.portuguese,
+      );
+      final restored = RunVoiceSettings.fromJson(original.toJson());
+      expect(restored.language, RunVoiceLanguage.portuguese);
+    });
+
+    test(
+      'app default follows locale while an explicit language overrides it',
+      () {
+        expect(
+          RunVoiceLanguage.app.resolve('pt_BR'),
+          RunVoiceLanguage.portuguese,
+        );
+        expect(
+          RunVoiceLanguage.english.resolve('pt_BR'),
+          RunVoiceLanguage.english,
+        );
+        expect(
+          RunVoiceLanguage.portuguese.resolve('en_US'),
+          RunVoiceLanguage.portuguese,
+        );
+      },
+    );
 
     test('clamps distance frequency', () {
       final restored = RunVoiceSettings.fromJson({'distanceEveryKm': 7});
@@ -100,7 +141,7 @@ void main() {
         );
         expect(
           spoken.single,
-          'Steady. 2.8 kilometers. Target 6 00 per kilometer.',
+          'Steady. 2 kilometers and 800 meters. Target pace 6 minutes per kilometer.',
         );
 
         await coach.onTrackingUpdate(
@@ -110,7 +151,7 @@ void main() {
             movingTimeSeconds: 972,
           ),
         );
-        expect(spoken.last, '100 meters.');
+        expect(spoken.last, '100 meters left.');
 
         await coach.onTrackingUpdate(
           _recordingState(
@@ -122,6 +163,45 @@ void main() {
         expect(spoken.last, 'Workout complete.');
       },
     );
+
+    test('follows the Portuguese app locale by default', () async {
+      final previousLocale = Intl.defaultLocale;
+      Intl.defaultLocale = 'pt_BR';
+      addTearDown(() => Intl.defaultLocale = previousLocale);
+      final spoken = <String>[];
+      final coach = RunVoiceCoach(
+        speak: (text) async => spoken.add(text),
+        audioCaps: () async =>
+            const RunAudioCapabilities(headsetConnected: true, inCall: false),
+        ensureTtsReady: () async {},
+        stopTts: () async {},
+      );
+      coach.settingsOverride = const RunVoiceSettings.defaults().copyWith(
+        headphonesOnly: false,
+        announceGpsStatus: false,
+      );
+      await coach.beginSession(intervalsOn: false);
+
+      await coach.onTrackingUpdate(
+        _recordingState(
+          distanceMeters: 1000,
+          durationSeconds: 360,
+          movingTimeSeconds: 360,
+          splits: [
+            const RunSplit(
+              km: 1,
+              distanceMeters: 1000,
+              durationSeconds: 360,
+              paceSecPerKm: 360,
+              isPartial: false,
+            ),
+          ],
+        ),
+      );
+
+      expect(spoken.single, startsWith('Quilômetro 1. Pace 6 minutos'));
+      expect(spoken.single, contains('Pace médio'));
+    });
 
     test('announces distance and split with open gate', () async {
       final spoken = <String>[];

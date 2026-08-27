@@ -1,5 +1,37 @@
 enum RunIntervalMetric { distance, time }
 
+enum RunVoiceLanguage {
+  app,
+  portuguese,
+  english;
+
+  String get storageValue => switch (this) {
+    RunVoiceLanguage.app => 'app',
+    RunVoiceLanguage.portuguese => 'pt',
+    RunVoiceLanguage.english => 'en',
+  };
+
+  String get localeTag => switch (this) {
+    RunVoiceLanguage.portuguese => 'pt-BR',
+    RunVoiceLanguage.app || RunVoiceLanguage.english => 'en-US',
+  };
+
+  bool get isPortuguese => this == RunVoiceLanguage.portuguese;
+
+  RunVoiceLanguage resolve(String? appLocale) {
+    if (this != RunVoiceLanguage.app) return this;
+    return appLocale?.toLowerCase().startsWith('pt') == true
+        ? RunVoiceLanguage.portuguese
+        : RunVoiceLanguage.english;
+  }
+
+  static RunVoiceLanguage fromJson(Object? raw) => switch (raw) {
+    'pt' || 'portuguese' => RunVoiceLanguage.portuguese,
+    'en' || 'english' => RunVoiceLanguage.english,
+    _ => RunVoiceLanguage.app,
+  };
+}
+
 class RunIntervalPreset {
   final RunIntervalMetric workMetric;
   final int workValue;
@@ -17,13 +49,13 @@ class RunIntervalPreset {
 
   /// Default: 400 m work / 90 s rest × 8.
   const RunIntervalPreset.defaults()
-      : this(
-          workMetric: RunIntervalMetric.distance,
-          workValue: 400,
-          restMetric: RunIntervalMetric.time,
-          restValue: 90,
-          repeats: 8,
-        );
+    : this(
+        workMetric: RunIntervalMetric.distance,
+        workValue: 400,
+        restMetric: RunIntervalMetric.time,
+        restValue: 90,
+        repeats: 8,
+      );
 
   RunIntervalPreset copyWith({
     RunIntervalMetric? workMetric,
@@ -42,12 +74,12 @@ class RunIntervalPreset {
   }
 
   Map<String, dynamic> toJson() => {
-        'workMetric': workMetric.name,
-        'workValue': workValue,
-        'restMetric': restMetric.name,
-        'restValue': restValue,
-        'repeats': repeats,
-      };
+    'workMetric': workMetric.name,
+    'workValue': workValue,
+    'restMetric': restMetric.name,
+    'restValue': restValue,
+    'repeats': repeats,
+  };
 
   factory RunIntervalPreset.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const RunIntervalPreset.defaults();
@@ -82,6 +114,7 @@ class RunVoiceSettings {
   static const storageKey = 'run_voice_settings_v1';
 
   final bool enabled;
+  final RunVoiceLanguage language;
   final bool headphonesOnly;
   final bool muteDuringCall;
   final bool announceDistance;
@@ -97,6 +130,7 @@ class RunVoiceSettings {
 
   const RunVoiceSettings({
     required this.enabled,
+    required this.language,
     required this.headphonesOnly,
     required this.muteDuringCall,
     required this.announceDistance,
@@ -112,24 +146,26 @@ class RunVoiceSettings {
   });
 
   const RunVoiceSettings.defaults()
-      : this(
-          enabled: true,
-          headphonesOnly: true,
-          muteDuringCall: true,
-          announceDistance: true,
-          distanceEveryKm: 1,
-          announceSplit: true,
-          announcePaceWarning: false,
-          targetPaceSecPerKm: null,
-          paceTolerancePercent: 10,
-          announceGpsStatus: true,
-          announceIntervals: true,
-          intervalsEnabledByDefault: false,
-          interval: const RunIntervalPreset.defaults(),
-        );
+    : this(
+        enabled: true,
+        language: RunVoiceLanguage.app,
+        headphonesOnly: true,
+        muteDuringCall: true,
+        announceDistance: true,
+        distanceEveryKm: 1,
+        announceSplit: true,
+        announcePaceWarning: false,
+        targetPaceSecPerKm: null,
+        paceTolerancePercent: 10,
+        announceGpsStatus: true,
+        announceIntervals: true,
+        intervalsEnabledByDefault: false,
+        interval: const RunIntervalPreset.defaults(),
+      );
 
   RunVoiceSettings copyWith({
     bool? enabled,
+    RunVoiceLanguage? language,
     bool? headphonesOnly,
     bool? muteDuringCall,
     bool? announceDistance,
@@ -146,6 +182,7 @@ class RunVoiceSettings {
   }) {
     return RunVoiceSettings(
       enabled: enabled ?? this.enabled,
+      language: language ?? this.language,
       headphonesOnly: headphonesOnly ?? this.headphonesOnly,
       muteDuringCall: muteDuringCall ?? this.muteDuringCall,
       announceDistance: announceDistance ?? this.announceDistance,
@@ -165,20 +202,21 @@ class RunVoiceSettings {
   }
 
   Map<String, dynamic> toJson() => {
-        'enabled': enabled,
-        'headphonesOnly': headphonesOnly,
-        'muteDuringCall': muteDuringCall,
-        'announceDistance': announceDistance,
-        'distanceEveryKm': distanceEveryKm,
-        'announceSplit': announceSplit,
-        'announcePaceWarning': announcePaceWarning,
-        'targetPaceSecPerKm': targetPaceSecPerKm,
-        'paceTolerancePercent': paceTolerancePercent,
-        'announceGpsStatus': announceGpsStatus,
-        'announceIntervals': announceIntervals,
-        'intervalsEnabledByDefault': intervalsEnabledByDefault,
-        'interval': interval.toJson(),
-      };
+    'enabled': enabled,
+    'language': language.storageValue,
+    'headphonesOnly': headphonesOnly,
+    'muteDuringCall': muteDuringCall,
+    'announceDistance': announceDistance,
+    'distanceEveryKm': distanceEveryKm,
+    'announceSplit': announceSplit,
+    'announcePaceWarning': announcePaceWarning,
+    'targetPaceSecPerKm': targetPaceSecPerKm,
+    'paceTolerancePercent': paceTolerancePercent,
+    'announceGpsStatus': announceGpsStatus,
+    'announceIntervals': announceIntervals,
+    'intervalsEnabledByDefault': intervalsEnabledByDefault,
+    'interval': interval.toJson(),
+  };
 
   factory RunVoiceSettings.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const RunVoiceSettings.defaults();
@@ -188,6 +226,7 @@ class RunVoiceSettings {
     final intervalRaw = json['interval'];
     return RunVoiceSettings(
       enabled: json['enabled'] as bool? ?? true,
+      language: RunVoiceLanguage.fromJson(json['language']),
       headphonesOnly: json['headphonesOnly'] as bool? ?? true,
       muteDuringCall: json['muteDuringCall'] as bool? ?? true,
       announceDistance: json['announceDistance'] as bool? ?? true,
@@ -201,9 +240,7 @@ class RunVoiceSettings {
       intervalsEnabledByDefault:
           json['intervalsEnabledByDefault'] as bool? ?? false,
       interval: RunIntervalPreset.fromJson(
-        intervalRaw is Map
-            ? Map<String, dynamic>.from(intervalRaw)
-            : null,
+        intervalRaw is Map ? Map<String, dynamic>.from(intervalRaw) : null,
       ),
     );
   }

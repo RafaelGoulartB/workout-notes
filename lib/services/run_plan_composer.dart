@@ -18,6 +18,9 @@ enum RunPlanIntensity { conservative, standard, aggressive }
 /// and pure run/walk progressions.
 enum RunPlanIntent { finish, pb }
 
+/// A recent race (current fitness) vs a goal time the athlete wants to hit.
+enum RunPlanPaceSource { recent, goal }
+
 /// Optional pace calibration from a recent race or a goal time.
 class RunPlanPaceCalibration {
   final double distanceMeters;
@@ -45,6 +48,12 @@ class RunPlanBuildConfig {
   final RunPlanIntent intent;
   final RunPlanIntensity intensity;
   final RunPlanPaceCalibration? calibration;
+  final RunPlanPaceSource paceSource;
+
+  /// Current fitness from a recorded (or typed) recent race. When [paceSource]
+  /// is a goal that sits far above this, training paces stay on fitness and
+  /// only race-pace work uses the goal.
+  final RunPlanPaceCalibration? fitnessCalibration;
   final DateTime? raceDate;
 
   /// Whether hill sessions may be prescribed. When false, the same training
@@ -68,6 +77,8 @@ class RunPlanBuildConfig {
     this.intent = RunPlanIntent.finish,
     this.intensity = RunPlanIntensity.standard,
     this.calibration,
+    this.paceSource = RunPlanPaceSource.goal,
+    this.fitnessCalibration,
     this.raceDate,
     this.currentWeeklyKm,
     this.includeHills = true,
@@ -79,6 +90,35 @@ class RunPlanBuildConfig {
     RunPlanIntensity.standard => 1.0,
     RunPlanIntensity.aggressive => 1.15,
   };
+
+  /// Goal time is much faster than known fitness — training paces must not
+  /// follow it.
+  bool get hasOptimisticGoal {
+    if (paceSource != RunPlanPaceSource.goal) return false;
+    final goal = calibration;
+    final fitness = fitnessCalibration;
+    if (goal == null || fitness == null) return false;
+    try {
+      return RunPaceCalculator.isOptimisticGoal(
+        fitness: fitness.paces,
+        goalDistanceMeters: goal.distanceMeters,
+        goalTimeSeconds: goal.timeSeconds,
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Easy / tempo / interval prescriptions. Falls back to fitness when the
+  /// typed goal would make week-1 quality unrunnable.
+  RunPaces? get trainingPaces {
+    if (calibration == null) return null;
+    if (hasOptimisticGoal) return fitnessCalibration!.paces;
+    return calibration!.paces;
+  }
+
+  /// Race-pace work follows the entered time (goal or recent).
+  RunPaces? get racePaces => calibration?.paces;
 
   /// Quality load multiplier (reps / tempo minutes). Finish is still quality,
   /// just gentler — matching polarized training, not junk mileage.
@@ -142,6 +182,10 @@ class RunPlanReadiness {
   /// Three running days in a row on a 3–4 day week.
   final bool consecutiveDays;
 
+  /// Goal time is far faster than known fitness; training paces stay on
+  /// current fitness. Does not block creation.
+  final bool optimisticGoal;
+
   const RunPlanReadiness({
     required this.startWeeklyKm,
     required this.currentWeeklyKm,
@@ -150,6 +194,7 @@ class RunPlanReadiness {
     required this.longRunCapKm,
     required this.baselineZero,
     required this.consecutiveDays,
+    this.optimisticGoal = false,
   });
 
   /// Week 1 sits more than 25% above what the athlete runs today.
@@ -170,6 +215,63 @@ class RunPlanReadiness {
   bool get canCreate => !baselineZero && !volumeGap && !longRunShort;
 
   bool get ok => canCreate;
+}
+
+/// Periodisation of a composed week, for the customize-wizard sparkline.
+enum RunPlanWeekPhase { build, recovery, taper, race }
+
+/// Materialised week: phase plus the kilometres the athlete will actually run.
+class RunPlanWeekOutline {
+  final int index;
+  final RunPlanWeekPhase phase;
+  final double weekKm;
+  final double longKm;
+
+  const RunPlanWeekOutline({
+    required this.index,
+    required this.phase,
+    required this.weekKm,
+    required this.longKm,
+  });
+}
+
+/// Full composed plan plus the week-by-week shape the wizard previews.
+class RunPlanOutline {
+  final List<List<RunPlanTemplateWorkout>> schedule;
+  final List<RunPlanWeekOutline> weeks;
+  final RunPlanReadiness readiness;
+
+  const RunPlanOutline({
+    required this.schedule,
+    required this.weeks,
+    required this.readiness,
+  });
+
+  List<RunPlanTemplateWorkout> get week1 =>
+      schedule.isEmpty ? const [] : schedule.first;
+
+  double get startWeeklyKm => readiness.startWeeklyKm;
+
+  double get peakWeeklyKm {
+    var peak = 0.0;
+    for (final week in weeks) {
+      if (week.phase == RunPlanWeekPhase.race) continue;
+      if (week.weekKm > peak) peak = week.weekKm;
+    }
+    return peak;
+  }
+
+  double get peakLongKm => readiness.peakLongKm;
+
+  /// 1-based week number of the race session, or null when there is none.
+  int? get raceWeekNumber {
+    for (final week in weeks) {
+      if (week.phase == RunPlanWeekPhase.race) return week.index + 1;
+    }
+    return null;
+  }
+
+  bool get hasVolumeCurve => weeks.any((week) => week.weekKm >= 1);
 }
 
 /// Where a week sits in the periodisation.
@@ -219,26 +321,38 @@ bool _isLongRole(_SessionRole role) =>
 /// getters always return a number because the composer has to convert
 /// time-based work into kilometres to balance weekly volume.
 class _PaceBook {
-  final RunPaces? paces;
+  final RunPaces? training;
+  final RunPaces? race;
   final double goalMeters;
 
-  const _PaceBook(this.paces, this.goalMeters);
+  const _PaceBook({
+    required this.training,
+    required this.race,
+    required this.goalMeters,
+  });
 
-  double? get easy => paces?.easySecPerKm;
-  double? get easyFast => paces?.easyFastSecPerKm;
-  double? get easySlow => paces?.easySlowSecPerKm;
-  double? get tempo => paces?.tempoSecPerKm;
-  double? get interval => paces?.intervalSecPerKm;
-  double? get repetition => paces?.repetitionSecPerKm;
+  factory _PaceBook.forConfig(RunPlanBuildConfig config, double goalMeters) =>
+      _PaceBook(
+        training: config.trainingPaces,
+        race: config.racePaces,
+        goalMeters: goalMeters,
+      );
+
+  double? get easy => training?.easySecPerKm;
+  double? get easyFast => training?.easyFastSecPerKm;
+  double? get easySlow => training?.easySlowSecPerKm;
+  double? get tempo => training?.tempoSecPerKm;
+  double? get interval => training?.intervalSecPerKm;
+  double? get repetition => training?.repetitionSecPerKm;
 
   /// Race pace for the distance this plan targets — never the calibration pace.
-  double? get goalRace => paces?.racePaceFor(goalMeters);
+  double? get goalRace => (race ?? training)?.racePaceFor(goalMeters);
 
-  double get estEasy => paces?.easySecPerKm ?? 390;
-  double get estTempo => paces?.tempoSecPerKm ?? 320;
-  double get estInterval => paces?.intervalSecPerKm ?? 295;
+  double get estEasy => training?.easySecPerKm ?? 390;
+  double get estTempo => training?.tempoSecPerKm ?? 320;
+  double get estInterval => training?.intervalSecPerKm ?? 295;
 
-  bool get calibrated => paces != null;
+  bool get calibrated => training != null || race != null;
 
   /// `6:11–6:57/km` for the easy window, or null when uncalibrated.
   String? get easyWindowLabel {
@@ -299,13 +413,7 @@ abstract final class RunPlanComposer {
   static List<List<RunPlanTemplateWorkout>> compose(
     RunPlanTemplate template,
     RunPlanBuildConfig config,
-  ) {
-    config.validate(template: template);
-    if (template.style == RunPlanTemplateStyle.runWalk) {
-      return _composeRunWalk(template, config);
-    }
-    return _composeRuns(template, config);
-  }
+  ) => outline(template, config).schedule;
 
   /// Coach's sanity check on a template + config *before* the plan is created.
   ///
@@ -317,31 +425,49 @@ abstract final class RunPlanComposer {
   static RunPlanReadiness assess(
     RunPlanTemplate template,
     RunPlanBuildConfig config,
+  ) => outline(template, config).readiness;
+
+  /// Composed sessions plus the week-by-week volume curve the wizard previews.
+  static RunPlanOutline outline(
+    RunPlanTemplate template,
+    RunPlanBuildConfig config,
   ) {
     config.validate(template: template);
     final consecutive =
         config.sessionsPerWeek <= 4 &&
         _hasThreeConsecutiveDays(config.availableDays);
     if (template.style == RunPlanTemplateStyle.runWalk) {
-      return RunPlanReadiness(
-        startWeeklyKm: 0,
-        currentWeeklyKm: config.currentWeeklyKm,
-        peakLongKm: 0,
-        requiredLongKm: 0,
-        longRunCapKm: 0,
-        baselineZero: false,
-        consecutiveDays: consecutive,
+      final schedule = _composeRunWalk(template, config);
+      return RunPlanOutline(
+        schedule: schedule,
+        weeks: [
+          for (var i = 0; i < schedule.length; i++)
+            RunPlanWeekOutline(
+              index: i,
+              phase: RunPlanWeekPhase.build,
+              weekKm: _materializedWeekKm(schedule[i]),
+              longKm: _materializedLongKm(schedule[i]),
+            ),
+        ],
+        readiness: RunPlanReadiness(
+          startWeeklyKm: 0,
+          currentWeeklyKm: config.currentWeeklyKm,
+          peakLongKm: 0,
+          requiredLongKm: 0,
+          longRunCapKm: 0,
+          baselineZero: false,
+          consecutiveDays: consecutive,
+          optimisticGoal: config.hasOptimisticGoal,
+        ),
       );
     }
+    final composed = _composeRuns(template, config);
+    final schedule = composed.schedule;
     final goalMeters = _goalDistanceMeters(template.goalKind);
-    final book = _PaceBook(
-      config.calibration?.paces,
+    final book = _PaceBook.forConfig(
+      config,
       goalMeters ?? RunPaceCalculator.tenKMeters,
     );
-    // Readiness must inspect the sessions the athlete will actually receive.
-    // Quality floors, warm-ups and easy-run caps are applied during
-    // materialisation and can make the result differ from the internal budget.
-    final schedule = _composeRuns(template, config);
     final training = schedule.where(
       (week) => !week.any((session) => session.kind == RunWorkoutKind.race),
     );
@@ -355,14 +481,21 @@ abstract final class RunPlanComposer {
     });
     final required = _requiredPeakLongKm(template.goalKind, goalMeters);
     final longCap = _longRunCapKm(template.goalKind, book);
-    return RunPlanReadiness(
-      startWeeklyKm: _materializedWeekKm(schedule.first),
-      currentWeeklyKm: config.currentWeeklyKm,
-      peakLongKm: peakLong,
-      requiredLongKm: required,
-      longRunCapKm: longCap,
-      baselineZero: config.currentWeeklyKm == 0,
-      consecutiveDays: consecutive,
+    return RunPlanOutline(
+      schedule: schedule,
+      weeks: composed.weeks,
+      readiness: RunPlanReadiness(
+        startWeeklyKm: schedule.isEmpty
+            ? 0
+            : _materializedWeekKm(schedule.first),
+        currentWeeklyKm: config.currentWeeklyKm,
+        peakLongKm: peakLong,
+        requiredLongKm: required,
+        longRunCapKm: longCap,
+        baselineZero: config.currentWeeklyKm == 0,
+        consecutiveDays: consecutive,
+        optimisticGoal: config.hasOptimisticGoal,
+      ),
     );
   }
 
@@ -392,13 +525,14 @@ abstract final class RunPlanComposer {
 
   // --- Planning ------------------------------------------------------------
 
-  static List<List<RunPlanTemplateWorkout>> _composeRuns(
-    RunPlanTemplate template,
-    RunPlanBuildConfig config,
-  ) {
+  static ({
+    List<List<RunPlanTemplateWorkout>> schedule,
+    List<RunPlanWeekOutline> weeks,
+  })
+  _composeRuns(RunPlanTemplate template, RunPlanBuildConfig config) {
     final goalMeters = _goalDistanceMeters(template.goalKind);
-    final book = _PaceBook(
-      config.calibration?.paces,
+    final book = _PaceBook.forConfig(
+      config,
       goalMeters ?? RunPaceCalculator.tenKMeters,
     );
     final weeks = _planWeeks(template, config, book, goalMeters);
@@ -408,6 +542,7 @@ abstract final class RunPlanComposer {
     );
 
     final result = <List<RunPlanTemplateWorkout>>[];
+    final outlines = <RunPlanWeekOutline>[];
     var lastBuildActual = 0.0;
     var lastBuildLong = 0.0;
     for (final planned in weeks) {
@@ -469,14 +604,36 @@ abstract final class RunPlanComposer {
         );
       }
       result.add(built);
+      outlines.add(
+        RunPlanWeekOutline(
+          index: week.index,
+          phase: _publicPhase(week.phase),
+          weekKm: _materializedWeekKm(built),
+          longKm: _materializedLongKm(built),
+        ),
+      );
     }
-    return result;
+    return (schedule: result, weeks: outlines);
   }
+
+  static RunPlanWeekPhase _publicPhase(_Phase phase) => switch (phase) {
+    _Phase.build => RunPlanWeekPhase.build,
+    _Phase.recovery => RunPlanWeekPhase.recovery,
+    _Phase.taper => RunPlanWeekPhase.taper,
+    _Phase.race => RunPlanWeekPhase.race,
+  };
 
   static double _materializedWeekKm(List<RunPlanTemplateWorkout> week) =>
       week.fold<double>(
         0,
         (sum, session) => sum + (session.targetDistanceMeters ?? 0) / 1000,
+      );
+
+  static double _materializedLongKm(List<RunPlanTemplateWorkout> week) =>
+      week.fold<double>(
+        0,
+        (peak, session) =>
+            math.max(peak, (session.targetDistanceMeters ?? 0) / 1000),
       );
 
   /// Phase, volume budget and roles for every week, in one pass.
@@ -929,9 +1086,7 @@ abstract final class RunPlanComposer {
       return weekIndex.isEven ? _SessionRole.hills : _SessionRole.fartlek;
     }
     if (template.key == 'threshold_block') {
-      return weekIndex % 3 == 2
-          ? _SessionRole.progression
-          : _SessionRole.tempo;
+      return weekIndex % 3 == 2 ? _SessionRole.progression : _SessionRole.tempo;
     }
     return endurance
         ? const [
@@ -1431,10 +1586,7 @@ abstract final class RunPlanComposer {
     // Bone and tendon adaptation lags the cardiovascular system, so a beginner
     // progression spreads its days instead of running the block Mon–Fri.
     final days = _spacedDays(config.availableDays);
-    final book = _PaceBook(
-      config.calibration?.paces,
-      RunPaceCalculator.fiveKMeters,
-    );
+    final book = _PaceBook.forConfig(config, RunPaceCalculator.fiveKMeters);
     final weeks = <List<RunPlanTemplateWorkout>>[];
 
     for (var w = 0; w < work.length; w++) {
