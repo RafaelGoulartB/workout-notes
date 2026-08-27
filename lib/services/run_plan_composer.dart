@@ -47,6 +47,10 @@ class RunPlanBuildConfig {
   final RunPlanPaceCalibration? calibration;
   final DateTime? raceDate;
 
+  /// Whether hill sessions may be prescribed. When false, the same training
+  /// slot becomes a controlled flat fartlek session.
+  final bool includeHills;
+
   /// What the athlete actually runs today, in km/week.
   ///
   /// A jump in workload relative to what the body is used to is the strongest
@@ -62,6 +66,7 @@ class RunPlanBuildConfig {
     this.calibration,
     this.raceDate,
     this.currentWeeklyKm,
+    this.includeHills = true,
   });
 
   double get volumeFactor => switch (intensity) {
@@ -116,6 +121,12 @@ class RunPlanReadiness {
   /// Longest run the goal distance demands (0 when there is no race).
   final double requiredLongKm;
 
+  /// Distance allowed by the time-on-feet ceiling for this athlete.
+  final double longRunCapKm;
+
+  /// The athlete explicitly reported no current running volume.
+  final bool baselineZero;
+
   /// Three running days in a row on a 3–4 day week.
   final bool consecutiveDays;
 
@@ -124,6 +135,8 @@ class RunPlanReadiness {
     required this.currentWeeklyKm,
     required this.peakLongKm,
     required this.requiredLongKm,
+    required this.longRunCapKm,
+    required this.baselineZero,
     required this.consecutiveDays,
   });
 
@@ -137,7 +150,14 @@ class RunPlanReadiness {
   bool get longRunShort =>
       requiredLongKm > 0 && peakLongKm < requiredLongKm - 0.5;
 
-  bool get ok => !volumeGap && !longRunShort;
+  /// The long-run safety ceiling itself prevents reaching the preparation
+  /// floor. The ceiling remains valid; the race goal is what must change.
+  bool get timeCapDistanceGap =>
+      requiredLongKm > 0 && longRunCapKm < requiredLongKm - 0.5;
+
+  bool get canCreate => !baselineZero && !volumeGap && !longRunShort;
+
+  bool get ok => canCreate;
 }
 
 /// Where a week sits in the periodisation.
@@ -296,6 +316,8 @@ abstract final class RunPlanComposer {
         currentWeeklyKm: config.currentWeeklyKm,
         peakLongKm: 0,
         requiredLongKm: 0,
+        longRunCapKm: 0,
+        baselineZero: false,
         consecutiveDays: consecutive,
       );
     }
@@ -304,23 +326,30 @@ abstract final class RunPlanComposer {
       config.calibration?.paces,
       goalMeters ?? RunPaceCalculator.tenKMeters,
     );
-    final weeks = _planWeeks(template, config, book, goalMeters);
-    final training = weeks.where((w) => w.phase != _Phase.race);
-    final peakLong = training.fold<double>(
-      0,
-      (max, w) => math.max(max, w.longKm),
+    // Readiness must inspect the sessions the athlete will actually receive.
+    // Quality floors, warm-ups and easy-run caps are applied during
+    // materialisation and can make the result differ from the internal budget.
+    final schedule = _composeRuns(template, config);
+    final training = schedule.where(
+      (week) => !week.any((session) => session.kind == RunWorkoutKind.race),
     );
-    // The time-on-feet cap is a deliberate ceiling, so it bounds what the plan
-    // can be asked to reach.
-    final required = math.min(
-      _requiredPeakLongKm(template.goalKind, goalMeters),
-      _longRunCapKm(template.goalKind, book),
-    );
+    final peakLong = training.fold<double>(0, (peak, week) {
+      final longest = week.fold<double>(
+        0,
+        (value, session) =>
+            math.max(value, (session.targetDistanceMeters ?? 0) / 1000),
+      );
+      return math.max(peak, longest);
+    });
+    final required = _requiredPeakLongKm(template.goalKind, goalMeters);
+    final longCap = _longRunCapKm(template.goalKind, book);
     return RunPlanReadiness(
-      startWeeklyKm: weeks.first.weekKm,
+      startWeeklyKm: _materializedWeekKm(schedule.first),
       currentWeeklyKm: config.currentWeeklyKm,
       peakLongKm: peakLong,
       requiredLongKm: required,
+      longRunCapKm: longCap,
+      baselineZero: config.currentWeeklyKm == 0,
       consecutiveDays: consecutive,
     );
   }
@@ -366,17 +395,77 @@ abstract final class RunPlanComposer {
       qualitySlots: _qualitySlotCount(template, config),
     );
 
-    return [
-      for (final week in weeks)
-        _buildWeek(
-          template: template,
-          config: config,
-          book: book,
-          slots: slots,
-          week: week,
-        ),
-    ];
+    final result = <List<RunPlanTemplateWorkout>>[];
+    var lastBuildActual = 0.0;
+    var lastBuildLong = 0.0;
+    for (final planned in weeks) {
+      var week = planned;
+      if (week.phase == _Phase.build &&
+          lastBuildLong > 0 &&
+          week.longKm > lastBuildLong + 3.0) {
+        week = _WeekPlan(
+          index: week.index,
+          phase: week.phase,
+          weekKm: week.weekKm,
+          longKm: lastBuildLong + 3.0,
+          roles: week.roles,
+        );
+      }
+      var built = _buildWeek(
+        template: template,
+        config: config,
+        book: book,
+        slots: slots,
+        week: week,
+      );
+
+      // The physiological growth cap applies to delivered kilometres, not to
+      // an internal budget. Recovery weeks deliberately do not replace the
+      // last build reference, so the next build returns to the pre-recovery
+      // line instead of treating the down week as lost fitness.
+      if (week.phase == _Phase.build && lastBuildActual > 0) {
+        final cap = lastBuildActual * 1.10;
+        final delivered = _materializedWeekKm(built);
+        if (delivered > cap + 0.05) {
+          // Scale from what was actually delivered. The planned budget can be
+          // materially higher when a three-day schedule cannot distribute all
+          // of a five-day template; using it as the denominator used to
+          // over-correct and collapse subsequent weeks.
+          final ratio = cap / delivered;
+          week = _WeekPlan(
+            index: week.index,
+            phase: week.phase,
+            weekKm: cap,
+            longKm: math.min(week.longKm * ratio, week.longKm),
+            roles: week.roles,
+          );
+          built = _buildWeek(
+            template: template,
+            config: config,
+            book: book,
+            slots: slots,
+            week: week,
+          );
+        }
+      }
+      if (week.phase == _Phase.build) {
+        lastBuildActual = _materializedWeekKm(built);
+        lastBuildLong = built.fold<double>(
+          0,
+          (value, session) =>
+              math.max(value, (session.targetDistanceMeters ?? 0) / 1000),
+        );
+      }
+      result.add(built);
+    }
+    return result;
   }
+
+  static double _materializedWeekKm(List<RunPlanTemplateWorkout> week) =>
+      week.fold<double>(
+        0,
+        (sum, session) => sum + (session.targetDistanceMeters ?? 0) / 1000,
+      );
 
   /// Phase, volume budget and roles for every week, in one pass.
   static List<_WeekPlan> _planWeeks(
@@ -598,8 +687,17 @@ abstract final class RunPlanComposer {
     RunPlanBuildConfig config,
   ) {
     if (template.style == RunPlanTemplateStyle.runWalk) return 0;
+    // Beginners adapt to consistency first. One controlled pace-change
+    // session is enough even when they can run four or five days.
+    if (template.level == RunPlanTemplateLevel.beginner) return 1;
     // Return-to-running: ease back with one stimulus only.
     if (template.key == 'return') return 1;
+    // Finishing an endurance race rewards aerobic consistency more than a
+    // second mid-week workout. Specific long runs count as the second stimulus.
+    final endurance =
+        template.goalKind == RunPlanGoalKind.half ||
+        template.goalKind == RunPlanGoalKind.marathon;
+    if (config.intent == RunPlanIntent.finish && endurance) return 1;
     if (config.sessionsPerWeek >= 4) return 2;
     return 1;
   }
@@ -612,6 +710,9 @@ abstract final class RunPlanComposer {
     required _Phase phase,
   }) {
     if (template.style == RunPlanTemplateStyle.runWalk) return false;
+    // This template promises an easy aerobic block. Strides can still be
+    // attached to an easy run without turning it into structured quality.
+    if (template.key == 'base') return false;
     // Race week keeps a short sharpener; a taper keeps full intensity.
     if (phase == _Phase.race || phase == _Phase.taper) return true;
     if (template.style == RunPlanTemplateStyle.performance) return true;
@@ -704,7 +805,9 @@ abstract final class RunPlanComposer {
           ? _gentleQuality(weekIndex)
           : _primaryQuality(weekIndex, endurance),
     ];
-    if (qualitySlots > 1) {
+    // A long run with race-pace blocks is already a load-bearing quality day.
+    // Never combine it with two additional workouts in the same week.
+    if (qualitySlots > 1 && longRole != _SessionRole.longRacePace) {
       quality.add(
         gentle
             ? _gentleQuality(weekIndex + 1)
@@ -953,44 +1056,54 @@ abstract final class RunPlanComposer {
         totalWeight <= 0 ? 0.0 : support * weights[i] / totalWeight,
     ];
 
+    final effectiveRoles = [...week.roles];
     final built = List<RunPlanTemplateWorkout?>.filled(week.roles.length, null);
     var spent = 0.0;
 
-    RunPlanTemplateWorkout make(int i, double km, bool strides) => _sessionFor(
+    RunPlanTemplateWorkout make(
+      int i,
+      _SessionRole role,
+      double km,
+      bool strides,
+    ) => _sessionFor(
       template: template,
       config: config,
       book: book,
       week: week,
-      role: week.roles[i],
+      role: role,
       day: days[i],
       km: km,
       withStrides: strides,
     );
 
     // Pass 1 — quality, then the long run. How big these get is decided by
-    // physiology (the long-run share, the 8% / 10% quality caps), not by
-    // whatever volume happens to be left over. On a tiny week (a beginner on
-    // five days runs 2–3 km at a time) a quality session's warm-up and
-    // cool-down alone can out-distance the long run, so the long run is
-    // built last and lifted just above the longest quality session — the long
-    // run must stay the longest run of the week.
-    var longestQualityKm = 0.0;
+    // physiology (the long-run share and quality-work caps), not by whatever
+    // volume happens to be left over. If a structured session cannot fit the
+    // week while keeping the long run longest, it becomes an easy run.
     for (var i = 0; i < week.roles.length; i++) {
       final role = week.roles[i];
       if (!_isQualityRole(role)) continue;
-      final session = make(i, math.max(hint[i], 3.0), false);
+      final session = make(i, role, math.max(hint[i], 3.0), false);
+      final sessionKm = (session.targetDistanceMeters ?? 0) / 1000;
+      final remainingNonLong = [
+        for (var j = 0; j < week.roles.length; j++)
+          if (j != i && built[j] == null && !_isLongRole(week.roles[j])) j,
+      ].length;
+      final projected =
+          spent + sessionKm + week.longKm + remainingNonLong * 0.8;
+      final outgrowsLong =
+          week.phase != _Phase.race && sessionKm > week.longKm / 1.05;
+      if (outgrowsLong || projected > week.weekKm + 0.02) {
+        effectiveRoles[i] = _SessionRole.easy;
+        continue;
+      }
       built[i] = session;
-      final km = (session.targetDistanceMeters ?? 0) / 1000;
-      spent += km;
-      longestQualityKm = math.max(longestQualityKm, km);
+      spent += sessionKm;
     }
-    var longKm = week.longKm;
+    final longKm = week.longKm;
     for (var i = 0; i < week.roles.length; i++) {
       if (!_isLongRole(week.roles[i])) continue;
-      if (week.phase != _Phase.race) {
-        longKm = math.max(longKm, longestQualityKm * 1.05);
-      }
-      final session = make(i, longKm, false);
+      final session = make(i, week.roles[i], longKm, false);
       built[i] = session;
       spent += (session.targetDistanceMeters ?? 0) / 1000;
     }
@@ -1005,11 +1118,14 @@ abstract final class RunPlanComposer {
     final easyWeight = easyIndexes.fold<double>(0, (a, i) => a + weights[i]);
     // 2.5 km is the shortest run worth lacing up for — unless the long run
     // itself is barely longer, in which case the easy days shrink with it.
-    final minEasyKm = math.min(2.5, longKm * 0.85);
-    final leftover = math.max(
-      week.weekKm - spent,
-      easyIndexes.length * minEasyKm,
-    );
+    final available = math.max(week.weekKm - spent, 0.0);
+    final preferredMinEasyKm = math.min(2.5, longKm * 0.85);
+    final minEasyKm =
+        easyIndexes.isNotEmpty &&
+            available >= preferredMinEasyKm * easyIndexes.length
+        ? preferredMinEasyKm
+        : 0.0;
+    final leftover = available;
     // No mid-week run may approach the long run. On a 3-day week the leftover
     // can otherwise pile onto a single easy day and quietly turn it into a
     // second long run — a 20 km "easy" Tuesday is not easy. A beginner's 4 km
@@ -1021,14 +1137,26 @@ abstract final class RunPlanComposer {
       [longKm * 0.85, longKm * 0.45 + 2.0, week.weekKm * 0.3].reduce(math.min),
       minEasyKm,
     );
+    final distributable = math.max(
+      leftover - easyIndexes.length * minEasyKm,
+      0.0,
+    );
     var stridesUsed = week.phase != _Phase.build || week.index < 2;
     for (final i in easyIndexes) {
-      final share = easyWeight <= 0
-          ? minEasyKm
-          : leftover * weights[i] / easyWeight;
-      final wantsStrides = !stridesUsed && week.roles[i] == _SessionRole.easy;
+      final share =
+          minEasyKm +
+          (easyWeight <= 0 ? 0.0 : distributable * weights[i] / easyWeight);
+      final wantsStrides =
+          !stridesUsed &&
+          effectiveRoles[i] == _SessionRole.easy &&
+          share >= 2.5;
       if (wantsStrides) stridesUsed = true;
-      built[i] = make(i, share.clamp(minEasyKm, easyCap), wantsStrides);
+      built[i] = make(
+        i,
+        effectiveRoles[i],
+        share.clamp(minEasyKm, easyCap),
+        wantsStrides,
+      );
     }
 
     return [for (final session in built) session!];
@@ -1070,6 +1198,9 @@ abstract final class RunPlanComposer {
       case _SessionRole.sharpen:
         return _sharpen(day, km, book);
       case _SessionRole.interval:
+        if (week.weekKm * 0.08 < 0.6) {
+          return _progression(day, km, book);
+        }
         return _interval(
           day: day,
           weekKm: week.weekKm,
@@ -1083,6 +1214,10 @@ abstract final class RunPlanComposer {
           soft: soft,
         );
       case _SessionRole.tempo:
+        final maxThresholdMinutes = week.weekKm * 0.10 * book.estTempo / 60;
+        if (maxThresholdMinutes < 10) {
+          return _fartlek(day, km, book, weekKm: week.weekKm, soft: true);
+        }
         return _tempo(
           day: day,
           weekKm: week.weekKm,
@@ -1095,6 +1230,9 @@ abstract final class RunPlanComposer {
       case _SessionRole.fartlek:
         return _fartlek(day, km, book, weekKm: week.weekKm, soft: soft);
       case _SessionRole.hills:
+        if (!config.includeHills) {
+          return _fartlek(day, km, book, weekKm: week.weekKm, soft: soft);
+        }
         return _hills(
           day: day,
           warmupKm: warmup,
@@ -1376,14 +1514,28 @@ abstract final class RunPlanComposer {
   ) {
     final racePace = book.goalRace;
     final band = racePace == null ? null : RunPaceCalculator.band(racePace);
-    final blocks = km >= 24 ? 3 : 2;
-    final blockKm = (km * 0.12).clamp(2.0, 5.0);
-    final easyKm = math.max(km - blocks * (blockKm + 1.0) - 1.0, 3.0);
+    // Scale the structure down with the long run. Fixed 2 km blocks used to
+    // turn an 8 km budget into a 10 km workout and silently break the weekly
+    // load cap for lower-volume runners.
+    final blocks = km >= 24
+        ? 3
+        : km >= 12
+        ? 2
+        : 1;
+    final blockKm = (km * 0.12).clamp(0.8, 5.0);
+    final recoveryKm = (km * 0.04).clamp(0.4, 1.0);
+    final cooldownKm = (km * 0.08).clamp(0.5, 1.0);
+    final easyKm = math.max(
+      km - blocks * (blockKm + recoveryKm) - cooldownKm,
+      0.0,
+    );
     return RunPlanTemplateWorkout(
       name: 'Longão com blocos no ritmo de prova',
       kind: RunWorkoutKind.progression,
       dayOfWeek: day,
-      targetDistanceMeters: _meters(easyKm + blocks * (blockKm + 1.0) + 1.0),
+      targetDistanceMeters: _meters(
+        easyKm + blocks * (blockKm + recoveryKm) + cooldownKm,
+      ),
       targetPaceSecPerKm: book.easy,
       effortZone: 'Z2 → ritmo de prova',
       notes:
@@ -1407,13 +1559,16 @@ abstract final class RunPlanComposer {
         ),
         RunPlanTemplateStep(
           role: RunStepRole.recovery,
-          value: 1000,
+          value: _meters(recoveryKm).round(),
           repeatGroup: 1,
           repeatCount: blocks,
           targetPaceMinSecPerKm: book.easyFast,
           targetPaceMaxSecPerKm: book.easySlow,
         ),
-        const RunPlanTemplateStep(role: RunStepRole.cooldown, value: 1000),
+        RunPlanTemplateStep(
+          role: RunStepRole.cooldown,
+          value: _meters(cooldownKm).round(),
+        ),
       ],
     );
   }
@@ -1497,7 +1652,7 @@ abstract final class RunPlanComposer {
 
     // A low-volume week gets shorter reps rather than an unrunnable rep count.
     var meters = templateMeters;
-    while (meters > 400 && meters * 3 > maxWorkKm * 1000) {
+    while (meters > 200 && meters * 3 > maxWorkKm * 1000) {
       meters -= 200;
     }
     final fits = (maxWorkKm * 1000 / meters).floor();
@@ -1844,16 +1999,17 @@ abstract final class RunPlanComposer {
   }) {
     final racePace = book.goalRace;
     final band = racePace == null ? null : RunPaceCalculator.band(racePace);
-    final blockKm = switch (goal) {
+    final desiredBlockKm = switch (goal) {
       RunPlanGoalKind.marathon || RunPlanGoalKind.half => 3.0,
       RunPlanGoalKind.tenK => 2.0,
       _ => 1.0,
     };
-    // Race-pace work is aerobic, so it tolerates more volume than VO2max work.
-    final blocks = math
-        .min(weekKm * 0.15 / blockKm, workBudget * 0.7 / blockKm)
-        .floor()
-        .clamp(2, 6);
+    // Race-pace work is aerobic, but it still shares the week with another
+    // stimulus. Scale both block length and count to the actual session budget;
+    // forcing two 3 km blocks is what used to double low-volume weeks.
+    final maxWorkKm = math.min(weekKm * 0.12, workBudget * 0.70);
+    final blockKm = math.min(desiredBlockKm, math.max(0.4, maxWorkKm));
+    final blocks = math.max(1, (maxWorkKm / blockKm).floor()).clamp(1, 6);
     final restSec = goal == RunPlanGoalKind.fiveK ? 90 : 120;
     final restKm = blocks * restSec / book.estEasy;
     return RunPlanTemplateWorkout(

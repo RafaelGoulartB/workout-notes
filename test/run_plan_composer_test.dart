@@ -90,10 +90,7 @@ void main() {
         RunPlanTemplates.fiveK,
         config(),
       );
-      final kinds = schedule
-          .expand((w) => w)
-          .map((s) => s.kind)
-          .toSet();
+      final kinds = schedule.expand((w) => w).map((s) => s.kind).toSet();
       expect(kinds.contains(RunWorkoutKind.interval), isTrue);
       expect(kinds.contains(RunWorkoutKind.tempo), isTrue);
       expect(
@@ -117,10 +114,7 @@ void main() {
       expect(schedule.first.every((s) => !_isQuality(s.kind)), isTrue);
       // Later build weeks must include quality — not just easy + long.
       final later = schedule.skip(2).take(4);
-      expect(
-        later.any((week) => week.any((s) => _isQuality(s.kind))),
-        isTrue,
-      );
+      expect(later.any((week) => week.any((s) => _isQuality(s.kind))), isTrue);
     });
 
     test('recovery week drops to a single soft quality session', () {
@@ -129,10 +123,7 @@ void main() {
         config(),
       );
       // Week index 3 is recovery (w > 0 && w % 4 == 3).
-      expect(
-        schedule[3].where((s) => _isQuality(s.kind)),
-        hasLength(1),
-      );
+      expect(schedule[3].where((s) => _isQuality(s.kind)), hasLength(1));
       expect(
         schedule[2].where((s) => _isQuality(s.kind)).length,
         greaterThanOrEqualTo(2),
@@ -231,10 +222,16 @@ void main() {
       expect(week.every((s) => s.kind == RunWorkoutKind.easy), isTrue);
     });
 
-    test('run-walk is capped at four days a week', () {
+    test('beginner and return plans are capped at four days a week', () {
       // Bone and tendon adaptation lags the cardiovascular system: a brand-new
-      // runner must not be offered a fifth run/walk day.
-      expect(RunPlanTemplates.runWalk.allowedSessionsPerWeek, isNot(contains(5)));
+      // or returning runner must not be offered a fifth impact day.
+      for (final template in [
+        RunPlanTemplates.runWalk,
+        RunPlanTemplates.returnToRunning,
+        RunPlanTemplates.firstFiveK,
+      ]) {
+        expect(template.allowedSessionsPerWeek, isNot(contains(5)));
+      }
     });
   });
 }

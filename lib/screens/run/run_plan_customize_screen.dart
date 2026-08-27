@@ -28,6 +28,7 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
   final Set<int> _days = {};
   RunPlanIntent _intent = RunPlanIntent.finish;
   RunPlanIntensity _intensity = RunPlanIntensity.standard;
+  bool _includeHills = true;
   bool _skipPace = false;
   _PaceSource _paceSource = _PaceSource.goal;
   late double _paceDistanceMeters;
@@ -44,8 +45,11 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     _sessions = allowed.contains(preferred) ? preferred : allowed.last;
     _paceDistanceMeters = _defaultDistance(widget.template.goalKind);
     _seedDefaultDays();
-    if (widget.template.level == RunPlanTemplateLevel.beginner &&
-        widget.template.key == 'return') {
+    if (widget.template.key == 'return' ||
+        widget.template.key == 'first_5k' ||
+        widget.template.key == 'first_10k' ||
+        widget.template.key == 'first_half' ||
+        widget.template.key == 'first_marathon') {
       _intent = RunPlanIntent.finish;
     } else if (widget.template.style == RunPlanTemplateStyle.performance ||
         widget.template.raceFinish) {
@@ -67,7 +71,7 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     final raw = _weeklyKmCtl.text.trim().replaceAll(',', '.');
     if (raw.isEmpty) return null;
     final value = double.tryParse(raw);
-    if (value == null || value <= 0) return null;
+    if (value == null || value < 0) return null;
     return value;
   }
 
@@ -119,6 +123,7 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     calibration: _calibration,
     raceDate: _raceDate,
     currentWeeklyKm: _currentWeeklyKm,
+    includeHills: _includeHills,
   );
 
   List<RunPlanTemplateWorkout> get _weekPreview {
@@ -148,12 +153,18 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     if (readiness == null) return const SizedBox.shrink();
     final messages = <String>[
       if (readiness.consecutiveDays) loc.runPlanCustomizeWarnConsecutiveDays,
+      if (full && readiness.baselineZero) loc.runPlanCustomizeWarnZeroBaseline,
       if (full && readiness.volumeGap)
         loc.runPlanCustomizeWarnVolumeGap(
           _km(readiness.startWeeklyKm),
           _km(readiness.currentWeeklyKm ?? 0),
         ),
-      if (full && readiness.longRunShort)
+      if (full && readiness.timeCapDistanceGap)
+        loc.runPlanCustomizeWarnTimeCapGap(
+          _km(readiness.longRunCapKm),
+          _km(readiness.requiredLongKm),
+        )
+      else if (full && readiness.longRunShort)
         loc.runPlanCustomizeWarnLongRunShort(
           _km(readiness.peakLongKm),
           _km(readiness.requiredLongKm),
@@ -161,10 +172,17 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     ];
     if (messages.isEmpty) return const SizedBox.shrink();
     final scheme = theme.colorScheme;
+    final blocking = full && !readiness.canCreate;
+    final background = blocking
+        ? scheme.errorContainer
+        : scheme.tertiaryContainer;
+    final foreground = blocking
+        ? scheme.onErrorContainer
+        : scheme.onTertiaryContainer;
     return Padding(
       padding: const EdgeInsets.only(top: 16),
       child: Card(
-        color: scheme.tertiaryContainer,
+        color: background,
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -172,15 +190,12 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
             children: [
               Row(
                 children: [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    color: scheme.onTertiaryContainer,
-                  ),
+                  Icon(Icons.warning_amber_rounded, color: foreground),
                   const SizedBox(width: 8),
                   Text(
                     loc.runPlanCustomizeWarnTitle,
                     style: theme.textTheme.titleSmall?.copyWith(
-                      color: scheme.onTertiaryContainer,
+                      color: foreground,
                     ),
                   ),
                 ],
@@ -189,8 +204,16 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
                 const SizedBox(height: 8),
                 Text(
                   message,
+                  style: theme.textTheme.bodySmall?.copyWith(color: foreground),
+                ),
+              ],
+              if (blocking) ...[
+                const SizedBox(height: 8),
+                Text(
+                  loc.runPlanCustomizeBlocked,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.onTertiaryContainer,
+                    color: foreground,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -202,7 +225,7 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
   }
 
   Future<void> _create() async {
-    if (_creating || !_daysValid) return;
+    if (_creating || !_daysValid || !(_readiness?.canCreate ?? false)) return;
     setState(() => _creating = true);
     try {
       final isPt = Localizations.localeOf(context).languageCode == 'pt';
@@ -233,7 +256,7 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
       0 => _daysValid,
       1 => true,
       2 => _skipPace || _calibration != null,
-      _ => _daysValid,
+      _ => _daysValid && (_readiness?.canCreate ?? false),
     };
 
     return Scaffold(
@@ -500,6 +523,16 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
               ),
           ],
         ),
+        if (widget.template.style == RunPlanTemplateStyle.performance) ...[
+          const SizedBox(height: 16),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(loc.runPlanCustomizeIncludeHills),
+            subtitle: Text(loc.runPlanCustomizeIncludeHillsHelp),
+            value: _includeHills,
+            onChanged: (value) => setState(() => _includeHills = value),
+          ),
+        ],
         const SizedBox(height: 24),
         Text(
           loc.runPlanCustomizeBaselineTitle,

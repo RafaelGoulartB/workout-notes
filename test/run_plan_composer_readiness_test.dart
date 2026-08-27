@@ -23,6 +23,7 @@ RunPlanBuildConfig _config({
   RunPlanIntensity intensity = RunPlanIntensity.standard,
   RunPlanPaceCalibration? calibration,
   double? currentWeeklyKm,
+  bool includeHills = true,
 }) => RunPlanBuildConfig(
   sessionsPerWeek: sessions,
   availableDays: days,
@@ -30,6 +31,7 @@ RunPlanBuildConfig _config({
   intensity: intensity,
   calibration: calibration,
   currentWeeklyKm: currentWeeklyKm,
+  includeHills: includeHills,
 );
 
 void main() {
@@ -82,14 +84,47 @@ void main() {
       expect(gap.startWeeklyKm, greaterThan(8 * 1.25));
     });
 
-    test('long-run requirement is bounded by the time-on-feet cap', () {
-      // A slow runner's marathon long run is capped near 3 h; the plan must
-      // not be flagged for respecting its own ceiling.
+    test('time-on-feet cap does not hide a marathon preparation gap', () {
+      // Keeping a slow runner under three hours is sensible. Calling an
+      // 18.5 km peak sufficient preparation for 42.2 km is not.
       final ready = RunPlanComposer.assess(
         RunPlanTemplates.marathon,
         _config(calibration: _slow, currentWeeklyKm: 35),
       );
-      expect(ready.longRunShort, isFalse);
+      expect(ready.longRunCapKm, lessThan(25));
+      expect(ready.requiredLongKm, greaterThan(27));
+      expect(ready.timeCapDistanceGap, isTrue);
+      expect(ready.longRunShort, isTrue);
+      expect(ready.canCreate, isFalse);
+    });
+
+    test('zero is a real baseline and blocks non-run-walk plans', () {
+      final marathon = RunPlanComposer.assess(
+        RunPlanTemplates.marathon,
+        _config(currentWeeklyKm: 0),
+      );
+      expect(marathon.baselineZero, isTrue);
+      expect(marathon.canCreate, isFalse);
+
+      final runWalk = RunPlanComposer.assess(
+        RunPlanTemplates.runWalk,
+        _config(sessions: 3, days: const [2, 4, 7], currentWeeklyKm: 0),
+      );
+      expect(runWalk.baselineZero, isFalse);
+      expect(runWalk.canCreate, isTrue);
+    });
+
+    test('readiness reports the materialised first week exactly', () {
+      final config = _config(
+        sessions: 4,
+        days: const [1, 3, 5, 7],
+        intensity: RunPlanIntensity.conservative,
+        calibration: _slow,
+        currentWeeklyKm: 8,
+      );
+      final schedule = RunPlanComposer.compose(RunPlanTemplates.fiveK, config);
+      final readiness = RunPlanComposer.assess(RunPlanTemplates.fiveK, config);
+      expect(readiness.startWeeklyKm, closeTo(_weekKm(schedule.first), 0.001));
     });
 
     test('three consecutive days are flagged only on 3–4 day weeks', () {
@@ -248,6 +283,137 @@ void main() {
         );
         expect(taper.any((s) => s.kind == RunWorkoutKind.hills), isFalse);
       }
+    });
+  });
+
+  group('whole-plan load', () {
+    test('no training week contains more than two load-bearing sessions', () {
+      for (final template in [
+        RunPlanTemplates.half,
+        RunPlanTemplates.halfPerformance,
+        RunPlanTemplates.marathon,
+      ]) {
+        for (final intent in RunPlanIntent.values) {
+          final schedule = RunPlanComposer.compose(
+            template,
+            _config(
+              sessions: 5,
+              days: const [1, 2, 4, 6, 7],
+              intent: intent,
+              calibration: _mid,
+              currentWeeklyKm: template.prerequisiteWeeklyKm,
+            ),
+          );
+          for (final week in schedule.take(schedule.length - 1)) {
+            final loadBearing = week.where((session) => session.kind.isQuality);
+            expect(
+              loadBearing.length,
+              lessThanOrEqualTo(2),
+              reason:
+                  '${template.key}/${intent.name}: '
+                  '${loadBearing.map((s) => s.name).join(', ')}',
+            );
+          }
+        }
+      }
+    });
+
+    test('beginner plans carry at most one structured quality session', () {
+      for (final template in [
+        RunPlanTemplates.returnToRunning,
+        RunPlanTemplates.firstFiveK,
+        RunPlanTemplates.firstTenK,
+      ]) {
+        for (final sessions in template.allowedSessionsPerWeek) {
+          final schedule = RunPlanComposer.compose(
+            template,
+            _config(
+              sessions: sessions,
+              days: const [1, 2, 4, 6, 7].sublist(0, sessions),
+            ),
+          );
+          for (final week in schedule.take(schedule.length - 1)) {
+            expect(
+              week.where((session) => session.kind.isQuality).length,
+              lessThanOrEqualTo(1),
+              reason: '${template.key}/$sessions',
+            );
+          }
+        }
+      }
+    });
+
+    test('actual build-line growth stays near ten percent at low volume', () {
+      final schedule = RunPlanComposer.compose(
+        RunPlanTemplates.half,
+        _config(
+          sessions: 4,
+          days: const [1, 3, 5, 7],
+          intensity: RunPlanIntensity.conservative,
+          calibration: _slow,
+          currentWeeklyKm: 8,
+        ),
+      );
+      var lastBuild = 0.0;
+      for (var i = 0; i < schedule.length - 1; i++) {
+        final recovery = i > 0 && i % 4 == 3;
+        final taper = i >= schedule.length - 2;
+        if (recovery || taper) continue;
+        final current = _weekKm(schedule[i]);
+        if (lastBuild > 0) {
+          expect(
+            current,
+            lessThanOrEqualTo(lastBuild * 1.11),
+            reason: 'week ${i + 1}: $lastBuild -> $current',
+          );
+        }
+        lastBuild = current;
+      }
+    });
+
+    test('disabling hills replaces every hill session with flat work', () {
+      for (final template in [
+        RunPlanTemplates.fiveK,
+        RunPlanTemplates.tenK,
+        RunPlanTemplates.half,
+        RunPlanTemplates.marathon,
+      ]) {
+        final schedule = RunPlanComposer.compose(
+          template,
+          _config(
+            intent: RunPlanIntent.pb,
+            includeHills: false,
+            currentWeeklyKm: template.prerequisiteWeeklyKm,
+          ),
+        );
+        expect(
+          schedule
+              .expand((week) => week)
+              .any((session) => session.kind == RunWorkoutKind.hills),
+          isFalse,
+          reason: template.key,
+        );
+        expect(
+          schedule
+              .expand((week) => week)
+              .any((session) => session.kind == RunWorkoutKind.fartlek),
+          isTrue,
+          reason: '${template.key} lost the replacement stimulus',
+        );
+      }
+    });
+
+    test('aerobic-base plan stays easy apart from strides', () {
+      final schedule = RunPlanComposer.compose(
+        RunPlanTemplates.base,
+        _config(currentWeeklyKm: 12),
+      );
+      expect(
+        schedule
+            .expand((week) => week)
+            .any((session) => session.kind.isQuality),
+        isFalse,
+      );
     });
   });
 

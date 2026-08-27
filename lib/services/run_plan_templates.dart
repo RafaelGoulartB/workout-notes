@@ -132,14 +132,17 @@ class RunPlanTemplate {
 
   /// Suggested days/week choices for the customize wizard.
   ///
-  /// A run/walk progression caps at four days: bone and tendon adaptation lags
-  /// the cardiovascular system, so a brand-new runner gains nothing from a
-  /// fifth day and takes on the injury risk of one.
-  List<int> get allowedSessionsPerWeek => switch (style) {
-    RunPlanTemplateStyle.runWalk => const [3, 4],
-    RunPlanTemplateStyle.continuous => const [3, 4, 5],
-    RunPlanTemplateStyle.performance => const [3, 4, 5],
-  };
+  /// Beginner and return progressions cap at four days: bone and tendon
+  /// adaptation lags the cardiovascular system, so these runners gain little
+  /// from a fifth impact day and take on avoidable injury risk.
+  List<int> get allowedSessionsPerWeek {
+    if (style == RunPlanTemplateStyle.runWalk ||
+        key == 'return' ||
+        key == 'first_5k') {
+      return const [3, 4];
+    }
+    return const [3, 4, 5];
+  }
 }
 
 abstract final class RunPlanTemplates {
