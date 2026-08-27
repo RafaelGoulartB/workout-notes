@@ -146,9 +146,10 @@
   <div class="kicker">run_plan_composer · revisão de qualidade dos planos</div>
   <h1>Os planos de corrida agora começam onde o atleta está e chegam onde a prova exige</h1>
   <p>Revisão do gerador de planos por objetivo (<code>lib/services/run_plan_templates.dart</code> +
-  <code>lib/services/run_plan_composer.dart</code>): 76 cenários gerados e inspecionados semana a
-  semana, sete problemas de prescrição corrigidos, uma API de prontidão (<code>RunPlanComposer.assess</code>)
-  ligada ao wizard, 15 testes novos. Nada na arquitetura mudou — mudaram as regras dentro de
+  <code>lib/services/run_plan_composer.dart</code>): mais de mil combinações geradas e validadas semana a
+  semana, problemas de prescrição e de carga materializada corrigidos, uma API de prontidão
+  (<code>RunPlanComposer.assess</code>) ligada ao wizard e uma matriz permanente de regressão.
+  Nada na arquitetura mudou — mudaram as regras dentro de
   <code>_planWeeks</code>, <code>_rolesForWeek</code>, <code>_buildWeek</code> e das sessões.</p>
 </header>
 
@@ -162,9 +163,10 @@ semana, limiar ≤ 10%, taper que mantém intensidade, semana de recuperação a
 problemas estavam nas bordas que o usuário real atinge: 3 dias por semana, iniciantes e volume
 atual muito abaixo do template.</p>
 
-<p>Para avaliar, cada template foi composto em 3/4/5 dias × <em>finish</em>/PB × com e sem
-calibração × com volume atual de 8 km × dias consecutivos, e o resultado foi lido sessão por
-sessão. A mesma bateria rodou depois das mudanças; os números abaixo vêm dela.</p>
+<p>Para avaliar, cada template foi composto em todas as frequências permitidas ×
+<em>finish</em>/PB × três intensidades × três calibrações × diferentes volumes atuais × com e sem
+morros. O resultado foi validado sessão por sessão e semana por semana; a mesma matriz agora vive
+como teste de regressão.</p>
 
 <figure class="fig">
 <svg viewBox="0 0 860 250" role="img" aria-label="Fluxo do compositor: template e configuração do wizard entram; planWeeks, rolesForWeek e buildWeek produzem o plano; assess produz os avisos que o wizard exibe.">
@@ -211,7 +213,7 @@ sessão. A mesma bateria rodou depois das mudanças; os números abaixo vêm del
   <path class="arrow" d="M605 132 H 640 V 70 H 668" marker-end="url(#ah)"/>
   <path class="arrow" d="M605 188 H 668" marker-end="url(#ah)"/>
 </svg>
-<figcaption><code>assess</code> reaproveita <code>_planWeeks</code>: o aviso é calculado sobre a mesma escada que vira plano, não sobre uma estimativa paralela.</figcaption>
+<figcaption><code>assess</code> compõe o mesmo plano entregue e mede suas sessões materializadas; avisos e bloqueios não dependem de uma estimativa paralela.</figcaption>
 </figure>
 
 <div class="tbl-scroll">
@@ -328,13 +330,13 @@ cabe é volume que a semana não recebe: reduzir a semana é a resposta certa qu
 semana de 64 para 55,8 km.</p>
 
 <div class="note warn">
-<strong>O longão continua sendo a maior corrida da semana — agora por construção.</strong>
-Com pisos de qualidade (seção 05) e semanas de 8–10 km em 5 dias, um limiar de 15 min mais
-aquecimento ultrapassava um longão de 4 km. <code>_buildWeek</code> passou a construir as sessões
-de qualidade primeiro e o longão por último, elevando-o para <code>1,05 ×</code> a maior sessão
-de qualidade se preciso; o piso da rodagem leve (2,5 km) também cede para <code>0,85 × longão</code>
-quando o longão é menor que 3 km. O teste "the long run is the longest session of its week" roda
-sobre todos os templates × dias × 3 calibrações.
+<strong>O longão continua sendo a maior corrida da semana — agora sem inflar o orçamento.</strong>
+Com semanas pequenas, aquecimento, trabalho e desaquecimento podiam ultrapassar o longão.
+<code>_buildWeek</code> constrói a qualidade primeiro, mas a transforma em rodagem fácil quando ela
+não cabe no volume disponível ou ficaria maior que o longão. O piso de 2,5 km das rodagens só é
+aplicado quando existe orçamento para todas; o restante é distribuído depois desses pisos, sem
+contá-los duas vezes. A matriz falha diante de qualquer sessão zerada ou longão menor que uma
+rodagem de suporte.
 </div>
 
 <h2 id="qualidade"><span class="num">05</span>Qualidade com piso, não só com cap</h2>
@@ -371,51 +373,54 @@ Quem passava pelo wizard recebia, a partir da semana 3, intervalado a RPE 8–9,
 enquanto o template bruto (usado quando não há configuração) era 100% leve. Duas versões do mesmo
 plano, e a mais dura ia para quem menos aguenta.</p>
 
-<p><strong>Templates <code>continuous</code> de nível <code>beginner</code> só recebem fartlek e
-progressivo</strong> (<code>_gentleQuality</code>: alterna a cada semana; com dois slots de
-qualidade, um de cada). São os dois estímulos que ensinam troca de ritmo e chegada forte a esforço
-controlado (RPE 5–7). VO₂ e morros ficam nos templates de performance, que assumem a distância já
-completada. Vale para Primeiros 5 km, Voltar a correr, 5→10 km e Base; o teste percorre 3/4/5 dias e
-falha se aparecer <code>interval</code> ou <code>hills</code>.</p>
+<p><strong>Templates <code>continuous</code> de nível <code>beginner</code> têm no máximo um estímulo
+controlado por semana</strong>, alternando fartlek e progressivo. VO₂ e morros ficam nos templates de
+performance, que assumem a distância já completada. Base permanece inteiramente aeróbico; Começar,
+Voltar a correr e Primeiros 5 km são limitados a quatro dias para evitar um quinto dia de impacto.
+A matriz falha se um iniciante receber mais de uma sessão de qualidade.</p>
 
 <h2 id="checagem"><span class="num">07</span>A checagem do treinador no wizard</h2>
 
-<p>O compositor não pode recusar as escolhas do atleta — 3 dias, 8 km/semana e uma meia em 14
-semanas é uma combinação legítima de pedir. O que ele não pode é ficar em silêncio.
+<p>O compositor preserva as escolhas viáveis do atleta, mas não cria silenciosamente um plano que
+começa muito acima do volume atual ou não alcança o longão mínimo do objetivo.
 <code>RunPlanComposer.assess(template, config)</code> devolve um <code>RunPlanReadiness</code>
-calculado sobre a mesma escada que vira plano, e <code>run_plan_customize_screen.dart</code> mostra
-um card "Checagem do treinador" na etapa de dias (só o aviso de agenda) e na de preview (todos).</p>
+calculado sobre as sessões realmente materializadas. <code>run_plan_customize_screen.dart</code>
+mostra um card "Checagem do treinador" e desabilita "Criar plano" diante de um bloqueio.</p>
 
 <div class="tbl-scroll">
 <table>
 <thead><tr><th>Sinal</th><th>Dispara quando</th><th>O que o atleta lê</th></tr></thead>
 <tbody>
+<tr><td><code>baselineZero</code></td><td>o atleta informou explicitamente 0 km/semana em qualquer plano que não seja Começar a correr</td><td>Direciona para a progressão corrida/caminhada; deixar em branco continua representando "não informado".</td></tr>
 <tr><td><code>volumeGap</code></td><td><code>startWeeklyKm &gt; 1,25 × currentWeeklyKm</code> <span class="muted">(só com volume informado)</span></td><td>"A semana 1 começa com X km, mas você corre cerca de Y km hoje…" — sugere volume conservador ou o plano de Base antes.</td></tr>
-<tr><td><code>longRunShort</code></td><td><code>peakLongKm &lt; requiredLongKm − 0,5</code>, com <code>required</code> = 100% da prova (5/10 km), 80% (meia, 16,9 km), 65% (maratona, 27,4 km), limitado pelo cap de tempo do longão (150 min; 180 min na maratona)</td><td>"O longão chega a X km, mas esta prova pede cerca de Y km…" — adicionar dias, subir volume ou escolher objetivo mais curto.</td></tr>
+<tr><td><code>longRunShort</code></td><td><code>peakLongKm &lt; requiredLongKm − 0,5</code>, com <code>required</code> = 100% da prova (5/10 km), 80% (meia, 16,9 km) ou 65% (maratona, 27,4 km)</td><td>"O longão chega a X km, mas esta prova pede cerca de Y km…" — adicionar dias, subir volume ou escolher objetivo mais curto.</td></tr>
+<tr><td><code>timeCapDistanceGap</code></td><td>o limite seguro de 150/180 min impede alcançar o longão mínimo da prova</td><td>Explica separadamente que o limite por tempo torna aquele objetivo incompatível com a configuração atual.</td></tr>
 <tr><td><code>consecutiveDays</code></td><td>3 dias seguidos (circular, Dom→Seg conta) numa semana de ≤4 dias</td><td>"Três dias de corrida seguidos sem descanso…" — espalhar se puder.</td></tr>
 </tbody>
 </table>
 </div>
 
-<p>O cap de tempo entra na conta do <code>required</code> de propósito: um corredor de 5 km em
-38:00 tem o longão de maratona limitado a 18,5 km (180 min a 9:43/km). Isso é uma decisão do
-compositor, não uma falha do plano — se <code>assess</code> comparasse com 27,4 km, esse atleta
-seria avisado para sempre e o aviso perderia valor. Ele recebe, em vez disso, o
-<code>volumeGap</code> quando o salto de volume existe.</p>
+<p>O cap de tempo não reduz mais o requisito da prova. Um corredor de 5 km em 38:00 ainda tem o
+longão limitado a cerca de 18,5 km por segurança, mas a maratona continua exigindo cerca de
+27,4 km de pico nesta regra. O wizard mostra o conflito e bloqueia a criação, em vez de chamar
+18,5 km de preparação suficiente.</p>
 
-<h2 id="fora"><span class="num">08</span>O que ficou de fora e como conferir</h2>
+<h2 id="fora"><span class="num">08</span>Correções finais e como conferir</h2>
 
 <ul>
-  <li><strong>O cap de +10% por semana ainda vale sobre o orçamento, não sobre os km realizados.</strong> As sessões de qualidade são dimensionadas fora do orçamento (passo 1) e as leves têm piso, então uma semana real pode crescer 12–14% (5 km, 3 dias, semanas 5→7). Corrigir exige redistribuir depois do passo 2 e mexer no tamanho da qualidade; ficou documentado, não feito.</li>
+  <li><strong>O cap de +10% vale sobre os km realizados.</strong> A composição mede a semana pronta e a reconstrói quando necessário. Semanas de recuperação não substituem a última referência de build.</li>
+  <li><strong>Não há três sessões duras.</strong> Iniciantes têm no máximo uma; os demais, duas. Longão com blocos no ritmo de prova já conta como uma delas, e planos de meia/maratona com intenção <em>finish</em> reservam só uma qualidade no meio da semana.</li>
+  <li><strong>Morros são opcionais.</strong> O wizard oferece "Incluir treinos em subida". Quando desligado, cada sessão de morros vira fartlek de esforço equivalente em terreno plano, preservando o objetivo fisiológico sem exigir uma ladeira segura.</li>
+  <li><strong>Blocos específicos escalam com a semana.</strong> Repetições no ritmo de prova e longões específicos não têm mais mínimos fixos capazes de estourar a quilometragem; se uma qualidade não couber, ela vira rodagem fácil.</li>
   <li><strong>Templates brutos de performance continuam desbalanceados</strong> (longão de 58–72% da semana) — são blueprint para o compositor. Só importa se algum caminho chamar <code>RunPlanTemplates.create</code> com <code>config == null</code>; o wizard sempre passa configuração.</li>
-  <li><strong>Maratona em 5 dias com PB ainda tem semanas de três sessões duras</strong> (ritmo de prova + limiar + longão com blocos). É escolha de quem pede PB; para <em>finish</em> o segundo slot poderia virar progressivo — não alterado.</li>
 </ul>
 
-<p>Para validar: <code>flutter test test/run_plan_composer_readiness_test.dart</code> (15 testes:
-prontidão, âncora, teto da leve, pisos de qualidade, trilha de iniciante, longão sempre maior) e
-<code>flutter test</code> completo (703 testes). A única mudança em teste existente foi a tolerância
-da fração do longão na maratona, de 0,50 para 0,505 — a fração passou a ser exatamente 50% e o
-arredondamento de 10 m empurra para 0,5001.</p>
+<p>Para validar: <code>run_plan_composer_product_quality_test.dart</code> percorre mais de mil
+combinações de template, frequência, intenção, intensidade, pace, volume atual e disponibilidade
+de morros. Ele rejeita crescimento materializado acima do limite, sessão zerada, excesso de
+qualidade, trabalho intenso desproporcional, morros quando desativados e divergência entre
+<code>assess</code> e o plano entregue. <code>run_plan_customize_screen_test.dart</code> cobre a opção
+de morros e o bloqueio de volume zero.</p>
 
 <footer>
   Gerado a partir do código em <code>lib/services/run_plan_composer.dart</code> e
