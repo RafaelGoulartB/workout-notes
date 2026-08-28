@@ -851,27 +851,29 @@ class _ReportNarrative extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pt = Localizations.localeOf(context).languageCode == 'pt';
+    final loc = AppLocalizations.of(context)!;
     final averageEnergy = checkins.isEmpty
         ? null
         : checkins.map((item) => item.energy).reduce((a, b) => a + b) /
               checkins.length;
     final sentences = <String>[
-      pt
-          ? '${metrics.workoutCount} treinos e ${metrics.completedSets} séries concluídas foram registrados no período.'
-          : '${metrics.workoutCount} workouts and ${metrics.completedSets} completed sets were logged in the period.',
+      loc.periodizationReportTrainingNarrative(
+        metrics.workoutCount,
+        metrics.completedSets,
+      ),
       if (metrics.nutritionDaysLogged > 0)
-        pt
-            ? 'A alimentação foi registrada em ${metrics.nutritionDaysLogged} dias, com média de ${metrics.averageCalories?.round() ?? 0} kcal.'
-            : 'Nutrition was logged on ${metrics.nutritionDaysLogged} days, averaging ${metrics.averageCalories?.round() ?? 0} kcal.',
+        loc.periodizationReportNutritionNarrative(
+          metrics.nutritionDaysLogged,
+          metrics.averageCalories?.round() ?? 0,
+        ),
       if (metrics.weightChangeKg != null)
-        pt
-            ? 'A mudança de peso observada foi ${metrics.weightChangeKg!.toStringAsFixed(1)} kg.'
-            : 'Observed weight change was ${metrics.weightChangeKg!.toStringAsFixed(1)} kg.',
+        loc.periodizationReportWeightNarrative(
+          metrics.weightChangeKg!.toStringAsFixed(1),
+        ),
       if (averageEnergy != null)
-        pt
-            ? 'Energia média nas revisões: ${averageEnergy.toStringAsFixed(1)}/5.'
-            : 'Average energy in reviews: ${averageEnergy.toStringAsFixed(1)}/5.',
+        loc.periodizationReportEnergyNarrative(
+          averageEnergy.toStringAsFixed(1),
+        ),
     ];
     return Card(
       margin: EdgeInsets.zero,

@@ -39,18 +39,10 @@ class FrequencyCharts extends StatelessWidget {
               const SizedBox(height: 10),
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: WorkoutHeatmap(
-                  dailyData: heatmapData,
-                  year: year,
-                ),
+                child: WorkoutHeatmap(dailyData: heatmapData, year: year),
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Spacer(),
-                  _buildLegend(theme, loc),
-                ],
-              ),
+              Row(children: [const Spacer(), _buildLegend(theme, loc)]),
             ],
           ),
         ),
@@ -61,13 +53,9 @@ class FrequencyCharts extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: _DayOfWeekChart(workoutDates: workoutDates),
-              ),
+              Expanded(child: _DayOfWeekChart(workoutDates: workoutDates)),
               const SizedBox(width: 10),
-              Expanded(
-                child: _TimeOfDayChart(workoutDates: workoutDates),
-              ),
+              Expanded(child: _TimeOfDayChart(workoutDates: workoutDates)),
             ],
           ),
         ],
@@ -122,8 +110,7 @@ class _WeeklyFrequencyChart extends StatelessWidget {
     final weeks = <_WeekBar>[];
 
     for (int i = 11; i >= 0; i--) {
-      final weekStart =
-          now.subtract(Duration(days: now.weekday - 1 + (i * 7)));
+      final weekStart = now.subtract(Duration(days: now.weekday - 1 + (i * 7)));
       final weekEnd = weekStart.add(const Duration(days: 6));
       final startStr = weekStart.toIso8601String().substring(0, 10);
       final endStr = weekEnd.toIso8601String().substring(0, 10);
@@ -135,14 +122,12 @@ class _WeeklyFrequencyChart extends StatelessWidget {
           count++;
         }
       }
-      weeks.add(_WeekBar(
-        weekLabel(weekStart, loc.progressWeekAbbreviation),
-        count,
-      ));
+      weeks.add(
+        _WeekBar(weekLabel(weekStart, loc.progressWeekAbbreviation), count),
+      );
     }
 
-    final maxCount =
-        weeks.fold<int>(0, (a, b) => a > b.count ? a : b.count);
+    final maxCount = weeks.fold<int>(0, (a, b) => a > b.count ? a : b.count);
     final total = weeks.fold<int>(0, (a, b) => a + b.count);
     final avg = total / weeks.length;
 
@@ -164,7 +149,7 @@ class _WeeklyFrequencyChart extends StatelessWidget {
                 maxY: maxCount < 5 ? 5 : maxCount * 1.25,
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
-                    tooltipRoundedRadius: 10,
+                    tooltipBorderRadius: BorderRadius.circular(10),
                     getTooltipColor: (_) => theme.colorScheme.inverseSurface,
                     getTooltipItem: (g, gi, r, ri) {
                       final w = weeks[gi];
@@ -235,8 +220,9 @@ class _WeeklyFrequencyChart extends StatelessWidget {
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval:
-                      niceInterval(maxCount > 0 ? maxCount / 4 : 1),
+                  horizontalInterval: niceInterval(
+                    maxCount > 0 ? maxCount / 4 : 1,
+                  ),
                   getDrawingHorizontalLine: (v) => FlLine(
                     color: theme.colorScheme.outlineVariant.withAlpha(60),
                     strokeWidth: 1,
@@ -290,15 +276,7 @@ class _DayOfWeekChart extends StatelessWidget {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
 
-    final dowCount = <int, int>{
-      0: 0,
-      1: 0,
-      2: 0,
-      3: 0,
-      4: 0,
-      5: 0,
-      6: 0,
-    };
+    final dowCount = <int, int>{0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0};
     for (final wd in workoutDates) {
       final dow = wd['day_of_week'] as int? ?? 0;
       dowCount[dow] = (dowCount[dow] ?? 0) + 1;
@@ -333,7 +311,7 @@ class _DayOfWeekChart extends StatelessWidget {
                 maxY: maxVal < 3 ? 3 : maxVal * 1.25,
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
-                    tooltipRoundedRadius: 8,
+                    tooltipBorderRadius: BorderRadius.circular(8),
                     getTooltipColor: (_) => theme.colorScheme.inverseSurface,
                     getTooltipItem: (g, gi, r, ri) {
                       return BarTooltipItem(
@@ -506,8 +484,7 @@ class _TimeOfDayChart extends StatelessWidget {
                             PieChartSectionData(
                               color: colors[i],
                               value: values[i].toDouble(),
-                              title:
-                                  '${(values[i] / total * 100).round()}%',
+                              title: '${(values[i] / total * 100).round()}%',
                               titleStyle: const TextStyle(
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,

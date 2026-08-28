@@ -57,7 +57,7 @@ class NutritionBarChart extends StatelessWidget {
           minY: 0,
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
-              tooltipRoundedRadius: 10,
+              tooltipBorderRadius: BorderRadius.circular(10),
               tooltipPadding: const EdgeInsets.symmetric(
                 horizontal: 10,
                 vertical: 6,
@@ -219,12 +219,8 @@ class WeeklyMacroBarChart extends StatelessWidget {
     }
     final maxValue = points.fold<double>(
       0,
-      (acc, p) => [
-        p.protein,
-        p.carbs,
-        p.fat,
-        acc,
-      ].reduce((a, b) => a > b ? a : b),
+      (acc, p) =>
+          [p.protein, p.carbs, p.fat, acc].reduce((a, b) => a > b ? a : b),
     );
     final chartMax = _positiveMax(maxValue * 1.25);
     final labelStep = (points.length / 12).ceil().clamp(1, 99);
@@ -237,7 +233,7 @@ class WeeklyMacroBarChart extends StatelessWidget {
           minY: 0,
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
-              tooltipRoundedRadius: 10,
+              tooltipBorderRadius: BorderRadius.circular(10),
               tooltipPadding: const EdgeInsets.symmetric(
                 horizontal: 10,
                 vertical: 6,
@@ -413,9 +409,7 @@ class NutrientTrendChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final flat = [
-      for (final s in series) ...s.points,
-    ];
+    final flat = [for (final s in series) ...s.points];
     if (flat.isEmpty) {
       return const SizedBox(height: 120, child: Center(child: Text('—')));
     }
@@ -437,31 +431,30 @@ class NutrientTrendChart extends StatelessWidget {
           maxY: chartMax,
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
-              tooltipRoundedRadius: 10,
+              tooltipBorderRadius: BorderRadius.circular(10),
               tooltipPadding: const EdgeInsets.symmetric(
                 horizontal: 10,
                 vertical: 6,
               ),
               getTooltipColor: (_) => theme.colorScheme.inverseSurface,
-              getTooltipItems: (spots) =>
-                  spots.map((spot) {
-                    final index = spot.x.toInt();
-                    if (spot.barIndex < 0 ||
-                        spot.barIndex >= series.length ||
-                        index < 0 ||
-                        index >= series[spot.barIndex].points.length) {
-                      return null;
-                    }
-                    final point = series[spot.barIndex].points[index];
-                    return LineTooltipItem(
-                      '${point.tooltip}\n${formatValue(point.value)}',
-                      TextStyle(
-                        color: theme.colorScheme.onInverseSurface,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 11,
-                      ),
-                    );
-                  }).toList(),
+              getTooltipItems: (spots) => spots.map((spot) {
+                final index = spot.x.toInt();
+                if (spot.barIndex < 0 ||
+                    spot.barIndex >= series.length ||
+                    index < 0 ||
+                    index >= series[spot.barIndex].points.length) {
+                  return null;
+                }
+                final point = series[spot.barIndex].points[index];
+                return LineTooltipItem(
+                  '${point.tooltip}\n${formatValue(point.value)}',
+                  TextStyle(
+                    color: theme.colorScheme.onInverseSurface,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                );
+              }).toList(),
             ),
           ),
           titlesData: FlTitlesData(
@@ -544,10 +537,7 @@ class NutrientTrendChart extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      s.color.withAlpha(70),
-                      s.color.withAlpha(10),
-                    ],
+                    colors: [s.color.withAlpha(70), s.color.withAlpha(10)],
                   ),
                 ),
               ),

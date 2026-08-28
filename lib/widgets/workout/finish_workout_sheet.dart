@@ -97,10 +97,6 @@ class PR {
     required this.previous,
   });
 
-  String get label {
-    return type == 'weight' ? '🏋️ Peso Máximo' : '📦 Volume';
-  }
-
   IconData get icon =>
       type == 'weight' ? Icons.emoji_events : Icons.inventory_2;
 }

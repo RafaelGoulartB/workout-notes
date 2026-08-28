@@ -496,7 +496,9 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
       if (!mounted) return;
       _scaffoldMessengerKey.currentState?.showSnackBar(
         SnackBar(
-          content: Text('Erro ao reordenar: $e'),
+          content: Text(
+            AppLocalizations.of(context)!.commonReorderError(e.toString()),
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );

@@ -1389,7 +1389,7 @@ class _RollingLineChart extends StatelessWidget {
         maxY: safeMax,
         lineTouchData: LineTouchData(
           touchTooltipData: LineTouchTooltipData(
-            tooltipRoundedRadius: 10,
+            tooltipBorderRadius: BorderRadius.circular(10),
             tooltipPadding: const EdgeInsets.symmetric(
               horizontal: 10,
               vertical: 6,

@@ -68,7 +68,9 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao reordenar: $e'),
+          content: Text(
+            AppLocalizations.of(context)!.commonReorderError(e.toString()),
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -533,8 +535,10 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
                     Expanded(
                       child: Text(
                         setNumber > 0
-                            ? 'Editar Série $setNumber'
-                            : 'Adicionar Série',
+                            ? AppLocalizations.of(
+                                ctx,
+                              )!.activeWorkoutEditSetNumber(setNumber)
+                            : AppLocalizations.of(ctx)!.activeWorkoutAddSet,
                         style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -650,7 +654,7 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
-            tooltip: 'Mais opções',
+            tooltip: loc.commonMoreOptions,
             onSelected: (value) {
               switch (value) {
                 case 'edit_day':

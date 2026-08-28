@@ -178,18 +178,20 @@ class ExportService {
     required String dialogTitle,
     required String fileName,
     required Uint8List bytes,
-  }) {
-    return FilePicker.saveFile(
+  }) async {
+    final uri = await FilePicker.saveFile(
       dialogTitle: dialogTitle,
       fileName: fileName,
       type: FileType.custom,
       allowedExtensions: ['json'],
       bytes: bytes,
     );
+    if (uri == null) return null;
+    return uri.scheme == 'file' ? uri.toFilePath() : uri.toString();
   }
 
   static Future<void> _shareFileWithSheet(XFile file, String text) async {
-    await Share.shareXFiles([file], text: text);
+    await SharePlus.instance.share(ShareParams(files: [file], text: text));
   }
 
   // ===================================================================
@@ -293,7 +295,7 @@ class ExportService {
         (row['workout_comment'] as String?) ?? '',
       ]);
     }
-    final csvData = const ListToCsvConverter().convert(csvRows);
+    final csvData = csv.encode(csvRows);
     final dir = await getTemporaryDirectory();
     final file = File(
       '${dir.path}/workout_notes_export_${DateTime.now().millisecondsSinceEpoch}.csv',
@@ -315,7 +317,9 @@ class ExportService {
       endDate: endDate,
     );
     final file = XFile(path, mimeType: 'text/csv');
-    await Share.shareXFiles([file], text: 'Workout Notes - Export');
+    await SharePlus.instance.share(
+      ShareParams(files: [file], text: 'Workout Notes - Export'),
+    );
   }
 
   // ===================================================================
@@ -402,11 +406,11 @@ class ExportService {
             : loc.exportNutritionFlagComplete,
       ]);
     }
-    final csv = const ListToCsvConverter().convert(csvRows);
+    final csvData = csv.encode(csvRows);
     final dir = await getTemporaryDirectory();
     final path =
         '${dir.path}/workout_notes_nutrition_${DateTime.now().millisecondsSinceEpoch}.csv';
-    await File(path).writeAsString(csv);
+    await File(path).writeAsString(csvData);
     return path;
   }
 
@@ -421,7 +425,9 @@ class ExportService {
       loc: loc,
     );
     final file = XFile(path, mimeType: 'text/csv');
-    await Share.shareXFiles([file], text: loc.exportNutritionShareText);
+    await SharePlus.instance.share(
+      ShareParams(files: [file], text: loc.exportNutritionShareText),
+    );
   }
 
   static Map<String, String> _mealHeader(AppLocalizations loc) => {
@@ -482,7 +488,7 @@ class ExportService {
         text += '   $complete $i: $weight ${loc.workoutDetailKg} × $reps\n';
       }
     }
-    await Share.share(text);
+    await SharePlus.instance.share(ShareParams(text: text));
   }
 
   /// Returns the localized exercise name using the locale key, falling back

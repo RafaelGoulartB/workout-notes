@@ -312,7 +312,7 @@ mixin _ActiveWorkoutRoutineActions
             ),
             const SizedBox(height: 16),
             Text(
-              'Tempo de Descanso',
+              AppLocalizations.of(context)!.routinesRestTimeTitle,
               style: Theme.of(
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -375,9 +375,9 @@ mixin _ActiveWorkoutRoutineActions
               child: TextField(
                 controller: ctl,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Segundos',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.commonSeconds,
+                  border: const OutlineInputBorder(),
                 ),
                 autofocus: true,
               ),
@@ -399,7 +399,7 @@ mixin _ActiveWorkoutRoutineActions
                 Navigator.pop(ctx);
               }
             },
-            child: const Text('Definir'),
+            child: Text(AppLocalizations.of(context)!.activeWorkoutSetValue),
           ),
         ],
       ),

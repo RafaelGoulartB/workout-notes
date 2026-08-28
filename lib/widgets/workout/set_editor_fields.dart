@@ -104,7 +104,7 @@ class WorkoutSetFieldControls extends StatelessWidget {
                 onTap: () async {
                   final value = await _showDecimalEditor(
                     context,
-                    title: 'Editar peso',
+                    title: loc.activeWorkoutEditWeight,
                     current: weight,
                     suffix: 'kg',
                     maxDecimals: 2,
@@ -171,7 +171,7 @@ class WorkoutSetFieldControls extends StatelessWidget {
                 onTap: () async {
                   final value = await _showIntegerEditor(
                     context,
-                    title: 'Editar repetições',
+                    title: loc.activeWorkoutEditReps,
                     current: reps,
                     suffix: 'reps',
                   );
@@ -236,7 +236,7 @@ class WorkoutSetFieldControls extends StatelessWidget {
                 onTap: () async {
                   final value = await _showDecimalEditor(
                     context,
-                    title: 'Editar distância',
+                    title: loc.activeWorkoutEditDistance,
                     current: distance,
                     suffix: 'km',
                     maxDecimals: 2,
@@ -359,6 +359,7 @@ class WorkoutSetFieldControls extends StatelessWidget {
     final minutes = pace ~/ 60;
     final seconds = pace.round() % 60;
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Container(
@@ -374,7 +375,9 @@ class WorkoutSetFieldControls extends StatelessWidget {
             const Icon(Icons.speed, size: 16, color: Color(0xFFE53935)),
             const SizedBox(width: 6),
             Text(
-              'Pace: $minutes:${seconds.toString().padLeft(2, '0')} /km',
+              loc.activeWorkoutPaceValue(
+                '$minutes:${seconds.toString().padLeft(2, '0')}',
+              ),
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: const Color(0xFFE53935),
@@ -534,10 +537,10 @@ class WorkoutSetFieldControls extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Editar tempo',
-                      style: TextStyle(
+                      AppLocalizations.of(context)!.activeWorkoutEditTime,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
