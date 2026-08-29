@@ -4,6 +4,20 @@ import org.json.JSONObject
 
 enum class RunIntervalMetric { distance, time }
 
+enum class RunVoiceLanguage {
+    app,
+    pt,
+    en;
+
+    companion object {
+        fun from(raw: Any?): RunVoiceLanguage = when (raw?.toString()) {
+            "pt", "portuguese" -> pt
+            "en", "english" -> en
+            else -> app
+        }
+    }
+}
+
 data class RunIntervalPreset(
     val workMetric: RunIntervalMetric = RunIntervalMetric.distance,
     val workValue: Int = 400,
@@ -44,6 +58,7 @@ data class RunIntervalPreset(
 
 data class RunVoiceSettings(
     val enabled: Boolean = true,
+    val language: RunVoiceLanguage = RunVoiceLanguage.app,
     val headphonesOnly: Boolean = true,
     val muteDuringCall: Boolean = true,
     val announceDistance: Boolean = true,
@@ -83,6 +98,7 @@ data class RunVoiceSettings(
             } else null
             return RunVoiceSettings(
                 enabled = json.optBoolean("enabled", true),
+                language = RunVoiceLanguage.from(json.optString("language", "app")),
                 headphonesOnly = json.optBoolean("headphonesOnly", true),
                 muteDuringCall = json.optBoolean("muteDuringCall", true),
                 announceDistance = json.optBoolean("announceDistance", true),
@@ -108,6 +124,7 @@ data class RunVoiceSettings(
             val intervalRaw = map["interval"] as? Map<String, Any?>
             return RunVoiceSettings(
                 enabled = map["enabled"] as? Boolean ?: true,
+                language = RunVoiceLanguage.from(map["resolvedLanguage"] ?: map["language"]),
                 headphonesOnly = map["headphonesOnly"] as? Boolean ?: true,
                 muteDuringCall = map["muteDuringCall"] as? Boolean ?: true,
                 announceDistance = map["announceDistance"] as? Boolean ?: true,
@@ -126,6 +143,7 @@ data class RunVoiceSettings(
 
     fun toJson(): JSONObject = JSONObject().apply {
         put("enabled", enabled)
+        put("language", language.name)
         put("headphonesOnly", headphonesOnly)
         put("muteDuringCall", muteDuringCall)
         put("announceDistance", announceDistance)

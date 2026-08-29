@@ -126,7 +126,13 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
     final value = double.tryParse(_valueController.text.replaceAll(',', '.'));
     if (value == null || value <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.commonError('valor inválido'))),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(
+              context,
+            )!.commonError(AppLocalizations.of(context)!.commonInvalidValue),
+          ),
+        ),
       );
       return;
     }
@@ -280,16 +286,24 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? color.withAlpha(40) : theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+          color: isSelected
+              ? color.withAlpha(40)
+              : theme.colorScheme.surfaceContainerHighest.withAlpha(60),
           border: Border.all(
-            color: isSelected ? color : theme.colorScheme.outlineVariant.withAlpha(60),
+            color: isSelected
+                ? color
+                : theme.colorScheme.outlineVariant.withAlpha(60),
             width: isSelected ? 1.5 : 1,
           ),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
           children: [
-            Icon(icon, color: isSelected ? color : theme.colorScheme.onSurfaceVariant, size: 22),
+            Icon(
+              icon,
+              color: isSelected ? color : theme.colorScheme.onSurfaceVariant,
+              size: 22,
+            ),
             const SizedBox(height: 4),
             Text(
               label,
@@ -444,8 +458,11 @@ class _GoalFormSheetState extends State<GoalFormSheet> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.auto_awesome,
-                        size: 14, color: theme.colorScheme.primary),
+                    Icon(
+                      Icons.auto_awesome,
+                      size: 14,
+                      color: theme.colorScheme.primary,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       loc.goalSuggestedTarget(

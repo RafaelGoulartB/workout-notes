@@ -55,7 +55,9 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erro ao reordenar: $e'),
+          content: Text(
+            AppLocalizations.of(context)!.commonReorderError(e.toString()),
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -536,11 +538,13 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
                 // Comment (top)
                 TextField(
                   controller: commentCtl,
-                  decoration: const InputDecoration(
-                    labelText: 'Observação',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: AppLocalizations.of(
+                      context,
+                    )!.activeWorkoutSetNote,
+                    border: const OutlineInputBorder(),
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(
+                    contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 10,
                     ),
@@ -707,7 +711,9 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       builder: (ctx) => AlertDialog(
         title: Text(AppLocalizations.of(context)!.activeWorkoutRemoveExercise),
         content: Text(
-          'Remover "${exercise.localizedName(AppLocalizations.of(context)!)}" do treino? Todas as séries registradas serão perdidas.',
+          AppLocalizations.of(context)!.activeWorkoutRemoveExerciseContent(
+            exercise.localizedName(AppLocalizations.of(context)!),
+          ),
         ),
         actions: [
           TextButton(

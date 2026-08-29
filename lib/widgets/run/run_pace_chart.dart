@@ -75,7 +75,7 @@ class RunPaceChart extends StatelessWidget {
           lineTouchData: LineTouchData(
             handleBuiltInTouches: true,
             touchTooltipData: LineTouchTooltipData(
-              tooltipRoundedRadius: 10,
+              tooltipBorderRadius: BorderRadius.circular(10),
               tooltipPadding: const EdgeInsets.symmetric(
                 horizontal: 10,
                 vertical: 8,
@@ -156,17 +156,15 @@ class RunPaceChart extends StatelessWidget {
                     return const SizedBox.shrink();
                   }
                   final nearEdge = value < 0.01 || (maxX - value).abs() < 0.01;
-                  final onStep = (value / xInterval - (value / xInterval).round())
-                          .abs() <
+                  final onStep =
+                      (value / xInterval - (value / xInterval).round()).abs() <
                       0.02;
                   if (!nearEdge && !onStep) return const SizedBox.shrink();
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       value.toStringAsFixed(1),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: muted,
-                      ),
+                      style: theme.textTheme.labelSmall?.copyWith(color: muted),
                     ),
                   );
                 },
@@ -195,7 +193,9 @@ class RunPaceChart extends StatelessWidget {
                   horizontalLines: [
                     HorizontalLine(
                       y: -avg,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
+                      color: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.75,
+                      ),
                       strokeWidth: 1.2,
                       dashArray: const [6, 4],
                     ),

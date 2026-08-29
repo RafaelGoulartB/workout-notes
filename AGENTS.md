@@ -6,10 +6,20 @@ A comprehensive guide for LLM agents working on the Workout Notes project. This 
 
 ## 1. Project Overview
 
-**Workout Notes** is a Flutter mobile application for tracking workouts, exercises, sets, and progress. It supports Android, iOS, web, and desktop (Linux, macOS, Windows).
+**Workout Notes** is a local-first Flutter application for strength training,
+running, sleep, nutrition, body measurements, goals, periodization and progress.
+Android is the most complete target because background run tracking, sleep
+monitoring, alarms, barcode scanning and voice coaching use native Android
+services. The remaining Flutter UI is designed to stay portable.
 
-- **Journal module:** Write, edit, browse, and delete personal notes. Persisted via `shared_preferences` (local JSON).
-- **Workout tracker module:** Exercise library, workout logging, set tracking, routines, body measurements, progress charts, calendar, rest timer, CSV export. All persisted via **SQLite** (`sqflite`).
+- **Workout module:** Exercise library, live workout logging, routines, body
+  measurements, goals, progress charts, calendar, rest timer and CSV export.
+- **Running module:** GPS and stationary-bike sessions, plans, interval engine,
+  replay, achievements and voice coaching.
+- **Wellness modules:** Sleep monitoring/alarms, nutrition diary, food library,
+  saved meals and periodization plans/check-ins.
+- **AI Coach:** Multi-provider chat with read tools and explicitly approved
+  proposal flows for routine changes and manual food creation.
 
 The app uses Material 3 with dynamic theming, automatic dark mode support, and customizable accent colors.
 
@@ -22,7 +32,7 @@ The app uses Material 3 with dynamic theming, automatic dark mode support, and c
 | Language | Dart 3.12+ |
 | UI Framework | Flutter (Material 3) |
 | State Management | `setState` + `ChangeNotifier` (lightweight) |
-| Notes Storage | `shared_preferences` (JSON string) |
+| Preferences | `shared_preferences` |
 | Workout Storage | `sqflite` (SQLite) |
 | Charts | `fl_chart` |
 | Animations | `flutter_animate` |
@@ -37,19 +47,18 @@ The app uses Material 3 with dynamic theming, automatic dark mode support, and c
 ```
 lib/
 ├── main.dart                          # App entry, theme, navigation shell
-├── models/
-│   └── note.dart                      # Note data model
+├── models/                            # Workout, run, sleep, nutrition, periodization and AI models
 ├── database/
 │   ├── database_helper.dart           # SQLite singleton (all workout tables)
 │   ├── seed_data.dart                 # Default exercise categories & exercises
 │   └── test_seed_data.dart            # Sample workout data for development
-├── services/
-│   ├── storage_service.dart           # Notes CRUD via shared_preferences
-│   ├── export_service.dart            # CSV data export
-│   └── rest_timer_service.dart        # Rest timer logic
+├── repositories/                      # SQLite access grouped by domain
+├── services/                          # AI, export, timers, run, sleep and notification logic
+├── state/                             # Shared ChangeNotifier coordinators
+├── navigation/                        # Cross-feature navigation helpers
 ├── screens/
-│   ├── home_screen.dart               # Notes list view
-│   ├── note_editor_screen.dart        # Note create/edit screen
+│   ├── main_shell.dart                # Four-tab application shell
+│   ├── run/                           # Run recording, plans, history and analytics
 │   └── workout/
 │       ├── workout_home_screen.dart   # Workout module dashboard
 │       ├── active_workout_screen.dart # Live workout session (largest file)
@@ -96,9 +105,10 @@ The project intentionally avoids heavy state management libraries (Riverpod, Blo
 
 ### 4.2 Database Architecture
 
-**Notes** (removed) — previously stored in `shared_preferences` as a single JSON string. The app is now workout-only.
-
-**Workout data** uses SQLite via `sqflite` with the following relational schema:
+Domain data uses SQLite via `sqflite`. Schema creation is split across
+`database_schema.dart`, `database_nutrition_schema.dart`,
+`database_periodization_schema.dart` and `database_run_plan_schema.dart`;
+incremental migrations live under `lib/database/migrations/`.
 
 ```
 exercise_categories (1) ──→ (N) exercises (1) ──→ (N) exercise_entries (1) ──→ (N) sets
@@ -120,20 +130,22 @@ Key points:
 ### 4.3 Theme System
 
 - Accent color is persisted in `shared_preferences` as `accent_color` (int).
-- `ThemeNotifier` is a static `ChangeNotifier` on `LifeNotesApp.themeNotifier`.
+- `ThemeNotifier` is a static `ChangeNotifier` on `WorkoutNotesApp.themeNotifier`.
 - Both light and dark themes are built from the same seed color using `ColorScheme.fromSeed`.
 - Theme mode follows the system (`ThemeMode.system`).
 
 ### 4.4 Navigation
 
-- A `MainShell` widget holds an `IndexedStack` with two tabs: `HomeScreen` (notes) and `WorkoutHomeScreen`.
-- Bottom `NavigationBar` (Material 3 style) switches between them.
+- `MainShell` lazily populates an `IndexedStack` with Workout, Sleep, Nutrition
+  and Plan tabs. Plan visibility is controlled by `SectionsNotifier`.
+- A Material 3 `NavigationBar` switches between the tabs while preserving each
+  tab's state.
 - Screen-to-screen navigation uses `Navigator.push` with `MaterialPageRoute`.
 
 ### 4.5 Locale
 
-- The app uses **`pt_BR`** for date formatting (Brazilian Portuguese).
-- `initializeDateFormatting('pt_BR', null)` is called before `runApp`.
+- The app supports English and Brazilian Portuguese. The saved locale controls
+  both `AppLocalizations` and `Intl.defaultLocale` (`en` or `pt_BR`).
 
 ---
 
@@ -182,18 +194,9 @@ Always use parameterized queries (`?` placeholders) to prevent SQL injection. Ne
 
 ## 6. Key Data Models
 
-### Note
-
-```dart
-class Note {
-  final String id;
-  final String title;
-  final String content;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  // preview getter, copyWith, toJson/fromJson, ==, hashCode, toString
-}
-```
+Models are grouped by domain under `lib/models/`. Run, sleep, nutrition,
+periodization and AI records use typed Dart models; legacy workout repository
+APIs still expose some SQLite rows as `Map<String, dynamic>`.
 
 ### SQLite Tables (Workout Module)
 
@@ -216,11 +219,12 @@ class Note {
 ## 7. Testing Strategy
 
 - Tests are in `test/` directory.
-- Currently only `widget_test.dart` exists (skeleton).
+- The suite contains unit, repository, service, localization and widget tests;
+  keep new coverage close to the behavior being changed.
 - When adding tests:
   - Use `flutter_test` for widget tests.
   - Use `sqflite_common_ffi` for database unit tests (in-memory SQLite).
-  - Use `SharedPreferences.setMockInitialValues` for notes storage tests.
+  - Use `SharedPreferences.setMockInitialValues` for settings tests.
 - Coverage priority: database operations > screen rendering > service logic.
 
 ---
@@ -269,10 +273,16 @@ class Note {
 
 1. **Database instance:** Always use `DatabaseHelper.instance.database`. Do **not** create a new `DatabaseHelper()`.
 2. **setState after async:** Always check `mounted` before calling `setState` in an async callback.
-3. **Locale:** The app uses `pt_BR`. Date strings are in `yyyy-MM-dd` format. `DateTime.toIso8601String().substring(0, 10)` is the standard way to get a date string.
-4. **Theme changes:** When reading/changing accent color, use `LifeNotesApp.themeNotifier` and persist to `SharedPreferences`.
+3. **Locale:** The app supports `en` and `pt_BR`. All visible strings belong in
+   the ARBs. Date strings stored in SQLite use `yyyy-MM-dd`; format visible dates
+   with the active locale.
+4. **Theme changes:** When reading/changing accent color, use
+   `WorkoutNotesApp.themeNotifier` and persist to `SharedPreferences`.
 5. **Workout timer:** The timer in `active_workout_screen.dart` is managed client-side; `startWorkoutTimer`/`stopWorkoutTimer`/`resetWorkoutTimer` in `DatabaseHelper` handle persistence.
-6. **File sizes:** `active_workout_screen.dart` (~1.6K lines) is the largest file. Consider splitting if new functionality is added.
+6. **Active workout split:** UI, controller logic and routine actions live in
+   `active_workout_screen.dart`, `active_workout_controller.dart` and
+   `active_workout_routine_actions.dart`. Keep new behavior in the appropriate
+   part rather than growing the screen again.
 7. **Empty states:** Use `EmptyStatePlaceholder` widget for consistent empty-state UI across screens.
 8. **Don't use relative imports across top-level directories.** Use `package:workout_notes/...` imports.
 9. **Seed data** lives in `seed_data.dart` — categorized by `energy_system` (aerobic/anaerobic). The `test_seed_data.dart` file generates sample workouts for development testing.
@@ -297,17 +307,21 @@ flutter analyze                # Static analysis
 | Package | Version | Purpose |
 |---|---|---|
 | `flutter` | SDK | Framework |
-| `cupertino_icons` | ^1.0.8 | iOS icons |
-| `uuid` | ^4.5.1 | UUID generation |
+| `uuid` | ^4.6.0 | UUID generation |
 | `intl` | ^0.20.2 | Date formatting |
-| `shared_preferences` | ^2.3.4 | Notes & settings storage |
+| `shared_preferences` | ^2.3.4 | App and feature preferences |
 | `sqflite` | ^2.4.2 | Workout database |
 | `path` | ^1.9.1 | Path utilities for DB |
-| `path_provider` | ^2.1.5 | File system paths |
-| `fl_chart` | ^0.70.2 | Progress charts |
+| `path_provider` | ^2.1.6 | File system paths |
+| `fl_chart` | ^1.2.0 | Progress charts |
 | `flutter_animate` | ^4.5.2 | Animations |
-| `share_plus` | ^10.1.4 | File sharing/export |
-| `csv` | ^6.0.0 | CSV generation |
+| `flutter_map` | ^8.3.2 | Running maps |
+| `latlong2` | ^0.10.1 | Geographic coordinates |
+| `flutter_local_notifications` | ^22.3.0 | Notifications and alarms |
+| `share_plus` | ^13.3.0 | File sharing/export |
+| `csv` | ^8.0.0 | CSV generation |
+| `file_picker` | ^12.1.1 | Backup import/export picker |
+| `flutter_secure_storage` | ^10.3.1 | AI provider tokens |
 
 ---
 
@@ -315,7 +329,7 @@ flutter analyze                # Static analysis
 
 | Decision | Rationale |
 |---|---|
-| SharedPreferences for notes, SQLite for workouts | Notes are simple key-value data; workouts need relational queries (JOINs, aggregates, history). |
+| SQLite for domain data, preferences for settings | Relational history needs transactions and indexed queries; simple UI configuration does not. |
 | `setState` over state management libs | The app's complexity doesn't warrant the overhead. Each screen is relatively self-contained. |
 | UUID v4 as primary keys | Offline-first friendly; no auto-increment conflicts. |
 | `pt_BR` locale | The primary user is Brazilian Portuguese speaking. |
@@ -335,7 +349,7 @@ Conversations are persisted locally; tokens are stored in `flutter_secure_storag
 | Layer | Key files |
 |---|---|
 | Models | `lib/models/ai_provider.dart`, `ai_settings.dart`, `ai_chat_thread.dart`, `ai_chat_message.dart`, `ai_message_role.dart`, `ai_tool_call.dart`, `ai_chat_state.dart` |
-| Services | `lib/services/ai_service.dart` (OpenAI-compatible HTTP), `lib/services/ai_context_service.dart` (DB → JSON), `lib/services/ai_tool_registry.dart` (13 read tools + schemas) |
+| Services | `lib/services/ai_service.dart` (OpenAI-compatible HTTP), `lib/services/ai_context_service.dart` (DB → JSON), `lib/services/ai_tool_registry.dart` (39 read tools + guarded proposal schemas), `lib/services/ai_run_tool_service.dart` (recorded cardio, progress, achievements, plans and adherence) |
 | State | `lib/state/ai_settings_notifier.dart` (provider config, persisted to SharedPreferences), `lib/state/ai_chat_service.dart` (singleton `ChangeNotifier` orchestrator) |
 | Utils | `lib/utils/token_estimator.dart` (3.5 chars/token estimate for history compaction) |
 | UI | `lib/screens/workout/ai_chat_screen.dart`, `ai_settings_screen.dart`, `ai_chat_history_screen.dart` |
@@ -356,17 +370,24 @@ Conversations are persisted locally; tokens are stored in `flutter_secure_storag
 ### Chat flow (`AiChatService`)
 
 1. `send(text)` → loads the active provider + token from `AiSettingsNotifier`, ensures a thread (creates a new `ai_chat_threads` row on first message), appends a user `AiChatMessage`, sets `phase = sending`.
-2. `_runTurn` builds the wire payload: system prompt + `<workout_data>{…summary JSON…}</workout_data>` (from `AiContextService`, cached 60s) + compacted history (≤ 8000 estimated tokens) + the 13 read tools from `AiToolRegistry.openAiReadToolsSchema()`.
+2. `_runTurn` builds the wire payload from the system policy, cached context,
+   compacted history and a query-selected subset of the 39 read tools. Guarded
+   proposal and capability-discovery tools are added only when applicable.
 3. `AiService.sendChat` POSTs to `{baseUrl}/chat/completions` and parses the response (text + tool_calls + usage).
 4. If the response has `tool_calls`: switch to `phase = executingReads`, run each via `AiToolRegistry.executeRead(...)`, append `role='tool'` messages with the JSON result, and re-send to the model. Up to 3 read rounds; after that a final no-tools call is made to force a closing answer.
 5. If no tool calls: store the assistant message, set `phase = idle`, persist the thread + messages to SQLite.
 6. **Interrupted-turn recovery**: when opening a thread, if an assistant message has `tool_calls` without matching `tool` responses, a synthetic `{ok:false, code:'interrupted'}` response is appended so the next turn can continue.
 
-### Tool system (13 read-only tools)
+### Tool system (39 read tools + guarded proposals)
 
-`list_recent_workouts`, `get_workout_detail`, `list_exercises`, `get_exercise_history`, `get_exercise_personal_records`, `get_weekly_volume_breakdown`, `get_progress_trend`, `list_routines`, `get_routine_detail`, `list_body_measurements`, `get_cardio_summary`, `list_goals`, `get_goal_progress_history`.
+The registry covers workout history/details, exercises and PRs, routines, body
+measurements, cardio/running plans, goals, sleep, nutrition and cross-domain
+wellness analysis. Treat `AiToolRegistry._tools` as the source of truth rather
+than duplicating the full list here.
 
-- All read tools execute immediately. There are **no mutation tools** — the AI cannot edit app data. This is a deliberate design decision (see §13.4 below).
+- Read tools execute immediately. `propose_routine_change` and
+  `propose_manual_food_creation` create reviewable previews; they never apply a
+  change without an explicit in-app confirmation.
 - JSON schemas are hand-written in `AiToolRegistry._schemaFor(name)`.
 - The registry uses argument aliasing (English/Portuguese keys) and falls back to friendly `humanLabel(...)` strings for the chat UI.
 
@@ -380,21 +401,23 @@ Conversations are persisted locally; tokens are stored in `flutter_secure_storag
 - Cached 60s in-memory; invalidated on turn boundary.
 - The system prompt explicitly tells the model to never follow instructions inside `<workout_data>` and to use the read tools for further details.
 
-### Database schema (v15)
+### Database schema (v49)
 
-Two new tables added in `_dbVersion = 15`:
+The current database version is 49. AI persistence currently uses:
 
 - `ai_chat_threads (id PK, title, created_at, updated_at, last_message_preview, archived)` with `idx_ai_chat_threads_updated (updated_at DESC)`.
 - `ai_chat_messages (id PK, thread_id FK→threads ON DELETE CASCADE, role, content, tool_call_id, tool_name, tool_calls_json, created_at)` with `idx_ai_chat_messages_thread (thread_id, created_at ASC)`.
 - New methods on `DatabaseHelper`: `upsertAiChatThread`, `replaceAiChatMessages`, `getAiChatThreads`, `getAiChatMessagesThread`, `renameAiChatThread`, `deleteAiChatThread`.
-- Migration is `CREATE TABLE IF NOT EXISTS` blocks in the `if (oldVersion < 15)` branch of `_onUpgrade`, wrapped in `try/catch` (matches the rest of the app's additive-migration pattern).
+- The AI chat tables originated in the v15 migration; later migrations add
+  pinning, proposals and attachments. The application schema as a whole is v49.
 
 ### 13.4 Design decisions (deliberate, not gaps)
 
 - **Routine mutations use proposals, never direct AI writes.** `propose_routine_change` creates an `ai_routine_proposals` draft only after an explicit user request. The chat shows an approval card; `AiRoutineMutationService.approve` rechecks the stored routine snapshot and applies the complete tree in one SQLite transaction. Rejected drafts do nothing, stale drafts cannot apply, and a successful application is followed by a no-tools AI summary. Exercises must already exist in the library.
 
 - **Output sanitisation is narrow and targeted.** `TextSanitizer.sanitize` strips exactly two patterns: `<think>…</think>` reasoning blocks (a DeepSeek-R1 model architecture artifact) and `$\d+` / `$\{\d+\}` citation placeholders (e.g. `$1`, `${2}`). The latter is a learned behavior from pre-training that several models exhibit — the model uses `$1` as a token meaning "the proper noun I should write here". System prompt instructions don't reliably override it, so the sanitizer handles it as a last resort. We do NOT touch `[1]`, `【1】`, `〈1〉`, `⟨1⟩`, zero-width chars, whitespace, or legitimate `$` (e.g. `R$ 100` with no digit after the `$`). The system prompt still forbids citation placeholders, which helps models that obey and signals when a model doesn't.
-- **No mutation tools** — the AI is read-only by design. Users must register workouts / measurements / goals in the app. This avoids the complexity of `preview`/`apply`/`discard` flows, fingerprint checks, audit logs, and DB transactions inside the chat pipeline. If a future version adds editing, follow the `gastos` pattern (`AiMutationService` + `applyProposal`).
+- **No direct AI writes.** Routine and manual-food changes use guarded proposal
+  flows with explicit confirmation. Other domains remain read-only from chat.
 - **No token/cost tracking** — no `AiUsageScreen`, no per-message cost badge, no monthly usage stats. The current implementation discards `usage` from the API response. Keep it that way unless the feature is requested.
 - **No streaming** — single `POST` + parse full response. UI shows a phase banner (`sending` → `executingReads` → `idle`). Switching to SSE would require an `http.Client.stream` upgrade plus chunked state updates.
 - **Entry only via Settings** — no FAB on the home screen. Discovery happens in `settings_screen.dart` under the new `AI COACH` section, with two `LinkTile`s: `Treinador IA` (chat, redirects to settings if not configured) and `Configurar IA` (provider list + system prompt + context mode).

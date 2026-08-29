@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 import 'package:workout_notes/models/run_session_goal.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
@@ -17,7 +18,7 @@ import 'package:workout_notes/services/run_voice_settings_store.dart';
 typedef RunVoiceSpeakFn = Future<void> Function(String text);
 typedef RunVoiceCapsFn = Future<RunAudioCapabilities> Function();
 
-/// Listens to run tracking snapshots and speaks configured English cues.
+/// Listens to run tracking snapshots and speaks localized coaching cues.
 class RunVoiceCoach extends ChangeNotifier {
   RunVoiceCoach({
     RunVoiceSettingsStore? settingsStore,
@@ -55,6 +56,7 @@ class RunVoiceCoach extends ChangeNotifier {
   final RunVoiceCueArbiter _arbiter = RunVoiceCueArbiter();
 
   RunVoiceSettings _settings = const RunVoiceSettings.defaults();
+  RunVoicePhrases _phrases = const RunVoicePhrases(RunVoiceLanguage.english);
   RunSessionGoal _goal = const RunSessionGoal.defaults();
   RunPlanWorkout? _planWorkout;
   bool _goalCompleted = false;
@@ -127,6 +129,7 @@ class RunVoiceCoach extends ChangeNotifier {
 
   Future<void> prepare() async {
     _settings = settingsOverride ?? await _settingsStore.load();
+    _refreshLanguage();
     _intervalEngine.configure(_settings.interval);
     _intervalsOn = _settings.intervalsEnabledByDefault;
     notifyListeners();
@@ -139,10 +142,11 @@ class RunVoiceCoach extends ChangeNotifier {
       _settingsStore.invalidateCache();
       _settings = await _settingsStore.load();
     }
+    _refreshLanguage();
     _intervalEngine.configure(_settings.interval);
     if (_active && _useNativeVoice) {
       await RunNativeVoiceService.instance.syncSettings(
-        settings: _settings.toJson(),
+        settings: _nativeSettings(),
         goal: {
           'enabled': _goal.enabled,
           'metric': _goal.metric.name,
@@ -154,6 +158,23 @@ class RunVoiceCoach extends ChangeNotifier {
       );
     }
     notifyListeners();
+  }
+
+  void _refreshLanguage() {
+    final resolved = _settings.language.resolve(Intl.defaultLocale);
+    _phrases = RunVoicePhrases(resolved);
+  }
+
+  Map<String, dynamic> _nativeSettings() => {
+    ..._settings.toJson(),
+    'resolvedLanguage': _phrases.language.storageValue,
+  };
+
+  Future<void> _ensureLocalizedTtsReady() {
+    if (_isCustomSpeak) return _ensureTtsReady();
+    return RunTtsService.instance.ensureReady(
+      languageTag: _phrases.language.localeTag,
+    );
   }
 
   void setIntervalsOn(bool value) {
@@ -216,7 +237,7 @@ class RunVoiceCoach extends ChangeNotifier {
     _stepEngine.reset();
     if (_useNativeVoice) {
       await RunNativeVoiceService.instance.beginSession(
-        settings: _settings.toJson(),
+        settings: _nativeSettings(),
         goal: {
           'enabled': _goal.enabled,
           'metric': _goal.metric.name,
@@ -229,7 +250,7 @@ class RunVoiceCoach extends ChangeNotifier {
       // Still ensure TTS for test fallback or when service not yet ready,
       // but live announcements will be driven by native controller.
     } else {
-      await _ensureTtsReady();
+      await _ensureLocalizedTtsReady();
     }
     notifyListeners();
   }
@@ -268,8 +289,8 @@ class RunVoiceCoach extends ChangeNotifier {
   /// Planned sessions already announce their final step and do not repeat it.
   Future<void> announceManualCompletion() async {
     if (!_settings.enabled || hasPlan) return;
-    await _ensureTtsReady();
-    await _speakIfAllowed(RunVoicePhrases.workoutComplete());
+    await _ensureLocalizedTtsReady();
+    await _speakIfAllowed(_phrases.workoutComplete());
   }
 
   Future<void> onTrackingUpdate(RunTrackingState state) async {
@@ -287,7 +308,7 @@ class RunVoiceCoach extends ChangeNotifier {
       if (goalJustCompleted) {
         cues.add(
           RunVoiceCue(
-            text: RunVoicePhrases.goalComplete(
+            text: _phrases.goalComplete(
               metric: _goal.metric,
               value: _goal.value,
             ),
@@ -394,12 +415,12 @@ class RunVoiceCoach extends ChangeNotifier {
       out.add(
         RunVoiceCue(
           text: hasNewMilestone
-              ? RunVoicePhrases.splitSummary(
+              ? _phrases.splitSummary(
                   km: split.km,
                   splitPaceSecPerKm: split.paceSecPerKm,
                   avgPaceSecPerKm: avgPace,
                 )
-              : RunVoicePhrases.splitComplete(
+              : _phrases.splitComplete(
                   km: split.km,
                   paceSecPerKm: split.paceSecPerKm,
                 ),
@@ -411,7 +432,7 @@ class RunVoiceCoach extends ChangeNotifier {
       _lastAnnouncedKm = milestone;
       out.add(
         RunVoiceCue(
-          text: RunVoicePhrases.distanceMilestone(
+          text: _phrases.distanceMilestone(
             km: milestone,
             durationSeconds: state.durationSeconds,
             avgPaceSecPerKm: avgPace,
@@ -439,9 +460,7 @@ class RunVoiceCoach extends ChangeNotifier {
           _lastGpsAnnounceAt = now;
           out.add(
             RunVoiceCue(
-              text: weak
-                  ? RunVoicePhrases.weakGps()
-                  : RunVoicePhrases.gpsRestored(),
+              text: weak ? _phrases.weakGps() : _phrases.gpsRestored(),
               priority: RunVoiceCuePriority.safety,
               key: weak ? 'gps-weak' : 'gps-restored',
             ),
@@ -478,7 +497,7 @@ class RunVoiceCoach extends ChangeNotifier {
     }
     _goalProgressCues.add(threshold);
     return RunVoiceCue(
-      text: RunVoicePhrases.goalRemaining(
+      text: _phrases.goalRemaining(
         metric: _goal.metric,
         value: _goal
             .remaining(
@@ -519,7 +538,7 @@ class RunVoiceCoach extends ChangeNotifier {
       if (_paceCorrectionSpoken) {
         _paceCorrectionSpoken = false;
         return RunVoiceCue(
-          text: RunVoicePhrases.paceOnTarget(),
+          text: _phrases.paceOnTarget(),
           priority: RunVoiceCuePriority.coaching,
           key: 'pace-on-target',
         );
@@ -542,9 +561,7 @@ class RunVoiceCoach extends ChangeNotifier {
     _lastPaceAnnounceAt = now;
     _paceCorrectionSpoken = true;
     return RunVoiceCue(
-      text: direction < 0
-          ? RunVoicePhrases.paceTooFast()
-          : RunVoicePhrases.paceTooSlow(),
+      text: direction < 0 ? _phrases.paceTooFast() : _phrases.paceTooSlow(),
       priority: RunVoiceCuePriority.coaching,
       key: direction < 0 ? 'pace-fast' : 'pace-slow',
     );
@@ -557,7 +574,7 @@ class RunVoiceCoach extends ChangeNotifier {
     _wasPaused = paused;
     if (previous == null || previous == paused) return null;
     return RunVoiceCue(
-      text: paused ? RunVoicePhrases.paused() : RunVoicePhrases.resumed(),
+      text: paused ? _phrases.paused() : _phrases.resumed(),
       priority: RunVoiceCuePriority.transition,
       key: paused ? 'paused' : 'resumed',
     );
@@ -616,7 +633,7 @@ class RunVoiceCoach extends ChangeNotifier {
         final target = min != null && max != null
             ? (min + max) / 2
             : min ?? max;
-        return RunVoicePhrases.stepStart(
+        return _phrases.stepStart(
           role: event.role,
           repIndex: event.repIndex,
           repTotal: event.repTotal,
@@ -625,15 +642,15 @@ class RunVoiceCoach extends ChangeNotifier {
           targetPaceSecPerKm: target,
         );
       case RunStepEventKind.timeRemainingCue:
-        return RunVoicePhrases.timeRemaining(event.remainingSeconds ?? 30);
+        return _phrases.timeRemaining(event.remainingSeconds ?? 30);
       case RunStepEventKind.distanceRemainingCue:
-        return RunVoicePhrases.distanceRemaining(event.remainingMeters ?? 100);
+        return _phrases.distanceRemaining(event.remainingMeters ?? 100);
       case RunStepEventKind.paceTooSlow:
-        return RunVoicePhrases.stepPaceTooSlow(event.paceSecPerKm);
+        return _phrases.stepPaceTooSlow(event.paceSecPerKm);
       case RunStepEventKind.paceTooFast:
-        return RunVoicePhrases.stepPaceTooFast(event.paceSecPerKm);
+        return _phrases.stepPaceTooFast(event.paceSecPerKm);
       case RunStepEventKind.workoutCompleted:
-        return RunVoicePhrases.workoutComplete();
+        return _phrases.workoutComplete();
       // Completion is implied by the next step's start cue.
       case RunStepEventKind.stepCompleted:
         return null;
@@ -684,19 +701,19 @@ class RunVoiceCoach extends ChangeNotifier {
   String? _phraseForInterval(RunIntervalEvent event) {
     switch (event.kind) {
       case RunIntervalEventKind.workStarted:
-        return RunVoicePhrases.workIntervalStart(
+        return _phrases.workIntervalStart(
           index: event.workIndex,
           total: event.totalWorks,
         );
       case RunIntervalEventKind.restStarted:
-        return RunVoicePhrases.restIntervalStart(
+        return _phrases.restIntervalStart(
           metric: _settings.interval.restMetric,
           value: _settings.interval.restValue,
         );
       case RunIntervalEventKind.completed:
-        return RunVoicePhrases.intervalsComplete();
+        return _phrases.intervalsComplete();
       case RunIntervalEventKind.timeRemainingCue:
-        return RunVoicePhrases.timeRemaining(event.remainingSeconds ?? 30);
+        return _phrases.timeRemaining(event.remainingSeconds ?? 30);
     }
   }
 
@@ -735,12 +752,17 @@ class RunVoiceCoach extends ChangeNotifier {
     await prepare();
     if (!_settings.enabled) return false;
     if (_useNativeVoice) {
+      await RunNativeVoiceService.instance.syncSettings(
+        settings: _nativeSettings(),
+        goal: const {'enabled': false, 'metric': 'distance', 'value': 0},
+        intervalsOn: false,
+      );
       final ok = await RunNativeVoiceService.instance.speakTest();
       if (ok) return true;
       // Fallback to Dart TTS if native not available (service not bound)
     }
-    await _ensureTtsReady();
-    const phrase = 'Voice cues ready. Pace 5 30 per kilometer.';
+    await _ensureLocalizedTtsReady();
+    final phrase = _phrases.testAnnouncement();
     if (kDebugMode) {
       debugPrint('RunVoiceCoach: test speak');
     }

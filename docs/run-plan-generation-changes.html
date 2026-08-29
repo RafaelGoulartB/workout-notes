@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Mudanças na geração automática de planos de corrida</title>
+  <style>
+    :root {
+      --bg: #f4f7f2;
+      --surface: #ffffff;
+      --surface-soft: #eef4ed;
+      --ink: #17231d;
+      --muted: #5c6c63;
+      --line: #d7e2d8;
+      --brand: #146b46;
+      --brand-dark: #0c4c31;
+      --brand-soft: #d9f3e3;
+      --blue: #2563a7;
+      --blue-soft: #e2efff;
+      --amber: #a85d08;
+      --amber-soft: #fff0d5;
+      --red: #a33a31;
+      --red-soft: #fde8e5;
+      --shadow: 0 16px 38px rgba(23, 35, 29, .09);
+      --radius: 18px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #101713;
+        --surface: #17211b;
+        --surface-soft: #1d2a22;
+        --ink: #edf6ef;
+        --muted: #a8b9ae;
+        --line: #33463a;
+        --brand: #65d29a;
+        --brand-dark: #9ce9be;
+        --brand-soft: #183e2b;
+        --blue: #8ec3ff;
+        --blue-soft: #17344f;
+        --amber: #ffc06b;
+        --amber-soft: #422e13;
+        --red: #ff9f95;
+        --red-soft: #482521;
+        --shadow: 0 18px 44px rgba(0, 0, 0, .25);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--brand) 13%, transparent), transparent 28rem),
+        var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.65;
+    }
+
+    a { color: var(--brand-dark); }
+    code {
+      padding: .12rem .36rem;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface-soft);
+      font: .9em ui-monospace, SFMono-Regular, Consolas, monospace;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 250px minmax(0, 920px);
+      gap: 42px;
+      width: min(1240px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 48px 0 80px;
+    }
+
+    aside {
+      position: sticky;
+      top: 24px;
+      align-self: start;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      backdrop-filter: blur(10px);
+    }
+
+    aside strong {
+      display: block;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    aside a {
+      display: block;
+      padding: 7px 9px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      text-decoration: none;
+    }
+
+    aside a:hover { background: var(--surface-soft); color: var(--ink); }
+
+    main { min-width: 0; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 42px;
+      border: 1px solid color-mix(in srgb, var(--brand) 34%, var(--line));
+      border-radius: 26px;
+      background: linear-gradient(135deg, var(--surface), var(--brand-soft));
+      box-shadow: var(--shadow);
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -75px;
+      bottom: -100px;
+      width: 290px;
+      height: 290px;
+      border: 42px solid color-mix(in srgb, var(--brand) 12%, transparent);
+      border-radius: 50%;
+    }
+
+    .eyebrow {
+      position: relative;
+      z-index: 1;
+      color: var(--brand-dark);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      position: relative;
+      z-index: 1;
+      max-width: 760px;
+      margin: 10px 0 14px;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1.05;
+      letter-spacing: -.045em;
+    }
+
+    .hero p {
+      position: relative;
+      z-index: 1;
+      max-width: 720px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .meta {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-top: 24px;
+    }
+
+    .pill {
+      padding: 6px 11px;
+      border: 1px solid color-mix(in srgb, var(--brand) 28%, var(--line));
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--surface) 72%, transparent);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    section { margin-top: 54px; scroll-margin-top: 22px; }
+    h2 {
+      margin: 0 0 12px;
+      font-size: clamp(27px, 3vw, 37px);
+      line-height: 1.15;
+      letter-spacing: -.03em;
+    }
+    h3 { margin: 0 0 8px; font-size: 19px; }
+    .lead { max-width: 790px; color: var(--muted); font-size: 17px; }
+
+    .summary-grid,
+    .cards,
+    .before-after {
+      display: grid;
+      gap: 16px;
+      margin-top: 24px;
+    }
+    .summary-grid { grid-template-columns: repeat(3, 1fr); }
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .before-after { grid-template-columns: 1fr 1fr; }
+
+    .metric,
+    .card,
+    .comparison {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: 0 8px 22px rgba(23, 35, 29, .04);
+    }
+    .metric { padding: 20px; }
+    .metric b { display: block; color: var(--brand-dark); font-size: 30px; line-height: 1; }
+    .metric span { display: block; margin-top: 8px; color: var(--muted); font-size: 14px; }
+    .card { padding: 22px; }
+    .card p, .comparison p { margin: 0; color: var(--muted); }
+    .card .tag {
+      display: inline-block;
+      margin-bottom: 12px;
+      padding: 4px 8px;
+      border-radius: 7px;
+      background: var(--brand-soft);
+      color: var(--brand-dark);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .comparison { overflow: hidden; }
+    .comparison header {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .comparison.before header { color: var(--red); background: var(--red-soft); }
+    .comparison.after header { color: var(--brand-dark); background: var(--brand-soft); }
+    .comparison .body { padding: 20px; }
+    .comparison ul { margin: 12px 0 0; padding-left: 20px; }
+    .comparison li + li { margin-top: 7px; }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      margin-top: 28px;
+    }
+    .flow-step {
+      position: relative;
+      min-height: 155px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--surface);
+    }
+    .flow-step:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      top: 50%;
+      right: -20px;
+      width: 16px;
+      color: var(--brand);
+      font-size: 24px;
+      font-weight: 900;
+      transform: translateY(-50%);
+    }
+    .flow-step b {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      margin-bottom: 14px;
+      border-radius: 50%;
+      background: var(--brand);
+      color: var(--surface);
+      font-size: 13px;
+    }
+    .flow-step p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+
+    .callout {
+      margin-top: 24px;
+      padding: 20px 22px;
+      border-left: 5px solid var(--brand);
+      border-radius: 4px 14px 14px 4px;
+      background: var(--brand-soft);
+    }
+    .callout.warning { border-color: var(--amber); background: var(--amber-soft); }
+    .callout p { margin: 4px 0 0; }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 680px; }
+    th, td { padding: 15px 17px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--surface-soft); color: var(--muted); font-size: 12px; letter-spacing: .07em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+
+    .hill-demo {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 18px;
+      align-items: center;
+      margin-top: 26px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .workout {
+      padding: 18px;
+      border-radius: 14px;
+      background: var(--surface-soft);
+    }
+    .workout strong { display: block; margin-bottom: 5px; }
+    .workout small { color: var(--muted); }
+    .arrow { color: var(--brand); font-size: 30px; font-weight: 900; }
+
+    .checklist {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 22px;
+      padding: 0;
+      list-style: none;
+    }
+    .checklist li {
+      position: relative;
+      padding: 15px 16px 15px 44px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: var(--surface);
+    }
+    .checklist li::before {
+      content: "✓";
+      position: absolute;
+      top: 14px;
+      left: 16px;
+      display: grid;
+      place-items: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--brand-soft);
+      color: var(--brand-dark);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    footer {
+      margin-top: 62px;
+      padding-top: 22px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 920px) {
+      .shell { display: block; width: min(100% - 28px, 820px); padding-top: 20px; }
+      aside { position: static; margin-bottom: 20px; }
+      aside strong { margin-bottom: 5px; }
+      aside a { display: inline-block; }
+      .summary-grid, .flow { grid-template-columns: repeat(2, 1fr); }
+      .flow-step:nth-child(2)::after { display: none; }
+    }
+
+    @media (max-width: 620px) {
+      .hero { padding: 28px 22px; }
+      .summary-grid, .cards, .before-after, .flow, .checklist { grid-template-columns: 1fr; }
+      .flow-step::after { display: none; }
+      .hill-demo { grid-template-columns: 1fr; }
+      .hill-demo .arrow { text-align: center; transform: rotate(90deg); }
+      section { margin-top: 42px; }
+    }
+
+    @media print {
+      :root { color-scheme: light; }
+      body { background: #fff; }
+      .shell { display: block; width: 100%; padding: 0; }
+      aside { display: none; }
+      .hero, .metric, .card, .comparison, .flow-step, .table-wrap, .hill-demo { box-shadow: none; }
+      section { break-inside: avoid; }
+      a { color: inherit; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside aria-label="Índice do documento">
+      <strong>Neste documento</strong>
+      <a href="#resumo">Resumo</a>
+      <a href="#antes-depois">Antes e depois</a>
+      <a href="#algoritmo">Novo fluxo</a>
+      <a href="#carga">Carga e qualidade</a>
+      <a href="#morros">Opção sem morros</a>
+      <a href="#seguranca">Bloqueios de segurança</a>
+      <a href="#perfis">Regras por perfil</a>
+      <a href="#validacao">Validação</a>
+    </aside>
+
+    <main>
+      <header class="hero">
+        <div class="eyebrow">Workout Notes · planos de corrida</div>
+        <h1>Como a geração automática de planos ficou mais segura e útil</h1>
+        <p>
+          O gerador agora valida o treino realmente entregue, adapta a carga à experiência do
+          corredor e permite remover sessões em subida sem perder o objetivo fisiológico.
+        </p>
+        <div class="meta">
+          <span class="pill">Carga materializada</span>
+          <span class="pill">Morros opcionais</span>
+          <span class="pill">Prontidão bloqueante</span>
+          <span class="pill">714 testes aprovados</span>
+        </div>
+      </header>
+
+      <section id="resumo">
+        <h2>O resultado em poucas palavras</h2>
+        <p class="lead">
+          Antes, algumas regras eram aplicadas ao orçamento interno da semana, mas aquecimentos,
+          mínimos de blocos e pisos de rodagem podiam fazer o treino final ultrapassar esse valor.
+          Agora a última palavra é sempre do plano materializado: as distâncias que a pessoa verá
+          e executará no aplicativo.
+        </p>
+        <div class="summary-grid">
+          <div class="metric">
+            <b>≤ 10%</b>
+            <span>Crescimento entre semanas de construção, medido nos quilômetros entregues.</span>
+          </div>
+          <div class="metric">
+            <b>1–2</b>
+            <span>Máximo de sessões de qualidade: uma para iniciantes e duas para os demais.</span>
+          </div>
+          <div class="metric">
+            <b>0</b>
+            <span>Sessões zeradas aceitas pela matriz de qualidade.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="antes-depois">
+        <h2>O que mudou na prática</h2>
+        <div class="before-after">
+          <article class="comparison before">
+            <header>Comportamento anterior</header>
+            <div class="body">
+              <h3>O orçamento podia divergir do treino</h3>
+              <ul>
+                <li>Blocos mínimos de ritmo podiam aumentar demais uma semana pequena.</li>
+                <li>Pisos das rodagens podiam ser somados duas vezes na distribuição.</li>
+                <li>Um longão específico curto podia ser inflado por blocos fixos.</li>
+                <li>Uma maratona podia reunir três sessões duras na mesma semana.</li>
+                <li>O limite de tempo do longão podia esconder uma preparação insuficiente.</li>
+              </ul>
+            </div>
+          </article>
+          <article class="comparison after">
+            <header>Comportamento atual</header>
+            <div class="body">
+              <h3>O treino final precisa caber e ser executável</h3>
+              <ul>
+                <li>A quilometragem pronta é medida e reconstruída quando ultrapassa o teto.</li>
+                <li>Os pisos só existem quando há orçamento para todas as sessões.</li>
+                <li>Blocos específicos diminuem com a sessão disponível.</li>
+                <li>Longão com ritmo de prova já conta como dia de qualidade.</li>
+                <li>Configurações incompatíveis ficam bloqueadas no wizard.</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="algoritmo">
+        <h2>O novo fluxo de geração</h2>
+        <p class="lead">
+          O template continua fornecendo a escada geral do plano, mas agora há uma conferência
+          completa depois que cada sessão ganha distância, aquecimento, recuperação e blocos.
+        </p>
+        <div class="flow" role="list" aria-label="Fluxo da geração de uma semana">
+          <div class="flow-step" role="listitem">
+            <b>1</b>
+            <h3>Planejar</h3>
+            <p>Define fase, orçamento semanal, longão e papéis das sessões.</p>
+          </div>
+          <div class="flow-step" role="listitem">
+            <b>2</b>
+            <h3>Materializar</h3>
+            <p>Cria cada treino com seus blocos, ritmos, aquecimento e desaquecimento.</p>
+          </div>
+          <div class="flow-step" role="listitem">
+            <b>3</b>
+            <h3>Medir</h3>
+            <p>Soma os quilômetros reais e compara a semana com a última semana de construção.</p>
+          </div>
+          <div class="flow-step" role="listitem">
+            <b>4</b>
+            <h3>Corrigir</h3>
+            <p>Reduz e reconstrói quando necessário; uma qualidade inviável vira rodagem fácil.</p>
+          </div>
+        </div>
+        <div class="callout">
+          <strong>Semanas de recuperação continuam sendo semanas de recuperação.</strong>
+          <p>
+            Elas não substituem a referência de carga da última semana de construção. Assim, a
+            semana seguinte retoma a progressão anterior sem tratar a redução planejada como perda
+            de condicionamento.
+          </p>
+        </div>
+      </section>
+
+      <section id="carga">
+        <h2>Mais controle sobre carga e sessões intensas</h2>
+        <div class="cards">
+          <article class="card">
+            <span class="tag">Volume</span>
+            <h3>O teto vale para o que será corrido</h3>
+            <p>
+              A semana pronta não pode crescer acima de aproximadamente 10% em relação à última
+              semana de construção. O cálculo usa quilômetros materializados, não a meta interna.
+            </p>
+          </article>
+          <article class="card">
+            <span class="tag">Qualidade</span>
+            <h3>Dias duros são contabilizados de verdade</h3>
+            <p>
+              Longão com blocos no ritmo de prova é um treino exigente. Por isso ele ocupa uma das
+              vagas de qualidade e não é combinado com mais dois estímulos fortes.
+            </p>
+          </article>
+          <article class="card">
+            <span class="tag">Orçamento</span>
+            <h3>Treinos específicos diminuem quando necessário</h3>
+            <p>
+              Blocos de ritmo de prova, intervalos e longões específicos escalam com o volume
+              disponível. Mínimos fixos não podem mais dobrar uma semana pequena.
+            </p>
+          </article>
+          <article class="card">
+            <span class="tag">Viabilidade</span>
+            <h3>Rodagem fácil é a saída segura</h3>
+            <p>
+              Se aquecimento, trabalho e desaquecimento não couberem ou ultrapassarem o longão, a
+              sessão estruturada é substituída por uma rodagem fácil naquele dia.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="morros">
+        <h2>Morros agora são opcionais</h2>
+        <p class="lead">
+          Os templates de performance mostram a opção <strong>“Incluir treinos em subida”</strong>
+          no wizard. Ela vem ligada, mas pode ser desligada quando a pessoa não tem uma ladeira
+          segura, mora em região plana ou prefere evitar esse tipo de terreno.
+        </p>
+        <div class="hill-demo" aria-label="Substituição do treino de morros">
+          <div class="workout">
+            <strong>Com morros</strong>
+            <small>Repetições controladas em subida · força específica · recuperação na descida</small>
+          </div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="workout">
+            <strong>Sem morros</strong>
+            <small>Fartlek em terreno plano · mesma faixa de esforço · recuperação controlada</small>
+          </div>
+        </div>
+        <div class="callout">
+          <strong>O treino não é simplesmente removido.</strong>
+          <p>
+            Ele é substituído por fartlek plano, preservando a mudança de ritmo e o estímulo
+            cardiorrespiratório sem exigir inclinação. Nenhuma sessão do plano permanece com o tipo
+            “morros” quando a opção está desligada.
+          </p>
+        </div>
+      </section>
+
+      <section id="seguranca">
+        <h2>O wizard passou a impedir planos incompatíveis</h2>
+        <p class="lead">
+          A checagem usa exatamente as sessões que serão salvas. Alertas de agenda continuam sendo
+          orientativos, mas incompatibilidades de carga ou preparação desabilitam o botão de criar.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Condição</th>
+                <th>Interpretação</th>
+                <th>Resposta do wizard</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>0 km por semana</strong></td>
+                <td>A pessoa informou explicitamente que ainda não corre.</td>
+                <td>Bloqueia os demais planos e orienta usar “Começar a correr”.</td>
+              </tr>
+              <tr>
+                <td><strong>Semana inicial &gt; 125% do volume atual</strong></td>
+                <td>O salto inicial é maior do que a adaptação informada.</td>
+                <td>Bloqueia e sugere intensidade conservadora ou construção de base.</td>
+              </tr>
+              <tr>
+                <td><strong>Longão abaixo do necessário</strong></td>
+                <td>O plano não alcança o pico mínimo usado para aquele objetivo.</td>
+                <td>Bloqueia e sugere mais base, mais dias ou uma distância menor.</td>
+              </tr>
+              <tr>
+                <td><strong>Limite de tempo impede o pico</strong></td>
+                <td>O teto seguro de 150 min, ou 180 min na maratona, fica abaixo do requisito.</td>
+                <td>Explica o conflito sem fingir que um longão curto é suficiente.</td>
+              </tr>
+              <tr>
+                <td><strong>Três dias consecutivos</strong></td>
+                <td>A distribuição reduz as oportunidades de recuperação.</td>
+                <td>Mostra aviso, mas permite continuar porque a escolha pode ser necessária.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout warning">
+          <strong>Campo vazio é diferente de zero.</strong>
+          <p>
+            Vazio significa “volume não informado” e usa o pré-requisito do template como hipótese.
+            Zero é uma informação explícita e aciona a proteção para quem ainda não corre.
+          </p>
+        </div>
+      </section>
+
+      <section id="perfis">
+        <h2>Regras mais coerentes com cada perfil</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Perfil ou objetivo</th>
+                <th>Regra atual</th>
+                <th>Motivo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Começar, Voltar e Primeiros 5 km</strong></td>
+                <td>Máximo de quatro dias de impacto por semana.</td>
+                <td>Consistência e adaptação musculoesquelética vêm antes de frequência alta.</td>
+              </tr>
+              <tr>
+                <td><strong>Iniciantes</strong></td>
+                <td>No máximo um fartlek ou progressivo controlado por semana.</td>
+                <td>Evita combinar múltiplos estímulos antes de consolidar volume fácil.</td>
+              </tr>
+              <tr>
+                <td><strong>Base aeróbica</strong></td>
+                <td>Sem sessões estruturadas de qualidade; educativos curtos ainda podem aparecer.</td>
+                <td>O objetivo do bloco é acumular corrida confortável.</td>
+              </tr>
+              <tr>
+                <td><strong>Meia e maratona · completar</strong></td>
+                <td>Uma qualidade no meio da semana; longão específico pode ser o segundo estímulo.</td>
+                <td>Prioriza resistência, recuperação e capacidade de sustentar o plano.</td>
+              </tr>
+              <tr>
+                <td><strong>Performance e recorde pessoal</strong></td>
+                <td>Até duas sessões de qualidade, somente quando o orçamento comporta.</td>
+                <td>Preserva especificidade sem transformar toda semana em competição.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="validacao">
+        <h2>Como foi validado</h2>
+        <p class="lead">
+          A revisão deixou de depender apenas de exemplos escolhidos manualmente. Uma matriz
+          permanente gera mais de mil combinações e inspeciona cada semana entregue.
+        </p>
+        <ul class="checklist">
+          <li>Todos os templates e frequências permitidas.</li>
+          <li>Objetivos de completar e recorde pessoal.</li>
+          <li>Intensidades conservadora, padrão e agressiva.</li>
+          <li>Sem pace, pace mais lento e pace intermediário.</li>
+          <li>Diferentes volumes semanais atuais.</li>
+          <li>Planos com e sem disponibilidade de morros.</li>
+          <li>Nenhuma sessão com distância zero.</li>
+          <li>Limite de qualidade e crescimento materializado.</li>
+          <li>Coerência entre a checagem e a semana entregue.</li>
+          <li>Substituição integral das sessões de subida.</li>
+        </ul>
+        <div class="callout">
+          <strong>Resultado da verificação final</strong>
+          <p>
+            <code>flutter analyze</code> sem problemas e suíte completa com
+            <strong>714 testes aprovados</strong>, incluindo testes unitários, matriz de produto e
+            testes do wizard.
+          </p>
+        </div>
+      </section>
+
+      <footer>
+        Documento complementar a <code>docs/run-plan-quality-review.html</code>. Implementação
+        principal em <code>lib/services/run_plan_composer.dart</code>,
+        <code>lib/services/run_plan_templates.dart</code> e
+        <code>lib/screens/run/run_plan_customize_screen.dart</code>.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

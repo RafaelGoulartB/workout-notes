@@ -38,6 +38,37 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
     await _store.save(next);
   }
 
+  String _languageLabel(AppLocalizations loc, RunVoiceLanguage language) =>
+      switch (language) {
+        RunVoiceLanguage.app => loc.runVoiceLanguageApp,
+        RunVoiceLanguage.portuguese => loc.runVoiceLanguagePortuguese,
+        RunVoiceLanguage.english => loc.runVoiceLanguageEnglish,
+      };
+
+  Future<void> _pickLanguage() async {
+    final loc = AppLocalizations.of(context)!;
+    final choice = await showModalBottomSheet<RunVoiceLanguage>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final language in RunVoiceLanguage.values)
+              ListTile(
+                title: Text(_languageLabel(loc, language)),
+                trailing: language == _settings.language
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () => Navigator.pop(ctx, language),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null) return;
+    await _persist(_settings.copyWith(language: choice));
+  }
+
   Future<void> _playTestAnnouncement() async {
     final loc = AppLocalizations.of(context)!;
     if (!_settings.enabled) {
@@ -346,6 +377,13 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
                       subtitle: loc.runVoiceEnabledSubtitle,
                       value: s.enabled,
                       onChanged: (v) => _persist(s.copyWith(enabled: v)),
+                    ),
+                    const SettingsCardDivider(),
+                    SettingsLinkTile(
+                      icon: Icons.language,
+                      title: loc.runVoiceLanguage,
+                      subtitle: _languageLabel(loc, s.language),
+                      onTap: _pickLanguage,
                     ),
                     const SettingsCardDivider(),
                     SettingsLinkTile(

@@ -112,9 +112,7 @@ class AiWellnessAnalyticsService {
       [start],
     );
     // An active plan's current week overrides the settings goal.
-    final effective = await EffectiveNutritionGoalService.resolve(
-      date: _now(),
-    );
+    final effective = await EffectiveNutritionGoalService.resolve(date: _now());
     final goal = effective.goal;
 
     double? avg(String key) => _average(
@@ -185,11 +183,19 @@ class AiWellnessAnalyticsService {
         'workoutVolumeKg': (workout['volume_kg'] as num?)?.toDouble(),
         'feeling': (workout['feeling'] as num?)?.toDouble(),
         'completedSets': (workout['completed_sets'] as num?)?.toInt(),
+        'recordedRuns': (workout['run_count'] as num?)?.toInt() ?? 0,
+        'stationaryBikeSessions': (workout['bike_count'] as num?)?.toInt() ?? 0,
+        'cardioDistanceMeters':
+            (workout['cardio_distance_meters'] as num?)?.toDouble() ?? 0,
+        'cardioMovingTimeSeconds':
+            (workout['cardio_moving_seconds'] as num?)?.toInt() ?? 0,
+        'averageCardioRpe': (workout['cardio_rpe'] as num?)?.toDouble(),
       });
     }
     return {
       'windowDays': days,
-      'pairingRule': 'sleep and workouts recorded on the same calendar date',
+      'pairingRule':
+          'sleep and completed strength/cardio activities recorded on the same calendar date',
       'pairedDays': pairs.length,
       'correlations': {
         'sleepMinutesVsWorkoutVolume': _correlationFrom(
@@ -334,11 +340,18 @@ class AiWellnessAnalyticsService {
     final start = _date(_today().subtract(Duration(days: days - 1)));
     return database.rawQuery(
       '''
-      SELECT date, COUNT(*) workout_count, SUM(duration_seconds) duration_seconds,
-        AVG(feeling_rating) feeling, SUM(volume_kg) volume_kg,
-        SUM(completed_sets) completed_sets
+      SELECT date, SUM(workout_count) workout_count,
+        SUM(run_count) run_count, SUM(bike_count) bike_count,
+        SUM(duration_seconds) duration_seconds,
+        AVG(feeling_rating) feeling, AVG(cardio_rpe) cardio_rpe,
+        SUM(volume_kg) volume_kg, SUM(completed_sets) completed_sets,
+        SUM(cardio_distance_meters) cardio_distance_meters,
+        SUM(cardio_moving_seconds) cardio_moving_seconds
       FROM (
-        SELECT w.id, w.date, w.duration_seconds, w.feeling_rating,
+        SELECT w.id, w.date, 1 AS workout_count, 0 AS run_count,
+          0 AS bike_count, w.duration_seconds, w.feeling_rating,
+          NULL AS cardio_rpe, 0.0 AS cardio_distance_meters,
+          0 AS cardio_moving_seconds,
           SUM(CASE WHEN s.is_complete = 1 AND COALESCE(s.is_warmup, 0) = 0
             THEN COALESCE(s.weight, 0) * COALESCE(s.reps, 0) ELSE 0 END) volume_kg,
           SUM(CASE WHEN s.is_complete = 1 AND COALESCE(s.is_warmup, 0) = 0
@@ -348,10 +361,23 @@ class AiWellnessAnalyticsService {
         LEFT JOIN sets s ON s.exercise_entry_id = ee.id
         WHERE w.date >= ?
         GROUP BY w.id
+        UNION ALL
+        SELECT ra.id, substr(ra.started_at, 1, 10) AS date,
+          0 AS workout_count,
+          CASE WHEN ra.activity_type = 'running' THEN 1 ELSE 0 END AS run_count,
+          CASE WHEN ra.activity_type = 'stationary_bike' THEN 1 ELSE 0 END
+            AS bike_count,
+          ra.duration_seconds, ra.feeling_rating, ra.rpe AS cardio_rpe,
+          ra.distance_meters AS cardio_distance_meters,
+          CASE WHEN ra.moving_time_seconds > 0 THEN ra.moving_time_seconds
+            ELSE ra.duration_seconds END AS cardio_moving_seconds,
+          0.0 AS volume_kg, 0 AS completed_sets
+        FROM run_activities ra
+        WHERE ra.status = 'completed' AND substr(ra.started_at, 1, 10) >= ?
       ) daily
       GROUP BY date ORDER BY date ASC
       ''',
-      [start],
+      [start, start],
     );
   }
 
@@ -585,8 +611,13 @@ class _RecoveryBucket {
   final List<double> bedtimes = [];
   final List<double> wakeTimes = [];
   final List<double> feelings = [];
+  final List<double> cardioRpes = [];
   double volumeKg = 0;
   int workoutCount = 0;
+  int runCount = 0;
+  int bikeCount = 0;
+  double cardioDistanceMeters = 0;
+  int cardioMovingSeconds = 0;
 
   void addSleep(Map<String, dynamic> row) {
     final sleep = AiWellnessAnalyticsService._effectiveSleep(row);
@@ -601,9 +632,16 @@ class _RecoveryBucket {
 
   void addWorkout(Map<String, dynamic> row) {
     workoutCount += (row['workout_count'] as num?)?.toInt() ?? 0;
+    runCount += (row['run_count'] as num?)?.toInt() ?? 0;
+    bikeCount += (row['bike_count'] as num?)?.toInt() ?? 0;
     volumeKg += (row['volume_kg'] as num?)?.toDouble() ?? 0;
+    cardioDistanceMeters +=
+        (row['cardio_distance_meters'] as num?)?.toDouble() ?? 0;
+    cardioMovingSeconds += (row['cardio_moving_seconds'] as num?)?.toInt() ?? 0;
     final feeling = (row['feeling'] as num?)?.toDouble();
     if (feeling != null) feelings.add(feeling);
+    final cardioRpe = (row['cardio_rpe'] as num?)?.toDouble();
+    if (cardioRpe != null) cardioRpes.add(cardioRpe);
   }
 
   Map<String, dynamic> toMap(String weekStart) {
@@ -649,6 +687,15 @@ class _RecoveryBucket {
       ),
       'workoutCount': workoutCount,
       'trainingVolumeKg': AiWellnessAnalyticsService._round(volumeKg),
+      'recordedRuns': runCount,
+      'stationaryBikeSessions': bikeCount,
+      'cardioDistanceMeters': AiWellnessAnalyticsService._round(
+        cardioDistanceMeters,
+      ),
+      'cardioMovingTimeSeconds': cardioMovingSeconds,
+      'averageCardioRpe': AiWellnessAnalyticsService._roundOrNull(
+        AiWellnessAnalyticsService._average(cardioRpes),
+      ),
     };
   }
 }

@@ -113,7 +113,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
             IconButton(
               icon: const Icon(Icons.timer_outlined),
               onPressed: _openRestTimer,
-              tooltip: 'Temporizador',
+              tooltip: AppLocalizations.of(
+                context,
+              )!.activeWorkoutRestTimerTooltip,
             ),
           if (_isPaused)
             IconButton(
@@ -135,7 +137,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen>
             ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
-            tooltip: 'Mais opções',
+            tooltip: AppLocalizations.of(context)!.commonMoreOptions,
             onSelected: (value) {
               switch (value) {
                 case 'import_routine':

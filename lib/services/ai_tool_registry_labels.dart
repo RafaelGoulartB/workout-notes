@@ -34,6 +34,20 @@ extension AiToolRegistryLabels on AiToolRegistry {
           return l10n.aiToolBodyMeasurements;
         case 'get_cardio_summary':
           return l10n.aiToolCardioSummary;
+        case 'list_run_activities':
+          return l10n.aiToolListRunActivities;
+        case 'get_run_activity_detail':
+          return l10n.aiToolRunActivityDetail;
+        case 'get_run_progress':
+          return l10n.aiToolRunProgress;
+        case 'get_run_achievements':
+          return l10n.aiToolRunAchievements;
+        case 'list_run_plans':
+          return l10n.aiToolListRunPlans;
+        case 'get_run_plan_detail':
+          return l10n.aiToolRunPlanDetail;
+        case 'get_run_schedule':
+          return l10n.aiToolRunSchedule;
         case 'list_goals':
           return l10n.aiToolListGoals;
         case 'get_goal_progress_history':
@@ -107,6 +121,14 @@ extension AiToolRegistryLabels on AiToolRegistry {
         return 'Medidas corporais';
       case 'get_cardio_summary':
         return 'Resumo de cardio';
+      case 'list_run_activities':
+        return 'Consultando corridas registradas';
+      case 'get_run_activity_detail':
+        return 'Detalhando corrida';
+      case 'get_run_progress':
+        return 'Analisando evolução na corrida';
+      case 'get_run_achievements':
+        return 'Consultando recordes de corrida';
       case 'list_run_plans':
         return 'Listando planos de corrida';
       case 'get_run_plan_detail':

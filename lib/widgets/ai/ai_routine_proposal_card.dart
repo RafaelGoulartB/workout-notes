@@ -142,17 +142,17 @@ class _AiRoutineProposalCardState extends State<AiRoutineProposalCard> {
                   _MetricChip(
                     icon: Icons.calendar_view_week_rounded,
                     value: '${after['days'] ?? 0}',
-                    label: 'dias',
+                    label: l10n.commonDays,
                   ),
                   _MetricChip(
                     icon: Icons.fitness_center_rounded,
                     value: '${after['exercises'] ?? 0}',
-                    label: 'exercícios',
+                    label: l10n.commonExercises,
                   ),
                   _MetricChip(
                     icon: Icons.repeat_rounded,
                     value: '${after['sets'] ?? 0}',
-                    label: 'séries',
+                    label: l10n.commonSets,
                   ),
                 ],
               ),
@@ -389,7 +389,7 @@ class _Details extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '${l10n.aiRoutineProposalAdded}: ${added['days'] ?? 0} dias, ${added['exercises'] ?? 0} exercícios, ${added['sets'] ?? 0} séries',
+            '${l10n.aiRoutineProposalAdded}: ${l10n.aiRoutineProposalAddedSummary((added['days'] as num?)?.toInt() ?? 0, (added['exercises'] as num?)?.toInt() ?? 0, (added['sets'] as num?)?.toInt() ?? 0)}',
           ),
           if (proposal.hasRemovals)
             Text(
@@ -405,7 +405,7 @@ class _Details extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    day['name'] as String? ?? 'Dia',
+                    day['name'] as String? ?? l10n.commonDay,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   ...exercises.map((rawExercise) {
@@ -413,7 +413,7 @@ class _Details extends StatelessWidget {
                     return Padding(
                       padding: const EdgeInsets.only(left: 8, top: 3),
                       child: Text(
-                        '• ${e['exercise_name'] ?? e['exercise_id']} · ${(e['sets'] as List? ?? const []).length} séries${e['rest_time_seconds'] == null ? '' : ' · ${e['rest_time_seconds']}s'}',
+                        '• ${l10n.aiRoutineProposalExerciseSummary('${e['exercise_name'] ?? e['exercise_id']}', (e['sets'] as List? ?? const []).length, e['rest_time_seconds'] == null ? '' : ' · ${e['rest_time_seconds']}s')}',
                       ),
                     );
                   }),

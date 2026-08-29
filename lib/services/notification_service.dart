@@ -67,7 +67,7 @@ class NotificationService {
       iOS: iosSettings,
     );
 
-    await _plugin.initialize(initSettings);
+    await _plugin.initialize(settings: initSettings);
     await _loadLocale();
 
     // Create/update channels with current settings
@@ -100,8 +100,10 @@ class NotificationService {
   /// Request the POST_NOTIFICATIONS permission on Android 13+.
   /// Returns `true` if already granted or permission was granted.
   Future<bool> requestPermission() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android == null) {
       _notificationsAllowed = true;
       return true; // not Android
@@ -124,8 +126,10 @@ class NotificationService {
   // Channel updates
 
   Future<void> _updateRestChannel() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android == null) return;
 
     await android.createNotificationChannel(
@@ -141,8 +145,10 @@ class NotificationService {
   }
 
   Future<void> _updateWorkoutChannel() async {
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+    final android = _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (android == null) return;
 
     await android.createNotificationChannel(
@@ -165,10 +171,10 @@ class NotificationService {
     if (!await _ensureNotificationPermission()) return;
 
     await _plugin.show(
-      _restTimerId,
-      _loc.notificationRestTimerTitle,
-      _formatCountdown(remainingSeconds),
-      NotificationDetails(
+      id: _restTimerId,
+      title: _loc.notificationRestTimerTitle,
+      body: _formatCountdown(remainingSeconds),
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _restChannelId,
           _loc.notificationRestChannelName,
@@ -195,13 +201,13 @@ class NotificationService {
     if (!await _ensureNotificationPermission()) return;
 
     // Cancel the ongoing first so a fresh notification alert plays
-    await _plugin.cancel(_restTimerId);
+    await _plugin.cancel(id: _restTimerId);
 
     await _plugin.show(
-      _restTimerId,
-      _loc.notificationRestCompleteTitle,
-      _loc.notificationRestCompleteBody,
-      NotificationDetails(
+      id: _restTimerId,
+      title: _loc.notificationRestCompleteTitle,
+      body: _loc.notificationRestCompleteBody,
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _restChannelId,
           _loc.notificationRestChannelName,
@@ -224,7 +230,7 @@ class NotificationService {
 
   /// Cancel the rest timer notification.
   Future<void> cancelRestTimer() async {
-    await _plugin.cancel(_restTimerId);
+    await _plugin.cancel(id: _restTimerId);
   }
 
   // Workout Timer Notifications
@@ -236,10 +242,10 @@ class NotificationService {
     if (!await _ensureNotificationPermission()) return;
 
     await _plugin.show(
-      _workoutTimerId,
-      _loc.notificationWorkoutTimerTitle,
-      elapsedFormatted,
-      NotificationDetails(
+      id: _workoutTimerId,
+      title: _loc.notificationWorkoutTimerTitle,
+      body: elapsedFormatted,
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _workoutChannelId,
           _loc.notificationWorkoutChannelName,
@@ -257,13 +263,13 @@ class NotificationService {
 
   /// Cancel the workout timer notification.
   Future<void> cancelWorkoutTimer() async {
-    await _plugin.cancel(_workoutTimerId);
+    await _plugin.cancel(id: _workoutTimerId);
   }
 
   /// Cancel all timer notifications.
   Future<void> cancelAll() async {
-    await _plugin.cancel(_restTimerId);
-    await _plugin.cancel(_workoutTimerId);
+    await _plugin.cancel(id: _restTimerId);
+    await _plugin.cancel(id: _workoutTimerId);
   }
 
   // Helpers

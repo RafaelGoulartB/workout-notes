@@ -5,6 +5,7 @@ import '../models/nutrition/ai_food_label_draft.dart';
 import '../models/nutrition/ai_manual_food_proposal.dart';
 import '../repositories/goal_repository.dart';
 import 'ai_nutrition_tool_service.dart';
+import 'ai_run_tool_service.dart';
 import 'ai_sleep_tool_service.dart';
 import 'ai_wellness_analytics_service.dart';
 import 'ai_workout_tool_service.dart';
@@ -18,6 +19,7 @@ class AiToolRegistry {
   final AiNutritionToolService nutrition;
   final AiSleepToolService sleep;
   final AiWorkoutToolService workouts;
+  final AiRunToolService runs;
   final Map<String, Map<String, dynamic>> _schemaCache = {};
   AiToolRegistry({
     DatabaseHelper? db,
@@ -26,12 +28,14 @@ class AiToolRegistry {
     AiNutritionToolService? nutrition,
     AiSleepToolService? sleep,
     AiWorkoutToolService? workouts,
+    AiRunToolService? runs,
   }) : db = db ?? DatabaseHelper.instance,
        goalRepo = goalRepo ?? GoalRepository(),
        wellness = wellness ?? AiWellnessAnalyticsService(db: db),
        nutrition = nutrition ?? AiNutritionToolService(db: db),
        sleep = sleep ?? AiSleepToolService(db: db),
-       workouts = workouts ?? AiWorkoutToolService(db: db);
+       workouts = workouts ?? AiWorkoutToolService(db: db),
+       runs = runs ?? AiRunToolService(db: db);
 
   /// OpenAI function-calling JSON schemas for all read tools.
   List<Map<String, dynamic>> openAiReadToolsSchema({Iterable<String>? names}) {
@@ -156,6 +160,34 @@ class AiToolRegistry {
       'academia',
       'malhei',
       'malhar',
+    ]);
+    final runIntent = hasAny([
+      'cardio',
+      'corrida',
+      'correr',
+      'corri',
+      'run ',
+      'running',
+      'pace',
+      'ritmo',
+      'split',
+      'quilometragem',
+      'km ',
+      '5k',
+      '10k',
+      'meia maratona',
+      'maratona',
+      'pedal',
+      'pedalei',
+      'bicicleta',
+      'bike',
+    ]);
+    final bikeIntent = hasAny([
+      'pedal',
+      'pedalei',
+      'bicicleta',
+      'bike',
+      'ciclismo',
     ]);
     final sleepPerformanceIntent =
         workoutIntent ||
@@ -394,23 +426,72 @@ class AiToolRegistry {
     ])) {
       selected.addAll({'list_exercises', 'get_exercise_detail'});
     }
-    if (hasAny(['recorde', 'record', 'pr ', '1rm'])) {
+    if (!runIntent && hasAny(['recorde', 'record', 'pr ', '1rm'])) {
       selected.addAll({'list_exercises', 'get_exercise_personal_records'});
     }
-    if (hasAny(['volume'])) {
+    if (!runIntent && hasAny(['volume'])) {
       selected.addAll({'get_weekly_volume_breakdown', 'get_training_summary'});
     }
-    if (hasAny([
-      'progresso',
-      'progressao',
-      'progressão',
-      'evolucao',
-      'evolução',
-    ])) {
+    if (!runIntent &&
+        hasAny([
+          'progresso',
+          'progressao',
+          'progressão',
+          'evolucao',
+          'evolução',
+        ])) {
       selected.addAll({'list_exercises', 'get_progress_trend'});
     }
-    if (hasAny(['cardio', 'corrida', 'correr', 'distancia', 'distância'])) {
-      selected.add('get_cardio_summary');
+    if (runIntent ||
+        hasAny([
+          'distancia corrida',
+          'distância corrida',
+          'atividade aerobica',
+        ])) {
+      selected.addAll({
+        'get_cardio_summary',
+        'list_run_activities',
+        'get_run_activity_detail',
+      });
+      if (!bikeIntent &&
+          hasAny([
+            'progresso',
+            'progressao',
+            'progressão',
+            'evolucao',
+            'evolução',
+            'tendencia',
+            'tendência',
+            'volume',
+            'frequencia',
+            'frequência',
+            'consistencia',
+            'consistência',
+            'semana',
+            'mes',
+            'mês',
+          ])) {
+        selected.add('get_run_progress');
+      }
+      if (!bikeIntent &&
+          hasAny([
+            'recorde',
+            'record',
+            'melhor tempo',
+            'melhor pace',
+            'mais rapida',
+            'mais rápida',
+            'mais longa',
+            'conquista',
+            'medalha',
+            'pr ',
+            '5k',
+            '10k',
+            'meia maratona',
+            'maratona',
+          ])) {
+        selected.add('get_run_achievements');
+      }
     }
     if (hasAny([
       'plano de corrida',
@@ -447,6 +528,8 @@ class AiToolRegistry {
     ])) {
       selected.addAll({
         'list_recent_workouts',
+        'get_cardio_summary',
+        'get_run_progress',
         'get_sleep_summary',
         'get_nutrition_summary',
         'get_weekly_recovery_trend',
@@ -491,7 +574,19 @@ class AiToolRegistry {
           next.add('get_run_schedule');
           break;
         case 'get_cardio_summary':
-          next.add('get_run_schedule');
+          next.addAll({
+            'list_run_activities',
+            'get_run_activity_detail',
+            'get_run_progress',
+            'get_run_achievements',
+            'get_run_schedule',
+          });
+          break;
+        case 'list_run_activities':
+          next.addAll({'get_run_activity_detail', 'get_run_progress'});
+          break;
+        case 'get_run_progress':
+          next.addAll({'list_run_activities', 'get_run_achievements'});
           break;
         case 'get_routine_detail':
           next.add('list_exercises');
@@ -624,9 +719,43 @@ class AiToolRegistry {
           return _ok(await _listBodyMeasurements(args));
         case 'get_cardio_summary':
           return _ok(await _getCardioSummary(args));
+        case 'list_run_activities':
+          return _ok(
+            await runs.listActivities(
+              startDate: _isoDate(args['start_date'] ?? args['startDate']),
+              endDate: _isoDate(args['end_date'] ?? args['endDate']),
+              activityType:
+                  _nullableString(
+                    args['activity_type'] ?? args['activityType'],
+                  ) ??
+                  'running',
+              page: _boundedInt(args, 'page', 1, 1, 100000),
+              pageSize: _boundedInt(args, 'page_size', 20, 1, 50),
+            ),
+          );
+        case 'get_run_activity_detail':
+          final activityId = _nullableString(
+            args['activity_id'] ?? args['activityId'],
+          );
+          if (activityId == null) {
+            return const AiToolResult(
+              ok: false,
+              code: 'invalid_args',
+              message: 'activity_id é obrigatório.',
+            );
+          }
+          return _ok(await runs.activityDetail(activityId));
+        case 'get_run_progress':
+          return _ok(
+            await runs.progress(
+              period: _nullableString(args['period']) ?? '12_weeks',
+            ),
+          );
+        case 'get_run_achievements':
+          return _ok(await runs.achievements());
         case 'list_run_plans':
           return _ok(
-            await workouts.listRunPlans(
+            await runs.listPlans(
               includeArchived:
                   args['include_archived'] as bool? ??
                   args['includeArchived'] as bool? ??
@@ -642,10 +771,10 @@ class AiToolRegistry {
               message: 'plan_id é obrigatório.',
             );
           }
-          return _ok(await workouts.runPlanDetail(planId));
+          return _ok(await runs.planDetail(planId));
         case 'get_run_schedule':
           return _ok(
-            await workouts.runSchedule(
+            await runs.schedule(
               startDate: _nullableString(
                 args['start_date'] ?? args['startDate'],
               ),
@@ -985,7 +1114,17 @@ class AiToolRegistry {
   Future<Map<String, dynamic>> _getCardioSummary(
     Map<String, dynamic> args,
   ) async {
-    return workouts.cardioSummary(weeks: _boundedInt(args, 'weeks', 4, 2, 16));
+    final weeks = _boundedInt(args, 'weeks', 4, 2, 16);
+    final summaries = await Future.wait([
+      runs.cardioSummary(weeks: weeks),
+      workouts.cardioSummary(weeks: weeks),
+    ]);
+    return {
+      ...summaries[0],
+      'legacyAerobicWorkoutData': summaries[1],
+      'sourceNote':
+          'recorded activities come from run_activities; legacy aerobic sets are reported separately',
+    };
   }
 
   Future<Map<String, dynamic>> _listGoals(Map<String, dynamic> args) async {
@@ -1088,7 +1227,13 @@ class AiToolRegistry {
         },
         'routines' => {'list_routines', 'get_routine_detail'},
         'body' => {'list_body_measurements'},
-        'cardio' => {'get_cardio_summary'},
+        'cardio' || 'running' => {
+          'get_cardio_summary',
+          'list_run_activities',
+          'get_run_activity_detail',
+          'get_run_progress',
+          'get_run_achievements',
+        },
         'run_plans' => {
           'list_run_plans',
           'get_run_plan_detail',
@@ -1123,6 +1268,8 @@ class AiToolRegistry {
           'get_sleep_summary',
           'get_nutrition_summary',
           'list_recent_workouts',
+          'get_cardio_summary',
+          'get_run_progress',
         },
         'routine_changes' => {
           'list_exercises',
@@ -1170,6 +1317,7 @@ class AiToolRegistry {
                       'routines',
                       'body',
                       'cardio',
+                      'running',
                       'run_plans',
                       'goals',
                       'sleep',
@@ -1448,12 +1596,92 @@ class AiToolRegistry {
           'function': {
             'name': name,
             'description':
-                'Resumo de cardio: distância semanal por modalidade.',
+                'Resumo de corridas GPS, bicicleta estacionária e cardio legado, com distância, duração, ritmo, velocidade e esforço.',
             'parameters': {
               'type': 'object',
               'properties': {
                 'weeks_back': {'type': 'integer', 'default': 4},
               },
+              'required': const [],
+            },
+          },
+        };
+      case 'list_run_activities':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Lista corridas GPS ou sessões de bicicleta registradas, com distância, tempo, pace, calorias, RPE, sensação e melhores esforços.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'start_date': {
+                  'type': 'string',
+                  'description': 'Data inicial yyyy-MM-dd.',
+                },
+                'end_date': {
+                  'type': 'string',
+                  'description': 'Data final yyyy-MM-dd.',
+                },
+                'activity_type': {
+                  'type': 'string',
+                  'enum': ['running', 'stationary_bike', 'all'],
+                  'default': 'running',
+                },
+                'page': {'type': 'integer', 'default': 1},
+                'page_size': {'type': 'integer', 'default': 20},
+              },
+              'required': const [],
+            },
+          },
+        };
+      case 'get_run_activity_detail':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Detalha uma corrida ou pedal registrado: métricas, rota agregada, plano associado e comparação planejado versus realizado por etapa.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'activity_id': {'type': 'string'},
+              },
+              'required': const ['activity_id'],
+            },
+          },
+        };
+      case 'get_run_progress':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Analisa evolução de corrida: volume, frequência, ritmo, comparação com período anterior, sequência semanal e tendências.',
+            'parameters': {
+              'type': 'object',
+              'properties': {
+                'period': {
+                  'type': 'string',
+                  'enum': ['4_weeks', '12_weeks', 'year', 'all'],
+                  'default': '12_weeks',
+                },
+              },
+              'required': const [],
+            },
+          },
+        };
+      case 'get_run_achievements':
+        return {
+          'type': 'function',
+          'function': {
+            'name': name,
+            'description':
+                'Retorna recordes e pódios de corrida: maior distância/duração, melhor pace, split e esforços de 1 km a maratona.',
+            'parameters': {
+              'type': 'object',
+              'properties': const <String, dynamic>{},
               'required': const [],
             },
           },
@@ -1464,8 +1692,7 @@ class AiToolRegistry {
           'function': {
             'name': name,
             'description':
-                'Lista planos de corrida (longão, tiros, ritmo) com objetivo '
-                'e número de semanas.',
+                'Lista planos de corrida com ativação, semana atual, objetivo, progresso, sessões concluídas, puladas e pendentes.',
             'parameters': {
               'type': 'object',
               'properties': {
@@ -1481,8 +1708,7 @@ class AiToolRegistry {
           'function': {
             'name': name,
             'description':
-                'Detalha um plano de corrida: semanas, treinos e etapas '
-                '(aquecimento, tiros, recuperação, desaquecimento).',
+                'Detalha um plano de corrida: progresso e aderência, semanas, treinos e etapas (aquecimento, tiros, recuperação e desaquecimento).',
             'parameters': {
               'type': 'object',
               'properties': {
@@ -2076,6 +2302,19 @@ class AiToolRegistry {
     {'name': 'get_routine_detail', 'description': 'Routine details'},
     {'name': 'list_body_measurements', 'description': 'List body measurements'},
     {'name': 'get_cardio_summary', 'description': 'Cardio summary'},
+    {
+      'name': 'list_run_activities',
+      'description': 'List recorded cardio activities',
+    },
+    {
+      'name': 'get_run_activity_detail',
+      'description': 'Recorded activity details',
+    },
+    {'name': 'get_run_progress', 'description': 'Running progress analytics'},
+    {
+      'name': 'get_run_achievements',
+      'description': 'Running records and achievements',
+    },
     {'name': 'list_run_plans', 'description': 'List running plans'},
     {'name': 'get_run_plan_detail', 'description': 'Running plan details'},
     {'name': 'get_run_schedule', 'description': 'Planned runs in a window'},

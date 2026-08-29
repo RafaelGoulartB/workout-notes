@@ -19,7 +19,8 @@ class ExerciseDetailTabsScreen extends StatefulWidget {
   });
 
   @override
-  State<ExerciseDetailTabsScreen> createState() => _ExerciseDetailTabsScreenState();
+  State<ExerciseDetailTabsScreen> createState() =>
+      _ExerciseDetailTabsScreenState();
 }
 
 class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
@@ -44,8 +45,6 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   Map<String, dynamic>? _history;
   bool _historyLoading = true;
   int _chartType = 0;
-  static const _chartTypes = ['1RM', 'Max Weight', 'Volume', 'Total Reps'];
-
   final _types = [
     {'id': 'weightReps', 'icon': Icons.fitness_center_rounded},
     {'id': 'distanceTime', 'icon': Icons.straighten_rounded},
@@ -59,7 +58,17 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     {'id': 'timeOnly', 'icon': Icons.timer_outlined},
   ];
 
-  final _equipmentOptions = ['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight', 'Treadmill', 'Stationary', 'Kettlebell', 'Band'];
+  final _equipmentOptions = [
+    'Barbell',
+    'Dumbbell',
+    'Cable',
+    'Machine',
+    'Bodyweight',
+    'Treadmill',
+    'Stationary',
+    'Kettlebell',
+    'Band',
+  ];
 
   @override
   void initState() {
@@ -96,8 +105,9 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
       _notesCtl.text = ex['notes'] as String? ?? '';
       _equipment = ex['equipment'] as String? ?? '';
       final wi = (ex['weight_increment'] as num?)?.toDouble();
-      _weightIncrementCtl.text =
-          wi != null ? wi.toStringAsFixed(wi.truncateToDouble() == wi ? 0 : 1) : '';
+      _weightIncrementCtl.text = wi != null
+          ? wi.toStringAsFixed(wi.truncateToDouble() == wi ? 0 : 1)
+          : '';
       final drt = ex['default_rest_time'] as int?;
       _defaultRestCtl.text = drt?.toString() ?? '';
     }
@@ -105,7 +115,10 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   }
 
   Future<void> _loadHistory() async {
-    final data = await _analyticsRepo.getExerciseHistory(widget.exerciseId, limit: 30);
+    final data = await _analyticsRepo.getExerciseHistory(
+      widget.exerciseId,
+      limit: 30,
+    );
     if (!mounted) return;
     setState(() {
       _history = data;
@@ -117,9 +130,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     if (_nameCtl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            AppLocalizations.of(context)!.exerciseFormNameRequired,
-          ),
+          content: Text(AppLocalizations.of(context)!.exerciseFormNameRequired),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -158,17 +169,21 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   }
 
   Future<void> _deleteExercise() async {
+    final loc = AppLocalizations.of(context)!;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Excluir Exercício'),
-        content: Text('Tem certeza que deseja excluir "${widget.exerciseName}"?'),
+        title: Text(loc.exerciseDetailDeleteTitle),
+        content: Text(loc.exerciseDetailDeleteBody(widget.exerciseName)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(loc.commonCancel),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Excluir'),
+            child: Text(loc.commonDelete),
           ),
         ],
       ),
@@ -190,8 +205,14 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     final rough = range / 5;
     double magnitude = 1;
     double temp = rough;
-    while (temp >= 10) { temp /= 10; magnitude *= 10; }
-    while (temp < 1) { temp *= 10; magnitude /= 10; }
+    while (temp >= 10) {
+      temp /= 10;
+      magnitude *= 10;
+    }
+    while (temp < 1) {
+      temp *= 10;
+      magnitude /= 10;
+    }
     if (temp <= 1) {
       temp = 1;
     } else if (temp <= 2) {
@@ -207,6 +228,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
@@ -216,15 +238,18 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
           IconButton(
             icon: const Icon(Icons.delete_outline),
             onPressed: _deleteExercise,
-            tooltip: 'Excluir',
+            tooltip: loc.commonDelete,
           ),
         ],
         bottom: TabBar(
           controller: _tabCtl,
-          tabs: const [
-            Tab(icon: Icon(Icons.edit_outlined), text: 'Editar'),
-            Tab(icon: Icon(Icons.history), text: 'Histórico'),
-            Tab(icon: Icon(Icons.bar_chart_outlined), text: 'Gráficos'),
+          tabs: [
+            Tab(icon: const Icon(Icons.edit_outlined), text: loc.commonEdit),
+            Tab(icon: const Icon(Icons.history), text: loc.commonHistory),
+            Tab(
+              icon: const Icon(Icons.bar_chart_outlined),
+              text: loc.commonCharts,
+            ),
           ],
         ),
       ),
@@ -263,8 +288,9 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                 hintText: loc.exerciseFormNameHint,
                 border: const OutlineInputBorder(),
                 filled: true,
-                fillColor:
-                    theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+                fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                  60,
+                ),
               ),
               textCapitalization: TextCapitalization.words,
             ),
@@ -281,8 +307,8 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                 if (textEditingValue.text.isEmpty) return _equipmentOptions;
                 return _equipmentOptions.where(
                   (opt) => opt.toLowerCase().contains(
-                        textEditingValue.text.toLowerCase(),
-                      ),
+                    textEditingValue.text.toLowerCase(),
+                  ),
                 );
               },
               initialValue: TextEditingValue(text: _equipment),
@@ -294,8 +320,8 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                   hintText: loc.exerciseFormEquipmentHint,
                   border: const OutlineInputBorder(),
                   filled: true,
-                  fillColor:
-                      theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+                  fillColor: theme.colorScheme.surfaceContainerHighest
+                      .withAlpha(60),
                 ),
                 onSubmitted: (_) => onSubmit(),
                 onChanged: (v) => _equipment = v,
@@ -315,8 +341,9 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                 hintText: loc.exerciseFormWeightIncrementHint,
                 border: const OutlineInputBorder(),
                 filled: true,
-                fillColor:
-                    theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+                fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                  60,
+                ),
               ),
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
@@ -330,8 +357,9 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                 hintText: loc.exerciseFormDefaultRestHint,
                 border: const OutlineInputBorder(),
                 filled: true,
-                fillColor:
-                    theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+                fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                  60,
+                ),
               ),
               keyboardType: TextInputType.number,
             ),
@@ -344,8 +372,9 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                 hintText: loc.exerciseFormNotesHint,
                 border: const OutlineInputBorder(),
                 filled: true,
-                fillColor:
-                    theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+                fillColor: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                  60,
+                ),
               ),
             ),
           ],
@@ -376,8 +405,11 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     final loc = AppLocalizations.of(context)!;
     final current = _categories.firstWhere(
       (c) => c['id'] == _categoryId,
-      orElse: () =>
-          {'id': _categoryId, 'name': _categoryId, 'color': 0xFF757575},
+      orElse: () => {
+        'id': _categoryId,
+        'name': _categoryId,
+        'color': 0xFF757575,
+      },
     );
     final currentName = ExerciseLocaleHelper.categoryName(loc, current);
     final currentColor = Color(current['color'] as int? ?? 0xFF757575);
@@ -407,9 +439,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                         shape: BoxShape.circle,
                       ),
                     ),
-                    title: Text(
-                      ExerciseLocaleHelper.categoryName(loc, cat),
-                    ),
+                    title: Text(ExerciseLocaleHelper.categoryName(loc, cat)),
                     trailing: isSelected
                         ? Icon(
                             Icons.check_rounded,
@@ -558,6 +588,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   // ===================== TAB 2: HISTORY =====================
 
   Widget _buildHistoryTab(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
     if (_historyLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -567,12 +598,23 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.history, size: 64, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
+            Icon(
+              Icons.history,
+              size: 64,
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+            ),
             const SizedBox(height: 16),
-            Text('Nenhum treino registrado', style: theme.textTheme.titleMedium),
+            Text(
+              loc.exerciseDetailNoWorkouts,
+              style: theme.textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
-            Text('Os treinos com este exercício aparecerão aqui',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text(
+              loc.exerciseDetailNoWorkoutsBody,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       );
@@ -590,11 +632,35 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
           // Records cards
           Row(
             children: [
-              Expanded(child: _buildRecCard('Peso Máx', bestWeight > 0 ? '${bestWeight.toStringAsFixed(1)} kg' : '--', Icons.monitor_weight, theme.colorScheme.primary, theme)),
+              Expanded(
+                child: _buildRecCard(
+                  loc.exerciseDetailMaxWeightShort,
+                  bestWeight > 0 ? '${bestWeight.toStringAsFixed(1)} kg' : '--',
+                  Icons.monitor_weight,
+                  theme.colorScheme.primary,
+                  theme,
+                ),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: _buildRecCard('Volume', bestVolume > 0 ? '${_formatVolume(bestVolume)} kg' : '--', Icons.auto_graph, theme.colorScheme.secondary, theme)),
+              Expanded(
+                child: _buildRecCard(
+                  loc.commonVolume,
+                  bestVolume > 0 ? '${_formatVolume(bestVolume)} kg' : '--',
+                  Icons.auto_graph,
+                  theme.colorScheme.secondary,
+                  theme,
+                ),
+              ),
               const SizedBox(width: 8),
-              Expanded(child: _buildRecCard('1RM', best1RM > 0 ? '${best1RM.toStringAsFixed(1)} kg' : '--', Icons.emoji_events, Colors.amber, theme)),
+              Expanded(
+                child: _buildRecCard(
+                  '1RM',
+                  best1RM > 0 ? '${best1RM.toStringAsFixed(1)} kg' : '--',
+                  Icons.emoji_events,
+                  Colors.amber,
+                  theme,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -608,11 +674,51 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
             ),
             child: Row(
               children: [
-                Expanded(flex: 2, child: Text('Data', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text('Peso', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text('Volume', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text('Sets×Reps', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text('1RM', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    loc.commonDate,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    loc.commonWeight,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    loc.commonVolume,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    loc.exerciseDetailSetsReps,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    '1RM',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -631,29 +737,65 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                     ? () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => WorkoutDetailScreen(workoutId: workoutId),
+                          builder: (_) =>
+                              WorkoutDetailScreen(workoutId: workoutId),
                         ),
                       )
                     : null,
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+                    color: theme.colorScheme.surfaceContainerHighest.withAlpha(
+                      60,
+                    ),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      Expanded(flex: 2, child: Text(date.length >= 10 ? date.substring(5) : date,
-                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                      Expanded(flex: 2, child: Text(maxW > 0 ? maxW.toStringAsFixed(1) : '-',
-                          style: theme.textTheme.bodySmall)),
-                      Expanded(flex: 2, child: Text(vol > 0 ? vol.toStringAsFixed(0) : '-',
-                          style: theme.textTheme.bodySmall)),
-                      Expanded(flex: 2, child: Text('$sets×$reps',
-                          style: theme.textTheme.bodySmall)),
-                      Expanded(flex: 2, child: Text(est1RM != null ? est1RM.toStringAsFixed(1) : '-',
-                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: Colors.amber[700]))),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          date.length >= 10 ? date.substring(5) : date,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          maxW > 0 ? maxW.toStringAsFixed(1) : '-',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          vol > 0 ? vol.toStringAsFixed(0) : '-',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          '$sets×$reps',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Text(
+                          est1RM != null ? est1RM.toStringAsFixed(1) : '-',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.amber[700],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -665,7 +807,13 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
     );
   }
 
-  Widget _buildRecCard(String label, String value, IconData icon, Color color, ThemeData theme) {
+  Widget _buildRecCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+    ThemeData theme,
+  ) {
     return Card(
       elevation: 0,
       color: color.withAlpha(15),
@@ -676,8 +824,20 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
           children: [
             Icon(icon, color: color, size: 20),
             const SizedBox(height: 4),
-            Text(value, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, fontSize: 11)),
-            Text(label, style: theme.textTheme.bodySmall?.copyWith(fontSize: 9, color: theme.colorScheme.onSurfaceVariant)),
+            Text(
+              value,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+              ),
+            ),
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 9,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       ),
@@ -687,6 +847,13 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   // ===================== TAB 3: CHARTS =====================
 
   Widget _buildChartsTab(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
+    final chartTypes = [
+      loc.exerciseDetailChart1RM,
+      loc.exerciseDetailChartMaxWeight,
+      loc.exerciseDetailChartVolume,
+      loc.exerciseDetailChartTotalReps,
+    ];
     if (_historyLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -699,12 +866,15 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
             height: 36,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              children: List.generate(_chartTypes.length, (i) {
+              children: List.generate(chartTypes.length, (i) {
                 final isSelected = _chartType == i;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
-                    label: Text(_chartTypes[i], style: TextStyle(fontSize: 12)),
+                    label: Text(
+                      chartTypes[i],
+                      style: const TextStyle(fontSize: 12),
+                    ),
                     selected: isSelected,
                     onSelected: (_) => setState(() => _chartType = i),
                   ),
@@ -720,6 +890,7 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
   }
 
   Widget _buildChartContent(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
     final history = _history?['history'] as List? ?? [];
 
     String title;
@@ -727,20 +898,26 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
 
     switch (_chartType) {
       case 0:
-        title = 'Evolução do 1RM Estimado';
-        values = history.map((h) => (h['estimated_1rm'] as double?) ?? 0).toList();
+        title = loc.exerciseDetailEstimated1RMProgress;
+        values = history
+            .map((h) => (h['estimated_1rm'] as double?) ?? 0)
+            .toList();
         break;
       case 1:
-        title = 'Evolução do Peso Máximo';
+        title = loc.exerciseDetailMaxWeightProgress;
         values = history.map((h) => (h['max_weight'] as double?) ?? 0).toList();
         break;
       case 2:
-        title = 'Volume por Treino';
-        values = history.map((h) => (h['total_volume'] as double?) ?? 0).toList();
+        title = loc.exerciseDetailVolumePerWorkout;
+        values = history
+            .map((h) => (h['total_volume'] as double?) ?? 0)
+            .toList();
         break;
       case 3:
-        title = 'Repetições por Treino';
-        values = history.map((h) => (h['total_reps'] as int?)?.toDouble() ?? 0).toList();
+        title = loc.exerciseDetailRepsPerWorkout;
+        values = history
+            .map((h) => (h['total_reps'] as int?)?.toDouble() ?? 0)
+            .toList();
         break;
       default:
         return const SizedBox.shrink();
@@ -756,12 +933,23 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.bar_chart_outlined, size: 64, color: theme.colorScheme.onSurfaceVariant.withAlpha(80)),
+            Icon(
+              Icons.bar_chart_outlined,
+              size: 64,
+              color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+            ),
             const SizedBox(height: 16),
-            Text('Nenhum dado disponível', style: theme.textTheme.titleMedium),
+            Text(
+              loc.exerciseDetailNoChartData,
+              style: theme.textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
-            Text('Registre treinos com este exercício para ver os gráficos',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            Text(
+              loc.exerciseDetailNoChartDataBody,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       );
@@ -776,7 +964,9 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+          side: BorderSide(
+            color: theme.colorScheme.outlineVariant.withAlpha(80),
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -785,9 +975,19 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
             children: [
               Row(
                 children: [
-                  Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                  Text(
+                    title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const Spacer(),
-                  Text('${history.length} treinos', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                  Text(
+                    loc.exerciseDetailWorkoutCount(history.length),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -815,8 +1015,12 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                           getTitlesWidget: (v, _) => Padding(
                             padding: const EdgeInsets.only(right: 4),
                             child: Text(
-                              _chartType == 3 ? v.toInt().toString() : v.toStringAsFixed(1),
-                              style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+                              _chartType == 3
+                                  ? v.toInt().toString()
+                                  : v.toStringAsFixed(1),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 10,
+                              ),
                             ),
                           ),
                         ),
@@ -828,32 +1032,43 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                           interval: history.length > 15 ? 2 : 1,
                           getTitlesWidget: (v, _) {
                             final idx = v.toInt();
-                            if (idx < 0 || idx >= history.length) return const SizedBox.shrink();
+                            if (idx < 0 || idx >= history.length) {
+                              return const SizedBox.shrink();
+                            }
                             final date = history[idx]['date'] as String? ?? '';
                             return Padding(
                               padding: const EdgeInsets.only(top: 4),
                               child: Text(
                                 date.length >= 10 ? date.substring(5) : date,
-                                style: theme.textTheme.bodySmall?.copyWith(fontSize: 9),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 9,
+                                ),
                               ),
                             );
                           },
                         ),
                       ),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                     ),
                     borderData: FlBorderData(show: false),
                     lineBarsData: [
                       LineChartBarData(
-                        spots: values.asMap().entries.map((e) =>
-                          FlSpot(e.key.toDouble(), e.value)).toList(),
+                        spots: values
+                            .asMap()
+                            .entries
+                            .map((e) => FlSpot(e.key.toDouble(), e.value))
+                            .toList(),
                         isCurved: true,
                         color: _chartType == 0
                             ? Colors.amber
                             : _chartType == 2
-                                ? theme.colorScheme.secondary
-                                : theme.colorScheme.primary,
+                            ? theme.colorScheme.secondary
+                            : theme.colorScheme.primary,
                         barWidth: 3,
                         dotData: FlDotData(
                           show: history.length <= 30,
@@ -863,32 +1078,38 @@ class _ExerciseDetailTabsScreenState extends State<ExerciseDetailTabsScreen>
                                 color: _chartType == 0
                                     ? Colors.amber
                                     : _chartType == 2
-                                        ? theme.colorScheme.secondary
-                                        : theme.colorScheme.primary,
+                                    ? theme.colorScheme.secondary
+                                    : theme.colorScheme.primary,
                               ),
                         ),
                         belowBarData: BarAreaData(
                           show: true,
-                          color: (_chartType == 0
-                              ? Colors.amber
-                              : _chartType == 2
-                                  ? theme.colorScheme.secondary
-                                  : theme.colorScheme.primary).withAlpha(30),
+                          color:
+                              (_chartType == 0
+                                      ? Colors.amber
+                                      : _chartType == 2
+                                      ? theme.colorScheme.secondary
+                                      : theme.colorScheme.primary)
+                                  .withAlpha(30),
                         ),
                       ),
                     ],
                     lineTouchData: LineTouchData(
                       touchTooltipData: LineTouchTooltipData(
-                        getTooltipItems: (touchedSpots) => touchedSpots.map((spot) {
-                          final idx = spot.spotIndex;
-                          final date = idx < history.length
-                              ? (history[idx]['date'] as String? ?? '')
-                              : '';
-                          return LineTooltipItem(
-                            '$date\n${spot.y.toStringAsFixed(1)}',
-                            TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-                          );
-                        }).toList(),
+                        getTooltipItems: (touchedSpots) =>
+                            touchedSpots.map((spot) {
+                              final idx = spot.spotIndex;
+                              final date = idx < history.length
+                                  ? (history[idx]['date'] as String? ?? '')
+                                  : '';
+                              return LineTooltipItem(
+                                '$date\n${spot.y.toStringAsFixed(1)}',
+                                TextStyle(
+                                  color: theme.colorScheme.onSurface,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            }).toList(),
                       ),
                     ),
                   ),

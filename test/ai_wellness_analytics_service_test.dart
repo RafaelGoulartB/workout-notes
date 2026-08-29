@@ -160,6 +160,38 @@ void main() {
     },
   );
 
+  test('sleep-performance includes cardio-only activity days', () async {
+    final date = _date(now);
+    await database.insert('sleep_entries', {
+      'id': 'sleep-run',
+      'date': date,
+      'sleep_minutes': 450,
+      'actual_sleep_minutes': 430,
+      'source': 'manual',
+      'created_at': now.toIso8601String(),
+    });
+    await database.insert('run_activities', {
+      'id': 'recovery-run',
+      'activity_type': 'running',
+      'started_at': now.toIso8601String(),
+      'duration_seconds': 1800,
+      'moving_time_seconds': 1700,
+      'distance_meters': 5000.0,
+      'rpe': 7.0,
+      'feeling_rating': 4,
+      'status': 'completed',
+      'created_at': now.toIso8601String(),
+      'updated_at': now.toIso8601String(),
+    });
+
+    final result = await service.sleepPerformance(days: 7);
+    final pair = (result['recentPairs'] as List).single as Map;
+    expect(result['pairedDays'], 1);
+    expect(pair['recordedRuns'], 1);
+    expect(pair['cardioDistanceMeters'], 5000.0);
+    expect(pair['averageCardioRpe'], 7.0);
+  });
+
   test(
     'weekly recovery is bounded and reports its non-clinical method',
     () async {
@@ -185,6 +217,19 @@ void main() {
             'is_from_routine': 0,
             'created_at': now.toIso8601String(),
           });
+          await database.insert('run_activities', {
+            'id': 'recovery-run-$i',
+            'activity_type': 'running',
+            'started_at': now.subtract(Duration(days: i)).toIso8601String(),
+            'duration_seconds': 1800,
+            'moving_time_seconds': 1700,
+            'distance_meters': 5000.0,
+            'rpe': 6.0,
+            'feeling_rating': 4,
+            'status': 'completed',
+            'created_at': now.toIso8601String(),
+            'updated_at': now.toIso8601String(),
+          });
         }
       }
 
@@ -193,9 +238,17 @@ void main() {
 
       expect(trend, isNotEmpty);
       for (final raw in trend) {
-        final score = (raw as Map)['recoveryScore'] as num?;
+        final row = raw as Map;
+        final score = row['recoveryScore'] as num?;
         if (score != null) expect(score, inInclusiveRange(0, 100));
       }
+      expect(
+        trend.fold<int>(
+          0,
+          (sum, raw) => sum + ((raw as Map)['recordedRuns'] as int),
+        ),
+        7,
+      );
       expect(result['method'], contains('non-clinical'));
     },
   );

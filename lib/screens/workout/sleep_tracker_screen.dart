@@ -128,8 +128,9 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       final summariesByEntry = {
         for (final summary in nightSummaries) summary.entry.id: summary,
       };
-      final latestNight =
-          stats.latest == null ? null : summariesByEntry[stats.latest!.id];
+      final latestNight = stats.latest == null
+          ? null
+          : summariesByEntry[stats.latest!.id];
       if (!mounted) return;
       setState(() {
         _entries = entries;
@@ -208,7 +209,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         actions: [
           const AiCoachHeaderButton(),
           IconButton(
-            tooltip: 'Alarmes',
+            tooltip: loc.alarmTitle,
             icon: const Icon(Icons.alarm_rounded),
             onPressed: _openTraditionalAlarms,
           ),
@@ -414,8 +415,9 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         );
       }
     }
-    final maxValue =
-        recordedSpots.map((spot) => spot.y).fold<double>(8, math.max);
+    final maxValue = recordedSpots
+        .map((spot) => spot.y)
+        .fold<double>(8, math.max);
 
     return Column(
       children: [
@@ -507,7 +509,9 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
           ],
         ),
         const SizedBox(height: 10),
-        ..._entries.take(visibleCount).map(
+        ..._entries
+            .take(visibleCount)
+            .map(
               (entry) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: _SleepHistoryCard(

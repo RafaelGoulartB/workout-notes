@@ -756,13 +756,11 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
 
     // ----- Option C: pick a JSON file through Android's native picker -----
     Future<void> pickFromDevice() async {
-      FilePickerResult? result;
+      PlatformFile? file;
       try {
-        result = await FilePicker.pickFiles(
+        file = await FilePicker.pickFile(
           type: FileType.custom,
           allowedExtensions: ['json'],
-          allowMultiple: false,
-          withData: true,
         );
       } catch (e) {
         if (!mounted) return;
@@ -775,23 +773,31 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
         return;
       }
 
-      if (result == null || !mounted) return;
+      if (file == null || !mounted) return;
 
-      final file = result.files.single;
-      if (file.bytes != null) {
-        await confirmAndRestoreFromBytes(file.bytes!);
-      } else if (file.path != null) {
-        await confirmAndRestoreFromFile(file.path!);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              loc.settingsImportPickerError(loc.settingsNoBackupFile),
-            ),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      Uint8List? bytes;
+      try {
+        bytes = await file.readAsBytes();
+      } catch (_) {
+        // Some native providers expose only a filesystem path.
       }
+      if (bytes != null) {
+        await confirmAndRestoreFromBytes(bytes);
+        return;
+      }
+      if (file.path != null) {
+        await confirmAndRestoreFromFile(file.path!);
+        return;
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            loc.settingsImportPickerError(loc.settingsNoBackupFile),
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
 
     // ----- Main menu -----
@@ -1038,7 +1044,9 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
         setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('🔧 Modo desenvolvedor ativado!'),
+            content: Text(
+              AppLocalizations.of(context)!.settingsDeveloperModeEnabled,
+            ),
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
           ),

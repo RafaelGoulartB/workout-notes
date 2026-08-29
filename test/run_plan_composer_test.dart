@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
+import 'package:workout_notes/services/run_pace_calculator.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
 
@@ -90,10 +91,7 @@ void main() {
         RunPlanTemplates.fiveK,
         config(),
       );
-      final kinds = schedule
-          .expand((w) => w)
-          .map((s) => s.kind)
-          .toSet();
+      final kinds = schedule.expand((w) => w).map((s) => s.kind).toSet();
       expect(kinds.contains(RunWorkoutKind.interval), isTrue);
       expect(kinds.contains(RunWorkoutKind.tempo), isTrue);
       expect(
@@ -117,10 +115,7 @@ void main() {
       expect(schedule.first.every((s) => !_isQuality(s.kind)), isTrue);
       // Later build weeks must include quality — not just easy + long.
       final later = schedule.skip(2).take(4);
-      expect(
-        later.any((week) => week.any((s) => _isQuality(s.kind))),
-        isTrue,
-      );
+      expect(later.any((week) => week.any((s) => _isQuality(s.kind))), isTrue);
     });
 
     test('recovery week drops to a single soft quality session', () {
@@ -129,10 +124,7 @@ void main() {
         config(),
       );
       // Week index 3 is recovery (w > 0 && w % 4 == 3).
-      expect(
-        schedule[3].where((s) => _isQuality(s.kind)),
-        hasLength(1),
-      );
+      expect(schedule[3].where((s) => _isQuality(s.kind)), hasLength(1));
       expect(
         schedule[2].where((s) => _isQuality(s.kind)).length,
         greaterThanOrEqualTo(2),
@@ -231,10 +223,122 @@ void main() {
       expect(week.every((s) => s.kind == RunWorkoutKind.easy), isTrue);
     });
 
-    test('run-walk is capped at four days a week', () {
+    test('beginner and return plans are capped at four days a week', () {
       // Bone and tendon adaptation lags the cardiovascular system: a brand-new
-      // runner must not be offered a fifth run/walk day.
-      expect(RunPlanTemplates.runWalk.allowedSessionsPerWeek, isNot(contains(5)));
+      // or returning runner must not be offered a fifth impact day.
+      for (final template in [
+        RunPlanTemplates.runWalk,
+        RunPlanTemplates.walkJog,
+        RunPlanTemplates.returnToRunning,
+        RunPlanTemplates.returnAfterInjury,
+        RunPlanTemplates.firstFiveK,
+        RunPlanTemplates.habit,
+      ]) {
+        expect(template.allowedSessionsPerWeek, isNot(contains(5)));
+      }
+    });
+
+    test('keep-fit expands to the chosen length with flat varied weeks', () {
+      final schedule = RunPlanComposer.compose(
+        RunPlanTemplates.keepFit,
+        const RunPlanBuildConfig(
+          sessionsPerWeek: 4,
+          availableDays: [2, 4, 5, 7],
+          intent: RunPlanIntent.finish,
+          currentWeeklyKm: 30,
+          weeks: 12,
+        ),
+      );
+      expect(schedule, hasLength(12));
+      expect(schedule.every((week) => week.length == 4), isTrue);
+
+      final buildKm = <double>[];
+      for (var i = 0; i < schedule.length; i++) {
+        if (i > 0 && i % 4 == 3) continue; // recovery
+        buildKm.add(
+          schedule[i].fold<double>(
+            0,
+            (sum, s) => sum + (s.targetDistanceMeters ?? 0) / 1000,
+          ),
+        );
+      }
+      final mean = buildKm.reduce((a, b) => a + b) / buildKm.length;
+      for (final km in buildKm) {
+        expect(km, closeTo(mean, mean * 0.12));
+      }
+
+      final kinds = schedule.expand((week) => week).map((s) => s.kind).toSet();
+      expect(kinds.length, greaterThanOrEqualTo(3));
+      expect(kinds.contains(RunWorkoutKind.long), isTrue);
+    });
+
+    test('outline exposes build, recovery, taper and race weeks', () {
+      final outline = RunPlanComposer.outline(
+        RunPlanTemplates.marathon,
+        config(sessions: 4, days: const [2, 4, 5, 7]),
+      );
+      expect(outline.weeks, hasLength(outline.schedule.length));
+      expect(
+        outline.weeks.any((w) => w.phase == RunPlanWeekPhase.build),
+        isTrue,
+      );
+      expect(
+        outline.weeks.any((w) => w.phase == RunPlanWeekPhase.recovery),
+        isTrue,
+      );
+      expect(
+        outline.weeks.any((w) => w.phase == RunPlanWeekPhase.taper),
+        isTrue,
+      );
+      expect(outline.weeks.last.phase, RunPlanWeekPhase.race);
+      expect(outline.peakWeeklyKm, greaterThan(outline.startWeeklyKm));
+      expect(outline.peakLongKm, closeTo(outline.readiness.peakLongKm, 0.05));
+      expect(outline.raceWeekNumber, outline.weeks.length);
+    });
+
+    test('optimistic goal keeps training paces on fitness', () {
+      const fitness = RunPlanPaceCalibration(
+        distanceMeters: 5000,
+        timeSeconds: 28 * 60,
+      );
+      const goal = RunPlanPaceCalibration(
+        distanceMeters: 5000,
+        timeSeconds: 22 * 60,
+      );
+      final built = RunPlanComposer.compose(
+        RunPlanTemplates.fiveK,
+        RunPlanBuildConfig(
+          sessionsPerWeek: 4,
+          availableDays: const [2, 4, 5, 7],
+          intent: RunPlanIntent.pb,
+          calibration: goal,
+          paceSource: RunPlanPaceSource.goal,
+          fitnessCalibration: fitness,
+        ),
+      );
+      final easy = built
+          .expand((week) => week)
+          .firstWhere((s) => s.kind == RunWorkoutKind.easy);
+      expect(easy.targetPaceSecPerKm, closeTo(fitness.paces.easySecPerKm, 1));
+      expect(
+        easy.targetPaceSecPerKm,
+        isNot(closeTo(goal.paces.easySecPerKm, 8)),
+      );
+
+      final raceWork = built
+          .expand((week) => week)
+          .where(
+            (s) =>
+                s.name.startsWith('Ritmo de prova') ||
+                s.kind == RunWorkoutKind.race,
+          );
+      expect(raceWork, isNotEmpty);
+      final racePace = raceWork.first.targetPaceSecPerKm;
+      expect(racePace, isNotNull);
+      expect(
+        racePace,
+        closeTo(goal.paces.racePaceFor(RunPaceCalculator.fiveKMeters), 2),
+      );
     });
   });
 }

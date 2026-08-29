@@ -38,16 +38,8 @@ class _VolumeChartsState extends State<VolumeCharts> {
     try {
       final (start, end) = _currentRange();
       final results = await Future.wait([
-        widget.analytics.getAnaerobicVolumeTrend(
-          end,
-          _bucket,
-          bySets: _bySets,
-        ),
-        widget.analytics.getAnaerobicTopExercises(
-          start,
-          end,
-          bySets: _bySets,
-        ),
+        widget.analytics.getAnaerobicVolumeTrend(end, _bucket, bySets: _bySets),
+        widget.analytics.getAnaerobicTopExercises(start, end, bySets: _bySets),
       ]);
       if (!mounted) return;
       setState(() {
@@ -121,11 +113,7 @@ class _VolumeChartsState extends State<VolumeCharts> {
           unitLabel: _unitLabel(loc),
         ),
         const SizedBox(height: 12),
-        _CategoryCard(
-          analytics: widget.analytics,
-          start: start,
-          end: end,
-        ),
+        _CategoryCard(analytics: widget.analytics, start: start, end: end),
         if (_topExercises.isNotEmpty) ...[
           const SizedBox(height: 12),
           _TopExercisesChart(
@@ -225,9 +213,7 @@ class _CompactSegmentedButton<T> extends StatelessWidget {
                 curve: Curves.easeOut,
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 decoration: BoxDecoration(
-                  color: isSel
-                      ? theme.colorScheme.primary
-                      : Colors.transparent,
+                  color: isSel ? theme.colorScheme.primary : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 alignment: Alignment.center,
@@ -273,8 +259,9 @@ class _TrendChart extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
-    final volumes =
-        data.map((m) => (m['volume'] as num?)?.toDouble() ?? 0).toList();
+    final volumes = data
+        .map((m) => (m['volume'] as num?)?.toDouble() ?? 0)
+        .toList();
     final maxVol = volumes.fold<double>(0, (a, b) => a > b ? a : b);
     final hasData = maxVol > 0;
 
@@ -289,10 +276,7 @@ class _TrendChart extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           if (!hasData)
-            _EmptyChart(
-              icon: Icons.show_chart,
-              message: loc.progressNoData,
-            )
+            _EmptyChart(icon: Icons.show_chart, message: loc.progressNoData)
           else
             SizedBox(
               height: 130,
@@ -303,11 +287,12 @@ class _TrendChart extends StatelessWidget {
                   minY: 0,
                   barTouchData: BarTouchData(
                     touchTooltipData: BarTouchTooltipData(
-                      tooltipRoundedRadius: 10,
+                      tooltipBorderRadius: BorderRadius.circular(10),
                       tooltipPadding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      getTooltipColor: (_) =>
-                          theme.colorScheme.inverseSurface,
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      getTooltipColor: (_) => theme.colorScheme.inverseSurface,
                       getTooltipItem: (group, groupIndex, rod, rodIndex) {
                         final m = data[groupIndex];
                         final start = m['bucket_start'] as String? ?? '';
@@ -338,9 +323,10 @@ class _TrendChart extends StatelessWidget {
                             padding: const EdgeInsets.only(top: 6),
                             child: Text(
                               _axisLabel(
-                                  data[idx]['bucket_start'] as String? ?? '',
-                                  idx,
-                                  data.length),
+                                data[idx]['bucket_start'] as String? ?? '',
+                                idx,
+                                data.length,
+                              ),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 fontSize: 9,
                                 color: theme.colorScheme.onSurfaceVariant,
@@ -371,16 +357,19 @@ class _TrendChart extends StatelessWidget {
                       ),
                     ),
                     topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                     rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false)),
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval:
-                        maxVol > 0 ? niceInterval(maxVol / 4) : 1,
+                    horizontalInterval: maxVol > 0
+                        ? niceInterval(maxVol / 4)
+                        : 1,
                     getDrawingHorizontalLine: (_) => FlLine(
                       color: theme.colorScheme.outlineVariant.withAlpha(60),
                       strokeWidth: 1,
@@ -536,8 +525,9 @@ class _CategoryCardState extends State<_CategoryCard> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
-    final unitLabel =
-        _bySets ? loc.progressVolumeUnitSets : loc.progressVolumeUnitWeight;
+    final unitLabel = _bySets
+        ? loc.progressVolumeUnitSets
+        : loc.progressVolumeUnitWeight;
 
     final headerToggles = Row(
       mainAxisSize: MainAxisSize.min,
@@ -563,11 +553,7 @@ class _CategoryCardState extends State<_CategoryCard> {
             setState(() => _bySets = v);
             _load();
           },
-          option1: (
-            false,
-            Icons.fitness_center,
-            loc.progressVolumeTypeWeight,
-          ),
+          option1: (false, Icons.fitness_center, loc.progressVolumeTypeWeight),
           option2: (
             true,
             Icons.format_list_numbered,
@@ -587,7 +573,9 @@ class _CategoryCardState extends State<_CategoryCard> {
     }
 
     final total = _data.fold<double>(
-        0, (a, b) => a + ((b['volume'] as num?)?.toDouble() ?? 0));
+      0,
+      (a, b) => a + ((b['volume'] as num?)?.toDouble() ?? 0),
+    );
 
     return _PrettyCard(
       child: Column(
@@ -617,18 +605,18 @@ class _CategoryCardState extends State<_CategoryCard> {
             child: _isLoading
                 ? const _CategoryLoading(key: ValueKey('loading'))
                 : _view == _CategoryView.pie
-                    ? _CategoryPie(
-                        key: const ValueKey('pie'),
-                        data: _data,
-                        total: total,
-                        formatValue: _formatValue,
-                        unitLabel: unitLabel,
-                      )
-                    : _CategoryList(
-                        key: const ValueKey('list'),
-                        data: _data,
-                        formatValue: _formatValue,
-                      ),
+                ? _CategoryPie(
+                    key: const ValueKey('pie'),
+                    data: _data,
+                    total: total,
+                    formatValue: _formatValue,
+                    unitLabel: unitLabel,
+                  )
+                : _CategoryList(
+                    key: const ValueKey('list'),
+                    data: _data,
+                    formatValue: _formatValue,
+                  ),
           ),
         ],
       ),
@@ -690,14 +678,11 @@ class _CategoryPie extends StatelessWidget {
                       sections: data.take(8).map((e) {
                         final vol = (e['volume'] as num?)?.toDouble() ?? 0;
                         final pct = total > 0 ? vol / total * 100 : 0.0;
-                        final base =
-                            Color(e['color'] as int? ?? 0xFF757575);
+                        final base = Color(e['color'] as int? ?? 0xFF757575);
                         return PieChartSectionData(
                           color: base,
                           value: vol,
-                          title: pct >= 8
-                              ? '${pct.toStringAsFixed(0)}%'
-                              : '',
+                          title: pct >= 8 ? '${pct.toStringAsFixed(0)}%' : '',
                           titleStyle: const TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
@@ -793,7 +778,9 @@ class _CategoryList extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final maxVol = data.fold<double>(
-        0, (a, b) => a + ((b['volume'] as num?)?.toDouble() ?? 0));
+      0,
+      (a, b) => a + ((b['volume'] as num?)?.toDouble() ?? 0),
+    );
     final rows = data.take(6).toList();
 
     return Column(
@@ -813,9 +800,13 @@ class _CategoryList extends StatelessWidget {
                 width: 86,
                 child: Text(
                   ExerciseLocaleHelper.categoryName(
-                      AppLocalizations.of(context)!, cat),
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(fontWeight: FontWeight.w600, fontSize: 11),
+                    AppLocalizations.of(context)!,
+                    cat,
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -836,10 +827,7 @@ class _CategoryList extends StatelessWidget {
                           height: 12,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [
-                                color.withAlpha(180),
-                                color,
-                              ],
+                              colors: [color.withAlpha(180), color],
                             ),
                           ),
                         ),
@@ -853,8 +841,10 @@ class _CategoryList extends StatelessWidget {
                 width: 50,
                 child: Text(
                   formatValue(vol),
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(fontWeight: FontWeight.w800, fontSize: 11),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                  ),
                   textAlign: TextAlign.right,
                 ),
               ),
@@ -940,8 +930,7 @@ class _TopExercisesChart extends StatelessWidget {
             final ex = entry.value;
             final vol = (ex['volume'] as num?)?.toDouble() ?? 0;
             final pct = maxVol > 0 ? vol / maxVol : 0.0;
-            final catColor =
-                Color(ex['category_color'] as int? ?? 0xFF757575);
+            final catColor = Color(ex['category_color'] as int? ?? 0xFF757575);
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
@@ -952,9 +941,13 @@ class _TopExercisesChart extends StatelessWidget {
                     width: 96,
                     child: Text(
                       ExerciseLocaleHelper.exerciseName(
-                          AppLocalizations.of(context)!, ex),
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(fontWeight: FontWeight.w600, fontSize: 11),
+                        AppLocalizations.of(context)!,
+                        ex,
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -975,10 +968,7 @@ class _TopExercisesChart extends StatelessWidget {
                               height: 12,
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [
-                                    catColor.withAlpha(180),
-                                    catColor,
-                                  ],
+                                  colors: [catColor.withAlpha(180), catColor],
                                 ),
                               ),
                             ),
@@ -992,8 +982,10 @@ class _TopExercisesChart extends StatelessWidget {
                     width: 48,
                     child: Text(
                       formatValue(vol),
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(fontWeight: FontWeight.w800, fontSize: 11),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 11,
+                      ),
                       textAlign: TextAlign.right,
                     ),
                   ),
@@ -1023,7 +1015,9 @@ class _PrettyCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withAlpha(80)),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withAlpha(80),
+        ),
       ),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: child,
@@ -1165,9 +1159,7 @@ class _ToggleButton extends StatelessWidget {
           width: 26,
           height: 26,
           decoration: BoxDecoration(
-            color: isSelected
-                ? theme.colorScheme.primary
-                : Colors.transparent,
+            color: isSelected ? theme.colorScheme.primary : Colors.transparent,
             borderRadius: BorderRadius.circular(6),
           ),
           alignment: Alignment.center,

@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planos de corrida — revisão de qualidade e melhorias</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-soft: #f6f7f9;
+    --bg-code: #f2f3f5;
+    --fg: #16181d;
+    --fg-soft: #5b6270;
+    --line: #e2e5ea;
+    --accent: #2f6df6;
+    --accent-soft: #e8f0ff;
+    --ok: #17864a;
+    --warn: #b06a00;
+    --err: #c0392b;
+    --video: #2f6df6;
+    --audio: #7d4bd8;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --bg-soft: #171a20;
+      --bg-code: #14171d;
+      --fg: #e6e8ec;
+      --fg-soft: #99a1af;
+      --line: #262b34;
+      --accent: #6c9bff;
+      --accent-soft: #1a2238;
+      --ok: #4ec98a;
+      --warn: #e0a552;
+      --err: #f0857a;
+      --video: #6c9bff;
+      --audio: #b18cf0;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 3rem; max-width: 1180px; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; }
+  @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; gap: 1.5rem; } nav.toc { position: static !important; } }
+
+  nav.toc { position: sticky; top: 2rem; align-self: start; font-size: 14px; }
+  nav.toc h2 { font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--fg-soft); margin: 0 0 .75rem; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; counter-reset: toc; }
+  nav.toc li { counter-increment: toc; margin: .1rem 0; }
+  nav.toc a { display: block; padding: .28rem .55rem; border-radius: 6px; color: var(--fg-soft); text-decoration: none; border-left: 2px solid transparent; }
+  nav.toc a::before { content: counter(toc) ". "; color: var(--line); }
+  nav.toc a:hover { background: var(--bg-soft); color: var(--fg); }
+
+  header.hero { margin-bottom: 2.5rem; }
+  header.hero .kicker { font: 600 12px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+  h1 { font-size: 2rem; line-height: 1.2; margin: .6rem 0 .5rem; letter-spacing: -.02em; }
+  header.hero p { color: var(--fg-soft); margin: 0; max-width: 62ch; }
+
+  h2 { font-size: 1.3rem; margin: 3rem 0 .8rem; letter-spacing: -.01em; padding-top: .4rem; }
+  h2 .num { color: var(--fg-soft); font-family: var(--mono); font-size: .85em; margin-right: .5rem; }
+  h3 { font-size: 1rem; margin: 1.8rem 0 .5rem; }
+  p, li { max-width: 74ch; }
+  a { color: var(--accent); }
+
+  code { font-family: var(--mono); font-size: .875em; background: var(--bg-code); padding: .12em .38em; border-radius: 4px; border: 1px solid var(--line); }
+  pre { background: var(--bg-code); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.1rem; overflow-x: auto; font-family: var(--mono); font-size: 13px; line-height: 1.6; }
+  pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+  pre .c { color: var(--fg-soft); }
+  pre .k { color: var(--accent); }
+  pre .s { color: var(--ok); }
+
+  .fig { margin: 1.5rem 0; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-soft); padding: 1.2rem; overflow-x: auto; }
+  .fig svg { display: block; max-width: 100%; height: auto; }
+  .fig figcaption { color: var(--fg-soft); font-size: 13px; margin-top: .8rem; }
+
+  .tbl-scroll { overflow-x: auto; margin: 1.2rem 0; border: 1px solid var(--line); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: .6rem .85rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { background: var(--bg-soft); font-weight: 600; font-size: 12.5px; letter-spacing: .02em; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td code { white-space: nowrap; }
+
+  .note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: .85rem 1.1rem; border-radius: 0 8px 8px 0; margin: 1.2rem 0; font-size: 14.5px; }
+  .note.warn { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+  .note strong { display: block; margin-bottom: .2rem; }
+
+  .muted { color: var(--fg-soft); font-size: 12.5px; }
+
+  details.tech { border: 1px solid var(--line); border-radius: 10px; margin: .7rem 0; background: var(--bg-soft); }
+  details.tech > summary { cursor: pointer; padding: .7rem 1rem; font-weight: 600; font-size: 14.5px; list-style: none; display: flex; align-items: center; gap: .55rem; border-radius: 10px; }
+  details.tech > summary::-webkit-details-marker { display: none; }
+  details.tech > summary::before { content: "▸"; color: var(--accent); font-size: 11px; display: inline-block; transition: transform .15s ease; }
+  details.tech[open] > summary::before { transform: rotate(90deg); }
+  details.tech > summary:hover { color: var(--accent); }
+  details.tech > summary .tag { margin-left: auto; font: 500 11px/1.6 var(--mono); color: var(--fg-soft); white-space: nowrap; }
+  details.tech .body { padding: 0 1rem 1.1rem; border-top: 1px solid var(--line); }
+  details.tech .body > :first-child { margin-top: 1rem; }
+  details.tech .body > :last-child { margin-bottom: 0; }
+  details.tech pre, details.tech .tbl-scroll { background: var(--bg); }
+  @media (max-width: 620px) { details.tech > summary .tag { display: none; } }
+  .pill { display: inline-block; font: 600 11px/1.6 var(--mono); padding: 0 .5em; border-radius: 999px; border: 1px solid var(--line); background: var(--bg-soft); color: var(--fg-soft); }
+  .pill.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+  .pill.err { color: var(--err); border-color: color-mix(in srgb, var(--err) 35%, transparent); }
+  .pill.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+
+  svg text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  svg .lbl { fill: var(--fg); font-size: 12px; }
+  svg .lbl-sm { fill: var(--fg-soft); font-size: 10.5px; }
+  svg .lbl-mono { fill: var(--fg-soft); font-size: 10.5px; font-family: var(--mono); }
+  svg .box { fill: var(--bg); stroke: var(--line); stroke-width: 1.5; }
+  svg .box-accent { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+  svg .arrow { stroke: var(--fg-soft); stroke-width: 1.4; fill: none; }
+  svg .arrow-err { stroke: var(--err); stroke-width: 1.4; fill: none; }
+  svg .grid-line { stroke: var(--line); stroke-width: 1; }
+  svg .dash { stroke: var(--fg-soft); stroke-width: 1; stroke-dasharray: 3 3; }
+
+  footer { border-top: 1px solid var(--line); margin-top: 4rem; padding-top: 1.2rem; color: var(--fg-soft); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Nesta página</h2>
+  <ol>
+    <li><a href="#visao">O que foi revisado e o que mudou</a></li>
+    <li><a href="#ancora">A escada começa no atleta e termina na prova</a></li>
+    <li><a href="#longao">O longão cabe na semana, não o contrário</a></li>
+    <li><a href="#leve">Rodagem leve tem teto</a></li>
+    <li><a href="#qualidade">Qualidade com piso, não só com cap</a></li>
+    <li><a href="#iniciante">Iniciante não faz tiro de VO₂</a></li>
+    <li><a href="#checagem">A checagem do treinador no wizard</a></li>
+    <li><a href="#fora">O que ficou de fora e como conferir</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="hero">
+  <div class="kicker">run_plan_composer · revisão de qualidade dos planos</div>
+  <h1>Os planos de corrida agora começam onde o atleta está e chegam onde a prova exige</h1>
+  <p>Revisão do gerador de planos por objetivo (<code>lib/services/run_plan_templates.dart</code> +
+  <code>lib/services/run_plan_composer.dart</code>): mais de mil combinações geradas e validadas semana a
+  semana, problemas de prescrição e de carga materializada corrigidos, uma API de prontidão
+  (<code>RunPlanComposer.assess</code>) ligada ao wizard e uma matriz permanente de regressão.
+  Nada na arquitetura mudou — mudaram as regras dentro de
+  <code>_planWeeks</code>, <code>_rolesForWeek</code>, <code>_buildWeek</code> e das sessões.</p>
+</header>
+
+<h2 id="visao"><span class="num">01</span>O que foi revisado e o que mudou</h2>
+
+<p>O módulo não é uma lista de planos prontos — é um <em>compositor</em>: cada template é um
+blueprint (escada de km por semana, distância do tiro, reps base) e o <code>RunPlanComposer</code>
+recompõe o plano para os dias, a intenção, a intensidade, a calibração de pace e o volume atual
+que o atleta escolheu no wizard. A base fisiológica já estava certa (paces por VDOT, VO₂ ≤ 8% da
+semana, limiar ≤ 10%, taper que mantém intensidade, semana de recuperação a cada 4ª). Os
+problemas estavam nas bordas que o usuário real atinge: 3 dias por semana, iniciantes e volume
+atual muito abaixo do template.</p>
+
+<p>Para avaliar, cada template foi composto em todas as frequências permitidas ×
+<em>finish</em>/PB × três intensidades × três calibrações × diferentes volumes atuais × com e sem
+morros. O resultado foi validado sessão por sessão e semana por semana; a mesma matriz agora vive
+como teste de regressão.</p>
+
+<figure class="fig">
+<svg viewBox="0 0 860 250" role="img" aria-label="Fluxo do compositor: template e configuração do wizard entram; planWeeks, rolesForWeek e buildWeek produzem o plano; assess produz os avisos que o wizard exibe.">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 z" fill="var(--fg-soft)"/>
+    </marker>
+  </defs>
+
+  <rect class="box" x="8" y="40" width="150" height="60" rx="9"/>
+  <text class="lbl" x="83" y="64" text-anchor="middle" font-weight="600">RunPlanTemplate</text>
+  <text class="lbl-mono" x="83" y="82" text-anchor="middle">escada km · prereqKm</text>
+
+  <rect class="box" x="8" y="150" width="150" height="60" rx="9"/>
+  <text class="lbl" x="83" y="174" text-anchor="middle" font-weight="600">RunPlanBuildConfig</text>
+  <text class="lbl-mono" x="83" y="192" text-anchor="middle">dias · intent · km/sem</text>
+
+  <rect class="box-accent" x="205" y="16" width="420" height="218" rx="12"/>
+  <text class="lbl" x="415" y="38" text-anchor="middle" font-weight="600">RunPlanComposer</text>
+
+  <rect class="box" x="225" y="54" width="380" height="44" rx="7"/>
+  <text class="lbl" x="415" y="72" text-anchor="middle">_planWeeks</text>
+  <text class="lbl-sm" x="415" y="88" text-anchor="middle">fase · orçamento da semana · longão · âncora com rampa</text>
+
+  <rect class="box" x="225" y="110" width="380" height="44" rx="7"/>
+  <text class="lbl" x="415" y="128" text-anchor="middle">_rolesForWeek → _buildWeek</text>
+  <text class="lbl-sm" x="415" y="144" text-anchor="middle">qualidade primeiro, longão por último, leves absorvem o resto</text>
+
+  <rect class="box" x="225" y="166" width="380" height="44" rx="7"/>
+  <text class="lbl" x="415" y="184" text-anchor="middle">assess</text>
+  <text class="lbl-sm" x="415" y="200" text-anchor="middle">volumeGap · longRunShort · consecutiveDays</text>
+
+  <rect class="box" x="672" y="40" width="180" height="60" rx="9"/>
+  <text class="lbl" x="762" y="64" text-anchor="middle" font-weight="600">Plano (20 semanas)</text>
+  <text class="lbl-sm" x="762" y="82" text-anchor="middle">RunPlanRepository</text>
+
+  <rect class="box" x="672" y="150" width="180" height="60" rx="9"/>
+  <text class="lbl" x="762" y="174" text-anchor="middle" font-weight="600">Checagem do treinador</text>
+  <text class="lbl-sm" x="762" y="192" text-anchor="middle">banner no wizard</text>
+
+  <path class="arrow" d="M158 70 H 200" marker-end="url(#ah)"/>
+  <path class="arrow" d="M158 180 H 200" marker-end="url(#ah)"/>
+  <path class="arrow" d="M415 98 V 106" marker-end="url(#ah)"/>
+  <path class="arrow" d="M605 132 H 640 V 70 H 668" marker-end="url(#ah)"/>
+  <path class="arrow" d="M605 188 H 668" marker-end="url(#ah)"/>
+</svg>
+<figcaption><code>assess</code> compõe o mesmo plano entregue e mede suas sessões materializadas; avisos e bloqueios não dependem de uma estimativa paralela.</figcaption>
+</figure>
+
+<div class="tbl-scroll">
+<table>
+<thead><tr><th>Cenário</th><th>Antes</th><th>Agora</th></tr></thead>
+<tbody>
+<tr><td>1ª maratona, 5 dias, <em>finish</em> — pico semanal</td><td><span class="pill err">76,2 km</span> <span class="muted">(template: 41,7)</span></td><td><span class="pill ok">68,1 km</span></td></tr>
+<tr><td>1ª maratona, 5 dias — semana 1</td><td>42,5 km <span class="muted">(pré-requisito: 35)</span></td><td>34,7 km</td></tr>
+<tr><td>1ª maratona, 3 dias — "Rodagem leve" de terça na semana 15</td><td><span class="pill err">20,9 km</span></td><td><span class="pill ok">14,1 km</span></td></tr>
+<tr><td>5 km mais rápido, 4 dias / 5 dias — semana 1</td><td>22,0 / 24,6 km <span class="muted">(pré-requisito: 15)</span></td><td>15,0 / 17,4 km</td></tr>
+<tr><td>1ª meia, 3 dias, 8 km/sem atuais — longão de pico → prova</td><td>10,0 km → 21,1 km, <span class="pill err">sem aviso</span></td><td>10,4 km → 21,1 km, <span class="pill warn">volumeGap + longRunShort</span> no wizard</td></tr>
+<tr><td>1ª maratona, 3 dias, 8 km/sem atuais — longão de pico</td><td><span class="pill err">13,6 km</span></td><td><span class="pill ok">28,4 km</span> <span class="muted">(+ aviso de salto de volume)</span></td></tr>
+<tr><td>10 km, 3 dias — única qualidade da semana 3</td><td>Morros 4×30 s <span class="muted">(2 min de trabalho)</span></td><td>Morros 6×45 s</td></tr>
+<tr><td>Primeiros 5 km, 3 dias — qualidade da semana 3</td><td>Morros 4×30 s a RPE 7</td><td>Fartlek 4×60 s a RPE 6; semana 6: Progressivo 3 km</td></tr>
+<tr><td>5 km PB, 5 dias — qualidade do taper (semana 9)</td><td>Morros 6×45 s</td><td>Ritmo de prova 2×1 km a 5:00/km</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="ancora"><span class="num">02</span>A escada começa no atleta e termina na prova</h2>
+
+<p><strong>A âncora não é mais um multiplicador global — é uma rampa.</strong> Antes,
+<code>currentWeeklyKm</code> virava um fator (<code>anchor</code>, limitado a 0,5–1,5) aplicado a
+todas as semanas, inclusive ao pico. Um atleta de 8 km/semana recebia um plano de meia com longão
+máximo de 10 km e, na semana 14, a prova de 21,1 km. Agora <code>anchorAt(w)</code> interpola de
+<code>anchor</code> na semana 1 até 1,0 em <code>rampWeeks = floor(0,6 × semanas)</code>; a
+partir daí a escada é a do template. Entre um ponto e outro, quem decide a velocidade real da
+subida é o cap de +10% por semana de build que já existia.</p>
+
+<figure class="fig">
+<svg viewBox="0 0 860 230" role="img" aria-label="Linha do tempo de 20 semanas: a âncora sobe de 0,5 na semana 1 até 1,0 na semana 12 e fica lá; antes, ficava em 0,5 até o fim.">
+  <line class="grid-line" x1="90" y1="170" x2="790" y2="170"/>
+  <text class="lbl-sm" x="90" y="188" text-anchor="middle">S1</text>
+  <text class="lbl-sm" x="475" y="188" text-anchor="middle">S12 = rampWeeks</text>
+  <text class="lbl-sm" x="790" y="188" text-anchor="middle">S20 · prova</text>
+  <g class="dash">
+    <line x1="475" y1="30" x2="475" y2="170"/>
+    <line x1="790" y1="30" x2="790" y2="170"/>
+  </g>
+  <text class="lbl" x="80" y="60" text-anchor="end">×1,0</text>
+  <text class="lbl" x="80" y="140" text-anchor="end">×0,5</text>
+  <line class="grid-line" x1="90" y1="56" x2="790" y2="56"/>
+  <line class="grid-line" x1="90" y1="136" x2="790" y2="136"/>
+
+  <text class="lbl-sm" x="260" y="150" text-anchor="middle">antes: anchor constante</text>
+  <path class="arrow-err" d="M90 136 H 790"/>
+
+  <text class="lbl-sm" x="230" y="86" text-anchor="middle">agora: anchorAt(w) sobe e para em 1,0</text>
+  <path class="arrow" d="M90 136 L 475 56 H 790"/>
+
+  <rect class="box" x="92" y="196" width="380" height="28" rx="7"/>
+  <text class="lbl" x="282" y="215" text-anchor="middle">semana 1 = o que o atleta corre hoje</text>
+  <rect class="box" x="478" y="196" width="310" height="28" rx="7"/>
+  <text class="lbl" x="633" y="215" text-anchor="middle">pico = o que a prova pede</text>
+</svg>
+<figcaption>Com 20 semanas o cap de 10% fecha o buraco de 8 km até um longão de 28 km. Com 14 semanas (meia) não fecha — e é aí que <code>assess</code> avisa em vez de fingir.</figcaption>
+</figure>
+
+<p><strong>Sem volume informado, a semana 1 ancora no pré-requisito do template.</strong> Cada
+template ganhou <code>prerequisiteWeeklyKm</code>, o volume que o próprio texto de pré-requisito
+já assumia: Primeiros 5 km 8, 5 km mais rápido 15, 5→10 km 15, 10 km mais rápido 25, 1ª meia 25,
+Meia PB 40, 1ª maratona 35, Base 12. "5 km mais rápido" dizia "corra 15 km por semana" e abria
+com 22 km em 4 dias — um salto de 47% já na primeira semana para quem seguiu a recomendação. Volta
+a correr e Manutenção não têm valor: o primeiro começa do zero por definição, o segundo é uma
+semana só.</p>
+
+<div class="note">
+<strong>Volume medido é a semana 1; pré-requisito é só uma suposição.</strong>
+Quando <code>currentWeeklyKm</code> foi informado, a semana 1 é esse número, independente de o
+atleta ter escolhido conservador ou agressivo — o corpo não sabe qual botão foi apertado. Quando
+a âncora vem do pré-requisito, o fator de intensidade (0,85 / 1,0 / 1,15) ainda desloca a semana 1,
+porque aí o número é uma estimativa nossa e a escolha do atleta é a informação melhor. Sem essa
+distinção, "conservador" e "agressivo" abriam com a mesma semana.
+</div>
+
+<h2 id="longao"><span class="num">03</span>O longão cabe na semana, não o contrário</h2>
+
+<p>O comentário de projeto do compositor sempre disse "o volume semanal é a quantidade primária; o
+longão é uma fração dele, nunca o inverso". O código fazia o inverso:
+<code>week = max(templateWeek, long / maxLongShare)</code> — para um longão de 32 km caber em 42% da
+semana, a semana era inflada para 76 km. Uma primeira maratona a 76 km/semana não é o que o
+template (pico 41,7 km) nem o pré-requisito (35 km) prometem.</p>
+
+<p><strong>Agora a semana estica no máximo 15%, e o longão encolhe para caber.</strong>
+<code>week = min(max(templateWeek, long / share), templateWeek × 1,15)</code> seguido de
+<code>long = min(long, share × week)</code>. Para não punir a maratona, cuja fração legítima em
+3–4 dias é alta (Higdon Novice 1: 32 km num total de 64 km com 4 corridas), a fração da maratona
+subiu de 0,45 para 0,50 e a da meia de 0,40 para 0,42; os ajustes por frequência continuam
+(+0,05 em ≤3 dias, −0,03 em ≥5).</p>
+
+<div class="tbl-scroll">
+<table>
+<thead><tr><th>1ª maratona · dias/semana</th><th>Pico antes</th><th>Pico agora</th><th>Longão de pico</th></tr></thead>
+<tbody>
+<tr><td>3 dias</td><td>64,0 km</td><td>55,8 km</td><td>30,7 km <span class="muted">(55% da semana — 3 dias é isso)</span></td></tr>
+<tr><td>4 dias</td><td>71,1 km</td><td>64,0 km</td><td>32,0 km</td></tr>
+<tr><td>5 dias</td><td>76,2 km</td><td>68,1 km</td><td>32,0 km</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 id="leve"><span class="num">04</span>Rodagem leve tem teto</h2>
+
+<p>Nos planos de 3 dias, o volume que sobra depois do longão e da qualidade cai inteiro numa
+única rodagem. O teto anterior (<code>0,85 × longão</code>) deixava passar uma "Rodagem leve" de
+20,9 km na terça da maratona. Não é leve — é um segundo longão com nome trocado, e o atleta faz
+dois por semana sem saber.</p>
+
+<p><strong>O teto agora é uma fração que encolhe com o tamanho do longão:</strong>
+<code>min(0,85 × L, 0,45 × L + 2, 0,30 × semana)</code>. Para um longão de 4 km (iniciante) o
+teto é 3,4 km — os 85% que o template de iniciante sempre teve; para 32 km é 16,4 km. O que não
+cabe é volume que a semana não recebe: reduzir a semana é a resposta certa quando o atleta só tem
+3 dias, não empilhar na terça. Na maratona de 3 dias, a terça de pico caiu de 20,9 para 14,1 km e a
+semana de 64 para 55,8 km.</p>
+
+<div class="note warn">
+<strong>O longão continua sendo a maior corrida da semana — agora sem inflar o orçamento.</strong>
+Com semanas pequenas, aquecimento, trabalho e desaquecimento podiam ultrapassar o longão.
+<code>_buildWeek</code> constrói a qualidade primeiro, mas a transforma em rodagem fácil quando ela
+não cabe no volume disponível ou ficaria maior que o longão. O piso de 2,5 km das rodagens só é
+aplicado quando existe orçamento para todas; o restante é distribuído depois desses pisos, sem
+contá-los duas vezes. A matriz falha diante de qualquer sessão zerada ou longão menor que uma
+rodagem de suporte.
+</div>
+
+<h2 id="qualidade"><span class="num">05</span>Qualidade com piso, não só com cap</h2>
+
+<p>Os caps de Daniels (VO₂ ≤ 8% da semana, limiar ≤ 10%) estavam implementados como se fossem
+alvos. Numa semana de 32 km o limiar travava em 13 min e ficava lá por dez semanas da maratona,
+porque as rodagens absorviam qualquer crescimento. Morros de 4×30 s (2 min de trabalho) eram a
+única qualidade de uma semana de 26 km no plano de 10 km.</p>
+
+<ul>
+  <li><strong>Limiar tem piso de 10–15 min.</strong> <code>floorMinutes = clamp(0,5 × semana, 10, 15)</code>: 15 min a partir de ~30 km/semana, proporcional abaixo disso. Acima de 20 min continua fracionando em <em>cruise intervals</em>.</li>
+  <li><strong>Morros são 45 s (finish) ou 60 s (PB), de 6 a 10 reps.</strong> 30 s nunca acumula trabalho suficiente; 45–60 s é a faixa que constrói força específica sem virar sprint. O número de reps é limitado pelo orçamento da sessão (<code>workBudgetKm / repKm</code>, mínimo 4), para nunca passar do longão numa semana pequena.</li>
+  <li><strong>Fartlek cresce com a semana.</strong> Tiros de 60 s, <code>reps = (6 ou 8) + semana/15</code>, entre 4 e 12 e limitados pelo orçamento. 15 km/semana → 6–7 reps; 45 km → 9–11.</li>
+  <li><strong>Taper é ritmo de prova.</strong> Na semana de taper a qualidade deixa de seguir a rotação (que podia cair em morros) e vira <code>_SessionRole.racePace</code> sempre que o objetivo tem distância de prova. Reduzir volume e manter intensidade só funciona se a intensidade for a da prova.</li>
+</ul>
+
+<details class="tech">
+<summary>Como o plano de 10 km em 3 dias ficou nas quatro primeiras semanas <span class="tag">sem calibração · Ter/Qui/Dom</span></summary>
+<div class="body">
+<pre><code>W1  23,2 km   Ter leve 6,6   Qui 3×600 m VO₂ (6,2)      Dom longão 10,3
+W2  24,2 km   Ter leve 7,1   Qui Limiar 14 min (5,8)     Dom longão 11,3
+W3  25,2 km   Ter leve 7,5   Qui Morros 6×45 s (5,4)     Dom longão 12,3   <span class="c">// antes: 4×30 s</span>
+W4  20,2 km   Ter leve 6,1   Qui Limiar 12 min (4,9)     Dom longão 9,2    <span class="c">// semana de recuperação, −20%</span></code></pre>
+<p>A semana 1 abre em 23 km porque o pré-requisito do template é 25 km e o fator de 3 dias
+(<code>sqrt(3/4)</code>) reduz um pouco. Antes abria em 24,4 e subia para 36 na semana 10; agora o
+pico fica perto do template.</p>
+</div>
+</details>
+
+<h2 id="iniciante"><span class="num">06</span>Iniciante não faz tiro de VO₂</h2>
+
+<p>"Primeiros 5 km" pede como pré-requisito "correr ou alternar corrida e caminhada por 25 min".
+Quem passava pelo wizard recebia, a partir da semana 3, intervalado a RPE 8–9, morros e limiar —
+enquanto o template bruto (usado quando não há configuração) era 100% leve. Duas versões do mesmo
+plano, e a mais dura ia para quem menos aguenta.</p>
+
+<p><strong>Templates <code>continuous</code> de nível <code>beginner</code> têm no máximo um estímulo
+controlado por semana</strong>, alternando fartlek e progressivo. VO₂ e morros ficam nos templates de
+performance, que assumem a distância já completada. Base permanece inteiramente aeróbico; Começar,
+Voltar a correr e Primeiros 5 km são limitados a quatro dias para evitar um quinto dia de impacto.
+A matriz falha se um iniciante receber mais de uma sessão de qualidade.</p>
+
+<h2 id="checagem"><span class="num">07</span>A checagem do treinador no wizard</h2>
+
+<p>O compositor preserva as escolhas viáveis do atleta, mas não cria silenciosamente um plano que
+começa muito acima do volume atual ou não alcança o longão mínimo do objetivo.
+<code>RunPlanComposer.assess(template, config)</code> devolve um <code>RunPlanReadiness</code>
+calculado sobre as sessões realmente materializadas. <code>run_plan_customize_screen.dart</code>
+mostra um card "Checagem do treinador" e desabilita "Criar plano" diante de um bloqueio.</p>
+
+<div class="tbl-scroll">
+<table>
+<thead><tr><th>Sinal</th><th>Dispara quando</th><th>O que o atleta lê</th></tr></thead>
+<tbody>
+<tr><td><code>baselineZero</code></td><td>o atleta informou explicitamente 0 km/semana em qualquer plano que não seja Começar a correr</td><td>Direciona para a progressão corrida/caminhada; deixar em branco continua representando "não informado".</td></tr>
+<tr><td><code>volumeGap</code></td><td><code>startWeeklyKm &gt; 1,25 × currentWeeklyKm</code> <span class="muted">(só com volume informado)</span></td><td>"A semana 1 começa com X km, mas você corre cerca de Y km hoje…" — sugere volume conservador ou o plano de Base antes.</td></tr>
+<tr><td><code>longRunShort</code></td><td><code>peakLongKm &lt; requiredLongKm − 0,5</code>, com <code>required</code> = 100% da prova (5/10 km), 80% (meia, 16,9 km) ou 65% (maratona, 27,4 km)</td><td>"O longão chega a X km, mas esta prova pede cerca de Y km…" — adicionar dias, subir volume ou escolher objetivo mais curto.</td></tr>
+<tr><td><code>timeCapDistanceGap</code></td><td>o limite seguro de 150/180 min impede alcançar o longão mínimo da prova</td><td>Explica separadamente que o limite por tempo torna aquele objetivo incompatível com a configuração atual.</td></tr>
+<tr><td><code>consecutiveDays</code></td><td>3 dias seguidos (circular, Dom→Seg conta) numa semana de ≤4 dias</td><td>"Três dias de corrida seguidos sem descanso…" — espalhar se puder.</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>O cap de tempo não reduz mais o requisito da prova. Um corredor de 5 km em 38:00 ainda tem o
+longão limitado a cerca de 18,5 km por segurança, mas a maratona continua exigindo cerca de
+27,4 km de pico nesta regra. O wizard mostra o conflito e bloqueia a criação, em vez de chamar
+18,5 km de preparação suficiente.</p>
+
+<h2 id="fora"><span class="num">08</span>Correções finais e como conferir</h2>
+
+<ul>
+  <li><strong>O cap de +10% vale sobre os km realizados.</strong> A composição mede a semana pronta e a reconstrói quando necessário. Semanas de recuperação não substituem a última referência de build.</li>
+  <li><strong>Não há três sessões duras.</strong> Iniciantes têm no máximo uma; os demais, duas. Longão com blocos no ritmo de prova já conta como uma delas, e planos de meia/maratona com intenção <em>finish</em> reservam só uma qualidade no meio da semana.</li>
+  <li><strong>Morros são opcionais.</strong> O wizard oferece "Incluir treinos em subida". Quando desligado, cada sessão de morros vira fartlek de esforço equivalente em terreno plano, preservando o objetivo fisiológico sem exigir uma ladeira segura.</li>
+  <li><strong>Blocos específicos escalam com a semana.</strong> Repetições no ritmo de prova e longões específicos não têm mais mínimos fixos capazes de estourar a quilometragem; se uma qualidade não couber, ela vira rodagem fácil.</li>
+  <li><strong>Templates brutos de performance continuam desbalanceados</strong> (longão de 58–72% da semana) — são blueprint para o compositor. Só importa se algum caminho chamar <code>RunPlanTemplates.create</code> com <code>config == null</code>; o wizard sempre passa configuração.</li>
+</ul>
+
+<p>Para validar: <code>run_plan_composer_product_quality_test.dart</code> percorre mais de mil
+combinações de template, frequência, intenção, intensidade, pace, volume atual e disponibilidade
+de morros. Ele rejeita crescimento materializado acima do limite, sessão zerada, excesso de
+qualidade, trabalho intenso desproporcional, morros quando desativados e divergência entre
+<code>assess</code> e o plano entregue. <code>run_plan_customize_screen_test.dart</code> cobre a opção
+de morros e o bloqueio de volume zero.</p>
+
+<footer>
+  Gerado a partir do código em <code>lib/services/run_plan_composer.dart</code> e
+  <code>lib/services/run_plan_templates.dart</code>. Leituras seguintes:
+  <code>docs/run-plans-concepts.html</code> (conceitos e vocabulário dos planos),
+  <code>test/run_plan_composer_quality_test.dart</code> (invariantes fisiológicos que já existiam) e
+  <code>lib/screens/run/run_plan_customize_screen.dart</code> (onde o banner aparece).
+</footer>
+
+</main>
+</div>
+</body>
+</html>

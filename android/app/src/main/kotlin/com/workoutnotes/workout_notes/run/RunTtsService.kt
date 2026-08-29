@@ -22,12 +22,18 @@ class RunTtsService(private val context: Context) : TextToSpeech.OnInitListener 
     private var tts: TextToSpeech? = null
     @Volatile private var ready = false
     @Volatile private var initializing = false
+    @Volatile private var desiredLanguage = RunVoiceLanguage.en
     private val pendingQueue = LinkedBlockingQueue<String>()
     private var audioManager: AudioManager? = null
     private var focusRequest: AudioFocusRequest? = null
 
-    fun ensureReady() {
-        if (ready || initializing) return
+    fun ensureReady(language: RunVoiceLanguage = desiredLanguage) {
+        desiredLanguage = language
+        if (ready) {
+            applyLanguage(tts ?: return)
+            return
+        }
+        if (initializing) return
         initializing = true
         try {
             tts = TextToSpeech(context.applicationContext, this)
@@ -46,13 +52,7 @@ class RunTtsService(private val context: Context) : TextToSpeech.OnInitListener 
         }
         val engine = tts ?: return
         try {
-            val locale = Locale("en", "US")
-            val avail = engine.isLanguageAvailable(locale)
-            if (avail >= TextToSpeech.LANG_AVAILABLE) {
-                engine.language = locale
-            } else {
-                engine.language = Locale.US
-            }
+            applyLanguage(engine)
             // flutter_tts normalizes its 0.48 setting to 0.96 on Android
             // (the plugin multiplies the Dart value by 2). This native path
             // must use the Android TextToSpeech scale directly, where 1.0 is
@@ -84,10 +84,34 @@ class RunTtsService(private val context: Context) : TextToSpeech.OnInitListener 
                 val text = pendingQueue.poll() ?: break
                 speakInternal(text)
             }
-            Log.i("RunTts", "TTS ready en-US")
+            Log.i("RunTts", "TTS ready ${localeFor(desiredLanguage).toLanguageTag()}")
         } catch (e: Throwable) {
             Log.w("RunTts", "TTS onInit config failed: ${e.message}")
             initializing = false
+        }
+    }
+
+    fun setLanguage(language: RunVoiceLanguage) {
+        desiredLanguage = language
+        val engine = tts
+        if (ready && engine != null) applyLanguage(engine)
+    }
+
+    private fun localeFor(language: RunVoiceLanguage): Locale = when (language) {
+        RunVoiceLanguage.pt -> Locale.forLanguageTag("pt-BR")
+        RunVoiceLanguage.app, RunVoiceLanguage.en -> Locale.US
+    }
+
+    private fun applyLanguage(engine: TextToSpeech) {
+        val locale = localeFor(desiredLanguage)
+        val availability = engine.isLanguageAvailable(locale)
+        if (availability >= TextToSpeech.LANG_AVAILABLE) {
+            engine.language = locale
+        } else {
+            Log.w("RunTts", "TTS language unavailable: ${locale.toLanguageTag()} status=$availability")
+            // Keep the requested locale. The engine reports the synthesis error
+            // instead of reading Portuguese phrases with an English voice.
+            engine.language = locale
         }
     }
 
