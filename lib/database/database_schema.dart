@@ -334,6 +334,17 @@ abstract final class DatabaseSchema {
       )
     ''');
 
+    // Rolling summary of the part of a thread no longer sent on the wire (v50).
+    await db.execute('''
+      CREATE TABLE ai_chat_thread_summaries (
+        thread_id TEXT PRIMARY KEY,
+        summary TEXT NOT NULL,
+        through_message_id TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
+      )
+    ''');
+
     // AI routine proposals (v17). These are drafts only until user approval.
     await db.execute('''
       CREATE TABLE ai_routine_proposals (

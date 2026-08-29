@@ -530,5 +530,20 @@ abstract final class DatabaseWellnessMigrations {
         );
       } catch (_) {}
     }
+    if (oldVersion < 50) {
+      // Rolling summary of the older part of an AI chat thread. Lets the
+      // coach keep long-range context without resending the whole transcript.
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS ai_chat_thread_summaries (
+            thread_id TEXT PRIMARY KEY,
+            summary TEXT NOT NULL,
+            through_message_id TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
+          )
+        ''');
+      } catch (_) {}
+    }
   }
 }

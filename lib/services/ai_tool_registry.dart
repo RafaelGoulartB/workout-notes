@@ -47,22 +47,34 @@ class AiToolRegistry {
   }
 
   /// All tools available during a chat turn, including guarded proposals.
+  ///
+  /// The chat sends this full catalog on every request. A stable catalog lets
+  /// the model pick by description, re-call a tool with other parameters and
+  /// cross domains mid-turn, and keeps the request prefix cacheable by the
+  /// provider. Pass [names] only for dedicated flows that intentionally
+  /// expose a single tool.
   List<Map<String, dynamic>> openAiChatToolsSchema({
     Iterable<String>? names,
     bool includeRoutineProposal = true,
-    bool includeCapabilityDiscovery = true,
   }) {
     final selected = names?.toSet();
     return [
       ...openAiReadToolsSchema(names: names),
-      if (includeCapabilityDiscovery) _schemaFor('discover_app_capabilities'),
       if (selected == null || selected.contains('propose_manual_food_creation'))
         _schemaFor('propose_manual_food_creation'),
       if (includeRoutineProposal) _schemaFor('propose_routine_change'),
     ];
   }
 
-  /// Selects a compact tool catalog for the current user request.
+  /// Names of every read tool in the catalog.
+  Set<String> get readToolNames =>
+      _tools.map((tool) => tool['name'] as String).toSet();
+
+  /// Suggests the tools most likely relevant to [query].
+  ///
+  /// This is only a hint surfaced to the model; it never restricts the
+  /// catalog. A single `propose_manual_food_creation` result marks a
+  /// dedicated manual-food turn.
   Set<String> toolNamesForQuery(String query) {
     final text = query.toLowerCase();
     final selected = <String>{};
@@ -539,91 +551,6 @@ class AiToolRegistry {
     return selected;
   }
 
-  /// Returns only tools that can naturally continue the calls just executed.
-  /// This avoids billing the entire first-round schema catalog repeatedly.
-  Set<String> followUpToolNames(
-    Iterable<String> calledNames, {
-    required bool routineIntent,
-  }) {
-    final next = <String>{};
-    for (final name in calledNames) {
-      switch (name) {
-        case 'list_recent_workouts':
-        case 'get_workout_history':
-          next.add('get_workout_detail');
-          break;
-        case 'list_exercises':
-          if (routineIntent) {
-            next.addAll({'list_routines', 'get_routine_detail'});
-          } else {
-            next.addAll({
-              'get_exercise_detail',
-              'get_exercise_history',
-              'get_exercise_personal_records',
-              'get_progress_trend',
-            });
-          }
-          break;
-        case 'list_routines':
-          next.add('get_routine_detail');
-          break;
-        case 'list_run_plans':
-          next.addAll({'get_run_plan_detail', 'get_run_schedule'});
-          break;
-        case 'get_run_plan_detail':
-          next.add('get_run_schedule');
-          break;
-        case 'get_cardio_summary':
-          next.addAll({
-            'list_run_activities',
-            'get_run_activity_detail',
-            'get_run_progress',
-            'get_run_achievements',
-            'get_run_schedule',
-          });
-          break;
-        case 'list_run_activities':
-          next.addAll({'get_run_activity_detail', 'get_run_progress'});
-          break;
-        case 'get_run_progress':
-          next.addAll({'list_run_activities', 'get_run_achievements'});
-          break;
-        case 'get_routine_detail':
-          next.add('list_exercises');
-          break;
-        case 'list_goals':
-          next.add('get_goal_progress_history');
-          break;
-        case 'get_sleep_summary':
-          next.addAll({
-            'get_sleep_night_detail',
-            'get_sleep_history',
-            'get_sleep_profile',
-          });
-          break;
-        case 'get_sleep_history':
-          next.add('get_sleep_night_detail');
-          break;
-        case 'get_nutrition_summary':
-          next.addAll({
-            'get_nutrition_diary_day',
-            'get_nutrition_history',
-            'get_micronutrient_summary',
-            'get_nutrition_profile',
-          });
-          break;
-        case 'get_nutrition_diary_day':
-        case 'search_food_library':
-          next.add('get_food_detail');
-          break;
-        case 'list_saved_meals':
-          next.add('get_saved_meal_detail');
-          break;
-      }
-    }
-    return next;
-  }
-
   /// Dispatch a read tool call to the right DB query.
   Future<AiToolResult> executeRead({
     required String toolName,
@@ -631,8 +558,6 @@ class AiToolRegistry {
   }) async {
     try {
       switch (toolName) {
-        case 'discover_app_capabilities':
-          return _ok(_discoverAppCapabilities(args));
         case 'propose_manual_food_creation':
           return _prepareManualFoodProposal(args);
         case 'list_recent_workouts':
@@ -1204,90 +1129,6 @@ class AiToolRegistry {
     };
   }
 
-  Map<String, dynamic> _discoverAppCapabilities(Map<String, dynamic> args) {
-    final requested = (args['capabilities'] as List? ?? const [])
-        .whereType<String>()
-        .toSet();
-    final names = <String>{};
-    for (final capability in requested) {
-      names.addAll(switch (capability) {
-        'workouts' => {
-          'list_recent_workouts',
-          'get_workout_history',
-          'get_workout_detail',
-          'get_weekly_volume_breakdown',
-          'get_training_summary',
-        },
-        'exercises' => {
-          'list_exercises',
-          'get_exercise_detail',
-          'get_exercise_history',
-          'get_exercise_personal_records',
-          'get_progress_trend',
-        },
-        'routines' => {'list_routines', 'get_routine_detail'},
-        'body' => {'list_body_measurements'},
-        'cardio' || 'running' => {
-          'get_cardio_summary',
-          'list_run_activities',
-          'get_run_activity_detail',
-          'get_run_progress',
-          'get_run_achievements',
-        },
-        'run_plans' => {
-          'list_run_plans',
-          'get_run_plan_detail',
-          'get_run_schedule',
-        },
-        'goals' => {'list_goals', 'get_goal_progress_history'},
-        'sleep' => {
-          'get_sleep_summary',
-          'get_sleep_night_detail',
-          'get_sleep_history',
-          'get_sleep_profile',
-          'analyze_sleep_performance',
-        },
-        'nutrition' => {
-          'get_nutrition_summary',
-          'get_nutrition_diary_day',
-          'get_nutrition_history',
-          'get_micronutrient_summary',
-          'get_nutrition_profile',
-          'analyze_nutrition_body_trend',
-        },
-        'nutrition_diary' => {
-          'get_nutrition_diary_day',
-          'get_nutrition_history',
-        },
-        'micronutrients' => {'get_micronutrient_summary'},
-        'food_library' => {'search_food_library', 'get_food_detail'},
-        'saved_meals' => {'list_saved_meals', 'get_saved_meal_detail'},
-        'food_creation' => {'propose_manual_food_creation'},
-        'recovery' => {
-          'get_weekly_recovery_trend',
-          'get_sleep_summary',
-          'get_nutrition_summary',
-          'list_recent_workouts',
-          'get_cardio_summary',
-          'get_run_progress',
-        },
-        'routine_changes' => {
-          'list_exercises',
-          'list_routines',
-          'get_routine_detail',
-          'propose_routine_change',
-        },
-        _ => const <String>{},
-      });
-    }
-    return {
-      'capabilities': requested.toList(),
-      'tools': names.toList(),
-      'instruction':
-          'Use as ferramentas retornadas que forem necessárias para concluir a solicitação.',
-    };
-  }
-
   // ===========================================================================
   // SCHEMA GENERATION
   // ===========================================================================
@@ -1297,48 +1138,6 @@ class AiToolRegistry {
 
   Map<String, dynamic> _buildSchemaFor(String name) {
     switch (name) {
-      case 'discover_app_capabilities':
-        return {
-          'type': 'function',
-          'function': {
-            'name': name,
-            'description':
-                'Descobre ferramentas do app por capacidade. Use quando dados do app ou uma ação ajudariam, mas a ferramenta necessária ainda não estiver disponível.',
-            'parameters': {
-              'type': 'object',
-              'properties': {
-                'capabilities': {
-                  'type': 'array',
-                  'items': {
-                    'type': 'string',
-                    'enum': [
-                      'workouts',
-                      'exercises',
-                      'routines',
-                      'body',
-                      'cardio',
-                      'running',
-                      'run_plans',
-                      'goals',
-                      'sleep',
-                      'nutrition',
-                      'nutrition_diary',
-                      'micronutrients',
-                      'food_library',
-                      'saved_meals',
-                      'food_creation',
-                      'recovery',
-                      'routine_changes',
-                    ],
-                  },
-                  'description':
-                      'Uma ou mais capacidades relevantes para a tarefa.',
-                },
-              },
-              'required': ['capabilities'],
-            },
-          },
-        };
       case 'list_recent_workouts':
         return {
           'type': 'function',

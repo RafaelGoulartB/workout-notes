@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/models/ai_chat_message.dart';
 import 'package:workout_notes/models/ai_image_attachment.dart';
@@ -103,23 +105,105 @@ void main() {
     expect(users.last.toString(), contains('data:image/jpeg;base64,abc'));
   });
 
-  test('routine safety policy is omitted from unrelated turns', () {
+  test('wire has a static prefix followed by one dynamic block', () {
     final now = DateTime(2026, 8, 10);
     final messages = [_message('u1', AiMessageRole.user, now, content: 'Olá')];
 
-    final wire = AiChatService.instance.buildWireMessagesForTest(messages);
-    final systemMessages = wire.where((m) => m['role'] == 'system');
+    final wire = AiChatService.instance.buildWireMessagesForTest(
+      messages,
+      threadSummary: 'Usuário quer ganhar massa.',
+      toolHints: const ['get_sleep_summary'],
+    );
+    final systemMessages = wire
+        .where((m) => m['role'] == 'system')
+        .map((m) => m['content'] as String)
+        .toList();
 
-    expect(systemMessages, hasLength(1));
+    expect(systemMessages, hasLength(2));
+    // Static prefix: prompt + grounding + routine policy, nothing per-turn.
+    expect(systemMessages.first, contains('Propostas de rotina'));
+    expect(systemMessages.first, isNot(contains('<workout_data>')));
+    expect(systemMessages.first, isNot(contains('ganhar massa')));
+    // Dynamic block: context, rolling summary and tool hints.
+    expect(systemMessages.last, contains('<workout_data>'));
+    expect(systemMessages.last, contains('Usuário quer ganhar massa.'));
+    expect(systemMessages.last, contains('get_sleep_summary'));
   });
 
-  test('routine safety policy remains present for mutation turns', () {
+  test('static prefix is identical across turns with different hints', () {
     final now = DateTime(2026, 8, 10);
-    final wire = AiChatService.instance.buildWireMessagesForTest([
-      _message('u1', AiMessageRole.user, now, content: 'Crie uma rotina'),
-    ], includeRoutinePolicy: true);
+    final a = AiChatService.instance.buildWireMessagesForTest(
+      [_message('u1', AiMessageRole.user, now, content: 'Olá')],
+      toolHints: const ['get_sleep_summary'],
+    );
+    final b = AiChatService.instance.buildWireMessagesForTest(
+      [_message('u2', AiMessageRole.user, now, content: 'E o treino?')],
+      threadSummary: 'algo',
+      toolHints: const ['list_recent_workouts'],
+    );
 
-    expect(wire.where((m) => m['role'] == 'system'), hasLength(2));
+    expect(a.first, equals(b.first));
+  });
+
+  test('oversized tool results are truncated on the wire only', () {
+    final service = AiChatService.instance;
+    final big =
+        '{"rows":"${List.filled(kMaxToolResultChars + 500, 'x').join()}"}';
+
+    final wired = service.wireToolContentForTest(big);
+    final decoded = jsonDecode(wired) as Map;
+
+    expect(decoded['truncated'], isTrue);
+    expect(decoded['omittedChars'], 500 + '{"rows":""}'.length);
+    expect((decoded['partial'] as String).length, kMaxToolResultChars);
+    expect(service.wireToolContentForTest('{"ok":true}'), '{"ok":true}');
+  });
+
+  test('compaction reports which older turns were dropped', () {
+    final now = DateTime(2026, 8, 10);
+    final filler = List.filled(2000, 'a').join();
+    final messages = [
+      _message('u1', AiMessageRole.user, now, content: 'Primeira $filler'),
+      _message('a1', AiMessageRole.assistant, now, content: 'Resposta 1'),
+      _message('u2', AiMessageRole.user, now, content: 'Segunda $filler'),
+      _message('a2', AiMessageRole.assistant, now, content: 'Resposta 2'),
+      _message('u3', AiMessageRole.user, now, content: 'Terceira'),
+    ];
+
+    final kept = AiChatService.instance.compactHistoryForTest(
+      messages,
+      tokenBudget: 700,
+    );
+    final dropped = AiChatService.instance.droppedByCompactionForTest(
+      messages,
+      tokenBudget: 700,
+    );
+
+    expect(kept.map((m) => m.id), ['u2', 'a2', 'u3']);
+    expect(dropped.map((m) => m.id), ['u1', 'a1']);
+  });
+
+  test('summary transcript keeps speaker labels and bounds size', () {
+    final now = DateTime(2026, 8, 10);
+    final transcript = AiChatService.instance.transcriptForSummaryForTest([
+      _message('u1', AiMessageRole.user, now, content: 'Quero correr 10k'),
+      _message('a1', AiMessageRole.assistant, now, content: 'Ótimo plano.'),
+    ]);
+
+    expect(transcript, 'Usuário: Quero correr 10k\nTreinador: Ótimo plano.\n');
+  });
+
+  test('malformed tool arguments are surfaced instead of swallowed', () {
+    final call = AiToolCall.fromJson({
+      'id': 'call-1',
+      'type': 'function',
+      'function': {'name': 'get_workout_detail', 'arguments': '{"workout_id":'},
+    });
+
+    expect(call.arguments, isEmpty);
+    expect(call.argumentsError, contains('JSON inválido'));
+    // The transcript echoes the provider's original string back verbatim.
+    expect((call.toJson()['function'] as Map)['arguments'], '{"workout_id":');
   });
 
   test(
@@ -234,12 +318,8 @@ void main() {
     );
   });
 
-  test('single selected data tool uses portable auto choice', () {
-    final choice = AiChatService.instance.requiredToolChoiceForTest(const {
-      'get_sleep_summary',
-    });
-
-    expect(choice, 'auto');
+  test('grounded turns ask the provider for a required tool call', () {
+    expect(AiChatService.instance.requiredToolChoiceForTest(), 'required');
   });
 
   test('wire includes the non-editable personal-data grounding policy', () {

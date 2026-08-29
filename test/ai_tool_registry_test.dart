@@ -32,9 +32,15 @@ void main() {
     }
   });
 
-  test('openAiChatToolsSchema includes the guarded routine proposal tool', () {
+  test('openAiChatToolsSchema exposes the full catalog plus proposals', () {
     final tools = registry.openAiChatToolsSchema();
-    expect(tools, hasLength(42));
+    expect(tools, hasLength(41));
+    final names = tools
+        .map((tool) => (tool['function'] as Map)['name'] as String)
+        .toSet();
+    expect(names, containsAll(registry.readToolNames));
+    expect(names, contains('propose_manual_food_creation'));
+    expect(names, isNot(contains('discover_app_capabilities')));
     final proposal = tools.firstWhere(
       (tool) => (tool['function'] as Map)['name'] == 'propose_routine_change',
     );
@@ -47,7 +53,7 @@ void main() {
       names: const {'propose_manual_food_creation'},
       includeRoutineProposal: false,
     );
-    expect(tools, hasLength(2));
+    expect(tools, hasLength(1));
     final proposal = tools.firstWhere(
       (tool) =>
           (tool['function'] as Map)['name'] == 'propose_manual_food_creation',
@@ -79,54 +85,6 @@ void main() {
     );
   });
 
-  test(
-    'manual food request can omit capability discovery for compatibility',
-    () {
-      final tools = registry.openAiChatToolsSchema(
-        names: const {'propose_manual_food_creation'},
-        includeRoutineProposal: false,
-        includeCapabilityDiscovery: false,
-      );
-
-      expect(tools, hasLength(1));
-      expect(
-        (tools.single['function'] as Map)['name'],
-        'propose_manual_food_creation',
-      );
-    },
-  );
-
-  test('chat schema always includes lightweight capability discovery', () {
-    final tools = registry.openAiChatToolsSchema(
-      names: const <String>{},
-      includeRoutineProposal: false,
-    );
-    expect(tools, hasLength(1));
-    expect(
-      (tools.single['function'] as Map)['name'],
-      'discover_app_capabilities',
-    );
-  });
-
-  test(
-    'capability discovery unlocks reads and guarded routine proposals',
-    () async {
-      final result = await registry.executeRead(
-        toolName: 'discover_app_capabilities',
-        args: {
-          'capabilities': ['sleep', 'routine_changes'],
-        },
-      );
-      final tools = ((result.data as Map)['tools'] as List).cast<String>();
-      expect(tools, contains('get_sleep_summary'));
-      expect(tools, contains('get_sleep_night_detail'));
-      expect(tools, contains('get_sleep_history'));
-      expect(tools, contains('get_sleep_profile'));
-      expect(tools, contains('list_exercises'));
-      expect(tools, contains('propose_routine_change'));
-    },
-  );
-
   test('routine proposal schema uses portable scalar property types', () {
     final proposal = registry.openAiChatToolsSchema().firstWhere(
       (tool) => (tool['function'] as Map)['name'] == 'propose_routine_change',
@@ -157,17 +115,13 @@ void main() {
     }
   });
 
-  test('tool routing exposes a compact domain-specific catalog', () {
+  test('tool hints point at the domain-specific tools', () {
     final names = registry.toolNamesForQuery(
       'Meu sono está afetando meu desempenho no treino?',
     );
     expect(names, contains('get_sleep_summary'));
     expect(names, contains('analyze_sleep_performance'));
     expect(names, isNot(contains('get_routine_detail')));
-    expect(
-      registry.openAiReadToolsSchema(names: names).length,
-      lessThan(registry.openAiReadToolsSchema().length),
-    );
   });
 
   test('running vocabulary routes to recorded activity tools', () {
@@ -298,23 +252,13 @@ void main() {
     }
   });
 
-  test('tool routing sends no schemas for casual conversation', () {
-    final names = registry.toolNamesForQuery('Olá, tudo bem?');
-    expect(names, isEmpty);
-    expect(registry.openAiReadToolsSchema(names: names), isEmpty);
+  test('casual conversation yields no tool hints', () {
+    expect(registry.toolNamesForQuery('Olá, tudo bem?'), isEmpty);
   });
 
   test('generic workout routing does not expose unrelated tools', () {
     final names = registry.toolNamesForQuery('Como foi meu último treino?');
     expect(names, {'list_recent_workouts', 'get_workout_detail'});
-  });
-
-  test('follow-up catalog contains only valid dependent reads', () {
-    final names = registry.followUpToolNames(const [
-      'list_recent_workouts',
-    ], routineIntent: false);
-    expect(names, {'get_workout_detail'});
-    expect(names, isNot(contains('get_sleep_summary')));
   });
 
   test('tool results preserve all rows requested by the query', () async {

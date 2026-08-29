@@ -31,7 +31,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 49;
+  static const _dbVersion = 50;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -863,5 +863,35 @@ class DatabaseHelper {
   Future<void> deleteAiChatThread(String threadId) async {
     final db = await database;
     await db.delete('ai_chat_threads', where: 'id = ?', whereArgs: [threadId]);
+  }
+
+  Future<Map<String, dynamic>?> getAiChatThreadSummary(String threadId) async {
+    final db = await database;
+    try {
+      final rows = await db.query(
+        'ai_chat_thread_summaries',
+        where: 'thread_id = ?',
+        whereArgs: [threadId],
+        limit: 1,
+      );
+      return rows.isEmpty ? null : rows.first;
+    } catch (_) {
+      // Older schema without the summaries table.
+      return null;
+    }
+  }
+
+  Future<void> upsertAiChatThreadSummary({
+    required String threadId,
+    required String summary,
+    required String throughMessageId,
+  }) async {
+    final db = await database;
+    await db.insert('ai_chat_thread_summaries', {
+      'thread_id': threadId,
+      'summary': summary,
+      'through_message_id': throughMessageId,
+      'updated_at': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 }

@@ -1,29 +1,77 @@
 part of 'ai_chat_service.dart';
 
+/// Everything a wire transcript needs besides the message list. Built once
+/// per turn so every round of the same turn shares an identical prefix.
+class _TurnWireOptions {
+  final String systemPrompt;
+  final Map<String, dynamic> contextJson;
+  final String? threadSummary;
+  final List<String> toolHints;
+  final String? visionMessageId;
+  final List<String> imageDataUrls;
+  final int historyTokenBudget;
+
+  const _TurnWireOptions({
+    required this.systemPrompt,
+    required this.contextJson,
+    this.threadSummary,
+    this.toolHints = const [],
+    this.visionMessageId,
+    this.imageDataUrls = const [],
+    this.historyTokenBudget = kHistoryTokenBudget,
+  });
+}
+
+class _CompactedHistory {
+  final List<AiChatMessage> kept;
+
+  /// Older user/assistant messages that no longer fit the budget. Tool
+  /// transcripts are never part of this list; they are dropped silently.
+  final List<AiChatMessage> dropped;
+
+  const _CompactedHistory({required this.kept, required this.dropped});
+}
+
 /// Builds compact OpenAI-compatible transcripts and routes data tools.
 extension AiChatWireTesting on AiChatService {
   List<Map<String, dynamic>> _buildWireMessages(
-    List<AiChatMessage> messages, {
-    required String systemPrompt,
-    required Map<String, dynamic> contextJson,
-    bool includeRoutinePolicy = false,
-    String? visionMessageId,
-    List<String> imageDataUrls = const [],
-    int historyTokenBudget = kHistoryTokenBudget,
-  }) {
+    List<AiChatMessage> messages,
+    _TurnWireOptions options,
+  ) {
     final out = <Map<String, dynamic>>[];
+    // Static prefix first: identical across rounds, turns and threads, so the
+    // provider can serve it from its prompt cache. The product safety policy
+    // lives here (not in the editable prompt) so a custom personality cannot
+    // bypass approval requirements.
     out.add({
       'role': 'system',
       'content':
-          '$systemPrompt\n\n$_dataGroundingPolicy\n\n'
-          '<workout_data>${jsonEncode(contextJson)}</workout_data>',
+          '${options.systemPrompt}\n\n$_dataGroundingPolicy\n\n'
+          '$_routineMutationPolicy',
     });
-    // This product safety policy is intentionally separate from the editable
-    // prompt so a custom personality cannot bypass approval requirements.
-    if (includeRoutinePolicy) {
-      out.add({'role': 'system', 'content': _routineMutationPolicy});
+    // Everything that changes per turn goes in one separate message after
+    // the static prefix.
+    final dynamicBlock = StringBuffer(
+      '<workout_data>${jsonEncode(options.contextJson)}</workout_data>',
+    );
+    final summary = options.threadSummary?.trim();
+    if (summary != null && summary.isNotEmpty) {
+      dynamicBlock.write(
+        '\n\n# Resumo da conversa anterior\n'
+        'As mensagens mais antigas desta conversa foram resumidas abaixo. '
+        'Trate o resumo como contexto, não como dado do app: qualquer fato '
+        'pessoal ainda exige consulta às ferramentas.\n$summary',
+      );
     }
-    if (imageDataUrls.isNotEmpty) {
+    if (options.toolHints.isNotEmpty) {
+      dynamicBlock.write(
+        '\n\nFerramentas provavelmente relevantes para a última mensagem: '
+        '${options.toolHints.join(', ')}. Isso é apenas uma sugestão; use '
+        'qualquer ferramenta do catálogo que a pergunta exigir.',
+      );
+    }
+    out.add({'role': 'system', 'content': dynamicBlock.toString()});
+    if (options.imageDataUrls.isNotEmpty) {
       out.add({
         'role': 'system',
         'content':
@@ -34,10 +82,9 @@ extension AiChatWireTesting on AiChatService {
       });
     }
 
-    // Compact history if too long.
     final compacted = _compactHistory(
       messages,
-      tokenBudget: historyTokenBudget,
+      tokenBudget: options.historyTokenBudget,
     );
 
     for (final m in compacted) {
@@ -45,7 +92,8 @@ extension AiChatWireTesting on AiChatService {
         case AiMessageRole.system:
           continue;
         case AiMessageRole.user:
-          if (m.id == visionMessageId && imageDataUrls.isNotEmpty) {
+          if (m.id == options.visionMessageId &&
+              options.imageDataUrls.isNotEmpty) {
             out.add({
               'role': 'user',
               'content': [
@@ -55,7 +103,7 @@ extension AiChatWireTesting on AiChatService {
                       ? m.content
                       : 'Analise as imagens anexadas.',
                 },
-                for (final url in imageDataUrls)
+                for (final url in options.imageDataUrls)
                   {
                     'type': 'image_url',
                     'image_url': {'url': url, 'detail': 'auto'},
@@ -87,7 +135,7 @@ extension AiChatWireTesting on AiChatService {
           out.add({
             'role': 'tool',
             'tool_call_id': m.toolCallId ?? '',
-            'content': m.content ?? '',
+            'content': _wireToolContent(m.content ?? ''),
           });
           break;
       }
@@ -95,12 +143,39 @@ extension AiChatWireTesting on AiChatService {
     return out;
   }
 
+  /// Caps a tool result on the wire. The persisted message keeps the full
+  /// payload for the UI; only the provider sees the bounded version, with an
+  /// explicit marker so the model can narrow the query instead of guessing.
+  String _wireToolContent(String content) {
+    if (content.length <= kMaxToolResultChars) return content;
+    final omitted = content.length - kMaxToolResultChars;
+    return jsonEncode({
+      'truncated': true,
+      'omittedChars': omitted,
+      'instruction':
+          'O resultado excedeu o limite e foi cortado. Se faltarem dados, '
+          'refine a consulta: período menor, paginação (page/page_size), '
+          'filtros ou uma ferramenta mais específica.',
+      'partial': content.substring(0, kMaxToolResultChars),
+    });
+  }
+
+  @visibleForTesting
+  String wireToolContentForTest(String content) => _wireToolContent(content);
+
   /// Drops oldest user/assistant blocks until total estimated tokens <= budget.
   List<AiChatMessage> _compactHistory(
     List<AiChatMessage> messages, {
     int tokenBudget = kHistoryTokenBudget,
+  }) => _compactHistoryDetailed(messages, tokenBudget: tokenBudget).kept;
+
+  _CompactedHistory _compactHistoryDetailed(
+    List<AiChatMessage> messages, {
+    int tokenBudget = kHistoryTokenBudget,
   }) {
-    if (messages.isEmpty) return messages;
+    if (messages.isEmpty) {
+      return const _CompactedHistory(kept: [], dropped: []);
+    }
 
     // Tool transcripts are useful only while the current user turn is still
     // running. Once a final answer exists, retain that answer and discard old
@@ -125,7 +200,9 @@ extension AiChatWireTesting on AiChatService {
     }
 
     final total = _estimateTokens(normalized);
-    if (total <= tokenBudget) return normalized;
+    if (total <= tokenBudget) {
+      return _CompactedHistory(kept: normalized, dropped: const []);
+    }
 
     // Compact whole user turns. A tool result without its preceding assistant
     // tool_call is an invalid transcript and prevents the model from reliably
@@ -139,37 +216,57 @@ extension AiChatWireTesting on AiChatService {
       }
       turn?.add(message);
     }
-    if (turns.isEmpty) return normalized;
+    if (turns.isEmpty) {
+      return _CompactedHistory(kept: normalized, dropped: const []);
+    }
 
     final keep = <AiChatMessage>[];
     var running = 0;
+    var firstKeptTurn = turns.length;
     for (var i = turns.length - 1; i >= 0; i--) {
       final candidate = turns[i];
       final est = _estimateTokens(candidate);
       if (running + est > tokenBudget && keep.isNotEmpty) break;
       keep.insertAll(0, candidate);
       running += est;
+      firstKeptTurn = i;
     }
-    return keep;
+    final dropped = <AiChatMessage>[
+      for (var i = 0; i < firstKeptTurn; i++)
+        ...turns[i].where((m) => m.isUser || m.isAssistant),
+    ];
+    return _CompactedHistory(kept: keep, dropped: dropped);
   }
 
   @visibleForTesting
-  List<AiChatMessage> compactHistoryForTest(List<AiChatMessage> messages) =>
-      _compactHistory(messages);
+  List<AiChatMessage> compactHistoryForTest(
+    List<AiChatMessage> messages, {
+    int tokenBudget = kHistoryTokenBudget,
+  }) => _compactHistory(messages, tokenBudget: tokenBudget);
+
+  @visibleForTesting
+  List<AiChatMessage> droppedByCompactionForTest(
+    List<AiChatMessage> messages, {
+    int tokenBudget = kHistoryTokenBudget,
+  }) => _compactHistoryDetailed(messages, tokenBudget: tokenBudget).dropped;
 
   @visibleForTesting
   List<Map<String, dynamic>> buildWireMessagesForTest(
     List<AiChatMessage> messages, {
-    bool includeRoutinePolicy = false,
     String? visionMessageId,
     List<String> imageDataUrls = const [],
+    String? threadSummary,
+    List<String> toolHints = const [],
   }) => _buildWireMessages(
     messages,
-    systemPrompt: 'system',
-    contextJson: const {},
-    includeRoutinePolicy: includeRoutinePolicy,
-    visionMessageId: visionMessageId,
-    imageDataUrls: imageDataUrls,
+    _TurnWireOptions(
+      systemPrompt: 'system',
+      contextJson: const {},
+      visionMessageId: visionMessageId,
+      imageDataUrls: imageDataUrls,
+      threadSummary: threadSummary,
+      toolHints: toolHints,
+    ),
   );
 
   int _estimateTokens(List<AiChatMessage> messages) {
@@ -181,38 +278,70 @@ extension AiChatWireTesting on AiChatService {
   }
 
   int _estimateMessageTokens(AiChatMessage m) {
-    return TokenEstimator.estimateMessage(
+    final raw = TokenEstimator.estimateMessage(
       role: m.role.wireValue,
-      content: m.content,
+      content: m.isTool ? _wireToolContent(m.content ?? '') : m.content,
       toolName: m.toolName,
       toolCallArguments: m.toolCalls.isEmpty
           ? null
           : jsonEncode(m.toolCalls.map((c) => c.arguments).toList()),
     );
+    return (raw * _tokenScale).ceil();
+  }
+
+  int _estimateWireTokens(
+    List<Map<String, dynamic>> wire,
+    List<Map<String, dynamic>>? toolsSchema,
+  ) {
+    final raw =
+        TokenEstimator.estimateText(jsonEncode(wire)) +
+        (toolsSchema == null
+            ? 0
+            : TokenEstimator.estimateText(jsonEncode(toolsSchema)));
+    return (raw * _tokenScale).ceil();
+  }
+
+  /// Replaces the chars-per-token heuristic with the ratio the provider just
+  /// reported, so history budgets track the real tokenizer of the active
+  /// model. Kept in memory only; nothing about usage is persisted or shown.
+  void _calibrateTokenScale({
+    required List<Map<String, dynamic>> wire,
+    required List<Map<String, dynamic>>? toolsSchema,
+    required int? promptTokens,
+  }) {
+    if (promptTokens == null || promptTokens <= 0) return;
+    final rawEstimate =
+        TokenEstimator.estimateText(jsonEncode(wire)) +
+        (toolsSchema == null
+            ? 0
+            : TokenEstimator.estimateText(jsonEncode(toolsSchema)));
+    if (rawEstimate <= 0) return;
+    _tokenScale = (promptTokens / rawEstimate).clamp(0.6, 2.5);
   }
 
   int _historyBudgetFor({
     required String systemPrompt,
     required Map<String, dynamic> contextJson,
     required List<Map<String, dynamic>> toolsSchema,
-    required bool includeRoutinePolicy,
   }) {
     final fixedTokens =
-        TokenEstimator.estimateText(systemPrompt) +
-        TokenEstimator.estimateText(_dataGroundingPolicy) +
-        (includeRoutinePolicy
-            ? TokenEstimator.estimateText(_routineMutationPolicy)
-            : 0) +
-        TokenEstimator.estimateText(jsonEncode(contextJson)) +
-        TokenEstimator.estimateText(jsonEncode(toolsSchema)) +
-        80;
+        ((TokenEstimator.estimateText(systemPrompt) +
+                    TokenEstimator.estimateText(_dataGroundingPolicy) +
+                    TokenEstimator.estimateText(_routineMutationPolicy) +
+                    TokenEstimator.estimateText(jsonEncode(contextJson)) +
+                    TokenEstimator.estimateText(jsonEncode(toolsSchema)) +
+                    80) *
+                _tokenScale)
+            .ceil();
     return (kTargetInputTokenBudget - fixedTokens).clamp(
       kMinHistoryTokenBudget,
       kHistoryTokenBudget,
     );
   }
 
-  Set<String> _toolNamesForTurn(
+  /// Tools most likely relevant to the latest message. Only a hint; the full
+  /// catalog is always sent.
+  Set<String> _toolHintsForTurn(
     List<AiChatMessage> messages,
     String latestUserText,
   ) {
@@ -236,10 +365,10 @@ extension AiChatWireTesting on AiChatService {
 
   bool _requiresGroundedToolCall(
     String latestUserText,
-    Set<String> toolNames, {
+    Set<String> toolHints, {
     required bool routineProposalFollowUp,
   }) {
-    if (toolNames.isEmpty) return false;
+    if (toolHints.isEmpty) return false;
     if (routineProposalFollowUp) return true;
     final normalized = latestUserText.trim().toLowerCase();
     if (_looksLikeFollowUp(normalized)) return true;
@@ -286,19 +415,17 @@ extension AiChatWireTesting on AiChatService {
     'evolucao',
   ].any(normalized.contains);
 
-  Object _requiredToolChoice(Set<String> toolNames) {
-    // `auto` is the only representation consistently accepted by every
-    // OpenAI-compatible provider supported by the app. Grounding is still
-    // mandatory: the orchestrator rejects an answer without tool calls and
-    // retries with an explicit instruction in `_retryMissingRequiredToolCall`.
-    return 'auto';
-  }
+  /// `required` makes the provider emit at least one tool call in the first
+  /// round of a grounded turn, saving the reject-and-retry round trip.
+  /// Providers that reject the value are handled by [AiService], which drops
+  /// `tool_choice` for that model and falls back to `auto` behaviour.
+  Object _requiredToolChoice() => 'required';
 
   @visibleForTesting
   Set<String> toolNamesForTurnForTest(
     List<AiChatMessage> messages,
     String latestUserText,
-  ) => _toolNamesForTurn(messages, latestUserText);
+  ) => _toolHintsForTurn(messages, latestUserText);
 
   @visibleForTesting
   bool groundedToolCallRequiredForTest(
@@ -312,8 +439,7 @@ extension AiChatWireTesting on AiChatService {
   );
 
   @visibleForTesting
-  Object requiredToolChoiceForTest(Set<String> toolNames) =>
-      _requiredToolChoice(toolNames);
+  Object requiredToolChoiceForTest() => _requiredToolChoice();
 
   bool _isRoutineProposalFollowUp(
     List<AiChatMessage> messages,

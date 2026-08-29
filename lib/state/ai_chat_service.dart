@@ -30,10 +30,24 @@ part 'ai_chat_wire.dart';
 
 const _uuid = Uuid();
 
-const int kMaxToolRounds = 3;
-const int kHistoryTokenBudget = 6000;
-const int kTargetInputTokenBudget = 7000;
-const int kMinHistoryTokenBudget = 1200;
+/// Upper bound on tool rounds per turn. The real limiter is
+/// [kMaxTurnInputTokens]; this only stops a model that loops forever.
+const int kMaxToolRounds = 8;
+
+/// Once a request (history + tool results + schema) is estimated above this,
+/// the next provider call is made without tools so the turn ends.
+const int kMaxTurnInputTokens = 48000;
+
+/// Prior conversation kept on the wire. Anything older is summarised.
+const int kHistoryTokenBudget = 24000;
+const int kTargetInputTokenBudget = 32000;
+const int kMinHistoryTokenBudget = 4000;
+
+/// A single tool result larger than this is cut on the wire (about 2.3k
+/// tokens) with a marker telling the model to narrow the query. Several
+/// rounds of analytics results add up fast, and slow providers time out on
+/// requests past ~60k characters.
+const int kMaxToolResultChars = 8000;
 const int kMaxInvalidAnswerRegenerations = 2;
 const int kMaxMissingToolCallRetries = 1;
 const String _dataGroundingPolicy = r'''# Consulta obrigatória aos dados do app
@@ -41,7 +55,7 @@ As ferramentas são a fonte primária para fatos pessoais do usuário. Quando a 
 
 Interprete continuações usando a conversa recente. Se o usuário mudar apenas o domínio, preserve os qualificadores ainda aplicáveis do pedido anterior, especialmente período, comparação e objetivo. Exemplo: depois de um resumo da última semana, "E o sono?" exige consultar o resumo de sono para o mesmo período. O usuário nunca precisa pedir explicitamente que você use uma tool.
 
-Use `discover_app_capabilities` somente quando a ferramenta necessária não estiver entre as ferramentas diretas disponíveis. Se uma consulta falhar ou não tiver registros suficientes, informe isso; nunca complete a lacuna com dados inventados.
+Todo o catálogo de ferramentas está sempre disponível; escolha pela descrição. Você pode chamar a mesma ferramenta mais de uma vez com parâmetros diferentes (outra página, outro período, outro identificador) e cruzar domínios no mesmo turno. Se um resultado vier marcado como truncado, refine a consulta em vez de deduzir o que faltou. Se uma consulta falhar ou não tiver registros suficientes, informe isso; nunca complete a lacuna com dados inventados.
 
 Para alimentação, escolha a ferramenta mais específica: diário do dia para refeições e itens consumidos; histórico para totais por dia; micronutrientes para vitaminas, minerais, fibras, açúcares e sódio; biblioteca para alimentos cadastrados; refeições salvas para modelos; perfil para meta e tipos de refeição. Preserve `null` como dado não informado, nunca como zero.
 
@@ -77,6 +91,12 @@ const String _manualFoodJsonFallbackPrompt =
 {"name":"...","brand":"... opcional","barcode":"... opcional","reference_amount":100,"reference_unit":"g ou ml","per":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"saturated_fat_g":0,"monounsaturated_fat_g":0,"polyunsaturated_fat_g":0,"trans_fat_g":0,"fiber_g":0,"sugars_g":0,"sodium_mg":0,"potassium_mg":0,"calcium_mg":0,"iron_mg":0,"magnesium_mg":0,"zinc_mg":0,"vitamin_a_ug":0,"vitamin_c_mg":0,"vitamin_d_ug":0,"vitamin_b12_ug":0},"servings":[{"label":"...","quantity":1,"unit":"...","grams_equivalent":0,"ml_equivalent":0}],"notes":"..."}
 
 Omita campos opcionais ou nutrientes que não puder identificar com segurança; não escreva null. Para alimentos genéricos, use valores típicos plausíveis e descreva a hipótese em notes. Todos os nutrientes devem corresponder à quantidade de referência.''';
+const String _threadSummaryPrompt =
+    r'''Você mantém o resumo compacto de uma conversa entre um usuário e seu treinador de IA em um app de treino, sono e nutrição. Atualize o resumo incorporando as novas mensagens.
+
+Preserve: objetivos, preferências e restrições do usuário; decisões tomadas; recomendações dadas; rotinas, planos ou alimentos propostos e se foram aprovados; períodos, métricas e números citados; pendências ou perguntas em aberto. Descarte cumprimentos e repetições.
+
+Escreva em português brasileiro, em texto corrido ou lista curta, com no máximo 250 palavras. Não invente nada que não esteja nas mensagens ou no resumo atual. Responda somente com o resumo atualizado.''';
 
 /// Singleton orchestrator for AI chat turns. Owns the chat state.
 ///
@@ -100,6 +120,10 @@ class AiChatService extends ChangeNotifier {
   final Map<String, String> _persistedMessageSignatures = {};
   _AiTurnDiagnostics? _activeTurnDiagnostics;
   String? _activeReasoningEffort;
+
+  /// Multiplier applied to the chars-per-token heuristic, learned from the
+  /// `prompt_tokens` the provider reports. See `_calibrateTokenScale`.
+  double _tokenScale = 1.0;
 
   AiChatState _state = const AiChatState();
 
@@ -175,10 +199,6 @@ class AiChatService extends ChangeNotifier {
       await _imageStore.deleteOrphans(retained);
     } catch (_) {}
   }
-
-  // ===========================================================================
-  // THREAD MANAGEMENT
-  // ===========================================================================
 
   // ===========================================================================
   // SENDING
@@ -459,118 +479,141 @@ class AiChatService extends ChangeNotifier {
     final imageDataUrls = visionMessage.attachments.isEmpty
         ? const <String>[]
         : await _imageStore.readDataUrls(visionMessage.attachments);
-    final latestUserText =
-        current.lastWhere((message) => message.isUser).content ?? '';
+    final latestUserText = visionMessage.content ?? '';
     final routineProposalFollowUp = _isRoutineProposalFollowUp(
       current,
       latestUserText,
     );
-    var toolNames = _toolNamesForTurn(current, latestUserText);
+    final toolHints = _toolHintsForTurn(current, latestUserText);
     final manualFoodProposalTurn =
-        toolNames.length == 1 &&
-        toolNames.contains('propose_manual_food_creation');
+        toolHints.length == 1 &&
+        toolHints.contains('propose_manual_food_creation');
     final manualFoodTextTurn = manualFoodProposalTurn && imageDataUrls.isEmpty;
     if (routineProposalFollowUp) {
-      toolNames.addAll({
+      toolHints.addAll({
         'list_exercises',
         'list_routines',
         'get_routine_detail',
+        'propose_routine_change',
       });
     }
-    var proposalAvailable = false;
-    var routineCapabilityActive =
-        routineProposalFollowUp ||
-        toolNames.any(
-          const {
-            'list_routines',
-            'get_routine_detail',
-            'list_exercises',
-          }.contains,
-        );
     final requiresGroundedToolCall = _requiresGroundedToolCall(
       latestUserText,
-      toolNames,
+      toolHints,
       routineProposalFollowUp: routineProposalFollowUp,
     );
-    _context.invalidate();
     final contextJson = manualFoodTextTurn
         ? const <String, dynamic>{}
         : await _context.build(mode: contextMode);
+    // One catalog for the whole turn: the model can pick any tool by
+    // description, re-call one with new parameters and cross domains, and the
+    // provider can cache the identical request prefix across rounds.
+    final fullSchema = _tools.openAiChatToolsSchema();
+    final manualFoodSchema = _tools.openAiChatToolsSchema(
+      names: const {'propose_manual_food_creation'},
+      includeRoutineProposal: false,
+    );
+    final historyBudget = _historyBudgetFor(
+      systemPrompt: systemPrompt,
+      contextJson: contextJson,
+      toolsSchema: fullSchema,
+    );
+    final threadSummary = manualFoodTextTurn
+        ? null
+        : await _ensureThreadSummary(
+            current: current,
+            historyBudget: historyBudget,
+            baseUrl: baseUrl,
+            token: token,
+            model: model,
+          );
+    final options = _TurnWireOptions(
+      systemPrompt: systemPrompt,
+      contextJson: contextJson,
+      threadSummary: threadSummary,
+      toolHints: toolHints.toList()..sort(),
+      visionMessageId: visionMessage.id,
+      imageDataUrls: imageDataUrls,
+      historyTokenBudget: historyBudget,
+    );
 
-    for (var round = 0; round < kMaxToolRounds + 1; round++) {
-      final toolsSchema = _tools.openAiChatToolsSchema(
-        names: toolNames,
-        includeRoutineProposal: proposalAvailable,
-        includeCapabilityDiscovery:
-            toolNames.isEmpty && (!manualFoodTextTurn || round > 0),
-      );
-      final wire = manualFoodTextTurn && round == 0
+    int? lastPromptTokens;
+    for (var round = 0; ; round++) {
+      final manualFoodRound = manualFoodTextTurn && round == 0;
+      final wire = manualFoodRound
           ? _buildManualFoodProposalWire(current)
-          : _buildWireMessages(
-              current,
-              systemPrompt: systemPrompt,
-              contextJson: contextJson,
-              includeRoutinePolicy:
-                  routineCapabilityActive || proposalAvailable,
-              visionMessageId: visionMessage.id,
-              imageDataUrls: imageDataUrls,
-              historyTokenBudget: _historyBudgetFor(
-                systemPrompt: systemPrompt,
-                contextJson: contextJson,
-                toolsSchema: toolsSchema,
-                includeRoutinePolicy:
-                    routineCapabilityActive || proposalAvailable,
-              ),
-            );
+          : _buildWireMessages(current, options);
+      // Tools stay available while the request fits the turn budget. Beyond
+      // that (or past the round cap) the model must answer with what it has.
+      final inputExceeded =
+          (lastPromptTokens ?? 0) > kMaxTurnInputTokens ||
+          _estimateWireTokens(wire, fullSchema) > kMaxTurnInputTokens;
+      final allowTools = round < kMaxToolRounds && !inputExceeded;
+      final toolsSchema = !allowTools
+          ? null
+          : manualFoodRound
+          ? manualFoodSchema
+          : fullSchema;
 
       _state = _state.copyWith(
         phase: round == 0 ? AiTurnPhase.sending : AiTurnPhase.executingReads,
-        phaseMessage: round == 0 ? 'sending' : 'reading',
+        phaseMessage: !allowTools
+            ? 'finalising'
+            : round == 0
+            ? 'sending'
+            : 'reading',
       );
       notifyListeners();
 
-      final toolChoice = round == 0 && requiresGroundedToolCall
-          ? _requiredToolChoice(toolNames)
+      final toolChoice = round == 0 && requiresGroundedToolCall && allowTools
+          ? _requiredToolChoice()
           : 'auto';
       _activeTurnDiagnostics = _activeTurnDiagnostics?.copyWith(
-        stage: round == 0
+        stage: !allowTools
+            ? 'final_provider_request'
+            : round == 0
             ? 'initial_provider_request'
             : 'followup_provider_request',
         round: round + 1,
-        schemaToolCount: toolsSchema.length,
+        schemaToolCount: toolsSchema?.length ?? 0,
         requestCharacters: jsonEncode(wire).length,
-        tools: toolNames.toList()..sort(),
+        tools: toolsSchema == null
+            ? const []
+            : (toolsSchema
+                  .map((tool) => (tool['function'] as Map)['name'] as String)
+                  .toList()
+                ..sort()),
       );
-      var completion = imageDataUrls.isEmpty
-          ? manualFoodTextTurn && round == 0
-                ? await _sendManualFoodProposalCompletion(
-                    baseUrl: baseUrl,
-                    token: token,
-                    model: model,
-                    messages: wire,
-                    toolsSchema: toolsSchema,
-                    toolChoice: toolChoice,
-                  )
-                : await _service.sendChat(
-                    baseUrl: baseUrl,
-                    token: token,
-                    model: model,
-                    reasoningEffort: _activeReasoningEffort,
-                    messages: wire,
-                    tools: toolsSchema,
-                    toolChoice: toolChoice,
-                  )
-          : await _service.sendMultimodalChat(
+      var completion = manualFoodRound
+          ? await _sendManualFoodProposalCompletion(
               baseUrl: baseUrl,
               token: token,
               model: model,
-              reasoningEffort: _activeReasoningEffort,
+              messages: wire,
+              toolsSchema: manualFoodSchema,
+              toolChoice: toolChoice,
+            )
+          : await _sendCompletion(
+              baseUrl: baseUrl,
+              token: token,
+              model: model,
               messages: wire,
               tools: toolsSchema,
               toolChoice: toolChoice,
+              hasImages: imageDataUrls.isNotEmpty,
             );
+      _calibrateTokenScale(
+        wire: wire,
+        toolsSchema: toolsSchema,
+        promptTokens: completion.promptTokens,
+      );
+      lastPromptTokens = completion.promptTokens;
 
-      if (round == 0 && requiresGroundedToolCall && !completion.hasToolCalls) {
+      if (round == 0 &&
+          allowTools &&
+          !manualFoodRound &&
+          requiresGroundedToolCall &&
+          !completion.hasToolCalls) {
         _activeTurnDiagnostics = _activeTurnDiagnostics?.copyWith(
           stage: 'required_tool_retry',
         );
@@ -580,7 +623,7 @@ class AiChatService extends ChangeNotifier {
           baseUrl: baseUrl,
           token: token,
           model: model,
-          toolsSchema: toolsSchema,
+          toolsSchema: fullSchema,
           toolChoice: toolChoice,
           hasImages: imageDataUrls.isNotEmpty,
         );
@@ -591,7 +634,7 @@ class AiChatService extends ChangeNotifier {
         id: _uuid.v4(),
         threadId: _state.activeThreadId ?? '',
         role: AiMessageRole.assistant,
-        content: _formatCompletion(completion, current),
+        content: completion.text,
         toolCalls: completion.toolCalls,
         createdAt: DateTime.now(),
       );
@@ -604,11 +647,7 @@ class AiChatService extends ChangeNotifier {
           baseUrl: baseUrl,
           token: token,
           model: model,
-          systemPrompt: systemPrompt,
-          contextJson: contextJson,
-          includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
-          visionMessageId: visionMessage.id,
-          imageDataUrls: imageDataUrls,
+          options: options,
         );
         if (accepted != null) {
           current = [...current.sublist(0, current.length - 1), accepted];
@@ -628,7 +667,6 @@ class AiChatService extends ChangeNotifier {
       _state = _state.copyWith(messages: current);
       notifyListeners();
 
-      // Execute reads sequentially; tool-call order is preserved.
       final hasRoutineProposal = completion.toolCalls.any(
         (call) => call.name == 'propose_routine_change',
       );
@@ -653,6 +691,15 @@ class AiChatService extends ChangeNotifier {
       // preparation remains ordered and executes after all reads finish.
       final readResults = await Future.wait(
         completion.toolCalls.map((call) async {
+          if (call.argumentsError != null) {
+            return AiToolResult(
+              ok: false,
+              code: 'invalid_arguments_json',
+              message:
+                  '${call.argumentsError} Reenvie a chamada com um objeto '
+                  'JSON válido.',
+            );
+          }
           if (call.name == 'propose_routine_change') return null;
           return _tools.executeRead(toolName: call.name, args: call.arguments);
         }),
@@ -660,13 +707,13 @@ class AiChatService extends ChangeNotifier {
       var preparedManualFood = false;
       for (var i = 0; i < completion.toolCalls.length; i++) {
         final call = completion.toolCalls[i];
-        final result = call.name == 'propose_routine_change'
-            ? await _routineMutations.prepareProposal(
-                threadId: _state.activeThreadId ?? '',
-                toolCallId: call.id,
-                args: call.arguments,
-              )
-            : readResults[i]!;
+        final result =
+            readResults[i] ??
+            await _routineMutations.prepareProposal(
+              threadId: _state.activeThreadId ?? '',
+              toolCallId: call.id,
+              args: call.arguments,
+            );
         if (call.name == 'propose_routine_change' && result.ok) {
           final data = result.data as Map?;
           final proposalId = data?['proposalId'] as String?;
@@ -702,126 +749,143 @@ class AiChatService extends ChangeNotifier {
         await _persistCurrentThread();
         return;
       }
-
-      final calledNames = completion.toolCalls.map((call) => call.name).toSet();
-      final discoveredNames = <String>{};
-      for (var i = 0; i < completion.toolCalls.length; i++) {
-        if (completion.toolCalls[i].name != 'discover_app_capabilities') {
-          continue;
-        }
-        final data = readResults[i]?.data;
-        if (data is Map) {
-          discoveredNames.addAll(
-            (data['tools'] as List? ?? const []).whereType<String>(),
-          );
-        }
-      }
-      routineCapabilityActive =
-          routineCapabilityActive ||
-          discoveredNames.any(
-            const {
-              'list_routines',
-              'get_routine_detail',
-              'list_exercises',
-              'propose_routine_change',
-            }.contains,
-          );
-      final followUpNames = _tools.followUpToolNames(
-        calledNames,
-        routineIntent: routineCapabilityActive,
-      );
-      toolNames = {
-        ...followUpNames,
-        ...discoveredNames.where((name) => name != 'propose_routine_change'),
-      };
-      proposalAvailable =
-          proposalAvailable ||
-          discoveredNames.contains('propose_routine_change') ||
-          (routineCapabilityActive &&
-              calledNames.any(
-                (name) =>
-                    name == 'list_exercises' || name == 'get_routine_detail',
-              ));
-      if (calledNames.contains('propose_routine_change')) {
-        proposalAvailable = false;
-      }
-
-      if (round == kMaxToolRounds) {
-        // Force final answer with no tools.
-        _state = _state.copyWith(
-          phase: AiTurnPhase.sending,
-          phaseMessage: 'finalising',
-        );
-        notifyListeners();
-        final finalWire = _buildWireMessages(
-          current,
-          systemPrompt: systemPrompt,
-          contextJson: contextJson,
-          includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
-          visionMessageId: visionMessage.id,
-          imageDataUrls: imageDataUrls,
-        );
-        _activeTurnDiagnostics = _activeTurnDiagnostics?.copyWith(
-          stage: 'final_provider_request',
-          round: round + 2,
-          schemaToolCount: 0,
-          requestCharacters: jsonEncode(finalWire).length,
-          tools: const [],
-        );
-        final finalCompletion = imageDataUrls.isEmpty
-            ? await _service.sendChat(
-                baseUrl: baseUrl,
-                token: token,
-                model: model,
-                reasoningEffort: _activeReasoningEffort,
-                messages: finalWire,
-              )
-            : await _service.sendMultimodalChat(
-                baseUrl: baseUrl,
-                token: token,
-                model: model,
-                reasoningEffort: _activeReasoningEffort,
-                messages: finalWire,
-              );
-        final candidate = AiChatMessage(
-          id: _uuid.v4(),
-          threadId: _state.activeThreadId ?? '',
-          role: AiMessageRole.assistant,
-          content: finalCompletion.text,
-          createdAt: DateTime.now(),
-        );
-        current = [...current, candidate];
-        final accepted = await _regenerateInvalidAnswer(
-          completion: finalCompletion,
-          current: current,
-          baseUrl: baseUrl,
-          token: token,
-          model: model,
-          systemPrompt: systemPrompt,
-          contextJson: contextJson,
-          includeRoutinePolicy: routineCapabilityActive || proposalAvailable,
-          visionMessageId: visionMessage.id,
-          imageDataUrls: imageDataUrls,
-        );
-        final finalAssistant = AiChatMessage(
-          id: accepted?.id ?? candidate.id,
-          threadId: _state.activeThreadId ?? '',
-          role: AiMessageRole.assistant,
-          content: accepted?.content ?? finalCompletion.text,
-          createdAt: DateTime.now(),
-        );
-        current = [...current.sublist(0, current.length - 1), finalAssistant];
-        _state = _state.copyWith(
-          messages: current,
-          phase: AiTurnPhase.idle,
-          phaseMessage: null,
-        );
-        notifyListeners();
-        await _persistCurrentThread();
-        return;
-      }
     }
   }
+
+  Future<AiChatCompletion> _sendCompletion({
+    required String baseUrl,
+    required String token,
+    required String model,
+    required List<Map<String, dynamic>> messages,
+    List<Map<String, dynamic>>? tools,
+    Object? toolChoice,
+    required bool hasImages,
+  }) {
+    if (hasImages) {
+      return _service.sendMultimodalChat(
+        baseUrl: baseUrl,
+        token: token,
+        model: model,
+        reasoningEffort: _activeReasoningEffort,
+        messages: messages,
+        tools: tools,
+        toolChoice: toolChoice,
+      );
+    }
+    return _service.sendChat(
+      baseUrl: baseUrl,
+      token: token,
+      model: model,
+      reasoningEffort: _activeReasoningEffort,
+      messages: messages,
+      tools: tools,
+      toolChoice: toolChoice,
+    );
+  }
+
+  // ===========================================================================
+  // ROLLING THREAD SUMMARY
+  // ===========================================================================
+
+  /// Returns the summary of the part of [current] that no longer fits the
+  /// history budget, refreshing it with one extra provider call when new
+  /// messages fell out of the window. Failures degrade to the last summary.
+  Future<String?> _ensureThreadSummary({
+    required List<AiChatMessage> current,
+    required int historyBudget,
+    required String baseUrl,
+    required String token,
+    required String model,
+  }) async {
+    final threadId = _state.activeThreadId;
+    if (threadId == null) return null;
+    Map<String, dynamic>? existing;
+    try {
+      existing = await _db.getAiChatThreadSummary(threadId);
+    } catch (_) {}
+    final existingSummary = existing?['summary'] as String?;
+    final existingThrough = existing?['through_message_id'] as String?;
+
+    final dropped = _compactHistoryDetailed(
+      current,
+      tokenBudget: historyBudget,
+    ).dropped;
+    if (dropped.isEmpty || existingThrough == dropped.last.id) {
+      return existingSummary;
+    }
+    var deltaStart = 0;
+    if (existingThrough != null) {
+      final index = dropped.indexWhere((m) => m.id == existingThrough);
+      if (index >= 0) deltaStart = index + 1;
+    }
+    final delta = dropped.sublist(deltaStart);
+    if (delta.isEmpty) return existingSummary;
+
+    _state = _state.copyWith(phaseMessage: 'compacting');
+    notifyListeners();
+    _activeTurnDiagnostics = _activeTurnDiagnostics?.copyWith(
+      stage: 'thread_summary',
+    );
+    try {
+      final request = StringBuffer();
+      if (existingSummary != null && existingSummary.trim().isNotEmpty) {
+        request.write('Resumo atual:\n$existingSummary\n\n');
+      }
+      request.write(
+        'Novas mensagens a incorporar:\n${_transcriptForSummary(delta)}',
+      );
+      final completion = await _service.sendChat(
+        baseUrl: baseUrl,
+        token: token,
+        model: model,
+        reasoningEffort: _activeReasoningEffort,
+        messages: [
+          const {'role': 'system', 'content': _threadSummaryPrompt},
+          {'role': 'user', 'content': request.toString()},
+        ],
+      );
+      final text = completion.text?.trim();
+      if (text == null || text.isEmpty) return existingSummary;
+      final summary = TextSanitizer.sanitize(text).trim();
+      if (summary.isEmpty) return existingSummary;
+      await _db.upsertAiChatThreadSummary(
+        threadId: threadId,
+        summary: summary,
+        throughMessageId: dropped.last.id,
+      );
+      return summary;
+    } catch (_) {
+      return existingSummary;
+    }
+  }
+
+  String _transcriptForSummary(List<AiChatMessage> messages) {
+    const perMessage = 1500;
+    const total = 24000;
+    final buffer = StringBuffer();
+    for (final message in messages) {
+      final content = message.content?.trim();
+      if (content == null || content.isEmpty) continue;
+      final compact = content.length <= perMessage
+          ? content
+          : '${content.substring(0, perMessage)}…';
+      final line = '${message.isUser ? 'Usuário' : 'Treinador'}: $compact\n';
+      if (buffer.length + line.length > total) {
+        buffer.write('[mensagens restantes omitidas por tamanho]\n');
+        break;
+      }
+      buffer.write(line);
+    }
+    return buffer.toString();
+  }
+
+  @visibleForTesting
+  String transcriptForSummaryForTest(List<AiChatMessage> messages) =>
+      _transcriptForSummary(messages);
+
+  // ===========================================================================
+  // MANUAL FOOD FLOW
+  // ===========================================================================
 
   List<Map<String, dynamic>> _buildManualFoodProposalWire(
     List<AiChatMessage> messages,
@@ -958,6 +1022,13 @@ class AiChatService extends ChangeNotifier {
     );
   }
 
+  // ===========================================================================
+  // ANSWER VALIDATION
+  // ===========================================================================
+
+  /// Asks once more for a tool call when a grounded turn came back without
+  /// one. If the model still answers directly, that answer is accepted: a
+  /// possibly less grounded reply beats failing the whole turn.
   Future<AiChatCompletion> _retryMissingRequiredToolCall({
     required AiChatCompletion firstCompletion,
     required List<Map<String, dynamic>> wire,
@@ -990,34 +1061,29 @@ class AiChatService extends ChangeNotifier {
               'ferramentas fornecidas e só responda depois do resultado.',
         },
       );
-      completion = hasImages
-          ? await _service.sendMultimodalChat(
-              baseUrl: baseUrl,
-              token: token,
-              model: model,
-              reasoningEffort: _activeReasoningEffort,
-              messages: retryWire,
-              tools: toolsSchema,
-              toolChoice: toolChoice,
-            )
-          : await _service.sendChat(
-              baseUrl: baseUrl,
-              token: token,
-              model: model,
-              reasoningEffort: _activeReasoningEffort,
-              messages: retryWire,
-              tools: toolsSchema,
-              toolChoice: toolChoice,
-            );
+      try {
+        completion = await _sendCompletion(
+          baseUrl: baseUrl,
+          token: token,
+          model: model,
+          messages: retryWire,
+          tools: toolsSchema,
+          toolChoice: toolChoice,
+          hasImages: hasImages,
+        );
+      } catch (_) {
+        break;
+      }
     }
-    if (!completion.hasToolCalls) {
-      throw const AiServiceException(
-        'O provedor respondeu sem consultar os dados obrigatórios do app. '
-        'Tente novamente ou use outro modelo com suporte a tool calls.',
-        code: 'required_tool_call_missing',
+    if (!completion.hasToolCalls && kDebugMode) {
+      debugPrint(
+        'AiChatService: provider answered a grounded turn without tools; '
+        'accepting the direct answer.',
       );
     }
-    return completion;
+    return completion.text == null && !completion.hasToolCalls
+        ? firstCompletion
+        : completion;
   }
 
   Future<AiChatMessage?> _regenerateInvalidAnswer({
@@ -1026,11 +1092,7 @@ class AiChatService extends ChangeNotifier {
     required String baseUrl,
     required String token,
     required String model,
-    required String systemPrompt,
-    required Map<String, dynamic> contextJson,
-    required bool includeRoutinePolicy,
-    String? visionMessageId,
-    List<String> imageDataUrls = const [],
+    required _TurnWireOptions options,
   }) async {
     var text = completion.text;
     if (text == null || !TextSanitizer.containsReferencePlaceholder(text)) {
@@ -1056,14 +1118,7 @@ class AiChatService extends ChangeNotifier {
           createdAt: DateTime.now(),
         ),
       ];
-      final wire = _buildWireMessages(
-        transcript,
-        systemPrompt: systemPrompt,
-        contextJson: contextJson,
-        includeRoutinePolicy: includeRoutinePolicy,
-        visionMessageId: visionMessageId,
-        imageDataUrls: imageDataUrls,
-      );
+      final wire = _buildWireMessages(transcript, options);
       _activeTurnDiagnostics = _activeTurnDiagnostics?.copyWith(
         stage: 'answer_validation_retry',
         round: attempt + 1,
@@ -1073,21 +1128,13 @@ class AiChatService extends ChangeNotifier {
       );
       AiChatCompletion regenerated;
       try {
-        regenerated = imageDataUrls.isEmpty
-            ? await _service.sendChat(
-                baseUrl: baseUrl,
-                token: token,
-                model: model,
-                reasoningEffort: _activeReasoningEffort,
-                messages: wire,
-              )
-            : await _service.sendMultimodalChat(
-                baseUrl: baseUrl,
-                token: token,
-                model: model,
-                reasoningEffort: _activeReasoningEffort,
-                messages: wire,
-              );
+        regenerated = await _sendCompletion(
+          baseUrl: baseUrl,
+          token: token,
+          model: model,
+          messages: wire,
+          hasImages: options.imageDataUrls.isNotEmpty,
+        );
       } catch (_) {
         break;
       }
@@ -1186,8 +1233,7 @@ class AiChatService extends ChangeNotifier {
   }
 
   // ===========================================================================
-  // PERSISTENCE
-  // ===========================================================================
+  // ERRORS
   // ===========================================================================
 
   String _readableError(Object e) {
@@ -1247,13 +1293,6 @@ class AiChatService extends ChangeNotifier {
     final uri = Uri.tryParse(endpoint);
     if (uri == null) return null;
     return '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}${uri.path}';
-  }
-
-  String? _formatCompletion(
-    AiChatCompletion completion,
-    Iterable<AiChatMessage> messages,
-  ) {
-    return completion.text;
   }
 }
 
