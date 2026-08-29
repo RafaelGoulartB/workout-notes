@@ -50,6 +50,8 @@ void main() {
     final summary = json['summary'] as Map;
     expect(summary['availableDomains'], contains('sleep'));
     expect(summary['availableDomains'], contains('nutrition'));
+    expect(summary['availableDomains'], contains('running'));
+    expect(summary['availableDomains'], contains('run_plans'));
     expect(summary.containsKey('categoryDistributionPct'), isFalse);
     expect(summary.containsKey('bodyTrend30d'), isFalse);
   });
@@ -81,9 +83,21 @@ void main() {
       'is_from_routine': 0,
       'created_at': now,
     });
+    await db.insert('run_activities', {
+      'id': 'run_ctx',
+      'activity_type': 'running',
+      'started_at': now,
+      'duration_seconds': 1200,
+      'moving_time_seconds': 1100,
+      'distance_meters': 3000.0,
+      'status': 'completed',
+      'created_at': now,
+      'updated_at': now,
+    });
     final json = await context.build(mode: AiContextMode.standard);
     final totals = (json['summary'] as Map)['totals'] as Map;
     expect(totals['workouts'], 1);
     expect(totals['exercises'], 1);
+    expect(totals['recordedRuns'], 1);
   });
 }

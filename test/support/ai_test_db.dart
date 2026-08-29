@@ -1,5 +1,6 @@
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/database/database_helper.dart';
+import 'package:workout_notes/database/database_run_plan_schema.dart';
 
 Database? _currentDb;
 
@@ -97,6 +98,31 @@ Future<Database> installAiTestDb({bool includeRoutineDayNotes = true}) async {
         await db.execute(
           'CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)',
         );
+        await db.execute('''
+          CREATE TABLE run_activities (
+            id TEXT PRIMARY KEY, activity_type TEXT NOT NULL DEFAULT 'running',
+            started_at TEXT NOT NULL, ended_at TEXT, duration_seconds INTEGER NOT NULL DEFAULT 0,
+            moving_time_seconds INTEGER NOT NULL DEFAULT 0, distance_meters REAL NOT NULL DEFAULT 0,
+            avg_pace_sec_per_km REAL, max_pace_sec_per_km REAL, calories INTEGER,
+            title TEXT, notes TEXT, rpe REAL, feeling_rating INTEGER,
+            status TEXT NOT NULL DEFAULT 'completed', polyline_summary TEXT,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+            best_split_pace_sec_per_km REAL, best_effort_1k_sec INTEGER,
+            best_effort_3k_sec INTEGER, best_effort_5k_sec INTEGER,
+            best_effort_10k_sec INTEGER, best_effort_half_sec INTEGER,
+            best_effort_marathon_sec INTEGER, efforts_computed INTEGER NOT NULL DEFAULT 0,
+            plan_workout_id TEXT
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE run_track_points (
+            id TEXT PRIMARY KEY, activity_id TEXT NOT NULL, seq INTEGER NOT NULL,
+            lat REAL NOT NULL, lng REAL NOT NULL, altitude REAL, accuracy REAL,
+            speed REAL, recorded_at TEXT NOT NULL,
+            FOREIGN KEY (activity_id) REFERENCES run_activities(id) ON DELETE CASCADE
+          )
+        ''');
+        await DatabaseRunPlanSchema.create(db);
       },
     ),
   );

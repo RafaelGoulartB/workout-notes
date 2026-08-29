@@ -52,6 +52,9 @@ class AiContextService {
         'routines': counts['routines'] ?? 0,
         'bodyMeasurements': counts['bodyMeasurements'] ?? 0,
         'activeGoals': counts['activeGoals'] ?? 0,
+        'recordedRuns': counts['recordedRuns'] ?? 0,
+        'stationaryBikeSessions': counts['stationaryBikeSessions'] ?? 0,
+        'runPlans': counts['runPlans'] ?? 0,
       },
       'currentStreakDays': (overview['current_streak'] as int?) ?? 0,
     };
@@ -70,6 +73,9 @@ class AiContextService {
         'sleep',
         'nutrition',
         'recovery_analytics',
+        'running',
+        'run_activities',
+        'run_plans',
       ];
     }
 
@@ -106,7 +112,13 @@ class AiContextService {
             WHERE date >= ? AND date <= ? AND end_time IS NOT NULL)
             AS workouts_30d,
           (SELECT COUNT(*) FROM body_measurements
-            WHERE type = ? AND date >= ?) AS weight_30d
+            WHERE type = ? AND date >= ?) AS weight_30d,
+          (SELECT COUNT(*) FROM run_activities
+            WHERE status = 'completed' AND activity_type = 'running'
+              AND started_at >= ?) AS runs_30d,
+          (SELECT COUNT(*) FROM run_activities
+            WHERE status = 'completed' AND activity_type = 'stationary_bike'
+              AND started_at >= ?) AS bike_30d
       ''',
         [
           start7,
@@ -115,6 +127,8 @@ class AiContextService {
           now.toIso8601String().substring(0, 10),
           'weight',
           start30,
+          '${start30}T00:00:00',
+          '${start30}T00:00:00',
         ],
       );
       final row = rows.first;
@@ -123,6 +137,8 @@ class AiContextService {
         'nutritionDays7d': (row['nutrition_7d'] as num?)?.toInt() ?? 0,
         'workouts30d': (row['workouts_30d'] as num?)?.toInt() ?? 0,
         'weightMeasurements30d': (row['weight_30d'] as num?)?.toInt() ?? 0,
+        'recordedRuns30d': (row['runs_30d'] as num?)?.toInt() ?? 0,
+        'stationaryBikeSessions30d': (row['bike_30d'] as num?)?.toInt() ?? 0,
       };
     } catch (_) {
       return const {};
@@ -137,7 +153,14 @@ class AiContextService {
           (SELECT COUNT(*) FROM exercises) AS exercises,
           (SELECT COUNT(*) FROM routines) AS routines,
           (SELECT COUNT(*) FROM body_measurements) AS body_measurements,
-          (SELECT COUNT(*) FROM user_goals WHERE is_active = 1) AS active_goals
+          (SELECT COUNT(*) FROM user_goals WHERE is_active = 1) AS active_goals,
+          (SELECT COUNT(*) FROM run_activities
+            WHERE status = 'completed' AND activity_type = 'running')
+            AS recorded_runs,
+          (SELECT COUNT(*) FROM run_activities
+            WHERE status = 'completed' AND activity_type = 'stationary_bike')
+            AS stationary_bike_sessions,
+          (SELECT COUNT(*) FROM run_plans) AS run_plans
       ''');
       final row = rows.first;
       return {
@@ -145,6 +168,10 @@ class AiContextService {
         'routines': (row['routines'] as num?)?.toInt() ?? 0,
         'bodyMeasurements': (row['body_measurements'] as num?)?.toInt() ?? 0,
         'activeGoals': (row['active_goals'] as num?)?.toInt() ?? 0,
+        'recordedRuns': (row['recorded_runs'] as num?)?.toInt() ?? 0,
+        'stationaryBikeSessions':
+            (row['stationary_bike_sessions'] as num?)?.toInt() ?? 0,
+        'runPlans': (row['run_plans'] as num?)?.toInt() ?? 0,
       };
     } catch (_) {
       return const {};

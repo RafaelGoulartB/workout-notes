@@ -20,9 +20,9 @@ void main() {
     await uninstallAiTestDb();
   });
 
-  test('openAiReadToolsSchema returns 35 tools with valid shape', () {
+  test('openAiReadToolsSchema returns 39 tools with valid shape', () {
     final tools = registry.openAiReadToolsSchema();
-    expect(tools.length, 35);
+    expect(tools.length, 39);
     for (final t in tools) {
       expect(t['type'], 'function');
       expect(t['function'], isA<Map>());
@@ -34,7 +34,7 @@ void main() {
 
   test('openAiChatToolsSchema includes the guarded routine proposal tool', () {
     final tools = registry.openAiChatToolsSchema();
-    expect(tools, hasLength(38));
+    expect(tools, hasLength(42));
     final proposal = tools.firstWhere(
       (tool) => (tool['function'] as Map)['name'] == 'propose_routine_change',
     );
@@ -168,6 +168,25 @@ void main() {
       registry.openAiReadToolsSchema(names: names).length,
       lessThan(registry.openAiReadToolsSchema().length),
     );
+  });
+
+  test('running vocabulary routes to recorded activity tools', () {
+    final latest = registry.toolNamesForQuery(
+      'Como foi minha última corrida e qual foi meu pace?',
+    );
+    expect(latest, contains('list_run_activities'));
+    expect(latest, contains('get_run_activity_detail'));
+    expect(latest, isNot(contains('get_exercise_personal_records')));
+
+    final records = registry.toolNamesForQuery(
+      'Qual é meu recorde de 5k e minha evolução semanal?',
+    );
+    expect(records, contains('get_run_achievements'));
+    expect(records, contains('get_run_progress'));
+
+    final bike = registry.toolNamesForQuery('Como foi meu pedal de bicicleta?');
+    expect(bike, contains('list_run_activities'));
+    expect(bike, isNot(contains('get_run_achievements')));
   });
 
   test('manual food creation routes directly to the guarded preview tool', () {

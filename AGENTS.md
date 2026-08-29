@@ -349,7 +349,7 @@ Conversations are persisted locally; tokens are stored in `flutter_secure_storag
 | Layer | Key files |
 |---|---|
 | Models | `lib/models/ai_provider.dart`, `ai_settings.dart`, `ai_chat_thread.dart`, `ai_chat_message.dart`, `ai_message_role.dart`, `ai_tool_call.dart`, `ai_chat_state.dart` |
-| Services | `lib/services/ai_service.dart` (OpenAI-compatible HTTP), `lib/services/ai_context_service.dart` (DB → JSON), `lib/services/ai_tool_registry.dart` (35 read tools + guarded proposal schemas) |
+| Services | `lib/services/ai_service.dart` (OpenAI-compatible HTTP), `lib/services/ai_context_service.dart` (DB → JSON), `lib/services/ai_tool_registry.dart` (39 read tools + guarded proposal schemas), `lib/services/ai_run_tool_service.dart` (recorded cardio, progress, achievements, plans and adherence) |
 | State | `lib/state/ai_settings_notifier.dart` (provider config, persisted to SharedPreferences), `lib/state/ai_chat_service.dart` (singleton `ChangeNotifier` orchestrator) |
 | Utils | `lib/utils/token_estimator.dart` (3.5 chars/token estimate for history compaction) |
 | UI | `lib/screens/workout/ai_chat_screen.dart`, `ai_settings_screen.dart`, `ai_chat_history_screen.dart` |
@@ -371,14 +371,14 @@ Conversations are persisted locally; tokens are stored in `flutter_secure_storag
 
 1. `send(text)` → loads the active provider + token from `AiSettingsNotifier`, ensures a thread (creates a new `ai_chat_threads` row on first message), appends a user `AiChatMessage`, sets `phase = sending`.
 2. `_runTurn` builds the wire payload from the system policy, cached context,
-   compacted history and a query-selected subset of the 35 read tools. Guarded
+   compacted history and a query-selected subset of the 39 read tools. Guarded
    proposal and capability-discovery tools are added only when applicable.
 3. `AiService.sendChat` POSTs to `{baseUrl}/chat/completions` and parses the response (text + tool_calls + usage).
 4. If the response has `tool_calls`: switch to `phase = executingReads`, run each via `AiToolRegistry.executeRead(...)`, append `role='tool'` messages with the JSON result, and re-send to the model. Up to 3 read rounds; after that a final no-tools call is made to force a closing answer.
 5. If no tool calls: store the assistant message, set `phase = idle`, persist the thread + messages to SQLite.
 6. **Interrupted-turn recovery**: when opening a thread, if an assistant message has `tool_calls` without matching `tool` responses, a synthetic `{ok:false, code:'interrupted'}` response is appended so the next turn can continue.
 
-### Tool system (35 read tools + guarded proposals)
+### Tool system (39 read tools + guarded proposals)
 
 The registry covers workout history/details, exercises and PRs, routines, body
 measurements, cardio/running plans, goals, sleep, nutrition and cross-domain
