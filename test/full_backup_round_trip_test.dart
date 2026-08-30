@@ -1,7 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/repositories/export_import_repository.dart';
+import 'package:workout_notes/services/run_route_codec.dart';
 
 void main() {
   late Database database;
@@ -15,7 +18,7 @@ void main() {
     database = await databaseFactory.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
-        version: 50,
+        version: 51,
         onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: DatabaseSchema.onCreate,
       ),
@@ -111,6 +114,35 @@ void main() {
         'search_name': 'cache remoto',
         'fetched_at': now,
       });
+      await database.insert('run_activities', {
+        'id': 'run-compact',
+        'activity_type': 'running',
+        'started_at': now,
+        'ended_at': now,
+        'duration_seconds': 1,
+        'moving_time_seconds': 1,
+        'distance_meters': 3.0,
+        'status': 'completed',
+        'created_at': now,
+        'updated_at': now,
+      });
+      await database.insert('run_route_data', {
+        'activity_id': 'run-compact',
+        'codec_version': 1,
+        'quality': 'detailed',
+        'point_count': 2,
+        'original_point_count': 2,
+        'payload': Uint8List.fromList([1, 2, 3, 4]),
+        'checksum': RunRouteCodec.checksum(Uint8List.fromList([1, 2, 3, 4])),
+        'compacted_at': now,
+      });
+      await database.insert('run_splits', {
+        'activity_id': 'run-compact',
+        'split_index': 1,
+        'distance_meters': 3.0,
+        'duration_seconds': 1,
+        'is_partial': 1,
+      });
 
       final repository = ExportImportRepository(
         databaseProvider: () async => database,
@@ -139,6 +171,10 @@ void main() {
           (row) => (row as Map)['id'] == 'unused-cache',
         ),
         isEmpty,
+      );
+      expect(
+        ((backup['run_route_data'] as List).single as Map)['payload_base64'],
+        'AQIDBA==',
       );
 
       await database.delete('meal_types');
@@ -174,6 +210,9 @@ void main() {
         ),
         isEmpty,
       );
+      final restoredRoute = (await database.query('run_route_data')).single;
+      expect(restoredRoute['payload'], Uint8List.fromList([1, 2, 3, 4]));
+      expect(await database.query('run_splits'), hasLength(1));
     },
   );
 }

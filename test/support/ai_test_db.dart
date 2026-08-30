@@ -114,17 +114,50 @@ Future<Database> installAiTestDb({bool includeRoutineDayNotes = true}) async {
             best_effort_3k_sec INTEGER, best_effort_5k_sec INTEGER,
             best_effort_10k_sec INTEGER, best_effort_half_sec INTEGER,
             best_effort_marathon_sec INTEGER, efforts_computed INTEGER NOT NULL DEFAULT 0,
-            plan_workout_id TEXT
+              plan_workout_id TEXT,
+              elevation_gain_meters REAL,
+              elevation_loss_meters REAL,
+              minimum_altitude_meters REAL,
+              maximum_altitude_meters REAL,
+              gps_accuracy_mean_meters REAL,
+              gps_accuracy_good_fraction REAL,
+              raw_point_count INTEGER,
+              stored_point_count INTEGER,
+              route_quality TEXT,
+              route_codec_version INTEGER
           )
         ''');
         await db.execute('''
-          CREATE TABLE run_track_points (
+            CREATE TABLE run_track_points (
             id TEXT PRIMARY KEY, activity_id TEXT NOT NULL, seq INTEGER NOT NULL,
             lat REAL NOT NULL, lng REAL NOT NULL, altitude REAL, accuracy REAL,
             speed REAL, recorded_at TEXT NOT NULL,
             FOREIGN KEY (activity_id) REFERENCES run_activities(id) ON DELETE CASCADE
-          )
-        ''');
+            )
+          ''');
+        await db.execute('''
+            CREATE TABLE run_route_data (
+              activity_id TEXT PRIMARY KEY,
+              codec_version INTEGER NOT NULL,
+              quality TEXT NOT NULL,
+              point_count INTEGER NOT NULL,
+              original_point_count INTEGER NOT NULL,
+              payload BLOB NOT NULL,
+              checksum INTEGER NOT NULL,
+              compacted_at TEXT NOT NULL
+            )
+          ''');
+        await db.execute('''
+            CREATE TABLE run_splits (
+              activity_id TEXT NOT NULL,
+              split_index INTEGER NOT NULL,
+              distance_meters REAL NOT NULL,
+              duration_seconds INTEGER NOT NULL,
+              pace_sec_per_km REAL,
+              is_partial INTEGER NOT NULL DEFAULT 0,
+              PRIMARY KEY (activity_id, split_index)
+            )
+          ''');
         await DatabaseRunPlanSchema.create(db);
       },
     ),

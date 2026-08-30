@@ -127,7 +127,7 @@ Future<Database> _openFreshDb(String dir, String name) {
   return databaseFactoryFfi.openDatabase(
     p.join(dir, name),
     options: OpenDatabaseOptions(
-      version: 39,
+      version: 51,
       onCreate: DatabaseSchema.onCreate,
     ),
   );

@@ -38,7 +38,7 @@ CI (`.github/workflows/release-android.yml`) runs `flutter analyze` + `flutter t
 Deliberately lightweight — no Riverpod/Bloc. Per-screen `setState` for local state; **`ChangeNotifier` singletons** for cross-cutting services. Singletons follow the pattern `ClassName.instance` (static final) or a static field on `WorkoutNotesApp` (e.g. `WorkoutNotesApp.themeNotifier`, `.aiSettings`). Screens consume them via `ListenableBuilder`/`addListener`. Don't introduce a state-management library unless this pattern clearly fails.
 
 ### Database & repositories
-`DatabaseHelper` (`lib/database/database_helper.dart`) is a **singleton** — always `DatabaseHelper.instance.database`, never `new DatabaseHelper()`. Current schema version is `_dbVersion = 50`. It holds `late final` lazy repository instances (`.settingsRepo`, `.workoutRepo`, `.sleepMonitorRepo`, `.traditionalAlarmRepo`, etc.).
+`DatabaseHelper` (`lib/database/database_helper.dart`) is a **singleton** — always `DatabaseHelper.instance.database`, never `new DatabaseHelper()`. Current schema version is `_dbVersion = 51`. It holds `late final` lazy repository instances (`.settingsRepo`, `.workoutRepo`, `.sleepMonitorRepo`, `.traditionalAlarmRepo`, etc.).
 
 Each domain has a repository in `lib/repositories/` extending `BaseRepository` (which exposes `db`). Repositories own all SQL — screens query repos, never raw SQL directly (except through repo methods). Tables use UUID v4 client-generated PKs and `ON DELETE CASCADE` FKs.
 

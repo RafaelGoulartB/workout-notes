@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_achievement.dart';
 import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
@@ -55,11 +56,17 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final activity =
         await _repo.ensureEffortMetrics(widget.activityId) ??
         await _repo.getActivity(widget.activityId);
-    final planSteps = await _planRepo.getActivitySteps(widget.activityId);
-    final points = activity == null
-        ? <RunTrackPoint>[]
-        : await _repo.getTrackPoints(widget.activityId);
-    final analytics = activity == null
+    final results = activity == null
+        ? <Object>[<RunActivityStep>[], <RunTrackPoint>[], <RunSplit>[]]
+        : await Future.wait<Object>([
+            _planRepo.getActivitySteps(widget.activityId),
+            _repo.getTrackPoints(widget.activityId),
+            _repo.getSplits(widget.activityId),
+          ]);
+    final planSteps = results[0] as List<RunActivityStep>;
+    final points = results[1] as List<RunTrackPoint>;
+    final storedSplits = results[2] as List<RunSplit>;
+    final derivedAnalytics = activity == null
         ? const RunPaceAnalytics(
             samples: [],
             splits: [],
@@ -69,6 +76,16 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
         : RunPaceAnalytics.fromTrackPoints(
             points,
             activityAvgPaceSecPerKm: activity.avgPaceSecPerKm,
+          );
+    final analytics = storedSplits.isEmpty
+        ? derivedAnalytics
+        : RunPaceAnalytics(
+            samples: derivedAnalytics.samples,
+            splits: storedSplits,
+            avgPaceSecPerKm: derivedAnalytics.avgPaceSecPerKm,
+            bestSplitPaceSecPerKm:
+                activity?.bestSplitPaceSecPerKm ??
+                derivedAnalytics.bestSplitPaceSecPerKm,
           );
     final all = await _repo.listActivities(limit: 500);
     final board = RunAchievementEngine.build(all);

@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../database_nutrition_schema.dart';
 import '../database_run_plan_schema.dart';
+import '../database_run_route_schema.dart';
 import '../database_seed.dart';
 
 /// Incremental database upgrades extracted from the legacy schema versions.
@@ -544,6 +545,27 @@ abstract final class DatabaseWellnessMigrations {
           )
         ''');
       } catch (_) {}
+    }
+    if (oldVersion < 51) {
+      try {
+        await DatabaseRunRouteSchema.create(db);
+      } catch (_) {}
+      for (final sql in const [
+        'ALTER TABLE run_activities ADD COLUMN elevation_gain_meters REAL',
+        'ALTER TABLE run_activities ADD COLUMN elevation_loss_meters REAL',
+        'ALTER TABLE run_activities ADD COLUMN minimum_altitude_meters REAL',
+        'ALTER TABLE run_activities ADD COLUMN maximum_altitude_meters REAL',
+        'ALTER TABLE run_activities ADD COLUMN gps_accuracy_mean_meters REAL',
+        'ALTER TABLE run_activities ADD COLUMN gps_accuracy_good_fraction REAL',
+        'ALTER TABLE run_activities ADD COLUMN raw_point_count INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN stored_point_count INTEGER',
+        'ALTER TABLE run_activities ADD COLUMN route_quality TEXT',
+        'ALTER TABLE run_activities ADD COLUMN route_codec_version INTEGER',
+      ]) {
+        try {
+          await db.execute(sql);
+        } catch (_) {}
+      }
     }
   }
 }

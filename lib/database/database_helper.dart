@@ -31,7 +31,7 @@ import '../utils/nutrition_conversion.dart';
 
 class DatabaseHelper {
   static const _dbName = 'workout_notes.db';
-  static const _dbVersion = 50;
+  static const _dbVersion = 51;
 
   static DatabaseHelper? _instance;
   static Database? _database;
@@ -96,6 +96,10 @@ class DatabaseHelper {
       version: _dbVersion,
       onConfigure: (db) async {
         await db.execute('PRAGMA foreign_keys = ON');
+        // Effective for newly-created databases. Existing databases keep
+        // their current mode until a user-approved full compaction, but can
+        // still reuse pages released by compact-route migration.
+        await db.execute('PRAGMA auto_vacuum = INCREMENTAL');
       },
       onCreate: DatabaseSchema.onCreate,
       onUpgrade: DatabaseSchema.onUpgrade,

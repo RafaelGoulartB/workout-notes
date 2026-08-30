@@ -1,5 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:sqflite/sqflite.dart';
 import 'base_repository.dart';
+import 'package:workout_notes/services/run_route_codec.dart';
 
 /// Repository for data export and import operations.
 ///
@@ -8,7 +12,7 @@ import 'base_repository.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
-  static const int currentBackupVersion = 15;
+  static const int currentBackupVersion = 16;
   static const int minimumSupportedBackupVersion = 2;
   static const String backupType = 'workout_notes_full_backup';
 
@@ -46,6 +50,8 @@ class ExportImportRepository extends BaseRepository {
     'periodization_checkins',
     'run_activities',
     'run_track_points',
+    'run_route_data',
+    'run_splits',
     'run_plans',
     'run_plan_workouts',
     'run_workout_steps',
@@ -109,6 +115,8 @@ class ExportImportRepository extends BaseRepository {
       // them — restoring the plans without them would break the FKs.
       'run_activities': await _queryIfExists(db, 'run_activities'),
       'run_track_points': await _queryIfExists(db, 'run_track_points'),
+      'run_route_data': await _exportRunRoutes(db),
+      'run_splits': await _queryIfExists(db, 'run_splits'),
       'run_plans': await _queryIfExists(db, 'run_plans'),
       'run_plan_workouts': await _queryIfExists(db, 'run_plan_workouts'),
       'run_workout_steps': await _queryIfExists(db, 'run_workout_steps'),
@@ -176,6 +184,8 @@ class ExportImportRepository extends BaseRepository {
         'run_workout_steps',
         'run_plan_workouts',
         'run_plans',
+        'run_splits',
+        'run_route_data',
         'run_track_points',
         'run_activities',
       ]) {
@@ -259,6 +269,18 @@ class ExportImportRepository extends BaseRepository {
         // Parents before children, mirroring the clear order above.
         'run_activities',
         'run_track_points',
+      ]) {
+        if (await _tableExists(txn, table)) {
+          totalRows += await _insertAll(txn, table, data[table]);
+        }
+      }
+      if (await _tableExists(txn, 'run_route_data')) {
+        totalRows += await _insertRunRoutes(txn, data['run_route_data']);
+      }
+      if (await _tableExists(txn, 'run_splits')) {
+        totalRows += await _insertAll(txn, 'run_splits', data['run_splits']);
+      }
+      for (final table in [
         'run_plans',
         'run_plan_workouts',
         'run_workout_steps',
@@ -342,7 +364,12 @@ class ExportImportRepository extends BaseRepository {
       if (counts is! Map) {
         throw const FormatException('Backup record counts are missing.');
       }
-      for (final key in currentCollectionKeys) {
+      final requiredKeys = version >= 16
+          ? currentCollectionKeys
+          : currentCollectionKeys
+                .where((key) => key != 'run_route_data' && key != 'run_splits')
+                .toList(growable: false);
+      for (final key in requiredKeys) {
         final rows = data[key];
         if (rows is! List) {
           throw FormatException('Backup collection "$key" is missing.');
@@ -353,7 +380,12 @@ class ExportImportRepository extends BaseRepository {
       }
     }
 
-    for (final key in currentCollectionKeys) {
+    final validatedKeys = version >= 16
+        ? currentCollectionKeys
+        : currentCollectionKeys.where(
+            (key) => key != 'run_route_data' && key != 'run_splits',
+          );
+    for (final key in validatedKeys) {
       final rows = data[key];
       if (rows == null) continue;
       if (rows is! List || rows.any((row) => row is! Map)) {
@@ -465,6 +497,24 @@ class ExportImportRepository extends BaseRepository {
     };
   }
 
+  static Future<List<Map<String, Object?>>> _exportRunRoutes(
+    Database database,
+  ) async {
+    final rows = await _queryIfExists(database, 'run_route_data');
+    return rows
+        .map((row) {
+          final copy = Map<String, Object?>.from(row);
+          final payload = copy.remove('payload');
+          if (payload is List<int>) {
+            copy['payload_base64'] = base64Encode(payload);
+          } else {
+            throw const FormatException('Invalid compact run route payload.');
+          }
+          return copy;
+        })
+        .toList(growable: false);
+  }
+
   static Future<bool> _tableExists(
     DatabaseExecutor database,
     String table,
@@ -484,6 +534,40 @@ class ExportImportRepository extends BaseRepository {
       await txn.insert(
         table,
         row as Map<String, dynamic>,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      count++;
+    }
+    return count;
+  }
+
+  Future<int> _insertRunRoutes(Transaction txn, dynamic rows) async {
+    if (rows == null || rows is! List || rows.isEmpty) return 0;
+    var count = 0;
+    for (final raw in rows) {
+      final row = Map<String, dynamic>.from(raw as Map);
+      final encoded = row.remove('payload_base64');
+      if (encoded is! String) {
+        throw const FormatException('Invalid compact run route backup.');
+      }
+      try {
+        row['payload'] = base64Decode(encoded);
+      } on FormatException {
+        throw const FormatException('Invalid compact run route backup.');
+      }
+      final expectedChecksum = row['checksum'];
+      final payload = row['payload'];
+      if (expectedChecksum is! int ||
+          payload is! List<int> ||
+          RunRouteCodec.checksum(
+                payload is Uint8List ? payload : Uint8List.fromList(payload),
+              ) !=
+              expectedChecksum) {
+        throw const FormatException('Invalid compact run route checksum.');
+      }
+      await txn.insert(
+        'run_route_data',
+        row,
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
       count++;
@@ -605,6 +689,8 @@ class ExportImportRepository extends BaseRepository {
         'run_workout_steps',
         'run_plan_workouts',
         'run_plans',
+        'run_splits',
+        'run_route_data',
         'run_track_points',
         'run_activities',
       ]) {
