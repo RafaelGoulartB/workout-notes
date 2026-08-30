@@ -341,8 +341,8 @@
   "settingsExportSaveError": "Could not save backup: {error}",
 
   "settingsImportBackup": "Import Backup",
-  "settingsImportBackupSubtitle": "Restore all data from a JSON backup",
-  "settingsImportWarning": "This will replace ALL your current data (workouts, exercises, routines, measurements, settings) with the backup data.\n\nThis action cannot be undone.",
+  "settingsImportBackupSubtitle": "Migrate app data from a JSON backup",
+  "settingsImportWarning": "This will replace ALL current essential app data with the backup: workouts, runs, consolidated sleep, nutrition, measurements, goals, routines, plans, and settings.\n\nAI conversations and proposals and detailed sleep stages are not part of the backup and will be removed from this device. AI access tokens are also excluded and must be configured on the other device. This action cannot be undone.",
   "settingsImport": "Import",
   "settingsImportSuccess": "✅ {count} records imported! Restart the app to apply changes.",
   "settingsImportError": "Import error: {error}",
@@ -1762,7 +1762,7 @@
     "placeholders": { "error": { "type": "String" } }
   },
 
-  "settingsExportIncludesNutrition": "Workouts, sleep, nutrition, measurements, routines, plans and settings",
+  "settingsExportIncludesNutrition": "Essential data; AI chats, detailed stages, tokens, and caches stay out",
 
   "tabPlan": "Progress",
   "trackingTitle": "Progress",

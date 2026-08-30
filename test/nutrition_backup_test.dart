@@ -3,10 +3,12 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/repositories/export_import_repository.dart';
 import 'package:workout_notes/services/export_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late Database database;
 
   setUpAll(() {
@@ -15,6 +17,7 @@ void main() {
   });
 
   setUp(() async {
+    SharedPreferences.setMockInitialValues({});
     database = await databaseFactory.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
@@ -187,7 +190,7 @@ void main() {
   });
 
   test(
-    'round-trip preserves workout goals and all persisted sleep data',
+    'round-trip preserves workout goals and consolidated sleep data',
     () async {
       const tableIds = <String, String>{
         'user_goals': 'goal-1',

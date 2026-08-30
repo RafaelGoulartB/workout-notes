@@ -81,7 +81,11 @@ The coach receives workout context only when used. API credentials are stored wi
 ### Data and customization
 
 - Store workout data locally in SQLite; no account is required.
-- Export and restore a complete JSON backup.
+- Export and restore a compact JSON backup for device migration, including
+  essential history, preferences, and progress photos. AI conversations and
+  proposals, detailed sleep stages, API tokens, runtime permissions, active
+  background state, raw diagnostics, and rebuildable caches are intentionally
+  excluded.
 - Export workout data as CSV and share completed sessions.
 - Switch between metric and imperial units.
 - Choose English or Brazilian Portuguese.

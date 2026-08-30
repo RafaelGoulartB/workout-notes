@@ -8,8 +8,51 @@ import 'base_repository.dart';
 /// inserts the backup rows inside a single transaction so the database
 /// ends up in an exact copy of the exported state.
 class ExportImportRepository extends BaseRepository {
-  static const int currentBackupVersion = 14;
+  static const int currentBackupVersion = 15;
   static const int minimumSupportedBackupVersion = 2;
+  static const String backupType = 'workout_notes_full_backup';
+
+  /// Collections that must be present in backups produced by this version.
+  /// Keeping the manifest explicit prevents a newly-created but truncated JSON
+  /// object from being interpreted as an intentionally empty database.
+  static const List<String> currentCollectionKeys = [
+    'categories',
+    'exercises',
+    'workouts',
+    'exercise_entries',
+    'sets',
+    'routines',
+    'routine_days',
+    'routine_exercises',
+    'predefined_sets',
+    'body_measurements',
+    'user_goals',
+    'sleep_entries',
+    'sleep_monitor_sessions',
+    'foods',
+    'food_variants',
+    'food_servings',
+    'meal_types',
+    'meal_logs',
+    'meal_log_items',
+    'nutrition_goals',
+    'saved_meals',
+    'saved_meal_items',
+    'traditional_alarms',
+    'periodization_plans',
+    'periodization_phases',
+    'phase_targets',
+    'phase_routine_links',
+    'periodization_checkins',
+    'run_activities',
+    'run_track_points',
+    'run_plans',
+    'run_plan_workouts',
+    'run_workout_steps',
+    'scheduled_runs',
+    'run_activity_steps',
+    'settings',
+  ];
 
   final Future<Database> Function()? _databaseProvider;
 
@@ -25,7 +68,9 @@ class ExportImportRepository extends BaseRepository {
   /// Exports all user-modifiable data as a JSON-serialisable map.
   Future<Map<String, dynamic>> exportAllData() async {
     final db = await this.db;
-    return {
+    final nutrition = await _exportNutrition(db);
+    final data = <String, dynamic>{
+      'backup_type': backupType,
       'version': currentBackupVersion,
       'exported_at': DateTime.now().toIso8601String(),
       'categories': await db.query('exercise_categories'),
@@ -40,10 +85,11 @@ class ExportImportRepository extends BaseRepository {
       'body_measurements': await db.query('body_measurements'),
       'user_goals': await _queryIfExists(db, 'user_goals'),
       'sleep_entries': await db.query('sleep_entries'),
-      'sleep_monitor_sessions': await db.query('sleep_monitor_sessions'),
-      'foods': await _queryIfExists(db, 'foods'),
-      'food_variants': await _queryIfExists(db, 'food_variants'),
-      'food_servings': await _queryIfExists(db, 'food_servings'),
+      'sleep_monitor_sessions': await _exportSleepSessions(db),
+      'foods': nutrition['foods'],
+      'food_variants': nutrition['food_variants'],
+      'food_servings': nutrition['food_servings'],
+      'meal_types': await _queryIfExists(db, 'meal_types'),
       'meal_logs': await _queryIfExists(db, 'meal_logs'),
       'meal_log_items': await _queryIfExists(db, 'meal_log_items'),
       'nutrition_goals': await _queryIfExists(db, 'nutrition_goals'),
@@ -69,7 +115,30 @@ class ExportImportRepository extends BaseRepository {
       'scheduled_runs': await _queryIfExists(db, 'scheduled_runs'),
       'run_activity_steps': await _queryIfExists(db, 'run_activity_steps'),
       'settings': await db.query('app_settings'),
+      // Platform preferences and portable file bytes are filled by
+      // ExportService. Empty defaults keep this envelope valid for repository
+      // callers and database-only tests.
+      'preferences': const <String, Object>{},
+      'preference_count': 0,
+      'media_files': const <Map<String, Object?>>[],
+      'media_count': 0,
+      'excluded_data': const [
+        'api_tokens',
+        'runtime_permissions',
+        'active_background_sessions',
+        'sleep_monitor_segments',
+        'sleep_stage_epochs',
+        'ai_chat_threads',
+        'ai_chat_messages',
+        'ai_chat_thread_summaries',
+        'ai_routine_proposals',
+        'unused_remote_food_cache',
+      ],
     };
+    data['record_counts'] = {
+      for (final key in currentCollectionKeys) key: (data[key] as List).length,
+    };
+    return data;
   }
 
   // ------------------------------------------------------------------
@@ -84,12 +153,17 @@ class ExportImportRepository extends BaseRepository {
   ///
   /// Returns the total number of rows inserted.
   Future<int> restoreFromBackup(Map<String, dynamic> data) async {
+    validateBackup(data);
     final db = await this.db;
     int totalRows = 0;
 
     await db.transaction((txn) async {
       // 1. Clear all tables (order matters because of FKs)
       for (final table in [
+        'ai_routine_proposals',
+        'ai_chat_thread_summaries',
+        'ai_chat_messages',
+        'ai_chat_threads',
         'periodization_checkins',
         'phase_routine_links',
         'phase_targets',
@@ -131,6 +205,7 @@ class ExportImportRepository extends BaseRepository {
       for (final table in [
         'meal_log_items',
         'meal_logs',
+        'meal_types',
         'food_servings',
         'food_variants',
         'foods',
@@ -215,6 +290,7 @@ class ExportImportRepository extends BaseRepository {
         'foods',
         'food_variants',
         'food_servings',
+        'meal_types',
         'meal_logs',
         'meal_log_items',
         'nutrition_goals',
@@ -247,6 +323,45 @@ class ExportImportRepository extends BaseRepository {
     return totalRows;
   }
 
+  /// Validates the envelope and all row collections before any data is
+  /// deleted. Version 15 introduced a strict manifest; older backups retain
+  /// their historical optional-table compatibility.
+  static void validateBackup(Map<String, dynamic> data) {
+    final version = data['version'];
+    if (version is! int ||
+        version < minimumSupportedBackupVersion ||
+        version > currentBackupVersion) {
+      throw FormatException('Unsupported backup version: $version.');
+    }
+
+    if (version >= 15) {
+      if (data['backup_type'] != backupType) {
+        throw const FormatException('This is not a Workout Notes backup.');
+      }
+      final counts = data['record_counts'];
+      if (counts is! Map) {
+        throw const FormatException('Backup record counts are missing.');
+      }
+      for (final key in currentCollectionKeys) {
+        final rows = data[key];
+        if (rows is! List) {
+          throw FormatException('Backup collection "$key" is missing.');
+        }
+        if (counts[key] is! int || counts[key] != rows.length) {
+          throw FormatException('Backup collection "$key" is incomplete.');
+        }
+      }
+    }
+
+    for (final key in currentCollectionKeys) {
+      final rows = data[key];
+      if (rows == null) continue;
+      if (rows is! List || rows.any((row) => row is! Map)) {
+        throw FormatException('Invalid rows in backup collection "$key".');
+      }
+    }
+  }
+
   static Future<List<Map<String, Object?>>> _queryIfExists(
     Database database,
     String table,
@@ -254,6 +369,100 @@ class ExportImportRepository extends BaseRepository {
     return await _tableExists(database, table)
         ? database.query(table)
         : const [];
+  }
+
+  /// Preserves the monitored-night record and alarm metadata without carrying
+  /// the low-priority sleep-stage analysis. The database defaults the restored
+  /// session to `legacy_unavailable`, matching the intentionally absent epochs.
+  static Future<List<Map<String, Object?>>> _exportSleepSessions(
+    Database database,
+  ) async {
+    final rows = await database.query('sleep_monitor_sessions');
+    const stageAnalysisColumns = {
+      'analysis_status',
+      'sleep_onset_at',
+      'final_wake_at',
+      'sleep_latency_minutes',
+      'awake_minutes',
+      'sleeping_minutes',
+      'deep_sleep_minutes',
+      'unknown_minutes',
+      'awakening_count',
+      'sleep_efficiency',
+      'stage_confidence',
+      'stage_algorithm_version',
+    };
+    return rows
+        .map((raw) {
+          final row = Map<String, Object?>.from(raw);
+          for (final column in stageAnalysisColumns) {
+            row.remove(column);
+          }
+          return row;
+        })
+        .toList(growable: false);
+  }
+
+  /// Keeps manual/favorite/used foods while omitting disposable remote search
+  /// cache rows. Referenced variants and servings are retained with parents so
+  /// meal history and saved meals remain fully usable after restoration.
+  static Future<Map<String, List<Map<String, Object?>>>> _exportNutrition(
+    Database database,
+  ) async {
+    final foods = await _queryIfExists(database, 'foods');
+    final variants = await _queryIfExists(database, 'food_variants');
+    final servings = await _queryIfExists(database, 'food_servings');
+    if (foods.isEmpty) {
+      return {
+        'foods': const [],
+        'food_variants': const [],
+        'food_servings': const [],
+      };
+    }
+
+    final referencedFoodIds = <String>{};
+    final referencedVariantIds = <String>{};
+    for (final table in ['meal_log_items', 'saved_meal_items']) {
+      for (final row in await _queryIfExists(database, table)) {
+        final foodId = row['food_id'];
+        final variantId = row['food_variant_id'];
+        if (foodId is String) referencedFoodIds.add(foodId);
+        if (variantId is String) referencedVariantIds.add(variantId);
+      }
+    }
+    for (final variant in variants) {
+      if (referencedVariantIds.contains(variant['id'])) {
+        final foodId = variant['food_id'];
+        if (foodId is String) referencedFoodIds.add(foodId);
+      }
+    }
+
+    final keptFoods = foods
+        .where((food) {
+          return food['source'] == 'manual' ||
+              food['is_favorite'] == 1 ||
+              referencedFoodIds.contains(food['id']);
+        })
+        .toList(growable: false);
+    final keptFoodIds = keptFoods
+        .map((food) => food['id'])
+        .whereType<String>()
+        .toSet();
+    final keptVariants = variants
+        .where((variant) => keptFoodIds.contains(variant['food_id']))
+        .toList(growable: false);
+    final keptVariantIds = keptVariants
+        .map((variant) => variant['id'])
+        .whereType<String>()
+        .toSet();
+    final keptServings = servings
+        .where((serving) => keptVariantIds.contains(serving['food_variant_id']))
+        .toList(growable: false);
+    return {
+      'foods': keptFoods,
+      'food_variants': keptVariants,
+      'food_servings': keptServings,
+    };
   }
 
   static Future<bool> _tableExists(
@@ -432,6 +641,9 @@ class ExportImportRepository extends BaseRepository {
     await db.transaction((txn) async {
       await txn.delete('meal_log_items');
       await txn.delete('meal_logs');
+      if (await _tableExists(txn, 'meal_types')) {
+        await txn.delete('meal_types');
+      }
       await txn.delete('food_servings');
       await txn.delete('food_variants');
       await txn.delete('foods');

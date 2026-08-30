@@ -341,8 +341,8 @@
   "settingsExportSaveError": "N\u00E3o foi poss\u00EDvel salvar o backup: {error}",
 
   "settingsImportBackup": "Importar Backup",
-  "settingsImportBackupSubtitle": "Restaurar todos os dados de um backup JSON",
-  "settingsImportWarning": "Isso vai substituir TODOS os seus dados atuais (treinos, exercícios, rotinas, medidas, configurações) pelos dados do backup.\n\nEsta ação não pode ser desfeita.",
+  "settingsImportBackupSubtitle": "Migrar os dados do app a partir de um backup JSON",
+  "settingsImportWarning": "Isso vai substituir TODOS os dados principais atuais do app pelos dados do backup: treinos, corridas, sono consolidado, alimentação, medidas, metas, rotinas, planos e configurações.\n\nConversas e propostas da IA e estágios detalhados do sono não fazem parte do backup e serão removidos deste dispositivo. Tokens de acesso da IA também não são incluídos e precisam ser configurados no outro aparelho. Esta ação não pode ser desfeita.",
   "settingsImport": "Importar",
   "settingsImportSuccess": "✅ {count} registros importados! Reinicie o app para aplicar as alterações.",
   "settingsImportError": "Erro na importação: {error}",
@@ -1742,7 +1742,7 @@
   "exportNutritionSuccess": "CSV de alimentação gerado",
   "exportNutritionError": "Não foi possível gerar o CSV de alimentação: {error}",
 
-  "settingsExportIncludesNutrition": "Treinos, sono, alimentação, medidas, rotinas, planos e configurações",
+  "settingsExportIncludesNutrition": "Dados essenciais; conversas da IA, estágios detalhados, tokens e caches ficam de fora",
 
   "tabPlan": "Progresso",
   "trackingTitle": "Progresso",
