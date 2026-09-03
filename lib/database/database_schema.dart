@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 import 'database_nutrition_schema.dart';
 import 'database_periodization_schema.dart';
 import 'database_run_plan_schema.dart';
+import 'database_run_route_schema.dart';
 import 'database_seed.dart';
 import 'migrations/database_migrations_catalog_v11.dart';
 import 'migrations/database_migrations_catalog_v12.dart';
@@ -334,6 +335,17 @@ abstract final class DatabaseSchema {
       )
     ''');
 
+    // Rolling summary of the part of a thread no longer sent on the wire (v50).
+    await db.execute('''
+      CREATE TABLE ai_chat_thread_summaries (
+        thread_id TEXT PRIMARY KEY,
+        summary TEXT NOT NULL,
+        through_message_id TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (thread_id) REFERENCES ai_chat_threads(id) ON DELETE CASCADE
+      )
+    ''');
+
     // AI routine proposals (v17). These are drafts only until user approval.
     await db.execute('''
       CREATE TABLE ai_routine_proposals (
@@ -384,7 +396,17 @@ abstract final class DatabaseSchema {
         best_effort_half_sec INTEGER,
         best_effort_marathon_sec INTEGER,
         efforts_computed INTEGER NOT NULL DEFAULT 0,
-        plan_workout_id TEXT
+        plan_workout_id TEXT,
+        elevation_gain_meters REAL,
+        elevation_loss_meters REAL,
+        minimum_altitude_meters REAL,
+        maximum_altitude_meters REAL,
+        gps_accuracy_mean_meters REAL,
+        gps_accuracy_good_fraction REAL,
+        raw_point_count INTEGER,
+        stored_point_count INTEGER,
+        route_quality TEXT,
+        route_codec_version INTEGER
       )
     ''');
     await db.execute('''
@@ -401,6 +423,7 @@ abstract final class DatabaseSchema {
         FOREIGN KEY (activity_id) REFERENCES run_activities(id) ON DELETE CASCADE
       )
     ''');
+    await DatabaseRunRouteSchema.create(db);
 
     // Nutrition module (v22). Foods, variants, servings, meal logs and
     // goals share a single helper so `_onCreate` and `_onUpgrade` use

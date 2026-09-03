@@ -105,7 +105,6 @@ class AiRunToolService {
       ),
       database.query(
         'run_activities',
-        columns: ['plan_workout_id'],
         where: 'id = ?',
         whereArgs: [activityId],
         limit: 1,
@@ -115,14 +114,15 @@ class AiRunToolService {
     final trackPoints = results[1] as List;
     final scheduledRows = results[2] as List<Map<String, Object?>>;
     final activityRows = results[3] as List<Map<String, Object?>>;
+    final activityRow = activityRows.isEmpty
+        ? const <String, Object?>{}
+        : activityRows.first;
     final scheduled = scheduledRows.isEmpty
         ? null
         : ScheduledRun.fromMap(Map<String, dynamic>.from(scheduledRows.first));
     final planWorkoutId =
         scheduled?.runPlanWorkoutId ??
-        (activityRows.isEmpty
-            ? null
-            : activityRows.first['plan_workout_id'] as String?);
+        activityRow['plan_workout_id'] as String?;
     final planWorkout = planWorkoutId == null
         ? null
         : await plans.getWorkout(planWorkoutId);
@@ -143,14 +143,26 @@ class AiRunToolService {
       'found': true,
       'activity': _activityJson(activity),
       'routeSummary': {
-        'trackPointCount': trackPoints.length,
-        'minimumAltitudeMeters': altitudes.isEmpty
-            ? null
-            : altitudes.reduce((a, b) => a < b ? a : b),
-        'maximumAltitudeMeters': altitudes.isEmpty
-            ? null
-            : altitudes.reduce((a, b) => a > b ? a : b),
-        'elevationGainMeters': elevationGain,
+        'trackPointCount':
+            (activityRow['raw_point_count'] as num?)?.toInt() ??
+            trackPoints.length,
+        'storedPointCount':
+            (activityRow['stored_point_count'] as num?)?.toInt() ??
+            trackPoints.length,
+        'routeQuality': activityRow['route_quality'],
+        'minimumAltitudeMeters':
+            (activityRow['minimum_altitude_meters'] as num?)?.toDouble() ??
+            (altitudes.isEmpty
+                ? null
+                : altitudes.reduce((a, b) => a < b ? a : b)),
+        'maximumAltitudeMeters':
+            (activityRow['maximum_altitude_meters'] as num?)?.toDouble() ??
+            (altitudes.isEmpty
+                ? null
+                : altitudes.reduce((a, b) => a > b ? a : b)),
+        'elevationGainMeters':
+            (activityRow['elevation_gain_meters'] as num?)?.toDouble() ??
+            elevationGain,
       },
       'plan': plan == null
           ? null

@@ -92,6 +92,7 @@ class RunTrackingService extends ChangeNotifier {
       _notificationsGranted = true;
       _initialized = true;
       notifyListeners();
+      await _maintainRouteStorage();
       return;
     }
     if (!_initialized) {
@@ -113,6 +114,17 @@ class RunTrackingService extends ChangeNotifier {
     await _recoverActiveNativeSession();
     _sessionContext = _state.sessionContext;
     await recoverPendingSessions();
+    await _maintainRouteStorage();
+  }
+
+  Future<void> _maintainRouteStorage() async {
+    try {
+      await _repository.migrateLegacyRoutes(limit: 5);
+      await _repository.optimizeOldRoutes(limit: 5);
+      await _repository.reclaimIncrementalVacuumPages();
+    } catch (_) {
+      // Storage maintenance is opportunistic and must never block tracking.
+    }
   }
 
   Future<void> _recoverActiveNativeSession() async {

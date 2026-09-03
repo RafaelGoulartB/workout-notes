@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/repositories/export_import_repository.dart';
 import 'package:workout_notes/services/export_service.dart';
 
@@ -17,7 +18,12 @@ void main() {
     databaseFactory = databaseFactoryFfi;
   });
 
-    setUp(() async {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({
+      'accent_color': 123,
+      'app_locale': 'pt',
+      'run_permission_onboarding_seen': true,
+    });
     backupsDirectory = await Directory.systemTemp.createTemp(
       'workout_notes_export_test_',
     );
@@ -102,11 +108,91 @@ void main() {
         {'key': 'current', 'value': 'unchanged'},
       ]);
       expect(data['sleep_monitor_sessions'], isEmpty);
-      // Transient calculation material is never exported.
+      // Raw diagnostics and rebuildable caches are never exported.
       expect(data, isNot(contains('sleep_monitor_segments')));
       expect(data, isNot(contains('sleep_stage_epochs')));
+      expect(data, isNot(contains('ai_chat_threads')));
+      expect(data, isNot(contains('ai_chat_messages')));
+      expect(data, isNot(contains('ai_routine_proposals')));
+      expect(data, isNot(contains('ai_chat_thread_summaries')));
+      expect(data['preferences'], {'accent_color': 123, 'app_locale': 'pt'});
+      expect(
+        data['preferences'],
+        isNot(contains('run_permission_onboarding_seen')),
+      );
     },
   );
+
+  test('exports AI provider choices without the fetched model cache', () async {
+    SharedPreferences.setMockInitialValues({
+      'ai_providers_v1': jsonEncode([
+        {
+          'id': 'provider-1',
+          'name': 'Local',
+          'baseUrl': 'http://localhost:1234/v1',
+          'availableModels': ['cached-model'],
+          'selectedModel': 'selected-model',
+          'reasoningEffortByModel': {'selected-model': 'high'},
+          'createdAt': '2026-08-29T08:00:00.000Z',
+        },
+      ]),
+    });
+    final exportService = ExportService(
+      exportRepo: ExportImportRepository(
+        databaseProvider: () async => database,
+      ),
+    );
+
+    final data =
+        jsonDecode(utf8.decode(await exportService.exportBackupBytes()))
+            as Map<String, dynamic>;
+    final providerJson =
+        (data['preferences'] as Map<String, dynamic>)['ai_providers_v1']
+            as String;
+    final provider = (jsonDecode(providerJson) as List).single as Map;
+
+    expect(provider['selectedModel'], 'selected-model');
+    expect(provider['reasoningEffortByModel'], {'selected-model': 'high'});
+    expect(provider['availableModels'], isEmpty);
+  });
+
+  test('restores portable preferences and removes stale choices', () async {
+    final backup = _validBackup();
+    backup['preferences'] = <String, Object>{
+      'accent_color': 456,
+      'app_locale': 'en',
+      'section_plan_enabled': false,
+    };
+    backup['preference_count'] = 3;
+
+    await service.restoreFromBytes(_bytes(backup));
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getInt('accent_color'), 456);
+    expect(preferences.getString('app_locale'), 'en');
+    expect(preferences.getBool('section_plan_enabled'), isFalse);
+    expect(preferences.containsKey('theme_mode'), isFalse);
+  });
+
+  test('rolls preferences back when the database restore fails', () async {
+    final backup = _validBackup();
+    backup['categories'] = [
+      {'id': 'bad-category', 'unknown_column': 'invalid'},
+    ];
+    (backup['record_counts'] as Map<String, dynamic>)['categories'] = 1;
+    backup['preferences'] = <String, Object>{'accent_color': 999};
+    backup['preference_count'] = 1;
+
+    await expectLater(
+      () => service.restoreFromBytes(_bytes(backup)),
+      throwsA(anything),
+    );
+
+    expect(await database.query('app_settings'), [
+      {'key': 'current', 'value': 'unchanged'},
+    ]);
+    expect((await SharedPreferences.getInstance()).getInt('accent_color'), 123);
+  });
 
   test('passes bytes to the save picker and handles cancellation', () async {
     Uint8List? receivedBytes;
@@ -197,6 +283,17 @@ void main() {
   );
 
   test(
+    'rejects an incomplete current backup without changing current data',
+    () async {
+      final backup = _validBackup()..remove('workouts');
+
+      await expectInvalidAndUnchanged(
+        () => service.restoreFromBytes(_bytes(backup)),
+      );
+    },
+  );
+
+  test(
     'rejects an incompatible backup version without changing current data',
     () async {
       final backup = _validBackup()..['version'] = 999;
@@ -236,6 +333,9 @@ void main() {
     backup['sleep_monitor_sessions'] = [
       {'id': 'night-1', 'alarm_at': '2026-08-01T10:00:00.000Z'},
     ];
+    (backup['record_counts']
+            as Map<String, dynamic>)['sleep_monitor_sessions'] =
+        1;
 
     await service.restoreFromBytes(_bytes(backup));
 
@@ -261,28 +361,23 @@ void main() {
 Uint8List _bytes(Object data) =>
     Uint8List.fromList(utf8.encode(jsonEncode(data)));
 
-Map<String, dynamic> _validBackup() => {
-  'version': ExportImportRepository.currentBackupVersion,
-  'categories': <Map<String, dynamic>>[],
-  'exercises': <Map<String, dynamic>>[],
-  'workouts': <Map<String, dynamic>>[],
-  'exercise_entries': <Map<String, dynamic>>[],
-  'sets': <Map<String, dynamic>>[],
-  'routines': <Map<String, dynamic>>[],
-  'routine_days': <Map<String, dynamic>>[],
-  'routine_exercises': <Map<String, dynamic>>[],
-  'predefined_sets': <Map<String, dynamic>>[],
-  'body_measurements': <Map<String, dynamic>>[],
-  'sleep_entries': <Map<String, dynamic>>[],
-  'sleep_monitor_sessions': <Map<String, dynamic>>[],
-  'sleep_monitor_segments': <Map<String, dynamic>>[],
-  'foods': <Map<String, dynamic>>[],
-  'food_variants': <Map<String, dynamic>>[],
-  'food_servings': <Map<String, dynamic>>[],
-  'meal_logs': <Map<String, dynamic>>[],
-  'meal_log_items': <Map<String, dynamic>>[],
-  'nutrition_goals': <Map<String, dynamic>>[],
-  'settings': [
+Map<String, dynamic> _validBackup() {
+  final backup = <String, dynamic>{
+    'backup_type': ExportImportRepository.backupType,
+    'version': ExportImportRepository.currentBackupVersion,
+    for (final key in ExportImportRepository.currentCollectionKeys)
+      key: <Map<String, dynamic>>[],
+    'preferences': <String, Object>{},
+    'preference_count': 0,
+    'media_files': <Map<String, dynamic>>[],
+    'media_count': 0,
+  };
+  backup['settings'] = [
     {'key': 'restored', 'value': 'yes'},
-  ],
-};
+  ];
+  backup['record_counts'] = {
+    for (final key in ExportImportRepository.currentCollectionKeys)
+      key: (backup[key] as List).length,
+  };
+  return backup;
+}

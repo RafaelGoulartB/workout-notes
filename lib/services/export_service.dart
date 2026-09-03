@@ -6,11 +6,13 @@ import 'package:csv/csv.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_localizations.dart';
 import '../l10n/l10n_exercises.dart';
 import '../repositories/workout_repository.dart';
 import '../repositories/export_import_repository.dart';
 import '../repositories/nutrition_repository.dart';
+import 'backup_media_service.dart';
 
 typedef SaveFileCallback =
     Future<String?> Function({
@@ -49,18 +51,38 @@ class ExportService {
   final ExportImportRepository _exportRepo;
   final SaveFileCallback _saveFile;
   final ShareFileCallback _shareFile;
+  final BackupMediaService _backupMedia;
+  final Future<SharedPreferences> Function() _preferencesProvider;
   final Future<Directory> Function()? backupsDirectoryProvider;
 
   ExportService({
     ExportImportRepository? exportRepo,
     SaveFileCallback? saveFile,
     ShareFileCallback? shareFile,
+    BackupMediaService? backupMedia,
+    Future<SharedPreferences> Function()? preferencesProvider,
     this.backupsDirectoryProvider,
   }) : _exportRepo = exportRepo ?? ExportImportRepository(),
        _saveFile = saveFile ?? _saveFileWithPicker,
-       _shareFile = shareFile ?? _shareFileWithSheet;
+       _shareFile = shareFile ?? _shareFileWithSheet,
+       _backupMedia = backupMedia ?? BackupMediaService(),
+       _preferencesProvider =
+           preferencesProvider ?? SharedPreferences.getInstance;
 
   static const _backupFolderName = 'WorkoutNotes';
+  static const _portablePreferenceKeys = <String>[
+    'accent_color',
+    'theme_mode',
+    'app_locale',
+    'section_plan_enabled',
+    'ai_providers_v1',
+    'ai_active_provider_id_v1',
+    'ai_system_prompt_v1',
+    'ai_context_mode_v1',
+    'ai_response_style_v1',
+    'ai_show_message_timestamps_v1',
+    'ai_auto_expand_tool_details_v1',
+  ];
 
   // ===================================================================
   // Backups directory
@@ -138,6 +160,10 @@ class ExportService {
   /// Generates the current backup format as UTF-8 JSON bytes.
   Future<Uint8List> exportBackupBytes() async {
     final data = await _exportRepo.exportAllData();
+    final preferences = await _exportPortablePreferences();
+    data['preferences'] = preferences;
+    data['preference_count'] = preferences.length;
+    await _backupMedia.addPortableMedia(data);
     final json = const JsonEncoder.withIndent('  ').convert(data);
     return Uint8List.fromList(utf8.encode(json));
   }
@@ -239,7 +265,117 @@ class ExportService {
         'Versão esperada: ${ExportImportRepository.currentBackupVersion}.',
       );
     }
-    return _exportRepo.restoreFromBackup(data);
+    ExportImportRepository.validateBackup(data);
+    _validatePortableEnvelope(data);
+
+    final previousPreferences = await _readPortablePreferences(
+      stripAiModelCache: false,
+    );
+    final restoreDirectory = await _backupMedia.materializeForRestore(data);
+    var preferencesChanged = false;
+    try {
+      if (data['preferences'] is Map) {
+        preferencesChanged = true;
+        await _restorePortablePreferences(data);
+      }
+      final count = await _exportRepo.restoreFromBackup(data);
+      await _backupMedia.commitRestore(restoreDirectory);
+      return count;
+    } catch (_) {
+      if (preferencesChanged) {
+        try {
+          await _replacePortablePreferences(previousPreferences);
+        } catch (_) {}
+      }
+      await _backupMedia.discardRestore(restoreDirectory);
+      rethrow;
+    }
+  }
+
+  Future<Map<String, Object>> _exportPortablePreferences() async {
+    return _readPortablePreferences(stripAiModelCache: true);
+  }
+
+  Future<Map<String, Object>> _readPortablePreferences({
+    required bool stripAiModelCache,
+  }) async {
+    final preferences = await _preferencesProvider();
+    final result = <String, Object>{};
+    for (final key in _portablePreferenceKeys) {
+      final value = preferences.get(key);
+      if (value == null) continue;
+      if (stripAiModelCache && key == 'ai_providers_v1' && value is String) {
+        result[key] = _withoutAiModelCache(value);
+      } else if (value is String || value is bool || value is int) {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
+  Future<void> _restorePortablePreferences(Map<String, dynamic> data) async {
+    final raw = data['preferences'];
+    if (raw is! Map) return;
+    await _replacePortablePreferences(raw);
+  }
+
+  Future<void> _replacePortablePreferences(Map raw) async {
+    final preferences = await _preferencesProvider();
+    for (final key in _portablePreferenceKeys) {
+      if (!raw.containsKey(key)) {
+        await preferences.remove(key);
+        continue;
+      }
+      final value = raw[key];
+      if (value is String) {
+        await preferences.setString(key, value);
+      } else if (value is bool) {
+        await preferences.setBool(key, value);
+      } else if (value is int) {
+        await preferences.setInt(key, value);
+      }
+    }
+  }
+
+  static void _validatePortableEnvelope(Map<String, dynamic> data) {
+    if (data['version'] != ExportImportRepository.currentBackupVersion) return;
+    final preferences = data['preferences'];
+    if (preferences is! Map ||
+        data['preference_count'] is! int ||
+        data['preference_count'] != preferences.length) {
+      throw const FormatException('Backup preferences are incomplete.');
+    }
+    for (final entry in preferences.entries) {
+      if (!_portablePreferenceKeys.contains(entry.key) ||
+          (entry.value is! String &&
+              entry.value is! bool &&
+              entry.value is! int)) {
+        throw const FormatException('Invalid backup preference.');
+      }
+    }
+    if (data['media_files'] is! List || data['media_count'] is! int) {
+      throw const FormatException('Backup media manifest is missing.');
+    }
+  }
+
+  static String _withoutAiModelCache(String raw) {
+    try {
+      final providers = jsonDecode(raw);
+      if (providers is! List) return raw;
+      return jsonEncode(
+        providers
+            .map((provider) {
+              if (provider is! Map) return provider;
+              return {
+                ...Map<String, dynamic>.from(provider),
+                'availableModels': [],
+              };
+            })
+            .toList(growable: false),
+      );
+    } catch (_) {
+      return raw;
+    }
   }
 
   /// Deletes a backup file.

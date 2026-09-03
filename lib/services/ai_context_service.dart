@@ -79,11 +79,13 @@ class AiContextService {
       ];
     }
 
+    // Day granularity only: a per-second timestamp would change the request
+    // on every call and defeat the provider's prompt cache.
     return {
       'metadata': {
         'app': 'workout_notes',
         'locale': 'pt_BR',
-        'generated_at': now.toIso8601String(),
+        'today': now.toIso8601String().substring(0, 10),
         'mode': mode.storageKey,
       },
       'summary': summary,

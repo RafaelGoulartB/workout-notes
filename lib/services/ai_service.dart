@@ -53,7 +53,7 @@ class AiService {
 
   AiService({
     http.Client? client,
-    this.timeout = const Duration(seconds: 90),
+    this.timeout = const Duration(seconds: 180),
     Future<void> Function(Duration)? delay,
   }) : _client = client ?? http.Client(),
        _delay = delay ?? ((duration) => Future<void>.delayed(duration));
@@ -139,7 +139,12 @@ class AiService {
       if (tools != null && tools.isNotEmpty) {
         payload['tools'] = tools;
         if (!compatibility.omitToolChoice) {
-          payload['tool_choice'] = toolChoice ?? 'auto';
+          final choice = toolChoice ?? 'auto';
+          payload['tool_choice'] =
+              choice == 'required' &&
+                  compatibility.toolChoiceRequiredUnsupported
+              ? 'auto'
+              : choice;
         }
       }
 
@@ -152,7 +157,10 @@ class AiService {
             )
             .timeout(timeout);
       } on TimeoutException catch (error) {
-        if (transientRetries < _maxTransientRetries) {
+        // A request that already ran the full timeout is usually too heavy
+        // for this provider; resending it identically two more times only
+        // multiplies the wait. Allow a single retry.
+        if (transientRetries < _maxTimeoutRetries) {
           await _waitBeforeRetry(transientRetries++);
           continue;
         }
@@ -588,13 +596,23 @@ class AiService {
       compatibility.omitTemperature = true;
       return compatibility.record('temperature omitted');
     }
+    // `tool_choice: "required"` is the newest of these knobs and the one most
+    // often missing from OpenAI-compatible backends. Any 4xx while it was
+    // sent first falls back to `auto` for this model; only a further failure
+    // that names tool_choice drops the field entirely.
+    if (sentPayload['tool_choice'] == 'required' &&
+        !compatibility.toolChoiceRequiredUnsupported) {
+      compatibility.toolChoiceRequiredUnsupported = true;
+      return compatibility.record('tool_choice required→auto');
+    }
     final toolChoiceUnsupported =
         error.contains('tool_choice') &&
         (error.contains('unsupported') ||
             error.contains('not supported') ||
             error.contains('unknown') ||
             error.contains('unrecognized') ||
-            error.contains('not allowed'));
+            error.contains('not allowed') ||
+            error.contains('invalid'));
     if (toolChoiceUnsupported &&
         sentPayload.containsKey('tool_choice') &&
         !compatibility.omitToolChoice) {
@@ -689,12 +707,14 @@ class AiService {
   String _truncate(String s) => s.length > 200 ? '${s.substring(0, 200)}…' : s;
 
   static const int _maxTransientRetries = 2;
+  static const int _maxTimeoutRetries = 1;
 }
 
 class _ModelCompatibility {
   double? temperatureOverride;
   bool omitTemperature = false;
   bool omitToolChoice = false;
+  bool toolChoiceRequiredUnsupported = false;
   bool omitReasoningEffort = false;
   final Set<String> adjustments = {};
 
