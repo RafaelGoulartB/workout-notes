@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:workout_notes/models/sleep_monitor_state.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
 
 void main() {
@@ -113,5 +114,28 @@ void main() {
     expect(capabilities['fullScreenIntentGranted'], isFalse);
     expect(service.state.exactAlarmGranted, isTrue);
     expect(service.state.fullScreenIntentGranted, isFalse);
+  });
+
+  test('recognizes a durable monitored alarm snooze snapshot', () {
+    final state = SleepMonitorState.fromMap({
+      'supported': true,
+      'microphone_granted': true,
+      'status': 'completed',
+      'session_id': 'night-1',
+      'alarm_at': alarmAt.toIso8601String(),
+      'monitor_mode': 'alarm_with_mission',
+      'mission_status': 'pending',
+      'alarm_ringing': false,
+      'alarm_snoozing': true,
+      'alarm_state': 'scheduled',
+      'snooze_count': 2,
+      'max_snoozes': 3,
+      'alarm_dismissed': false,
+    });
+
+    expect(state.isAlarmSnoozing, isTrue);
+    expect(state.snoozeCount, 2);
+    expect(state.maxSnoozes, 3);
+    expect(state.mode.requiresMission, isTrue);
   });
 }

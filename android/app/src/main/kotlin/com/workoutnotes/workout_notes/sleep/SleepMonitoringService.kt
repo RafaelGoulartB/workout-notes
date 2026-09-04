@@ -97,6 +97,10 @@ class SleepMonitoringService : Service() {
                 "alarm_dismissed" to true,
                 "alarm_dismiss_method" to method,
                 "alarm_ringing" to false,
+                "alarm_snoozing" to false,
+                "alarm_state" to SleepAlarmScheduler.STATE_COMPLETED,
+                "snooze_count" to (snapshot?.snoozeCount ?: 0),
+                "max_snoozes" to (snapshot?.maxSnoozes ?: 0),
                 "mission_status" to "completed",
                 "session_id" to snapshot?.sessionId,
                 "end_reason" to "alarm",
@@ -109,6 +113,10 @@ class SleepMonitoringService : Service() {
             val snapshot = SleepAlarmScheduler.read(context)
             val updated = (lastState ?: currentState(context)) + mapOf(
                 "alarm_ringing" to true,
+                "alarm_snoozing" to false,
+                "alarm_state" to SleepAlarmScheduler.STATE_RINGING,
+                "snooze_count" to (snapshot?.snoozeCount ?: 0),
+                "max_snoozes" to (snapshot?.maxSnoozes ?: 0),
                 "emergency_taps" to SleepAlarmScheduler.emergencyTaps(context),
                 "monitor_mode" to (snapshot?.monitorMode ?: "alarm_without_mission"),
                 "mission_status" to if (snapshot?.requiresMission == true) {
@@ -128,6 +136,30 @@ class SleepMonitoringService : Service() {
             eventSink?.invoke(updated)
         }
 
+        fun publishAlarmSnoozing(context: android.content.Context) {
+            val snapshot = SleepAlarmScheduler.read(context) ?: return
+            if (snapshot.state != SleepAlarmScheduler.STATE_SCHEDULED ||
+                snapshot.snoozeCount <= 0
+            ) return
+            val updated = (lastState ?: currentState(context)) + mapOf(
+                "alarm_ringing" to false,
+                "alarm_snoozing" to true,
+                "alarm_state" to snapshot.state,
+                "snooze_count" to snapshot.snoozeCount,
+                "max_snoozes" to snapshot.maxSnoozes,
+                "emergency_taps" to 0,
+                "monitor_mode" to snapshot.monitorMode,
+                "mission_status" to if (snapshot.requiresMission) "pending" else "unconfigured",
+                "alarm_at" to Instant.ofEpochMilli(snapshot.alarmAtMillis).toString(),
+                "session_id" to snapshot.sessionId,
+                "alarm_dismissed" to false,
+                "alarm_dismiss_method" to null,
+                "end_reason" to "alarm",
+            )
+            lastState = updated
+            eventSink?.invoke(updated)
+        }
+
         fun currentState(context: android.content.Context): Map<String, Any?> {
             val service = activeInstance
             if (service != null) return service.stateMap()
@@ -136,17 +168,29 @@ class SleepMonitoringService : Service() {
                 Manifest.permission.RECORD_AUDIO,
             ) == PackageManager.PERMISSION_GRANTED
             val snapshot = SleepAlarmScheduler.read(context)
-            if (lastState == null && snapshot?.state == SleepAlarmScheduler.STATE_RINGING) {
-                return state(context, "completed", granted) + mapOf(
+            val base = lastState ?: state(context, "idle", granted)
+            if (snapshot != null &&
+                (snapshot.state == SleepAlarmScheduler.STATE_RINGING ||
+                    (snapshot.state == SleepAlarmScheduler.STATE_SCHEDULED &&
+                        snapshot.snoozeCount > 0))
+            ) {
+                return base + mapOf(
                     "session_id" to snapshot.sessionId,
                     "alarm_at" to Instant.ofEpochMilli(snapshot.alarmAtMillis).toString(),
                     "monitor_mode" to snapshot.monitorMode,
                     "mission_status" to if (snapshot.requiresMission) "pending" else "unconfigured",
-                    "alarm_ringing" to true,
+                    "alarm_ringing" to (snapshot.state == SleepAlarmScheduler.STATE_RINGING),
+                    "alarm_snoozing" to (snapshot.state == SleepAlarmScheduler.STATE_SCHEDULED),
+                    "alarm_state" to snapshot.state,
+                    "snooze_count" to snapshot.snoozeCount,
+                    "max_snoozes" to snapshot.maxSnoozes,
+                    "alarm_dismissed" to false,
+                    "alarm_dismiss_method" to null,
                     "emergency_taps" to SleepAlarmScheduler.emergencyTaps(context),
+                    "end_reason" to "alarm",
                 )
             }
-            return lastState ?: state(context, "idle", granted)
+            return base
         }
 
         private fun state(

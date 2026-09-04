@@ -95,6 +95,8 @@ class SleepMonitorBridge(private val context: Context) :
             }
             "startMonitoring" -> startMonitoring(call, result)
             "updateAlarm" -> updateAlarm(call, result)
+            "openSnoozedAlarmMission" -> openSnoozedAlarmMission(result)
+            "dismissSnoozedAlarm" -> dismissSnoozedAlarm(result)
             "stopMonitoring" -> result.success(SleepMonitoringService.stopCurrent("user"))
             "discardSession" -> {
                 SleepMonitoringService.discardCurrent()
@@ -303,6 +305,46 @@ class SleepMonitorBridge(private val context: Context) :
             if (monitorMode != "monitoring_only") SleepAlarmScheduler.cancel(context)
             result.error("alarm_schedule_failed", error.message, null)
         }
+    }
+
+    private fun openSnoozedAlarmMission(result: MethodChannel.Result) {
+        val current = SleepAlarmScheduler.read(context)
+        val snapshot = if (current != null &&
+            current.state == SleepAlarmScheduler.STATE_RINGING &&
+            current.requiresMission
+        ) {
+            current
+        } else {
+            SleepAlarmScheduler.resumeSnoozedMission(context)
+        }
+        if (snapshot == null) {
+            result.error("invalid_alarm_state", "No monitored mission is currently snoozing", null)
+            return
+        }
+        SleepMonitoringService.publishAlarmRinging(context)
+        SleepAlarmRingingService.start(context, snapshot.alarmAtMillis)
+        val alarmIntent = Intent(context, SleepAlarmActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(SleepAlarmScheduler.EXTRA_ALARM_AT, snapshot.alarmAtMillis)
+        }
+        val visibleActivity = activity
+        if (visibleActivity != null) {
+            visibleActivity.startActivity(alarmIntent)
+        } else {
+            alarmIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(alarmIntent)
+        }
+        result.success(SleepMonitoringService.currentState(context))
+    }
+
+    private fun dismissSnoozedAlarm(result: MethodChannel.Result) {
+        val snapshot = SleepAlarmScheduler.dismissSnooze(context)
+        if (snapshot == null) {
+            result.error("invalid_alarm_state", "No unprotected monitored alarm is snoozing", null)
+            return
+        }
+        SleepMonitoringService.alarmDismissed(context, SleepMonitorSessionDismiss.BUTTON)
+        result.success(SleepMonitoringService.currentState(context))
     }
 
     private fun updateAlarm(call: MethodCall, result: MethodChannel.Result) {

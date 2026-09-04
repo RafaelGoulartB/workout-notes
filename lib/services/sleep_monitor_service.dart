@@ -242,6 +242,48 @@ class SleepMonitorService extends ChangeNotifier {
     }
   }
 
+  Future<bool> openSnoozedAlarmMission() async {
+    if (!_isAndroid ||
+        !_state.isAlarmSnoozing ||
+        !_state.mode.requiresMission) {
+      return false;
+    }
+    try {
+      final result = await methods.invokeMapMethod<String, dynamic>(
+        'openSnoozedAlarmMission',
+      );
+      if (result != null) _onEvent(result);
+      return _state.alarmRinging;
+    } on PlatformException catch (error) {
+      _setError(error.code, error.message ?? error.toString());
+      return false;
+    } catch (error) {
+      _setError('alarm_resume_failed', error.toString());
+      return false;
+    }
+  }
+
+  Future<bool> dismissSnoozedAlarm() async {
+    if (!_isAndroid ||
+        !_state.isAlarmSnoozing ||
+        _state.mode.requiresMission) {
+      return false;
+    }
+    try {
+      final result = await methods.invokeMapMethod<String, dynamic>(
+        'dismissSnoozedAlarm',
+      );
+      if (result != null) _onEvent(result);
+      return _state.alarmDismissed;
+    } on PlatformException catch (error) {
+      _setError(error.code, error.message ?? error.toString());
+      return false;
+    } catch (error) {
+      _setError('alarm_dismiss_failed', error.toString());
+      return false;
+    }
+  }
+
   Future<Map<String, dynamic>?> scanBarcodeForMission() async {
     if (!_isAndroid) return null;
     try {

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 
 import '../../models/traditional_alarm.dart';
+import '../../models/traditional_alarm_runtime_state.dart';
 import '../../services/traditional_alarm_service.dart';
 
 class TraditionalAlarmsScreen extends StatefulWidget {
@@ -98,6 +99,31 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
     await _service.delete(alarm);
   }
 
+  Future<void> _handleSnooze(
+    TraditionalAlarm alarm,
+    TraditionalAlarmRuntimeState runtimeState,
+  ) async {
+    setState(() => _busy = true);
+    try {
+      if (runtimeState.requiresMission) {
+        await _service.openSnoozedMission(alarm.id);
+      } else {
+        await _service.dismissSnooze(alarm.id);
+      }
+    } catch (_) {
+      try {
+        await _service.reconcile();
+      } catch (_) {
+        // Keep the original action feedback even if refresh also fails.
+      }
+      if (mounted) {
+        _message(AppLocalizations.of(context)!.alarmSnoozeActionError);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   void _message(String text) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
@@ -121,12 +147,17 @@ class _TraditionalAlarmsScreenState extends State<TraditionalAlarmsScreen>
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (_, index) {
                 final alarm = _service.alarms[index];
+                final runtimeState = _service.runtimeStateFor(alarm.id);
                 return _AlarmCard(
                   alarm: alarm,
+                  runtimeState: runtimeState,
                   disabled: _busy,
                   onTap: () => _edit(alarm),
                   onToggle: (enabled) => _toggle(alarm, enabled),
                   onDelete: () => _delete(alarm),
+                  onSnoozeAction: runtimeState?.isSnoozing == true
+                      ? () => _handleSnooze(alarm, runtimeState!)
+                      : null,
                 );
               },
             ),
@@ -168,27 +199,35 @@ class _EmptyAlarms extends StatelessWidget {
 class _AlarmCard extends StatelessWidget {
   const _AlarmCard({
     required this.alarm,
+    required this.runtimeState,
     required this.disabled,
     required this.onTap,
     required this.onToggle,
     required this.onDelete,
+    required this.onSnoozeAction,
   });
   final TraditionalAlarm alarm;
+  final TraditionalAlarmRuntimeState? runtimeState;
   final bool disabled;
   final VoidCallback onTap;
   final ValueChanged<bool> onToggle;
   final VoidCallback onDelete;
+  final VoidCallback? onSnoozeAction;
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final isSnoozing = runtimeState?.isSnoozing == true;
     final color = alarm.enabled
         ? Theme.of(context).colorScheme.primary
         : Theme.of(context).colorScheme.onSurfaceVariant;
     return Card(
+      color: isSnoozing
+          ? Theme.of(context).colorScheme.secondaryContainer
+          : null,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
+        onTap: isSnoozing ? null : onTap,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 8, 14),
           child: Row(
@@ -209,7 +248,62 @@ class _AlarmCard extends StatelessWidget {
                       _days(loc),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
-                    if (alarm.enabled && alarm.nextTriggerAt != null) ...[
+                    if (isSnoozing) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        key: Key('alarm-snoozing-${alarm.id}'),
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.snooze_rounded, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    loc.alarmSnoozingUntil(
+                                      _snoozeTime(context),
+                                    ),
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleSmall,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              loc.alarmSnoozeProgress(
+                                runtimeState!.snoozeCount,
+                                runtimeState!.maxSnoozes,
+                              ),
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                            const SizedBox(height: 10),
+                            FilledButton.tonalIcon(
+                              onPressed: disabled ? null : onSnoozeAction,
+                              icon: Icon(
+                                runtimeState!.requiresMission
+                                    ? Icons.qr_code_scanner_rounded
+                                    : Icons.alarm_off_rounded,
+                              ),
+                              label: Text(
+                                runtimeState!.requiresMission
+                                    ? loc.alarmOpenMissionNow
+                                    : loc.alarmDismissSnooze,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (alarm.enabled &&
+                        alarm.nextTriggerAt != null) ...[
                       const SizedBox(height: 8),
                       Text(
                         loc.alarmNext(
@@ -257,9 +351,10 @@ class _AlarmCard extends StatelessWidget {
                 children: [
                   Switch(
                     value: alarm.enabled,
-                    onChanged: disabled ? null : onToggle,
+                    onChanged: disabled || isSnoozing ? null : onToggle,
                   ),
                   PopupMenuButton<String>(
+                    enabled: !disabled && !isSnoozing,
                     onSelected: (value) {
                       if (value == 'delete') onDelete();
                     },
@@ -284,6 +379,13 @@ class _AlarmCard extends StatelessWidget {
         TimeOfDay(hour: alarm.hour, minute: alarm.minute),
         alwaysUse24HourFormat: true,
       );
+
+  String _snoozeTime(BuildContext context) =>
+      MaterialLocalizations.of(context).formatTimeOfDay(
+        TimeOfDay.fromDateTime(runtimeState!.alarmAt.toLocal()),
+        alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+      );
+
   String _days(AppLocalizations loc) {
     if (alarm.weekdays.isEmpty) return loc.alarmOneShot;
     if (alarm.weekdays.length == 7) return loc.alarmEveryDay;

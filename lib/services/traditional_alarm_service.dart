@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../models/traditional_alarm.dart';
+import '../models/traditional_alarm_runtime_state.dart';
 import '../repositories/traditional_alarm_repository.dart';
 import '../repositories/settings_repository.dart';
 import 'notification_service.dart';
@@ -23,6 +24,10 @@ class TraditionalAlarmService extends ChangeNotifier {
   List<TraditionalAlarm> _alarms = const [];
   List<TraditionalAlarm> get alarms => List.unmodifiable(_alarms);
 
+  Map<String, TraditionalAlarmRuntimeState> _runtimeStates = const {};
+  TraditionalAlarmRuntimeState? runtimeStateFor(String alarmId) =>
+      _runtimeStates[alarmId];
+
   Future<void> initialize() async {
     await reconcile();
   }
@@ -31,26 +36,30 @@ class TraditionalAlarmService extends ChangeNotifier {
   /// only database alarms that do not yet have a native snapshot.
   Future<void> reconcile() async {
     await refresh();
-    if (!_isAndroid) return;
+    if (!_isAndroid) {
+      _runtimeStates = const {};
+      return;
+    }
     try {
       final states =
           await _channel.invokeListMethod<dynamic>('states') ?? const [];
       final nativeIds = <String>{};
+      final runtimeStates = <String, TraditionalAlarmRuntimeState>{};
       for (final value in states) {
         if (value is! Map) continue;
         final map = Map<String, dynamic>.from(value);
         final id = map['id'] as String?;
-        if (id == null) continue;
+        final epoch = map['alarm_at_epoch_ms'];
+        if (id == null || epoch is! num) continue;
         nativeIds.add(id);
-        final epoch = map['alarm_at_epoch_ms'] as int?;
+        runtimeStates[id] = TraditionalAlarmRuntimeState.fromMap(map);
         await _repository.updateNativeSchedule(
           id,
           enabled: map['enabled'] == true,
-          nextTriggerAt: epoch == null
-              ? null
-              : DateTime.fromMillisecondsSinceEpoch(epoch),
+          nextTriggerAt: DateTime.fromMillisecondsSinceEpoch(epoch.toInt()),
         );
       }
+      _runtimeStates = runtimeStates;
       await refresh();
       for (final alarm in _alarms.where(
         (alarm) => alarm.enabled && !nativeIds.contains(alarm.id),
@@ -59,6 +68,7 @@ class TraditionalAlarmService extends ChangeNotifier {
       }
       await _channel.invokeMethod<void>('restore');
     } on MissingPluginException {
+      _runtimeStates = const {};
       // The alarm manager is intentionally an Android enhancement.
     }
   }
@@ -115,6 +125,18 @@ class TraditionalAlarmService extends ChangeNotifier {
     await _cancel(value.id);
     await _repository.delete(value.id);
     await refresh();
+  }
+
+  Future<void> openSnoozedMission(String alarmId) async {
+    if (!_isAndroid) return;
+    await _channel.invokeMethod<void>('openSnoozedMission', {'id': alarmId});
+    await reconcile();
+  }
+
+  Future<void> dismissSnooze(String alarmId) async {
+    if (!_isAndroid) return;
+    await _channel.invokeMethod<void>('dismissSnooze', {'id': alarmId});
+    await reconcile();
   }
 
   Future<bool> preparePermissions() async {

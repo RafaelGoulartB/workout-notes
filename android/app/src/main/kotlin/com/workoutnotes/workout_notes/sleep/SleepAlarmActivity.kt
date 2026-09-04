@@ -162,7 +162,7 @@ class SleepAlarmActivity : Activity() {
         root.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
         if (SleepAlarmScheduler.canSnooze(this)) {
             root.addView(Button(this).apply {
-                text = "Sonecar (5 min)"
+                text = getString(R.string.sleep_alarm_snooze_detail)
                 textSize = 16f
                 isAllCaps = false
                 setOnClickListener {
