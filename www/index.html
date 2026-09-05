@@ -1,1331 +1,1490 @@
 <!doctype html>
-<html lang="en" class="scroll-smooth">
+<html lang="en" data-theme="dark">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
-    <title>Workout Notes — Offline workout journal, with optional AI</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Workout Notes · Training, running, sleep and nutrition in one local-first app</title>
     <meta
       name="description"
-      content="An open-source Flutter app for logging workouts, exercises, routines, body measurements, sleep and progress. Works 100% offline. Optionally with an AI coach."
+      content="Workout Notes is an open-source Flutter app for strength training, GPS running, sleep, nutrition, body measurements and periodization. Your journal stays on your device. No account required."
     />
+    <meta name="theme-color" content="#08090c" />
+    <link rel="canonical" href="https://rafaelgoulartb.github.io/workout-notes/" />
 
-    <!-- Tailwind via CDN -->
-    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Workout Notes · one local-first training journal" />
+    <meta
+      property="og:description"
+      content="Strength, running, sleep, nutrition and periodization in a single offline app. Open source, MIT licensed, built with Flutter."
+    />
+    <meta property="og:image" content="assets/brand/icon-512.png" />
+    <meta name="twitter:card" content="summary_large_image" />
 
-    <!-- DM Sans + JetBrains Mono -->
+    <link rel="icon" href="assets/brand/icon-64.png" sizes="64x64" />
+    <link rel="apple-touch-icon" href="assets/brand/icon-180.png" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+    <link rel="stylesheet" href="assets/css/base.css" />
+    <link rel="stylesheet" href="assets/css/landing.css" />
 
     <script>
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            colors: {
-              bg: "#09090b",
-              "bg-elev": "#0c0c0e",
-              "bg-card": "#111113",
-              fg: "#fafafa",
-              "fg-muted": "#a1a1aa",
-              "fg-dim": "#71717a",
-              "fg-faint": "#52525b",
-              border: "rgba(255,255,255,0.08)",
-              "border-strong": "rgba(255,255,255,0.14)",
-              accent: "oklch(0.68 0.11 198)",
-              "accent-dim": "oklch(0.68 0.11 198 / 0.18)",
-            },
-            fontFamily: {
-              sans: ['"DM Sans"', "system-ui", "sans-serif"],
-              mono: ['"JetBrains Mono"', "ui-monospace", "monospace"],
-            },
-            maxWidth: {
-              container: "1240px",
-            },
-            borderRadius: {
-              tile: "16px",
-            },
-          },
-        },
-      };
+      // Applied before first paint so the chosen theme never flashes.
+      (function () {
+        try {
+          var saved = localStorage.getItem("wn-theme");
+          if (saved === "light" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
+            document.documentElement.setAttribute("data-theme", "light");
+          }
+        } catch (e) {}
+      })();
     </script>
-
-    <link rel="stylesheet" href="styles.css" />
   </head>
 
-  <body
-    class="bg-bg text-fg font-sans antialiased selection:bg-accent selection:text-bg"
-    style="font-feature-settings: 'ss01', 'ss02'"
-  >
-    <!-- film grain overlay -->
-    <div
-      class="pointer-events-none fixed inset-0 z-[60] mix-blend-overlay opacity-[0.035]"
-      style="
-        background-image: url(&quot;data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>&quot;);
-      "
-    ></div>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
 
-    <!-- ============== NAV ============== -->
-    <header
-      id="nav"
-      class="sticky top-0 z-50 backdrop-blur-md bg-bg/70 border-b border-transparent transition-colors"
+    <!-- ===================== ICON SPRITE ===================== -->
+    <svg
+      width="0"
+      height="0"
+      style="position: absolute"
+      aria-hidden="true"
+      focusable="false"
     >
-      <div
-        class="max-w-container mx-auto px-6 lg:px-8 h-16 flex items-center justify-between"
-      >
-        <a href="#" class="flex items-center gap-2 group">
-          <span
-            class="w-7 h-7 rounded-md bg-accent flex items-center justify-center text-bg font-bold text-sm"
-            >W</span
-          >
-          <span class="font-medium tracking-tight text-[15px]"
-            >Workout Notes</span
-          >
+      <defs>
+        <g id="stroke-defaults"></g>
+      </defs>
+      <symbol id="i-dumbbell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6.5 6.5v11M3.5 9v6M17.5 6.5v11M20.5 9v6M6.5 12h11" />
+      </symbol>
+      <symbol id="i-route" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="6" cy="19" r="2.5" />
+        <circle cx="18" cy="5" r="2.5" />
+        <path d="M8.5 19h4.5a3.5 3.5 0 0 0 0-7h-3a3.5 3.5 0 0 1 0-7h3.5" />
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" />
+      </symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2.6v2.2M12 19.2v2.2M4.3 4.3l1.6 1.6M18.1 18.1l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.3 19.7l1.6-1.6M18.1 5.9l1.6-1.6" />
+      </symbol>
+      <symbol id="i-utensils" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 3v6a2.5 2.5 0 0 0 5 0V3M8.5 11.5V21M16.5 21v-8M16.5 13c1.6 0 2.5-1.8 2.5-4.5S18 3 16.5 3 14 4.8 14 8.5 14.9 13 16.5 13Z" />
+      </symbol>
+      <symbol id="i-plan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4.5" width="11" height="4" rx="2" />
+        <rect x="7" y="10" width="14" height="4" rx="2" />
+        <rect x="3" y="15.5" width="9" height="4" rx="2" />
+      </symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19V4.5M4 19h16" />
+        <path d="M7 15l3.5-4.5 3 2.5L18.5 7" />
+      </symbol>
+      <symbol id="i-bot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="8" width="16" height="12" rx="3.5" />
+        <path d="M12 4v4M9.2 13.5h.01M14.8 13.5h.01M9.5 17h5" />
+      </symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l7.5 3v6c0 4.4-3.1 8.2-7.5 9.5C7.6 20.2 4.5 16.4 4.5 12V6L12 3Z" />
+        <path d="M9 12l2.2 2.2L15.5 10" />
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+        <path d="M8.5 10.5V7.5a3.5 3.5 0 1 1 7 0v3" />
+      </symbol>
+      <symbol id="i-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <ellipse cx="12" cy="6" rx="7.5" ry="3" />
+        <path d="M4.5 6v12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6" />
+        <path d="M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3" />
+      </symbol>
+      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+      </symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h13M12.5 6l6 6-6 6" />
+      </symbol>
+      <symbol id="i-arrow-up-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 17 17 7M8.5 7H17v8.5" />
+      </symbol>
+      <symbol id="i-chev-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9.5 5l7 7-7 7" />
+      </symbol>
+      <symbol id="i-chev-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14.5 5l-7 7 7 7" />
+      </symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </symbol>
+      <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 13l4 4L19 7" />
+      </symbol>
+      <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 6.6C10.5 5.1 8.5 4.3 6 4.3H4v14h2c2.5 0 4.5.8 6 2.3 1.5-1.5 3.5-2.3 6-2.3h2v-14h-2c-2.5 0-4.5.8-6 2.3Z" />
+        <path d="M12 6.6v14" />
+      </symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 7.5V12l3.2 2" />
+      </symbol>
+      <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="8.5" />
+        <circle cx="12" cy="12" r="4.5" />
+        <path d="M12 12h.01" />
+      </symbol>
+      <symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+        <path d="M9 10a3 3 0 0 1 6 0" />
+        <path d="M12 15.5h.01" />
+      </symbol>
+      <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13.5 3 5.5 13.5H11l-.5 7.5 8-10.5H13l.5-7.5Z" />
+      </symbol>
+      <symbol id="i-offline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 3.5l18 17" />
+        <path d="M8.6 13.4a6 6 0 0 1 3.4-1.9M5 9.6A11 11 0 0 1 9.5 7M19 9.6a11 11 0 0 0-4-2.3M15.4 13.4c.5.3 1 .7 1.4 1.1M12 18.5h.01" />
+      </symbol>
+      <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 7l-5 5 5 5M15 7l5 5-5 5" />
+      </symbol>
+      <symbol id="i-alarm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="13.5" r="7" />
+        <path d="M12 10.5v3.5l2.5 1.5M5 4.5 7.5 6.6M19 4.5 16.5 6.6" />
+      </symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9.5" y="3" width="5" height="10" rx="2.5" />
+        <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" />
+      </symbol>
+      <symbol id="i-barcode" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+        <path d="M4 5v14M7.5 5v14M11 5v10M14.5 5v14M18 5v10M21 5v14" />
+      </symbol>
+      <symbol id="i-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 3.5 3.5 6v14.5L9 18l6 2.5 5.5-2.5V3.5L15 6 9 3.5Z" />
+        <path d="M9 3.5V18M15 6v14.5" />
+      </symbol>
+      <symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 3l1.7 4.3L17 9l-4.3 1.7L11 15l-1.7-4.3L5 9l4.3-1.7L11 3Z" />
+        <path d="M18 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2Z" />
+      </symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3 3.5 7.5 12 12l8.5-4.5L12 3Z" />
+        <path d="M3.5 12.5 12 17l8.5-4.5M3.5 17 12 21.5 20.5 17" />
+      </symbol>
+      <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor">
+        <path
+          d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5Z"
+        />
+      </symbol>
+      <symbol id="i-android" viewBox="0 0 24 24" fill="currentColor">
+        <path
+          d="M6 9.5h12a1 1 0 0 1 1 1V17a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6.5a1 1 0 0 1 1-1Zm-3 .5a1.4 1.4 0 0 1 1.4 1.4v4.2a1.4 1.4 0 0 1-2.8 0v-4.2A1.4 1.4 0 0 1 3 10Zm18 0a1.4 1.4 0 0 1 1.4 1.4v4.2a1.4 1.4 0 0 1-2.8 0v-4.2A1.4 1.4 0 0 1 21 10ZM9 19.5h1.6v2.1a1.3 1.3 0 0 1-2.6 0v-2.1Zm4.4 0H15v2.1a1.3 1.3 0 0 1-2.6 0v-2.1ZM8.4 3.2l.9 1.6A6.6 6.6 0 0 1 12 4.3c1 0 1.9.2 2.7.5l.9-1.6a.5.5 0 1 1 .87.5l-.85 1.5A5.6 5.6 0 0 1 18.4 8.5H5.6a5.6 5.6 0 0 1 2.78-3.3l-.85-1.5a.5.5 0 1 1 .87-.5ZM9.4 6.6h.01M14.6 6.6h.01"
+        />
+      </symbol>
+    </svg>
+
+    <!-- ===================== HEADER ===================== -->
+    <header class="site-header" data-header>
+      <div class="container site-header__inner">
+        <a class="brand" href="index.html" aria-label="Workout Notes home">
+          <img src="assets/brand/icon-64.png" alt="" width="27" height="27" />
+          <span>Workout Notes</span>
         </a>
 
-        <nav class="hidden md:flex items-center gap-8 text-sm text-fg-muted">
-          <a href="#features" class="hover:text-fg transition-colors"
-            >Features</a
-          >
-          <a href="#ai" class="hover:text-fg transition-colors">AI Coach</a>
-          <a href="#progress" class="hover:text-fg transition-colors"
-            >Progress</a
-          >
-          <a href="#opensource" class="hover:text-fg transition-colors"
-            >Open Source</a
-          >
+        <nav class="site-nav" aria-label="Main">
+          <a href="#domains">Features</a>
+          <a href="#ai">AI Coach</a>
+          <a href="#gallery">Screenshots</a>
+          <a href="#data">Your data</a>
+          <a href="docs/index.html">Docs</a>
         </nav>
 
-        <div class="flex items-center gap-2">
+        <div class="header-actions">
+          <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch theme">
+            <svg class="icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+            <svg class="icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+          </button>
           <a
-            href="#download"
-            class="hidden sm:inline-flex items-center gap-2 px-3.5 h-9 rounded-md text-sm font-medium bg-fg text-bg hover:-translate-y-px transition-transform"
-            >Download
-            <svg
-              class="w-3.5 h-3.5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M7 17L17 7M9 7h8v8" />
-            </svg>
-          </a>
-          <a
+            class="gh-link"
             href="https://github.com/RafaelGoulartB/workout-notes"
             target="_blank"
-            rel="noopener noreferrer"
-            id="starBtn"
-            class="inline-flex items-center gap-2 px-3 h-9 rounded-md text-sm border border-border hover:border-border-strong transition-colors font-mono"
-            aria-label="View repository on GitHub"
+            rel="noopener"
           >
-            <svg
-              class="w-4 h-4"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 015.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5z"
-              />
-            </svg>
-            <span class="hidden sm:inline" id="starCount">★ 1</span>
-            <span class="sm:hidden" id="starCountMobile">1</span>
+            <svg aria-hidden="true"><use href="#i-github" /></svg>
+            <span aria-hidden="true">★</span>
+            <span data-stars>1</span>
+            <span class="sr-only">stars on GitHub</span>
+          </a>
+          <a class="btn btn--primary btn--sm" href="docs/index.html">
+            Documentation
           </a>
           <button
-            id="menuBtn"
-            class="md:hidden w-9 h-9 inline-flex items-center justify-center rounded-md border border-border"
+            class="icon-btn nav-toggle"
+            type="button"
+            data-nav-toggle
+            aria-expanded="false"
+            aria-controls="mobile-nav"
             aria-label="Open menu"
           >
-            <svg
-              class="w-4 h-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <svg aria-hidden="true"><use href="#i-menu" /></svg>
           </button>
         </div>
       </div>
 
-      <div
-        id="mobileMenu"
-        class="md:hidden hidden border-t border-border bg-bg-elev"
-      >
-        <div class="px-6 py-4 flex flex-col gap-3 text-sm text-fg-muted">
-          <a href="#features" class="py-1.5">Features</a>
-          <a href="#ai" class="py-1.5">AI Coach</a>
-          <a href="#progress" class="py-1.5">Progress</a>
-          <a href="#opensource" class="py-1.5">Open Source</a>
-          <a
-            href="#download"
-            class="mt-2 inline-flex items-center justify-center h-10 rounded-md bg-fg text-bg font-medium"
-            >Download app</a
-          >
+      <div class="mobile-nav" id="mobile-nav">
+        <div class="container">
+          <ul>
+            <li><a href="#domains">Features</a></li>
+            <li><a href="#ai">AI Coach</a></li>
+            <li><a href="#gallery">Screenshots</a></li>
+            <li><a href="#data">Your data</a></li>
+            <li><a href="#opensource">Open source</a></li>
+            <li><a href="docs/index.html">Documentation</a></li>
+          </ul>
+          <a class="btn btn--primary btn--block" href="docs/index.html">
+            Read the documentation
+            <svg aria-hidden="true"><use href="#i-arrow-right" /></svg>
+          </a>
         </div>
       </div>
     </header>
 
-    <!-- ============== HERO ============== -->
-    <section class="relative overflow-hidden">
-      <!-- grid mask -->
-      <div
-        class="pointer-events-none absolute inset-0 opacity-[0.35]"
-        style="
-          background-image: linear-gradient(
-              to right,
-              rgba(255, 255, 255, 0.04) 1px,
-              transparent 1px
-            ),
-            linear-gradient(
-              to bottom,
-              rgba(255, 255, 255, 0.04) 1px,
-              transparent 1px
-            );
-          background-size: 48px 48px;
-          -webkit-mask-image: radial-gradient(
-            ellipse 70% 60% at 50% 30%,
-            black 30%,
-            transparent 75%
-          );
-          mask-image: radial-gradient(
-            ellipse 70% 60% at 50% 30%,
-            black 30%,
-            transparent 75%
-          );
-        "
-      ></div>
+    <main id="main">
+      <!-- ===================== HERO ===================== -->
+      <section class="hero">
+        <div class="backdrop">
+          <div class="backdrop__grid"></div>
+          <div class="backdrop__glow"></div>
+        </div>
 
-      <div class="relative max-w-container mx-auto px-6 lg:px-8 pt-24 pb-24">
-        <div class="text-center max-w-3xl mx-auto fade-in">
-          <div
-            class="inline-flex items-center gap-2 px-3 h-7 rounded-full border border-border bg-bg-card/60 backdrop-blur font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
-          >
-            <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
-            v0.9 — Flutter, offline-first
-          </div>
+        <div class="container hero__inner">
+          <span class="badge badge--accent">
+            Open source · MIT · Flutter
+          </span>
 
-          <h1
-            class="mt-8 text-5xl sm:text-6xl md:text-7xl font-medium leading-[1.05] tracking-[-0.035em]"
-          >
-            Your workout journal,
-            <span
-              class="text-fg-muted"
-              style="
-                background: linear-gradient(
-                  180deg,
-                  #fafafa 0%,
-                  #fafafa 50%,
-                  #71717a 100%
-                );
-                -webkit-background-clip: text;
-                background-clip: text;
-                color: transparent;
-              "
-              >now intelligent.</span
-            >
+          <h1>
+            Everything you train,<br />
+            <span class="grad">in one journal you own.</span>
           </h1>
 
-          <p class="mt-6 text-fg-muted text-lg leading-relaxed max-w-2xl mx-auto">
-            Log sets, weight, reps, RPE, cardio, measurements and sleep in one
-            place. Works 100% offline. Connect an AI coach whenever you want to
-            chat about your data.
+          <p class="hero__lead">
+            Strength sessions, GPS runs, sleep, food, body measurements and a
+            periodized plan, logged in a single app that keeps its database on
+            your device and works with the network off.
           </p>
 
-          <div class="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div class="hero__cta">
             <a
-              href="#download"
-              class="inline-flex items-center gap-2 h-11 px-5 rounded-lg bg-fg text-bg font-medium hover:-translate-y-px transition-transform"
+              class="btn btn--primary btn--lg"
+              href="https://github.com/RafaelGoulartB/workout-notes/releases/latest"
+              target="_blank"
+              rel="noopener"
             >
+              <svg aria-hidden="true"><use href="#i-download" /></svg>
               Download for Android
-              <svg
-                class="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M12 5v14M5 12l7 7 7-7" />
-              </svg>
             </a>
-            <a
-              href="https://github.com/RafaelGoulartB/workout-notes"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex items-center gap-2 h-11 px-5 rounded-lg border border-border hover:border-border-strong hover:bg-bg-card/40 transition-colors"
-            >
-              <svg
-                class="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 015.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5z"
-                />
-              </svg>
-              View on GitHub
+            <a class="btn btn--outline btn--lg" href="docs/index.html">
+              <svg aria-hidden="true"><use href="#i-book" /></svg>
+              Explore the docs
             </a>
           </div>
 
-          <p
-            class="mt-5 font-mono text-[11px] uppercase tracking-[0.14em] text-fg-faint"
-          >
-            Android · iOS · Web · macOS · Windows · Linux
-          </p>
-        </div>
-
-        <!-- Phone mockup + floating tiles -->
-        <div
-          class="relative mt-20 mx-auto max-w-3xl perspective h-[640px] sm:h-[680px]"
-          style="perspective: 1400px"
-        >
-          <div
-            class="phone-frame absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[260px] sm:w-[290px] tilt"
-            style="
-              background: linear-gradient(#ffffff04, transparent);
-            "
-          >
-            <img
-              src="assets/screenshots/home.png"
-              alt="Workout Notes home screen showing the dashboard with month stats, quick actions and completed workouts list"
-              class="w-full h-auto block"
-              loading="eager"
-              decoding="async"
-            />
-          </div>
-
-          <!-- floating tiles -->
-          <div
-            class="float-tile absolute -left-6 top-12 sm:-left-12 sm:top-16 w-20 h-20 sm:w-24 sm:h-24 rounded-3xl border border-border bg-bg-elev/80 backdrop-blur"
-            style="
-              background: radial-gradient(
-                circle at 30% 25%,
-                oklch(0.7 0.12 195 / 0.3),
-                #14141a 65%
-              );
-            "
-          >
-            <div
-              class="w-full h-full flex items-center justify-center font-mono text-2xl"
-            >
-              🏋
-            </div>
-          </div>
-          <div
-            class="float-tile absolute -right-4 top-4 sm:-right-10 sm:top-8 w-20 h-20 sm:w-24 sm:h-24 rounded-3xl border border-border bg-bg-elev/80 backdrop-blur"
-            style="
-              background: radial-gradient(
-                circle at 70% 30%,
-                oklch(0.7 0.18 30 / 0.3),
-                #14141a 65%
-              );
-              animation-delay: 1.4s;
-            "
-          >
-            <div
-              class="w-full h-full flex items-center justify-center font-mono text-2xl"
-            >
-              🤖
-            </div>
-          </div>
-          <div
-            class="float-tile absolute left-10 -bottom-8 sm:left-20 sm:-bottom-10 w-20 h-20 sm:w-24 sm:h-24 rounded-3xl border border-border bg-bg-elev/80 backdrop-blur"
-            style="
-              background: radial-gradient(
-                circle at 50% 30%,
-                oklch(0.72 0.16 220 / 0.25),
-                #14141a 65%
-              );
-              animation-delay: 2.8s;
-            "
-          >
-            <div
-              class="w-full h-full flex items-center justify-center font-mono text-2xl"
-            >
-              💤
-            </div>
-          </div>
-          <div
-            class="float-tile hidden sm:flex absolute right-1/4 -bottom-12 w-20 h-20 rounded-3xl border border-border bg-bg-elev/80 backdrop-blur"
-            style="
-              background: radial-gradient(
-                circle at 50% 30%,
-                oklch(0.74 0.18 60 / 0.25),
-                #14141a 65%
-              );
-              animation-delay: 4.2s;
-            "
-          >
-            <div
-              class="w-full h-full items-center justify-center font-mono text-2xl flex"
-            >
-              📈
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============== PLATFORM STRIP ============== -->
-    <section class="border-t border-border">
-      <div
-        class="max-w-container mx-auto px-6 lg:px-8 py-12 grid grid-cols-3 sm:grid-cols-6 gap-y-8 gap-x-4"
-      >
-        <div
-          class="flex flex-col items-center gap-2 text-fg-muted hover:text-fg transition-colors"
-        >
-          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M17.6 9.5c-.04-2.7 2.2-4 2.3-4-1.26-1.84-3.2-2.1-3.9-2.13-1.66-.17-3.24.98-4.08.98-.86 0-2.15-.96-3.55-.93-1.83.03-3.52 1.06-4.46 2.7-1.9 3.3-.48 8.18 1.36 10.85.9 1.3 1.97 2.77 3.36 2.72 1.35-.06 1.86-.87 3.49-.87 1.62 0 2.09.87 3.52.84 1.46-.02 2.37-1.33 3.27-2.64 1.03-1.51 1.46-2.98 1.48-3.05-.03-.01-2.84-1.09-2.87-4.32zM14.9 2.06c.74-.9 1.24-2.15 1.1-3.4-1.07.05-2.37.72-3.13 1.6-.69.78-1.3 2.05-1.13 3.27 1.19.1 2.42-.6 3.16-1.47z"
-            />
-          </svg>
-          <span class="text-xs font-mono">iOS</span>
-        </div>
-        <div
-          class="flex flex-col items-center gap-2 text-fg-muted hover:text-fg transition-colors"
-        >
-          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M17.6 8.5c-1.4 0-2.6 1-3 1.6-.7-.5-1.7-1-3-1-2.5 0-4.6 2-4.6 4.5 0 2.5 1.7 4 3 5.5 1.2 1.4 1.5 2 2.4 2 .9 0 1.2-.5 2.2-.5s1.3.5 2.2.5c.9 0 1.4-.6 2.4-2 1.3-1.5 3-3 3-5.5 0-2.5-2.1-4.5-4.6-4.5zM14.6 5.4c.9-1 1.4-2.4 1.2-3.7-1.1.1-2.5.7-3.3 1.7-.7.8-1.3 2.1-1.1 3.4 1.2.1 2.4-.6 3.2-1.4z"
-            />
-          </svg>
-          <span class="text-xs font-mono">Android</span>
-        </div>
-        <div
-          class="flex flex-col items-center gap-2 text-fg-muted hover:text-fg transition-colors"
-        >
-          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 18a8 8 0 110-16 8 8 0 010 16zm-1-13h2v6h-2V7zm0 7h2v2h-2v-2z"
-            />
-          </svg>
-          <span class="text-xs font-mono">Web</span>
-        </div>
-        <div
-          class="flex flex-col items-center gap-2 text-fg-muted hover:text-fg transition-colors"
-        >
-          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M3 6h18v12H3V6zm0-2h18a2 2 0 012 2v12a2 2 0 01-2 2H3a2 2 0 01-2-2V6a2 2 0 012-2zm5 4l4 3-4 3V8z"
-            />
-          </svg>
-          <span class="text-xs font-mono">macOS</span>
-        </div>
-        <div
-          class="flex flex-col items-center gap-2 text-fg-muted hover:text-fg transition-colors"
-        >
-          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M3 4h8v8H3V4zm10 0h8v8h-8V4zM3 14h8v6H3v-6zm10 0h8v6h-8v-6z"
-            />
-          </svg>
-          <span class="text-xs font-mono">Windows</span>
-        </div>
-        <div
-          class="flex flex-col items-center gap-2 text-fg-muted hover:text-fg transition-colors"
-        >
-          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M12 2c-1.7 0-3 1.3-3 3v1H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-3V5c0-1.7-1.3-3-3-3zm-1 4V5c0-.6.4-1 1-1s1 .4 1 1v1h-2z"
-            />
-          </svg>
-          <span class="text-xs font-mono">Linux</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============== FEATURE: ACTIVE SESSION ============== -->
-    <section id="features" class="border-t border-border">
-      <div
-        class="max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center"
-      >
-        <div>
-          <span
-            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
-            >Active session</span
-          >
-          <h2
-            class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
-          >
-            Real-time training, friction-free.
-          </h2>
-          <p class="mt-5 text-fg-muted leading-relaxed">
-            Open the app, pick the exercise and start logging sets. Rest timer,
-            supersets, RPE, warm-up sets and pre-fill from history — all in the
-            same flow.
-          </p>
-
-          <ul class="mt-7 space-y-3 text-fg-muted">
-            <li class="flex items-start gap-3">
-              <span
-                class="mt-0.5 inline-flex w-5 h-5 rounded-md border border-border items-center justify-center text-accent"
-                >
-                <svg
-                  class="w-3 h-3"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="3"
-                >
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
-              </span>
-              Rest timer with notification and sound
-            </li>
-            <li class="flex items-start gap-3">
-              <span
-                class="mt-0.5 inline-flex w-5 h-5 rounded-md border border-border items-center justify-center text-accent"
-                ><svg
-                  class="w-3 h-3"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="3"
-                >
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
-              </span>
-              Color-coded superset and tri-set groups
-            </li>
-            <li class="flex items-start gap-3">
-              <span
-                class="mt-0.5 inline-flex w-5 h-5 rounded-md border border-border items-center justify-center text-accent"
-                ><svg
-                  class="w-3 h-3"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="3"
-                >
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
-              </span>
-              Auto-suggest weight and reps from last workout
-            </li>
-            <li class="flex items-start gap-3">
-              <span
-                class="mt-0.5 inline-flex w-5 h-5 rounded-md border border-border items-center justify-center text-accent"
-                ><svg
-                  class="w-3 h-3"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="3"
-                >
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
-              </span>
-              RPE, per-set notes and warm-up sets
-            </li>
-            <li class="flex items-start gap-3">
-              <span
-                class="mt-0.5 inline-flex w-5 h-5 rounded-md border border-border items-center justify-center text-accent"
-                ><svg
-                  class="w-3 h-3"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="3"
-                >
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
-              </span>
-              Works offline — no login, no server
-            </li>
-          </ul>
-        </div>
-
-        <!-- Active workout phone screenshot -->
-        <div class="relative perspective flex justify-center" style="perspective: 1400px">
-          <div
-            class="phone-frame relative tilt w-[240px] sm:w-[280px]"
-            style="background: linear-gradient(#ffffff04, transparent)"
-          >
-            <img
-              src="assets/screenshots/workout-progress.png"
-              alt="Active workout screen showing Squat and Romanian Deadlift sets with weight, reps, RPE and rest timer"
-              class="w-full h-auto block"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-          <!-- floating annotation -->
-          <div
-            class="hidden sm:flex absolute -left-4 top-1/3 items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-bg-elev/80 backdrop-blur font-mono text-[11px] text-fg-muted"
-          >
-            <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
-            rest timer
-          </div>
-          <div
-            class="hidden sm:flex absolute -right-6 bottom-12 items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-bg-elev/80 backdrop-blur font-mono text-[11px] text-fg-muted"
-          >
-            +45kg (+3%)
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============== FEATURE: LIBRARY + ROUTINES ============== -->
-    <section class="border-t border-border">
-      <div
-        class="max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-[1fr_1.1fr] gap-12 lg:gap-16 items-center"
-      >
-        <!-- library mock -->
-        <div
-          class="tile rounded-tile border border-border bg-bg-card/60 overflow-hidden order-2 lg:order-1"
-        >
-          <div
-            class="flex items-center justify-between px-5 py-3 border-b border-border bg-bg-elev"
-          >
-            <span
-              class="font-mono text-[11px] text-fg-dim uppercase tracking-[0.14em]"
-              >library</span
-            >
-            <div class="flex items-center gap-1.5">
-              <span
-                class="font-mono text-[10px] px-1.5 py-0.5 rounded-full bg-accent-dim text-accent"
-                >42 exercises</span
-              >
-              <span
-                class="font-mono text-[10px] px-1.5 py-0.5 rounded-full border border-border text-fg-muted"
-                >8 categories</span
-              >
-            </div>
-          </div>
-          <div class="p-3 grid grid-cols-2 gap-2">
-            <div
-              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
-            >
-              <span class="w-2 h-2 rounded-full bg-accent"></span>
-              <span class="text-sm">Bench Press</span>
-            </div>
-            <div
-              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
-            >
-              <span class="w-2 h-2 rounded-full bg-accent"></span>
-              <span class="text-sm">Back Squat</span>
-            </div>
-            <div
-              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
-            >
-              <span class="w-2 h-2 rounded-full bg-ok"></span>
-              <span class="text-sm">Deadlift</span>
-            </div>
-            <div
-              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
-            >
-              <span class="w-2 h-2 rounded-full bg-ok"></span>
-              <span class="text-sm">Bent-over Row</span>
-            </div>
-            <div
-              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
-            >
-              <span class="w-2 h-2 rounded-full bg-warn"></span>
-              <span class="text-sm">Overhead Press</span>
-            </div>
-            <div
-              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
-            >
-              <span class="w-2 h-2 rounded-full bg-warn"></span>
-              <span class="text-sm">Lat Pulldown</span>
-            </div>
-            <div
-              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
-            >
-              <span class="w-2 h-2 rounded-full bg-[#e67e22]"></span>
-              <span class="text-sm">Bicep Curl</span>
-            </div>
-            <div
-              class="px-3 py-2.5 rounded-md border border-border bg-bg-elev/40 flex items-center gap-2"
-            >
-              <span class="w-2 h-2 rounded-full bg-[#e67e22]"></span>
-              <span class="text-sm">Tricep Pushdown</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="order-1 lg:order-2">
-          <span
-            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
-            >Library & Routines</span
-          >
-          <h2
-            class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
-          >
-            Your library, your way.
-          </h2>
-          <p class="mt-5 text-fg-muted leading-relaxed">
-            Categories by energy system (aerobic / anaerobic), favorites,
-            equipment, type, personal notes and default rest time per exercise.
-            Build multi-day routines with predefined sets and start a workout
-            in one tap.
-          </p>
-          <div class="mt-6 grid grid-cols-2 gap-3 text-sm">
-            <div class="tile rounded-lg border border-border p-3">
-              <div class="font-mono text-[11px] text-fg-dim uppercase">
-                Favorites
-              </div>
-              <div class="mt-1 text-fg">Quick access</div>
-            </div>
-            <div class="tile rounded-lg border border-border p-3">
-              <div class="font-mono text-[11px] text-fg-dim uppercase">
-                Increment
-              </div>
-              <div class="mt-1 text-fg">Per exercise</div>
-            </div>
-            <div class="tile rounded-lg border border-border p-3">
-              <div class="font-mono text-[11px] text-fg-dim uppercase">
-                Routines
-              </div>
-              <div class="mt-1 text-fg">Multi-day</div>
-            </div>
-            <div class="tile rounded-lg border border-border p-3">
-              <div class="font-mono text-[11px] text-fg-dim uppercase">
-                Sets
-              </div>
-              <div class="mt-1 text-fg">Predefined</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============== AI COACH ============== -->
-    <section
-      id="ai"
-      class="border-t border-border relative overflow-hidden"
-    >
-      <div
-        class="pointer-events-none absolute inset-0"
-        style="
-          background: radial-gradient(
-            600px 300px at 50% 0%,
-            oklch(0.68 0.11 198 / 0.08),
-            transparent 70%
-          );
-        "
-      ></div>
-      <div
-        class="relative max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-[1fr_1.25fr] gap-12 lg:gap-16 items-center"
-      >
-        <div>
-          <span
-            class="font-mono text-[11px] uppercase tracking-[0.14em] text-accent"
-            >AI Coach</span
-          >
-          <h2
-            class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
-          >
-            Chat with your data.
-          </h2>
-          <p class="mt-5 text-fg-muted leading-relaxed">
-            The AI Coach is an optional, <strong class="text-fg">read-only</strong>
-            chat that sees your history, measurements, routines and goals. It
-            uses tools to pull details on demand and answer with real context
-            — never inventing numbers.
-          </p>
-
-          <ul class="mt-7 space-y-3 text-fg-muted">
-            <li class="flex items-start gap-3">
-              <span class="text-accent">▸</span>
-              <span><span class="text-fg">13 read tools:</span> workouts, PRs, volume, trends, measurements, sleep, cardio and goals</span>
-            </li>
-            <li class="flex items-start gap-3">
-              <span class="text-accent">▸</span>
-              <span><span class="text-fg">Multi-provider:</span> OpenAI, OpenRouter, Ollama or any compatible endpoint</span>
-            </li>
-            <li class="flex items-start gap-3">
-              <span class="text-accent">▸</span>
-              <span><span class="text-fg">Local tokens:</span> stored with <code class="font-mono text-xs px-1 py-0.5 rounded bg-bg-elev">flutter_secure_storage</code>, never in the database</span>
-            </li>
-            <li class="flex items-start gap-3">
-              <span class="text-accent">▸</span>
-              <span><span class="text-fg">Routine proposals:</span> AI suggests changes and you approve before applying</span>
-            </li>
-          </ul>
-        </div>
-
-        <!-- terminal mockup -->
-        <div
-          class="tile rounded-tile border border-border bg-bg-card/60 overflow-hidden"
-        >
-          <div
-            class="flex items-center justify-between px-5 py-3 border-b border-border bg-bg-elev"
-          >
-            <div class="flex items-center gap-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f57]"></span>
-              <span class="w-2.5 h-2.5 rounded-full bg-[#febc2e]"></span>
-              <span class="w-2.5 h-2.5 rounded-full bg-[#28c840]"></span>
-            </div>
-            <span
-              class="font-mono text-[11px] text-fg-dim uppercase tracking-[0.14em]"
-              >ai-chat</span
-            >
-            <span
-              class="font-mono text-[11px] text-fg-faint"
-              >gpt-4o · 3 tools</span
-            >
-          </div>
-          <div class="p-5 space-y-4 font-mono text-sm">
-            <div class="flex gap-3">
-              <span class="text-fg-dim shrink-0">user</span>
-              <span class="text-fg"
-                >What's my weekly chest volume over the last 4 weeks?</span
-              >
-            </div>
-
-            <div class="flex gap-3">
-              <span class="text-accent shrink-0">tool</span>
-              <span class="text-fg-muted"
-                >↳ get_weekly_volume_breakdown(weeks=4, group="chest")
-                <span class="text-ok">[ok]</span></span
-              >
-            </div>
-
-            <div class="flex gap-3">
-              <span class="text-accent shrink-0">assistant</span>
-              <div class="text-fg space-y-2">
-                <p>
-                  Your chest volume over the last 4 weeks was
-                  <span class="text-accent">28,400 kg</span> total, broken down
-                  as follows:
-                </p>
-                <ul class="space-y-1 pl-2 text-fg-muted">
-                  <li>· Week 1: 6,200 kg <span class="text-fg-faint">(baseline)</span></li>
-                  <li>· Week 2: 6,850 kg <span class="text-ok">+10.5%</span></li>
-                  <li>· Week 3: 7,200 kg <span class="text-ok">+5.1%</span></li>
-                  <li>· Week 4: 8,150 kg <span class="text-ok">+13.2%</span></li>
-                </ul>
-                <p class="text-fg-muted pt-1">
-                  Consistent positive trend, no signs of overreaching. Want me
-                  to also look at the per-exercise distribution?
-                </p>
-                <span class="inline-block w-2 h-4 bg-accent align-middle caret-blink"></span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============== PROGRESS ============== -->
-    <section id="progress" class="border-t border-border">
-      <div
-        class="max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center"
-      >
-        <div>
-          <span
-            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
-            >Progress</span
-          >
-          <h2
-            class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
-          >
-            See the trend, not the day.
-          </h2>
-          <p class="mt-5 text-fg-muted leading-relaxed">
-            Weekly volume charts, personal records, muscle group distribution,
-            frequency, current streak and automatic monthly report — all built
-            directly on your real data.
-          </p>
-
-          <div class="mt-7 grid grid-cols-3 gap-3 text-center">
-            <div class="tile rounded-lg border border-border p-4">
-              <div class="font-mono text-2xl text-fg">28.4k</div>
-              <div class="font-mono text-[10px] text-fg-dim uppercase mt-1">
-                kg / 4 wk
-              </div>
-            </div>
-            <div class="tile rounded-lg border border-border p-4">
-              <div class="font-mono text-2xl text-fg">12</div>
-              <div class="font-mono text-[10px] text-fg-dim uppercase mt-1">
-                streak
-              </div>
-            </div>
-            <div class="tile rounded-lg border border-border p-4">
-              <div class="font-mono text-2xl text-fg">7</div>
-              <div class="font-mono text-[10px] text-fg-dim uppercase mt-1">
-                PRs
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Progress phone screenshot -->
-        <div class="relative perspective flex justify-center" style="perspective: 1400px">
-          <div
-            class="phone-frame relative tilt w-[240px] sm:w-[280px]"
-            style="background: linear-gradient(#ffffff04, transparent)"
-          >
-            <img
-              src="assets/screenshots/progress.png"
-              alt="Progress screen showing monthly report, total workouts and sets, goals, annual heatmap and weekly frequency"
-              class="w-full h-auto block"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-          <!-- floating annotation -->
-          <div
-            class="hidden sm:flex absolute -left-6 top-1/4 items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-bg-elev/80 backdrop-blur font-mono text-[11px] text-fg-muted"
-          >
-            <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
-            annual heatmap
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============== BODY + SLEEP + GOALS ============== -->
-    <section class="border-t border-border">
-      <div
-        class="max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center"
-      >
-        <div>
-          <span
-            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
-            >Body & habits</span
-          >
-          <h2
-            class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
-          >
-            More than dumbbells.
-          </h2>
-          <p class="mt-5 text-fg-muted leading-relaxed">
-            Training is only part of it. Track body measurements, weight,
-            sleep, time-bound goals and cardio — all in the same local store.
-          </p>
-
-          <div class="mt-8 grid sm:grid-cols-2 gap-3">
-            <div class="tile rounded-tile border border-border p-4 bg-bg-card/40">
-              <div class="text-xl">📏</div>
-              <div class="mt-2 font-medium text-sm">Body measurements</div>
-              <p class="mt-1 text-xs text-fg-muted">
-                Trend per region over time.
-              </p>
-            </div>
-            <div class="tile rounded-tile border border-border p-4 bg-bg-card/40">
-              <div class="text-xl">😴</div>
-              <div class="mt-2 font-medium text-sm">Sleep & quality</div>
-              <p class="mt-1 text-xs text-fg-muted">
-                Duration and perceived impact on training.
-              </p>
-            </div>
-            <div class="tile rounded-tile border border-border p-4 bg-bg-card/40">
-              <div class="text-xl">🎯</div>
-              <div class="mt-2 font-medium text-sm">Time-bound goals</div>
-              <p class="mt-1 text-xs text-fg-muted">
-                Weight, PR, measurement. Automatic progress.
-              </p>
-            </div>
-            <div class="tile rounded-tile border border-border p-4 bg-bg-card/40">
-              <div class="text-xl">🏃</div>
-              <div class="mt-2 font-medium text-sm">Cardio</div>
-              <p class="mt-1 text-xs text-fg-muted">
-                Distance, pace, time in the weekly summary.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Body measurements phone screenshot -->
-        <div class="relative perspective flex justify-center" style="perspective: 1400px">
-          <div
-            class="phone-frame relative tilt w-[240px] sm:w-[280px]"
-            style="background: linear-gradient(#ffffff04, transparent)"
-          >
-            <img
-              src="assets/screenshots/body-measurements.png"
-              alt="Body measurements screen showing side-by-side left/right comparison, trend chart and min/max/average stats"
-              class="w-full h-auto block"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-          <!-- floating annotation -->
-          <div
-            class="hidden sm:flex absolute -right-4 top-1/3 items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-bg-elev/80 backdrop-blur font-mono text-[11px] text-fg-muted"
-          >
-            <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
-            trend chart
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============== OPENSOURCE / PRIVACY ============== -->
-    <section id="opensource" class="border-t border-border">
-      <div
-        class="max-w-container mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center"
-      >
-        <div
-          class="tile rounded-tile border border-border bg-bg-card/60 overflow-hidden"
-        >
-          <div
-            class="flex items-center justify-between px-5 py-3 border-b border-border bg-bg-elev"
-          >
-            <div class="flex items-center gap-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-[#ff5f57]"></span>
-              <span class="w-2.5 h-2.5 rounded-full bg-[#febc2e]"></span>
-              <span class="w-2.5 h-2.5 rounded-full bg-[#28c840]"></span>
-            </div>
-            <span
-              class="font-mono text-[11px] text-fg-dim uppercase tracking-[0.14em]"
-              >local-first</span
-            >
-            <span class="font-mono text-[11px] text-fg-faint">~/data</span>
-          </div>
-          <div class="p-5 font-mono text-sm space-y-2">
-            <div class="flex gap-3">
-              <span class="text-accent">$</span>
-              <span class="text-fg-muted"># All your data stays on the device</span>
-            </div>
-            <div class="flex gap-3">
-              <span class="text-accent">$</span>
-              <span class="text-fg">sqlite&gt; SELECT COUNT(*) FROM workouts;</span>
-            </div>
-            <div class="flex gap-3">
-              <span class="text-fg-dim ml-5">142</span>
-            </div>
-            <div class="flex gap-3">
-              <span class="text-accent">$</span>
-              <span class="text-fg">sqlite&gt; SELECT SUM(weight*reps) FROM sets;</span>
-            </div>
-            <div class="flex gap-3">
-              <span class="text-fg-dim ml-5">284,350</span>
-            </div>
-            <div class="flex gap-3">
-              <span class="text-accent">$</span>
-              <span class="text-fg-muted"
-                ># One-tap export: full CSV</span
-              >
-            </div>
-            <div class="flex gap-3">
-              <span class="text-accent">$</span>
-              <span class="text-fg">share_plus.save("workouts.csv")</span>
-            </div>
-            <div class="flex gap-3">
-              <span class="text-ok">✓</span>
-              <span class="text-fg-muted">Cloud is optional. Account never required.</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-8">
-          <div>
-            <span
-              class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
-              >Open source · local-first</span
-            >
-            <h2
-              class="mt-4 text-4xl md:text-5xl font-medium leading-[1.05] tracking-[-0.035em]"
-            >
-              Your data. Your device.
-            </h2>
-            <p class="mt-5 text-fg-muted leading-relaxed">
-              Workout Notes is built with Flutter and SQLite. Nothing leaves
-              your phone unless you ask. The AI Coach is fully optional —
-              without it, the app runs 100% offline, with no login, no
-              analytics.
-            </p>
-            <div class="mt-6 flex flex-wrap gap-2 font-mono text-[11px]">
-              <span class="px-2.5 py-1 rounded-full border border-border text-fg-muted"
-                >MIT License</span
-              >
-              <span class="px-2.5 py-1 rounded-full border border-border text-fg-muted"
-                >Flutter 3.x</span
-              >
-              <span class="px-2.5 py-1 rounded-full border border-border text-fg-muted"
-                >SQLite (sqflite)</span
-              >
-              <span class="px-2.5 py-1 rounded-full border border-border text-fg-muted"
-                >Material 3</span
-              >
-              <span class="px-2.5 py-1 rounded-full border border-border text-fg-muted"
-                >flutter_secure_storage</span
-              >
-              <span class="px-2.5 py-1 rounded-full border border-border text-fg-muted"
-                >fl_chart</span
-              >
-            </div>
-            <a
-              href="https://github.com/RafaelGoulartB/workout-notes"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="mt-7 inline-flex items-center gap-2 h-10 px-4 rounded-md border border-border hover:border-border-strong transition-colors text-sm"
-            >
-              <svg
-                class="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path
-                  d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 015.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5z"
-                />
-              </svg>
-              Explore the code
-            </a>
-          </div>
-
-          <!-- Workout detail phone screenshot -->
-          <div class="relative perspective flex justify-center sm:justify-start" style="perspective: 1400px">
-            <div
-              class="phone-frame relative tilt w-[200px] sm:w-[220px]"
-              style="background: linear-gradient(#ffffff04, transparent)"
-            >
-              <img
-                src="assets/screenshots/workout-finish.png"
-                alt="Completed workout details with evolution, highlights, muscle volume per group and sets with RPE"
-                class="w-full h-auto block"
-                loading="lazy"
-                decoding="async"
-              />
-            </div>
-            <div
-              class="hidden sm:flex absolute -right-4 top-1/3 items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-bg-elev/80 backdrop-blur font-mono text-[11px] text-fg-muted"
-            >
-              <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
-              post-workout detail
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============== FINAL CTA ============== -->
-    <section
-      id="download"
-      class="border-t border-border relative overflow-hidden"
-    >
-      <div
-        class="pointer-events-none absolute inset-0"
-        style="
-          background: radial-gradient(
-            500px 400px at 50% 100%,
-            oklch(0.68 0.11 198 / 0.12),
-            transparent 70%
-          );
-        "
-      ></div>
-      <div
-        class="relative max-w-container mx-auto px-6 lg:px-8 py-28 text-center"
-      >
-        <h2
-          class="text-4xl md:text-6xl font-medium leading-[1.05] tracking-[-0.035em] max-w-3xl mx-auto"
-        >
-          Start logging
-          <span
-            class="text-transparent"
-            style="
-              background: linear-gradient(180deg, #fafafa 30%, #71717a 100%);
-              -webkit-background-clip: text;
-              background-clip: text;
-            "
-            >today.</span
-          >
-        </h2>
-        <p class="mt-5 text-fg-muted max-w-xl mx-auto">
-          Build straight from the repo, or grab a release. No account, no
-          subscription, no telemetry.
-        </p>
-        <div class="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <a
-            href="https://github.com/RafaelGoulartB/workout-notes/releases/latest"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="inline-flex items-center gap-2 h-11 px-5 rounded-lg bg-fg text-bg font-medium hover:-translate-y-px transition-transform"
-          >
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M3 20.5V3.5c0-.4.2-.8.5-1L14.6 12 3.5 21.5c-.3-.2-.5-.6-.5-1zm14.5-7L20 11.5l-3 1.7-2.4-1.4 2.9-1.3zm-2.4 2.7L5.5 21 17 14-1.9-1.1zM5.5 3l11.5 7.5L15.1 9 5.5 3z"
-              />
-            </svg>
-            Download APK
-          </a>
-          <a
-            href="https://github.com/RafaelGoulartB/workout-notes#readme"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="inline-flex items-center gap-2 h-11 px-5 rounded-lg border border-border hover:border-border-strong transition-colors"
-          >
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 015.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5z"
-              />
-            </svg>
-            View on GitHub
-          </a>
-          <a
-            href="https://github.com/RafaelGoulartB/workout-notes"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="inline-flex items-center gap-2 h-11 px-5 rounded-lg border border-border hover:border-border-strong transition-colors font-mono text-sm"
-          >
-            $ git clone
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============== FOOTER ============== -->
-    <footer class="border-t border-border">
-      <div
-        class="max-w-container mx-auto px-6 lg:px-8 py-14 grid sm:grid-cols-2 lg:grid-cols-5 gap-10"
-      >
-        <div class="lg:col-span-2">
-          <div class="flex items-center gap-2">
-            <span
-              class="w-7 h-7 rounded-md bg-accent flex items-center justify-center text-bg font-bold text-sm"
-              >W</span
-            >
-            <span class="font-medium tracking-tight text-[15px]"
-              >Workout Notes</span
-            >
-          </div>
-          <p class="mt-3 text-sm text-fg-muted max-w-xs">
-            Offline workout journal, with optional AI. Built with Flutter.
-          </p>
-        </div>
-
-        <div>
-          <div
-            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
-          >
-            Product
-          </div>
-          <ul class="mt-3 space-y-2 text-sm text-fg-muted">
-            <li><a href="#features" class="hover:text-fg">Features</a></li>
-            <li><a href="#ai" class="hover:text-fg">AI Coach</a></li>
-            <li><a href="#progress" class="hover:text-fg">Progress</a></li>
-            <li><a href="#download" class="hover:text-fg">Download</a></li>
-          </ul>
-        </div>
-
-        <div>
-          <div
-            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
-          >
-            Resources
-          </div>
-          <ul class="mt-3 space-y-2 text-sm text-fg-muted">
-            <li>
-              <a
-                href="https://github.com/RafaelGoulartB/workout-notes#readme"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="hover:text-fg"
-                >Documentation</a
-              >
-            </li>
-            <li>
-              <a
-                href="https://github.com/RafaelGoulartB/workout-notes/releases"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="hover:text-fg"
-                >Changelog</a
-              >
-            </li>
-            <li>
-              <a
-                href="https://github.com/RafaelGoulartB/workout-notes/issues"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="hover:text-fg"
-                >Roadmap</a
-              >
-            </li>
-            <li>
-              <a
-                href="https://github.com/RafaelGoulartB/workout-notes/blob/main/README.md"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="hover:text-fg"
-                >README</a
-              >
-            </li>
-          </ul>
-        </div>
-
-        <div>
-          <div
-            class="font-mono text-[11px] uppercase tracking-[0.14em] text-fg-dim"
-          >
-            Community
-          </div>
-          <ul class="mt-3 space-y-2 text-sm text-fg-muted">
-            <li>
-              <a
-                href="https://github.com/RafaelGoulartB/workout-notes"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="hover:text-fg"
-                >GitHub</a
-              >
-            </li>
-            <li>
-              <a
-                href="https://github.com/RafaelGoulartB/workout-notes/issues/new"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="hover:text-fg"
-                >Report bug</a
-              >
-            </li>
-            <li>
-              <a
-                href="https://github.com/RafaelGoulartB/workout-notes/blob/main/CONTRIBUTING.md"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="hover:text-fg"
-                >Contribute</a
-              >
-            </li>
-            <li>
-              <a
-                href="https://github.com/RafaelGoulartB/workout-notes/blob/main/LICENSE"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="hover:text-fg"
-                >MIT License</a
-              >
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="border-t border-border">
-        <div
-          class="max-w-container mx-auto px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-fg-dim"
-        >
-          <div class="font-mono">
-            © 2025 Workout Notes · MIT License · built with Flutter
-          </div>
-          <div class="flex items-center gap-4 font-mono">
-            <a
-              href="https://github.com/RafaelGoulartB/workout-notes/blob/main/LICENSE"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="hover:text-fg"
-              >MIT License</a
-            >
-            <span class="flex items-center gap-1.5">
-              <span class="w-1.5 h-1.5 rounded-full bg-accent"></span>
-              status: ok
+          <p class="hero__meta">
+            <span>
+              <svg aria-hidden="true"><use href="#i-offline" /></svg>
+              Works offline
             </span>
+            <span>
+              <svg aria-hidden="true"><use href="#i-lock" /></svg>
+              No account
+            </span>
+            <span>
+              <svg aria-hidden="true"><use href="#i-database" /></svg>
+              Local SQLite
+            </span>
+            <span>
+              <svg aria-hidden="true"><use href="#i-android" /></svg>
+              Android first
+            </span>
+          </p>
+        </div>
+
+        <div class="container container-wide">
+          <div class="showcase">
+            <div class="showcase__item showcase__item--left">
+              <div class="phone phone--sm phone--flat">
+                <div class="phone__screen">
+                  <img
+                    src="assets/screenshots/nutrition.png"
+                    alt="Nutrition diary showing daily calories, macronutrients and logged meals"
+                    width="1080"
+                    height="2400"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="showcase__item showcase__item--center">
+              <div class="phone">
+                <div class="phone__screen">
+                  <img
+                    src="assets/screenshots/home.png"
+                    alt="Workout Notes dashboard with monthly workout count, volume, streak, quick actions and completed sessions"
+                    width="1080"
+                    height="2400"
+                    fetchpriority="high"
+                  />
+                </div>
+              </div>
+              <span class="tag" style="top: 22%; left: -74px">
+                <span class="dot"></span> streak · volume
+              </span>
+              <span class="tag" style="bottom: 20%; right: -66px">
+                1-tap session start
+              </span>
+            </div>
+
+            <div class="showcase__item showcase__item--right">
+              <div class="phone phone--sm phone--flat">
+                <div class="phone__screen">
+                  <img
+                    src="assets/screenshots/run.jpg"
+                    alt="Completed run with route map, distance, pace, calories and a pace chart"
+                    width="810"
+                    height="1800"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="showcase__fade"></div>
           </div>
+        </div>
+      </section>
+
+      <!-- ===================== VALUE STRIP ===================== -->
+      <section class="strip">
+        <div class="container">
+          <div class="strip__grid">
+            <div class="strip__cell">
+              <strong>0</strong>
+              <span>accounts, logins or servers to sign up for</span>
+            </div>
+            <div class="strip__cell">
+              <strong>6</strong>
+              <span>domains: strength, cardio, sleep, food, body, planning</span>
+            </div>
+            <div class="strip__cell">
+              <strong>2</strong>
+              <span>languages: English and Brazilian Portuguese</span>
+            </div>
+            <div class="strip__cell">
+              <strong>MIT</strong>
+              <span>licensed, auditable, built with Flutter</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== DOMAINS BENTO ===================== -->
+      <section class="section section--flush" id="domains">
+        <div class="container">
+          <div class="section__head section__head--center" data-reveal>
+            <span class="eyebrow">What it covers</span>
+            <h2>Six connected areas, one database</h2>
+            <p>
+              Every domain reads the same local data, so your body weight feeds
+              calorie estimates, your runs count toward goals, and a
+              periodization week can drive both your routine and your macros.
+            </p>
+          </div>
+
+          <div class="bento" data-reveal>
+            <a class="card card--hover bento__card" href="docs/strength-training.html">
+              <span class="itile itile--accent">
+                <svg aria-hidden="true"><use href="#i-dumbbell" /></svg>
+              </span>
+              <h3>Strength training</h3>
+              <p>
+                Log sets with weight, reps, RPE, warm-up flags and notes. Rest
+                timer, drag-to-reorder, auto-filled sets from your last session
+                and PR detection on finish.
+              </p>
+              <div class="bento__tags">
+                <span class="pill">Routines</span>
+                <span class="pill">Rest timer</span>
+                <span class="pill">10 exercise types</span>
+              </div>
+              <span class="arrow-link">
+                Read the guide
+                <svg aria-hidden="true"><use href="#i-arrow-right" /></svg>
+              </span>
+            </a>
+
+            <a class="card card--hover bento__card" href="docs/running.html">
+              <span class="itile itile--green">
+                <svg aria-hidden="true"><use href="#i-route" /></svg>
+              </span>
+              <h3>Running &amp; cycling</h3>
+              <p>
+                GPS recording in a foreground service that survives a closed
+                app, per-kilometre splits, elevation, best-effort times and
+                route replay. Stationary bike sessions need no GPS.
+              </p>
+              <div class="bento__tags">
+                <span class="pill">Splits</span>
+                <span class="pill">Route replay</span>
+                <span class="pill">Achievements</span>
+              </div>
+              <span class="arrow-link">
+                Read the guide
+                <svg aria-hidden="true"><use href="#i-arrow-right" /></svg>
+              </span>
+            </a>
+
+            <a class="card card--hover bento__card" href="docs/run-plans.html">
+              <span class="itile itile--violet">
+                <svg aria-hidden="true"><use href="#i-map" /></svg>
+              </span>
+              <h3>Running plans</h3>
+              <p>
+                Build a plan from a template catalog covering 5K to marathon, base
+                building, threshold and hill blocks, with paces derived from a
+                VDOT model and step-by-step voice coaching.
+              </p>
+              <div class="bento__tags">
+                <span class="pill">VDOT paces</span>
+                <span class="pill">Intervals</span>
+                <span class="pill">Voice cues</span>
+              </div>
+              <span class="arrow-link">
+                Read the guide
+                <svg aria-hidden="true"><use href="#i-arrow-right" /></svg>
+              </span>
+            </a>
+
+            <a class="card card--hover bento__card" href="docs/sleep.html">
+              <span class="itile">
+                <svg aria-hidden="true"><use href="#i-moon" /></svg>
+              </span>
+              <h3>Sleep &amp; alarms</h3>
+              <p>
+                Log nights by hand or let the Android monitor estimate sleep
+                stages from on-device audio aggregates. Alarms keep ringing with
+                the app closed, with an optional barcode wake-up mission.
+              </p>
+              <div class="bento__tags">
+                <span class="pill">Efficiency</span>
+                <span class="pill">Regularity</span>
+                <span class="pill">Missions</span>
+              </div>
+              <span class="arrow-link">
+                Read the guide
+                <svg aria-hidden="true"><use href="#i-arrow-right" /></svg>
+              </span>
+            </a>
+
+            <a class="card card--hover bento__card" href="docs/nutrition.html">
+              <span class="itile itile--amber">
+                <svg aria-hidden="true"><use href="#i-utensils" /></svg>
+              </span>
+              <h3>Nutrition</h3>
+              <p>
+                A meal diary with calorie and macro targets, a reusable food
+                library, saved meals, barcode lookup, label photos and
+                micronutrient summaries.
+              </p>
+              <div class="bento__tags">
+                <span class="pill">Barcode</span>
+                <span class="pill">Saved meals</span>
+                <span class="pill">Macro math</span>
+              </div>
+              <span class="arrow-link">
+                Read the guide
+                <svg aria-hidden="true"><use href="#i-arrow-right" /></svg>
+              </span>
+            </a>
+
+            <a class="card card--hover bento__card" href="docs/periodization.html">
+              <span class="itile itile--rose">
+                <svg aria-hidden="true"><use href="#i-plan" /></svg>
+              </span>
+              <h3>Periodization</h3>
+              <p>
+                Split a training block into phases with versioned nutrition,
+                training, weight, sleep and running targets, then review
+                adherence in a weekly check-in.
+              </p>
+              <div class="bento__tags">
+                <span class="pill">Phases</span>
+                <span class="pill">Adherence</span>
+                <span class="pill">Check-ins</span>
+              </div>
+              <span class="arrow-link">
+                Read the guide
+                <svg aria-hidden="true"><use href="#i-arrow-right" /></svg>
+              </span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== FEATURE: STRENGTH ===================== -->
+      <section class="section">
+        <div class="container">
+          <div class="feature">
+            <div class="feature__copy" data-reveal>
+              <span class="eyebrow">Live session</span>
+              <h2>Logging that keeps up with the set you just finished</h2>
+              <p>
+                Open a routine day or start empty. Each new exercise arrives
+                pre-filled with the weight and reps from the last time you
+                trained it, so most sets are one tap.
+              </p>
+              <ul class="checks">
+                <li>
+                  <span
+                    ><strong>Rest timer starts itself</strong> when you tick a
+                    set, anchored to wall-clock time so it stays accurate in the
+                    background.</span
+                  >
+                </li>
+                <li>
+                  <span
+                    ><strong>Pause is honest:</strong> resuming shifts the
+                    start time forward, so paused minutes never inflate your
+                    session duration.</span
+                  >
+                </li>
+                <li>
+                  <span
+                    ><strong>RPE 0–10, warm-up flags and per-set comments</strong>
+                    in one sheet, with controls that adapt to the exercise
+                    type.</span
+                  >
+                </li>
+                <li>
+                  <span
+                    ><strong>Personal records detected on finish</strong> for top
+                    weight, session volume and cardio distance.</span
+                  >
+                </li>
+              </ul>
+              <a class="arrow-link" href="docs/strength-training.html">
+                Strength training documentation
+                <svg aria-hidden="true"><use href="#i-arrow-right" /></svg>
+              </a>
+            </div>
+
+            <div class="feature__media" data-reveal>
+              <div class="phone">
+                <div class="phone__screen">
+                  <img
+                    src="assets/screenshots/workout-progress.png"
+                    alt="Live strength session with a session timer, rest timer, and completed and pending sets for each exercise"
+                    width="1080"
+                    height="2400"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+              <span class="tag" style="top: 26%; left: -12px">
+                <span class="dot"></span> rest 1:30
+              </span>
+              <span class="tag" style="bottom: 22%; right: -18px">
+                volume vs last session
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== FEATURE: RUNNING ===================== -->
+      <section class="section">
+        <div class="container">
+          <div class="feature feature--flip">
+            <div class="feature__copy" data-reveal>
+              <span class="eyebrow">Running</span>
+              <h2>Runs that survive a locked screen</h2>
+              <p>
+                Recording runs in an Android foreground service, with the
+                durable copy written by the native side and imported into SQLite
+                when you reopen the app. Kill the app mid-run and the session is
+                still there.
+              </p>
+              <dl class="feature__stats">
+                <div>
+                  <dt>Splits</dt>
+                  <dd>Per km + fastest</dd>
+                </div>
+                <div>
+                  <dt>Elevation</dt>
+                  <dd>Gain / loss</dd>
+                </div>
+                <div>
+                  <dt>Efforts</dt>
+                  <dd>1K → marathon</dd>
+                </div>
+              </dl>
+              <ul class="checks" style="margin-top: 22px">
+                <li><span>Live map, splits and interval rows while you run</span></li>
+                <li><span>Route replay and pace charts after the session</span></li>
+                <li>
+                  <span>Stationary bike sessions timed without GPS or a native service</span>
+                </li>
+              </ul>
+              <a class="arrow-link" href="docs/running.html">
+                Running &amp; cycling documentation
+                <svg aria-hidden="true"><use href="#i-arrow-right" /></svg>
+              </a>
+            </div>
+
+            <div class="feature__media" data-reveal>
+              <div class="phone">
+                <div class="phone__screen">
+                  <img
+                    src="assets/screenshots/run-progress.jpg"
+                    alt="Run in progress with a live route on the map, elapsed time, distance, pace and session controls"
+                    width="810"
+                    height="1800"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+              <span class="tag" style="top: 30%; right: -14px">
+                <span class="dot"></span> live GPS
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== FEATURE: SLEEP + NUTRITION ===================== -->
+      <section class="section">
+        <div class="container">
+          <div class="feature">
+            <div class="feature__copy" data-reveal>
+              <span class="eyebrow">Recovery &amp; fuel</span>
+              <h2>The two habits that decide whether training works</h2>
+              <p>
+                Sleep and nutrition are first-class tabs, not afterthoughts. The
+                sleep monitor labels 30-second epochs as awake, sleeping or deep
+                using only aggregate signals computed on the device. Raw audio
+                is never read by the analysis.
+              </p>
+              <ul class="checks">
+                <li>
+                  <span
+                    ><strong>Sleep dashboard</strong> with efficiency, latency,
+                    awakenings, 7- and 30-day averages and a regularity
+                    score.</span
+                  >
+                </li>
+                <li>
+                  <span
+                    ><strong>Calorie and macro targets</strong> suggested from
+                    Mifflin-St Jeor and an activity factor, then adjusted for a
+                    cut, maintenance or bulk.</span
+                  >
+                </li>
+                <li>
+                  <span
+                    ><strong>Barcode and label-photo entry</strong> so building
+                    the food library stays quick.</span
+                  >
+                </li>
+              </ul>
+              <div class="hero__cta" style="justify-content: flex-start; margin-top: 26px">
+                <a class="btn btn--outline btn--sm" href="docs/sleep.html">
+                  <svg aria-hidden="true"><use href="#i-moon" /></svg>
+                  Sleep docs
+                </a>
+                <a class="btn btn--outline btn--sm" href="docs/nutrition.html">
+                  <svg aria-hidden="true"><use href="#i-utensils" /></svg>
+                  Nutrition docs
+                </a>
+              </div>
+            </div>
+
+            <div class="feature__media" data-reveal>
+              <div class="phone phone--sm" style="margin-right: -46px; transform: translateY(24px)">
+                <div class="phone__screen">
+                  <img
+                    src="assets/screenshots/sleep.png"
+                    alt="Sleep dashboard with goal completion, efficiency, bedtime and estimated sleep stages"
+                    width="1080"
+                    height="2400"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+              <div class="phone phone--sm">
+                <div class="phone__screen">
+                  <img
+                    src="assets/screenshots/nutrition-balance.png"
+                    alt="Weekly nutrition balance with daily intake versus target, a seven-day rolling average and macronutrient distribution"
+                    width="1080"
+                    height="2400"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== FEATURE: PROGRESS ===================== -->
+      <section class="section">
+        <div class="container">
+          <div class="feature feature--flip">
+            <div class="feature__copy" data-reveal>
+              <span class="eyebrow">Progress</span>
+              <h2>Numbers you can trace back to a formula</h2>
+              <p>
+                Charts are built from your own rows, and the maths is written
+                down. Estimated one-rep max uses Epley on the heaviest set of a
+                session; volume is always the sum of weight × reps with warm-ups
+                excluded; body-weight trend is a least-squares slope per week.
+              </p>
+              <div class="table-wrap" style="margin-top: 24px">
+                <table class="matrix">
+                  <thead>
+                    <tr>
+                      <th>Metric</th>
+                      <th style="width: auto; text-align: left">How it is computed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Estimated 1RM</td>
+                      <td style="text-align: left" class="mono">weight × (1 + reps / 30)</td>
+                    </tr>
+                    <tr>
+                      <td>Volume</td>
+                      <td style="text-align: left" class="mono">Σ weight × reps, is_warmup = 0</td>
+                    </tr>
+                    <tr>
+                      <td>Density</td>
+                      <td style="text-align: left" class="mono">volume ÷ session duration</td>
+                    </tr>
+                    <tr>
+                      <td>Streak</td>
+                      <td style="text-align: left" class="mono">consecutive days with a finished workout</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <a class="arrow-link" href="docs/progress.html" style="margin-top: 26px">
+                Progress &amp; analytics documentation
+                <svg aria-hidden="true"><use href="#i-arrow-right" /></svg>
+              </a>
+            </div>
+
+            <div class="feature__media" data-reveal>
+              <div class="phone">
+                <div class="phone__screen">
+                  <img
+                    src="assets/screenshots/progress.png"
+                    alt="Training progress report with goals, an annual activity heatmap and weekly workout frequency"
+                    width="1080"
+                    height="2400"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+              <span class="tag" style="top: 18%; left: -16px">
+                <span class="dot"></span> yearly heatmap
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== AI COACH ===================== -->
+      <section class="section" id="ai">
+        <div class="backdrop">
+          <div class="backdrop__glow backdrop__glow--violet"></div>
+        </div>
+        <div class="container">
+          <div class="feature">
+            <div class="feature__copy" data-reveal>
+              <span class="eyebrow">Optional AI Coach</span>
+              <h2>Bring your own provider. Keep the veto.</h2>
+              <p>
+                Point the app at any OpenAI-compatible endpoint, paste your
+                token and pick a model. The coach answers with your data because
+                it calls read tools against your local database, never from
+                memory or guesswork.
+              </p>
+              <ul class="checks">
+                <li>
+                  <span
+                    ><strong>Read tools run directly:</strong> workouts,
+                    exercises, records, runs, sleep, nutrition, goals and
+                    cross-domain analyses.</span
+                  >
+                </li>
+                <li>
+                  <span
+                    ><strong>Writes are proposals only:</strong> routine changes
+                    and new manual foods are reviewed in the app, revalidated,
+                    then applied in a transaction.</span
+                  >
+                </li>
+                <li>
+                  <span
+                    ><strong>Credentials stay in secure storage:</strong> never
+                    in SQLite, logs, prompts or backups.</span
+                  >
+                </li>
+                <li>
+                  <span
+                    ><strong>Fully optional:</strong> nothing is bundled and no
+                    key ships with the app; skip it and the rest works
+                    unchanged.</span
+                  >
+                </li>
+              </ul>
+              <a class="arrow-link" href="docs/ai-coach.html">
+                AI Coach documentation
+                <svg aria-hidden="true"><use href="#i-arrow-right" /></svg>
+              </a>
+            </div>
+
+            <div class="feature__media" data-reveal>
+              <div class="panel chat">
+                <div class="panel__head">
+                  <span>ai coach</span>
+                  <span class="term__dots"><i></i><i></i><i></i></span>
+                </div>
+                <div class="chat__thread">
+                  <div class="chat__msg chat__msg--user">
+                    Is my squat actually moving, or am I just adding sets?
+                  </div>
+                  <div class="chat__tool">
+                    <svg aria-hidden="true"><use href="#i-code" /></svg>
+                    get_exercise_history
+                  </div>
+                  <div class="chat__tool">
+                    <svg aria-hidden="true"><use href="#i-code" /></svg>
+                    get_weekly_volume_breakdown
+                  </div>
+                  <div class="chat__msg chat__msg--bot">
+                    Top set went <strong>92.5 kg × 5</strong> → <strong>100 kg × 5</strong>
+                    over eight weeks, so estimated 1RM is up about 8%. Weekly leg
+                    volume rose 34% in the same window; the strength gain is
+                    real, but the volume jump is the part I'd watch.<span class="caret"></span>
+                  </div>
+                  <div class="chat__proposal">
+                    <strong>Proposal · needs your approval</strong>
+                    <p>
+                      Trim <em>Leg Day</em> from 5 to 4 squat sets and add one
+                      back-off set at 80%.
+                    </p>
+                    <div class="chat__proposal-actions">
+                      <span class="btn btn--primary btn--sm">Review</span>
+                      <span class="btn btn--outline btn--sm">Discard</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== GALLERY ===================== -->
+      <section class="section" id="gallery" data-gallery>
+        <div class="container">
+          <div class="section__head section__head--center" data-reveal>
+            <span class="eyebrow">Screenshots</span>
+            <h2>See it before you install it</h2>
+            <p>
+              Captured on an Android device in dark mode. Tap any screen to open
+              it full size; the run screenshots use simulated GPS.
+            </p>
+          </div>
+
+          <div class="gallery__tabs" role="group" aria-label="Filter screenshots">
+            <button class="gallery__tab is-active" type="button" aria-pressed="true" data-filter="all">
+              All
+            </button>
+            <button class="gallery__tab" type="button" aria-pressed="false" data-filter="strength">
+              Strength
+            </button>
+            <button class="gallery__tab" type="button" aria-pressed="false" data-filter="cardio">
+              Running
+            </button>
+            <button class="gallery__tab" type="button" aria-pressed="false" data-filter="health">
+              Sleep &amp; food
+            </button>
+            <button class="gallery__tab" type="button" aria-pressed="false" data-filter="plan">
+              Planning
+            </button>
+          </div>
+
+          <div class="gallery__grid">
+            <button
+              class="shot"
+              type="button"
+              data-shot
+              data-group="strength"
+              data-caption="Dashboard: workouts this month, total volume, current streak, quick actions and recent sessions."
+            >
+              <span class="phone phone--sm phone--flat">
+                <span class="phone__screen">
+                  <img src="assets/screenshots/home.png" alt="Workout dashboard" width="1080" height="2400" loading="lazy" />
+                </span>
+              </span>
+              <span class="shot__caption">
+                <strong>Dashboard</strong>
+                <span>Month stats, streak and quick start</span>
+              </span>
+            </button>
+
+            <button
+              class="shot"
+              type="button"
+              data-shot
+              data-group="strength"
+              data-caption="Live strength session with session and rest timers, weights, reps and completed versus pending sets."
+            >
+              <span class="phone phone--sm phone--flat">
+                <span class="phone__screen">
+                  <img src="assets/screenshots/workout-progress.png" alt="Live strength session" width="1080" height="2400" loading="lazy" />
+                </span>
+              </span>
+              <span class="shot__caption">
+                <strong>Live session</strong>
+                <span>Sets, RPE and rest timer</span>
+              </span>
+            </button>
+
+            <button
+              class="shot"
+              type="button"
+              data-shot
+              data-group="strength"
+              data-caption="Session review with duration, volume, sets, density, evolution against a similar workout, highlights and the full set table."
+            >
+              <span class="phone phone--sm phone--flat">
+                <span class="phone__screen">
+                  <img src="assets/screenshots/workout-finish.png" alt="Session review" width="1080" height="2400" loading="lazy" />
+                </span>
+              </span>
+              <span class="shot__caption">
+                <strong>Session review</strong>
+                <span>Evolution, highlights, set table</span>
+              </span>
+            </button>
+
+            <button
+              class="shot"
+              type="button"
+              data-shot
+              data-group="cardio"
+              data-caption="Run in progress using simulated GPS, with a live route, elapsed time, distance, pace and session controls."
+            >
+              <span class="phone phone--sm phone--flat">
+                <span class="phone__screen">
+                  <img src="assets/screenshots/run-progress.jpg" alt="Run in progress" width="810" height="1800" loading="lazy" />
+                </span>
+              </span>
+              <span class="shot__caption">
+                <strong>Live run</strong>
+                <span>Map, pace and splits</span>
+              </span>
+            </button>
+
+            <button
+              class="shot"
+              type="button"
+              data-shot
+              data-group="cardio"
+              data-caption="Completed run with route map, distance, average pace, active and elapsed time, calories, fastest split, achievements and a pace chart."
+            >
+              <span class="phone phone--sm phone--flat">
+                <span class="phone__screen">
+                  <img src="assets/screenshots/run.jpg" alt="Completed run analysis" width="810" height="1800" loading="lazy" />
+                </span>
+              </span>
+              <span class="shot__caption">
+                <strong>Run analysis</strong>
+                <span>Splits, records and replay</span>
+              </span>
+            </button>
+
+            <button
+              class="shot"
+              type="button"
+              data-shot
+              data-group="health"
+              data-caption="Sleep dashboard with goal completion, efficiency, bedtime and wake time, and estimated sleep stages."
+            >
+              <span class="phone phone--sm phone--flat">
+                <span class="phone__screen">
+                  <img src="assets/screenshots/sleep.png" alt="Sleep dashboard" width="1080" height="2400" loading="lazy" />
+                </span>
+              </span>
+              <span class="shot__caption">
+                <strong>Sleep</strong>
+                <span>Stages, efficiency, regularity</span>
+              </span>
+            </button>
+
+            <button
+              class="shot"
+              type="button"
+              data-shot
+              data-group="health"
+              data-caption="Nutrition diary with daily calories, macronutrients, a plan-linked target and the meals logged that day."
+            >
+              <span class="phone phone--sm phone--flat">
+                <span class="phone__screen">
+                  <img src="assets/screenshots/nutrition.png" alt="Nutrition diary" width="1080" height="2400" loading="lazy" />
+                </span>
+              </span>
+              <span class="shot__caption">
+                <strong>Food diary</strong>
+                <span>Calories, macros and meals</span>
+              </span>
+            </button>
+
+            <button
+              class="shot"
+              type="button"
+              data-shot
+              data-group="health"
+              data-caption="Weekly nutrition balance with daily intake versus target, a seven-day rolling average and macronutrient distribution."
+            >
+              <span class="phone phone--sm phone--flat">
+                <span class="phone__screen">
+                  <img src="assets/screenshots/nutrition-balance.png" alt="Weekly nutrition balance" width="1080" height="2400" loading="lazy" />
+                </span>
+              </span>
+              <span class="shot__caption">
+                <strong>Calorie balance</strong>
+                <span>Deficit and surplus days</span>
+              </span>
+            </button>
+
+            <button
+              class="shot"
+              type="button"
+              data-shot
+              data-group="plan"
+              data-caption="Training report with goal rings, the annual activity heatmap and weekly workout frequency."
+            >
+              <span class="phone phone--sm phone--flat">
+                <span class="phone__screen">
+                  <img src="assets/screenshots/progress.png" alt="Training progress" width="1080" height="2400" loading="lazy" />
+                </span>
+              </span>
+              <span class="shot__caption">
+                <strong>Progress</strong>
+                <span>Goals, heatmap, frequency</span>
+              </span>
+            </button>
+
+            <button
+              class="shot"
+              type="button"
+              data-shot
+              data-group="plan"
+              data-caption="Active periodization plan with phases, the weekly nutrition and training targets in force, and the weekly review."
+            >
+              <span class="phone phone--sm phone--flat">
+                <span class="phone__screen">
+                  <img src="assets/screenshots/periodization.png" alt="Periodization plan" width="1080" height="2400" loading="lazy" />
+                </span>
+              </span>
+              <span class="shot__caption">
+                <strong>Periodization</strong>
+                <span>Phases, targets, check-ins</span>
+              </span>
+            </button>
+
+            <button
+              class="shot"
+              type="button"
+              data-shot
+              data-group="plan"
+              data-caption="Body weight history with a trend chart and estimated body composition."
+            >
+              <span class="phone phone--sm phone--flat">
+                <span class="phone__screen">
+                  <img src="assets/screenshots/body-measurements.png" alt="Body measurements" width="1080" height="2400" loading="lazy" />
+                </span>
+              </span>
+              <span class="shot__caption">
+                <strong>Body tracker</strong>
+                <span>Weight, trend, composition</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== DATA OWNERSHIP ===================== -->
+      <section class="section" id="data">
+        <div class="container">
+          <div class="section__head section__head--center" data-reveal>
+            <span class="eyebrow">Your data</span>
+            <h2>Local by default, portable on demand</h2>
+            <p>
+              There is no backend to trust. The database is a SQLite file on
+              your device, and the only outbound calls are the ones you switch
+              on yourself.
+            </p>
+          </div>
+
+          <div class="trio" data-reveal>
+            <div class="card trio__card">
+              <span class="itile itile--accent itile--lg">
+                <svg aria-hidden="true"><use href="#i-database" /></svg>
+              </span>
+              <h3>One file, versioned schema</h3>
+              <p>
+                Every domain lives in the same local database with UUID keys and
+                cascading deletes. Schema upgrades are incremental migrations
+                covered by tests.
+              </p>
+            </div>
+            <div class="card trio__card">
+              <span class="itile itile--green itile--lg">
+                <svg aria-hidden="true"><use href="#i-download" /></svg>
+              </span>
+              <h3>Backups you can read</h3>
+              <p>
+                Export a JSON backup, share it, or restore it from a file or
+                pasted text. Import validates every collection before it deletes
+                anything, then restores in one transaction.
+              </p>
+            </div>
+            <div class="card trio__card">
+              <span class="itile itile--violet itile--lg">
+                <svg aria-hidden="true"><use href="#i-shield" /></svg>
+              </span>
+              <h3>Deliberate boundaries</h3>
+              <p>
+                Sleep analysis reads aggregates, not audio. A wake-up mission
+                stores a salted hash, not your barcode. AI tokens never leave
+                secure storage.
+              </p>
+            </div>
+          </div>
+
+          <div class="table-wrap" style="margin-top: 40px" data-reveal>
+            <table class="matrix">
+              <caption class="sr-only">
+                Feature availability by platform
+              </caption>
+              <thead>
+                <tr>
+                  <th>Capability</th>
+                  <th>Android</th>
+                  <th>Other targets</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Workouts, exercises, routines, timers, progress</td>
+                  <td class="yes">Full</td>
+                  <td class="yes">Full</td>
+                </tr>
+                <tr>
+                  <td>Nutrition diary, food library, targets</td>
+                  <td class="yes">Full</td>
+                  <td class="yes">Full</td>
+                </tr>
+                <tr>
+                  <td>Periodization, goals, body measurements</td>
+                  <td class="yes">Full</td>
+                  <td class="yes">Full</td>
+                </tr>
+                <tr>
+                  <td>Background GPS run tracking</td>
+                  <td class="yes">Full</td>
+                  <td class="no">Not available</td>
+                </tr>
+                <tr>
+                  <td>Sleep monitoring, alarms, wake-up mission</td>
+                  <td class="yes">Full</td>
+                  <td class="no">Manual entries only</td>
+                </tr>
+                <tr>
+                  <td>Barcode scanning, native voice coaching</td>
+                  <td class="yes">Full</td>
+                  <td class="no">Not available</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="dim center" style="margin-top: 18px; font-size: 0.875rem">
+            Android is the most complete target. Elsewhere the native features
+            report themselves as unsupported instead of failing. See
+            <a class="text-accent" href="docs/data-privacy.html">data, backup &amp; privacy</a>.
+          </p>
+        </div>
+      </section>
+
+      <!-- ===================== OPEN SOURCE ===================== -->
+      <section class="section" id="opensource">
+        <div class="container">
+          <div class="feature">
+            <div class="feature__copy" data-reveal>
+              <span class="eyebrow">Open source</span>
+              <h2>Read it, build it, change it</h2>
+              <p>
+                Flutter and Material 3 on the front, SQLite repositories
+                underneath, Kotlin foreground services for the Android-only
+                features. State management stays deliberately small:
+                <span class="mono">setState</span> for local state,
+                <span class="mono">ChangeNotifier</span> for shared services.
+              </p>
+              <ul class="checks">
+                <li><span>MIT licensed, issues and pull requests welcome</span></li>
+                <li><span>Analyzer and test suite run in CI before every Android release</span></li>
+                <li><span>English and Brazilian Portuguese strings live in ARB files</span></li>
+              </ul>
+              <div class="hero__cta" style="justify-content: flex-start; margin-top: 28px">
+                <a
+                  class="btn btn--outline"
+                  href="https://github.com/RafaelGoulartB/workout-notes"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  <svg aria-hidden="true"><use href="#i-github" /></svg>
+                  Browse the repository
+                </a>
+                <a
+                  class="btn btn--ghost"
+                  href="https://github.com/RafaelGoulartB/workout-notes/blob/main/LICENSE"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  MIT license
+                  <svg aria-hidden="true"><use href="#i-arrow-up-right" /></svg>
+                </a>
+              </div>
+            </div>
+
+            <div class="feature__media" data-reveal>
+              <div class="panel term" style="width: 100%; max-width: 480px">
+                <div class="panel__head">
+                  <span>build it yourself</span>
+                  <span class="term__dots"><i></i><i></i><i></i></span>
+                </div>
+                <div class="term__body">
+                  <div class="term__line"><span class="term__prompt">$</span> git clone https://github.com/RafaelGoulartB/workout-notes</div>
+                  <div class="term__line"><span class="term__prompt">$</span> cd workout-notes</div>
+                  <div class="term__line"><span class="term__prompt">$</span> flutter pub get</div>
+                  <div class="term__line"><span class="term__prompt">$</span> flutter run</div>
+                  <div class="term__line term__comment"># checks used in CI</div>
+                  <div class="term__line"><span class="term__prompt">$</span> flutter analyze</div>
+                  <div class="term__line"><span class="term__prompt">$</span> flutter test</div>
+                  <div class="term__line"><span class="term__prompt">$</span> flutter build apk --release</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================== DOCS TEASER + CTA ===================== -->
+      <section class="section">
+        <div class="container">
+          <div class="section__head section__head--center" data-reveal>
+            <span class="eyebrow">Documentation</span>
+            <h2>Every feature, written down</h2>
+            <p>
+              The docs walk through each area of the app screen by screen, and
+              spell out the formulas and safety rules behind the numbers.
+            </p>
+          </div>
+
+          <div class="doclinks" data-reveal>
+            <a class="card card--hover doclink" href="docs/getting-started.html">
+              <span class="itile"><svg aria-hidden="true"><use href="#i-zap" /></svg></span>
+              <span class="doclink__text">
+                <strong>Getting started</strong>
+                <span>Install, permissions, first session</span>
+              </span>
+              <svg class="chev" aria-hidden="true"><use href="#i-chev-right" /></svg>
+            </a>
+            <a class="card card--hover doclink" href="docs/strength-training.html">
+              <span class="itile"><svg aria-hidden="true"><use href="#i-dumbbell" /></svg></span>
+              <span class="doclink__text">
+                <strong>Strength training</strong>
+                <span>Sets, routines, timers, history</span>
+              </span>
+              <svg class="chev" aria-hidden="true"><use href="#i-chev-right" /></svg>
+            </a>
+            <a class="card card--hover doclink" href="docs/progress.html">
+              <span class="itile"><svg aria-hidden="true"><use href="#i-chart" /></svg></span>
+              <span class="doclink__text">
+                <strong>Progress &amp; goals</strong>
+                <span>Charts, records, the formulas</span>
+              </span>
+              <svg class="chev" aria-hidden="true"><use href="#i-chev-right" /></svg>
+            </a>
+            <a class="card card--hover doclink" href="docs/run-plans.html">
+              <span class="itile"><svg aria-hidden="true"><use href="#i-map" /></svg></span>
+              <span class="doclink__text">
+                <strong>Running plans</strong>
+                <span>Templates, VDOT paces, voice</span>
+              </span>
+              <svg class="chev" aria-hidden="true"><use href="#i-chev-right" /></svg>
+            </a>
+            <a class="card card--hover doclink" href="docs/periodization.html">
+              <span class="itile"><svg aria-hidden="true"><use href="#i-plan" /></svg></span>
+              <span class="doclink__text">
+                <strong>Periodization</strong>
+                <span>Phases, targets, adherence</span>
+              </span>
+              <svg class="chev" aria-hidden="true"><use href="#i-chev-right" /></svg>
+            </a>
+            <a class="card card--hover doclink" href="docs/data-privacy.html">
+              <span class="itile"><svg aria-hidden="true"><use href="#i-lock" /></svg></span>
+              <span class="doclink__text">
+                <strong>Data &amp; privacy</strong>
+                <span>Backups, exports, boundaries</span>
+              </span>
+              <svg class="chev" aria-hidden="true"><use href="#i-chev-right" /></svg>
+            </a>
+          </div>
+
+          <div class="cta" style="margin-top: 56px" data-reveal>
+            <div class="cta__glow"></div>
+            <h2>Start logging tonight</h2>
+            <p>
+              Install the latest Android build, or clone the repository and run
+              it yourself. Either way, nothing leaves your device until you ask
+              it to.
+            </p>
+            <div class="cta__actions">
+              <a
+                class="btn btn--primary btn--lg"
+                href="https://github.com/RafaelGoulartB/workout-notes/releases/latest"
+                target="_blank"
+                rel="noopener"
+              >
+                <svg aria-hidden="true"><use href="#i-download" /></svg>
+                Get the latest release
+              </a>
+              <a class="btn btn--outline btn--lg" href="docs/getting-started.html">
+                Getting started guide
+                <svg aria-hidden="true"><use href="#i-arrow-right" /></svg>
+              </a>
+            </div>
+            <p class="cta__note">Android APK · MIT license · no telemetry</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ===================== FOOTER ===================== -->
+    <footer class="site-footer">
+      <div class="container">
+        <div class="site-footer__grid">
+          <div class="site-footer__about">
+            <a class="brand" href="index.html">
+              <img src="assets/brand/icon-64.png" alt="" width="27" height="27" />
+              <span>Workout Notes</span>
+            </a>
+            <p>
+              Training, running, sleep, nutrition and planning in one local-first
+              Flutter app. Built by Rafael Goulart and released under the MIT
+              license.
+            </p>
+          </div>
+
+          <div>
+            <h3>Documentation</h3>
+            <ul>
+              <li><a href="docs/index.html">Overview</a></li>
+              <li><a href="docs/getting-started.html">Getting started</a></li>
+              <li><a href="docs/strength-training.html">Strength training</a></li>
+              <li><a href="docs/progress.html">Progress &amp; goals</a></li>
+              <li><a href="docs/body.html">Body measurements</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h3>Guides</h3>
+            <ul>
+              <li><a href="docs/running.html">Running &amp; cycling</a></li>
+              <li><a href="docs/run-plans.html">Running plans</a></li>
+              <li><a href="docs/sleep.html">Sleep &amp; alarms</a></li>
+              <li><a href="docs/nutrition.html">Nutrition</a></li>
+              <li><a href="docs/periodization.html">Periodization</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h3>Project</h3>
+            <ul>
+              <li><a href="docs/ai-coach.html">AI Coach</a></li>
+              <li><a href="docs/data-privacy.html">Data &amp; privacy</a></li>
+              <li><a href="docs/faq.html">FAQ</a></li>
+              <li>
+                <a href="https://github.com/RafaelGoulartB/workout-notes" target="_blank" rel="noopener">
+                  GitHub repository
+                </a>
+              </li>
+              <li>
+                <a href="https://github.com/RafaelGoulartB/workout-notes/releases/latest" target="_blank" rel="noopener">
+                  Releases
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="site-footer__bottom">
+          <span>© <span data-year>2026</span> Rafael Goulart · MIT licensed</span>
+          <span>
+            <a href="https://github.com/RafaelGoulartB/workout-notes/blob/main/AGENTS.md" target="_blank" rel="noopener">
+              Contributing conventions
+            </a>
+            ·
+            <a href="https://www.linkedin.com/in/rafael-goulartb/" target="_blank" rel="noopener">LinkedIn</a>
+          </span>
         </div>
       </div>
     </footer>
 
-    <script src="script.js" defer></script>
+    <!-- ===================== LIGHTBOX ===================== -->
+    <div class="lightbox" data-lightbox aria-hidden="true" role="dialog" aria-modal="true" aria-label="Screenshot viewer">
+      <button class="icon-btn lightbox__close" type="button" data-lightbox-close aria-label="Close viewer">
+        <svg aria-hidden="true"><use href="#i-x" /></svg>
+      </button>
+      <button class="icon-btn lightbox__nav lightbox__nav--prev" type="button" data-lightbox-prev aria-label="Previous screenshot">
+        <svg aria-hidden="true"><use href="#i-chev-left" /></svg>
+      </button>
+      <button class="icon-btn lightbox__nav lightbox__nav--next" type="button" data-lightbox-next aria-label="Next screenshot">
+        <svg aria-hidden="true"><use href="#i-chev-right" /></svg>
+      </button>
+      <figure class="lightbox__figure" data-lightbox-figure>
+        <img data-lightbox-img src="assets/screenshots/home.png" alt="" />
+        <figcaption class="lightbox__caption" data-lightbox-caption></figcaption>
+      </figure>
+    </div>
+
+    <script src="assets/js/site.js" defer></script>
+    <script src="assets/js/landing.js" defer></script>
   </body>
 </html>
