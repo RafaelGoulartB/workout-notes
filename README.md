@@ -1,12 +1,28 @@
 <h1 align="center">Workout Notes</h1>
 
 <p align="center">
-  Training, nutrition, sleep, and progress in one local-first app.
+  <a href="https://www.linkedin.com/in/rafael-goulartb/">
+    <img alt="Rafael Goulart" src="https://img.shields.io/badge/-Rafael%20Goulart-0B7285?style=flat&logo=Linkedin&logoColor=white" />
+  </a>
+  <a href="https://github.com/RafaelGoulartB/workout-notes#readme">
+    <img alt="Documentation" src="https://img.shields.io/badge/documentation-yes-0B7285.svg" />
+  </a>
+  <a href="https://github.com/RafaelGoulartB/workout-notes/graphs/commit-activity">
+    <img alt="Maintenance" src="https://img.shields.io/badge/Maintained%3F-yes-0B7285.svg" />
+  </a>
+  <a href="https://github.com/RafaelGoulartB/workout-notes/blob/main/LICENSE">
+    <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-0B7285.svg" />
+  </a>
+  <a href="https://github.com/RafaelGoulartB/workout-notes/actions/workflows/release-android.yml">
+    <img alt="Android release" src="https://img.shields.io/github/actions/workflow/status/RafaelGoulartB/workout-notes/release-android.yml?branch=main&label=Android%20release&color=0B7285" />
+  </a>
+  <img alt="GitHub Pull Requests" src="https://img.shields.io/github/issues-pr/RafaelGoulartB/workout-notes?color=0B7285" />
+  <img alt="GitHub Contributors" src="https://img.shields.io/github/contributors/RafaelGoulartB/workout-notes?color=0B7285" />
+  <img alt="GitHub repository size" src="https://img.shields.io/github/repo-size/RafaelGoulartB/workout-notes?color=0B7285" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/RafaelGoulartB/workout-notes/actions/workflows/release-android.yml"><img alt="Android release" src="https://img.shields.io/github/actions/workflow/status/RafaelGoulartB/workout-notes/release-android.yml?branch=main&label=Android%20release&color=0B7285" /></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-0B7285.svg" /></a>
+  Training, nutrition, sleep, and progress in one local-first app.
 </p>
 
 Workout Notes brings strength training, GPS runs, food logging, sleep tracking, and body measurements together. Build routines, follow a periodized plan, and see how your habits change over time. Your journal lives on your device, with no account required.
@@ -21,16 +37,18 @@ Built with Flutter and Material 3, with English and Brazilian Portuguese, metric
 
 <table>
   <tr>
+    <th width="33%">Live strength workout</th>
+    <th width="33%">Live run tracking</th>
     <th width="33%">Training progress</th>
-    <th width="33%">Run analysis</th>
-    <th width="33%">Body measurements</th>
   </tr>
   <tr>
+    <td><a href="assets/screenshots/workout-progress.png"><img src="assets/screenshots/workout-progress.png" width="100%" alt="Strength workout in progress with session and rest timers, weights, reps, and completed and pending sets" /></a></td>
+    <td><a href="assets/screenshots/run-progress.png"><img src="assets/screenshots/run-progress.png" width="100%" alt="Run in progress using simulated GPS, with a live route, elapsed time, distance, pace, and session controls" /></a></td>
     <td><a href="assets/screenshots/progress.png"><img src="assets/screenshots/progress.png" width="100%" alt="Training report with goals, annual activity heatmap, and weekly workout frequency" /></a></td>
-    <td><a href="assets/screenshots/run.png"><img src="assets/screenshots/run.png" width="100%" alt="Completed GPS run with route map, distance, pace, achievements, and pace chart" /></a></td>
-    <td><a href="assets/screenshots/body-measurements.png"><img src="assets/screenshots/body-measurements.png" width="100%" alt="Body weight history with a trend chart and estimated body composition" /></a></td>
   </tr>
 </table>
+
+Also explore [completed run analysis](assets/screenshots/run.png) and [body measurements](assets/screenshots/body-measurements.png).
 
 ## Connect food, recovery, and planning
 
@@ -51,7 +69,7 @@ Built with Flutter and Material 3, with English and Brazilian Portuguese, metric
   </tr>
 </table>
 
-<sub>Captured from the Android emulator in dark mode. Tap an image to view it at full resolution.</sub>
+<sub>Captured from the Android emulator in dark mode; the live run uses simulated GPS. Tap an image to view it at full resolution.</sub>
 
 ## Optional AI Coach
 
