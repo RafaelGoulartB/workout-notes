@@ -44,26 +44,26 @@ class TestDataRunGenerator {
   }
 
   _RunPlan? _planFor(int weekday) => switch (weekday) {
-        DateTime.tuesday => const _RunPlan(
-          kind: 'easy',
-          baseKm: 6.0,
-          basePaceSecPerKm: 350,
-          title: 'Corrida leve',
-        ),
-        DateTime.thursday => const _RunPlan(
-          kind: 'tempo',
-          baseKm: 5.0,
-          basePaceSecPerKm: 310,
-          title: 'Treino de ritmo',
-        ),
-        DateTime.saturday => const _RunPlan(
-          kind: 'long',
-          baseKm: 10.0,
-          basePaceSecPerKm: 335,
-          title: 'Longão de fim de semana',
-        ),
-        _ => null,
-      };
+    DateTime.tuesday => const _RunPlan(
+      kind: 'easy',
+      baseKm: 6.0,
+      basePaceSecPerKm: 350,
+      title: 'Corrida leve',
+    ),
+    DateTime.thursday => const _RunPlan(
+      kind: 'tempo',
+      baseKm: 5.0,
+      basePaceSecPerKm: 310,
+      title: 'Treino de ritmo',
+    ),
+    DateTime.saturday => const _RunPlan(
+      kind: 'long',
+      baseKm: 10.0,
+      basePaceSecPerKm: 335,
+      title: 'Longão de fim de semana',
+    ),
+    _ => null,
+  };
 
   Future<bool> _run(DateTime date, int day, _RunPlan plan) async {
     final totalDays = context.now.difference(context.start).inDays;
@@ -71,7 +71,8 @@ class TestDataRunGenerator {
 
     // Volume builds and pace improves slightly across the scenario.
     final km = plan.baseKm * (1 + progress * 0.25) + context.jitter(0, 0.4);
-    final targetPace = plan.basePaceSecPerKm - progress * 20 + context.jitter(0, 6);
+    final targetPace =
+        plan.basePaceSecPerKm - progress * 20 + context.jitter(0, 6);
     final baseSpeed = 1000.0 / targetPace;
 
     final movingSeconds = (km * targetPace).round();
@@ -90,9 +91,7 @@ class TestDataRunGenerator {
       'seq': 0,
       'lat': double.parse(lat.toStringAsFixed(6)),
       'lng': double.parse(lng.toStringAsFixed(6)),
-      'altitude': double.parse(
-        (760 + context.jitter(0, 3)).toStringAsFixed(1),
-      ),
+      'altitude': double.parse((760 + context.jitter(0, 3)).toStringAsFixed(1)),
       'accuracy': 4.0 + context.random.nextDouble() * 4,
       'speed': null,
       'recorded_at': startedAt.toIso8601String(),
@@ -141,7 +140,8 @@ class TestDataRunGenerator {
     }
 
     final elapsedSeconds = totalTicks * _pointIntervalSeconds;
-    final durationSeconds = (elapsedSeconds * (1.01 + context.random.nextDouble() * 0.02)).round();
+    final durationSeconds =
+        (elapsedSeconds * (1.01 + context.random.nextDouble() * 0.02)).round();
     final avgPace = distanceMeters > 0
         ? elapsedSeconds / (distanceMeters / 1000.0)
         : null;
@@ -190,9 +190,14 @@ class TestDataRunGenerator {
       'efforts_computed': 1,
     });
 
+    // One awaited insert per point is far too slow for the volume generated
+    // here (tens of thousands of rows); a batch keeps generation fast enough
+    // for debug tools and their tests.
+    final batch = context.database.batch();
     for (final point in points) {
-      await context.database.insert('run_track_points', point);
+      batch.insert('run_track_points', point);
     }
+    await batch.commit(noResult: true);
     return true;
   }
 
