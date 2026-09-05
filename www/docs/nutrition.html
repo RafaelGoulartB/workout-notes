@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Nutrition · Workout Notes docs</title>
+    <meta name="description" content="The meal diary, food library and variants, barcode and label-photo entry, saved meals, micronutrients, and how calorie and macro targets are calculated." />
+    <meta name="theme-color" content="#08090c" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="Nutrition · Workout Notes docs" />
+    <meta property="og:description" content="The meal diary, food library and variants, barcode and label-photo entry, saved meals, micronutrients, and how calorie and macro targets are calculated." />
+    <meta property="og:image" content="../assets/brand/icon-512.png" />
+    <link rel="icon" href="../assets/brand/icon-64.png" sizes="64x64" />
+    <link rel="apple-touch-icon" href="../assets/brand/icon-180.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../assets/css/base.css" />
+    <link rel="stylesheet" href="../assets/css/docs.css" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("wn-theme");
+          if (saved === "light" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
+            document.documentElement.setAttribute("data-theme", "light");
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+
+  <body class="docs-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+      <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2.6v2.2M12 19.2v2.2M4.3 4.3l1.6 1.6M18.1 18.1l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.3 19.7l1.6-1.6M18.1 5.9l1.6-1.6" />
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" />
+      </symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="6.5" />
+        <path d="M16 16l4 4" />
+      </symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h13M12.5 6l6 6-6 6" />
+      </symbol>
+      <symbol id="i-arrow-up-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 17 17 7M8.5 7H17v8.5" />
+      </symbol>
+      <symbol id="i-chev-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9.5 5l7 7-7 7" />
+      </symbol>
+      <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 11v5.5M12 7.8h.01" />
+      </symbol>
+      <symbol id="i-bulb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V18h7v-4.1A6 6 0 0 0 12 3Z" />
+      </symbol>
+      <symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4.5 21 20H3L12 4.5Z" />
+        <path d="M12 10v4.5M12 17.4h.01" />
+      </symbol>
+      <symbol id="i-android" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M6 9.5h12a1 1 0 0 1 1 1V17a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6.5a1 1 0 0 1 1-1Zm-3 .5a1.4 1.4 0 0 1 1.4 1.4v4.2a1.4 1.4 0 0 1-2.8 0v-4.2A1.4 1.4 0 0 1 3 10Zm18 0a1.4 1.4 0 0 1 1.4 1.4v4.2a1.4 1.4 0 0 1-2.8 0v-4.2A1.4 1.4 0 0 1 21 10ZM9 19.5h1.6v2.1a1.3 1.3 0 0 1-2.6 0v-2.1Zm4.4 0H15v2.1a1.3 1.3 0 0 1-2.6 0v-2.1ZM8.4 3.2l.9 1.6A6.6 6.6 0 0 1 12 4.3c1 0 1.9.2 2.7.5l.9-1.6a.5.5 0 1 1 .87.5l-.85 1.5A5.6 5.6 0 0 1 18.4 8.5H5.6a5.6 5.6 0 0 1 2.78-3.3l-.85-1.5a.5.5 0 1 1 .87-.5Z" />
+      </symbol>
+      <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5Z" />
+      </symbol>
+      <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 6.6C10.5 5.1 8.5 4.3 6 4.3H4v14h2c2.5 0 4.5.8 6 2.3 1.5-1.5 3.5-2.3 6-2.3h2v-14h-2c-2.5 0-4.5.8-6 2.3Z" />
+        <path d="M12 6.6v14" />
+      </symbol>
+      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+        <path d="M8.5 10.5V7.5a3.5 3.5 0 1 1 7 0v3" />
+      </symbol>
+    </svg>
+
+    <header class="site-header" data-header>
+      <div class="container container-wide site-header__inner">
+        <button
+          class="icon-btn sidebar-toggle"
+          type="button"
+          data-sidebar-toggle
+          aria-expanded="false"
+          aria-controls="docs-sidebar"
+          aria-label="Open documentation menu"
+        >
+          <svg aria-hidden="true"><use href="#i-menu" /></svg>
+        </button>
+
+        <a class="brand" href="../index.html" aria-label="Workout Notes home">
+          <img src="../assets/brand/icon-64.png" alt="" width="27" height="27" />
+          <span>Workout Notes</span>
+          <span class="brand__sub">docs</span>
+        </a>
+
+        <nav class="site-nav" aria-label="Main">
+          <a href="../index.html">Home</a>
+          <a href="index.html" class="is-active">Documentation</a>
+          <a href="../index.html#gallery">Screenshots</a>
+          <a href="faq.html">FAQ</a>
+        </nav>
+
+        <div class="header-actions">
+          <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch theme">
+            <svg class="icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+            <svg class="icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+          </button>
+          <a
+            class="gh-link"
+            href="https://github.com/RafaelGoulartB/workout-notes"
+            target="_blank"
+            rel="noopener"
+          >
+            <svg aria-hidden="true"><use href="#i-github" /></svg>
+            <span aria-hidden="true">★</span>
+            <span data-stars>1</span>
+            <span class="sr-only">stars on GitHub</span>
+          </a>
+          <a
+            class="btn btn--primary btn--sm"
+            href="https://github.com/RafaelGoulartB/workout-notes/releases/latest"
+            target="_blank"
+            rel="noopener"
+          >
+            Download
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="docs-backdrop" data-docs-backdrop></div>
+
+    <div class="container container-wide docs-shell">
+      <!-- ============================================================
+           SIDEBAR: this block is intentionally identical on every page
+           under /docs. If you add, rename or reorder a guide, mirror the
+           change in each docs/*.html file. Everything else that is
+           page-specific (the highlighted link, the "on this page" list and
+           the previous/next pager) is derived at runtime by
+           assets/js/docs.js from the current URL and this list's order, so
+           it never has to be edited by hand.
+           ============================================================ -->
+      <aside class="docs-sidebar" id="docs-sidebar">
+        <div class="docs-filter">
+          <svg aria-hidden="true"><use href="#i-search" /></svg>
+          <input
+            type="search"
+            data-docs-filter
+            placeholder="Filter guides"
+            aria-label="Filter documentation pages"
+            autocomplete="off"
+          />
+          <kbd>/</kbd>
+        </div>
+
+        <nav class="docs-nav" aria-label="Documentation">
+          <p class="docs-nav__group">Start here</p>
+          <ul>
+            <li><a href="index.html" data-keywords="overview introduction start">Overview</a></li>
+            <li><a href="getting-started.html" data-keywords="install apk permissions setup units theme locale">Getting started</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Training</p>
+          <ul>
+            <li><a href="strength-training.html" data-keywords="workout sets reps rpe supersets routines exercises timer history">Strength training</a></li>
+            <li><a href="progress.html" data-keywords="charts analytics 1rm epley volume records goals streak heatmap">Progress &amp; goals</a></li>
+            <li><a href="body.html" data-keywords="weight body fat measurements circumference trend">Body measurements</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Cardio</p>
+          <ul>
+            <li><a href="running.html" data-keywords="gps run bike splits pace elevation replay achievements">Running &amp; cycling</a></li>
+            <li><a href="run-plans.html" data-keywords="plans templates vdot intervals voice coaching 5k 10k marathon">Plans, intervals &amp; voice</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Health</p>
+          <ul>
+            <li><a href="sleep.html" data-keywords="sleep stages efficiency alarm mission snooze">Sleep &amp; alarms</a></li>
+            <li><a href="nutrition.html" data-keywords="food diary macros calories barcode meals targets tdee">Nutrition</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Planning</p>
+          <ul>
+            <li><a href="periodization.html" data-keywords="phases targets adherence checkin cycle plan">Periodization</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Reference</p>
+          <ul>
+            <li><a href="ai-coach.html" data-keywords="ai provider openai tools proposal token model">AI Coach</a></li>
+            <li><a href="data-privacy.html" data-keywords="backup export import json csv privacy offline platform">Data, backup &amp; privacy</a></li>
+            <li><a href="faq.html" data-keywords="faq troubleshooting help questions">FAQ &amp; troubleshooting</a></li>
+          </ul>
+        </nav>
+
+        <div class="docs-sidebar__foot">
+          <a href="https://github.com/RafaelGoulartB/workout-notes" target="_blank" rel="noopener">
+            <svg aria-hidden="true"><use href="#i-github" /></svg>
+            Source on GitHub
+          </a>
+          <a href="https://github.com/RafaelGoulartB/workout-notes/issues" target="_blank" rel="noopener">
+            <svg aria-hidden="true"><use href="#i-info" /></svg>
+            Report an issue
+          </a>
+          <a href="https://github.com/RafaelGoulartB/workout-notes/releases/latest" target="_blank" rel="noopener">
+            <svg aria-hidden="true"><use href="#i-download" /></svg>
+            Latest release
+          </a>
+        </div>
+      </aside>
+
+      <!-- ============ CONTENT ============ -->
+      <main class="docs-main" id="main">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../index.html">Home</a>
+          <span aria-hidden="true">/</span>
+          <a href="index.html">Docs</a>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">Nutrition</span>
+        </nav>
+
+        <header class="doc-head">
+          <span class="eyebrow">Health</span>
+          <h1>Nutrition</h1>
+          <p class="lead">A food diary that is honest about missing data. A nutrient you never entered stays empty instead of quietly becoming zero, and no target exists until you create one.</p>
+          <div class="doc-meta"><span class="pill pill--amber">Meal diary</span><span class="pill">Barcode lookup</span><span class="pill">Mifflin-St Jeor</span><span class="pill">Saved meals</span></div>
+        </header>
+
+        <article class="prose">
+          <h2>The daily view</h2>
+          <p>
+            The Nutrition tab opens on today. At the top sit the day's totals against
+            your target; below that a tools row for progress, saved meals, the food
+            library and settings; below that a panel with one row per meal type.
+          </p>
+          <p>
+            Meal types are yours to define: three meals, six, or "pre-workout" and
+            "post-workout" if that is how you eat. Each row has a plus button that
+            opens food search already bound to that meal. If you delete a meal type
+            that still has entries, those entries keep showing rather than
+            disappearing with the type.
+          </p>
+
+          <figure class="figure-phone">
+            <span class="phone phone--sm phone--flat">
+              <span class="phone__screen">
+                <img
+                  src="../assets/screenshots/nutrition.png"
+                  alt="Nutrition diary with daily calories, macronutrients, a plan-linked target and the meals logged that day"
+                  width="1080"
+                  height="2400"
+                  loading="lazy"
+                />
+              </span>
+            </span>
+            <figcaption>
+              <strong>The day, at a glance</strong>
+              Calories and macros against target, with the meals underneath. When a
+              periodization phase is overriding your target, the day shows a chip
+              saying so.
+            </figcaption>
+          </figure>
+
+          <p>
+            A <strong>replicate day</strong> action copies a day's meals to another
+            date, the fastest way to log a week that repeats.
+          </p>
+
+          <h2>Adding food</h2>
+
+          <dl class="spec">
+            <div class="spec__row">
+              <dt>Search by name</dt>
+              <dd>
+                Searches your own library first, and can query Open Food Facts for
+                products you have not saved yet.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Barcode</dt>
+              <dd>
+                Scan a product barcode and look it up directly.
+                <strong>Android only.</strong>
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Label photo</dt>
+              <dd>
+                Photograph a nutrition label and get a pre-filled draft to review.
+                Uses the AI provider you configured. See
+                <a href="ai-coach.html">AI Coach</a>.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Manual entry</dt>
+              <dd>
+                Type a food in yourself, with as many or as few nutrients as you know.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Saved meals</dt>
+              <dd>
+                Log a whole combination (the bowl you eat every morning) in one
+                action.
+              </dd>
+            </div>
+          </dl>
+
+          <p>
+            After picking a food, a quantity sheet asks how much. Foods can have
+            multiple <strong>variants</strong> (whole versus skimmed, raw versus
+            cooked) and named <strong>servings</strong> (a slice, a scoop, a can), so
+            you record what you actually ate rather than converting to grams in your
+            head.
+          </p>
+
+          <h3>Nutrients tracked</h3>
+          <p>
+            Beyond calories and the three macros, a food can carry saturated,
+            monounsaturated, polyunsaturated and trans fat, fibre, sugars, sodium,
+            potassium, calcium, iron, magnesium, zinc, and vitamins A, C, D and B12.
+          </p>
+
+          <div class="callout callout--note">
+            <svg aria-hidden="true"><use href="#i-info" /></svg>
+            <div class="callout__body">
+              <span class="callout__title">Empty is not zero</span>
+              <p>
+                A nutrient you never filled in is stored as unknown. It is never
+                coerced to zero, because "this food has no iron" and "I do not know how
+                much iron this food has" are different statements, and the
+                micronutrient summary would lie if it conflated them.
+              </p>
+            </div>
+          </div>
+
+          <h3>About the food database</h3>
+          <p>
+            Product lookups query <strong>Open Food Facts</strong> anonymously: no
+            account, no key. Rate limiting is surfaced as its own error rather than as
+            a generic failure, and results you use are cached locally so repeat lookups
+            work offline. Products without a code or a name are discarded.
+          </p>
+
+          <h2>Calorie and macro targets</h2>
+          <p>
+            Nothing is assumed. Until you create a goal, the day screen shows your
+            totals and an invitation to set one. When you ask for a suggestion, this is
+            the arithmetic behind it.
+          </p>
+
+          <div class="formula">
+            <code>BMR = 10 × kg + 6.25 × cm − 5 × age + (5 for male / −161 for female)</code>
+            <span>Mifflin-St Jeor</span>
+          </div>
+
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Activity level</th>
+                  <th>Factor</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>Sedentary</td><td><code>× 1.2</code></td></tr>
+                <tr><td>Light</td><td><code>× 1.375</code></td></tr>
+                <tr><td>Moderate</td><td><code>× 1.55</code></td></tr>
+                <tr><td>Active</td><td><code>× 1.725</code></td></tr>
+                <tr><td>Very active</td><td><code>× 1.9</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            The result is your <strong>TDEE</strong>. The suggestion itself is always
+            <em>maintenance</em> (equal to TDEE), because the deficit or surplus is a
+            separate, explicit decision:
+          </p>
+
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Adjustment</th>
+                  <th>Default</th>
+                  <th>Target calories</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td><strong>Cut</strong></td><td>−20%</td><td><code>TDEE × 0.80</code></td></tr>
+                <tr><td><strong>Maintenance</strong></td><td>0%</td><td><code>TDEE</code></td></tr>
+                <tr><td><strong>Bulk</strong></td><td>+10%</td><td><code>TDEE × 1.10</code></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            The percentage is editable, and the label follows the number rather than
+            the other way around: set −5% and it is a cut, set +15% and it is a bulk.
+          </p>
+
+          <h3>How the macros are split</h3>
+          <ol>
+            <li>
+              <strong>Protein</strong> and <strong>fat</strong> come from grams per
+              kilogram of bodyweight: 1.8 g/kg protein and 1.0 g/kg fat by default.
+            </li>
+            <li>
+              <strong>Carbohydrate</strong> absorbs whatever calories are left, floored
+              at zero.
+            </li>
+            <li>Everything is rounded to whole grams.</li>
+          </ol>
+
+          <div class="callout callout--tip">
+            <svg aria-hidden="true"><use href="#i-bulb" /></svg>
+            <div class="callout__body">
+              <span class="callout__title">A plan week can override your target</span>
+              <p>
+                When an active <a href="periodization.html">periodization plan</a>
+                covers today, that phase's nutrition target takes precedence field by
+                field; a phase that sets only calories leaves your macro targets
+                alone. The dashboard shows a chip when this is happening. Nutrition
+                stays perfectly usable with no plan at all.
+              </p>
+            </div>
+          </div>
+
+          <h2>Trends</h2>
+          <p>
+            The nutrition progress screen looks past a single day: intake against
+            target across weeks and months, days in deficit or surplus, a rolling
+            seven-day average, and macronutrient distribution.
+          </p>
+
+          <figure class="figure-phone">
+            <span class="phone phone--sm phone--flat">
+              <span class="phone__screen">
+                <img
+                  src="../assets/screenshots/nutrition-balance.png"
+                  alt="Weekly nutrition balance with daily intake versus target, a seven-day rolling average and macronutrient distribution"
+                  width="1080"
+                  height="2400"
+                  loading="lazy"
+                />
+              </span>
+            </span>
+            <figcaption>
+              <strong>Weekly balance</strong>
+              The rolling average is the line to read. Single days above or below
+              target say very little; a fortnight of them says everything.
+            </figcaption>
+          </figure>
+
+          <p>
+            A separate micronutrient summary aggregates the nutrients you have actually
+            recorded, and is explicit about coverage: it will not claim you are low on
+            magnesium when most of your foods never had a magnesium value.
+          </p>
+
+          <h2>Exports and the AI Coach</h2>
+          <ul>
+            <li>
+              Meal-log history can be exported as CSV, or shared, from the backup
+              actions described in
+              <a href="data-privacy.html">Data, backup &amp; privacy</a>.
+            </li>
+            <li>
+              The <a href="ai-coach.html">AI Coach</a> reads nutrition through
+              read-only tools: day summaries, a specific diary day, history,
+              micronutrients, your food library, saved meals and your target profile.
+            </li>
+            <li>
+              Creating a food is the one nutrition action the coach can initiate, and
+              it is a <strong>proposal</strong>: approving it opens the manual food
+              form pre-filled, and nothing is saved until you press save yourself.
+            </li>
+          </ul>
+
+        </article>
+
+        <div class="doc-foot">
+          <span>Found something out of date or unclear?</span>
+          <a
+            class="btn btn--outline btn--sm"
+            href="https://github.com/RafaelGoulartB/workout-notes/issues/new"
+            target="_blank"
+            rel="noopener"
+          >
+            Open an issue
+            <svg aria-hidden="true"><use href="#i-arrow-up-right" /></svg>
+          </a>
+        </div>
+
+        <nav class="pager" data-pager aria-label="Pagination"></nav>
+      </main>
+
+      <!-- ============ ON THIS PAGE ============ -->
+      <aside class="docs-toc">
+        <p class="docs-toc__title">On this page</p>
+        <ul data-toc></ul>
+      </aside>
+    </div>
+
+    <footer class="site-footer">
+      <div class="container container-wide">
+        <div class="site-footer__grid">
+          <div class="site-footer__about">
+            <a class="brand" href="../index.html">
+              <img src="../assets/brand/icon-64.png" alt="" width="27" height="27" />
+              <span>Workout Notes</span>
+            </a>
+            <p>
+              Training, running, sleep, nutrition and planning in one local-first
+              Flutter app. MIT licensed.
+            </p>
+          </div>
+          <div>
+            <h3>Training</h3>
+            <ul>
+              <li><a href="strength-training.html">Strength training</a></li>
+              <li><a href="progress.html">Progress &amp; goals</a></li>
+              <li><a href="body.html">Body measurements</a></li>
+              <li><a href="periodization.html">Periodization</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Cardio &amp; health</h3>
+            <ul>
+              <li><a href="running.html">Running &amp; cycling</a></li>
+              <li><a href="run-plans.html">Plans &amp; voice coaching</a></li>
+              <li><a href="sleep.html">Sleep &amp; alarms</a></li>
+              <li><a href="nutrition.html">Nutrition</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Reference</h3>
+            <ul>
+              <li><a href="getting-started.html">Getting started</a></li>
+              <li><a href="ai-coach.html">AI Coach</a></li>
+              <li><a href="data-privacy.html">Data &amp; privacy</a></li>
+              <li><a href="faq.html">FAQ</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="site-footer__bottom">
+          <span>© <span data-year>2026</span> Rafael Goulart · MIT licensed</span>
+          <span><a href="../index.html">Back to the landing page</a></span>
+        </div>
+      </div>
+    </footer>
+
+    <script src="../assets/js/site.js" defer></script>
+    <script src="../assets/js/docs.js" defer></script>
+  </body>
+</html>

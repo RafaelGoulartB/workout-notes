@@ -1,0 +1,651 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Coach · Workout Notes docs</title>
+    <meta name="description" content="Connect your own OpenAI-compatible provider, see which read-only tools the coach can call, and why every change to your data is a proposal you approve." />
+    <meta name="theme-color" content="#08090c" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="AI Coach · Workout Notes docs" />
+    <meta property="og:description" content="Connect your own OpenAI-compatible provider, see which read-only tools the coach can call, and why every change to your data is a proposal you approve." />
+    <meta property="og:image" content="../assets/brand/icon-512.png" />
+    <link rel="icon" href="../assets/brand/icon-64.png" sizes="64x64" />
+    <link rel="apple-touch-icon" href="../assets/brand/icon-180.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../assets/css/base.css" />
+    <link rel="stylesheet" href="../assets/css/docs.css" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("wn-theme");
+          if (saved === "light" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
+            document.documentElement.setAttribute("data-theme", "light");
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+
+  <body class="docs-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+      <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2.6v2.2M12 19.2v2.2M4.3 4.3l1.6 1.6M18.1 18.1l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.3 19.7l1.6-1.6M18.1 5.9l1.6-1.6" />
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" />
+      </symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="6.5" />
+        <path d="M16 16l4 4" />
+      </symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h13M12.5 6l6 6-6 6" />
+      </symbol>
+      <symbol id="i-arrow-up-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 17 17 7M8.5 7H17v8.5" />
+      </symbol>
+      <symbol id="i-chev-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9.5 5l7 7-7 7" />
+      </symbol>
+      <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 11v5.5M12 7.8h.01" />
+      </symbol>
+      <symbol id="i-bulb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V18h7v-4.1A6 6 0 0 0 12 3Z" />
+      </symbol>
+      <symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4.5 21 20H3L12 4.5Z" />
+        <path d="M12 10v4.5M12 17.4h.01" />
+      </symbol>
+      <symbol id="i-android" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M6 9.5h12a1 1 0 0 1 1 1V17a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6.5a1 1 0 0 1 1-1Zm-3 .5a1.4 1.4 0 0 1 1.4 1.4v4.2a1.4 1.4 0 0 1-2.8 0v-4.2A1.4 1.4 0 0 1 3 10Zm18 0a1.4 1.4 0 0 1 1.4 1.4v4.2a1.4 1.4 0 0 1-2.8 0v-4.2A1.4 1.4 0 0 1 21 10ZM9 19.5h1.6v2.1a1.3 1.3 0 0 1-2.6 0v-2.1Zm4.4 0H15v2.1a1.3 1.3 0 0 1-2.6 0v-2.1ZM8.4 3.2l.9 1.6A6.6 6.6 0 0 1 12 4.3c1 0 1.9.2 2.7.5l.9-1.6a.5.5 0 1 1 .87.5l-.85 1.5A5.6 5.6 0 0 1 18.4 8.5H5.6a5.6 5.6 0 0 1 2.78-3.3l-.85-1.5a.5.5 0 1 1 .87-.5Z" />
+      </symbol>
+      <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5Z" />
+      </symbol>
+      <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 6.6C10.5 5.1 8.5 4.3 6 4.3H4v14h2c2.5 0 4.5.8 6 2.3 1.5-1.5 3.5-2.3 6-2.3h2v-14h-2c-2.5 0-4.5.8-6 2.3Z" />
+        <path d="M12 6.6v14" />
+      </symbol>
+      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+        <path d="M8.5 10.5V7.5a3.5 3.5 0 1 1 7 0v3" />
+      </symbol>
+    </svg>
+
+    <header class="site-header" data-header>
+      <div class="container container-wide site-header__inner">
+        <button
+          class="icon-btn sidebar-toggle"
+          type="button"
+          data-sidebar-toggle
+          aria-expanded="false"
+          aria-controls="docs-sidebar"
+          aria-label="Open documentation menu"
+        >
+          <svg aria-hidden="true"><use href="#i-menu" /></svg>
+        </button>
+
+        <a class="brand" href="../index.html" aria-label="Workout Notes home">
+          <img src="../assets/brand/icon-64.png" alt="" width="27" height="27" />
+          <span>Workout Notes</span>
+          <span class="brand__sub">docs</span>
+        </a>
+
+        <nav class="site-nav" aria-label="Main">
+          <a href="../index.html">Home</a>
+          <a href="index.html" class="is-active">Documentation</a>
+          <a href="../index.html#gallery">Screenshots</a>
+          <a href="faq.html">FAQ</a>
+        </nav>
+
+        <div class="header-actions">
+          <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch theme">
+            <svg class="icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+            <svg class="icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+          </button>
+          <a
+            class="gh-link"
+            href="https://github.com/RafaelGoulartB/workout-notes"
+            target="_blank"
+            rel="noopener"
+          >
+            <svg aria-hidden="true"><use href="#i-github" /></svg>
+            <span aria-hidden="true">★</span>
+            <span data-stars>1</span>
+            <span class="sr-only">stars on GitHub</span>
+          </a>
+          <a
+            class="btn btn--primary btn--sm"
+            href="https://github.com/RafaelGoulartB/workout-notes/releases/latest"
+            target="_blank"
+            rel="noopener"
+          >
+            Download
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="docs-backdrop" data-docs-backdrop></div>
+
+    <div class="container container-wide docs-shell">
+      <!-- ============================================================
+           SIDEBAR: this block is intentionally identical on every page
+           under /docs. If you add, rename or reorder a guide, mirror the
+           change in each docs/*.html file. Everything else that is
+           page-specific (the highlighted link, the "on this page" list and
+           the previous/next pager) is derived at runtime by
+           assets/js/docs.js from the current URL and this list's order, so
+           it never has to be edited by hand.
+           ============================================================ -->
+      <aside class="docs-sidebar" id="docs-sidebar">
+        <div class="docs-filter">
+          <svg aria-hidden="true"><use href="#i-search" /></svg>
+          <input
+            type="search"
+            data-docs-filter
+            placeholder="Filter guides"
+            aria-label="Filter documentation pages"
+            autocomplete="off"
+          />
+          <kbd>/</kbd>
+        </div>
+
+        <nav class="docs-nav" aria-label="Documentation">
+          <p class="docs-nav__group">Start here</p>
+          <ul>
+            <li><a href="index.html" data-keywords="overview introduction start">Overview</a></li>
+            <li><a href="getting-started.html" data-keywords="install apk permissions setup units theme locale">Getting started</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Training</p>
+          <ul>
+            <li><a href="strength-training.html" data-keywords="workout sets reps rpe supersets routines exercises timer history">Strength training</a></li>
+            <li><a href="progress.html" data-keywords="charts analytics 1rm epley volume records goals streak heatmap">Progress &amp; goals</a></li>
+            <li><a href="body.html" data-keywords="weight body fat measurements circumference trend">Body measurements</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Cardio</p>
+          <ul>
+            <li><a href="running.html" data-keywords="gps run bike splits pace elevation replay achievements">Running &amp; cycling</a></li>
+            <li><a href="run-plans.html" data-keywords="plans templates vdot intervals voice coaching 5k 10k marathon">Plans, intervals &amp; voice</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Health</p>
+          <ul>
+            <li><a href="sleep.html" data-keywords="sleep stages efficiency alarm mission snooze">Sleep &amp; alarms</a></li>
+            <li><a href="nutrition.html" data-keywords="food diary macros calories barcode meals targets tdee">Nutrition</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Planning</p>
+          <ul>
+            <li><a href="periodization.html" data-keywords="phases targets adherence checkin cycle plan">Periodization</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Reference</p>
+          <ul>
+            <li><a href="ai-coach.html" data-keywords="ai provider openai tools proposal token model">AI Coach</a></li>
+            <li><a href="data-privacy.html" data-keywords="backup export import json csv privacy offline platform">Data, backup &amp; privacy</a></li>
+            <li><a href="faq.html" data-keywords="faq troubleshooting help questions">FAQ &amp; troubleshooting</a></li>
+          </ul>
+        </nav>
+
+        <div class="docs-sidebar__foot">
+          <a href="https://github.com/RafaelGoulartB/workout-notes" target="_blank" rel="noopener">
+            <svg aria-hidden="true"><use href="#i-github" /></svg>
+            Source on GitHub
+          </a>
+          <a href="https://github.com/RafaelGoulartB/workout-notes/issues" target="_blank" rel="noopener">
+            <svg aria-hidden="true"><use href="#i-info" /></svg>
+            Report an issue
+          </a>
+          <a href="https://github.com/RafaelGoulartB/workout-notes/releases/latest" target="_blank" rel="noopener">
+            <svg aria-hidden="true"><use href="#i-download" /></svg>
+            Latest release
+          </a>
+        </div>
+      </aside>
+
+      <!-- ============ CONTENT ============ -->
+      <main class="docs-main" id="main">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../index.html">Home</a>
+          <span aria-hidden="true">/</span>
+          <a href="index.html">Docs</a>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">AI Coach</span>
+        </nav>
+
+        <header class="doc-head">
+          <span class="eyebrow">Reference</span>
+          <h1>AI Coach</h1>
+          <p class="lead">Optional, and built around one rule: the model can read your journal through tools, but it cannot write to it. Routine changes and new foods arrive as proposals that you review, and nothing is applied until you say so.</p>
+          <div class="doc-meta"><span class="pill pill--violet">Bring your own provider</span><span class="pill">Read tools</span><span class="pill pill--amber">Writes need approval</span><span class="pill">No key bundled</span></div>
+        </header>
+
+        <article class="prose">
+          <h2>What it is, and what it is not</h2>
+          <p>
+            The AI Coach is a chat screen that can query your local database while it
+            answers. It is <strong>not</strong> a hosted service, and no API key ships
+            with the app. If you never configure a provider, the feature simply does
+            not exist for you and everything else works unchanged.
+          </p>
+
+          <div class="callout callout--warn">
+            <svg aria-hidden="true"><use href="#i-warn" /></svg>
+            <div class="callout__body">
+              <span class="callout__title">Using it means sending data to a third party</span>
+              <p>
+                When you send a message, the conversation plus whatever the tools
+                returned goes to the provider <em>you</em> chose. That provider's
+                privacy policy and retention rules apply. This is the one part of the
+                app where your training data deliberately leaves the device, and it
+                only happens when you use it.
+              </p>
+            </div>
+          </div>
+
+          <h2>Setting up a provider</h2>
+          <p>
+            Go to <strong>Settings → Configure AI</strong>. Any
+            OpenAI-compatible endpoint works: the app normalises the base URL to end
+            in <code>/v1</code>, fetches the available models from the provider and
+            sorts them for you.
+          </p>
+
+          <dl class="spec">
+            <div class="spec__row">
+              <dt>Providers</dt>
+              <dd>
+                As many as you like, each with a name, base URL, token, model list and
+                a selected model. One is active at a time.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Reasoning effort</dt>
+              <dd>
+                Per model: automatic, low, medium or high. Automatic omits the
+                parameter entirely.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>System prompt</dt>
+              <dd>
+                Editable, so you can set the coach's personality and priorities.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Context mode</dt>
+              <dd>
+                <strong>Minimal</strong>, <strong>standard</strong> or
+                <strong>full</strong>: how much of the summary snapshot is attached
+                to each turn.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Response style</dt>
+              <dd>Concise, balanced or detailed.</dd>
+            </div>
+            <div class="spec__row">
+              <dt>Display</dt>
+              <dd>
+                Show message timestamps, and auto-expand tool details so you can watch
+                what it queried.
+              </dd>
+            </div>
+          </dl>
+
+          <h3>Where your token lives</h3>
+          <p>
+            Provider tokens are written to platform <strong>secure storage</strong>,
+            keyed per provider. They are deliberately kept out of the app database, out
+            of logs, out of prompts and out of backups, so exporting your journal and
+            handing the file to someone else cannot leak a key.
+          </p>
+
+          <h3>Transport details</h3>
+          <ul>
+            <li>Requests go to <code>POST {baseUrl}/chat/completions</code>.</li>
+            <li>A 180-second timeout, with a single retry on timeout.</li>
+            <li>
+              Compatibility is adjusted automatically: if a provider rejects
+              temperature, reasoning effort or a forced tool choice, the app drops or
+              downgrades that parameter and retries rather than failing.
+            </li>
+            <li>
+              <strong>No streaming</strong>, and no token or cost tracking. Answers
+              arrive complete.
+            </li>
+          </ul>
+
+          <h2>What gets sent</h2>
+          <p>
+            The request is deliberately structured so that the expensive, unchanging
+            part stays identical across turns, which is what lets a provider cache it.
+          </p>
+
+          <ol>
+            <li>
+              <strong>A static system prefix:</strong> your editable prompt, plus two
+              fixed policies that are <em>not</em> editable: one requiring the model to
+              consult tools for facts about you instead of relying on memory, and one
+              requiring approval before any routine change. Keeping those out of the
+              editable prompt means a custom personality cannot talk its way past the
+              approval requirement.
+            </li>
+            <li>
+              <strong>One dynamic block</strong> containing a small JSON snapshot of
+              your data, an optional summary of older messages in the thread, and an
+              optional hint line about which tools are probably relevant.
+            </li>
+            <li>
+              <strong>The conversation</strong>, with older tool transcripts dropped
+              from the request once a final answer exists; they stay in your history
+              for you to read.
+            </li>
+          </ol>
+
+          <h3>The snapshot</h3>
+          <p>
+            The injected snapshot is counts and availability, not content. It holds
+            totals: workouts, sets, total volume, exercises, routines, body
+            measurements, active goals, recorded runs, bike sessions, run plans, current
+            streak, and, in standard or full mode, which domains have recent data
+            (sleep nights in the last week, nutrition days, workouts and weight entries
+            in the last month, and so on). The date is day-granular on purpose.
+          </p>
+          <p>
+            No individual entries are dumped into the prompt. Every specific fact the
+            coach states has to come from a tool call, which is exactly why the tool
+            list below matters.
+          </p>
+
+          <div class="callout callout--note">
+            <svg aria-hidden="true"><use href="#i-info" /></svg>
+            <div class="callout__body">
+              <span class="callout__title">Long tool results are truncated on the wire only</span>
+              <p>
+                If a query returns too much, the version sent to the model is trimmed
+                and wrapped with a note telling it to narrow the query. The message
+                stored in your history keeps the full payload, so the app can still show
+                you everything it read.
+              </p>
+            </div>
+          </div>
+
+          <h2>The tool catalog</h2>
+          <p>
+            The full catalog is offered on every round. The relevance hint never filters
+            it; a hint that guesses wrong cannot stop the model from reaching the tool
+            it actually needs.
+          </p>
+
+          <h3>Read-only tools</h3>
+          <p>These execute directly against your database, with no confirmation step.</p>
+
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Area</th>
+                  <th>Tools</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Workouts</strong></td>
+                  <td>
+                    <code>list_recent_workouts</code>, <code>get_workout_history</code>,
+                    <code>get_workout_detail</code>, <code>get_training_summary</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Exercises</strong></td>
+                  <td>
+                    <code>list_exercises</code>, <code>get_exercise_detail</code>,
+                    <code>get_exercise_history</code>,
+                    <code>get_exercise_personal_records</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Volume &amp; trend</strong></td>
+                  <td>
+                    <code>get_weekly_volume_breakdown</code>,
+                    <code>get_progress_trend</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Routines</strong></td>
+                  <td><code>list_routines</code>, <code>get_routine_detail</code></td>
+                </tr>
+                <tr>
+                  <td><strong>Body</strong></td>
+                  <td><code>list_body_measurements</code></td>
+                </tr>
+                <tr>
+                  <td><strong>Cardio &amp; plans</strong></td>
+                  <td>
+                    <code>get_cardio_summary</code>, <code>list_run_activities</code>,
+                    <code>get_run_activity_detail</code>, <code>get_run_progress</code>,
+                    <code>get_run_achievements</code>, <code>list_run_plans</code>,
+                    <code>get_run_plan_detail</code>, <code>get_run_schedule</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Goals</strong></td>
+                  <td>
+                    <code>list_goals</code>, <code>get_goal_progress_history</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Sleep</strong></td>
+                  <td>
+                    <code>get_sleep_summary</code>,
+                    <code>get_sleep_night_detail</code>,
+                    <code>get_sleep_history</code>, <code>get_sleep_profile</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Nutrition</strong></td>
+                  <td>
+                    <code>get_nutrition_summary</code>,
+                    <code>get_nutrition_diary_day</code>,
+                    <code>get_nutrition_history</code>,
+                    <code>get_micronutrient_summary</code>,
+                    <code>search_food_library</code>, <code>get_food_detail</code>,
+                    <code>list_saved_meals</code>,
+                    <code>get_saved_meal_detail</code>,
+                    <code>get_nutrition_profile</code>
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Cross-domain analysis</strong></td>
+                  <td>
+                    <code>analyze_sleep_performance</code>,
+                    <code>analyze_nutrition_body_trend</code>,
+                    <code>get_weekly_recovery_trend</code>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Proposal tools</h3>
+          <p>
+            Two tools express an <em>intent</em> to change something. Neither one
+            writes.
+          </p>
+
+          <dl class="spec">
+            <div class="spec__row">
+              <dt><code>propose_routine_change</code></dt>
+              <dd>
+                Builds a routine proposal and stores it for review. Preparing a proposal
+                never mutates a routine. When you approve it, the app revalidates the
+                proposal against the current state of your data and applies it inside a
+                single transaction, so a proposal built against a routine you have
+                since edited fails loudly instead of overwriting your changes.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt><code>propose_manual_food_creation</code></dt>
+              <dd>
+                Produces an editable draft. Approving it opens the manual food form
+                pre-filled; the food exists only after you press save yourself.
+              </dd>
+            </div>
+          </dl>
+
+          <div class="callout callout--tip">
+            <svg aria-hidden="true"><use href="#i-lock" /></svg>
+            <div class="callout__body">
+              <span class="callout__title">The invariant</span>
+              <p>
+                No AI response can write domain data without explicit user approval.
+                That rule is enforced in the fixed part of the prompt, in the tool
+                registry, and in the code that applies a proposal: three independent
+                places, so changing the personality prompt cannot weaken it.
+              </p>
+            </div>
+          </div>
+
+          <h2>Images</h2>
+          <p>
+            You can attach an image to a message when the model supports vision. The
+            main built-in use is the <strong>food label photo</strong> flow: photograph a
+            nutrition label and get a food draft to review. The request carries a note
+            that images are user-provided content and that details must not be invented; a blurry label should produce blanks, not plausible numbers.
+          </p>
+
+          <h2>Threads and history</h2>
+          <p>
+            Conversations are stored locally with a history screen for older threads.
+            Older messages in a long thread are condensed into a summary for the
+            request, while the full messages stay readable in the app. Tool calls are
+            shown inline so you can expand any of them and see exactly what was queried
+            and what came back.
+          </p>
+
+          <h2>What it is good at</h2>
+          <p>
+            Questions that need several queries stitched together, which is tedious to
+            do by hand across screens:
+          </p>
+          <ul>
+            <li>"Has my bench actually progressed this quarter, or just my volume?"</li>
+            <li>"Compare my weeks with under six hours of sleep against the rest."</li>
+            <li>"Which exercises have I not trained in a month?"</li>
+            <li>"Am I hitting protein on training days specifically?"</li>
+            <li>"Is my long run keeping up with the plan's weekly distance?"</li>
+          </ul>
+
+          <div class="callout callout--note">
+            <svg aria-hidden="true"><use href="#i-info" /></svg>
+            <div class="callout__body">
+              <span class="callout__title">If an answer looks wrong</span>
+              <p>
+                Expand the tool calls in the message. Because every claim about your data
+                is supposed to come from a tool result, you can usually see immediately
+                whether the model misread the numbers or the numbers themselves are what
+                surprised you.
+              </p>
+            </div>
+          </div>
+
+        </article>
+
+        <div class="doc-foot">
+          <span>Found something out of date or unclear?</span>
+          <a
+            class="btn btn--outline btn--sm"
+            href="https://github.com/RafaelGoulartB/workout-notes/issues/new"
+            target="_blank"
+            rel="noopener"
+          >
+            Open an issue
+            <svg aria-hidden="true"><use href="#i-arrow-up-right" /></svg>
+          </a>
+        </div>
+
+        <nav class="pager" data-pager aria-label="Pagination"></nav>
+      </main>
+
+      <!-- ============ ON THIS PAGE ============ -->
+      <aside class="docs-toc">
+        <p class="docs-toc__title">On this page</p>
+        <ul data-toc></ul>
+      </aside>
+    </div>
+
+    <footer class="site-footer">
+      <div class="container container-wide">
+        <div class="site-footer__grid">
+          <div class="site-footer__about">
+            <a class="brand" href="../index.html">
+              <img src="../assets/brand/icon-64.png" alt="" width="27" height="27" />
+              <span>Workout Notes</span>
+            </a>
+            <p>
+              Training, running, sleep, nutrition and planning in one local-first
+              Flutter app. MIT licensed.
+            </p>
+          </div>
+          <div>
+            <h3>Training</h3>
+            <ul>
+              <li><a href="strength-training.html">Strength training</a></li>
+              <li><a href="progress.html">Progress &amp; goals</a></li>
+              <li><a href="body.html">Body measurements</a></li>
+              <li><a href="periodization.html">Periodization</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Cardio &amp; health</h3>
+            <ul>
+              <li><a href="running.html">Running &amp; cycling</a></li>
+              <li><a href="run-plans.html">Plans &amp; voice coaching</a></li>
+              <li><a href="sleep.html">Sleep &amp; alarms</a></li>
+              <li><a href="nutrition.html">Nutrition</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Reference</h3>
+            <ul>
+              <li><a href="getting-started.html">Getting started</a></li>
+              <li><a href="ai-coach.html">AI Coach</a></li>
+              <li><a href="data-privacy.html">Data &amp; privacy</a></li>
+              <li><a href="faq.html">FAQ</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="site-footer__bottom">
+          <span>© <span data-year>2026</span> Rafael Goulart · MIT licensed</span>
+          <span><a href="../index.html">Back to the landing page</a></span>
+        </div>
+      </div>
+    </footer>
+
+    <script src="../assets/js/site.js" defer></script>
+    <script src="../assets/js/docs.js" defer></script>
+  </body>
+</html>
