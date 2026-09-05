@@ -1,5 +1,8 @@
 package com.workoutnotes.workout_notes.sleep
 
+import android.os.BatteryManager
+import android.os.SystemClock
+
 import android.Manifest
 import android.app.Service
 import android.content.Intent
@@ -211,7 +214,8 @@ class SleepMonitoringService : Service() {
     private lateinit var spool: SleepSessionSpool
     private var session: MutableMap<String, Any?>? = null
     private var processor: AudioSignalProcessor? = null
-    private var motionAggregator: MotionAggregator? = null
+    private var sessionStartedAtMillis = 0L
+    private var sessionStartedElapsedMillis = 0L
     private var wakeLock: PowerManager.WakeLock? = null
     private var finished = false
     @Volatile private var finishing = false
@@ -252,6 +256,8 @@ class SleepMonitoringService : Service() {
         missionFormat = intent?.getStringExtra(SleepAlarmScheduler.EXTRA_MISSION_FORMAT)
         SleepMonitorNotification.ensureChannel(this)
         val startedAt = System.currentTimeMillis()
+        sessionStartedAtMillis = startedAt
+        sessionStartedElapsedMillis = SystemClock.elapsedRealtime()
         val notification = SleepMonitorNotification.build(this, startedAt, monitorMode)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
@@ -289,17 +295,16 @@ class SleepMonitoringService : Service() {
             "alarm_dismissed_at" to null,
             "utc_offset_start_minutes" to offset,
             "utc_offset_end_minutes" to null,
-            "sensor_mode" to "audio",
-            "algorithm_version" to "audio-features-v2",
+            "sensor_mode" to "audio_bedside",
+            "algorithm_version" to "audio-features-v3",
+            "battery_start" to batterySnapshot(),
             "time_in_bed_minutes" to null,
             "quiet_minutes" to null,
             "noisy_minutes" to null,
             "estimated_sleep_minutes" to null,
             "noise_event_count" to 0,
             "signal_quality_score" to null,
-            "analysis_status" to if (
-                SleepStageModelGate.capabilities(this)["sleep_staging_available"] == true
-            ) "pending" else "model_unavailable",
+            "analysis_status" to "pending",
             "stage_algorithm_version" to null,
             "end_reason" to null,
             "created_at" to start.toString(),
@@ -314,14 +319,10 @@ class SleepMonitoringService : Service() {
 
         try {
             acquireWakeLock()
-            val motion = MotionAggregator.from(this)
-            motion.register()
-            motionAggregator = motion
             processor = AudioSignalProcessor(
                 sessionId,
                 onSegment = ::onSegment,
                 onError = { finish("audio_error", "failed") },
-                onMotionSnapshot = { motion.snapshotAndReset() },
             )
             processor?.start()
             session!!["status"] = "running"
@@ -342,7 +343,7 @@ class SleepMonitoringService : Service() {
                 finish("permission_revoked", "failed")
                 return
             }
-            if (System.currentTimeMillis() - startedMillis >= MAX_SESSION_MILLIS) {
+            if (sessionNowMillis() - startedMillis >= MAX_SESSION_MILLIS) {
                 finish("time_limit", "completed")
                 return
             }
@@ -361,7 +362,7 @@ class SleepMonitoringService : Service() {
         current["noisy_minutes"] = (noisySeconds / 60.0).roundToInt()
         current["noise_event_count"] = noiseEvents
         current["signal_quality_score"] = if (segmentCount == 0) 0.0 else validFractionSum / segmentCount
-        current["time_in_bed_minutes"] = ((System.currentTimeMillis() - startedMillis) / 60_000.0).roundToInt()
+        current["time_in_bed_minutes"] = ((sessionNowMillis() - startedMillis) / 60_000.0).roundToInt()
         spool.appendSegment(segment)
         spool.updateSession(current)
         publish()
@@ -382,7 +383,7 @@ class SleepMonitoringService : Service() {
             // until this returns so the last seconds are durably spooled.
             try { processor?.stop() } catch (_: Throwable) {}
             processor = null
-            val endedMillis = System.currentTimeMillis()
+            val endedMillis = sessionNowMillis()
             val ended = Instant.ofEpochMilli(endedMillis)
             val elapsedMillis =
                 endedMillis - Instant.parse(current["started_at"].toString()).toEpochMilli()
@@ -392,6 +393,7 @@ class SleepMonitoringService : Service() {
                 elapsedMillis >= AudioSignalProcessor.NO_DATA_TIMEOUT_MILLIS
             current["status"] = if (completedWithoutData) "failed" else finalStatus
             current["ended_at"] = ended.toString()
+            current["battery_end"] = batterySnapshot()
             current["end_reason"] = if (completedWithoutData) "no_audio_data" else reason
             current["time_in_bed_minutes"] = if (elapsedMillis <= 0) {
                 0
@@ -425,8 +427,6 @@ class SleepMonitoringService : Service() {
 
     private fun releaseResources() {
         processor = null
-        motionAggregator?.unregister()
-        motionAggregator = null
         wakeLock?.let { lock ->
             if (lock.isHeld) lock.release()
         }
@@ -434,6 +434,19 @@ class SleepMonitoringService : Service() {
         activeInstance = null
         lastState = session?.let { stateMap() }
     }
+
+    // Two reads per session, no polling or extra wakeups. Diagnostic only.
+    private fun sessionNowMillis() = sessionStartedAtMillis +
+        SystemClock.elapsedRealtime() - sessionStartedElapsedMillis
+
+    private fun batterySnapshot(): Map<String, Any?> = try {
+        val battery = getSystemService(BATTERY_SERVICE) as BatteryManager
+        mapOf(
+            "percent" to battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY),
+            "charge_uah" to battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER),
+            "charging" to battery.isCharging,
+        )
+    } catch (_: Throwable) { emptyMap() }
 
     private fun acquireWakeLock() {
         val manager = getSystemService(POWER_SERVICE) as PowerManager

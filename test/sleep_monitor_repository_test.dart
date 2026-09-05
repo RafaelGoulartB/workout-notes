@@ -8,10 +8,51 @@ import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
 import 'package:workout_notes/services/sleep_stage_engine.dart';
+import 'support/sleep_bedside_fixture.dart';
 
 void main() {
   late Database database;
   late SleepMonitorRepository repository;
+
+  test(
+    'bedside uncertainty never falls back to quiet-time sleep or creates a sleep entry',
+    () async {
+      final session = bedsideSession(minutes: 240);
+      final spool = <String, dynamic>{
+        'session': session.toMap(),
+        'segments': [for (var i = 0; i < 480; i++) bedsideSegment(i).toMap()],
+      };
+      final imported = await repository.importNativeSpool(spool);
+      expect(imported.estimatedSleepMinutes, isNull);
+      expect(imported.sleepOnsetAt, isNull);
+      expect(imported.sleepLatencyMinutes, isNull);
+      expect(imported.unknownMinutes, 240);
+      expect(imported.deepSleepMinutes, isNull);
+      expect(imported.stageConfidence, isNull);
+      expect(imported.sleepEntryId, isNull);
+      await repository.importNativeSpool(spool);
+      expect((await repository.getSessions()).length, 1);
+      expect(await database.query('sleep_entries'), isEmpty);
+    },
+  );
+
+  test(
+    'bedside inference accepts short sessions and keeps aggregate source version',
+    () async {
+      final imported = await repository.importNativeSpool({
+        'session': bedsideSession(minutes: 60).toMap(),
+        'segments': [
+          for (var i = 0; i < 120; i++)
+            bedsideSegment(i, periodic: true).toMap(),
+        ],
+      });
+      expect(imported.estimatedSleepMinutes, greaterThan(45));
+      expect(imported.stageAlgorithmVersion, 'sleep-wake-bedside-v1');
+      expect(imported.finalWakeAt, isNull);
+      expect(imported.deepSleepMinutes, isNull);
+      expect(imported.sleepEntryId, isNotNull);
+    },
+  );
 
   setUpAll(() {
     sqfliteFfiInit();
@@ -325,19 +366,22 @@ void main() {
     },
   );
 
-  test('runs the heuristic engine for feature nights and persists aggregates', () async {
-    final start = DateTime.utc(2026, 8, 2, 22);
-    final imported = await repository.importNativeSpool(_featureSpool(start));
-    final stages = await repository.getStageEpochs(imported.id);
+  test(
+    'runs the heuristic engine for feature nights and persists aggregates',
+    () async {
+      final start = DateTime.utc(2026, 8, 2, 22);
+      final imported = await repository.importNativeSpool(_featureSpool(start));
+      final stages = await repository.getStageEpochs(imported.id);
 
-    expect(imported.analysisStatus, SleepMonitorSession.analysisAvailable);
-    expect(imported.stageAlgorithmVersion, SleepStageEngine.algorithmVersion);
-    expect(stages, isEmpty);
-    final summary = await repository.getNightSummary(imported.sleepEntryId!);
-    expect(summary, isNotNull);
-    expect(summary!.session?.sleepingMinutes, isNotNull);
-    expect(summary.session?.deepSleepMinutes, isNotNull);
-  });
+      expect(imported.analysisStatus, SleepMonitorSession.analysisAvailable);
+      expect(imported.stageAlgorithmVersion, SleepStageEngine.algorithmVersion);
+      expect(stages, isEmpty);
+      final summary = await repository.getNightSummary(imported.sleepEntryId!);
+      expect(summary, isNotNull);
+      expect(summary!.session?.sleepingMinutes, isNotNull);
+      expect(summary.session?.deepSleepMinutes, isNotNull);
+    },
+  );
 
   test('keeps legacy noise nights as legacy_unavailable', () async {
     final imported = await repository.importNativeSpool(
@@ -349,7 +393,10 @@ void main() {
       ),
     );
 
-    expect(imported.analysisStatus, SleepMonitorSession.analysisLegacyUnavailable);
+    expect(
+      imported.analysisStatus,
+      SleepMonitorSession.analysisLegacyUnavailable,
+    );
     expect(await repository.getStageEpochs(imported.id), isEmpty);
   });
 
@@ -456,7 +503,9 @@ Map<String, dynamic> _featureSpool(DateTime start) {
     return {
       'id': 'feature-segment-$index',
       'session_id': 'feature-session',
-      'started_at': start.add(Duration(seconds: offsetSeconds)).toIso8601String(),
+      'started_at': start
+          .add(Duration(seconds: offsetSeconds))
+          .toIso8601String(),
       'duration_seconds': 30,
       'audio_rms_dbfs': awake ? -25 : -40,
       'audio_peak_dbfs': awake ? -10 : -25,

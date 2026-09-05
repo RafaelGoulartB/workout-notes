@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'replay_sleep.dart' as replay;
 
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
@@ -47,11 +48,17 @@ Future<void> main(List<String> args) async {
     stderr.writeln(
       'Usage: dart run tool/validate_sleep_stages.dart <diagnostic.json> <diary.json>',
     );
-    stderr.writeln('       dart run tool/validate_sleep_stages.dart --template');
+    stderr.writeln(
+      '       dart run tool/validate_sleep_stages.dart --template',
+    );
     exit(1);
   }
 
   final diagnostic = _readJson(args[0]);
+  if (diagnostic['schema'] == 'sleep-aggregate-replay') {
+    replay.main(args);
+    return;
+  }
   final diary = _readJson(args[1]);
 
   final segments = segmentsFromDiagnostic(diagnostic);
@@ -72,7 +79,9 @@ Future<void> main(List<String> args) async {
     segments: segments,
   );
   if (!engineResult.ran) {
-    stderr.writeln('Engine could not stage this night: ${engineResult.blockers}');
+    stderr.writeln(
+      'Engine could not stage this night: ${engineResult.blockers}',
+    );
     exit(1);
   }
 
@@ -98,7 +107,9 @@ Future<void> main(List<String> args) async {
     stdout.writeln(report.threeStateBlock);
   }
   stdout.writeln();
-  stdout.writeln(nightErrorsBlock(engineResult.epochs, session, summary, truth));
+  stdout.writeln(
+    nightErrorsBlock(engineResult.epochs, session, summary, truth),
+  );
 }
 
 /// Re-stages a diagnostic without any manual diary, comparing the current
@@ -157,7 +168,9 @@ Future<void> _selfCheck(String path) async {
     'vs recorded $refTotal (sleeping $refSleep, deep $refDeep)',
   );
   stdout.writeln('Deep minutes:      engine ${summary?.deepSleepMinutes}');
-  stdout.writeln('Awake minutes:     engine ${summary?.awakeMinutes} vs recorded $refAwake');
+  stdout.writeln(
+    'Awake minutes:     engine ${summary?.awakeMinutes} vs recorded $refAwake',
+  );
 }
 
 String _offMin(DateTime? value, DateTime start) {
@@ -198,7 +211,9 @@ Map<String, dynamic> _readJson(String path) {
 }
 
 /// Builds the monitor segments recorded in a v4 diagnostic payload.
-List<SleepMonitorSegment> segmentsFromDiagnostic(Map<String, dynamic> diagnostic) {
+List<SleepMonitorSegment> segmentsFromDiagnostic(
+  Map<String, dynamic> diagnostic,
+) {
   final raw = diagnostic['segments_relative'] as List<dynamic>? ?? const [];
   final start = DateTime.utc(2026, 1, 1, 22);
   final segments = <SleepMonitorSegment>[];
@@ -217,18 +232,25 @@ List<SleepMonitorSegment> segmentsFromDiagnostic(Map<String, dynamic> diagnostic
         classification: map['classification'] as String? ?? 'quiet',
         validFraction: (map['valid_fraction'] as num?)?.toDouble() ?? 1.0,
         noiseBurstCount: (map['noise_burst_count'] as num?)?.toInt() ?? 0,
-        spectralBandEnergy0: (map['spectral_band_energy_0'] as num?)?.toDouble(),
-        spectralBandEnergy1: (map['spectral_band_energy_1'] as num?)?.toDouble(),
-        spectralBandEnergy2: (map['spectral_band_energy_2'] as num?)?.toDouble(),
-        spectralBandEnergy3: (map['spectral_band_energy_3'] as num?)?.toDouble(),
-        spectralBandEnergy4: (map['spectral_band_energy_4'] as num?)?.toDouble(),
+        spectralBandEnergy0: (map['spectral_band_energy_0'] as num?)
+            ?.toDouble(),
+        spectralBandEnergy1: (map['spectral_band_energy_1'] as num?)
+            ?.toDouble(),
+        spectralBandEnergy2: (map['spectral_band_energy_2'] as num?)
+            ?.toDouble(),
+        spectralBandEnergy3: (map['spectral_band_energy_3'] as num?)
+            ?.toDouble(),
+        spectralBandEnergy4: (map['spectral_band_energy_4'] as num?)
+            ?.toDouble(),
         spectralFlatness: (map['spectral_flatness'] as num?)?.toDouble(),
         spectralCentroidHz: (map['spectral_centroid_hz'] as num?)?.toDouble(),
         breathingRegularity: (map['breathing_regularity'] as num?)?.toDouble(),
         breathingRateHz: (map['breathing_rate_hz'] as num?)?.toDouble(),
         motionActiveSeconds: (map['motion_active_seconds'] as num?)?.toDouble(),
-        motionMeanDeviationG: (map['motion_mean_deviation_g'] as num?)?.toDouble(),
-        motionMaxDeviationG: (map['motion_max_deviation_g'] as num?)?.toDouble(),
+        motionMeanDeviationG: (map['motion_mean_deviation_g'] as num?)
+            ?.toDouble(),
+        motionMaxDeviationG: (map['motion_max_deviation_g'] as num?)
+            ?.toDouble(),
       ),
     );
   }
@@ -262,10 +284,13 @@ SleepMonitorSession sessionFromDiagnostic(
     timeInBedMinutes: timeInBed,
     quietMinutes: (technical?['quiet_minutes'] as num?)?.toInt(),
     noisyMinutes: (technical?['noisy_minutes'] as num?)?.toInt(),
-    estimatedSleepMinutes: (technical?['estimated_sleep_minutes'] as num?)?.toInt(),
+    estimatedSleepMinutes: (technical?['estimated_sleep_minutes'] as num?)
+        ?.toInt(),
     noiseEventCount: (technical?['noise_event_count'] as num?)?.toInt() ?? 0,
-    signalQualityScore: (technical?['signal_quality_score'] as num?)?.toDouble(),
-    endReason: (technical?['end_reason'] as String?) ?? SleepMonitorSession.endUser,
+    signalQualityScore: (technical?['signal_quality_score'] as num?)
+        ?.toDouble(),
+    endReason:
+        (technical?['end_reason'] as String?) ?? SleepMonitorSession.endUser,
     createdAt: start,
   );
 }
@@ -319,14 +344,17 @@ class DiaryTruth {
           }(),
       ],
       hasOptionalLabels =
-          (diary['optional_epoch_labels'] as List<dynamic>? ?? const []).isNotEmpty;
+          (diary['optional_epoch_labels'] as List<dynamic>? ?? const [])
+              .isNotEmpty;
 
   SleepStageType truthAt(int offsetSeconds) {
     for (final (from, to, stage) in optionalLabels) {
       if (offsetSeconds >= from && offsetSeconds < to) return stage;
     }
     for (final (from, to) in awakeningRanges) {
-      if (offsetSeconds >= from && offsetSeconds < to) return SleepStageType.awake;
+      if (offsetSeconds >= from && offsetSeconds < to) {
+        return SleepStageType.awake;
+      }
     }
     if (offsetSeconds < onsetOffsetSeconds) return SleepStageType.awake;
     if (offsetSeconds >= finalWakeOffsetSeconds) return SleepStageType.awake;
@@ -383,12 +411,13 @@ SleepStageValidationReport validateAgainstDiary(
   for (final epoch in epochs) {
     if (epoch.stage == SleepStageType.unknown) continue;
     final offset = epoch.startedAt.difference(sessionStart).inSeconds;
-    if (offset >= truth.finalWakeOffsetSeconds) continue;
     final truthStage = truth.truthAt(offset);
     final engineAsleep =
-        epoch.stage == SleepStageType.sleeping || epoch.stage == SleepStageType.deep;
+        epoch.stage == SleepStageType.sleeping ||
+        epoch.stage == SleepStageType.deep;
     final truthAsleep =
-        truthStage == SleepStageType.sleeping || truthStage == SleepStageType.deep;
+        truthStage == SleepStageType.sleeping ||
+        truthStage == SleepStageType.deep;
     if (engineAsleep && truthAsleep) {
       tp++;
     } else if (!engineAsleep && !truthAsleep) {
@@ -417,7 +446,8 @@ SleepStageValidationReport validateAgainstDiary(
   final sensitivity = (tp + fn) == 0 ? 0.0 : tp / (tp + fn);
   final specificity = (tn + fp) == 0 ? 0.0 : tn / (tn + fp);
   final prevalence = (tp + fn) / included;
-  final pe = (prevalence * (tp + fp) / included) +
+  final pe =
+      (prevalence * (tp + fp) / included) +
       ((1 - prevalence) * (tn + fn) / included);
   final kappa = pe == 1 ? 0.0 : (accuracy - pe) / (1 - pe);
 
@@ -429,8 +459,12 @@ SleepStageValidationReport validateAgainstDiary(
     ..writeln('  Cohen\'s kappa:      ${kappa.toStringAsFixed(2)}')
     ..writeln('  Confusion (rows=engine, cols=diary):')
     ..writeln('                awake  asleep')
-    ..writeln('    awake       ${tn.toString().padLeft(4)} ${fp.toString().padLeft(4)}')
-    ..writeln('    asleep      ${fn.toString().padLeft(4)} ${tp.toString().padLeft(4)}');
+    ..writeln(
+      '    awake       ${tn.toString().padLeft(4)} ${fn.toString().padLeft(4)}',
+    )
+    ..writeln(
+      '    asleep      ${fp.toString().padLeft(4)} ${tp.toString().padLeft(4)}',
+    );
 
   String threeState = '';
   if (truth.hasOptionalLabels) {

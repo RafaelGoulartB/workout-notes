@@ -2832,5 +2832,16 @@
     "placeholders": {
       "count": { "type": "int" }
     }
-  }
+  },
+  "sleepLiveProbablyAwake": "Provavelmente acordado ? provis?rio",
+  "sleepLiveProbablyAsleep": "Provavelmente dormindo ? provis?rio",
+  "sleepLiveUncertain": "Estado de sono indeterminado",
+  "sleepWakeEstimateTitle": "Estimativas de sono e vig?lia",
+  "sleepBedsideEstimateBody": "Para o celular na mesa de cabeceira. Sil?ncio sozinho n?o confirma sono. O tempo indeterminado aparece separado; o total da noite fica indispon?vel quando h? muita incerteza. Este modo n?o estima sono profundo.",
+  "sleepDiagnosticTitle": "Guardar diagn?sticos de sono",
+  "sleepDiagnosticBody": "Opcional: guarda resumos dos sensores e leituras de bateria do in?cio e fim no aparelho por at? 14 dias (m?ximo de 20 MB). Sem grava??es de ?udio nem envio autom?tico. Exporte uma noite para comparar resultados. Desativar apaga os diagn?sticos salvos.",
+  "sleepDiagnosticExport": "Exportar ?ltimo diagn?stico de sono",
+  "sleepDiagnosticError": "N?o foi poss?vel salvar ou exportar o diagn?stico de sono.",
+  "sleepDiagnosticMissing": "Ative os diagn?sticos antes de encerrar uma noite monitorada. N?o h? diagn?stico salvo dispon?vel.",
+  "sleepIncompleteNight": "Noite monitorada com estimativa incompleta"
 }

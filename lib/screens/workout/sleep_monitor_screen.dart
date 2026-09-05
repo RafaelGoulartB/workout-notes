@@ -6,6 +6,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_mode.dart';
 import 'package:workout_notes/models/sleep_monitor_state.dart';
+import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/services/notification_service.dart';
 import 'package:workout_notes/services/sleep_mission_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
@@ -49,8 +50,13 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     WidgetsBinding.instance.addObserver(this);
     _service.addListener(_onChanged);
     _initialize();
+    _startTicker();
+  }
+
+  void _startTicker() {
+    _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (mounted && _service.state.isActive) setState(() {});
     });
   }
 
@@ -64,6 +70,12 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startTicker();
+    } else {
+      _ticker?.cancel();
+      _ticker = null;
+    }
     if (state == AppLifecycleState.resumed && _service.isSupported) {
       _reloadMission();
       _service.initialize().then((_) => _service.getAlarmCapabilities());
@@ -332,9 +344,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     DateTime? alarmAt,
   ) {
     final maximum = state.maxSnoozes <= 0 ? 1 : state.maxSnoozes;
-    final progress = (state.snoozeCount / maximum)
-        .clamp(0.0, 1.0)
-        .toDouble();
+    final progress = (state.snoozeCount / maximum).clamp(0.0, 1.0).toDouble();
     return [
       _NightHero(
         icon: Icons.snooze_rounded,
@@ -373,10 +383,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
               LinearProgressIndicator(value: progress),
               const SizedBox(height: 8),
               Text(
-                loc.alarmSnoozeProgress(
-                  state.snoozeCount,
-                  state.maxSnoozes,
-                ),
+                loc.alarmSnoozeProgress(state.snoozeCount, state.maxSnoozes),
                 style: Theme.of(context).textTheme.labelLarge,
               ),
               const SizedBox(height: 14),
@@ -485,6 +492,15 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
                 noiseScore: state.currentNoiseScore,
                 loc: loc,
               ),
+              if (_service.liveDecision != null) ...[
+                const SizedBox(height: 8),
+                Text(switch (_service.liveDecision!.epoch.stage) {
+                  SleepStageType.awake => loc.sleepLiveProbablyAwake,
+                  SleepStageType.sleeping ||
+                  SleepStageType.deep => loc.sleepLiveProbablyAsleep,
+                  SleepStageType.unknown => loc.sleepLiveUncertain,
+                }),
+              ],
             ],
           ),
         ),
@@ -685,6 +701,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   }
 
   String _localizedError(AppLocalizations loc, String? code) {
+    if (code == 'diagnostic_save_failed') return loc.sleepDiagnosticError;
     switch (code) {
       case 'microphone_permission':
       case 'microphone_denied':
