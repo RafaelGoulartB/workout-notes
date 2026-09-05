@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Page not found · Workout Notes</title>
+    <meta name="description" content="That page does not exist. Here are the places you probably wanted." />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#08090c" />
+    <link rel="icon" href="assets/brand/icon-64.png" sizes="64x64" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/css/base.css" />
+    <link rel="stylesheet" href="assets/css/landing.css" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("wn-theme");
+          if (saved === "light" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
+            document.documentElement.setAttribute("data-theme", "light");
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <style>
+      .nf {
+        display: grid;
+        place-items: center;
+        min-height: 78vh;
+        text-align: center;
+        position: relative;
+      }
+      .nf__code {
+        font-family: var(--font-mono);
+        font-size: clamp(4rem, 16vw, 9rem);
+        line-height: 1;
+        letter-spacing: -0.04em;
+        background: linear-gradient(180deg, var(--fg) 10%, transparent 105%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .nf h1 {
+        margin-top: 6px;
+        font-size: clamp(1.5rem, 4vw, 2.25rem);
+      }
+      .nf p {
+        margin: 16px auto 0;
+        max-width: 46ch;
+        color: var(--fg-2);
+      }
+    </style>
+  </head>
+
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+      <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h13M12.5 6l6 6-6 6" />
+      </symbol>
+      <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 6.6C10.5 5.1 8.5 4.3 6 4.3H4v14h2c2.5 0 4.5.8 6 2.3 1.5-1.5 3.5-2.3 6-2.3h2v-14h-2c-2.5 0-4.5.8-6 2.3Z" />
+        <path d="M12 6.6v14" />
+      </symbol>
+    </svg>
+
+    <main class="nf">
+      <div class="backdrop">
+        <div class="backdrop__grid"></div>
+        <div class="backdrop__glow"></div>
+      </div>
+
+      <div class="container">
+        <span class="nf__code">404</span>
+        <h1>That page is not in the journal</h1>
+        <p>
+          The link is broken or the page moved. The two places worth trying are the
+          landing page and the documentation index.
+        </p>
+
+        <div class="hero__cta">
+          <a class="btn btn--primary btn--lg" href="index.html">
+            Back to the home page
+            <svg aria-hidden="true"><use href="#i-arrow-right" /></svg>
+          </a>
+          <a class="btn btn--outline btn--lg" href="docs/index.html">
+            <svg aria-hidden="true"><use href="#i-book" /></svg>
+            Documentation
+          </a>
+        </div>
+
+        <div class="doclinks" style="margin-top: 52px; text-align: left">
+          <a class="card card--hover doclink" href="docs/getting-started.html">
+            <span class="doclink__text">
+              <strong>Getting started</strong>
+              <span>Install, permissions, first session</span>
+            </span>
+          </a>
+          <a class="card card--hover doclink" href="docs/strength-training.html">
+            <span class="doclink__text">
+              <strong>Strength training</strong>
+              <span>Sets, routines, timers, history</span>
+            </span>
+          </a>
+          <a class="card card--hover doclink" href="docs/faq.html">
+            <span class="doclink__text">
+              <strong>FAQ</strong>
+              <span>Short answers and troubleshooting</span>
+            </span>
+          </a>
+        </div>
+      </div>
+    </main>
+
+    <script src="assets/js/site.js" defer></script>
+  </body>
+</html>

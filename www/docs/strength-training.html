@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Strength training · Workout Notes docs</title>
+    <meta name="description" content="How the live workout screen, set editing, RPE, rest and session timers, the exercise library, routines and session review work in Workout Notes." />
+    <meta name="theme-color" content="#08090c" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="Strength training · Workout Notes docs" />
+    <meta property="og:description" content="How the live workout screen, set editing, RPE, rest and session timers, the exercise library, routines and session review work in Workout Notes." />
+    <meta property="og:image" content="../assets/brand/icon-512.png" />
+    <link rel="icon" href="../assets/brand/icon-64.png" sizes="64x64" />
+    <link rel="apple-touch-icon" href="../assets/brand/icon-180.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../assets/css/base.css" />
+    <link rel="stylesheet" href="../assets/css/docs.css" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("wn-theme");
+          if (saved === "light" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
+            document.documentElement.setAttribute("data-theme", "light");
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+
+  <body class="docs-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+      <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2.6v2.2M12 19.2v2.2M4.3 4.3l1.6 1.6M18.1 18.1l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.3 19.7l1.6-1.6M18.1 5.9l1.6-1.6" />
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" />
+      </symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="6.5" />
+        <path d="M16 16l4 4" />
+      </symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h13M12.5 6l6 6-6 6" />
+      </symbol>
+      <symbol id="i-arrow-up-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 17 17 7M8.5 7H17v8.5" />
+      </symbol>
+      <symbol id="i-chev-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9.5 5l7 7-7 7" />
+      </symbol>
+      <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 11v5.5M12 7.8h.01" />
+      </symbol>
+      <symbol id="i-bulb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V18h7v-4.1A6 6 0 0 0 12 3Z" />
+      </symbol>
+      <symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4.5 21 20H3L12 4.5Z" />
+        <path d="M12 10v4.5M12 17.4h.01" />
+      </symbol>
+      <symbol id="i-android" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M6 9.5h12a1 1 0 0 1 1 1V17a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6.5a1 1 0 0 1 1-1Zm-3 .5a1.4 1.4 0 0 1 1.4 1.4v4.2a1.4 1.4 0 0 1-2.8 0v-4.2A1.4 1.4 0 0 1 3 10Zm18 0a1.4 1.4 0 0 1 1.4 1.4v4.2a1.4 1.4 0 0 1-2.8 0v-4.2A1.4 1.4 0 0 1 21 10ZM9 19.5h1.6v2.1a1.3 1.3 0 0 1-2.6 0v-2.1Zm4.4 0H15v2.1a1.3 1.3 0 0 1-2.6 0v-2.1ZM8.4 3.2l.9 1.6A6.6 6.6 0 0 1 12 4.3c1 0 1.9.2 2.7.5l.9-1.6a.5.5 0 1 1 .87.5l-.85 1.5A5.6 5.6 0 0 1 18.4 8.5H5.6a5.6 5.6 0 0 1 2.78-3.3l-.85-1.5a.5.5 0 1 1 .87-.5Z" />
+      </symbol>
+      <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5Z" />
+      </symbol>
+      <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 6.6C10.5 5.1 8.5 4.3 6 4.3H4v14h2c2.5 0 4.5.8 6 2.3 1.5-1.5 3.5-2.3 6-2.3h2v-14h-2c-2.5 0-4.5.8-6 2.3Z" />
+        <path d="M12 6.6v14" />
+      </symbol>
+      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+        <path d="M8.5 10.5V7.5a3.5 3.5 0 1 1 7 0v3" />
+      </symbol>
+    </svg>
+
+    <header class="site-header" data-header>
+      <div class="container container-wide site-header__inner">
+        <button
+          class="icon-btn sidebar-toggle"
+          type="button"
+          data-sidebar-toggle
+          aria-expanded="false"
+          aria-controls="docs-sidebar"
+          aria-label="Open documentation menu"
+        >
+          <svg aria-hidden="true"><use href="#i-menu" /></svg>
+        </button>
+
+        <a class="brand" href="../index.html" aria-label="Workout Notes home">
+          <img src="../assets/brand/icon-64.png" alt="" width="27" height="27" />
+          <span>Workout Notes</span>
+          <span class="brand__sub">docs</span>
+        </a>
+
+        <nav class="site-nav" aria-label="Main">
+          <a href="../index.html">Home</a>
+          <a href="index.html" class="is-active">Documentation</a>
+          <a href="../index.html#gallery">Screenshots</a>
+          <a href="faq.html">FAQ</a>
+        </nav>
+
+        <div class="header-actions">
+          <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch theme">
+            <svg class="icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+            <svg class="icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+          </button>
+          <a
+            class="gh-link"
+            href="https://github.com/RafaelGoulartB/workout-notes"
+            target="_blank"
+            rel="noopener"
+          >
+            <svg aria-hidden="true"><use href="#i-github" /></svg>
+            <span aria-hidden="true">★</span>
+            <span data-stars>1</span>
+            <span class="sr-only">stars on GitHub</span>
+          </a>
+          <a
+            class="btn btn--primary btn--sm"
+            href="https://github.com/RafaelGoulartB/workout-notes/releases/latest"
+            target="_blank"
+            rel="noopener"
+          >
+            Download
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="docs-backdrop" data-docs-backdrop></div>
+
+    <div class="container container-wide docs-shell">
+      <!-- ============================================================
+           SIDEBAR: this block is intentionally identical on every page
+           under /docs. If you add, rename or reorder a guide, mirror the
+           change in each docs/*.html file. Everything else that is
+           page-specific (the highlighted link, the "on this page" list and
+           the previous/next pager) is derived at runtime by
+           assets/js/docs.js from the current URL and this list's order, so
+           it never has to be edited by hand.
+           ============================================================ -->
+      <aside class="docs-sidebar" id="docs-sidebar">
+        <div class="docs-filter">
+          <svg aria-hidden="true"><use href="#i-search" /></svg>
+          <input
+            type="search"
+            data-docs-filter
+            placeholder="Filter guides"
+            aria-label="Filter documentation pages"
+            autocomplete="off"
+          />
+          <kbd>/</kbd>
+        </div>
+
+        <nav class="docs-nav" aria-label="Documentation">
+          <p class="docs-nav__group">Start here</p>
+          <ul>
+            <li><a href="index.html" data-keywords="overview introduction start">Overview</a></li>
+            <li><a href="getting-started.html" data-keywords="install apk permissions setup units theme locale">Getting started</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Training</p>
+          <ul>
+            <li><a href="strength-training.html" data-keywords="workout sets reps rpe supersets routines exercises timer history">Strength training</a></li>
+            <li><a href="progress.html" data-keywords="charts analytics 1rm epley volume records goals streak heatmap">Progress &amp; goals</a></li>
+            <li><a href="body.html" data-keywords="weight body fat measurements circumference trend">Body measurements</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Cardio</p>
+          <ul>
+            <li><a href="running.html" data-keywords="gps run bike splits pace elevation replay achievements">Running &amp; cycling</a></li>
+            <li><a href="run-plans.html" data-keywords="plans templates vdot intervals voice coaching 5k 10k marathon">Plans, intervals &amp; voice</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Health</p>
+          <ul>
+            <li><a href="sleep.html" data-keywords="sleep stages efficiency alarm mission snooze">Sleep &amp; alarms</a></li>
+            <li><a href="nutrition.html" data-keywords="food diary macros calories barcode meals targets tdee">Nutrition</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Planning</p>
+          <ul>
+            <li><a href="periodization.html" data-keywords="phases targets adherence checkin cycle plan">Periodization</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Reference</p>
+          <ul>
+            <li><a href="ai-coach.html" data-keywords="ai provider openai tools proposal token model">AI Coach</a></li>
+            <li><a href="data-privacy.html" data-keywords="backup export import json csv privacy offline platform">Data, backup &amp; privacy</a></li>
+            <li><a href="faq.html" data-keywords="faq troubleshooting help questions">FAQ &amp; troubleshooting</a></li>
+          </ul>
+        </nav>
+
+        <div class="docs-sidebar__foot">
+          <a href="https://github.com/RafaelGoulartB/workout-notes" target="_blank" rel="noopener">
+            <svg aria-hidden="true"><use href="#i-github" /></svg>
+            Source on GitHub
+          </a>
+          <a href="https://github.com/RafaelGoulartB/workout-notes/issues" target="_blank" rel="noopener">
+            <svg aria-hidden="true"><use href="#i-info" /></svg>
+            Report an issue
+          </a>
+          <a href="https://github.com/RafaelGoulartB/workout-notes/releases/latest" target="_blank" rel="noopener">
+            <svg aria-hidden="true"><use href="#i-download" /></svg>
+            Latest release
+          </a>
+        </div>
+      </aside>
+
+      <!-- ============ CONTENT ============ -->
+      <main class="docs-main" id="main">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../index.html">Home</a>
+          <span aria-hidden="true">/</span>
+          <a href="index.html">Docs</a>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">Strength training</span>
+        </nav>
+
+        <header class="doc-head">
+          <span class="eyebrow">Training</span>
+          <h1>Strength training</h1>
+          <p class="lead">The live session screen is built so that a normal working set costs one tap. Everything else (RPE, comments, warm-up flags, reordering) is one layer down, out of the way until you need it.</p>
+          <div class="doc-meta"><span class="pill pill--accent">Live session</span><span class="pill">Routines</span><span class="pill">Rest timer</span><span class="pill">Session review</span></div>
+        </header>
+
+        <article class="prose">
+          <h2>Starting a session</h2>
+          <p>There are three ways into the live workout screen.</p>
+
+          <dl class="spec">
+            <div class="spec__row">
+              <dt>Empty session</dt>
+              <dd>
+                <strong>New Workout · Start now</strong> on the dashboard. The
+                workout row is created straight away, but its start time stays
+                empty until you press start or complete a set, so an accidental
+                tap does not leave a five-hour session in your history.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>From a routine day</dt>
+              <dd>
+                Every exercise of that day is copied in with its predefined sets:
+                weight, reps, distance, time and warm-up flags included. You start
+                with the session already laid out.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Resume</dt>
+              <dd>
+                An unfinished session reopens exactly where you left it, including
+                a running or paused timer.
+              </dd>
+            </div>
+          </dl>
+
+          <h2>The session stopwatch</h2>
+          <p>
+            The header clock ticks every second and is mirrored into an ongoing
+            notification, so you can leave the app and still see the elapsed time.
+            It is formatted <code>MM:SS</code> up to an hour, then
+            <code>1h 04min</code>.
+          </p>
+          <ul>
+            <li>
+              <strong>Pause is honest.</strong> Pausing is stored, and resuming
+              shifts the start time forward by however long you were paused. Paused
+              minutes never inflate the session duration.
+            </li>
+            <li>
+              <strong>Closing the app while paused is safe.</strong> Reopening
+              performs the same shift, so the clock picks up where it stopped.
+            </li>
+            <li>
+              <strong>Reset asks first,</strong> then clears the start, end and
+              pause markers.
+            </li>
+            <li>
+              With <em>auto-start workout timer</em> enabled in settings, the clock
+              starts when you complete your first set and stops when every set in
+              the session is complete.
+            </li>
+          </ul>
+
+          <h2>The rest timer</h2>
+          <p>
+            Marking a set complete starts the rest countdown for that exercise,
+            using the exercise's own rest time, the routine's override, or the
+            global default (90 s) in that order. If the set you just ticked was the
+            last incomplete set in the session, a running rest timer is stopped
+            instead of restarted.
+          </p>
+
+          <div class="callout callout--note">
+            <svg aria-hidden="true"><use href="#i-info" /></svg>
+            <div class="callout__body">
+              <span class="callout__title">Why it does not drift</span>
+              <p>
+                The countdown is anchored to a wall-clock end time and re-synced on
+                every tick rather than decremented. Android throttling timers in the
+                background, or the screen going off, cannot make it lose seconds.
+              </p>
+            </div>
+          </div>
+
+          <p>
+            The dedicated timer screen shows a 280&nbsp;px progress ring with the
+            countdown in large type and a state label: <em>Resting</em>,
+            <em>Paused</em>, <em>Complete</em> or <em>Ready</em>. The ring turns
+            amber in the final five seconds and green on completion.
+          </p>
+          <ul>
+            <li>
+              <strong>Presets</strong> for 30 s, 60 s, 90 s, 2 min and 3 min appear
+              only while the timer is idle.
+            </li>
+            <li>
+              <strong>One control</strong> pauses and resumes; a stop action lives
+              in the app bar while the timer is active.
+            </li>
+            <li>
+              <strong>Completion is hard to miss:</strong> a notification plus a
+              burst of haptic feedback that repeats for about three seconds.
+            </li>
+          </ul>
+
+          <h2>Editing a set</h2>
+          <p>
+            Tapping a set row opens the editor sheet. The numeric controls adapt to
+            the exercise type, and use that exercise's own weight increment for the
+            plus and minus buttons.
+          </p>
+
+          <dl class="spec">
+            <div class="spec__row">
+              <dt>RPE</dt>
+              <dd>
+                A row of chips from 0 to 10, where 0 shows as <code>-</code>.
+                Tapping the value that is already selected clears it.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Warm-up</dt>
+              <dd>
+                A switch. Warm-up sets are excluded from volume, from personal
+                records and from the totals your goals count.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Comment</dt>
+              <dd>Free text on the individual set.</dd>
+            </div>
+            <div class="spec__row">
+              <dt>Values</dt>
+              <dd>
+                Weight, reps, distance and time, with pace shown where it applies.
+              </dd>
+            </div>
+          </dl>
+
+          <p>
+            <strong>Add set</strong> copies the previous set (weight, reps,
+            distance, time and the warm-up flag), so logging straight sets is
+            repeated taps rather than repeated typing. Deleting a set is immediate;
+            removing a whole exercise asks for confirmation.
+          </p>
+          <p>
+            Exercises can be dragged into a new order. The reorder is applied
+            optimistically and persisted as one batch; if the write fails, the
+            screen reloads the stored order and tells you.
+          </p>
+
+          <h3>Exercise types</h3>
+          <p>
+            Each exercise declares which fields it uses, so a treadmill entry does
+            not ask for weight and a plank does not ask for reps.
+          </p>
+
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Fields logged</th>
+                  <th>Typical use</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td><code>weightReps</code></td><td>Weight + reps</td><td>Most barbell and machine work</td></tr>
+                <tr><td><code>distanceTime</code></td><td>Distance + time</td><td>Treadmill, rowing, cycling</td></tr>
+                <tr><td><code>weightDistance</code></td><td>Weight + distance</td><td>Farmer's walks, sled pushes</td></tr>
+                <tr><td><code>weightTime</code></td><td>Weight + time</td><td>Weighted planks, loaded carries by time</td></tr>
+                <tr><td><code>repsDistance</code></td><td>Reps + distance</td><td>Bounds, broad jumps</td></tr>
+                <tr><td><code>repsTime</code></td><td>Reps + time</td><td>Timed sets of a fixed rep count</td></tr>
+                <tr><td><code>weightOnly</code></td><td>Weight</td><td>Static holds by load</td></tr>
+                <tr><td><code>repsOnly</code></td><td>Reps</td><td>Bodyweight pull-ups, push-ups</td></tr>
+                <tr><td><code>distanceOnly</code></td><td>Distance</td><td>Untimed distance work</td></tr>
+                <tr><td><code>timeOnly</code></td><td>Time</td><td>Planks, stretches, holds</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h2>Finishing the session</h2>
+          <p>
+            <strong>Finish</strong> stops the clock (resuming it first if it was
+            paused), computes the summary and opens a sheet where you rate how the
+            session felt and can leave a comment.
+          </p>
+
+          <h3>What the summary counts</h3>
+          <ul>
+            <li>
+              <strong>Total sets, distance and cardio time:</strong> every
+              non-warm-up set.
+            </li>
+            <li>
+              <strong>Volume and completed sets:</strong> non-warm-up sets that you
+              actually ticked as complete.
+            </li>
+            <li><strong>Volume</strong> is always the sum of weight × reps.</li>
+          </ul>
+
+          <div class="formula">
+            <code>calories = MET × 3.5 × bodyWeightKg ÷ 200 × minutes</code>
+            <span>
+              MET defaults to 5.0. The estimate needs a logged body weight; without
+              one, no calorie figure is produced. If you never started the
+              stopwatch, the planned duration is used instead of the measured one.
+            </span>
+          </div>
+
+          <h3>How personal records are decided</h3>
+          <p>
+            For every exercise in the session, the app queries your best result
+            across all <em>other</em> workouts, ignoring warm-ups and incomplete
+            sets, and compares.
+          </p>
+
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Record</th>
+                  <th>Fires when</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Top weight</strong></td>
+                  <td>The session's heaviest set matches or beats the previous best, and ties count</td>
+                </tr>
+                <tr>
+                  <td><strong>Session volume</strong></td>
+                  <td>Strictly greater than the best single-session volume for that exercise</td>
+                </tr>
+                <tr>
+                  <td><strong>Cardio distance</strong></td>
+                  <td>The session's distance matches or beats the previous best</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            The confirmation snackbar reports how many records fell. Records for
+            individual exercises, including estimated one-rep max, are collected on
+            the <a href="progress.html">Progress</a> screen.
+          </p>
+
+          <h3>Planned duration</h3>
+          <p>
+            Routines and unstarted sessions show an estimated duration, built from
+            the sets themselves:
+          </p>
+          <ul>
+            <li>a set takes its logged time if it has one, otherwise reps × 4 s, with a 30 s floor;</li>
+            <li>rest is added between every pair of sets, including the switch from one exercise to the next, using the preceding exercise's rest time (90 s when unset);</li>
+            <li>no rest is added after the final set, and the total is rounded up to whole minutes.</li>
+          </ul>
+
+          <h2>The exercise library</h2>
+          <p>
+            The app ships with a seeded catalog: localized names, per-exercise
+            notes, equipment, a default rest time and a weight increment.
+            Categories carry a colour and an energy system (<strong>anaerobic</strong> or <strong>aerobic</strong>), and that
+            classification is what most of the analytics filter on later.
+          </p>
+
+          <h3>Finding an exercise</h3>
+          <ul>
+            <li>Search by name, debounced as you type.</li>
+            <li>Category chips across the top; tapping the active chip clears it.</li>
+            <li>A favourites-only toggle in the app bar, and a star on each card.</li>
+            <li>
+              Cards show a type-derived icon tinted with the category colour, the
+              category and equipment, and an info marker when the exercise has
+              notes.
+            </li>
+          </ul>
+
+          <h3>Creating or editing one</h3>
+          <dl class="spec">
+            <div class="spec__row">
+              <dt>Name</dt>
+              <dd>Required.</dd>
+            </div>
+            <div class="spec__row">
+              <dt>Category</dt>
+              <dd>Picked from a sheet with colour dots.</dd>
+            </div>
+            <div class="spec__row">
+              <dt>Type</dt>
+              <dd>One of the ten types above; this decides which fields you log.</dd>
+            </div>
+            <div class="spec__row">
+              <dt>Equipment</dt>
+              <dd>
+                Autocomplete over Barbell, Dumbbell, Cable, Machine, Bodyweight,
+                Treadmill, Stationary, Kettlebell and Band. Free text is accepted.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Weight increment</dt>
+              <dd>
+                Drives the plus and minus steps in the set editor: 2.5 kg for a
+                barbell, 1 kg for a dumbbell, whatever your gym actually has.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Default rest time</dt>
+              <dd>In seconds, used when starting the rest timer for this exercise.</dd>
+            </div>
+            <div class="spec__row">
+              <dt>Notes</dt>
+              <dd>
+                Multi-line: setup, seat height, cues, anything you keep
+                forgetting.
+              </dd>
+            </div>
+          </dl>
+
+          <h3>The exercise detail screen</h3>
+          <p>
+            Opening an exercise gives you record cards for best weight, best session
+            volume and best estimated 1RM, a chart selector, and a per-session table
+            of sets, reps and estimated 1RM by date. Each row links back to the
+            workout it came from.
+          </p>
+
+          <h2>Routines</h2>
+          <p>
+            A routine is a named container of <strong>days</strong>; each day holds
+            ordered <strong>exercises</strong>; each exercise holds
+            <strong>predefined sets</strong>. Days are free-form, so "Upper A /
+            Lower A / Upper B / Lower B" and "Push / Pull / Legs" both work.
+          </p>
+
+          <ul>
+            <li>
+              Predefined sets carry weight, reps, distance, time and the warm-up
+              flag: the same fields a real set has, edited with the same controls.
+            </li>
+            <li>
+              A routine exercise can override the rest time it inherits from the
+              exercise itself.
+            </li>
+            <li>Exercises within a day can be dragged into order.</li>
+            <li>
+              Starting a workout from a day copies everything in, and the workout
+              remembers which routine it came from, which is how periodization
+              adherence knows whether you trained the planned session.
+            </li>
+          </ul>
+
+          <div class="callout callout--warn">
+            <svg aria-hidden="true"><use href="#i-warn" /></svg>
+            <div class="callout__body">
+              <span class="callout__title">Deleting a routine</span>
+              <p>
+                Deleting a routine also unlinks it from any periodization phase
+                target that pointed at it. Completed workouts are untouched: your
+                history never depends on a routine still existing.
+              </p>
+            </div>
+          </div>
+
+          <h2>History and review</h2>
+
+          <h3>Session review</h3>
+          <p>
+            Opening a finished workout gives you the header stats: duration,
+            volume, completed sets out of total, and density in weight per minute, plus an <strong>Evolution</strong> block comparing this session against
+            a similar one, <strong>Highlights</strong> (top set, highest-volume
+            exercise, average RPE), volume by muscle group, and the full set table
+            with RPE per set.
+          </p>
+
+          <figure class="figure-phone">
+            <span class="phone phone--sm phone--flat">
+              <span class="phone__screen">
+                <img
+                  src="../assets/screenshots/workout-finish.png"
+                  alt="Session review with duration, volume, sets, density, evolution deltas, highlights, muscle volume and the set table"
+                  width="1080"
+                  height="2400"
+                  loading="lazy"
+                />
+              </span>
+            </span>
+            <figcaption>
+              <strong>Session review</strong>
+              Deltas are shown against a comparable session rather than against the
+              immediately previous one, so a leg day is not compared with an upper
+              day. Green and red simply mark direction, not judgement.
+            </figcaption>
+          </figure>
+
+          <h3>Calendar and planning ahead</h3>
+          <p>
+            The calendar shows workouts by month alongside your routines. A future
+            date opens a planner that behaves like the session review but is built
+            for editing: no continue button and no timer, just exercises and sets
+            you can lay out in advance. Combined with a periodization phase, that
+            planned session is what adherence is measured against.
+          </p>
+
+          <div class="callout callout--tip">
+            <svg aria-hidden="true"><use href="#i-bulb" /></svg>
+            <div class="callout__body">
+              <span class="callout__title">Where to go next</span>
+              <p>
+                <a href="progress.html">Progress &amp; goals</a> covers what the
+                app does with all of this: estimated 1RM, weekly volume by
+                category, records, streaks and the yearly heatmap.
+              </p>
+            </div>
+          </div>
+
+        </article>
+
+        <div class="doc-foot">
+          <span>Found something out of date or unclear?</span>
+          <a
+            class="btn btn--outline btn--sm"
+            href="https://github.com/RafaelGoulartB/workout-notes/issues/new"
+            target="_blank"
+            rel="noopener"
+          >
+            Open an issue
+            <svg aria-hidden="true"><use href="#i-arrow-up-right" /></svg>
+          </a>
+        </div>
+
+        <nav class="pager" data-pager aria-label="Pagination"></nav>
+      </main>
+
+      <!-- ============ ON THIS PAGE ============ -->
+      <aside class="docs-toc">
+        <p class="docs-toc__title">On this page</p>
+        <ul data-toc></ul>
+      </aside>
+    </div>
+
+    <footer class="site-footer">
+      <div class="container container-wide">
+        <div class="site-footer__grid">
+          <div class="site-footer__about">
+            <a class="brand" href="../index.html">
+              <img src="../assets/brand/icon-64.png" alt="" width="27" height="27" />
+              <span>Workout Notes</span>
+            </a>
+            <p>
+              Training, running, sleep, nutrition and planning in one local-first
+              Flutter app. MIT licensed.
+            </p>
+          </div>
+          <div>
+            <h3>Training</h3>
+            <ul>
+              <li><a href="strength-training.html">Strength training</a></li>
+              <li><a href="progress.html">Progress &amp; goals</a></li>
+              <li><a href="body.html">Body measurements</a></li>
+              <li><a href="periodization.html">Periodization</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Cardio &amp; health</h3>
+            <ul>
+              <li><a href="running.html">Running &amp; cycling</a></li>
+              <li><a href="run-plans.html">Plans &amp; voice coaching</a></li>
+              <li><a href="sleep.html">Sleep &amp; alarms</a></li>
+              <li><a href="nutrition.html">Nutrition</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Reference</h3>
+            <ul>
+              <li><a href="getting-started.html">Getting started</a></li>
+              <li><a href="ai-coach.html">AI Coach</a></li>
+              <li><a href="data-privacy.html">Data &amp; privacy</a></li>
+              <li><a href="faq.html">FAQ</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="site-footer__bottom">
+          <span>© <span data-year>2026</span> Rafael Goulart · MIT licensed</span>
+          <span><a href="../index.html">Back to the landing page</a></span>
+        </div>
+      </div>
+    </footer>
+
+    <script src="../assets/js/site.js" defer></script>
+    <script src="../assets/js/docs.js" defer></script>
+  </body>
+</html>

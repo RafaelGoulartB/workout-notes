@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sleep and alarms · Workout Notes docs</title>
+    <meta name="description" content="Log nights manually or monitor sleep on Android, how sleep stages are estimated on the device, dashboard metrics, alarms and barcode wake-up missions." />
+    <meta name="theme-color" content="#08090c" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="Sleep and alarms · Workout Notes docs" />
+    <meta property="og:description" content="Log nights manually or monitor sleep on Android, how sleep stages are estimated on the device, dashboard metrics, alarms and barcode wake-up missions." />
+    <meta property="og:image" content="../assets/brand/icon-512.png" />
+    <link rel="icon" href="../assets/brand/icon-64.png" sizes="64x64" />
+    <link rel="apple-touch-icon" href="../assets/brand/icon-180.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../assets/css/base.css" />
+    <link rel="stylesheet" href="../assets/css/docs.css" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("wn-theme");
+          if (saved === "light" || saved === "dark") {
+            document.documentElement.setAttribute("data-theme", saved);
+          } else if (window.matchMedia("(prefers-color-scheme: light)").matches) {
+            document.documentElement.setAttribute("data-theme", "light");
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+
+  <body class="docs-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+      <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2.6v2.2M12 19.2v2.2M4.3 4.3l1.6 1.6M18.1 18.1l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.3 19.7l1.6-1.6M18.1 5.9l1.6-1.6" />
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" />
+      </symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="6.5" />
+        <path d="M16 16l4 4" />
+      </symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h13M12.5 6l6 6-6 6" />
+      </symbol>
+      <symbol id="i-arrow-up-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 17 17 7M8.5 7H17v8.5" />
+      </symbol>
+      <symbol id="i-chev-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9.5 5l7 7-7 7" />
+      </symbol>
+      <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 11v5.5M12 7.8h.01" />
+      </symbol>
+      <symbol id="i-bulb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V18h7v-4.1A6 6 0 0 0 12 3Z" />
+      </symbol>
+      <symbol id="i-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4.5 21 20H3L12 4.5Z" />
+        <path d="M12 10v4.5M12 17.4h.01" />
+      </symbol>
+      <symbol id="i-android" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M6 9.5h12a1 1 0 0 1 1 1V17a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6.5a1 1 0 0 1 1-1Zm-3 .5a1.4 1.4 0 0 1 1.4 1.4v4.2a1.4 1.4 0 0 1-2.8 0v-4.2A1.4 1.4 0 0 1 3 10Zm18 0a1.4 1.4 0 0 1 1.4 1.4v4.2a1.4 1.4 0 0 1-2.8 0v-4.2A1.4 1.4 0 0 1 21 10ZM9 19.5h1.6v2.1a1.3 1.3 0 0 1-2.6 0v-2.1Zm4.4 0H15v2.1a1.3 1.3 0 0 1-2.6 0v-2.1ZM8.4 3.2l.9 1.6A6.6 6.6 0 0 1 12 4.3c1 0 1.9.2 2.7.5l.9-1.6a.5.5 0 1 1 .87.5l-.85 1.5A5.6 5.6 0 0 1 18.4 8.5H5.6a5.6 5.6 0 0 1 2.78-3.3l-.85-1.5a.5.5 0 1 1 .87-.5Z" />
+      </symbol>
+      <symbol id="i-github" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.7 5.39-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.55C20.21 21.39 23.5 17.07 23.5 12 23.5 5.65 18.35.5 12 .5Z" />
+      </symbol>
+      <symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 6.6C10.5 5.1 8.5 4.3 6 4.3H4v14h2c2.5 0 4.5.8 6 2.3 1.5-1.5 3.5-2.3 6-2.3h2v-14h-2c-2.5 0-4.5.8-6 2.3Z" />
+        <path d="M12 6.6v14" />
+      </symbol>
+      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+        <path d="M8.5 10.5V7.5a3.5 3.5 0 1 1 7 0v3" />
+      </symbol>
+    </svg>
+
+    <header class="site-header" data-header>
+      <div class="container container-wide site-header__inner">
+        <button
+          class="icon-btn sidebar-toggle"
+          type="button"
+          data-sidebar-toggle
+          aria-expanded="false"
+          aria-controls="docs-sidebar"
+          aria-label="Open documentation menu"
+        >
+          <svg aria-hidden="true"><use href="#i-menu" /></svg>
+        </button>
+
+        <a class="brand" href="../index.html" aria-label="Workout Notes home">
+          <img src="../assets/brand/icon-64.png" alt="" width="27" height="27" />
+          <span>Workout Notes</span>
+          <span class="brand__sub">docs</span>
+        </a>
+
+        <nav class="site-nav" aria-label="Main">
+          <a href="../index.html">Home</a>
+          <a href="index.html" class="is-active">Documentation</a>
+          <a href="../index.html#gallery">Screenshots</a>
+          <a href="faq.html">FAQ</a>
+        </nav>
+
+        <div class="header-actions">
+          <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch theme">
+            <svg class="icon-sun" aria-hidden="true"><use href="#i-sun" /></svg>
+            <svg class="icon-moon" aria-hidden="true"><use href="#i-moon" /></svg>
+          </button>
+          <a
+            class="gh-link"
+            href="https://github.com/RafaelGoulartB/workout-notes"
+            target="_blank"
+            rel="noopener"
+          >
+            <svg aria-hidden="true"><use href="#i-github" /></svg>
+            <span aria-hidden="true">★</span>
+            <span data-stars>1</span>
+            <span class="sr-only">stars on GitHub</span>
+          </a>
+          <a
+            class="btn btn--primary btn--sm"
+            href="https://github.com/RafaelGoulartB/workout-notes/releases/latest"
+            target="_blank"
+            rel="noopener"
+          >
+            Download
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <div class="docs-backdrop" data-docs-backdrop></div>
+
+    <div class="container container-wide docs-shell">
+      <!-- ============================================================
+           SIDEBAR: this block is intentionally identical on every page
+           under /docs. If you add, rename or reorder a guide, mirror the
+           change in each docs/*.html file. Everything else that is
+           page-specific (the highlighted link, the "on this page" list and
+           the previous/next pager) is derived at runtime by
+           assets/js/docs.js from the current URL and this list's order, so
+           it never has to be edited by hand.
+           ============================================================ -->
+      <aside class="docs-sidebar" id="docs-sidebar">
+        <div class="docs-filter">
+          <svg aria-hidden="true"><use href="#i-search" /></svg>
+          <input
+            type="search"
+            data-docs-filter
+            placeholder="Filter guides"
+            aria-label="Filter documentation pages"
+            autocomplete="off"
+          />
+          <kbd>/</kbd>
+        </div>
+
+        <nav class="docs-nav" aria-label="Documentation">
+          <p class="docs-nav__group">Start here</p>
+          <ul>
+            <li><a href="index.html" data-keywords="overview introduction start">Overview</a></li>
+            <li><a href="getting-started.html" data-keywords="install apk permissions setup units theme locale">Getting started</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Training</p>
+          <ul>
+            <li><a href="strength-training.html" data-keywords="workout sets reps rpe supersets routines exercises timer history">Strength training</a></li>
+            <li><a href="progress.html" data-keywords="charts analytics 1rm epley volume records goals streak heatmap">Progress &amp; goals</a></li>
+            <li><a href="body.html" data-keywords="weight body fat measurements circumference trend">Body measurements</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Cardio</p>
+          <ul>
+            <li><a href="running.html" data-keywords="gps run bike splits pace elevation replay achievements">Running &amp; cycling</a></li>
+            <li><a href="run-plans.html" data-keywords="plans templates vdot intervals voice coaching 5k 10k marathon">Plans, intervals &amp; voice</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Health</p>
+          <ul>
+            <li><a href="sleep.html" data-keywords="sleep stages efficiency alarm mission snooze">Sleep &amp; alarms</a></li>
+            <li><a href="nutrition.html" data-keywords="food diary macros calories barcode meals targets tdee">Nutrition</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Planning</p>
+          <ul>
+            <li><a href="periodization.html" data-keywords="phases targets adherence checkin cycle plan">Periodization</a></li>
+          </ul>
+
+          <p class="docs-nav__group">Reference</p>
+          <ul>
+            <li><a href="ai-coach.html" data-keywords="ai provider openai tools proposal token model">AI Coach</a></li>
+            <li><a href="data-privacy.html" data-keywords="backup export import json csv privacy offline platform">Data, backup &amp; privacy</a></li>
+            <li><a href="faq.html" data-keywords="faq troubleshooting help questions">FAQ &amp; troubleshooting</a></li>
+          </ul>
+        </nav>
+
+        <div class="docs-sidebar__foot">
+          <a href="https://github.com/RafaelGoulartB/workout-notes" target="_blank" rel="noopener">
+            <svg aria-hidden="true"><use href="#i-github" /></svg>
+            Source on GitHub
+          </a>
+          <a href="https://github.com/RafaelGoulartB/workout-notes/issues" target="_blank" rel="noopener">
+            <svg aria-hidden="true"><use href="#i-info" /></svg>
+            Report an issue
+          </a>
+          <a href="https://github.com/RafaelGoulartB/workout-notes/releases/latest" target="_blank" rel="noopener">
+            <svg aria-hidden="true"><use href="#i-download" /></svg>
+            Latest release
+          </a>
+        </div>
+      </aside>
+
+      <!-- ============ CONTENT ============ -->
+      <main class="docs-main" id="main">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <a href="../index.html">Home</a>
+          <span aria-hidden="true">/</span>
+          <a href="index.html">Docs</a>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">Sleep &amp; alarms</span>
+        </nav>
+
+        <header class="doc-head">
+          <span class="eyebrow">Health</span>
+          <h1>Sleep &amp; alarms</h1>
+          <p class="lead">The sleep monitor never analyses raw audio. Android reduces the night to per-window aggregates on the device, and the app labels 30-second epochs from those numbers alone.</p>
+          <div class="doc-meta"><span class="pill pill--violet">Android monitor</span><span class="pill">30-second epochs</span><span class="pill">Efficiency &amp; regularity</span><span class="pill">Wake-up missions</span></div>
+        </header>
+
+        <article class="prose">
+          <h2>Two ways to record a night</h2>
+
+          <dl class="spec">
+            <div class="spec__row">
+              <dt>By hand</dt>
+              <dd>
+                Date, time asleep, optional actual sleep time, bedtime, wake time and
+                a comment. Works on every platform and needs no permissions.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Monitored</dt>
+              <dd>
+                Android runs a foreground service through the night and produces a
+                full session with stage estimates, efficiency, latency and awakening
+                counts.
+              </dd>
+            </div>
+          </dl>
+
+          <div class="callout callout--android">
+            <svg aria-hidden="true"><use href="#i-android" /></svg>
+            <div class="callout__body">
+              <span class="callout__title">Android only</span>
+              <p>
+                Monitoring, alarms and wake-up missions are native Android features.
+                On other platforms the sleep screens fall back to manual entries and
+                the dashboard still works from those.
+              </p>
+            </div>
+          </div>
+
+          <h2>Starting a monitored night</h2>
+          <p>Choose a mode when you start:</p>
+          <ol>
+            <li><strong>Monitoring only:</strong> no alarm, just the night's record.</li>
+            <li><strong>Alarm:</strong> monitoring plus a wake-up time.</li>
+            <li>
+              <strong>Alarm with a mission:</strong> the alarm will not stop until you
+              scan a barcode you chose in advance.
+            </li>
+          </ol>
+          <p>
+            Snoozes are limited to a number you set (0 to 10, default 3). Choosing an
+            alarm mode without a time, or a mission mode without a configured
+            barcode, is rejected up front with a clear reason rather than failing at
+            3 a.m. You can change the alarm while monitoring is already running, stop
+            the session, or discard it entirely.
+          </p>
+
+          <h2>How stages are estimated</h2>
+          <p>
+            This is an estimate produced from acoustic and motion aggregates, and the
+            app labels it as such. It is not a clinical sleep study.
+          </p>
+
+          <h3>What the analysis reads</h3>
+          <p>
+            The Android service computes per-window aggregates as the night goes (frequency band energies, spectral flatness, a breathing-regularity
+            measure, and motion and micro-motion figures), and persists those. The
+            stage engine consumes only that. It never looks at raw audio, and no
+            recording is kept.
+          </p>
+
+          <h3>The algorithm</h3>
+          <ol>
+            <li>
+              The night is divided into <strong>30-second epochs</strong> classified
+              into three states: <strong>awake</strong>, <strong>sleeping</strong> and
+              <strong>deep</strong>.
+            </li>
+            <li>
+              A small linear scorer weighs the features: noise level, bursts,
+              high- and low-frequency energy, motion, micro-motion, breathing
+              regularity and tonality.
+            </li>
+            <li>
+              Those scores pass through a <strong>three-state Viterbi smoothing
+              pass</strong> with sleep-architecture priors: no deep sleep immediately
+              after onset, deep sleep concentrated in the first half of the night, and
+              realistic dwell times in each state.
+            </li>
+            <li>
+              Guards clean up the edges: an awake bias over the first eight minutes,
+              a terminal awake guard for the last minute and a half, and no deep
+              sleep in the first twenty minutes.
+            </li>
+          </ol>
+
+          <h3>Finding the sleep window</h3>
+          <p>
+            Sleep <strong>onset</strong> is the first sustained asleep stretch after
+            the cold-start guard, a clear majority of a run of consecutive windows.
+            <strong>Final wake</strong> is the last sustained awake stretch inside the
+            final third of the session. Everything outside that window is relabelled
+            awake, so half an hour of reading in bed does not get counted as sleep.
+          </p>
+
+          <div class="formula">
+            <code>confidence = 0.55 × posterior + 0.25 × margin + 0.20 × signal quality</code>
+            <span>
+              Reported with every session, and no staging is produced at all below ten
+              scorable epochs. A low confidence night is a night to read loosely.
+            </span>
+          </div>
+
+          <h3>What a session stores</h3>
+          <ul>
+            <li>Time in bed, quiet minutes, noisy minutes and estimated sleep minutes</li>
+            <li>Minutes awake, sleeping, deep and unknown, plus awakening count</li>
+            <li>Sleep onset, final wake and sleep latency</li>
+            <li>Sleep efficiency and the stage confidence above</li>
+            <li>Noise event count and a signal quality score</li>
+            <li>How the session ended, and how the alarm was dismissed</li>
+            <li>The algorithm version that produced the labels</li>
+          </ul>
+
+          <div class="callout callout--note">
+            <svg aria-hidden="true"><use href="#i-info" /></svg>
+            <div class="callout__body">
+              <span class="callout__title">Nothing is lost to a crash</span>
+              <p>
+                Finished native recordings are imported into the database when you
+                reopen the app; sessions that never finished are marked as
+                interrupted rather than silently dropped. A failed database write
+                leaves the native copy intact so it can be retried.
+              </p>
+            </div>
+          </div>
+
+          <h2>The sleep dashboard</h2>
+
+          <figure class="figure-phone">
+            <span class="phone phone--sm phone--flat">
+              <span class="phone__screen">
+                <img
+                  src="../assets/screenshots/sleep.png"
+                  alt="Sleep dashboard with goal completion, efficiency, bedtime and wake time, and estimated sleep stages"
+                  width="1080"
+                  height="2400"
+                  loading="lazy"
+                />
+              </span>
+            </span>
+            <figcaption>
+              <strong>Last night, in context</strong>
+              Goal completion and efficiency for the most recent night, with the
+              stage breakdown underneath and rolling averages below that.
+            </figcaption>
+          </figure>
+
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Meaning</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Recorded vs actual</strong></td>
+                  <td>
+                    Time in bed against estimated sleep, averaged over 7 and 30 days
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Efficiency</strong></td>
+                  <td>
+                    How much of the time in bed was spent asleep, over 7 and 30 days
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Regularity</strong></td>
+                  <td>
+                    How consistent your schedule is, reported with the number of
+                    nights it is based on
+                  </td>
+                </tr>
+                <tr>
+                  <td><strong>Range</strong></td>
+                  <td>Shortest and longest night in the last 30 days</td>
+                </tr>
+                <tr>
+                  <td><strong>Coverage</strong></td>
+                  <td>How many of those days actually have a record</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>
+            The nightly sleep target is stored in 15-minute increments. It is a
+            personal preference used to draw the goal ring, not a clinical
+            recommendation.
+          </p>
+
+          <h2>Standalone alarms</h2>
+          <p>
+            Alarms are independent of sleep monitoring. They live in the app database
+            and are mirrored to Android, which owns the ringing and the repeat
+            schedule while the app is closed.
+          </p>
+
+          <dl class="spec">
+            <div class="spec__row">
+              <dt>Time and repeat</dt>
+              <dd>
+                Hour and minute, plus weekdays. No weekdays selected means a one-shot
+                alarm.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Snooze</dt>
+              <dd>
+                Enabled per alarm, with a snooze length and a maximum number of
+                snoozes. Global defaults exist for both.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Mission</dt>
+              <dd>
+                Requires scanning your chosen barcode to dismiss. Only available once
+                a mission has been configured.
+              </dd>
+            </div>
+            <div class="spec__row">
+              <dt>Next trigger</dt>
+              <dd>Computed and shown so you can confirm the schedule is what you meant.</dd>
+            </div>
+          </dl>
+
+          <p>
+            Because the database write is what defines the alarm, a platform channel
+            hiccup never makes the editor report failure. When you reopen the app it
+            reconciles: schedules created natively while the app was closed are picked
+            up, and alarms in the database that have no native schedule are
+            rescheduled.
+          </p>
+
+          <div class="callout callout--tip">
+            <svg aria-hidden="true"><use href="#i-lock" /></svg>
+            <div class="callout__body">
+              <span class="callout__title">The mission never stores your barcode</span>
+              <p>
+                Only a salted hash and the code format are saved. That is enough to
+                verify the right code was scanned and not enough to reconstruct it, so a backup or a database dump cannot reveal which product is sitting
+                on the far side of your bedroom.
+              </p>
+            </div>
+          </div>
+
+          <h2>Where sleep data shows up</h2>
+          <ul>
+            <li>
+              The <strong>Wellness</strong> tab of
+              <a href="progress.html">Progress</a>, alongside training feeling and
+              body weight.
+            </li>
+            <li>
+              <a href="periodization.html">Periodization</a> phases can set an average
+              sleep target, with adherence and coverage reported per phase and per
+              week.
+            </li>
+            <li>
+              The <a href="ai-coach.html">AI Coach</a> can read summaries, a specific
+              night, your history and your sleep profile, and can cross-reference
+              sleep against training performance.
+            </li>
+          </ul>
+
+          <div class="callout callout--warn">
+            <svg aria-hidden="true"><use href="#i-warn" /></svg>
+            <div class="callout__body">
+              <span class="callout__title">Not a diagnostic tool</span>
+              <p>
+                Sleep stages, efficiency and latency here are estimates from
+                microphone and motion aggregates. If you suspect a sleep disorder,
+                that is a conversation for a clinician, not for a phone in your
+                bedroom.
+              </p>
+            </div>
+          </div>
+
+        </article>
+
+        <div class="doc-foot">
+          <span>Found something out of date or unclear?</span>
+          <a
+            class="btn btn--outline btn--sm"
+            href="https://github.com/RafaelGoulartB/workout-notes/issues/new"
+            target="_blank"
+            rel="noopener"
+          >
+            Open an issue
+            <svg aria-hidden="true"><use href="#i-arrow-up-right" /></svg>
+          </a>
+        </div>
+
+        <nav class="pager" data-pager aria-label="Pagination"></nav>
+      </main>
+
+      <!-- ============ ON THIS PAGE ============ -->
+      <aside class="docs-toc">
+        <p class="docs-toc__title">On this page</p>
+        <ul data-toc></ul>
+      </aside>
+    </div>
+
+    <footer class="site-footer">
+      <div class="container container-wide">
+        <div class="site-footer__grid">
+          <div class="site-footer__about">
+            <a class="brand" href="../index.html">
+              <img src="../assets/brand/icon-64.png" alt="" width="27" height="27" />
+              <span>Workout Notes</span>
+            </a>
+            <p>
+              Training, running, sleep, nutrition and planning in one local-first
+              Flutter app. MIT licensed.
+            </p>
+          </div>
+          <div>
+            <h3>Training</h3>
+            <ul>
+              <li><a href="strength-training.html">Strength training</a></li>
+              <li><a href="progress.html">Progress &amp; goals</a></li>
+              <li><a href="body.html">Body measurements</a></li>
+              <li><a href="periodization.html">Periodization</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Cardio &amp; health</h3>
+            <ul>
+              <li><a href="running.html">Running &amp; cycling</a></li>
+              <li><a href="run-plans.html">Plans &amp; voice coaching</a></li>
+              <li><a href="sleep.html">Sleep &amp; alarms</a></li>
+              <li><a href="nutrition.html">Nutrition</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Reference</h3>
+            <ul>
+              <li><a href="getting-started.html">Getting started</a></li>
+              <li><a href="ai-coach.html">AI Coach</a></li>
+              <li><a href="data-privacy.html">Data &amp; privacy</a></li>
+              <li><a href="faq.html">FAQ</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="site-footer__bottom">
+          <span>© <span data-year>2026</span> Rafael Goulart · MIT licensed</span>
+          <span><a href="../index.html">Back to the landing page</a></span>
+        </div>
+      </div>
+    </footer>
+
+    <script src="../assets/js/site.js" defer></script>
+    <script src="../assets/js/docs.js" defer></script>
+  </body>
+</html>
