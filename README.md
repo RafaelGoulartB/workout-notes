@@ -48,8 +48,6 @@ Built with Flutter and Material 3, with English and Brazilian Portuguese, metric
   </tr>
 </table>
 
-Also explore [completed run analysis](assets/screenshots/run.png) and [body measurements](assets/screenshots/body-measurements.png).
-
 ## Connect food, recovery, and planning
 
 - **Nutrition:** keep a daily food diary with calorie and macro targets, saved meals, food search, barcode lookup, and nutrition trends.
@@ -66,6 +64,25 @@ Also explore [completed run analysis](assets/screenshots/run.png) and [body meas
     <td><a href="assets/screenshots/nutrition.png"><img src="assets/screenshots/nutrition.png" width="100%" alt="Nutrition diary with daily calories, macronutrients, a plan-linked target, and meals" /></a></td>
     <td><a href="assets/screenshots/sleep.png"><img src="assets/screenshots/sleep.png" width="100%" alt="Sleep dashboard with goal completion, efficiency, bedtime, and estimated sleep stages" /></a></td>
     <td><a href="assets/screenshots/periodization.png"><img src="assets/screenshots/periodization.png" width="100%" alt="Active periodization plan with phases, weekly nutrition and training targets, and a weekly review" /></a></td>
+  </tr>
+</table>
+
+## Review your habits and results
+
+- **Nutrition balance:** review weekly and monthly calorie intake against your target, days in deficit or surplus, the seven-day rolling average, and macronutrient distribution.
+- **Run review:** revisit the route after a session, compare pace and splits, and see distance, duration, and achievements.
+- **Body trends:** follow weight and measurement history, view trends and estimated body composition, and attach progress photos to entries.
+
+<table>
+  <tr>
+    <th width="33%">Weekly nutrition balance</th>
+    <th width="33%">Completed run analysis</th>
+    <th width="33%">Body measurements</th>
+  </tr>
+  <tr>
+    <td><a href="assets/screenshots/nutrition-balance.png"><img src="assets/screenshots/nutrition-balance.png" width="100%" alt="Weekly nutrition balance with daily calorie intake versus target, a seven-day rolling average, and macronutrient distribution" /></a></td>
+    <td><a href="assets/screenshots/run.png"><img src="assets/screenshots/run.png" width="100%" alt="Completed GPS run with route map, distance, pace, achievements, and pace chart" /></a></td>
+    <td><a href="assets/screenshots/body-measurements.png"><img src="assets/screenshots/body-measurements.png" width="100%" alt="Body weight history with a trend chart and estimated body composition" /></a></td>
   </tr>
 </table>
 
