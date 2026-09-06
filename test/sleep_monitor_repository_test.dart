@@ -15,7 +15,7 @@ void main() {
   late SleepMonitorRepository repository;
 
   test(
-    'bedside uncertainty never falls back to quiet-time sleep or creates a sleep entry',
+    'quiet bedside night is saved once with a usable estimate without breathing',
     () async {
       final session = bedsideSession(minutes: 240);
       final spool = <String, dynamic>{
@@ -23,16 +23,18 @@ void main() {
         'segments': [for (var i = 0; i < 480; i++) bedsideSegment(i).toMap()],
       };
       final imported = await repository.importNativeSpool(spool);
-      expect(imported.estimatedSleepMinutes, isNull);
-      expect(imported.sleepOnsetAt, isNull);
-      expect(imported.sleepLatencyMinutes, isNull);
-      expect(imported.unknownMinutes, 240);
+      expect(imported.estimatedSleepMinutes, greaterThan(210));
+      expect(imported.estimatedSleepMinutes, lessThan(240));
+      expect(imported.sleepOnsetAt, isNotNull);
+      expect(imported.sleepLatencyMinutes, greaterThanOrEqualTo(19));
+      expect(imported.unknownMinutes, 20);
       expect(imported.deepSleepMinutes, isNull);
       expect(imported.stageConfidence, isNull);
-      expect(imported.sleepEntryId, isNull);
+      expect(imported.sleepEntryId, isNotNull);
+      expect(await repository.getUnestimatedSessions(), isEmpty);
       await repository.importNativeSpool(spool);
       expect((await repository.getSessions()).length, 1);
-      expect(await database.query('sleep_entries'), isEmpty);
+      expect(await database.query('sleep_entries'), hasLength(1));
     },
   );
 
@@ -47,10 +49,29 @@ void main() {
         ],
       });
       expect(imported.estimatedSleepMinutes, greaterThan(45));
-      expect(imported.stageAlgorithmVersion, 'sleep-wake-bedside-v1');
+      expect(imported.stageAlgorithmVersion, 'sleep-wake-bedside-v2');
       expect(imported.finalWakeAt, isNull);
       expect(imported.deepSleepMinutes, isNull);
       expect(imported.sleepEntryId, isNotNull);
+    },
+  );
+
+  test(
+    'missing or invalid capture still leaves the night incomplete',
+    () async {
+      for (final invalid in [false, true]) {
+        final imported = await repository.importNativeSpool({
+          'session': bedsideSession(minutes: 240).toMap(),
+          'segments': [
+            for (var i = 0; i < (invalid ? 480 : 40); i++)
+              bedsideSegment(i, invalid: invalid).toMap(),
+          ],
+        });
+        expect(imported.estimatedSleepMinutes, isNull);
+        expect(imported.sleepEntryId, isNull);
+        expect(await repository.getUnestimatedSessions(), hasLength(1));
+        expect(await database.query('sleep_entries'), isEmpty);
+      }
     },
   );
 

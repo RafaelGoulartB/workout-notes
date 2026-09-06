@@ -1,5 +1,7 @@
 Implementação do monitor de sono — 05/09/2026
 
+Atualização de 06/09/2026: o comportamento `sleep-wake-bedside-v1` descrito abaixo foi corrigido em `sleep-wake-bedside-v2`. Consulte [a correção da regressão na cabeceira](sleep-bedside-regression-fix.md) para as regras atuais. Esta página registra a entrega original.
+
 As novas sessões usam `audio-features-v3` e o motor causal `sleep-wake-bedside-v1`, destinado ao celular na mesa de cabeceira. O caminho antigo permanece versionado para reproduzir gravações antigas; os resumos históricos não são reanalisados automaticamente.
 
 **Comportamento implementado**

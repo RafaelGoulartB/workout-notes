@@ -22,55 +22,54 @@ void main() {
     expect(result.epochs.every((e) => e.stage == SleepStageType.unknown), true);
   });
 
+  test('a quiet bedside night remains estimable without audible breathing', () {
+    for (final motion in <double?>[null, 0, 20]) {
+      final result = engine.run(
+        session: bedsideSession(minutes: 480),
+        segments: [
+          for (var i = 0; i < 960; i++) bedsideSegment(i, motion: motion),
+        ],
+      );
+      expect(result.ran, true);
+      expect(
+        result.epochs.take(39).every((e) => e.stage == SleepStageType.unknown),
+        true,
+      );
+      expect(result.epochs.skip(39).every((e) => e.isSleep), true);
+      expect(result.coverage, greaterThan(0.95));
+      expect(result.epochs.any((e) => e.stage == SleepStageType.deep), false);
+      final summary = const SleepStageAnalysisService().summarize(
+        sessionStart: bedsideStart,
+        sessionEnd: bedsideSession(minutes: 480).endedAt!,
+        epochs: result.epochs,
+      );
+      expect(summary!.unknownMinutes, 20);
+      expect(summary.sleepOnsetAt, result.epochs[39].startedAt);
+      expect(summary.finalWakeAt, isNull);
+    }
+  });
+
   test(
-    'quiet bedside audio does not invent onset, deep sleep or terminal wake',
+    'sleep confirmation does not backdate over sustained awake activity',
     () {
-      for (final motion in <double?>[null, 0, 20]) {
-        final result = engine.run(
-          session: bedsideSession(),
-          segments: [
-            for (var i = 0; i < 120; i++) bedsideSegment(i, motion: motion),
-          ],
-        );
-        expect(result.ran, true);
-        expect(
-          result.epochs.every((e) => e.stage == SleepStageType.unknown),
-          true,
-        );
-        expect(result.window.onsetAt, isNull);
-        expect(result.coverage, 0);
-        final summary = const SleepStageAnalysisService().summarize(
-          sessionStart: bedsideStart,
-          sessionEnd: bedsideSession().endedAt!,
-          epochs: result.epochs,
-        );
-        expect(summary!.unknownMinutes, 60);
-        expect(summary.sleepOnsetAt, isNull);
-        expect(summary.finalWakeAt, isNull);
-      }
+      final result = engine.run(
+        session: bedsideSession(),
+        segments: [
+          for (var i = 0; i < 120; i++)
+            bedsideSegment(i, periodic: i >= 60, activity: i < 60),
+        ],
+      );
+      expect(result.epochs.take(79).any((e) => e.isSleep), false);
+      expect(result.epochs[79].stage, SleepStageType.sleeping);
+      expect(result.epochs.any((e) => e.stage == SleepStageType.deep), false);
+      final summary = const SleepStageAnalysisService().summarize(
+        sessionStart: bedsideStart,
+        sessionEnd: bedsideSession().endedAt!,
+        epochs: result.epochs,
+      )!;
+      expect(summary.sleepOnsetAt, result.epochs[79].startedAt);
     },
   );
-
-  test('delayed periodic evidence does not backdate sleep over quiet wake', () {
-    final result = engine.run(
-      session: bedsideSession(),
-      segments: [
-        for (var i = 0; i < 120; i++) bedsideSegment(i, periodic: i >= 60),
-      ],
-    );
-    expect(
-      result.epochs.take(79).every((e) => e.stage == SleepStageType.unknown),
-      true,
-    );
-    expect(result.epochs[79].stage, SleepStageType.sleeping);
-    expect(result.epochs.any((e) => e.stage == SleepStageType.deep), false);
-    final summary = const SleepStageAnalysisService().summarize(
-      sessionStart: bedsideStart,
-      sessionEnd: bedsideSession().endedAt!,
-      epochs: result.epochs,
-    )!;
-    expect(summary.sleepOnsetAt, result.epochs[79].startedAt);
-  });
 
   test(
     'isolated noise holds sleep; sustained activity wakes; missing evidence expires',
@@ -129,6 +128,65 @@ void main() {
       cursor.add(bedsideSegment(21, periodic: true)).epoch.stage,
       SleepStageType.unknown,
     );
+  });
+
+  test('intermittent breathing and brief noises still allow bedside sleep', () {
+    final result = engine.run(
+      session: bedsideSession(minutes: 480),
+      segments: [
+        for (var i = 0; i < 960; i++)
+          bedsideSegment(i, periodic: i % 3 == 0, activity: i % 10 == 9),
+      ],
+    );
+    expect(result.coverage, greaterThan(0.94));
+    expect(result.epochs.any((e) => e.stage == SleepStageType.awake), false);
+    expect(result.epochs.last.stage, SleepStageType.sleeping);
+    expect(
+      result.decisionReasons.values,
+      contains('sustained_low_audio_activity'),
+    );
+  });
+
+  test('quiet audio maintains sleep after breathing becomes inaudible', () {
+    final result = engine.run(
+      session: bedsideSession(),
+      segments: [
+        for (var i = 0; i < 120; i++) bedsideSegment(i, periodic: i < 20),
+      ],
+    );
+    expect(result.epochs.skip(19).every((e) => e.isSleep), true);
+  });
+
+  test('sustained activity clears quiet support before sleep can resume', () {
+    final cursor = SleepWakeCursor(sessionId: 'bedside');
+    for (var i = 0; i < 80; i++) {
+      cursor.add(bedsideSegment(i));
+    }
+    cursor.add(bedsideSegment(80, activity: true));
+    expect(
+      cursor.add(bedsideSegment(81, activity: true)).epoch.stage,
+      SleepStageType.awake,
+    );
+    for (var i = 82; i < 121; i++) {
+      expect(cursor.add(bedsideSegment(i)).epoch.isSleep, false);
+    }
+    expect(cursor.add(bedsideSegment(121)).epoch.isSleep, true);
+  });
+
+  test('digital silence is a capture failure, not quiet sleep evidence', () {
+    final result = engine.run(
+      session: bedsideSession(minutes: 480),
+      segments: [
+        for (var i = 0; i < 960; i++)
+          SleepMonitorSegment.fromMap({
+            ...bedsideSegment(i).toMap(),
+            'digital_silence_fraction': 1.0,
+          }),
+      ],
+    );
+    expect(result.coverage, 0);
+    expect(result.validEpochs, 0);
+    expect(result.window.onsetAt, isNull);
   });
 
   test(

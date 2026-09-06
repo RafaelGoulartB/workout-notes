@@ -2857,7 +2857,7 @@
   "sleepLiveProbablyAsleep": "Probably asleep ? provisional",
   "sleepLiveUncertain": "Sleep state undetermined",
   "sleepWakeEstimateTitle": "Sleep and wake estimates",
-  "sleepBedsideEstimateBody": "For a phone on the bedside table. Silence alone cannot confirm sleep. Undetermined time is shown separately; the nightly total is unavailable when too much time is uncertain. Deep sleep is not estimated in this mode.",
+  "sleepBedsideEstimateBody": "For a phone on the bedside table. Sustained low sound activity allows a sleep estimate even when breathing is not audible. Quiet wakefulness can be mistaken for sleep. Undetermined time is shown separately; the nightly total is unavailable when too much time is uncertain. Deep sleep is not estimated in this mode.",
   "sleepDiagnosticTitle": "Keep sleep diagnostics",
   "sleepDiagnosticBody": "Optional: keep sensor summaries and start/end battery readings locally for up to 14 days (20 MB maximum). No audio recordings or automatic uploads. Export a night to compare results. Turning this off deletes the saved diagnostics.",
   "sleepDiagnosticExport": "Export latest sleep diagnostic",

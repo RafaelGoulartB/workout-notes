@@ -2833,15 +2833,15 @@
       "count": { "type": "int" }
     }
   },
-  "sleepLiveProbablyAwake": "Provavelmente acordado ? provis?rio",
-  "sleepLiveProbablyAsleep": "Provavelmente dormindo ? provis?rio",
+  "sleepLiveProbablyAwake": "Provavelmente acordado — provisório",
+  "sleepLiveProbablyAsleep": "Provavelmente dormindo — provisório",
   "sleepLiveUncertain": "Estado de sono indeterminado",
-  "sleepWakeEstimateTitle": "Estimativas de sono e vig?lia",
-  "sleepBedsideEstimateBody": "Para o celular na mesa de cabeceira. Sil?ncio sozinho n?o confirma sono. O tempo indeterminado aparece separado; o total da noite fica indispon?vel quando h? muita incerteza. Este modo n?o estima sono profundo.",
-  "sleepDiagnosticTitle": "Guardar diagn?sticos de sono",
-  "sleepDiagnosticBody": "Opcional: guarda resumos dos sensores e leituras de bateria do in?cio e fim no aparelho por at? 14 dias (m?ximo de 20 MB). Sem grava??es de ?udio nem envio autom?tico. Exporte uma noite para comparar resultados. Desativar apaga os diagn?sticos salvos.",
-  "sleepDiagnosticExport": "Exportar ?ltimo diagn?stico de sono",
-  "sleepDiagnosticError": "N?o foi poss?vel salvar ou exportar o diagn?stico de sono.",
-  "sleepDiagnosticMissing": "Ative os diagn?sticos antes de encerrar uma noite monitorada. N?o h? diagn?stico salvo dispon?vel.",
+  "sleepWakeEstimateTitle": "Estimativas de sono e vigília",
+  "sleepBedsideEstimateBody": "Para o celular na mesa de cabeceira. Baixa atividade sonora sustentada permite estimar sono mesmo sem respiração audível. Ficar acordado em silêncio pode ser confundido com sono. O tempo indeterminado aparece separado; o total da noite fica indisponível quando há muita incerteza. Este modo não estima sono profundo.",
+  "sleepDiagnosticTitle": "Guardar diagnósticos de sono",
+  "sleepDiagnosticBody": "Opcional: guarda resumos dos sensores e leituras de bateria do início e fim no aparelho por até 14 dias (máximo de 20 MB). Sem gravações de áudio nem envio automático. Exporte uma noite para comparar resultados. Desativar apaga os diagnósticos salvos.",
+  "sleepDiagnosticExport": "Exportar último diagnóstico de sono",
+  "sleepDiagnosticError": "Não foi possível salvar ou exportar o diagnóstico de sono.",
+  "sleepDiagnosticMissing": "Ative os diagnósticos antes de encerrar uma noite monitorada. Não há diagnóstico salvo disponível.",
   "sleepIncompleteNight": "Noite monitorada com estimativa incompleta"
 }

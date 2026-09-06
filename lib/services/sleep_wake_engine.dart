@@ -5,17 +5,21 @@ import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/services/sleep_stage_engine.dart'
     show SleepStageEngineResult, SleepWindow;
 
-/// Conservative, causal audio-only baseline for a phone on a bedside table.
+/// Causal audio-only estimate for a phone on a bedside table.
+/// Sustained low activity is a fallback when breathing is not audible; quiet
+/// wakefulness cannot be distinguished reliably with these signals alone.
 /// Scores are evidence strength, not calibrated physiological probabilities.
 /// No clock-of-night, terminal wake rule, deep-sleep prior or motion reward.
 class SleepWakeEngine {
-  static const algorithmVersion = 'sleep-wake-bedside-v1';
+  static const algorithmVersion = 'sleep-wake-bedside-v2';
   static const source = 'bedside_heuristic';
   static const sleepConfirmationSeconds = 10 * 60;
+  static const quietConfirmationSeconds = 20 * 60;
   static const wakeConfirmationSeconds = 60;
   static const evidenceHoldSeconds = 2 * 60;
   static const parameters = <String, num>{
     'sleep_confirmation_seconds': sleepConfirmationSeconds,
+    'quiet_confirmation_seconds': quietConfirmationSeconds,
     'wake_confirmation_seconds': wakeConfirmationSeconds,
     'evidence_hold_seconds': evidenceHoldSeconds,
     'minimum_valid_fraction': 0.8,
@@ -137,6 +141,7 @@ class SleepWakeCursor {
   DateTime? _expectedStart;
   SleepStageType _state = SleepStageType.unknown;
   int _sleepSeconds = 0;
+  int _quietSeconds = 0;
   int _wakeSeconds = 0;
   int _uncertainSeconds = 0;
 
@@ -145,7 +150,7 @@ class SleepWakeCursor {
   void reset() {
     _expectedStart = null;
     _state = SleepStageType.unknown;
-    _sleepSeconds = _wakeSeconds = _uncertainSeconds = 0;
+    _sleepSeconds = _quietSeconds = _wakeSeconds = _uncertainSeconds = 0;
   }
 
   SleepStageEpoch unknown(DateTime start, int seconds) =>
@@ -199,7 +204,16 @@ class SleepWakeCursor {
     final regularity = segment.breathingRegularity;
     final rate = segment.breathingRateHz;
     final flatness = segment.spectralFlatness;
+    // This is evidence from a valid recording, not missing audio or lack of
+    // phone motion. A bedside microphone need not resolve periodic breathing.
+    final quietEvidence =
+        noise < 6 &&
+        activity != null &&
+        activity.isFinite &&
+        activity >= 0 &&
+        activity / seconds < 0.1;
     final sleepEvidence =
+        quietEvidence &&
         regularity != null &&
         regularity.isFinite &&
         regularity >= 0.45 &&
@@ -208,16 +222,11 @@ class SleepWakeCursor {
         rate.isFinite &&
         rate >= 0.15 &&
         rate <= 0.65 &&
-        noise < 6 &&
         high < 0.4 &&
         flatness != null &&
         flatness.isFinite &&
         flatness >= 0 &&
-        flatness < 0.65 &&
-        activity != null &&
-        activity.isFinite &&
-        activity >= 0 &&
-        activity / seconds < 0.1;
+        flatness < 0.65;
     final wakeEvidence =
         activity != null &&
         activity.isFinite &&
@@ -232,33 +241,61 @@ class SleepWakeCursor {
     double strength;
     if (wakeEvidence) {
       _wakeSeconds += seconds;
-      _sleepSeconds = 0;
+      // A single short sound reduces pending support; only sustained activity
+      // restarts confirmation. This avoids a full reset for every bed turn.
+      _sleepSeconds = (_sleepSeconds - seconds).clamp(
+        0,
+        SleepWakeEngine.sleepConfirmationSeconds,
+      );
+      _quietSeconds = (_quietSeconds - seconds).clamp(
+        0,
+        SleepWakeEngine.quietConfirmationSeconds,
+      );
       _uncertainSeconds += seconds;
       if (_wakeSeconds >= SleepWakeEngine.wakeConfirmationSeconds) {
         _state = SleepStageType.awake;
+        _sleepSeconds = _quietSeconds = 0;
         _uncertainSeconds = 0;
       }
       reason = _state == SleepStageType.awake
           ? 'sustained_audio_activity'
           : 'activity_pending';
       strength = _state == SleepStageType.awake ? 0.6 : 0.3;
-    } else if (sleepEvidence) {
-      _sleepSeconds += seconds;
+    } else if (quietEvidence) {
+      _quietSeconds = (_quietSeconds + seconds).clamp(
+        0,
+        SleepWakeEngine.quietConfirmationSeconds,
+      );
+      _sleepSeconds = sleepEvidence
+          ? (_sleepSeconds + seconds).clamp(
+              0,
+              SleepWakeEngine.sleepConfirmationSeconds,
+            )
+          : 0;
       _wakeSeconds = 0;
       // During a transition, do not indefinitely retain the previous wake state.
       _uncertainSeconds = _state == SleepStageType.sleeping
           ? 0
           : _uncertainSeconds + seconds;
-      if (_sleepSeconds >= SleepWakeEngine.sleepConfirmationSeconds) {
+      if (_sleepSeconds >= SleepWakeEngine.sleepConfirmationSeconds ||
+          _quietSeconds >= SleepWakeEngine.quietConfirmationSeconds) {
         _state = SleepStageType.sleeping;
         _uncertainSeconds = 0;
       }
       reason = _state == SleepStageType.sleeping
-          ? 'sustained_periodic_audio'
+          ? (sleepEvidence
+                ? 'sustained_periodic_audio'
+                : 'sustained_low_audio_activity')
           : 'sleep_pending';
-      strength = _state == SleepStageType.sleeping ? 0.6 : 0.3;
+      strength = _state == SleepStageType.sleeping
+          ? (sleepEvidence ? 0.6 : 0.4)
+          : 0.3;
     } else {
       _wakeSeconds = _sleepSeconds = 0;
+      _quietSeconds = (_quietSeconds - seconds).clamp(
+        0,
+        SleepWakeEngine.quietConfirmationSeconds,
+      );
       _uncertainSeconds += seconds;
       reason = 'ambiguous_audio';
       strength = 0.3;
