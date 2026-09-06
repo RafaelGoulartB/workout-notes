@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/models/traditional_alarm.dart';
+import 'package:workout_notes/models/traditional_alarm_runtime_state.dart';
 
 TraditionalAlarm _alarm({
   required List<int> weekdays,
@@ -49,5 +50,38 @@ void main() {
       _alarm(weekdays: [1]).nextOccurrence(now: DateTime(2026, 8, 3, 7)),
       DateTime(2026, 8, 10, 7),
     );
+  });
+
+  test('runtime state recognizes a scheduled occurrence as snoozing', () {
+    final state = TraditionalAlarmRuntimeState.fromMap({
+      'id': 'alarm',
+      'enabled': true,
+      'state': 'scheduled',
+      'alarm_at_epoch_ms': 1788482700000,
+      'snooze_count': 2,
+      'max_snoozes': 3,
+      'requires_mission': true,
+    });
+
+    expect(state.isSnoozing, isTrue);
+    expect(state.snoozeCount, 2);
+    expect(state.maxSnoozes, 3);
+    expect(state.requiresMission, isTrue);
+  });
+
+  test('initial schedule and ringing state are not reported as snoozing', () {
+    TraditionalAlarmRuntimeState state(String status, int count) =>
+        TraditionalAlarmRuntimeState(
+          id: 'alarm',
+          enabled: true,
+          state: status,
+          alarmAt: DateTime(2026, 9, 4, 7),
+          snoozeCount: count,
+          maxSnoozes: 3,
+          requiresMission: true,
+        );
+
+    expect(state('scheduled', 0).isSnoozing, isFalse);
+    expect(state('ringing', 1).isSnoozing, isFalse);
   });
 }

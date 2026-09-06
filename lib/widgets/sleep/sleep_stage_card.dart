@@ -6,6 +6,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
+import 'package:workout_notes/services/sleep_wake_engine.dart';
 
 class SleepStageCard extends StatefulWidget {
   final SleepMonitorSession session;
@@ -55,13 +56,16 @@ class _SleepStageCardState extends State<SleepStageCard> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    loc.sleepStagesTitle,
+                    SleepWakeEngine.supports(widget.session)
+                        ? loc.sleepWakeEstimateTitle
+                        : loc.sleepStagesTitle,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
-                if ((_hasStages || _hasStageAggregates) &&
+                if (!SleepWakeEngine.supports(widget.session) &&
+                    (_hasStages || _hasStageAggregates) &&
                     widget.session.stageConfidence != null)
                   Chip(
                     visualDensity: VisualDensity.compact,
@@ -102,6 +106,10 @@ class _SleepStageCardState extends State<SleepStageCard> {
                 const SizedBox(height: 14),
               ],
               _Breakdown(session: widget.session),
+              if (SleepWakeEngine.supports(widget.session)) ...[
+                const SizedBox(height: 12),
+                Text(loc.sleepBedsideEstimateBody),
+              ],
               if (!widget.compact) ...[
                 const SizedBox(height: 14),
                 Divider(color: theme.colorScheme.outlineVariant),
@@ -243,9 +251,15 @@ class _Breakdown extends StatelessWidget {
         ),
         Expanded(
           child: _StageValue(
-            color: Colors.indigo,
-            label: loc.sleepStageDeepEstimated,
-            minutes: session.deepSleepMinutes ?? 0,
+            color: SleepWakeEngine.supports(session)
+                ? Colors.grey
+                : Colors.indigo,
+            label: SleepWakeEngine.supports(session)
+                ? loc.sleepStageUnknown
+                : loc.sleepStageDeepEstimated,
+            minutes: SleepWakeEngine.supports(session)
+                ? session.unknownMinutes ?? 0
+                : session.deepSleepMinutes ?? 0,
           ),
         ),
       ],

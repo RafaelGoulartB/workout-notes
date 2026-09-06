@@ -1156,6 +1156,9 @@
   "sleepMonitorProtectedStop": "Stop monitoring only",
   "sleepMonitorProtectedStopBody": "The alarm and mission will remain active for this time.",
   "sleepMonitorMissionPending": "Mission pending",
+  "sleepMonitorAlarmSnoozingTitle": "Alarm snoozed",
+  "sleepMonitorSnoozingMissionBody": "You can end the snooze now and complete the mission without waiting for the alarm to ring again.",
+  "sleepMonitorSnoozingDismissBody": "Dismiss only this alarm occurrence. Your sleep record will be kept.",
   "sleepMissionFormatUnknown": "barcode",
   "sleepMissionRemoved": "Mission removed for new sessions.",
   "sleepMissionSaved": "Code registered successfully.",
@@ -1174,6 +1177,13 @@
   "alarmSaveError": "Could not save the alarm.",
   "alarmNext": "Next: {time}",
   "@alarmNext": {"placeholders": {"time": {"type": "String"}}},
+  "alarmSnoozingUntil": "Snoozing until {time}",
+  "@alarmSnoozingUntil": {"placeholders": {"time": {"type": "String"}}},
+  "alarmSnoozeProgress": "Snooze {current} of {maximum}",
+  "@alarmSnoozeProgress": {"placeholders": {"current": {"type": "int"}, "maximum": {"type": "int"}}},
+  "alarmOpenMissionNow": "Open mission now",
+  "alarmDismissSnooze": "Dismiss this snooze",
+  "alarmSnoozeActionError": "This snooze is no longer active. The alarm list has been updated.",
   "alarmMission": "Mission",
   "alarmSnoozeChip": "{minutes} min • {count}x",
   "@alarmSnoozeChip": {"placeholders": {"minutes": {"type": "int"}, "count": {"type": "int"}}},
@@ -2842,5 +2852,16 @@
     "placeholders": {
       "count": { "type": "int" }
     }
-  }
+  },
+  "sleepLiveProbablyAwake": "Probably awake ? provisional",
+  "sleepLiveProbablyAsleep": "Probably asleep ? provisional",
+  "sleepLiveUncertain": "Sleep state undetermined",
+  "sleepWakeEstimateTitle": "Sleep and wake estimates",
+  "sleepBedsideEstimateBody": "For a phone on the bedside table. Sustained low sound activity allows a sleep estimate even when breathing is not audible. Quiet wakefulness can be mistaken for sleep. Undetermined time is shown separately; the nightly total is unavailable when too much time is uncertain. Deep sleep is not estimated in this mode.",
+  "sleepDiagnosticTitle": "Keep sleep diagnostics",
+  "sleepDiagnosticBody": "Optional: keep sensor summaries and start/end battery readings locally for up to 14 days (20 MB maximum). No audio recordings or automatic uploads. Export a night to compare results. Turning this off deletes the saved diagnostics.",
+  "sleepDiagnosticExport": "Export latest sleep diagnostic",
+  "sleepDiagnosticError": "Could not save or export the sleep diagnostic.",
+  "sleepDiagnosticMissing": "Enable diagnostics before finishing a monitored night. No saved diagnostic is available.",
+  "sleepIncompleteNight": "Monitored night with incomplete estimate"
 }

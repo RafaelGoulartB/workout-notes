@@ -8,10 +8,72 @@ import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
 import 'package:workout_notes/services/sleep_stage_engine.dart';
+import 'support/sleep_bedside_fixture.dart';
 
 void main() {
   late Database database;
   late SleepMonitorRepository repository;
+
+  test(
+    'quiet bedside night is saved once with a usable estimate without breathing',
+    () async {
+      final session = bedsideSession(minutes: 240);
+      final spool = <String, dynamic>{
+        'session': session.toMap(),
+        'segments': [for (var i = 0; i < 480; i++) bedsideSegment(i).toMap()],
+      };
+      final imported = await repository.importNativeSpool(spool);
+      expect(imported.estimatedSleepMinutes, greaterThan(210));
+      expect(imported.estimatedSleepMinutes, lessThan(240));
+      expect(imported.sleepOnsetAt, isNotNull);
+      expect(imported.sleepLatencyMinutes, greaterThanOrEqualTo(19));
+      expect(imported.unknownMinutes, 20);
+      expect(imported.deepSleepMinutes, isNull);
+      expect(imported.stageConfidence, isNull);
+      expect(imported.sleepEntryId, isNotNull);
+      expect(await repository.getUnestimatedSessions(), isEmpty);
+      await repository.importNativeSpool(spool);
+      expect((await repository.getSessions()).length, 1);
+      expect(await database.query('sleep_entries'), hasLength(1));
+    },
+  );
+
+  test(
+    'bedside inference accepts short sessions and keeps aggregate source version',
+    () async {
+      final imported = await repository.importNativeSpool({
+        'session': bedsideSession(minutes: 60).toMap(),
+        'segments': [
+          for (var i = 0; i < 120; i++)
+            bedsideSegment(i, periodic: true).toMap(),
+        ],
+      });
+      expect(imported.estimatedSleepMinutes, greaterThan(45));
+      expect(imported.stageAlgorithmVersion, 'sleep-wake-bedside-v2');
+      expect(imported.finalWakeAt, isNull);
+      expect(imported.deepSleepMinutes, isNull);
+      expect(imported.sleepEntryId, isNotNull);
+    },
+  );
+
+  test(
+    'missing or invalid capture still leaves the night incomplete',
+    () async {
+      for (final invalid in [false, true]) {
+        final imported = await repository.importNativeSpool({
+          'session': bedsideSession(minutes: 240).toMap(),
+          'segments': [
+            for (var i = 0; i < (invalid ? 480 : 40); i++)
+              bedsideSegment(i, invalid: invalid).toMap(),
+          ],
+        });
+        expect(imported.estimatedSleepMinutes, isNull);
+        expect(imported.sleepEntryId, isNull);
+        expect(await repository.getUnestimatedSessions(), hasLength(1));
+        expect(await database.query('sleep_entries'), isEmpty);
+      }
+    },
+  );
 
   setUpAll(() {
     sqfliteFfiInit();
@@ -325,19 +387,22 @@ void main() {
     },
   );
 
-  test('runs the heuristic engine for feature nights and persists aggregates', () async {
-    final start = DateTime.utc(2026, 8, 2, 22);
-    final imported = await repository.importNativeSpool(_featureSpool(start));
-    final stages = await repository.getStageEpochs(imported.id);
+  test(
+    'runs the heuristic engine for feature nights and persists aggregates',
+    () async {
+      final start = DateTime.utc(2026, 8, 2, 22);
+      final imported = await repository.importNativeSpool(_featureSpool(start));
+      final stages = await repository.getStageEpochs(imported.id);
 
-    expect(imported.analysisStatus, SleepMonitorSession.analysisAvailable);
-    expect(imported.stageAlgorithmVersion, SleepStageEngine.algorithmVersion);
-    expect(stages, isEmpty);
-    final summary = await repository.getNightSummary(imported.sleepEntryId!);
-    expect(summary, isNotNull);
-    expect(summary!.session?.sleepingMinutes, isNotNull);
-    expect(summary.session?.deepSleepMinutes, isNotNull);
-  });
+      expect(imported.analysisStatus, SleepMonitorSession.analysisAvailable);
+      expect(imported.stageAlgorithmVersion, SleepStageEngine.algorithmVersion);
+      expect(stages, isEmpty);
+      final summary = await repository.getNightSummary(imported.sleepEntryId!);
+      expect(summary, isNotNull);
+      expect(summary!.session?.sleepingMinutes, isNotNull);
+      expect(summary.session?.deepSleepMinutes, isNotNull);
+    },
+  );
 
   test('keeps legacy noise nights as legacy_unavailable', () async {
     final imported = await repository.importNativeSpool(
@@ -349,7 +414,10 @@ void main() {
       ),
     );
 
-    expect(imported.analysisStatus, SleepMonitorSession.analysisLegacyUnavailable);
+    expect(
+      imported.analysisStatus,
+      SleepMonitorSession.analysisLegacyUnavailable,
+    );
     expect(await repository.getStageEpochs(imported.id), isEmpty);
   });
 
@@ -456,7 +524,9 @@ Map<String, dynamic> _featureSpool(DateTime start) {
     return {
       'id': 'feature-segment-$index',
       'session_id': 'feature-session',
-      'started_at': start.add(Duration(seconds: offsetSeconds)).toIso8601String(),
+      'started_at': start
+          .add(Duration(seconds: offsetSeconds))
+          .toIso8601String(),
       'duration_seconds': 30,
       'audio_rms_dbfs': awake ? -25 : -40,
       'audio_peak_dbfs': awake ? -10 : -25,

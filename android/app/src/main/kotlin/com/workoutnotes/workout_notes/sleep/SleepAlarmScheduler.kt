@@ -168,7 +168,15 @@ object SleepAlarmScheduler {
         clear(context)
     }
 
-    fun markFired(context: Context) {
+    @Synchronized
+    fun markFired(context: Context, expectedAlarmAtMillis: Long): Boolean {
+        val snapshot = read(context) ?: return false
+        if (!SleepAlarmStatePolicy.canMarkRinging(
+                snapshot.state,
+                snapshot.alarmAtMillis,
+                expectedAlarmAtMillis,
+            )
+        ) return false
         preferences(context).edit()
             .putString(KEY_STATE, STATE_RINGING)
             .putInt(KEY_EMERGENCY_TAPS, 0)
@@ -177,8 +185,10 @@ object SleepAlarmScheduler {
             .remove(KEY_BARCODE_PAUSE_ATTEMPTS)
             .remove(KEY_BARCODE_PAUSE_ACTIVE)
             .apply()
+        return true
     }
 
+    @Synchronized
     fun complete(context: Context) {
         // Keep the immutable snapshot long enough for Flutter to import the
         // dismissal metadata after a cold start. A later session overwrites it
@@ -214,6 +224,64 @@ object SleepAlarmScheduler {
             snapshot.snoozeCount + 1,
         )
         return true
+    }
+
+    @Synchronized
+    fun resumeSnoozedMission(context: Context): Snapshot? {
+        val snapshot = read(context) ?: return null
+        if (!SleepAlarmStatePolicy.canResumeSnoozedMission(
+                snapshot.state,
+                snapshot.snoozeCount,
+                snapshot.requiresMission,
+            )
+        ) return null
+        context.getSystemService(AlarmManager::class.java).cancel(
+            fireIntent(
+                context,
+                snapshot.alarmAtMillis,
+                snapshot.sessionId,
+                snapshot.monitorMode,
+                snapshot.missionType,
+                snapshot.missionHash,
+                snapshot.missionSalt,
+                snapshot.missionFormat,
+            ),
+        )
+        preferences(context).edit()
+            .putLong(KEY_ALARM_AT, System.currentTimeMillis())
+            .putString(KEY_STATE, STATE_RINGING)
+            .putInt(KEY_EMERGENCY_TAPS, 0)
+            .remove(KEY_EMERGENCY_DEADLINE)
+            .remove(KEY_BARCODE_DEADLINE)
+            .remove(KEY_BARCODE_PAUSE_ATTEMPTS)
+            .remove(KEY_BARCODE_PAUSE_ACTIVE)
+            .apply()
+        return read(context)
+    }
+
+    @Synchronized
+    fun dismissSnooze(context: Context): Snapshot? {
+        val snapshot = read(context) ?: return null
+        if (!SleepAlarmStatePolicy.canDismissSnooze(
+                snapshot.state,
+                snapshot.snoozeCount,
+                snapshot.requiresMission,
+            )
+        ) return null
+        context.getSystemService(AlarmManager::class.java).cancel(
+            fireIntent(
+                context,
+                snapshot.alarmAtMillis,
+                snapshot.sessionId,
+                snapshot.monitorMode,
+                snapshot.missionType,
+                snapshot.missionHash,
+                snapshot.missionSalt,
+                snapshot.missionFormat,
+            ),
+        )
+        complete(context)
+        return snapshot
     }
 
     fun emergencyTaps(context: Context): Int =
@@ -317,8 +385,9 @@ object SleepAlarmScheduler {
             return
         }
         if (stored.alarmAtMillis <= System.currentTimeMillis()) {
-            markFired(context)
-            SleepAlarmRingingService.start(context, stored.alarmAtMillis)
+            if (markFired(context, stored.alarmAtMillis)) {
+                SleepAlarmRingingService.start(context, stored.alarmAtMillis)
+            }
             return
         }
         try {

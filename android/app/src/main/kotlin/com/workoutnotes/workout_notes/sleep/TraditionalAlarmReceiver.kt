@@ -8,7 +8,8 @@ class TraditionalAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != TraditionalAlarmScheduler.ACTION_FIRE) return
         val id = intent.getStringExtra(TraditionalAlarmScheduler.EXTRA_ID) ?: return
-        TraditionalAlarmScheduler.markRinging(context, id)
+        val alarmAt = intent.getLongExtra(TraditionalAlarmScheduler.EXTRA_ALARM_AT, Long.MIN_VALUE)
+        if (!TraditionalAlarmScheduler.markRinging(context, id, alarmAt)) return
         TraditionalAlarmRingingService.start(context, id)
     }
 }

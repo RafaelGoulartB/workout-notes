@@ -6,6 +6,7 @@ import '../models/sleep_monitor_segment.dart';
 import '../models/sleep_monitor_session.dart';
 import '../models/sleep_stage_epoch.dart';
 import '../models/sleep_stage_type.dart';
+import 'package:workout_notes/services/sleep_wake_engine.dart';
 
 /// Heuristic sleep-stage estimator that fuses spectral audio features with
 /// actigraphy into 30-second epochs (awake / sleeping / deep).
@@ -144,6 +145,9 @@ class SleepStageEngine {
     required List<SleepMonitorSegment> segments,
     DateTime? onset,
   }) {
+    if (SleepWakeEngine.supports(session)) {
+      return const SleepWakeEngine().run(session: session, segments: segments);
+    }
     final blockers = <String>[];
     final ordered = [...segments]
       ..sort((a, b) => a.startedAt.compareTo(b.startedAt));
@@ -192,11 +196,7 @@ class SleepStageEngine {
       final feature = windowFeatures[i];
       final scorableIndex = feature == null ? null : scorableIndexBySegment[i];
       final (stage, confidence, probs) = scorableIndex == null
-          ? (
-              SleepStageType.unknown,
-              0.0,
-              _zeroProbs,
-            )
+          ? (SleepStageType.unknown, 0.0, _zeroProbs)
           : viterbi.epochAt(scorableIndex);
       epochs.add(
         SleepStageEpoch(
@@ -261,8 +261,7 @@ class SleepStageEngine {
       // activity is settling-in time, not sleep. Accept only when the ~20
       // minutes after the run stay calm.
       var activityAfter = 0;
-      final horizon =
-          math.min(i + onsetSustainedWindows + 40, features.length);
+      final horizon = math.min(i + onsetSustainedWindows + 40, features.length);
       for (var k = i + onsetSustainedWindows; k < horizon; k++) {
         if (_isActivity(features[k])) activityAfter++;
       }
@@ -273,11 +272,13 @@ class SleepStageEngine {
     }
 
     DateTime? finalWakeAt;
-    final searchStart = features.length -
-        (features.length * finalWakeSearchFraction).round();
-    for (var i = searchStart;
-        i + finalWakeSustainedWindows <= features.length;
-        i++) {
+    final searchStart =
+        features.length - (features.length * finalWakeSearchFraction).round();
+    for (
+      var i = searchStart;
+      i + finalWakeSustainedWindows <= features.length;
+      i++
+    ) {
       var awake = 0;
       for (var k = i; k < i + finalWakeSustainedWindows; k++) {
         final (stage, _, _) = viterbi.epochAt(k);
@@ -340,8 +341,8 @@ class SleepStageEngine {
 
     final highFreq =
         (segment.spectralBandEnergy3 ?? 0) + (segment.spectralBandEnergy4 ?? 0);
-    final lowFreq = (segment.spectralBandEnergy0 ?? 0) +
-        (segment.spectralBandEnergy1 ?? 0);
+    final lowFreq =
+        (segment.spectralBandEnergy0 ?? 0) + (segment.spectralBandEnergy1 ?? 0);
     final regularity = segment.breathingRegularity ?? 0;
     final motionSeconds = segment.motionActiveSeconds ?? 0;
     final microMotionDeviation = segment.motionMeanDeviationG;
@@ -353,8 +354,10 @@ class SleepStageEngine {
       nBurst: (segment.noiseBurstCount / burstNormalizer).clamp(0.0, 1.0),
       highFreqFraction: (highFreq / totalBand).clamp(0.0, 1.0),
       lowFreqFraction: lowFreqFraction,
-      lowFreqDominance: (lowFreqFraction / deepLfDominanceThreshold)
-          .clamp(0.0, 1.0),
+      lowFreqDominance: (lowFreqFraction / deepLfDominanceThreshold).clamp(
+        0.0,
+        1.0,
+      ),
       tone: (1 - flatness).clamp(0.0, 1.0),
       regularity: regularity.clamp(0.0, 1.0),
       motion: (motionSeconds / motionNormalizer).clamp(0.0, 1.0),
@@ -368,6 +371,7 @@ class SleepStageEngine {
 
 /// Result of a heuristic staging pass.
 class SleepStageEngineResult {
+  final Map<String, String> decisionReasons;
   final bool ran;
   final List<SleepStageEpoch> epochs;
   final List<String> blockers;
@@ -377,6 +381,7 @@ class SleepStageEngineResult {
   final SleepWindow window;
 
   const SleepStageEngineResult({
+    this.decisionReasons = const {},
     required this.ran,
     this.epochs = const [],
     this.blockers = const [],
@@ -461,15 +466,13 @@ class _ViterbiPass {
   late final List<List<double>> _logT;
   late final List<double> _logPi;
 
-  _ViterbiPass(
-    this._features,
-    this._session,
-    this._sessionEnd,
-    this._onset,
-  ) {
+  _ViterbiPass(this._features, this._session, this._sessionEnd, this._onset) {
     _logT = [
       for (final row in _transition)
-        [for (final value in row) value <= 0 ? double.negativeInfinity : math.log(value)],
+        [
+          for (final value in row)
+            value <= 0 ? double.negativeInfinity : math.log(value),
+        ],
     ];
     _logPi = [for (final value in _initial) math.log(value)];
   }
@@ -477,7 +480,10 @@ class _ViterbiPass {
   _ViterbiResult run() {
     final n = _features.length;
     // Viterbi in log space.
-    final dp = List.generate(n, (_) => List.filled(_states, double.negativeInfinity));
+    final dp = List.generate(
+      n,
+      (_) => List.filled(_states, double.negativeInfinity),
+    );
     final back = List.generate(n, (_) => List.filled(_states, 0));
     for (var s = 0; s < _states; s++) {
       dp[0][s] = _logPi[s] + math.log(_emission(s, 0));
@@ -514,18 +520,26 @@ class _ViterbiPass {
 
     // Forward-backward for posterior marginals, in log space to avoid
     // underflow over a full night.
-    final lAlpha = List.generate(n, (_) => List.filled(_states, double.negativeInfinity));
-    final lBeta = List.generate(n, (_) => List.filled(_states, double.negativeInfinity));
+    final lAlpha = List.generate(
+      n,
+      (_) => List.filled(_states, double.negativeInfinity),
+    );
+    final lBeta = List.generate(
+      n,
+      (_) => List.filled(_states, double.negativeInfinity),
+    );
     for (var s = 0; s < _states; s++) {
       lAlpha[0][s] = _logPi[s] + math.log(_emission(s, 0));
     }
     for (var i = 1; i < n; i++) {
       for (var s = 0; s < _states; s++) {
-        lAlpha[i][s] = _logSumExp([
-          for (var p = 0; p < _states; p++)
-            if (_logT[p][s] != double.negativeInfinity)
-              lAlpha[i - 1][p] + _logT[p][s],
-        ]) + math.log(_emission(s, i));
+        lAlpha[i][s] =
+            _logSumExp([
+              for (var p = 0; p < _states; p++)
+                if (_logT[p][s] != double.negativeInfinity)
+                  lAlpha[i - 1][p] + _logT[p][s],
+            ]) +
+            math.log(_emission(s, i));
       }
     }
     for (var s = 0; s < _states; s++) {
@@ -578,7 +592,8 @@ class _ViterbiPass {
     final deepPrior = _deepPrior(f);
     final regSquared = f.regularity * f.regularity;
     return _Logits(
-      awake: SleepStageEngine.awakeNoiseWeight * f.nNoise +
+      awake:
+          SleepStageEngine.awakeNoiseWeight * f.nNoise +
           SleepStageEngine.awakeBurstWeight * f.nBurst +
           SleepStageEngine.awakeHfWeight * f.highFreqFraction +
           SleepStageEngine.awakeMotionWeight * f.motion +
@@ -586,12 +601,14 @@ class _ViterbiPass {
           SleepStageEngine.awakeRegWeight * f.regularity +
           _startAwakePrior(f) +
           _terminalAwakePrior(f),
-      sleeping: SleepStageEngine.sleepMotionWeight * (1 - f.motion) +
+      sleeping:
+          SleepStageEngine.sleepMotionWeight * (1 - f.motion) +
           SleepStageEngine.sleepBurstWeight * (1 - f.nBurst) +
           SleepStageEngine.sleepNoiseWeight * (1 - f.nNoise) +
           SleepStageEngine.sleepRegWeight * f.regularity +
           SleepStageEngine.sleepBias,
-      deep: SleepStageEngine.deepRegWeight * regSquared +
+      deep:
+          SleepStageEngine.deepRegWeight * regSquared +
           SleepStageEngine.deepLfWeight * f.lowFreqFraction +
           SleepStageEngine.deepToneWeight * f.tone +
           SleepStageEngine.deepQuietWeight *
@@ -610,8 +627,7 @@ class _ViterbiPass {
   /// Awake bias over the first [coldStartMinutes] of the session: you just set
   /// the phone down, so onset is unlikely in the opening minutes.
   double _startAwakePrior(_WindowFeatures f) {
-    final elapsedSeconds =
-        f.startedAt.difference(_session.startedAt).inSeconds;
+    final elapsedSeconds = f.startedAt.difference(_session.startedAt).inSeconds;
     final windowSeconds = SleepStageEngine.coldStartMinutes * 60;
     if (elapsedSeconds >= windowSeconds) return 0.0;
     return SleepStageEngine.coldStartPriorMax *
@@ -662,7 +678,8 @@ class _ViterbiPass {
       for (var s = 0; s < _states; s++) lAlpha[index][s] + lBeta[index][s],
     ]);
     final probs = <double>[
-      for (var s = 0; s < _states; s++) math.exp(lAlpha[index][s] + lBeta[index][s] - logZ),
+      for (var s = 0; s < _states; s++)
+        math.exp(lAlpha[index][s] + lBeta[index][s] - logZ),
     ];
     return _EpochProbs(probs[_awake], probs[_sleeping], probs[_deep]);
   }
@@ -670,7 +687,8 @@ class _ViterbiPass {
   double _confidence(int index, int state, double maxPosterior) {
     final f = _features[index];
     final logits = _logits(f);
-    final sorted = [logits.awake, logits.sleeping, logits.deep]..sort((a, b) => b.compareTo(a));
+    final sorted = [logits.awake, logits.sleeping, logits.deep]
+      ..sort((a, b) => b.compareTo(a));
     final featureMargin = ((sorted[0] - sorted[1]) / 4).clamp(0.0, 1.0);
     final confidence =
         SleepStageEngine.confidencePosteriorWeight * maxPosterior +
@@ -679,10 +697,8 @@ class _ViterbiPass {
     return confidence.clamp(0.0, 1.0);
   }
 
-  double _logMax(_Logits logits) => math.max(
-    logits.awake,
-    math.max(logits.sleeping, logits.deep),
-  );
+  double _logMax(_Logits logits) =>
+      math.max(logits.awake, math.max(logits.sleeping, logits.deep));
 
   double _logSumExp(List<double> values) {
     if (values.isEmpty) return double.negativeInfinity;

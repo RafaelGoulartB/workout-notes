@@ -12,6 +12,7 @@ import 'base_repository.dart';
 import '../services/sleep_inference_service.dart';
 import '../services/sleep_stage_analysis_service.dart';
 import '../services/sleep_stage_engine.dart';
+import 'package:workout_notes/services/sleep_wake_engine.dart';
 
 /// SQLite persistence and native-spool import for sleep monitoring.
 class SleepMonitorRepository extends BaseRepository {
@@ -25,6 +26,26 @@ class SleepMonitorRepository extends BaseRepository {
       'sleep_monitor_sessions',
       orderBy: 'started_at DESC',
       limit: limit,
+    );
+    return rows.map(SleepMonitorSession.fromMap).toList();
+  }
+
+  Future<List<SleepMonitorSession>> getUnestimatedSessions() async {
+    final database = await db;
+    if (!await _tableExists(database, 'sleep_monitor_sessions')) {
+      return const [];
+    }
+    final rows = await database.query(
+      'sleep_monitor_sessions',
+      where:
+          'sleep_entry_id IS NULL AND algorithm_version = ? AND status IN (?, ?)',
+      whereArgs: [
+        'audio-features-v3',
+        SleepMonitorSession.completed,
+        SleepMonitorSession.interrupted,
+      ],
+      orderBy: 'started_at DESC',
+      limit: 5,
     );
     return rows.map(SleepMonitorSession.fromMap).toList();
   }
@@ -220,15 +241,18 @@ class SleepMonitorRepository extends BaseRepository {
         .map((row) => SleepStageEpoch.fromMap(Map<String, dynamic>.from(row)))
         .toList();
     final recovered = SleepMonitorSession.fromNative(rawSession, rawSegments);
+    final bedside = SleepWakeEngine.supports(recovered);
     final diagnostics = SleepMonitorDiagnostics.fromSession(
       recovered,
       rawSegments,
     );
-    final inference = const SleepInferenceService().analyze(
-      session: recovered,
-      segments: rawSegments,
-      diagnostics: diagnostics,
-    );
+    final inference = bedside
+        ? null
+        : const SleepInferenceService().analyze(
+            session: recovered,
+            segments: rawSegments,
+            diagnostics: diagnostics,
+          );
     final sessionEnd = recovered.endedAt ?? recovered.startedAt;
     // Native stages win when a validated model produced them. Otherwise, for
     // feature-carrying nights (audio-features-v2), the heuristic engine labels
@@ -241,17 +265,18 @@ class SleepMonitorRepository extends BaseRepository {
     );
     if (stageSummary == null &&
         rawSegments.isNotEmpty &&
-        diagnostics.isSuitableForInference &&
+        (bedside || diagnostics.isSuitableForInference) &&
         rawSegments.any((segment) => segment.hasSpectralFeatures)) {
       final engineResult = const SleepStageEngine().run(
         session: recovered,
         segments: rawSegments,
-        onset: inference.sleepOnsetAt,
+        onset: inference?.sleepOnsetAt,
       );
       if (engineResult.ran &&
-          engineResult.epochs.any(
-            (epoch) => epoch.stage != SleepStageType.unknown,
-          )) {
+          (bedside ||
+              engineResult.epochs.any(
+                (epoch) => epoch.stage != SleepStageType.unknown,
+              ))) {
         stageEpochs = engineResult.epochs;
         stageSummary = const SleepStageAnalysisService().summarize(
           sessionStart: recovered.startedAt,
@@ -260,38 +285,49 @@ class SleepMonitorRepository extends BaseRepository {
         );
       }
     }
-    final inferredSleepMinutes = inference.estimatedSleepSeconds == null
+    final inferredSleepMinutes = inference?.estimatedSleepSeconds == null
         ? null
-        : (inference.estimatedSleepSeconds! / 60).round();
-    final estimatedSleepMinutes =
-        stageSummary?.estimatedSleepMinutes ??
-        recovered.estimatedSleepMinutes ??
-        inferredSleepMinutes;
+        : (inference!.estimatedSleepSeconds! / 60).round();
+    final sufficientlyClassified =
+        stageSummary != null &&
+        stageSummary.unknownMinutes <= (recovered.timeInBedMinutes ?? 0) * 0.2;
+    final estimatedSleepMinutes = bedside
+        ? (sufficientlyClassified ? stageSummary.estimatedSleepMinutes : null)
+        : stageSummary?.estimatedSleepMinutes ??
+              recovered.estimatedSleepMinutes ??
+              inferredSleepMinutes;
     final importedSession = recovered.copyWith(
       estimatedSleepMinutes: estimatedSleepMinutes,
       analysisStatus: stageSummary != null
           ? SleepMonitorSession.analysisAvailable
-          : rawSegments.any((segment) => segment.hasSpectralFeatures)
+          : bedside || rawSegments.any((segment) => segment.hasSpectralFeatures)
           ? SleepMonitorSession.analysisInsufficient
           : recovered.algorithmVersion == 'audio-noise-v1'
           ? SleepMonitorSession.analysisLegacyUnavailable
           : SleepMonitorSession.analysisModelUnavailable,
-      sleepOnsetAt: stageSummary?.sleepOnsetAt ?? inference.sleepOnsetAt,
+      sleepOnsetAt: bedside
+          ? stageSummary?.sleepOnsetAt
+          : stageSummary?.sleepOnsetAt ?? inference?.sleepOnsetAt,
       finalWakeAt: stageSummary?.finalWakeAt,
-      sleepLatencyMinutes:
-          stageSummary?.sleepLatencyMinutes ??
-          (inference.sleepOnsetAt
-              ?.difference(recovered.startedAt)
-              .inMinutes
-              .clamp(0, 16 * 60)),
+      sleepLatencyMinutes: bedside
+          ? (stageSummary?.sleepOnsetAt == null
+                ? null
+                : stageSummary?.sleepLatencyMinutes)
+          : stageSummary?.sleepLatencyMinutes ??
+                (inference?.sleepOnsetAt
+                    ?.difference(recovered.startedAt)
+                    .inMinutes
+                    .clamp(0, 16 * 60)),
       awakeMinutes: stageSummary?.awakeMinutes,
       sleepingMinutes: stageSummary?.sleepingMinutes,
-      deepSleepMinutes: stageSummary?.deepSleepMinutes,
+      deepSleepMinutes: bedside ? null : stageSummary?.deepSleepMinutes,
       unknownMinutes: stageSummary?.unknownMinutes,
       awakeningCount:
-          stageSummary?.awakeningCount ?? inference.awakenings.length,
-      sleepEfficiency: stageSummary?.sleepEfficiency,
-      stageConfidence: stageSummary?.stageConfidence,
+          stageSummary?.awakeningCount ?? inference?.awakenings.length,
+      sleepEfficiency: bedside && !sufficientlyClassified
+          ? null
+          : stageSummary?.sleepEfficiency,
+      stageConfidence: bedside ? null : stageSummary?.stageConfidence,
       stageAlgorithmVersion: stageSummary?.algorithmVersion,
     );
     final database = await db;
@@ -319,6 +355,7 @@ class SleepMonitorRepository extends BaseRepository {
           }.contains(importedSession.status) &&
           duration >= _minimumSleepEntryDuration &&
           rawSegments.isNotEmpty &&
+          (!bedside || importedSession.estimatedSleepMinutes != null) &&
           (importedSession.timeInBedMinutes ?? 0) > 0;
       final bedtimeMinutes = wallClockStart.hour * 60 + wallClockStart.minute;
       final wakeTimeMinutes = wallClockEnd.hour * 60 + wallClockEnd.minute;

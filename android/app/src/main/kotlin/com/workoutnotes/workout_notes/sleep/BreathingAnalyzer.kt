@@ -1,7 +1,6 @@
 package com.workoutnotes.workout_notes.sleep
 
 import kotlin.math.abs
-import kotlin.math.min
 
 /**
  * Estimates breathing regularity and rate from the slow amplitude envelope.
@@ -11,7 +10,7 @@ import kotlin.math.min
  * normalized autocorrelation peak over plausible breath-period lags yields the
  * regularity score; its argmax maps to breaths per second.
  */
-class BreathingAnalyzer {
+class BreathingAnalyzer(private val sampleRate: Int = 16_000) {
     companion object {
         const val HOP_SAMPLES = 8_000 // 0.5 s at 16 kHz
         const val MIN_LAG = 2 // 1.0 s -> 1.0 Hz ceiling
@@ -22,11 +21,12 @@ class BreathingAnalyzer {
     private var envelopeSum = 0.0
     private var hopBuffer = 0.0
     private var hopSamples = 0
+    private val hopSize = sampleRate / 2
 
     fun add(samples: ShortArray, length: Int) {
         var index = 0
         while (index < length) {
-            val take = minOf(HOP_SAMPLES - hopSamples, length - index)
+            val take = minOf(hopSize - hopSamples, length - index)
             var sum = 0.0
             for (i in 0 until take) {
                 sum += abs(samples[index + i].toDouble() / Short.MAX_VALUE)
@@ -34,8 +34,8 @@ class BreathingAnalyzer {
             hopBuffer += sum
             hopSamples += take
             index += take
-            if (hopSamples >= HOP_SAMPLES) {
-                envelope.add(hopBuffer / HOP_SAMPLES)
+            if (hopSamples >= hopSize) {
+                envelope.add(hopBuffer / hopSize)
                 envelopeSum += envelope.last()
                 hopBuffer = 0.0
                 hopSamples = 0
@@ -75,7 +75,7 @@ class BreathingAnalyzer {
                 bestLag = lag
             }
         }
-        val rateHz = 1.0 / (bestLag * HOP_SAMPLES / 16_000.0)
+        val rateHz = 1.0 / (bestLag * hopSize / sampleRate.toDouble())
         val regularity = bestRho.coerceIn(0.0, 1.0)
         reset()
         return regularity to rateHz
