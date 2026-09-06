@@ -26,10 +26,8 @@
 </p>
 
 <p align="center">
-  <strong><a href="https://rafaelgoulartb.github.io/workout-notes/">Explore the app ? official website</a></strong><br />
-  Discover the features and interface.<br /><br />
-  <strong><a href="https://rafaelgoulartb.github.io/workout-notes/docs/index.html">Read the documentation ? feature guides</a></strong><br />
-  Learn how to set up the app and use each feature.
+  <a href="https://rafaelgoulartb.github.io/workout-notes/">Website</a> &middot;
+  <a href="https://rafaelgoulartb.github.io/workout-notes/docs/index.html">Documentation</a>
 </p>
 
 Workout Notes brings strength training, GPS runs, food logging, sleep tracking, and body measurements together. Build routines, follow a periodized plan, and see how your habits change over time. Your journal lives on your device, with no account required.
