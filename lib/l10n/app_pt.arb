@@ -1157,6 +1157,9 @@
   "sleepMonitorProtectedStop": "Parar somente o monitoramento",
   "sleepMonitorProtectedStopBody": "O despertador e a missão continuarão ativos para este horário.",
   "sleepMonitorMissionPending": "Missão pendente",
+  "sleepMonitorAlarmSnoozingTitle": "Alarme em soneca",
+  "sleepMonitorSnoozingMissionBody": "Você pode encerrar a soneca agora e cumprir a missão sem esperar o alarme tocar novamente.",
+  "sleepMonitorSnoozingDismissBody": "Encerre somente esta ocorrência do alarme. Seu registro de sono será mantido.",
   "sleepMissionFormatUnknown": "código de barras",
   "sleepMissionRemoved": "Missão removida para novas sessões.",
   "sleepMissionSaved": "Código cadastrado com sucesso.",
@@ -1175,6 +1178,13 @@
   "alarmSaveError": "Não foi possível salvar o alarme.",
   "alarmNext": "Próximo: {time}",
   "@alarmNext": {"placeholders": {"time": {"type": "String"}}},
+  "alarmSnoozingUntil": "Em soneca até {time}",
+  "@alarmSnoozingUntil": {"placeholders": {"time": {"type": "String"}}},
+  "alarmSnoozeProgress": "Soneca {current} de {maximum}",
+  "@alarmSnoozeProgress": {"placeholders": {"current": {"type": "int"}, "maximum": {"type": "int"}}},
+  "alarmOpenMissionNow": "Abrir missão agora",
+  "alarmDismissSnooze": "Encerrar esta soneca",
+  "alarmSnoozeActionError": "Esta soneca não está mais ativa. A lista de alarmes foi atualizada.",
   "alarmMission": "Missão",
   "alarmSnoozeChip": "{minutes} min • {count}x",
   "@alarmSnoozeChip": {"placeholders": {"minutes": {"type": "int"}, "count": {"type": "int"}}},
@@ -2822,5 +2832,16 @@
     "placeholders": {
       "count": { "type": "int" }
     }
-  }
+  },
+  "sleepLiveProbablyAwake": "Provavelmente acordado — provisório",
+  "sleepLiveProbablyAsleep": "Provavelmente dormindo — provisório",
+  "sleepLiveUncertain": "Estado de sono indeterminado",
+  "sleepWakeEstimateTitle": "Estimativas de sono e vigília",
+  "sleepBedsideEstimateBody": "Para o celular na mesa de cabeceira. Baixa atividade sonora sustentada permite estimar sono mesmo sem respiração audível. Ficar acordado em silêncio pode ser confundido com sono. O tempo indeterminado aparece separado; o total da noite fica indisponível quando há muita incerteza. Este modo não estima sono profundo.",
+  "sleepDiagnosticTitle": "Guardar diagnósticos de sono",
+  "sleepDiagnosticBody": "Opcional: guarda resumos dos sensores e leituras de bateria do início e fim no aparelho por até 14 dias (máximo de 20 MB). Sem gravações de áudio nem envio automático. Exporte uma noite para comparar resultados. Desativar apaga os diagnósticos salvos.",
+  "sleepDiagnosticExport": "Exportar último diagnóstico de sono",
+  "sleepDiagnosticError": "Não foi possível salvar ou exportar o diagnóstico de sono.",
+  "sleepDiagnosticMissing": "Ative os diagnósticos antes de encerrar uma noite monitorada. Não há diagnóstico salvo disponível.",
+  "sleepIncompleteNight": "Noite monitorada com estimativa incompleta"
 }

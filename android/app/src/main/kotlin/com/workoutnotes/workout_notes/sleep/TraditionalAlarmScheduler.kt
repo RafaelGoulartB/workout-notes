@@ -48,8 +48,17 @@ object TraditionalAlarmScheduler {
         remove(context, id)
     }
 
-    fun markRinging(context: Context, id: String) {
-        read(context, id)?.let { persist(context, it.copy(state = "ringing")) }
+    @Synchronized
+    fun markRinging(context: Context, id: String, expectedAlarmAtMillis: Long? = null): Boolean {
+        val snapshot = read(context, id) ?: return false
+        if (!TraditionalAlarmStatePolicy.canMarkRinging(
+                snapshot.state,
+                snapshot.alarmAtMillis,
+                expectedAlarmAtMillis,
+            )
+        ) return false
+        persist(context, snapshot.copy(state = "ringing"))
+        return true
     }
 
     fun dismiss(context: Context, id: String) = finish(context, id)
@@ -63,16 +72,45 @@ object TraditionalAlarmScheduler {
         return scheduled
     }
 
+    @Synchronized
+    fun resumeSnoozedMission(context: Context, id: String): Snapshot? {
+        val snapshot = read(context, id) ?: return null
+        if (!TraditionalAlarmStatePolicy.canOpenSnoozedMission(
+                snapshot.enabled,
+                snapshot.state,
+                snapshot.snoozeCount,
+                snapshot.requiresMission,
+            )
+        ) return null
+        val ringing = snapshot.copy(state = "ringing")
+        persist(context, ringing)
+        context.getSystemService(AlarmManager::class.java).cancel(fireIntent(context, snapshot))
+        return ringing
+    }
+
+    @Synchronized
+    fun dismissSnooze(context: Context, id: String): Boolean {
+        val snapshot = read(context, id) ?: return false
+        if (!TraditionalAlarmStatePolicy.canDismissSnooze(
+                snapshot.enabled,
+                snapshot.state,
+                snapshot.snoozeCount,
+                snapshot.requiresMission,
+            )
+        ) return false
+        finish(context, id)
+        return true
+    }
+
     fun verifyMission(context: Context, id: String, raw: String, format: String): Boolean {
         val snapshot = read(context, id) ?: return false
         if (!snapshot.requiresMission || snapshot.state != "ringing" ||
             snapshot.missionHash.isNullOrBlank() || snapshot.missionSalt.isNullOrBlank()) return false
         val actual = BarcodeMissionCrypto.hash(format, raw, snapshot.missionSalt)
-        if (!BarcodeMissionCrypto.constantTimeEquals(actual, snapshot.missionHash)) return false
-        finish(context, id)
-        return true
+        return BarcodeMissionCrypto.constantTimeEquals(actual, snapshot.missionHash)
     }
 
+    @Synchronized
     fun finish(context: Context, id: String) {
         val snapshot = read(context, id) ?: return
         if (snapshot.weekdays.isEmpty()) {
@@ -102,7 +140,17 @@ object TraditionalAlarmScheduler {
     }
 
     fun states(context: Context): List<Map<String, Any>> = ids(context).mapNotNull { id ->
-        read(context, id)?.let { mapOf("id" to it.id, "enabled" to it.enabled, "alarm_at_epoch_ms" to it.alarmAtMillis, "state" to it.state) }
+        read(context, id)?.let {
+            mapOf(
+                "id" to it.id,
+                "enabled" to it.enabled,
+                "alarm_at_epoch_ms" to it.alarmAtMillis,
+                "state" to it.state,
+                "snooze_count" to it.snoozeCount,
+                "max_snoozes" to it.maxSnoozes,
+                "requires_mission" to it.requiresMission,
+            )
+        }
     }
 
     fun read(context: Context, id: String): Snapshot? {

@@ -7,8 +7,32 @@ import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
+import 'support/sleep_bedside_fixture.dart';
 
 void main() {
+  testWidgets(
+    'bedside result shows uncertainty without deep stage or confidence percent',
+    (tester) async {
+      final session = bedsideSession().copyWith(
+        analysisStatus: SleepMonitorSession.analysisAvailable,
+        awakeMinutes: 0,
+        sleepingMinutes: 0,
+        unknownMinutes: 60,
+      );
+      await tester.pumpWidget(
+        _app(SleepStageCard(session: session, stages: const [])),
+      );
+      await tester.pumpAndSettle();
+      final loc = AppLocalizations.of(
+        tester.element(find.byType(SleepStageCard)),
+      )!;
+      expect(find.text(loc.sleepWakeEstimateTitle), findsOneWidget);
+      expect(find.text(loc.sleepStageUnknown), findsOneWidget);
+      expect(find.text(loc.sleepStageDeepEstimated), findsNothing);
+      expect(find.byType(Chip), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('renders the three estimated stage labels at 320 px', (
     tester,
   ) async {

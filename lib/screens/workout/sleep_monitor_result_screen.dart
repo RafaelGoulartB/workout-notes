@@ -175,14 +175,16 @@ class _SessionSummaryCard extends StatelessWidget {
   }
 
   static String _percentage(double? value) =>
-      value == null ? '—' : '${(value * 100).round()}%';
+      value == null ? '—' : '${value.round()}%';
 
   static String _minutes(int? value) {
     if (value == null) return '—';
     final safe = value.clamp(0, 16 * 60);
     final hours = safe ~/ 60;
     final minutes = safe % 60;
-    return hours == 0 ? '$minutes min' : '${hours}h ${minutes.toString().padLeft(2, '0')}min';
+    return hours == 0
+        ? '$minutes min'
+        : '${hours}h ${minutes.toString().padLeft(2, '0')}min';
   }
 
   static String _duration(int seconds) {

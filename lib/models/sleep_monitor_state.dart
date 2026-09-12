@@ -20,6 +20,10 @@ class SleepMonitorState {
   final SleepMonitoringMode mode;
   final SleepMissionStatus missionStatus;
   final bool alarmRinging;
+  final bool alarmSnoozing;
+  final String? alarmState;
+  final int snoozeCount;
+  final int maxSnoozes;
   final int emergencyTaps;
   final String? alarmDismissMethod;
   final String? endReason;
@@ -42,6 +46,10 @@ class SleepMonitorState {
     this.mode = SleepMonitoringMode.alarmWithoutMission,
     this.missionStatus = SleepMissionStatus.unconfigured,
     this.alarmRinging = false,
+    this.alarmSnoozing = false,
+    this.alarmState,
+    this.snoozeCount = 0,
+    this.maxSnoozes = 0,
     this.emergencyTaps = 0,
     this.alarmDismissMethod,
     this.endReason,
@@ -66,6 +74,10 @@ class SleepMonitorState {
         mode: SleepMonitoringMode.alarmWithoutMission,
         missionStatus: SleepMissionStatus.unconfigured,
         alarmRinging: false,
+        alarmSnoozing: false,
+        alarmState: null,
+        snoozeCount: 0,
+        maxSnoozes: 0,
         emergencyTaps: 0,
         alarmDismissMethod: null,
         endReason: null,
@@ -80,6 +92,11 @@ class SleepMonitorState {
 
   bool get isActive =>
       status == starting || status == running || status == stopping;
+
+  bool get isAlarmSnoozing =>
+      !alarmDismissed &&
+      snoozeCount > 0 &&
+      (alarmSnoozing || alarmState == 'scheduled');
 
   Duration get elapsed {
     if (startedAt == null) return Duration.zero;
@@ -99,6 +116,10 @@ class SleepMonitorState {
     SleepMonitoringMode? mode,
     SleepMissionStatus? missionStatus,
     bool? alarmRinging,
+    bool? alarmSnoozing,
+    String? alarmState,
+    int? snoozeCount,
+    int? maxSnoozes,
     int? emergencyTaps,
     String? alarmDismissMethod,
     String? endReason,
@@ -121,6 +142,10 @@ class SleepMonitorState {
       mode: mode ?? this.mode,
       missionStatus: missionStatus ?? this.missionStatus,
       alarmRinging: alarmRinging ?? this.alarmRinging,
+      alarmSnoozing: alarmSnoozing ?? this.alarmSnoozing,
+      alarmState: alarmState ?? this.alarmState,
+      snoozeCount: snoozeCount ?? this.snoozeCount,
+      maxSnoozes: maxSnoozes ?? this.maxSnoozes,
       emergencyTaps: emergencyTaps ?? this.emergencyTaps,
       alarmDismissMethod: alarmDismissMethod ?? this.alarmDismissMethod,
       endReason: endReason ?? this.endReason,
@@ -151,6 +176,10 @@ class SleepMonitorState {
       mode: SleepMonitoringMode.fromWire(map['monitor_mode']),
       missionStatus: SleepMissionStatus.fromWire(map['mission_status']),
       alarmRinging: map['alarm_ringing'] as bool? ?? false,
+      alarmSnoozing: map['alarm_snoozing'] as bool? ?? false,
+      alarmState: map['alarm_state'] as String?,
+      snoozeCount: (map['snooze_count'] as num?)?.toInt() ?? 0,
+      maxSnoozes: (map['max_snoozes'] as num?)?.toInt() ?? 0,
       emergencyTaps: (map['emergency_taps'] as num?)?.toInt() ?? 0,
       alarmDismissMethod: map['alarm_dismiss_method'] as String?,
       endReason: map['end_reason'] as String?,

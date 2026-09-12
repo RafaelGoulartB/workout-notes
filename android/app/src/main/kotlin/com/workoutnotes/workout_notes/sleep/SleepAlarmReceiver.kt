@@ -13,7 +13,7 @@ class SleepAlarmReceiver : BroadcastReceiver() {
             SleepAlarmScheduler.EXTRA_ALARM_AT,
             System.currentTimeMillis(),
         )
-        SleepAlarmScheduler.markFired(context)
+        if (!SleepAlarmScheduler.markFired(context, alarmAt)) return
         SleepMonitoringService.stopCurrent("alarm")
 
         val ringing = Intent(context, SleepAlarmRingingService::class.java).apply {

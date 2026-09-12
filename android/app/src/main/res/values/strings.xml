@@ -7,6 +7,8 @@
     <string name="sleep_alarm_good_morning">Good morning</string>
     <string name="sleep_alarm_wake_message">Your monitored night is complete.</string>
     <string name="sleep_alarm_dismiss">Dismiss</string>
+    <string name="sleep_alarm_snooze">Snooze</string>
+    <string name="sleep_alarm_snooze_detail">Snooze (5 min)</string>
     <string name="sleep_alarm_mission_notification_body">Scan the registered barcode or use the emergency action.</string>
     <string name="sleep_alarm_mission_body">Scan the registered barcode to dismiss this alarm.</string>
     <string name="sleep_alarm_open_mission">Open mission</string>
@@ -27,4 +29,16 @@
     <string name="barcode_scanner_flashlight_off">Turn off flashlight</string>
     <string name="barcode_scanner_cancel">Cancel</string>
     <string name="barcode_scanner_time_left">%1$d s remaining</string>
+    <string name="traditional_alarm_channel_name">Alarms</string>
+    <string name="traditional_alarm_channel_description">Wake-up alarms</string>
+    <string name="traditional_alarm_notification_title">Alarm</string>
+    <string name="traditional_alarm_wake_title">Time to wake up</string>
+    <string name="traditional_alarm_ringing_body">Your alarm is ringing.</string>
+    <string name="traditional_alarm_mission_body">Complete the mission to dismiss this alarm.</string>
+    <string name="traditional_alarm_open_mission">Open mission</string>
+    <string name="traditional_alarm_dismiss">Dismiss</string>
+    <string name="traditional_alarm_snooze">Snooze</string>
+    <string name="traditional_alarm_snooze_detail">Snooze for %1$d min (%2$d/%3$d)</string>
+    <string name="traditional_alarm_mission_cancelled">Mission not completed. Scan the code to dismiss the alarm.</string>
+    <string name="traditional_alarm_mission_wrong_code">That code does not match. Try again.</string>
 </resources>

@@ -7,6 +7,8 @@
     <string name="sleep_alarm_good_morning">Bom dia</string>
     <string name="sleep_alarm_wake_message">Sua noite monitorada foi concluída.</string>
     <string name="sleep_alarm_dismiss">Desligar</string>
+    <string name="sleep_alarm_snooze">Sonecar</string>
+    <string name="sleep_alarm_snooze_detail">Sonecar (5 min)</string>
     <string name="sleep_alarm_mission_notification_body">Leia o código cadastrado ou use a ação de emergência.</string>
     <string name="sleep_alarm_mission_body">Leia o código cadastrado para desligar este alarme.</string>
     <string name="sleep_alarm_open_mission">Abrir missão</string>
@@ -27,4 +29,16 @@
     <string name="sleep_alarm_emergency_tap_button">Toque para cumprir</string>
     <string name="sleep_alarm_emergency_time_left">Restam %1$d s</string>
     <string name="sleep_alarm_emergency_cancel_hint">Se o tempo acabar, o alarme voltar&#225; a tocar.</string>
+    <string name="traditional_alarm_channel_name">Alarmes</string>
+    <string name="traditional_alarm_channel_description">Alarmes para despertar</string>
+    <string name="traditional_alarm_notification_title">Alarme</string>
+    <string name="traditional_alarm_wake_title">Hora de acordar</string>
+    <string name="traditional_alarm_ringing_body">Seu alarme está tocando.</string>
+    <string name="traditional_alarm_mission_body">Conclua a missão para desligar este alarme.</string>
+    <string name="traditional_alarm_open_mission">Abrir missão</string>
+    <string name="traditional_alarm_dismiss">Desligar</string>
+    <string name="traditional_alarm_snooze">Sonecar</string>
+    <string name="traditional_alarm_snooze_detail">Sonecar por %1$d min (%2$d/%3$d)</string>
+    <string name="traditional_alarm_mission_cancelled">Missão não concluída. Leia o código para desligar o alarme.</string>
+    <string name="traditional_alarm_mission_wrong_code">O código não confere. Tente novamente.</string>
 </resources>

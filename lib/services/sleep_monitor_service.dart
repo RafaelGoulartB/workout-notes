@@ -6,6 +6,10 @@ import 'package:flutter/services.dart';
 import '../models/sleep_monitor_state.dart';
 import '../models/sleep_monitor_mode.dart';
 import '../repositories/sleep_monitor_repository.dart';
+import 'package:workout_notes/models/sleep_monitor_segment.dart';
+import 'package:workout_notes/models/sleep_monitor_session.dart';
+import 'package:workout_notes/services/sleep_wake_engine.dart';
+import 'package:workout_notes/services/sleep_diagnostic_store.dart';
 
 /// Flutter facade for the Android foreground sleep monitor.
 ///
@@ -28,6 +32,11 @@ class SleepMonitorService extends ChangeNotifier {
   bool _initialized = false;
   bool _recovering = false;
   int _recoveredCount = 0;
+  SleepWakeCursor? _liveCursor;
+  DateTime? _lastLiveSegment;
+  SleepWakeDecision? _liveDecision;
+  SleepWakeDecision? get liveDecision => _liveDecision;
+  String? _restoredLiveSession;
 
   SleepMonitorState get state => _state;
   bool get isSupported => _state.supported;
@@ -94,6 +103,8 @@ class SleepMonitorService extends ChangeNotifier {
       final result = await methods.invokeMapMethod<String, dynamic>('getState');
       if (result != null) {
         _state = SleepMonitorState.fromMap(result);
+        await _restoreLiveState();
+        _updateLiveState(_state.latestSegment);
         notifyListeners();
       }
     } on MissingPluginException {
@@ -242,6 +253,46 @@ class SleepMonitorService extends ChangeNotifier {
     }
   }
 
+  Future<bool> openSnoozedAlarmMission() async {
+    if (!_isAndroid ||
+        !_state.isAlarmSnoozing ||
+        !_state.mode.requiresMission) {
+      return false;
+    }
+    try {
+      final result = await methods.invokeMapMethod<String, dynamic>(
+        'openSnoozedAlarmMission',
+      );
+      if (result != null) _onEvent(result);
+      return _state.alarmRinging;
+    } on PlatformException catch (error) {
+      _setError(error.code, error.message ?? error.toString());
+      return false;
+    } catch (error) {
+      _setError('alarm_resume_failed', error.toString());
+      return false;
+    }
+  }
+
+  Future<bool> dismissSnoozedAlarm() async {
+    if (!_isAndroid || !_state.isAlarmSnoozing || _state.mode.requiresMission) {
+      return false;
+    }
+    try {
+      final result = await methods.invokeMapMethod<String, dynamic>(
+        'dismissSnoozedAlarm',
+      );
+      if (result != null) _onEvent(result);
+      return _state.alarmDismissed;
+    } on PlatformException catch (error) {
+      _setError(error.code, error.message ?? error.toString());
+      return false;
+    } catch (error) {
+      _setError('alarm_dismiss_failed', error.toString());
+      return false;
+    }
+  }
+
   Future<Map<String, dynamic>?> scanBarcodeForMission() async {
     if (!_isAndroid) return null;
     try {
@@ -353,12 +404,50 @@ class SleepMonitorService extends ChangeNotifier {
                       id,
                     ) ??
                     listed;
-          await _repository.importNativeSpool(spool);
+          final importedSession = await _repository.importNativeSpool(spool);
+          try {
+            await SleepDiagnosticStore().save(
+              spool,
+              resultSummary: importedSession.toMap(),
+            );
+          } catch (_) {
+            _setError('diagnostic_save_failed', 'diagnostic_save_failed');
+          }
           await methods.invokeMethod<void>('deleteSpool', id);
           imported++;
         } catch (error) {
           _setError('import_failed', error.toString());
           // The native spool remains available for the next attempt.
+        }
+      }
+      // Reanalysis runs only while the user is outside an active recording.
+      // Read bounded opt-in archives; never recreate deleted/complete entries.
+      if (!current.isActive) {
+        final store = SleepDiagnosticStore();
+        final candidates = await store.isEnabled()
+            ? await _repository.getUnestimatedSessions()
+            : const <SleepMonitorSession>[];
+        for (final session in candidates) {
+          if (_state.isActive) break;
+          if (!{
+            'sleep-wake-bedside-v1',
+            'sleep-wake-bedside-v2',
+            'sleep-wake-bedside-v3',
+          }.contains(session.stageAlgorithmVersion)) {
+            continue;
+          }
+          try {
+            final archive = await store.readSession(session.id);
+            if (archive == null) continue;
+            if (_state.isActive) break;
+            final repaired = await _repository.reprocessDiagnostic(archive);
+            if (repaired != null) {
+              imported++;
+              await store.save(archive, resultSummary: repaired.toMap());
+            }
+          } catch (error) {
+            _setError('import_failed', error.toString());
+          }
         }
       }
       if (imported > 0) {
@@ -378,6 +467,7 @@ class SleepMonitorService extends ChangeNotifier {
     try {
       final map = Map<String, dynamic>.from(event);
       _state = SleepMonitorState.fromMap(map);
+      _updateLiveState(_state.latestSegment);
       if (map['alarm_dismissed'] == true &&
           map['session_id'] is String &&
           map['alarm_dismiss_method'] is String) {
@@ -392,6 +482,63 @@ class SleepMonitorService extends ChangeNotifier {
       notifyListeners();
     } catch (error) {
       _setError('event_invalid', error.toString());
+    }
+  }
+
+  void _updateLiveState(SleepMonitorSegment? segment) {
+    if (!_state.isActive ||
+        segment == null ||
+        segment.sessionId != _state.sessionId ||
+        segment.audioSampleRate == null) {
+      _liveCursor = null;
+      _lastLiveSegment = null;
+      _liveDecision = null;
+      return;
+    }
+    if (_liveCursor?.sessionId != segment.sessionId) {
+      _liveCursor = SleepWakeCursor(sessionId: segment.sessionId);
+      _lastLiveSegment = null;
+    }
+    if (_lastLiveSegment != null &&
+        !segment.startedAt.isAfter(_lastLiveSegment!)) {
+      return;
+    }
+    _liveDecision = _liveCursor!.add(segment);
+    _lastLiveSegment = segment.startedAt;
+  }
+
+  Future<void> _restoreLiveState() async {
+    final id = _state.sessionId;
+    if (!_isAndroid ||
+        !_state.isActive ||
+        id == null ||
+        _restoredLiveSession == id) {
+      return;
+    }
+    _restoredLiveSession = id;
+    try {
+      // Once on opening the session; no polling, background isolate or raw audio.
+      final spool = await methods.invokeMapMethod<String, dynamic>(
+        'readSession',
+        id,
+      );
+      if (_state.sessionId != id || !_state.isActive) return;
+      final segments =
+          (spool?['segments'] as List? ?? const [])
+              .whereType<Map>()
+              .map(
+                (s) =>
+                    SleepMonitorSegment.fromMap(Map<String, dynamic>.from(s)),
+              )
+              .toList()
+            ..sort((a, b) => a.startedAt.compareTo(b.startedAt));
+      _liveCursor = null;
+      _lastLiveSegment = null;
+      for (final segment in segments) {
+        _updateLiveState(segment);
+      }
+    } catch (_) {
+      _restoredLiveSession = null;
     }
   }
 

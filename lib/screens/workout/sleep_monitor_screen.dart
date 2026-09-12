@@ -6,6 +6,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_mode.dart';
 import 'package:workout_notes/models/sleep_monitor_state.dart';
+import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/services/notification_service.dart';
 import 'package:workout_notes/services/sleep_mission_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
@@ -49,8 +50,13 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     WidgetsBinding.instance.addObserver(this);
     _service.addListener(_onChanged);
     _initialize();
+    _startTicker();
+  }
+
+  void _startTicker() {
+    _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (mounted && _service.state.isActive) setState(() {});
     });
   }
 
@@ -64,6 +70,12 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startTicker();
+    } else {
+      _ticker?.cancel();
+      _ticker = null;
+    }
     if (state == AppLifecycleState.resumed && _service.isSupported) {
       _reloadMission();
       _service.initialize().then((_) => _service.getAlarmCapabilities());
@@ -167,7 +179,8 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     }
 
     final active = state.isActive;
-    final alarmAt = active && state.alarmAt != null
+    final snoozing = state.isAlarmSnoozing;
+    final alarmAt = (active || snoozing) && state.alarmAt != null
         ? state.alarmAt!.toLocal()
         : _selectedMode.hasAlarm
         ? SleepAlarmTime.nextOccurrence(_selectedTime)
@@ -185,7 +198,9 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
                   16,
                   28,
                 ),
-                children: active
+                children: snoozing
+                    ? _snoozingContent(loc, state, alarmAt)
+                    : active
                     ? _runningContent(loc, state, alarmAt)
                     : _readyContent(loc, state, alarmAt),
               ),
@@ -196,7 +211,21 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
               minimum: const EdgeInsets.fromLTRB(16, 10, 16, 12),
               child: SizedBox(
                 height: 56,
-                child: active
+                child: snoozing
+                    ? FilledButton.icon(
+                        onPressed: _isBusy ? null : _handleSnoozedAlarm,
+                        icon: _busyIcon(
+                          state.mode.requiresMission
+                              ? Icons.qr_code_scanner_rounded
+                              : Icons.alarm_off_rounded,
+                        ),
+                        label: Text(
+                          state.mode.requiresMission
+                              ? loc.alarmOpenMissionNow
+                              : loc.alarmDismissSnooze,
+                        ),
+                      )
+                    : active
                     ? FilledButton.icon(
                         onPressed: _isBusy ? null : _stop,
                         icon: _busyIcon(Icons.stop_rounded),
@@ -309,6 +338,75 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     ];
   }
 
+  List<Widget> _snoozingContent(
+    AppLocalizations loc,
+    SleepMonitorState state,
+    DateTime? alarmAt,
+  ) {
+    final maximum = state.maxSnoozes <= 0 ? 1 : state.maxSnoozes;
+    final progress = (state.snoozeCount / maximum).clamp(0.0, 1.0).toDouble();
+    return [
+      _NightHero(
+        icon: Icons.snooze_rounded,
+        title: loc.sleepMonitorAlarmSnoozingTitle,
+        subtitle: alarmAt == null
+            ? loc.sleepAlarmSectionTitle
+            : loc.alarmSnoozingUntil(_formatTime(alarmAt)),
+      ),
+      const SizedBox(height: 16),
+      Card(
+        key: const Key('sleep-monitor-snoozing-card'),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    state.mode.requiresMission
+                        ? Icons.qr_code_scanner_rounded
+                        : Icons.alarm_off_rounded,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      state.mode.requiresMission
+                          ? loc.sleepMonitorMissionPending
+                          : loc.sleepMonitorAlarmSnoozingTitle,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              LinearProgressIndicator(value: progress),
+              const SizedBox(height: 8),
+              Text(
+                loc.alarmSnoozeProgress(state.snoozeCount, state.maxSnoozes),
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                state.mode.requiresMission
+                    ? loc.sleepMonitorSnoozingMissionBody
+                    : loc.sleepMonitorSnoozingDismissBody,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      ),
+      if (state.errorCode != null) ...[
+        const SizedBox(height: 14),
+        Text(
+          _localizedError(loc, state.errorCode),
+          style: TextStyle(color: Theme.of(context).colorScheme.error),
+        ),
+      ],
+    ];
+  }
+
   List<Widget> _runningContent(
     AppLocalizations loc,
     SleepMonitorState state,
@@ -394,6 +492,15 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
                 noiseScore: state.currentNoiseScore,
                 loc: loc,
               ),
+              if (_service.liveDecision != null) ...[
+                const SizedBox(height: 8),
+                Text(switch (_service.liveDecision!.epoch.stage) {
+                  SleepStageType.awake => loc.sleepLiveProbablyAwake,
+                  SleepStageType.sleeping ||
+                  SleepStageType.deep => loc.sleepLiveProbablyAsleep,
+                  SleepStageType.unknown => loc.sleepLiveUncertain,
+                }),
+              ],
             ],
           ),
         ),
@@ -422,6 +529,20 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         ),
       ],
     ];
+  }
+
+  Future<void> _handleSnoozedAlarm() async {
+    if (_isBusy) return;
+    setState(() => _isBusy = true);
+    final state = _service.state;
+    final succeeded = state.mode.requiresMission
+        ? await _service.openSnoozedAlarmMission()
+        : await _service.dismissSnoozedAlarm();
+    if (!succeeded && mounted) {
+      _showMessage(AppLocalizations.of(context)!.alarmSnoozeActionError);
+      await _service.getState();
+    }
+    if (mounted) setState(() => _isBusy = false);
   }
 
   Widget _busyIcon(IconData fallback) => _isBusy
@@ -580,6 +701,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   }
 
   String _localizedError(AppLocalizations loc, String? code) {
+    if (code == 'diagnostic_save_failed') return loc.sleepDiagnosticError;
     switch (code) {
       case 'microphone_permission':
       case 'microphone_denied':
