@@ -1,5 +1,7 @@
 Correção da estimativa de sono na cabeceira — 06/09/2026
 
+Atualização de 09/09/2026: o diagnóstico real revelou falhas adicionais no v2, corrigidas no v3. Consulte [a análise de áudio quantizado e a recuperação de noites](sleep-quantized-audio-fix.md). A descrição abaixo registra a correção anterior.
+
 O usuário relatou duas noites com o alerta de estimativa incompleta após a entrega anterior. Os diagnósticos estavam desativados, portanto os agregados dessas noites não estão disponíveis para reprodução ou recuperação. A correção trata uma regressão reproduzível no código; não permite afirmar que foi a única causa no aparelho.
 
 O motor `sleep-wake-bedside-v1` exigia dez minutos consecutivos de áudio periódico compatível com respiração. Áudio válido e quieto, sem essa periodicidade, não confirmava sono e fazia uma classificação anterior expirar em dois minutos. Como o repositório não publica totais com mais de 20% de tempo indeterminado, uma noite quieta inteira podia ser coletada e terminar sem entrada no histórico. Os testes anteriores exigiam esse resultado, sem verificar a utilidade de uma noite típica na cabeceira.

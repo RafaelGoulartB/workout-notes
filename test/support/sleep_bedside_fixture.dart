@@ -1,7 +1,37 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 
 final bedsideStart = DateTime.utc(2026, 9, 1, 22);
+
+List<SleepMonitorSegment> quantizedBedsideSegments({
+  String fileName = 'sleep_quantized_bedside.json',
+}) {
+  final fixture =
+      jsonDecode(File('test/fixtures/$fileName').readAsStringSync())
+          as Map<String, dynamic>;
+  final columns = (fixture['columns'] as List).cast<String>();
+  return [
+    for (final (index, row) in (fixture['rows'] as List).indexed)
+      SleepMonitorSegment.fromMap({
+        for (var i = 1; i < columns.length; i++) columns[i]: row[i],
+        'id': 'recorded-$index',
+        'session_id': 'bedside',
+        'started_at': bedsideStart
+            .add(Duration(seconds: row[0] as int))
+            .toIso8601String(),
+      }),
+  ];
+}
+
+SleepMonitorSegment sustainedBedsideActivity(int index) =>
+    SleepMonitorSegment.fromMap({
+      ...bedsideSegment(index, activity: true).toMap(),
+      'noise_active_seconds': 30.0,
+      'audio_level_stddev_db': 5.0,
+    });
 
 SleepMonitorSession bedsideSession({
   int minutes = 60,

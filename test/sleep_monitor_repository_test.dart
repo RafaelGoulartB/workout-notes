@@ -49,7 +49,7 @@ void main() {
         ],
       });
       expect(imported.estimatedSleepMinutes, greaterThan(45));
-      expect(imported.stageAlgorithmVersion, 'sleep-wake-bedside-v2');
+      expect(imported.stageAlgorithmVersion, 'sleep-wake-bedside-v4');
       expect(imported.finalWakeAt, isNull);
       expect(imported.deepSleepMinutes, isNull);
       expect(imported.sleepEntryId, isNotNull);
@@ -72,6 +72,120 @@ void main() {
         expect(await repository.getUnestimatedSessions(), hasLength(1));
         expect(await database.query('sleep_entries'), isEmpty);
       }
+    },
+  );
+
+  test(
+    'recorded quantized bedside audio produces an entry instead of incomplete alert',
+    () async {
+      final spool = <String, dynamic>{
+        'session': bedsideSession(minutes: 425).toMap(),
+        'segments': quantizedBedsideSegments().map((s) => s.toMap()).toList(),
+      };
+      final result = await repository.importNativeSpool(spool);
+      expect(result.estimatedSleepMinutes, greaterThan(0));
+      expect(result.estimatedSleepMinutes, lessThan(425));
+      expect(result.unknownMinutes, lessThan(85));
+      expect(result.sleepEntryId, isNotNull);
+      expect(await repository.getUnestimatedSessions(), isEmpty);
+      await repository.importNativeSpool(spool);
+      expect(await database.query('sleep_entries'), hasLength(1));
+    },
+  );
+
+  test(
+    'archive repairs an existing incomplete night once and keeps alarm metadata',
+    () async {
+      final oldSession = bedsideSession(minutes: 425).copyWith(
+        stageAlgorithmVersion: 'sleep-wake-bedside-v2',
+        unknownMinutes: 386,
+      );
+      await database.insert('sleep_monitor_sessions', oldSession.toMap());
+      final archive = <String, dynamic>{
+        'session': oldSession.toMap(),
+        'segments': quantizedBedsideSegments().map((s) => s.toMap()).toList(),
+      };
+      final dismissedAt = oldSession.endedAt!.add(const Duration(minutes: 15));
+      await repository.markAlarmDismissed(
+        oldSession.id,
+        'barcode',
+        dismissedAt,
+      );
+      final result = await repository.reprocessDiagnostic(archive);
+      expect(result!.estimatedSleepMinutes, greaterThan(0));
+      expect(result.stageAlgorithmVersion, 'sleep-wake-bedside-v4');
+      expect(result.alarmDismissedAt, dismissedAt);
+      expect(await repository.reprocessDiagnostic(archive), isNull);
+      expect(await database.query('sleep_entries'), hasLength(1));
+      await repository.deleteSession(oldSession.id);
+      expect(await repository.reprocessDiagnostic(archive), isNull);
+      expect(await repository.getSession(oldSession.id), isNull);
+    },
+  );
+
+  test(
+    'reanalysis transaction cannot recreate a concurrently deleted session',
+    () async {
+      await expectLater(
+        repository.importNativeSpool({
+          'session': bedsideSession().toMap(),
+          'segments': [for (var i = 0; i < 120; i++) bedsideSegment(i).toMap()],
+        }, expectedStageVersion: 'sleep-wake-bedside-v2'),
+        throwsStateError,
+      );
+      expect(await database.query('sleep_monitor_sessions'), isEmpty);
+      expect(await database.query('sleep_entries'), isEmpty);
+    },
+  );
+
+  test(
+    'archive recovery preserves a manual entry added after the failed night',
+    () async {
+      final old = bedsideSession(
+        minutes: 425,
+      ).copyWith(stageAlgorithmVersion: 'sleep-wake-bedside-v2');
+      await database.insert('sleep_monitor_sessions', old.toMap());
+      await database.insert('sleep_entries', {
+        'id': 'manual',
+        'date': '2026-09-02',
+        'sleep_minutes': 360,
+        'actual_sleep_minutes': 355,
+        'source': 'manual',
+        'comment': 'My correction',
+        'created_at': bedsideStart.toIso8601String(),
+      });
+      final before = await database.query('sleep_entries');
+      final repaired = await repository.reprocessDiagnostic({
+        'session': old.toMap(),
+        'segments': quantizedBedsideSegments().map((s) => s.toMap()).toList(),
+      });
+      expect(repaired!.sleepEntryId, 'manual');
+      expect(await database.query('sleep_entries'), before);
+    },
+  );
+
+  test(
+    'v3 incomplete night is reprocessed from its archive and saved once',
+    () async {
+      final old = bedsideSession(minutes: 369).copyWith(
+        stageAlgorithmVersion: 'sleep-wake-bedside-v3',
+        unknownMinutes: 114,
+        sleepingMinutes: 228,
+      );
+      await database.insert('sleep_monitor_sessions', old.toMap());
+      final archive = <String, dynamic>{
+        'session': old.toMap(),
+        'segments': quantizedBedsideSegments(
+          fileName: 'sleep_ambiguous_bedside.json',
+        ).map((s) => s.toMap()).toList(),
+      };
+      final repaired = await repository.reprocessDiagnostic(archive);
+      expect(repaired!.stageAlgorithmVersion, 'sleep-wake-bedside-v4');
+      expect(repaired.estimatedSleepMinutes, isNotNull);
+      expect(repaired.unknownMinutes, lessThan(369 * 0.2));
+      expect(await repository.getUnestimatedSessions(), isEmpty);
+      expect(await repository.reprocessDiagnostic(archive), isNull);
+      expect(await database.query('sleep_entries'), hasLength(1));
     },
   );
 

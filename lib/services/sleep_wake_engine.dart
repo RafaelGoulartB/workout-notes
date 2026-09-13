@@ -11,7 +11,7 @@ import 'package:workout_notes/services/sleep_stage_engine.dart'
 /// Scores are evidence strength, not calibrated physiological probabilities.
 /// No clock-of-night, terminal wake rule, deep-sleep prior or motion reward.
 class SleepWakeEngine {
-  static const algorithmVersion = 'sleep-wake-bedside-v2';
+  static const algorithmVersion = 'sleep-wake-bedside-v4';
   static const source = 'bedside_heuristic';
   static const sleepConfirmationSeconds = 10 * 60;
   static const quietConfirmationSeconds = 20 * 60;
@@ -22,11 +22,13 @@ class SleepWakeEngine {
     'quiet_confirmation_seconds': quietConfirmationSeconds,
     'wake_confirmation_seconds': wakeConfirmationSeconds,
     'evidence_hold_seconds': evidenceHoldSeconds,
+    'maximum_context_age_seconds': quietConfirmationSeconds,
     'minimum_valid_fraction': 0.8,
+    'maximum_zero_sample_fraction': 0.98,
     'minimum_regularity': 0.45,
     'minimum_rate_hz': 0.15,
     'maximum_rate_hz': 0.65,
-    'maximum_sleep_noise': 6,
+    'maximum_quiet_active_fraction': 0.1,
     'minimum_wake_noise': 10,
     'minimum_wake_active_fraction': 0.1,
     'stationary_active_fraction': 0.8,
@@ -140,9 +142,10 @@ class SleepWakeCursor {
   final String sessionId;
   DateTime? _expectedStart;
   SleepStageType _state = SleepStageType.unknown;
+  SleepStageType _confirmedState = SleepStageType.unknown;
   int _sleepSeconds = 0;
   int _quietSeconds = 0;
-  int _wakeSeconds = 0;
+  double _wakeSeconds = 0;
   int _uncertainSeconds = 0;
 
   SleepWakeCursor({required this.sessionId});
@@ -150,7 +153,9 @@ class SleepWakeCursor {
   void reset() {
     _expectedStart = null;
     _state = SleepStageType.unknown;
-    _sleepSeconds = _quietSeconds = _wakeSeconds = _uncertainSeconds = 0;
+    _confirmedState = SleepStageType.unknown;
+    _sleepSeconds = _quietSeconds = _uncertainSeconds = 0;
+    _wakeSeconds = 0;
   }
 
   SleepStageEpoch unknown(DateTime start, int seconds) =>
@@ -182,7 +187,15 @@ class SleepWakeCursor {
         segment.validFraction >= 0.8 &&
         segment.validFraction <= 1 &&
         segment.audioCalibrated != false &&
-        (segment.digitalSilenceFraction ?? 0) < 0.2 &&
+        // This measures individual zero-valued PCM samples, not time without
+        // capture. Quiet, quantized 16-bit audio can contain many valid zeros.
+        // Reject near-total digital silence; require real spectral energy too.
+        (segment.digitalSilenceFraction == null ||
+            (segment.digitalSilenceFraction!.isFinite &&
+                segment.digitalSilenceFraction! >= 0 &&
+                segment.digitalSilenceFraction! <
+                    SleepWakeEngine
+                        .parameters['maximum_zero_sample_fraction']!)) &&
         noise != null &&
         noise.isFinite &&
         noise >= 0 &&
@@ -207,11 +220,11 @@ class SleepWakeCursor {
     // This is evidence from a valid recording, not missing audio or lack of
     // phone motion. A bedside microphone need not resolve periodic breathing.
     final quietEvidence =
-        noise < 6 &&
         activity != null &&
         activity.isFinite &&
         activity >= 0 &&
-        activity / seconds < 0.1;
+        activity / seconds <
+            SleepWakeEngine.parameters['maximum_quiet_active_fraction']!;
     final sleepEvidence =
         quietEvidence &&
         regularity != null &&
@@ -240,7 +253,9 @@ class SleepWakeCursor {
     String reason;
     double strength;
     if (wakeEvidence) {
-      _wakeSeconds += seconds;
+      // Accumulate actual noisy duration, not the entire aggregate window.
+      // Six seconds of sound across a minute must not count as a minute awake.
+      _wakeSeconds += activity.clamp(0, seconds);
       // A single short sound reduces pending support; only sustained activity
       // restarts confirmation. This avoids a full reset for every bed turn.
       _sleepSeconds = (_sleepSeconds - seconds).clamp(
@@ -251,9 +266,12 @@ class SleepWakeCursor {
         0,
         SleepWakeEngine.quietConfirmationSeconds,
       );
-      _uncertainSeconds += seconds;
+      _uncertainSeconds = _state == SleepStageType.awake
+          ? 0
+          : _uncertainSeconds + activity.clamp(0, seconds).ceil();
       if (_wakeSeconds >= SleepWakeEngine.wakeConfirmationSeconds) {
         _state = SleepStageType.awake;
+        _confirmedState = _state;
         _sleepSeconds = _quietSeconds = 0;
         _uncertainSeconds = 0;
       }
@@ -262,6 +280,10 @@ class SleepWakeCursor {
           : 'activity_pending';
       strength = _state == SleepStageType.awake ? 0.6 : 0.3;
     } else if (quietEvidence) {
+      // Neutral audio may suspend a label, but it is not a confirmed state
+      // change. Once usable quiet evidence returns, resume the last confirmed
+      // state. Actual gaps/invalid capture reset that context in reset().
+      if (_state == SleepStageType.unknown) _state = _confirmedState;
       _quietSeconds = (_quietSeconds + seconds).clamp(
         0,
         SleepWakeEngine.quietConfirmationSeconds,
@@ -273,13 +295,13 @@ class SleepWakeCursor {
             )
           : 0;
       _wakeSeconds = 0;
-      // During a transition, do not indefinitely retain the previous wake state.
-      _uncertainSeconds = _state == SleepStageType.sleeping
-          ? 0
-          : _uncertainSeconds + seconds;
+      // A pending transition with usable quiet audio is not missing evidence.
+      // Keep the last confirmed state until confirmation or ambiguous capture.
+      _uncertainSeconds = 0;
       if (_sleepSeconds >= SleepWakeEngine.sleepConfirmationSeconds ||
           _quietSeconds >= SleepWakeEngine.quietConfirmationSeconds) {
         _state = SleepStageType.sleeping;
+        _confirmedState = _state;
         _uncertainSeconds = 0;
       }
       reason = _state == SleepStageType.sleeping
@@ -291,7 +313,8 @@ class SleepWakeCursor {
           ? (sleepEvidence ? 0.6 : 0.4)
           : 0.3;
     } else {
-      _wakeSeconds = _sleepSeconds = 0;
+      _wakeSeconds = 0;
+      _sleepSeconds = 0;
       _quietSeconds = (_quietSeconds - seconds).clamp(
         0,
         SleepWakeEngine.quietConfirmationSeconds,
@@ -302,6 +325,10 @@ class SleepWakeCursor {
     }
     if (_uncertainSeconds > SleepWakeEngine.evidenceHoldSeconds) {
       _state = SleepStageType.unknown;
+    }
+    // Do not revive a state across a prolonged stretch of ambiguous audio.
+    if (_uncertainSeconds >= SleepWakeEngine.quietConfirmationSeconds) {
+      _confirmedState = SleepStageType.unknown;
     }
     if (_state == SleepStageType.unknown) strength = 0;
     return SleepWakeDecision(

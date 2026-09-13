@@ -7,6 +7,7 @@ import '../models/sleep_monitor_state.dart';
 import '../models/sleep_monitor_mode.dart';
 import '../repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
+import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
 import 'package:workout_notes/services/sleep_diagnostic_store.dart';
 
@@ -417,6 +418,36 @@ class SleepMonitorService extends ChangeNotifier {
         } catch (error) {
           _setError('import_failed', error.toString());
           // The native spool remains available for the next attempt.
+        }
+      }
+      // Reanalysis runs only while the user is outside an active recording.
+      // Read bounded opt-in archives; never recreate deleted/complete entries.
+      if (!current.isActive) {
+        final store = SleepDiagnosticStore();
+        final candidates = await store.isEnabled()
+            ? await _repository.getUnestimatedSessions()
+            : const <SleepMonitorSession>[];
+        for (final session in candidates) {
+          if (_state.isActive) break;
+          if (!{
+            'sleep-wake-bedside-v1',
+            'sleep-wake-bedside-v2',
+            'sleep-wake-bedside-v3',
+          }.contains(session.stageAlgorithmVersion)) {
+            continue;
+          }
+          try {
+            final archive = await store.readSession(session.id);
+            if (archive == null) continue;
+            if (_state.isActive) break;
+            final repaired = await _repository.reprocessDiagnostic(archive);
+            if (repaired != null) {
+              imported++;
+              await store.save(archive, resultSummary: repaired.toMap());
+            }
+          } catch (error) {
+            _setError('import_failed', error.toString());
+          }
         }
       }
       if (imported > 0) {

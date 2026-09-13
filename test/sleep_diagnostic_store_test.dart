@@ -15,6 +15,27 @@ void main() {
     await root.delete(recursive: true);
   });
   test(
+    'recovery reads only opted-in matching archives within retention',
+    () async {
+      expect(await store.readSession('night'), isNull);
+      await store.setEnabled(true);
+      await store.save({
+        'session': {'id': 'night'},
+        'segments': [],
+      });
+      expect((await store.readSession('night'))!['session']['id'], 'night');
+      expect(await store.readSession('../night'), isNull);
+      expect(await store.readSession('missing'), isNull);
+      final file = File('${root.path}/night.json');
+      await file.setLastModified(
+        DateTime.now().subtract(const Duration(days: 15)),
+      );
+      expect(await store.readSession('night'), isNull);
+      await store.setEnabled(false);
+      expect(await store.readSession('night'), isNull);
+    },
+  );
+  test(
     'disabled by default; only aggregates persist; disable removes archive',
     () async {
       final spool = {

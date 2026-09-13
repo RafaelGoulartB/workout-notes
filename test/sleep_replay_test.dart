@@ -37,8 +37,8 @@ void main() {
     'evaluates full wake intervals including the end of a night by duration',
     () {
       final cursor = SleepWakeCursor(sessionId: 'bedside');
-      cursor.add(bedsideSegment(0, activity: true));
-      final awake = cursor.add(bedsideSegment(1, activity: true)).epoch;
+      cursor.add(sustainedBedsideActivity(0));
+      final awake = cursor.add(sustainedBedsideActivity(1)).epoch;
       expect(awake.stage, SleepStageType.awake);
       final result = evaluateLabels(
         [awake],

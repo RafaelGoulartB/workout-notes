@@ -122,4 +122,31 @@ class SleepDiagnosticStore {
     dated.sort((a, b) => b.$2.compareTo(a.$2));
     return dated.firstOrNull?.$1;
   }
+
+  /// Reads only an opted-in archive for an existing database session.
+  Future<Map<String, dynamic>?> readSession(String id) async {
+    if (!await isEnabled() || !RegExp(r'^[a-zA-Z0-9_-]{1,100}$').hasMatch(id)) {
+      return null;
+    }
+    final directory = await directoryProvider();
+    final file = File('${directory.path}/$id.json');
+    if (!await file.exists()) return null;
+    final stat = await file.stat();
+    if (stat.size > maxFileBytes ||
+        stat.modified.isBefore(
+          DateTime.now().subtract(const Duration(days: 14)),
+        )) {
+      return null;
+    }
+    final decoded = jsonDecode(await file.readAsString());
+    if (decoded is! Map<String, dynamic> ||
+        decoded['schema'] != 'sleep-aggregate-replay' ||
+        decoded['schema_version'] != 1 ||
+        decoded['session'] is! Map ||
+        decoded['session']['id'] != id ||
+        decoded['segments'] is! List) {
+      return null;
+    }
+    return decoded;
+  }
 }

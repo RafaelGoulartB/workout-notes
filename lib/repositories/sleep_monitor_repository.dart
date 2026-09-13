@@ -225,8 +225,9 @@ class SleepMonitorRepository extends BaseRepository {
   /// Imports a native spool atomically. Re-importing the same session replaces
   /// its aggregate rows and never creates a second sleep entry.
   Future<SleepMonitorSession> importNativeSpool(
-    Map<String, dynamic> spool,
-  ) async {
+    Map<String, dynamic> spool, {
+    String? expectedStageVersion,
+  }) async {
     final rawSession = Map<String, dynamic>.from(
       spool['session'] as Map? ?? spool,
     );
@@ -334,6 +335,18 @@ class SleepMonitorRepository extends BaseRepository {
 
     SleepMonitorSession? imported;
     await database.transaction((txn) async {
+      if (expectedStageVersion != null) {
+        final existing = await txn.query(
+          'sleep_monitor_sessions',
+          columns: ['id'],
+          where:
+              'id = ? AND stage_algorithm_version = ? AND sleep_entry_id IS NULL AND estimated_sleep_minutes IS NULL',
+          whereArgs: [recovered.id, expectedStageVersion],
+        );
+        if (existing.isEmpty) {
+          throw StateError('session_changed_during_reanalysis');
+        }
+      }
       final end = importedSession.endedAt ?? importedSession.startedAt;
       final endOffsetMinutes =
           importedSession.utcOffsetEndMinutes ??
@@ -382,7 +395,8 @@ class SleepMonitorRepository extends BaseRepository {
             createdAt: importedSession.createdAt,
           );
           await txn.insert('sleep_entries', entry.toMap());
-        } else {
+        } else if (expectedStageVersion == null) {
+          // Archived reanalysis preserves any entry created since that night.
           // A short test/recovery session must not replace a longer night
           // already recorded for the same local date.
           final existingDuration = entry.timeInBedMinutes ?? entry.sleepMinutes;
@@ -434,6 +448,40 @@ class SleepMonitorRepository extends BaseRepository {
       imported = session;
     });
     return imported!;
+  }
+
+  /// Repairs only incomplete v1/v2/v3 results that still have capture data.
+  /// Database metadata wins over the archive, including later alarm dismissal.
+  Future<SleepMonitorSession?> reprocessDiagnostic(
+    Map<String, dynamic> archive,
+  ) async {
+    final raw = archive['session'];
+    if (raw is! Map || raw['id'] is! String) return null;
+    final current = await getSession(raw['id'] as String);
+    if (current == null ||
+        current.sleepEntryId != null ||
+        current.estimatedSleepMinutes != null ||
+        !SleepWakeEngine.supports(current) ||
+        !{
+          SleepMonitorSession.completed,
+          SleepMonitorSession.interrupted,
+        }.contains(current.status) ||
+        !{
+          'sleep-wake-bedside-v1',
+          'sleep-wake-bedside-v2',
+          'sleep-wake-bedside-v3',
+        }.contains(current.stageAlgorithmVersion) ||
+        DateTime.tryParse(raw['started_at']?.toString() ?? '') !=
+            current.startedAt ||
+        DateTime.tryParse(raw['ended_at']?.toString() ?? '') !=
+            current.endedAt ||
+        archive['segments'] is! List) {
+      return null;
+    }
+    return importNativeSpool({
+      'session': {...raw, ...current.toMap()},
+      'segments': archive['segments'],
+    }, expectedStageVersion: current.stageAlgorithmVersion);
   }
 
   /// Backfills dashboard fields for entries imported by older app versions.
