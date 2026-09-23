@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
@@ -180,7 +180,9 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
           proteinG: suggestion.proteinG,
           carbsG: suggestion.carbsG,
           fatG: suggestion.fatG,
-          successMessage: AppLocalizations.of(context)!.nutritionSettingsGoalApplied,
+          successMessage: AppLocalizations.of(
+            context,
+          )!.nutritionSettingsGoalApplied,
         );
       },
     );
@@ -261,7 +263,8 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
       final goalKcal = (tdee != null && tdee > 0 && adjustmentPercent != null)
           ? tdee * (1 + adjustmentPercent / 100)
           : null;
-      final resolvedCarbs = (goalKcal != null && proteinG != null && fatG != null)
+      final resolvedCarbs =
+          (goalKcal != null && proteinG != null && fatG != null)
           ? ((goalKcal - proteinG * 4 - fatG * 9) / 4)
                 .clamp(0, double.infinity)
                 .roundToDouble()
@@ -385,9 +388,9 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     reordered.insert(target, item);
     setState(() => _mealTypes = reordered);
     try {
-      await widget.repository.reorderMealTypes(
-        [for (final t in reordered) t.id],
-      );
+      await widget.repository.reorderMealTypes([
+        for (final t in reordered) t.id,
+      ]);
     } catch (_) {
       await _loadMealTypes();
     }
@@ -439,11 +442,8 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (ctx) => _NumberEditorSheet(
-        title: title,
-        unit: unit,
-        initial: initial,
-      ),
+      builder: (ctx) =>
+          _NumberEditorSheet(title: title, unit: unit, initial: initial),
     );
   }
 
@@ -469,6 +469,9 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
                 _GoalPreviewCard(
+                  label: _effective.fromPlan
+                      ? loc.nutritionSettingsBasePreviewLabel
+                      : loc.nutritionSettingsPreviewLabel,
                   tdee: _current?.tdee,
                   adjustmentKind: _current?.adjustmentKind,
                   adjustmentPercent: _current?.adjustmentPercent,
@@ -609,7 +612,8 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                           type: _mealTypes[i],
                           onTap: () => _openMealActions(_mealTypes[i], i),
                         ),
-                        if (i < _mealTypes.length - 1) const SettingsCardDivider(),
+                        if (i < _mealTypes.length - 1)
+                          const SettingsCardDivider(),
                       ],
                     if (_mealTypes.isNotEmpty) const SettingsCardDivider(),
                     SettingsLinkTile(
@@ -621,7 +625,9 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
                   ],
                 ),
                 if (_current != null) ...[
-                  SettingsSectionHeader(text: loc.nutritionSettingsSectionDanger),
+                  SettingsSectionHeader(
+                    text: loc.nutritionSettingsSectionDanger,
+                  ),
                   SettingsCard(
                     children: [
                       SettingsLinkTile(
@@ -646,9 +652,7 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
     final kind = _parseAdjustmentKind(current.adjustmentKind);
     final percent = current.adjustmentPercent;
     final kindLabel = _adjustmentKindLabel(loc, kind);
-    final percentLabel = percent == null
-        ? ''
-        : ' · ${_formatPercent(percent)}';
+    final percentLabel = percent == null ? '' : ' · ${_formatPercent(percent)}';
     return '$kindLabel$percentLabel';
   }
 
@@ -736,6 +740,7 @@ class _MealTypeRow extends StatelessWidget {
 /// Replaces the previous full-size preview block so the screen starts
 /// with a single dense overview instead of two stacked cards.
 class _GoalPreviewCard extends StatelessWidget {
+  final String? label;
   final double? calories;
   final double? tdee;
   final double? adjustmentPercent;
@@ -745,6 +750,7 @@ class _GoalPreviewCard extends StatelessWidget {
   final double? fatG;
 
   const _GoalPreviewCard({
+    this.label,
     this.calories,
     this.tdee,
     this.adjustmentPercent,
@@ -825,7 +831,7 @@ class _GoalPreviewCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    loc.nutritionSettingsPreviewLabel,
+                    label ?? loc.nutritionSettingsPreviewLabel,
                     style: theme.textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: theme.colorScheme.onSurfaceVariant,
@@ -1034,9 +1040,9 @@ class _NumberEditorSheetState extends State<_NumberEditorSheet> {
     final cleaned = text.replaceAll(',', '.');
     final parsed = double.tryParse(cleaned);
     if (parsed == null || parsed.isNaN || parsed.isInfinite || parsed < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.nutritionInvalidNumber)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.nutritionInvalidNumber)));
       return;
     }
     Navigator.of(context).pop(parsed);
@@ -1274,13 +1280,10 @@ class _MealTypeNameDialogState extends State<_MealTypeNameDialog> {
           decoration: InputDecoration(
             labelText: loc.nutritionMealName,
             hintText: loc.nutritionMealNameHint,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
           textInputAction: TextInputAction.done,
-          validator: (value) =>
-              (value == null || value.trim().isEmpty)
+          validator: (value) => (value == null || value.trim().isEmpty)
               ? loc.nutritionMealNameRequired
               : null,
           onFieldSubmitted: (_) => _submit(),
@@ -1291,10 +1294,7 @@ class _MealTypeNameDialogState extends State<_MealTypeNameDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: Text(loc.nutritionCancel),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: Text(loc.nutritionSave),
-        ),
+        FilledButton(onPressed: _submit, child: Text(loc.nutritionSave)),
       ],
     );
   }
@@ -1598,6 +1598,13 @@ class _PlanOverrideBanner extends StatelessWidget {
     final theme = Theme.of(context);
     final phase = planInfo.phase!;
     final color = Color(phase.color);
+    String formatGoal(double? value) {
+      if (value == null) return '—';
+      return value == value.roundToDouble()
+          ? value.toStringAsFixed(0)
+          : value.toStringAsFixed(1);
+    }
+
     return Material(
       color: color.withAlpha(30),
       borderRadius: BorderRadius.circular(14),
@@ -1616,15 +1623,33 @@ class _PlanOverrideBanner extends StatelessWidget {
               Icon(Icons.event_note_rounded, size: 20, color: color),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  loc.nutritionSettingsPlanOverrideBanner(
-                    phase.name,
-                    planInfo.weekNumber ?? 1,
-                    planInfo.totalWeeks ?? 1,
-                  ),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loc.nutritionSettingsPlanOverrideBanner(
+                        phase.name,
+                        planInfo.weekNumber ?? 1,
+                        planInfo.totalWeeks ?? 1,
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    if (planInfo.goal != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        loc.nutritionSettingsPlanCurrentTarget(
+                          formatGoal(planInfo.goal!.calories),
+                          formatGoal(planInfo.goal!.proteinG),
+                        ),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               Icon(
