@@ -671,12 +671,28 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
           (_activeFilter == _FoodSearchFilter.all ||
               _activeFilter == _FoodSearchFilter.favorites) &&
           _favorites.isNotEmpty;
-      final showMeal =
-          _activeFilter == _FoodSearchFilter.all &&
-          _selectedMealType != null &&
-          _mealSuggestions.isNotEmpty;
-      final showRecents =
-          _activeFilter == _FoodSearchFilter.all && _recents.isNotEmpty;
+      final favoritesToShow = showFavorites
+          ? _favorites
+          : const <FoodSearchResult>[];
+      final shownFoodIds = favoritesToShow
+          .map((result) => result.food.id)
+          .toSet();
+      final mealSuggestionsToShow =
+          _activeFilter == _FoodSearchFilter.all && _selectedMealType != null
+          ? _mealSuggestions
+                .where((result) => shownFoodIds.add(result.food.id))
+                .toList()
+          : const <FoodSearchResult>[];
+      final showMeal = mealSuggestionsToShow.isNotEmpty;
+      shownFoodIds.addAll(
+        mealSuggestionsToShow.map((result) => result.food.id),
+      );
+      final recentsToShow = _activeFilter == _FoodSearchFilter.all
+          ? _recents
+                .where((result) => shownFoodIds.add(result.food.id))
+                .toList()
+          : const <FoodSearchResult>[];
+      final showRecents = recentsToShow.isNotEmpty;
       final showAllFoods =
           _activeFilter == _FoodSearchFilter.myFoods && _allFoods.isNotEmpty;
       final showSavedMeals = _activeFilter == _FoodSearchFilter.meals;
@@ -695,12 +711,13 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               sliver: SliverList.separated(
-                itemCount: _favorites.length,
+                itemCount: favoritesToShow.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 6),
                 itemBuilder: (_, index) => _FoodCard(
-                  result: _favorites[index],
-                  onSelected: () => _selectFood(_favorites[index]),
-                  onToggleFavorite: () => _toggleFavorite(_favorites[index]),
+                  result: favoritesToShow[index],
+                  onSelected: () => _selectFood(favoritesToShow[index]),
+                  onToggleFavorite: () =>
+                      _toggleFavorite(favoritesToShow[index]),
                 ),
               ),
             ),
@@ -714,13 +731,13 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               sliver: SliverList.separated(
-                itemCount: _mealSuggestions.length,
+                itemCount: mealSuggestionsToShow.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 6),
                 itemBuilder: (_, index) => _FoodCard(
-                  result: _mealSuggestions[index],
-                  onSelected: () => _selectFood(_mealSuggestions[index]),
+                  result: mealSuggestionsToShow[index],
+                  onSelected: () => _selectFood(mealSuggestionsToShow[index]),
                   onToggleFavorite: () =>
-                      _toggleFavorite(_mealSuggestions[index]),
+                      _toggleFavorite(mealSuggestionsToShow[index]),
                 ),
               ),
             ),
@@ -735,12 +752,12 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
               sliver: SliverList.separated(
-                itemCount: _recents.length,
+                itemCount: recentsToShow.length,
                 separatorBuilder: (_, _) => const SizedBox(height: 6),
                 itemBuilder: (_, index) => _FoodCard(
-                  result: _recents[index],
-                  onSelected: () => _selectFood(_recents[index]),
-                  onToggleFavorite: () => _toggleFavorite(_recents[index]),
+                  result: recentsToShow[index],
+                  onSelected: () => _selectFood(recentsToShow[index]),
+                  onToggleFavorite: () => _toggleFavorite(recentsToShow[index]),
                 ),
               ),
             ),
