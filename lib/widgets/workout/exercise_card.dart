@@ -195,7 +195,7 @@ class ExerciseCard extends StatelessWidget {
               _buildVolumeComparison(context),
             ],
             const SizedBox(height: 10),
-            _buildHeaderRow(theme),
+            _buildHeaderRow(context, theme),
             const Divider(height: 4),
             ...List.generate(exercise.sets.length, (i) {
               final set = exercise.sets[i];
@@ -376,9 +376,10 @@ class ExerciseCard extends StatelessWidget {
     );
   }
 
-  Widget _buildHeaderRow(ThemeData theme) {
-    final fields = getFieldsForType(exercise.exerciseType);
-    final keys = fields.keys.toList();
+  Widget _buildHeaderRow(BuildContext context, ThemeData theme) {
+    final keys = getFieldsForType(exercise.exerciseType);
+    final loc = AppLocalizations.of(context)!;
+    final fields = {for (final key in keys) key: workoutFieldLabel(loc, key)};
     return Row(
       children: [
         const SizedBox(width: 26),
@@ -434,8 +435,7 @@ class ExerciseCard extends StatelessWidget {
     Map<String, dynamic> set,
     ThemeData theme,
   ) {
-    final fields = getFieldsForType(ex.exerciseType);
-    final keys = fields.keys.toList();
+    final keys = getFieldsForType(ex.exerciseType);
     final hasRpe = ex.sets.any((s) => s['rpe'] != null);
     return [
       Expanded(

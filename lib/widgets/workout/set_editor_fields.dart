@@ -40,7 +40,7 @@ class WorkoutSetFieldControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fields = getFieldsForType(exerciseType).keys;
+    final fields = getFieldsForType(exerciseType);
     final children = <Widget>[];
     var hasDistance = false;
 

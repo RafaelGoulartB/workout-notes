@@ -1,30 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:workout_notes/l10n/app_localizations.dart';
 
-/// Returns the field labels for a given exercise type.
-Map<String, String> getFieldsForType(String type) {
+/// Returns a localized label for a workout set field.
+String workoutFieldLabel(AppLocalizations loc, String key) => switch (key) {
+  'weight' => loc.activeWorkoutWeight,
+  'reps' => loc.activeWorkoutReps,
+  'distance' => loc.activeWorkoutDistance,
+  'time_seconds' => loc.activeWorkoutTime,
+  _ => key,
+};
+
+/// Returns the ordered field keys for a given exercise type.
+List<String> getFieldsForType(String type) {
   switch (type) {
     case 'weightReps':
-      return {'weight': 'Peso', 'reps': 'Reps'};
+      return ['weight', 'reps'];
     case 'distanceTime':
-      return {'distance': 'Dist.', 'time_seconds': 'Tempo'};
+      return ['distance', 'time_seconds'];
     case 'weightDistance':
-      return {'weight': 'Peso', 'distance': 'Dist.'};
+      return ['weight', 'distance'];
     case 'weightTime':
-      return {'weight': 'Peso', 'time_seconds': 'Tempo'};
+      return ['weight', 'time_seconds'];
     case 'repsDistance':
-      return {'reps': 'Reps', 'distance': 'Dist.'};
+      return ['reps', 'distance'];
     case 'repsTime':
-      return {'reps': 'Reps', 'time_seconds': 'Tempo'};
+      return ['reps', 'time_seconds'];
     case 'weightOnly':
-      return {'weight': 'Peso'};
+      return ['weight'];
     case 'repsOnly':
-      return {'reps': 'Reps'};
+      return ['reps'];
     case 'distanceOnly':
-      return {'distance': 'Dist.'};
+      return ['distance'];
     case 'timeOnly':
-      return {'time_seconds': 'Tempo'};
+      return ['time_seconds'];
     default:
-      return {'weight': 'Peso', 'reps': 'Reps'};
+      return ['weight', 'reps'];
   }
 }
 
