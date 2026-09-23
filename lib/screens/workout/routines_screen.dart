@@ -5,6 +5,7 @@ import 'package:workout_notes/widgets/category_timeline_bar.dart';
 import '../../repositories/routine_repository.dart';
 import '../../navigation/ai_coach_navigation.dart';
 import '../../utils/workout_estimator.dart';
+import 'active_workout_screen.dart';
 import 'routine_day_editor_screen.dart';
 
 class RoutinesScreen extends StatefulWidget {
@@ -301,16 +302,18 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
           for (final s in sets) {
             if ((s['is_warmup'] as int?) == 1) continue;
             catSets++;
+            final setVolume = exerciseType == 'weightReps'
+                ? ((s['weight'] as num?)?.toDouble() ?? 0) *
+                      ((s['reps'] as num?)?.toInt() ?? 0)
+                : 0.0;
+            catVolume += setVolume;
             dayStats.add(
               _DayStat(
                 categoryId: catId,
                 categoryName: catName,
                 color: Color(colorVal),
                 sets: 1,
-                volume: exerciseType == 'weightReps'
-                    ? ((s['weight'] as num?)?.toDouble() ?? 0) *
-                          ((s['reps'] as int?) ?? 0)
-                    : 0,
+                volume: setVolume,
               ),
             );
           }
@@ -640,9 +643,20 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right,
-                color: theme.colorScheme.onSurfaceVariant,
+              IconButton.filledTonal(
+                tooltip: AppLocalizations.of(context)!.routinesStartDay,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      builder: (_) => ActiveWorkoutScreen(
+                        routineId: widget.routineId,
+                        routineDayId: day['id'] as String,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.play_arrow_rounded),
               ),
             ],
           ),
