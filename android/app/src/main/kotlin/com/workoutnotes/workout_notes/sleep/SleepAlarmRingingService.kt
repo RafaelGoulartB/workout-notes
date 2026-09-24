@@ -233,7 +233,13 @@ class SleepAlarmRingingService : Service() {
             return START_NOT_STICKY
         }
         if (action == ACTION_SNOOZE) {
-            if (SleepAlarmScheduler.snooze(this)) {
+            val snoozed = try {
+                SleepAlarmScheduler.snooze(this)
+            } catch (_: Throwable) {
+                false
+            }
+            if (snoozed) {
+                SleepMonitoringService.publishAlarmSnoozing(this)
                 stopRinging()
                 stopSelf()
             }
@@ -382,7 +388,7 @@ class SleepAlarmRingingService : Service() {
             )
             builder.addAction(
                 android.R.drawable.ic_lock_idle_alarm,
-                "Sonecar",
+                getString(R.string.sleep_alarm_snooze),
                 snoozeIntent,
             )
         }
@@ -518,7 +524,7 @@ class SleepAlarmRingingService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
 }
 
-private object SleepMonitorSessionDismiss {
+internal object SleepMonitorSessionDismiss {
     const val BUTTON = "button"
     const val BARCODE = "barcode"
     const val EMERGENCY = "emergency_500_taps"

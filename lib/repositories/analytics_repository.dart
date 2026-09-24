@@ -37,8 +37,11 @@ class AnalyticsRepository extends BaseRepository {
     // Calculate stats per session
     final history = <Map<String, dynamic>>[];
     final entries = byDate.entries.toList();
-    final recent =
-        entries.reversed.take(effectiveLimit).toList().reversed.toList();
+    final recent = entries.reversed
+        .take(effectiveLimit)
+        .toList()
+        .reversed
+        .toList();
 
     for (final entry in recent) {
       final sets = entry.value;
@@ -46,12 +49,13 @@ class AnalyticsRepository extends BaseRepository {
           .map<double>((s) => (s['weight'] as num?)?.toDouble() ?? 0.0)
           .toList();
       final reps = sets.map<int>((s) => (s['reps'] as int?) ?? 0).toList();
-      final maxWeight =
-          weights.isEmpty ? 0.0 : weights.reduce((a, b) => a > b ? a : b);
+      final maxWeight = weights.isEmpty
+          ? 0.0
+          : weights.reduce((a, b) => a > b ? a : b);
       final totalVolume = weights.asMap().entries.fold<double>(
-            0.0,
-            (sum, e) => sum + (e.value * reps[e.key]),
-          );
+        0.0,
+        (sum, e) => sum + (e.value * reps[e.key]),
+      );
       final bestSetIndex = weights.indexOf(maxWeight);
 
       double? estimated1RM;
@@ -197,8 +201,8 @@ class AnalyticsRepository extends BaseRepository {
 
     final Map<String, int> result = {};
     for (final row in rows) {
-      result[row['date'] as String] =
-          ((row['volume'] as num?)?.toDouble() ?? 0).toInt();
+      result[row['date'] as String] = ((row['volume'] as num?)?.toDouble() ?? 0)
+          .toInt();
     }
     return result;
   }
@@ -314,8 +318,9 @@ class AnalyticsRepository extends BaseRepository {
     final db = await this.db;
     final startStr = start.toIso8601String().substring(0, 10);
     final endStr = end.toIso8601String().substring(0, 10);
-    final valueExpr =
-        bySets ? 'COUNT(s.id)' : 'COALESCE(SUM(s.weight * s.reps), 0)';
+    final valueExpr = bySets
+        ? 'COUNT(s.id)'
+        : 'COALESCE(SUM(s.weight * s.reps), 0)';
     return db.rawQuery(
       '''
       SELECT ec.id, ec.name, ec.color,
@@ -345,8 +350,9 @@ class AnalyticsRepository extends BaseRepository {
     final db = await this.db;
     final startStr = start.toIso8601String().substring(0, 10);
     final endStr = end.toIso8601String().substring(0, 10);
-    final valueExpr =
-        bySets ? 'COUNT(s.id)' : 'COALESCE(SUM(s.weight * s.reps), 0)';
+    final valueExpr = bySets
+        ? 'COUNT(s.id)'
+        : 'COALESCE(SUM(s.weight * s.reps), 0)';
     return db.rawQuery(
       '''
       SELECT e.id, e.name, ec.name as category_name, ec.color as category_color,
@@ -377,8 +383,9 @@ class AnalyticsRepository extends BaseRepository {
     required bool bySets,
   }) async {
     final db = await this.db;
-    final valueExpr =
-        bySets ? 'COUNT(s.id)' : 'COALESCE(SUM(s.weight * s.reps), 0)';
+    final valueExpr = bySets
+        ? 'COUNT(s.id)'
+        : 'COALESCE(SUM(s.weight * s.reps), 0)';
 
     final List<Map<String, dynamic>> results = [];
 
@@ -675,7 +682,8 @@ class AnalyticsRepository extends BaseRepository {
       ['$monthStr%'],
     );
 
-    final daysWithWorkouts = Sqflite.firstIntValue(
+    final daysWithWorkouts =
+        Sqflite.firstIntValue(
           await db.rawQuery(
             '''
       SELECT COUNT(DISTINCT date) FROM workouts WHERE date LIKE ?
@@ -710,9 +718,11 @@ class AnalyticsRepository extends BaseRepository {
     return {
       'current': current,
       'previous': previous,
-      'delta_workouts': (current['workout_count'] as int) -
+      'delta_workouts':
+          (current['workout_count'] as int) -
           (previous['workout_count'] as int),
-      'delta_volume': (current['total_volume'] as double) -
+      'delta_volume':
+          (current['total_volume'] as double) -
           (previous['total_volume'] as double),
       'delta_sets':
           (current['total_sets'] as int) - (previous['total_sets'] as int),
@@ -723,21 +733,27 @@ class AnalyticsRepository extends BaseRepository {
   // OVERVIEW STATS
   // ===================================================================
 
-  /// Counts consecutive workout days ending at today (or most recent day ≤ today).
+  /// Counts consecutive workout days ending today or yesterday.
+  ///
+  /// A streak older than yesterday is no longer current, so it must not stay
+  /// visible as an active streak indefinitely.
   Future<int> _calculateStreak() async {
     final db = await this.db;
-    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayKey = today.toIso8601String().substring(0, 10);
 
     final rows = await db.rawQuery(
       'SELECT DISTINCT date FROM workouts WHERE date <= ? '
       'AND end_time IS NOT NULL ORDER BY date DESC',
-      [today],
+      [todayKey],
     );
 
     if (rows.isEmpty) return 0;
 
     int streak = 1;
     DateTime prev = DateTime.parse(rows[0]['date'] as String);
+    if (today.difference(prev).inDays > 1) return 0;
 
     for (int i = 1; i < rows.length; i++) {
       final curr = DateTime.parse(rows[i]['date'] as String);
@@ -775,8 +791,7 @@ class AnalyticsRepository extends BaseRepository {
     final totals = rows.first;
     final totalWorkouts = (totals['total_workouts'] as num?)?.toInt() ?? 0;
     final totalSets = (totals['total_sets'] as num?)?.toInt() ?? 0;
-    final totalVolume =
-        (totals['total_volume'] as num?)?.toDouble() ?? 0.0;
+    final totalVolume = (totals['total_volume'] as num?)?.toDouble() ?? 0.0;
 
     final currentStreak = await _calculateStreak();
 

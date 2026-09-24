@@ -7,6 +7,7 @@ import 'package:workout_notes/widgets/workout/set_editor_fields.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/routine_repository.dart';
 import '../../models/exercise_with_sets.dart';
+import 'active_workout_screen.dart';
 
 /// Screen for planning/editing a future workout.
 /// Similar to WorkoutDetailScreen but tailored for future dates:
@@ -72,6 +73,16 @@ class _FutureWorkoutPlannerScreenState
 
   int get _totalSets =>
       _exercises.fold<int>(0, (sum, e) => sum + e.sets.length);
+
+  Future<void> _startWorkout() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ActiveWorkoutScreen(workoutId: widget.workoutId),
+      ),
+    );
+    if (result == true) _load();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -173,13 +184,30 @@ class _FutureWorkoutPlannerScreenState
                   SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                      child: FilledButton.icon(
-                        onPressed: _pickExercise,
-                        icon: const Icon(Icons.add, size: 18),
-                        label: Text(loc.activeWorkoutAddExercise),
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 48),
-                        ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: _startWorkout,
+                              icon: const Icon(Icons.play_arrow_rounded),
+                              label: Text(loc.futureWorkoutStart),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _pickExercise,
+                              icon: const Icon(Icons.add, size: 18),
+                              label: Text(loc.activeWorkoutAddExercise),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

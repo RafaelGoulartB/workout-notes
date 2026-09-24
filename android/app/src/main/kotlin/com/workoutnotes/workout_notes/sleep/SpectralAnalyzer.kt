@@ -3,7 +3,6 @@ package com.workoutnotes.workout_notes.sleep
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.exp
-import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.sin
 
@@ -17,6 +16,7 @@ import kotlin.math.sin
 class SpectralAnalyzer(private val sampleRate: Int = 16_000) {
     companion object {
         const val FFT_SIZE = 1024
+        const val MAX_FRAMES_PER_SECOND = 8
         val BANDS = listOf(
             0.0 to 200.0, // snore fundamental, HVAC rumble
             200.0 to 600.0, // snore harmonics, low speech formants
@@ -37,25 +37,51 @@ class SpectralAnalyzer(private val sampleRate: Int = 16_000) {
     private var centroidSum = 0.0
     private var binCount = 0
     private var frameCount = 0
+    private var pendingSamples = 0
+    private var pendingHasSignal = false
+    private var skipSamples = 0
+    // Bound FFT work to the same cadence at 16 kHz and the 44.1 kHz fallback.
+    private val hopSize = maxOf(FFT_SIZE, (sampleRate + MAX_FRAMES_PER_SECOND - 1) / MAX_FRAMES_PER_SECOND)
+    internal var processedFrames = 0L
+        private set
 
     fun add(samples: ShortArray, length: Int) {
         var offset = 0
-        while (offset + FFT_SIZE <= length) {
-            for (index in 0 until FFT_SIZE) {
-                re[index] =
-                    (samples[offset + index].toDouble() / Short.MAX_VALUE) * WINDOW[index]
-                im[index] = 0.0
+        while (offset < length) {
+            if (skipSamples > 0) {
+                val skip = minOf(skipSamples, length - offset)
+                skipSamples -= skip
+                offset += skip
+                continue
             }
-            offset += FFT_SIZE
-            fftRadix2()
-            accumulate()
-            frameCount++
+            val take = minOf(FFT_SIZE - pendingSamples, length - offset)
+            for (index in 0 until take) {
+                val target = pendingSamples + index
+                if (samples[offset + index].toInt() != 0) pendingHasSignal = true
+                re[target] = (samples[offset + index].toDouble() / Short.MAX_VALUE) * WINDOW[target]
+                im[target] = 0.0
+            }
+            offset += take
+            pendingSamples += take
+            if (pendingSamples < FFT_SIZE) continue
+            if (pendingHasSignal) {
+                fftRadix2()
+                accumulate()
+                frameCount++
+                processedFrames++
+            }
+            pendingSamples = 0
+            pendingHasSignal = false
+            skipSamples = hopSize - FFT_SIZE
         }
     }
 
     /** Returns per-window aggregates, or an empty map if no complete frame ran. */
     fun snapshot(): Map<String, Double> {
-        if (frameCount == 0) return emptyMap()
+        if (frameCount == 0 || powerSum <= 0.0) {
+            reset()
+            return emptyMap()
+        }
         val result = mutableMapOf<String, Double>()
         for (band in BANDS.indices) {
             result["spectral_band_energy_$band"] = bandSum[band]
@@ -78,9 +104,9 @@ class SpectralAnalyzer(private val sampleRate: Int = 16_000) {
 
     private fun accumulate() {
         for (k in 1 until FFT_SIZE / 2) {
-            val magnitude = hypot(re[k], im[k]) / FFT_SIZE
-            val power = magnitude * magnitude
+            val power = (re[k] * re[k] + im[k] * im[k]) / (FFT_SIZE.toDouble() * FFT_SIZE)
             val freq = k * sampleRate.toDouble() / FFT_SIZE
+            if (freq >= 8_000.0) continue
             for (band in BANDS.indices) {
                 if (freq >= BANDS[band].first && freq < BANDS[band].second) {
                     bandSum[band] += power
@@ -100,6 +126,9 @@ class SpectralAnalyzer(private val sampleRate: Int = 16_000) {
         centroidSum = 0.0
         binCount = 0
         frameCount = 0
+        pendingSamples = 0
+        pendingHasSignal = false
+        skipSamples = 0
     }
 
     /** Iterative radix-2 FFT, in-place on [re]/[im]. */

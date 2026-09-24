@@ -6,6 +6,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_mode.dart';
 import 'package:workout_notes/models/sleep_monitor_state.dart';
+import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/services/notification_service.dart';
 import 'package:workout_notes/services/sleep_mission_service.dart';
 import 'package:workout_notes/services/sleep_monitor_service.dart';
@@ -49,8 +50,13 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     WidgetsBinding.instance.addObserver(this);
     _service.addListener(_onChanged);
     _initialize();
+    _startTicker();
+  }
+
+  void _startTicker() {
+    _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (mounted && _service.state.isActive) setState(() {});
     });
   }
 
@@ -64,6 +70,12 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startTicker();
+    } else {
+      _ticker?.cancel();
+      _ticker = null;
+    }
     if (state == AppLifecycleState.resumed && _service.isSupported) {
       _reloadMission();
       _service.initialize().then((_) => _service.getAlarmCapabilities());
@@ -151,6 +163,8 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final state = _service.state;
+    final viewport = MediaQuery.sizeOf(context);
+    final compact = viewport.width < 380 || viewport.height < 650;
     if (!state.supported) {
       return Scaffold(
         appBar: AppBar(),
@@ -167,25 +181,27 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     }
 
     final active = state.isActive;
-    final alarmAt = active && state.alarmAt != null
+    final snoozing = state.isAlarmSnoozing;
+    final alarmAt = (active || snoozing) && state.alarmAt != null
         ? state.alarmAt!.toLocal()
         : _selectedMode.hasAlarm
         ? SleepAlarmTime.nextOccurrence(_selectedTime)
         : null;
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(),
+      appBar: AppBar(toolbarHeight: compact ? 48 : null),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _NightBackground(
               child: ListView(
                 padding: EdgeInsets.fromLTRB(
-                  16,
-                  MediaQuery.paddingOf(context).top + kToolbarHeight + 12,
-                  16,
-                  28,
+                  compact ? 12 : 16,
+                  compact ? 8 : 12,
+                  compact ? 12 : 16,
+                  compact ? 16 : 28,
                 ),
-                children: active
+                children: snoozing
+                    ? _snoozingContent(loc, state, alarmAt)
+                    : active
                     ? _runningContent(loc, state, alarmAt)
                     : _readyContent(loc, state, alarmAt),
               ),
@@ -193,10 +209,29 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
       bottomNavigationBar: _loading
           ? null
           : SafeArea(
-              minimum: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              minimum: EdgeInsets.fromLTRB(
+                compact ? 12 : 16,
+                compact ? 6 : 10,
+                compact ? 12 : 16,
+                compact ? 8 : 12,
+              ),
               child: SizedBox(
-                height: 56,
-                child: active
+                height: compact ? 52 : 56,
+                child: snoozing
+                    ? FilledButton.icon(
+                        onPressed: _isBusy ? null : _handleSnoozedAlarm,
+                        icon: _busyIcon(
+                          state.mode.requiresMission
+                              ? Icons.qr_code_scanner_rounded
+                              : Icons.alarm_off_rounded,
+                        ),
+                        label: Text(
+                          state.mode.requiresMission
+                              ? loc.alarmOpenMissionNow
+                              : loc.alarmDismissSnooze,
+                        ),
+                      )
+                    : active
                     ? FilledButton.icon(
                         onPressed: _isBusy ? null : _stop,
                         icon: _busyIcon(Icons.stop_rounded),
@@ -246,8 +281,8 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
           time: _formatTime(alarmAt),
           date: _formatModeDate(context, alarmAt),
           remaining: _formatModeRemaining(alarmAt),
-          sectionTitle: loc.sleepAlarmNext,
-          changeLabel: loc.sleepAlarmChange,
+          sectionTitle: loc.sleepMonitorReadyWakeTime,
+          changeLabel: loc.sleepMonitorChangeWakeTime,
           onTap: _chooseAlarmTime,
           onEarlier: () => _shiftAlarmTime(-15),
           onLater: () => _shiftAlarmTime(15),
@@ -309,6 +344,75 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
     ];
   }
 
+  List<Widget> _snoozingContent(
+    AppLocalizations loc,
+    SleepMonitorState state,
+    DateTime? alarmAt,
+  ) {
+    final maximum = state.maxSnoozes <= 0 ? 1 : state.maxSnoozes;
+    final progress = (state.snoozeCount / maximum).clamp(0.0, 1.0).toDouble();
+    return [
+      _NightHero(
+        icon: Icons.snooze_rounded,
+        title: loc.sleepMonitorAlarmSnoozingTitle,
+        subtitle: alarmAt == null
+            ? loc.sleepAlarmSectionTitle
+            : loc.alarmSnoozingUntil(_formatTime(alarmAt)),
+      ),
+      const SizedBox(height: 16),
+      Card(
+        key: const Key('sleep-monitor-snoozing-card'),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    state.mode.requiresMission
+                        ? Icons.qr_code_scanner_rounded
+                        : Icons.alarm_off_rounded,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      state.mode.requiresMission
+                          ? loc.sleepMonitorMissionPending
+                          : loc.sleepMonitorAlarmSnoozingTitle,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              LinearProgressIndicator(value: progress),
+              const SizedBox(height: 8),
+              Text(
+                loc.alarmSnoozeProgress(state.snoozeCount, state.maxSnoozes),
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 14),
+              Text(
+                state.mode.requiresMission
+                    ? loc.sleepMonitorSnoozingMissionBody
+                    : loc.sleepMonitorSnoozingDismissBody,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      ),
+      if (state.errorCode != null) ...[
+        const SizedBox(height: 14),
+        Text(
+          _localizedError(loc, state.errorCode),
+          style: TextStyle(color: Theme.of(context).colorScheme.error),
+        ),
+      ],
+    ];
+  }
+
   List<Widget> _runningContent(
     AppLocalizations loc,
     SleepMonitorState state,
@@ -349,31 +453,50 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
                     color: Theme.of(context).colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.alarm_rounded),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              loc.sleepAlarmRemaining,
-                              style: Theme.of(context).textTheme.labelMedium,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 320;
+                      final remaining = Row(
+                        children: [
+                          const Icon(Icons.alarm_rounded),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  loc.sleepAlarmRemaining,
+                                  style: Theme.of(
+                                    context,
+                                  ).textTheme.labelMedium,
+                                ),
+                                Text(
+                                  _formatRemaining(alarmAt, withSeconds: true),
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ],
                             ),
-                            Text(
-                              _formatRemaining(alarmAt, withSeconds: true),
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                          ],
-                        ),
-                      ),
-                      TextButton(
+                          ),
+                        ],
+                      );
+                      final changeButton = TextButton(
                         onPressed: _isBusy ? null : _chooseAlarmTime,
                         child: Text(loc.sleepAlarmChange),
-                      ),
-                    ],
+                      );
+                      return compact
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                remaining,
+                                Align(
+                                  alignment: AlignmentDirectional.centerEnd,
+                                  child: changeButton,
+                                ),
+                              ],
+                            )
+                          : Row(children: [remaining, changeButton]);
+                    },
                   ),
                 ),
               const SizedBox(height: 14),
@@ -394,6 +517,15 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
                 noiseScore: state.currentNoiseScore,
                 loc: loc,
               ),
+              if (_service.liveDecision != null) ...[
+                const SizedBox(height: 8),
+                Text(switch (_service.liveDecision!.epoch.stage) {
+                  SleepStageType.awake => loc.sleepLiveProbablyAwake,
+                  SleepStageType.sleeping ||
+                  SleepStageType.deep => loc.sleepLiveProbablyAsleep,
+                  SleepStageType.unknown => loc.sleepLiveUncertain,
+                }),
+              ],
             ],
           ),
         ),
@@ -422,6 +554,20 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
         ),
       ],
     ];
+  }
+
+  Future<void> _handleSnoozedAlarm() async {
+    if (_isBusy) return;
+    setState(() => _isBusy = true);
+    final state = _service.state;
+    final succeeded = state.mode.requiresMission
+        ? await _service.openSnoozedAlarmMission()
+        : await _service.dismissSnoozedAlarm();
+    if (!succeeded && mounted) {
+      _showMessage(AppLocalizations.of(context)!.alarmSnoozeActionError);
+      await _service.getState();
+    }
+    if (mounted) setState(() => _isBusy = false);
   }
 
   Widget _busyIcon(IconData fallback) => _isBusy
@@ -580,6 +726,7 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
   }
 
   String _localizedError(AppLocalizations loc, String? code) {
+    if (code == 'diagnostic_save_failed') return loc.sleepDiagnosticError;
     switch (code) {
       case 'microphone_permission':
       case 'microphone_denied':
@@ -617,47 +764,65 @@ class _SleepMonitorScreenState extends State<SleepMonitorScreen>
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
-                child: Text(
-                  loc.sleepMonitorModeSection,
-                  style: Theme.of(
-                    sheetContext,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                ),
-              ),
-              for (final mode in _modeOrder)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _ModeChoiceTile(
-                    icon: _modeIcon(mode),
-                    title: _modeTitle(loc, mode),
-                    body: mode.requiresMission && !_missions.config.isReady
-                        ? loc.sleepMonitorModeMissionUnavailable
-                        : _modeBody(loc, mode),
-                    selected: mode == _selectedMode,
-                    locked: mode.requiresMission && !_missions.config.isReady,
-                    onTap: () {
-                      if (mode.requiresMission && !_missions.config.isReady) {
-                        Navigator.pop(sheetContext);
-                        unawaited(_openSleepSettings());
-                        return;
-                      }
-                      Navigator.pop(sheetContext, mode);
-                    },
+      builder: (sheetContext) {
+        final sheetHeight = MediaQuery.sizeOf(sheetContext).height * 0.82;
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: sheetHeight),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+                    child: Text(
+                      loc.sleepMonitorModeSection,
+                      style: Theme.of(sheetContext).textTheme.titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
                   ),
-                ),
-            ],
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          for (final mode in _modeOrder)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _ModeChoiceTile(
+                                icon: _modeIcon(mode),
+                                title: _modeTitle(loc, mode),
+                                body:
+                                    mode.requiresMission &&
+                                        !_missions.config.isReady
+                                    ? loc.sleepMonitorModeMissionUnavailable
+                                    : _modeBody(loc, mode),
+                                selected: mode == _selectedMode,
+                                locked:
+                                    mode.requiresMission &&
+                                    !_missions.config.isReady,
+                                onTap: () {
+                                  if (mode.requiresMission &&
+                                      !_missions.config.isReady) {
+                                    Navigator.pop(sheetContext);
+                                    unawaited(_openSleepSettings());
+                                    return;
+                                  }
+                                  Navigator.pop(sheetContext, mode);
+                                },
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
     if (selected == null || !mounted || selected == _selectedMode) return;
     setState(() => _selectedMode = selected);
@@ -756,62 +921,118 @@ class _ModeSelectorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: scheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: scheme.onSecondaryContainer),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+        final text = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              sectionLabel,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.primary,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.7,
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      sectionLabel,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.primary,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.7,
-                      ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              title,
+              maxLines: compact ? 2 : null,
+              overflow: compact ? TextOverflow.ellipsis : null,
+              style:
+                  (compact
+                          ? theme.textTheme.titleSmall
+                          : theme.textTheme.titleMedium)
+                      ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ],
+        );
+        return Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: EdgeInsets.all(compact ? 12 : 16),
+              child: compact
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: scheme.secondaryContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                icon,
+                                size: 21,
+                                color: scheme.onSecondaryContainer,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(child: text),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.unfold_more_rounded,
+                              size: 20,
+                              color: scheme.primary,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          body,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: scheme.secondaryContainer,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(icon, color: scheme.onSecondaryContainer),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              text,
+                              const SizedBox(height: 3),
+                              Text(
+                                body,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.unfold_more_rounded, color: scheme.primary),
+                      ],
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      title,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      body,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(Icons.unfold_more_rounded, color: scheme.primary),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -840,53 +1061,88 @@ class _ModeChoiceTile extends StatelessWidget {
     final background = selected
         ? scheme.primaryContainer
         : scheme.surfaceContainerLow;
-    return Material(
-      color: background,
-      borderRadius: BorderRadius.circular(18),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: selected ? scheme.primary : null, size: 24),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      body,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                locked
-                    ? Icons.settings_outlined
-                    : selected
-                    ? Icons.check_circle_rounded
-                    : Icons.circle_outlined,
-                color: selected ? scheme.primary : scheme.onSurfaceVariant,
-                size: 22,
-              ),
-            ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+        final stateIcon = Icon(
+          locked
+              ? Icons.settings_outlined
+              : selected
+              ? Icons.check_circle_rounded
+              : Icons.circle_outlined,
+          color: selected ? scheme.primary : scheme.onSurfaceVariant,
+          size: 22,
+        );
+        final titleText = Text(
+          title,
+          maxLines: compact ? 2 : null,
+          overflow: compact ? TextOverflow.ellipsis : null,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
           ),
-        ),
-      ),
+        );
+        final bodyText = Text(
+          body,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
+        );
+        return Material(
+          color: background,
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: EdgeInsets.all(compact ? 12 : 16),
+              child: compact
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              icon,
+                              color: selected ? scheme.primary : null,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(child: titleText),
+                            const SizedBox(width: 6),
+                            stateIcon,
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Padding(
+                          padding: const EdgeInsetsDirectional.only(start: 32),
+                          child: bodyText,
+                        ),
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(icon, color: selected ? scheme.primary : null),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              titleText,
+                              const SizedBox(height: 4),
+                              bodyText,
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        stateIcon,
+                      ],
+                    ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -987,34 +1243,47 @@ class _NightHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      children: [
-        Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: theme.colorScheme.primary.withAlpha(26),
-          ),
-          child: Icon(icon, size: 38, color: theme.colorScheme.primary),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          title,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+        return Column(
+          children: [
+            Container(
+              width: compact ? 48 : 72,
+              height: compact ? 48 : 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.colorScheme.primary.withAlpha(26),
+              ),
+              child: Icon(
+                icon,
+                size: compact ? 26 : 38,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            SizedBox(height: compact ? 6 : 12),
+            Text(
+              title,
+              style:
+                  (compact
+                          ? theme.textTheme.titleMedium
+                          : theme.textTheme.headlineSmall)
+                      ?.copyWith(fontWeight: FontWeight.w700),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style:
+                  (compact
+                          ? theme.textTheme.bodySmall
+                          : theme.textTheme.bodyLarge)
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -1044,18 +1313,15 @@ class _AlarmClockCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          InkWell(
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
-              child: Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+        final header = compact
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
                         Icons.alarm_rounded,
@@ -1066,83 +1332,164 @@ class _AlarmClockCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           sectionTitle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                      Text(
-                        changeLabel,
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: scheme.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Icon(Icons.edit_rounded, size: 17, color: scheme.primary),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    time,
-                    style: theme.textTheme.displayLarge?.copyWith(
-                      fontWeight: FontWeight.w400,
-                      color: scheme.primary,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    date,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: scheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      remaining,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: scheme.onPrimaryContainer,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: TextButton.icon(
+                      onPressed: onTap,
+                      icon: const Icon(Icons.edit_rounded, size: 16),
+                      label: Text(changeLabel),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(0, 36),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        visualDensity: VisualDensity.compact,
                       ),
                     ),
                   ),
                 ],
+              )
+            : Row(
+                children: [
+                  Icon(Icons.alarm_rounded, size: 20, color: scheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      sectionTitle,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    changeLabel,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: scheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.edit_rounded, size: 17, color: scheme.primary),
+                ],
+              );
+        return Card(
+          margin: EdgeInsets.zero,
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              InkWell(
+                onTap: onTap,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    compact ? 14 : 20,
+                    compact ? 10 : 16,
+                    compact ? 14 : 20,
+                    compact ? 10 : 18,
+                  ),
+                  child: Column(
+                    children: [
+                      header,
+                      SizedBox(height: compact ? 4 : 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            time,
+                            style:
+                                (compact
+                                        ? theme.textTheme.displayMedium
+                                        : theme.textTheme.displayLarge)
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w400,
+                                      color: scheme.primary,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                    ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        date,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: compact ? 8 : 10),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: compact ? 10 : 12,
+                          vertical: compact ? 4 : 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: scheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          remaining,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: scheme.onPrimaryContainer,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-          Divider(height: 1, color: scheme.outlineVariant),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onEarlier,
-                    child: const Text('− 15 min'),
-                  ),
+              Divider(height: 1, color: scheme.outlineVariant),
+              Padding(
+                padding: EdgeInsets.all(compact ? 8 : 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: onEarlier,
+                        style: compact
+                            ? OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(40),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                              )
+                            : null,
+                        child: const Text('− 15 min'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: onLater,
+                        style: compact
+                            ? OutlinedButton.styleFrom(
+                                minimumSize: const Size.fromHeight(40),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                              )
+                            : null,
+                        child: const Text('+ 15 min'),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: onLater,
-                    child: const Text('+ 15 min'),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -1157,43 +1504,51 @@ class _MonitoringOnlyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          children: [
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: scheme.primaryContainer,
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Icon(
-                Icons.graphic_eq_rounded,
-                color: scheme.onPrimaryContainer,
-                size: 30,
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+        return Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: EdgeInsets.all(compact ? 16 : 22),
+            child: Column(
+              children: [
+                Container(
+                  width: compact ? 48 : 58,
+                  height: compact ? 48 : 58,
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Icon(
+                    Icons.graphic_eq_rounded,
+                    color: scheme.onPrimaryContainer,
+                    size: compact ? 26 : 30,
+                  ),
+                ),
+                SizedBox(height: compact ? 8 : 12),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style:
+                      (compact
+                              ? theme.textTheme.titleMedium
+                              : theme.textTheme.titleLarge)
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  body,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              body,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

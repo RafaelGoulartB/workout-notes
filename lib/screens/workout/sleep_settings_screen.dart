@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:workout_notes/services/sleep_diagnostic_store.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/services/sleep_mission_service.dart';
@@ -25,6 +27,8 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
   int _goalMinutes = SleepGoalService.defaultGoalMinutes;
   int _globalMaxSnoozes = TraditionalAlarmService.defaultMaxSnoozes;
   bool _globalSnoozeEnabled = true;
+  bool _diagnosticsEnabled = false;
+  final _diagnostics = SleepDiagnosticStore();
 
   @override
   void initState() {
@@ -37,13 +41,47 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
     final goalMinutes = await _sleepGoalService.load();
     final globalMaxSnoozes = await _alarmService.getGlobalMaxSnoozes();
     final globalSnoozeEnabled = await _alarmService.getGlobalSnoozeEnabled();
+    final diagnosticsEnabled = await _diagnostics.isEnabled();
     if (mounted) {
       setState(() {
         _goalMinutes = goalMinutes;
         _globalMaxSnoozes = globalMaxSnoozes;
         _globalSnoozeEnabled = globalSnoozeEnabled;
+        _diagnosticsEnabled = diagnosticsEnabled;
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _setDiagnostics(bool enabled) async {
+    try {
+      await _diagnostics.setEnabled(enabled);
+      if (mounted) setState(() => _diagnosticsEnabled = enabled);
+    } catch (_) {
+      if (mounted) _message(AppLocalizations.of(context)!.sleepDiagnosticError);
+    }
+  }
+
+  Future<void> _exportDiagnostic() async {
+    final loc = AppLocalizations.of(context)!;
+    try {
+      final file = await _diagnostics.latest();
+      if (!mounted) return;
+      if (file == null) {
+        _message(loc.sleepDiagnosticMissing);
+        return;
+      }
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      await FilePicker.saveFile(
+        dialogTitle: loc.sleepDiagnosticExport,
+        fileName: 'sleep_diagnostic.json',
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        bytes: bytes,
+      );
+    } catch (_) {
+      if (mounted) _message(loc.sleepDiagnosticError);
     }
   }
 
@@ -271,6 +309,24 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                     ),
                   ],
                 ),
+                SettingsSectionHeader(text: loc.sleepDiagnosticTitle),
+                SettingsCard(
+                  children: [
+                    SettingsSwitchTile(
+                      icon: Icons.analytics_outlined,
+                      title: loc.sleepDiagnosticTitle,
+                      subtitle: loc.sleepDiagnosticBody,
+                      value: _diagnosticsEnabled,
+                      onChanged: _setDiagnostics,
+                    ),
+                    if (_diagnosticsEnabled)
+                      SettingsLinkTile(
+                        icon: Icons.file_download_outlined,
+                        title: loc.sleepDiagnosticExport,
+                        onTap: _exportDiagnostic,
+                      ),
+                  ],
+                ),
                 SettingsSectionHeader(text: loc.sleepSettingsAlarmsSection),
                 SettingsCard(
                   children: [
@@ -316,7 +372,8 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                         _toggle(v);
                       },
                     ),
-                    if (_missions.config.isConfigured) const SettingsCardDivider(),
+                    if (_missions.config.isConfigured)
+                      const SettingsCardDivider(),
                     if (_missions.config.isConfigured)
                       SettingsInfoTile(
                         icon: Icons.qr_code_2_rounded,
@@ -328,7 +385,9 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
                             ? null
                             : DateFormat.yMd(
                                 Localizations.localeOf(context).toLanguageTag(),
-                              ).format(_missions.config.registeredAt!.toLocal()),
+                              ).format(
+                                _missions.config.registeredAt!.toLocal(),
+                              ),
                       )
                     else
                       SettingsInfoTile(

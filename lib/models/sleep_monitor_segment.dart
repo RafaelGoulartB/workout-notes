@@ -10,6 +10,14 @@ class SleepMonitorSegment {
   final String classification;
   final double validFraction;
   final int noiseBurstCount;
+  // v3: duration-based audio activity and capture diagnostics. Null on legacy data.
+  final double? noiseActiveSeconds;
+  final int? audioSampleRate;
+  final int? audioSampleCount;
+  final double? audioBaselineDbfs;
+  final bool? audioCalibrated;
+  final double? digitalSilenceFraction;
+  final double? audioLevelStddevDb;
 
   // v28 spectral features (audio-features-v2). Null on older recordings.
   final double? spectralBandEnergy0;
@@ -38,6 +46,13 @@ class SleepMonitorSegment {
     required this.classification,
     required this.validFraction,
     required this.noiseBurstCount,
+    this.noiseActiveSeconds,
+    this.audioSampleRate,
+    this.audioSampleCount,
+    this.audioBaselineDbfs,
+    this.audioCalibrated,
+    this.digitalSilenceFraction,
+    this.audioLevelStddevDb,
     this.spectralBandEnergy0,
     this.spectralBandEnergy1,
     this.spectralBandEnergy2,
@@ -74,18 +89,35 @@ class SleepMonitorSegment {
     'classification': classification,
     'valid_fraction': validFraction,
     'noise_burst_count': noiseBurstCount,
-    if (spectralBandEnergy0 != null) 'spectral_band_energy_0': spectralBandEnergy0,
-    if (spectralBandEnergy1 != null) 'spectral_band_energy_1': spectralBandEnergy1,
-    if (spectralBandEnergy2 != null) 'spectral_band_energy_2': spectralBandEnergy2,
-    if (spectralBandEnergy3 != null) 'spectral_band_energy_3': spectralBandEnergy3,
-    if (spectralBandEnergy4 != null) 'spectral_band_energy_4': spectralBandEnergy4,
+    if (audioLevelStddevDb != null) 'audio_level_stddev_db': audioLevelStddevDb,
+    if (noiseActiveSeconds != null) 'noise_active_seconds': noiseActiveSeconds,
+    if (audioSampleRate != null) 'audio_sample_rate': audioSampleRate,
+    if (audioSampleCount != null) 'audio_sample_count': audioSampleCount,
+    if (audioBaselineDbfs != null) 'audio_baseline_dbfs': audioBaselineDbfs,
+    if (audioCalibrated != null) 'audio_calibrated': audioCalibrated,
+    if (digitalSilenceFraction != null)
+      'digital_silence_fraction': digitalSilenceFraction,
+    if (spectralBandEnergy0 != null)
+      'spectral_band_energy_0': spectralBandEnergy0,
+    if (spectralBandEnergy1 != null)
+      'spectral_band_energy_1': spectralBandEnergy1,
+    if (spectralBandEnergy2 != null)
+      'spectral_band_energy_2': spectralBandEnergy2,
+    if (spectralBandEnergy3 != null)
+      'spectral_band_energy_3': spectralBandEnergy3,
+    if (spectralBandEnergy4 != null)
+      'spectral_band_energy_4': spectralBandEnergy4,
     if (spectralFlatness != null) 'spectral_flatness': spectralFlatness,
     if (spectralCentroidHz != null) 'spectral_centroid_hz': spectralCentroidHz,
-    if (breathingRegularity != null) 'breathing_regularity': breathingRegularity,
+    if (breathingRegularity != null)
+      'breathing_regularity': breathingRegularity,
     if (breathingRateHz != null) 'breathing_rate_hz': breathingRateHz,
-    if (motionActiveSeconds != null) 'motion_active_seconds': motionActiveSeconds,
-    if (motionMeanDeviationG != null) 'motion_mean_deviation_g': motionMeanDeviationG,
-    if (motionMaxDeviationG != null) 'motion_max_deviation_g': motionMaxDeviationG,
+    if (motionActiveSeconds != null)
+      'motion_active_seconds': motionActiveSeconds,
+    if (motionMeanDeviationG != null)
+      'motion_mean_deviation_g': motionMeanDeviationG,
+    if (motionMaxDeviationG != null)
+      'motion_max_deviation_g': motionMaxDeviationG,
   };
 
   factory SleepMonitorSegment.fromMap(Map<String, dynamic> map) {
@@ -100,6 +132,14 @@ class SleepMonitorSegment {
       classification: map['classification'] as String,
       validFraction: (map['valid_fraction'] as num).toDouble(),
       noiseBurstCount: (map['noise_burst_count'] as num?)?.toInt() ?? 0,
+      audioLevelStddevDb: (map['audio_level_stddev_db'] as num?)?.toDouble(),
+      noiseActiveSeconds: (map['noise_active_seconds'] as num?)?.toDouble(),
+      audioSampleRate: (map['audio_sample_rate'] as num?)?.toInt(),
+      audioSampleCount: (map['audio_sample_count'] as num?)?.toInt(),
+      audioBaselineDbfs: (map['audio_baseline_dbfs'] as num?)?.toDouble(),
+      audioCalibrated: map['audio_calibrated'] as bool?,
+      digitalSilenceFraction: (map['digital_silence_fraction'] as num?)
+          ?.toDouble(),
       spectralBandEnergy0: (map['spectral_band_energy_0'] as num?)?.toDouble(),
       spectralBandEnergy1: (map['spectral_band_energy_1'] as num?)?.toDouble(),
       spectralBandEnergy2: (map['spectral_band_energy_2'] as num?)?.toDouble(),
@@ -110,7 +150,8 @@ class SleepMonitorSegment {
       breathingRegularity: (map['breathing_regularity'] as num?)?.toDouble(),
       breathingRateHz: (map['breathing_rate_hz'] as num?)?.toDouble(),
       motionActiveSeconds: (map['motion_active_seconds'] as num?)?.toDouble(),
-      motionMeanDeviationG: (map['motion_mean_deviation_g'] as num?)?.toDouble(),
+      motionMeanDeviationG: (map['motion_mean_deviation_g'] as num?)
+          ?.toDouble(),
       motionMaxDeviationG: (map['motion_max_deviation_g'] as num?)?.toDouble(),
     );
   }

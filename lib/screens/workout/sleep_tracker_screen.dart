@@ -44,6 +44,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   final _monitorService = SleepMonitorService.instance;
   final _sleepGoalService = SleepGoalService();
   List<SleepEntry> _entries = const [];
+  List<SleepMonitorSession> _unestimatedSessions = const [];
   SleepDashboardStats? _stats;
   SleepNightSummary? _latestNight;
   Map<String, SleepNightSummary> _nightSummaries = const {};
@@ -118,6 +119,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         _sleepGoalService.load(),
         _monitorRepository.getNightSummaries(limit: _historyPageSize),
         _repository.getEntryCount(),
+        _monitorRepository.getUnestimatedSessions(),
       ]);
       final entryPage = results[0] as List<SleepEntry>;
       final entries = entryPage.take(_historyPageSize).toList(growable: false);
@@ -134,6 +136,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       if (!mounted) return;
       setState(() {
         _entries = entries;
+        _unestimatedSessions = results[5] as List<SleepMonitorSession>;
         _stats = stats;
         _sleepGoalMinutes = sleepGoalMinutes;
         _latestNight = latestNight;
@@ -241,6 +244,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       child: Column(
         children: [
+          ..._incompleteSessionCards(loc),
           SizedBox(
             height: MediaQuery.sizeOf(context).height * .5,
             child: EmptyStatePlaceholder(
@@ -262,6 +266,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       children: [
+        ..._incompleteSessionCards(loc),
         if (latest != null) ...[
           SleepGoalMetricsCard(
             entry: latest,
@@ -339,6 +344,31 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
       ),
     );
   }
+
+  List<Widget> _incompleteSessionCards(AppLocalizations loc) => [
+    for (final session in _unestimatedSessions)
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.bedtime_outlined),
+          title: Text(loc.sleepIncompleteNight),
+          subtitle: Text(
+            DateFormat.yMd(
+              Localizations.localeOf(context).toLanguageTag(),
+            ).add_jm().format(session.startedAt.toLocal()),
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (_) => SleepMonitorResultScreen(sessionId: session.id),
+              ),
+            );
+            if (mounted) await _load();
+          },
+        ),
+      ),
+  ];
 
   static String _formatElapsed(Duration duration) {
     final hours = duration.inHours.toString().padLeft(2, '0');

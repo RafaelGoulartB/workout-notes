@@ -4,6 +4,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
+import android.os.SystemClock
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.ln
@@ -71,14 +72,11 @@ class AudioSignalProcessor(
     private var worker: Thread? = null
     @Volatile private var running = false
     private var windowStartedAt = System.currentTimeMillis()
+    private var windowStartedElapsed = 0L
+    private var recordingStartedElapsed = 0L
+    private var recordingStartedAt = 0L
     private var windowSamples = 0
-    private var validSamples = 0
-    private var sumSquares = 0.0
-    private var peak = 0.0
-    private var bursts = 0
-    private val noiseBaseline = AdaptiveNoiseBaseline()
-    private val spectral = SpectralAnalyzer()
-    private val breathing = BreathingAnalyzer()
+    private var features = SleepAudioFeatures(SAMPLE_RATE)
     private var activeSampleRate = SAMPLE_RATE
 
     @Synchronized
@@ -87,8 +85,12 @@ class AudioSignalProcessor(
         val started = openStartedRecorder()
         audioRecord = started.record
         activeSampleRate = started.sampleRate
+        features = SleepAudioFeatures(activeSampleRate)
         running = true
         windowStartedAt = System.currentTimeMillis()
+        recordingStartedAt = windowStartedAt
+        windowStartedElapsed = SystemClock.elapsedRealtime()
+        recordingStartedElapsed = windowStartedElapsed
         worker = Thread(
             { captureLoop(started.record, started.bufferSizeBytes / 2) },
             "sleep-audio",
@@ -160,12 +162,12 @@ class AudioSignalProcessor(
     private fun captureLoop(record: AudioRecord, bufferLength: Int) {
         val buffer = ShortArray(max(bufferLength, 256))
         var consecutiveReadErrors = 0
-        var lastSuccessfulReadAt = System.currentTimeMillis()
+        var lastSuccessfulReadAt = SystemClock.elapsedRealtime()
         try {
             while (running) {
                 val read = record.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
                 if (read == 0) {
-                    if (System.currentTimeMillis() - lastSuccessfulReadAt >= NO_DATA_TIMEOUT_MILLIS) {
+                    if (SystemClock.elapsedRealtime() - lastSuccessfulReadAt >= NO_DATA_TIMEOUT_MILLIS) {
                         throw IllegalStateException("audio_record_no_data")
                     }
                     continue
@@ -181,9 +183,9 @@ class AudioSignalProcessor(
                     continue
                 }
                 consecutiveReadErrors = 0
-                lastSuccessfulReadAt = System.currentTimeMillis()
+                lastSuccessfulReadAt = SystemClock.elapsedRealtime()
                 addBuffer(buffer, read)
-                if (System.currentTimeMillis() - windowStartedAt >= WINDOW_SECONDS * 1_000L) {
+                if (SystemClock.elapsedRealtime() - windowStartedElapsed >= WINDOW_SECONDS * 1_000L) {
                     emitSegment()
                 }
             }
@@ -193,68 +195,36 @@ class AudioSignalProcessor(
     }
 
     private fun addBuffer(buffer: ShortArray, length: Int) {
-        val bufferRms = rms(buffer, length)
-        val db = dbfs(bufferRms)
-        val maxDb = peakDbfs(buffer, length)
         windowSamples += length
-        // Positive AudioRecord reads contain valid PCM samples. Clipping at
-        // Short.MIN_VALUE is still valid audio and must not become a dropout.
-        validSamples += length
-        sumSquares += bufferRms * bufferRms * length
-        peak = max(peak, Math.pow(10.0, maxDb / 20.0))
-        noiseBaseline.observe(db)
-        // Digital silence carries no spectral structure; skipping it keeps the
-        // per-window features null so the Dart side can mark it unknown.
-        if (db > -118.0) {
-            spectral.add(buffer, length)
-            breathing.add(buffer, length)
-        }
-        if (db > -118.0 &&
-            noiseBaseline.isCalibrated &&
-            db > noiseBaseline.value + NOISE_DELTA_DB
-        ) {
-            bursts++
-        }
+        features.add(buffer, length)
     }
 
     private fun emitSegment() {
         if (windowSamples <= 0) return
-        val now = System.currentTimeMillis()
-        val elapsedMillis = max(1L, now - windowStartedAt)
+        val elapsed = SystemClock.elapsedRealtime()
+        val now = recordingStartedAt + elapsed - recordingStartedElapsed
+        val elapsedMillis = max(1L, elapsed - windowStartedElapsed)
         val expectedSamples = max(1.0, activeSampleRate * elapsedMillis / 1_000.0)
-        val validFraction = min(1.0, validSamples.toDouble() / expectedSamples)
-        val rmsDb = dbfs(sqrt(sumSquares / windowSamples.toDouble()))
-        val peakDb = dbfs(peak)
-        // Until calibration completes, report zero delta instead of comparing
-        // arbitrary device gain against a fixed dBFS.
-        val noiseScore = noiseBaseline.noiseScore(rmsDb)
+        val validFraction = min(1.0, windowSamples.toDouble() / expectedSamples)
+        val snapshot = features.snapshot()
+        val noiseScore = (snapshot["noise_score"] as Number).toDouble()
         val classification = classify(validFraction, noiseScore)
         val startedAt = windowStartedAt
         val segment = mutableMapOf<String, Any?>(
             "id" to UUID.randomUUID().toString(),
             "session_id" to sessionId,
-            "started_at" to java.time.Instant.ofEpochMilli(startedAt).toString(),
-            "duration_seconds" to max(1L, (now - startedAt) / 1_000L).toInt(),
-            "audio_rms_dbfs" to rmsDb,
-            "audio_peak_dbfs" to peakDb,
-            "noise_score" to noiseScore,
+            "started_at" to java.time.Instant.ofEpochSecond(startedAt / 1_000L).toString(),
+            "duration_seconds" to max(1L, (now / 1_000L) - (startedAt / 1_000L)).toInt(),
             "classification" to classification,
             "valid_fraction" to validFraction,
-            "noise_burst_count" to bursts,
         )
-        segment.putAll(spectral.snapshot())
-        val breathingSnapshot = breathing.snapshot()
-        segment["breathing_regularity"] = breathingSnapshot.first
-        segment["breathing_rate_hz"] = breathingSnapshot.second
+        segment.putAll(snapshot)
         val motion = onMotionSnapshot?.invoke()
         if (motion != null) segment.putAll(motion)
         onSegment(segment)
         windowStartedAt = now
+        windowStartedElapsed = elapsed
         windowSamples = 0
-        validSamples = 0
-        sumSquares = 0.0
-        peak = 0.0
-        bursts = 0
     }
 
     private data class StartedRecorder(

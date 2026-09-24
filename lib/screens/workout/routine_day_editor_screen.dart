@@ -1090,8 +1090,8 @@ class _RoutineDayEditorScreenState extends State<RoutineDayEditorScreen> {
   ) {
     final sets = _predefinedSets[ex['id'] as String] ?? [];
     final exerciseType = ex['exercise_type'] as String? ?? 'weightReps';
-    final fields = getFieldsForType(exerciseType);
-    final keys = fields.keys.toList();
+    final keys = getFieldsForType(exerciseType);
+    final fields = {for (final key in keys) key: workoutFieldLabel(loc, key)};
     final catColor = Color(ex['category_color'] as int? ?? 0xFF757575);
 
     return Card(

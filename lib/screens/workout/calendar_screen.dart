@@ -37,7 +37,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   String get _selectedKey => _selectedDate.toIso8601String().substring(0, 10);
 
-  List<RunActivity> get _selectedDayRuns => _runsByDate[_selectedKey] ?? const [];
+  List<RunActivity> get _selectedDayRuns =>
+      _runsByDate[_selectedKey] ?? const [];
 
   /// Planned runs that were not recorded yet — a completed one shows up as an
   /// activity instead, so listing both would double the day.
@@ -81,10 +82,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
     final monthStart = DateTime(_currentYear, _currentMonth, 1);
     final monthEnd = DateTime(_currentYear, _currentMonth + 1, 0);
-    final scheduled = await _runPlanRepo.getScheduledRuns(
-      monthStart,
-      monthEnd,
-    );
+    final scheduled = await _runPlanRepo.getScheduledRuns(monthStart, monthEnd);
     final plannedByDate = <String, List<ScheduledRun>>{};
     for (final run in scheduled) {
       final key = run.date.toIso8601String().substring(0, 10);
@@ -207,6 +205,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                 ),
 
+                _buildCalendarLegend(theme),
+
                 // Calendar grid
                 Padding(
                   padding: const EdgeInsets.all(8),
@@ -271,74 +271,75 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             ..._selectedDayPlannedRuns.map(_plannedRunCard),
                             ..._selectedDayRuns.map(_completedRunCard),
                             ..._selectedDayWorkouts.map((w) {
-                            final duration =
-                                (w['duration_seconds'] as int?) ?? 0;
-                            final durStr = duration > 0
-                                ? '${duration ~/ 60}min'
-                                : AppLocalizations.of(
-                                    context,
-                                  )!.calendarInProgress;
-                            return Card(
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: BorderSide(
-                                  color: theme.colorScheme.outlineVariant
-                                      .withAlpha(80),
-                                ),
-                              ),
-                              child: ListTile(
-                                leading: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.primaryContainer,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(
-                                    Icons.fitness_center,
-                                    color: theme.colorScheme.onPrimaryContainer,
-                                    size: 20,
+                              final duration =
+                                  (w['duration_seconds'] as int?) ?? 0;
+                              final durStr = duration > 0
+                                  ? '${duration ~/ 60}min'
+                                  : AppLocalizations.of(
+                                      context,
+                                    )!.calendarInProgress;
+                              return Card(
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                    color: theme.colorScheme.outlineVariant
+                                        .withAlpha(80),
                                   ),
                                 ),
-                                title: Text(
-                                  w['start_time'] != null
-                                      ? DateFormat('HH:mm').format(
-                                          DateTime.parse(
-                                            w['start_time'] as String,
-                                          ),
-                                        )
-                                      : AppLocalizations.of(
-                                          context,
-                                        )!.calendarNoTime,
+                                child: ListTile(
+                                  leading: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      Icons.fitness_center,
+                                      color:
+                                          theme.colorScheme.onPrimaryContainer,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  title: Text(
+                                    w['start_time'] != null
+                                        ? DateFormat('HH:mm').format(
+                                            DateTime.parse(
+                                              w['start_time'] as String,
+                                            ),
+                                          )
+                                        : AppLocalizations.of(
+                                            context,
+                                          )!.calendarNoTime,
+                                  ),
+                                  subtitle: Text(durStr),
+                                  trailing: const Icon(Icons.chevron_right),
+                                  onTap: () async {
+                                    final today = DateTime.now()
+                                        .toIso8601String()
+                                        .substring(0, 10);
+                                    final workoutDate =
+                                        w['date'] as String? ?? '';
+                                    final isFuture =
+                                        workoutDate.compareTo(today) > 0;
+                                    Widget target;
+                                    if (isFuture) {
+                                      target = FutureWorkoutPlannerScreen(
+                                        workoutId: w['id'] as String,
+                                      );
+                                    } else {
+                                      target = WorkoutDetailScreen(
+                                        workoutId: w['id'] as String,
+                                      );
+                                    }
+                                    final result = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => target),
+                                    );
+                                    if (result == true) _loadMonth();
+                                  },
                                 ),
-                                subtitle: Text(durStr),
-                                trailing: const Icon(Icons.chevron_right),
-                                onTap: () async {
-                                  final today = DateTime.now()
-                                      .toIso8601String()
-                                      .substring(0, 10);
-                                  final workoutDate =
-                                      w['date'] as String? ?? '';
-                                  final isFuture =
-                                      workoutDate.compareTo(today) > 0;
-                                  Widget target;
-                                  if (isFuture) {
-                                    target = FutureWorkoutPlannerScreen(
-                                      workoutId: w['id'] as String,
-                                    );
-                                  } else {
-                                    target = WorkoutDetailScreen(
-                                      workoutId: w['id'] as String,
-                                    );
-                                  }
-                                  final result = await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => target),
-                                  );
-                                  if (result == true) _loadMonth();
-                                },
-                              ),
-                            );
+                              );
                             }),
                           ],
                         ),
@@ -465,8 +466,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         title: Text(
           activity.title ??
               (activity.isStationaryBike
-                  ? AppLocalizations.of(context)!
-                      .cardioActivityStationaryBike
+                  ? AppLocalizations.of(context)!.cardioActivityStationaryBike
                   : DateFormat('HH:mm').format(activity.startedAt)),
         ),
         subtitle: Text(
@@ -509,8 +509,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
       final cats = _categoriesByDate[dateStr] ?? [];
       final hasWorkout = cats.isNotEmpty;
       final hasRun = (_runsByDate[dateStr] ?? const []).isNotEmpty;
-      final hasPlannedRun = (_plannedRunsByDate[dateStr] ?? const [])
-          .any((run) => !run.isCompleted);
+      final hasPlannedRun = (_plannedRunsByDate[dateStr] ?? const []).any(
+        (run) => !run.isCompleted,
+      );
       final isToday = dateStr == today;
       final isSelected = dateStr == selectedStr;
 
@@ -572,6 +573,47 @@ class _CalendarScreenState extends State<CalendarScreen> {
       physics: const NeverScrollableScrollPhysics(),
       childAspectRatio: 1.0,
       children: cells,
+    );
+  }
+
+  Widget _buildCalendarLegend(ThemeData theme) {
+    final loc = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 14,
+        runSpacing: 4,
+        children: [
+          _CalendarLegendItem(
+            marker: Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                shape: BoxShape.circle,
+              ),
+            ),
+            label: loc.calendarLegendWorkout,
+          ),
+          _CalendarLegendItem(
+            marker: Icon(
+              Icons.directions_run_rounded,
+              size: 13,
+              color: theme.colorScheme.secondary,
+            ),
+            label: loc.calendarLegendCompletedRun,
+          ),
+          _CalendarLegendItem(
+            marker: Icon(
+              Icons.directions_run_rounded,
+              size: 13,
+              color: theme.colorScheme.secondary.withAlpha(110),
+            ),
+            label: loc.calendarLegendPlannedRun,
+          ),
+        ],
+      ),
     );
   }
 
@@ -807,6 +849,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
         content: Text(loc.activeWorkoutRoutineImported),
         behavior: SnackBarBehavior.floating,
       ),
+    );
+  }
+}
+
+class _CalendarLegendItem extends StatelessWidget {
+  final Widget marker;
+  final String label;
+
+  const _CalendarLegendItem({required this.marker, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        marker,
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }

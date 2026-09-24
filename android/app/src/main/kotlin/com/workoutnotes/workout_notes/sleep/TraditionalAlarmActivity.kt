@@ -5,12 +5,13 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.text.format.DateFormat
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import java.text.SimpleDateFormat
+import com.workoutnotes.workout_notes.R
 import java.util.Date
 
 class TraditionalAlarmActivity : Activity() {
@@ -28,9 +29,18 @@ class TraditionalAlarmActivity : Activity() {
         val alarmId = id ?: return
         val raw = data?.getStringExtra(BarcodeScannerActivity.EXTRA_RAW_VALUE)
         val format = data?.getStringExtra(BarcodeScannerActivity.EXTRA_FORMAT)
-        if (resultCode == BarcodeScannerActivity.RESULT_SUCCESS && raw != null && format != null && TraditionalAlarmScheduler.verifyMission(this, alarmId, raw, format)) {
-            TraditionalAlarmRingingService.missionComplete(this, alarmId); finishAndRemoveTask()
-        } else { error = "O código não confere. Tente novamente."; render() }
+        if (resultCode == BarcodeScannerActivity.RESULT_SUCCESS && raw != null && format != null) {
+            if (TraditionalAlarmScheduler.verifyMission(this, alarmId, raw, format)) {
+                TraditionalAlarmRingingService.missionComplete(this, alarmId)
+                finishAndRemoveTask()
+            } else {
+                error = getString(R.string.traditional_alarm_mission_wrong_code)
+                render()
+            }
+        } else {
+            error = getString(R.string.traditional_alarm_mission_cancelled)
+            render()
+        }
     }
 
     private fun lockScreen() {
@@ -44,13 +54,13 @@ class TraditionalAlarmActivity : Activity() {
         val snapshot = TraditionalAlarmScheduler.read(this, alarmId) ?: run { finish(); return }
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(dp(28), dp(48), dp(28), dp(36)); setBackgroundColor(Color.rgb(19, 24, 54)) }
         root.addView(TextView(this).apply { text = "⏰"; textSize = 56f; gravity = Gravity.CENTER })
-        root.addView(TextView(this).apply { text = "Hora de acordar"; textSize = 26f; gravity = Gravity.CENTER; setTextColor(Color.WHITE) })
-        root.addView(TextView(this).apply { text = SimpleDateFormat("HH:mm").format(Date(snapshot.alarmAtMillis)); textSize = 68f; gravity = Gravity.CENTER; setTextColor(Color.WHITE) })
-        root.addView(TextView(this).apply { text = if (snapshot.requiresMission) "Conclua a missão para desligar." else "Seu alarme está tocando."; textSize = 16f; gravity = Gravity.CENTER; setTextColor(Color.LTGRAY) })
+        root.addView(TextView(this).apply { text = getString(R.string.traditional_alarm_wake_title); textSize = 26f; gravity = Gravity.CENTER; setTextColor(Color.WHITE) })
+        root.addView(TextView(this).apply { text = DateFormat.getTimeFormat(this@TraditionalAlarmActivity).format(Date(snapshot.alarmAtMillis)); textSize = 68f; gravity = Gravity.CENTER; setTextColor(Color.WHITE) })
+        root.addView(TextView(this).apply { text = getString(if (snapshot.requiresMission) R.string.traditional_alarm_mission_body else R.string.traditional_alarm_ringing_body); textSize = 16f; gravity = Gravity.CENTER; setTextColor(Color.LTGRAY) })
         if (error != null) root.addView(TextView(this).apply { text = error; gravity = Gravity.CENTER; setTextColor(Color.rgb(255, 180, 180)) })
         root.addView(TextView(this), LinearLayout.LayoutParams(1, 0, 1f))
-        if (snapshot.snoozeEnabled && snapshot.snoozeCount < snapshot.maxSnoozes) root.addView(Button(this).apply { text = "Sonecar por ${snapshot.snoozeMinutes} min (${snapshot.snoozeCount + 1}/${snapshot.maxSnoozes})"; setOnClickListener { TraditionalAlarmRingingService.snooze(this@TraditionalAlarmActivity, alarmId); finishAndRemoveTask() } }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(54)))
-        root.addView(Button(this).apply { text = if (snapshot.requiresMission) "Abrir missão" else "Desligar"; setOnClickListener { if (snapshot.requiresMission) startActivityForResult(Intent(this@TraditionalAlarmActivity, BarcodeScannerActivity::class.java).apply { putExtra(BarcodeScannerActivity.EXTRA_ENROLLMENT, false) }, 9911) else { TraditionalAlarmRingingService.dismiss(this@TraditionalAlarmActivity, alarmId); finishAndRemoveTask() } } }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)).apply { topMargin = dp(12) })
+        if (snapshot.snoozeEnabled && snapshot.snoozeCount < snapshot.maxSnoozes) root.addView(Button(this).apply { text = getString(R.string.traditional_alarm_snooze_detail, snapshot.snoozeMinutes, snapshot.snoozeCount + 1, snapshot.maxSnoozes); setOnClickListener { TraditionalAlarmRingingService.snooze(this@TraditionalAlarmActivity, alarmId); finishAndRemoveTask() } }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(54)))
+        root.addView(Button(this).apply { text = getString(if (snapshot.requiresMission) R.string.traditional_alarm_open_mission else R.string.traditional_alarm_dismiss); setOnClickListener { if (snapshot.requiresMission) startActivityForResult(Intent(this@TraditionalAlarmActivity, BarcodeScannerActivity::class.java).apply { putExtra(BarcodeScannerActivity.EXTRA_ENROLLMENT, false) }, 9911) else { TraditionalAlarmRingingService.dismiss(this@TraditionalAlarmActivity, alarmId); finishAndRemoveTask() } } }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)).apply { topMargin = dp(12) })
         setContentView(root)
     }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()

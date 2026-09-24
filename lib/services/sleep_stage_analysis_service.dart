@@ -1,6 +1,7 @@
 import '../models/sleep_stage_epoch.dart';
 import '../models/sleep_stage_summary.dart';
 import '../models/sleep_stage_type.dart';
+import 'package:workout_notes/services/sleep_wake_engine.dart';
 
 /// Consolidates model-labelled epochs into user-facing nightly metrics.
 ///
@@ -22,12 +23,22 @@ class SleepStageAnalysisService {
     if (epochs.isEmpty || !sessionEnd.isAfter(sessionStart)) return null;
     final ordered = [...epochs]
       ..sort((a, b) => a.startedAt.compareTo(b.startedAt));
-    if (!ordered.any((epoch) => epoch.stage != SleepStageType.unknown)) {
+    final bedside = ordered.every(
+      (epoch) => epoch.source == SleepWakeEngine.source,
+    );
+    if (!bedside &&
+        !ordered.any((epoch) => epoch.stage != SleepStageType.unknown)) {
       return null;
     }
 
-    final onset = _findOnset(ordered, sessionEnd);
-    final finalWake = _findFinalWake(ordered, sessionEnd);
+    final onset = bedside
+        ? ordered.where((epoch) => epoch.isSleep).firstOrNull?.startedAt
+        : _findOnset(ordered, sessionEnd);
+    final finalWake = _findFinalWake(
+      ordered,
+      sessionEnd,
+      allowSessionEnd: !bedside,
+    );
     var awakeSeconds = 0;
     var sleepingSeconds = 0;
     var deepSeconds = 0;
@@ -104,10 +115,14 @@ class SleepStageAnalysisService {
     return null;
   }
 
-  DateTime? _findFinalWake(List<SleepStageEpoch> epochs, DateTime sessionEnd) {
+  DateTime? _findFinalWake(
+    List<SleepStageEpoch> epochs,
+    DateTime sessionEnd, {
+    bool allowSessionEnd = true,
+  }) {
     var runSeconds = 0;
     DateTime? runStart;
-    DateTime? expectedEnd;
+    DateTime? expectedEnd = sessionEnd;
     for (final epoch in epochs.reversed) {
       final closeToPrevious =
           expectedEnd == null ||
@@ -117,7 +132,9 @@ class SleepStageAnalysisService {
       runStart = epoch.startedAt;
       expectedEnd = epoch.startedAt;
     }
-    return runSeconds >= finalWakeSeconds ? runStart : sessionEnd;
+    return runSeconds >= finalWakeSeconds
+        ? runStart
+        : (allowSessionEnd ? sessionEnd : null);
   }
 
   int _countAwakenings(

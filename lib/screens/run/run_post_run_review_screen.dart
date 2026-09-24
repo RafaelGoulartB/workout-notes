@@ -862,13 +862,6 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
               ? loc.stationaryBikeReviewTitle
               : loc.runReviewTitle,
         ),
-        actions: [
-          IconButton(
-            onPressed: null,
-            tooltip: loc.runReviewShareSoon,
-            icon: const Icon(Icons.ios_share_outlined),
-          ),
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
