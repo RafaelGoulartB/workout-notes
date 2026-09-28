@@ -602,6 +602,39 @@ void main() {
       expect(active.isActivated, isTrue);
     });
 
+    test('a race plan is anchored so its last week is race week', () async {
+      final today = DateTime.now();
+      final monday = DateTime(
+        today.year,
+        today.month,
+        today.day,
+      ).subtract(Duration(days: today.weekday - 1));
+      // Race on the Saturday eight weeks from now; the plan is three weeks.
+      final race = monday.add(const Duration(days: 7 * 8 + 5));
+      final plan = await repository.createPlan(
+        name: '5 km',
+        goalKind: RunPlanGoalKind.fiveK,
+        weeks: 3,
+        raceDate: race,
+      );
+      for (var week = 0; week < 3; week++) {
+        await repository.addWorkout(
+          planId: plan.id,
+          weekIndex: week,
+          name: 'Rodagem',
+          kind: RunWorkoutKind.easy,
+          dayOfWeek: 3,
+          targetDistanceMeters: 5000,
+        );
+      }
+      await repository.activatePlan(plan.id);
+      final active = (await repository.getPlan(plan.id))!;
+      expect(active.activatedAt, monday.add(const Duration(days: 7 * 6)));
+      expect(active.activeWeekIndexOn(race), 2);
+      // Not started yet: nothing is due this week.
+      expect(active.activeWeekIndexOn(today), isNull);
+    });
+
     test('activating schedules the remaining weeks only once', () async {
       final plan = await seedPlan(weeks: 3);
       for (var week = 0; week < 3; week++) {

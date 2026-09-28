@@ -12,6 +12,9 @@ import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/widgets/run/run_plan_volume_sparkline.dart';
 
+/// Where the athlete can do hill-type strength work.
+enum _Terrain { hill, stairs, treadmill, flat }
+
 /// Coach-style wizard: days → intent/volume → paces → preview → create.
 class RunPlanCustomizeScreen extends StatefulWidget {
   final RunPlanTemplate template;
@@ -19,10 +22,14 @@ class RunPlanCustomizeScreen extends StatefulWidget {
   /// When set, skips loading GPS history (tests).
   final RunPlanHistoryInsights? history;
 
+  /// Clock for race-date maths (tests).
+  final DateTime? today;
+
   const RunPlanCustomizeScreen({
     super.key,
     required this.template,
     this.history,
+    this.today,
   });
 
   @override
@@ -32,54 +39,84 @@ class RunPlanCustomizeScreen extends StatefulWidget {
 class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
   final _repo = RunPlanRepository();
   final _runRepo = RunRepository();
-  final _timeCtl = TextEditingController();
+  final _currentCtl = TextEditingController();
+  final _goalCtl = TextEditingController();
   final _weeklyKmCtl = TextEditingController();
 
   int _step = 0;
   late int _sessions;
   late int _weeks;
   final Set<int> _days = {};
+  int? _longRunDay;
   RunPlanIntent _intent = RunPlanIntent.finish;
   RunPlanIntensity _intensity = RunPlanIntensity.standard;
-  bool _includeHills = true;
-  bool _skipPace = false;
-  RunPlanPaceSource _paceSource = RunPlanPaceSource.goal;
-  late double _paceDistanceMeters;
+  _Terrain _terrain = _Terrain.hill;
+  late double _currentDistanceMeters;
   DateTime? _raceDate;
   bool _creating = false;
   RunPlanHistoryInsights? _history;
-  bool _baselinePrefillApplied = false;
-  String _goalTimeText = '';
-  late double _goalDistanceMeters;
+  bool _historyApplied = false;
+  int _previewWeek = 0;
 
-  bool get _isMaintain => widget.template.maintainFitness;
+  RunPlanTemplate get _template => widget.template;
+  bool get _isMaintain => _template.maintainFitness;
+  bool get _isRunWalk => _template.style == RunPlanTemplateStyle.runWalk;
+
+  /// Race distance this template trains for, or null for base / maintenance.
+  double? get _goalDistance => _raceDistance(_template.goalKind);
+
+  /// The plan ends in a race, so a race date can align it.
+  bool get _hasRace =>
+      _goalDistance != null &&
+      !_isMaintain &&
+      (_template.raceFinish ||
+          _template.style == RunPlanTemplateStyle.performance);
+
+  /// Templates whose whole point is a faster time — asking "finish or PB?"
+  /// there is noise.
+  bool get _pbOnly => const {
+    '5k',
+    '5k_advanced',
+    '10k',
+    '10k_advanced',
+    'half_pb',
+    'marathon_pb',
+    'race_sharpen',
+  }.contains(_template.key);
+
+  /// Hill sessions can appear in this template.
+  bool get _canHaveHills =>
+      _template.style == RunPlanTemplateStyle.performance || _isMaintain;
+
+  DateTime get _today => widget.today ?? DateTime.now();
 
   @override
   void initState() {
     super.initState();
     // Templates cap what they allow (a run/walk progression tops out at four
     // days), so the default has to be a value the user can actually re-pick.
-    final allowed = widget.template.allowedSessionsPerWeek;
-    final preferred = widget.template.sessionsPerWeek.clamp(3, 5);
+    final allowed = _template.allowedSessionsPerWeek;
+    final preferred = _template.sessionsPerWeek.clamp(3, 5);
     _sessions = allowed.contains(preferred) ? preferred : allowed.last;
-    _weeks = widget.template.defaultSelectableWeeks;
-    _paceDistanceMeters = _defaultDistance(widget.template.goalKind);
-    _goalDistanceMeters = _paceDistanceMeters;
+    _weeks = _template.defaultSelectableWeeks;
+    _currentDistanceMeters = _goalDistance ?? RunPaceCalculator.fiveKMeters;
     _seedDefaultDays();
-    if (_isMaintain ||
-        widget.template.key == 'return' ||
-        widget.template.key == 'return_injury' ||
-        widget.template.key == 'first_5k' ||
-        widget.template.key == 'first_10k' ||
-        widget.template.key == 'to_half' ||
-        widget.template.key == 'first_half' ||
-        widget.template.key == 'first_marathon') {
-      _intent = RunPlanIntent.finish;
-    } else if (widget.template.style == RunPlanTemplateStyle.performance ||
-        widget.template.raceFinish) {
+    if (_pbOnly) {
       _intent = RunPlanIntent.pb;
-    } else {
+    } else if (_isMaintain ||
+        const {
+          'return',
+          'return_injury',
+          'first_5k',
+          'first_10k',
+          'to_half',
+          'first_half',
+          'first_marathon',
+        }.contains(_template.key)) {
       _intent = RunPlanIntent.finish;
+    } else if (_template.style == RunPlanTemplateStyle.performance ||
+        _template.raceFinish) {
+      _intent = RunPlanIntent.pb;
     }
     _history = widget.history;
     if (_history != null) {
@@ -95,7 +132,7 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
       if (!mounted) return;
       final insights = RunPlanHistoryInsights.from(
         activities,
-        goalDistanceMeters: _defaultDistance(widget.template.goalKind),
+        goalDistanceMeters: _goalDistance ?? RunPaceCalculator.fiveKMeters,
       );
       setState(() {
         _history = insights;
@@ -107,21 +144,44 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
   }
 
   void _applyHistory(RunPlanHistoryInsights insights) {
-    if (!_baselinePrefillApplied &&
-        _weeklyKmCtl.text.trim().isEmpty &&
-        insights.medianWeeklyKm != null) {
+    if (_historyApplied) return;
+    _historyApplied = true;
+    if (_weeklyKmCtl.text.trim().isEmpty && insights.medianWeeklyKm != null) {
       _weeklyKmCtl.text = _formatKmValue(insights.medianWeeklyKm!);
     }
-    _baselinePrefillApplied = true;
-    if (_paceSource == RunPlanPaceSource.recent &&
-        _timeCtl.text.trim().isEmpty) {
-      _applySuggestedRace();
+    final suggested = insights.suggestedRace;
+    if (suggested != null && _currentCtl.text.trim().isEmpty) {
+      // A GPS effort is rarely an exact race distance. Show the equivalent
+      // time at the standard distance whose chip is selected — "5 km in
+      // 28:30" for a 5.7 km run would misstate the athlete's fitness.
+      final distance = _standardDistances.reduce(
+        (a, b) =>
+            (a - suggested.distanceMeters).abs() <
+                (b - suggested.distanceMeters).abs()
+            ? a
+            : b,
+      );
+      final seconds = (suggested.distanceMeters - distance).abs() < 1
+          ? suggested.timeSeconds
+          : (RunPaceCalculator.racePaceFor(
+                      RunPaceCalculator.vdotFor(
+                        distanceMeters: suggested.distanceMeters,
+                        timeSeconds: suggested.timeSeconds,
+                      ),
+                      distance,
+                    ) *
+                    distance /
+                    1000)
+                .round();
+      _currentDistanceMeters = distance;
+      _currentCtl.text = _formatDuration(seconds);
     }
   }
 
   @override
   void dispose() {
-    _timeCtl.dispose();
+    _currentCtl.dispose();
+    _goalCtl.dispose();
     _weeklyKmCtl.dispose();
     super.dispose();
   }
@@ -139,6 +199,9 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     _days
       ..clear()
       ..addAll(_defaultDaysFor(_sessions));
+    if (_longRunDay != null && !_days.contains(_longRunDay)) {
+      _longRunDay = null;
+    }
   }
 
   static List<int> _defaultDaysFor(int sessions) => switch (sessions) {
@@ -147,61 +210,108 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     _ => const [2, 4, 5, 7],
   };
 
-  static double _defaultDistance(RunPlanGoalKind goal) => switch (goal) {
+  static const _standardDistances = [
+    RunPaceCalculator.fiveKMeters,
+    RunPaceCalculator.tenKMeters,
+    RunPaceCalculator.halfMeters,
+    RunPaceCalculator.marathonMeters,
+  ];
+
+  static String _distanceName(AppLocalizations loc, double meters) =>
+      switch (meters) {
+        RunPaceCalculator.fiveKMeters => '5 km',
+        RunPaceCalculator.tenKMeters => '10 km',
+        RunPaceCalculator.halfMeters => loc.runPlanGoalHalf,
+        RunPaceCalculator.marathonMeters => loc.runPlanGoalMarathon,
+        _ => RunPlanUi.distanceLabel(meters),
+      };
+
+  static double? _raceDistance(RunPlanGoalKind goal) => switch (goal) {
     RunPlanGoalKind.fiveK => RunPaceCalculator.fiveKMeters,
     RunPlanGoalKind.tenK => RunPaceCalculator.tenKMeters,
     RunPlanGoalKind.half => RunPaceCalculator.halfMeters,
     RunPlanGoalKind.marathon => RunPaceCalculator.marathonMeters,
-    _ => RunPaceCalculator.fiveKMeters,
+    _ => null,
   };
-
-  RunPlanPaceCalibration? get _fitnessCalibration =>
-      _history?.suggestedRace?.calibration;
 
   bool get _daysValid => _days.length == _sessions;
 
-  RunPlanPaceCalibration? get _calibration {
-    if (_skipPace) return null;
-    final seconds = _parseDuration(_timeCtl.text);
-    if (seconds == null || seconds <= 0) return null;
+  /// Seconds typed in [controller] for [distance]; null when empty.
+  /// Returns -1 for text that is not a plausible time.
+  static int? _typedSeconds(TextEditingController controller, double distance) {
+    final raw = controller.text.trim();
+    if (raw.isEmpty) return null;
+    return parseRaceTime(raw, distance) ?? -1;
+  }
+
+  int? get _currentSeconds =>
+      _typedSeconds(_currentCtl, _currentDistanceMeters);
+  int? get _goalSeconds {
+    final distance = _goalDistance;
+    return distance == null ? null : _typedSeconds(_goalCtl, distance);
+  }
+
+  RunPlanPaceCalibration? get _currentCalibration {
+    final seconds = _currentSeconds;
+    if (seconds == null || seconds < 0) return null;
     return RunPlanPaceCalibration(
-      distanceMeters: _paceDistanceMeters,
+      distanceMeters: _currentDistanceMeters,
       timeSeconds: seconds,
     );
   }
 
-  RunPaces? get _previewPaces {
-    try {
-      return _config.trainingPaces;
-    } catch (_) {
-      return null;
-    }
+  RunPlanPaceCalibration? get _goalCalibration {
+    final seconds = _goalSeconds, distance = _goalDistance;
+    if (seconds == null || seconds < 0 || distance == null) return null;
+    return RunPlanPaceCalibration(
+      distanceMeters: distance,
+      timeSeconds: seconds,
+    );
   }
 
-  RunPlanBuildConfig get _config => RunPlanBuildConfig(
-    sessionsPerWeek: _sessions,
-    availableDays: (_days.toList()..sort()),
-    intent: _intent,
-    intensity: _intensity,
-    calibration: _calibration,
-    paceSource: _paceSource,
-    fitnessCalibration: _fitnessCalibration,
-    raceDate: _isMaintain ? null : _raceDate,
-    currentWeeklyKm: _currentWeeklyKm,
-    includeHills: _includeHills,
-    weeks: widget.template.selectableWeeks ? _weeks : null,
-  );
+  bool get _paceInputsValid =>
+      (_currentSeconds ?? 0) >= 0 && (_goalSeconds ?? 0) >= 0;
+
+  RunPlanBuildConfig get _config {
+    final current = _currentCalibration;
+    final goal = _goalCalibration;
+    return RunPlanBuildConfig(
+      sessionsPerWeek: _sessions,
+      availableDays: (_days.toList()..sort()),
+      intent: _intent,
+      intensity: _intensity,
+      calibration: current ?? goal,
+      paceSource: current != null
+          ? RunPlanPaceSource.recent
+          : RunPlanPaceSource.goal,
+      goalCalibration: current != null ? goal : null,
+      fitnessCalibration: current == null
+          ? _history?.suggestedRace?.calibration
+          : null,
+      raceDate: _hasRace ? _raceDate : null,
+      startDate: _today,
+      currentWeeklyKm: _currentWeeklyKm,
+      includeHills: _terrain != _Terrain.flat,
+      hillSurface: switch (_terrain) {
+        _Terrain.stairs => RunPlanHillSurface.stairs,
+        _Terrain.treadmill => RunPlanHillSurface.treadmill,
+        _ => RunPlanHillSurface.hill,
+      },
+      longRunDay: _longRunDay != null && _days.contains(_longRunDay)
+          ? _longRunDay
+          : null,
+      weeks: _template.selectableWeeks ? _weeks : null,
+    );
+  }
 
   RunPlanOutline? get _outline {
     if (!_daysValid) return null;
     try {
-      return RunPlanComposer.outline(widget.template, _config);
+      return RunPlanComposer.outline(_template, _config);
     } catch (_) {
       return null;
     }
   }
-
-  RunPlanReadiness? get _readiness => _outline?.readiness;
 
   static String _km(double value) => value.toStringAsFixed(0);
 
@@ -213,39 +323,123 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     return rounded.toStringAsFixed(1);
   }
 
+  String _date(DateTime date) =>
+      MaterialLocalizations.of(context).formatMediumDate(date);
+
+  /// Opens [template] in a fresh wizard; a plan created there closes this one.
+  Future<void> _switchTo(RunPlanTemplate template) async {
+    final plan = await Navigator.push<RunPlan>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RunPlanCustomizeScreen(
+          template: template,
+          history: _history,
+          today: widget.today,
+        ),
+      ),
+    );
+    if (plan != null && mounted) Navigator.pop(context, plan);
+  }
+
   /// Coach warnings for the current step. Days step: only the schedule smell;
   /// preview step: everything, so the athlete sees it right before creating.
   Widget _buildWarnings(
     AppLocalizations loc,
-    ThemeData theme, {
+    ThemeData theme,
+    RunPlanOutline? outline, {
     required bool full,
   }) {
-    final readiness = _readiness;
+    final readiness = outline?.readiness;
     if (readiness == null) return const SizedBox.shrink();
-    final messages = <String>[
-      if (readiness.consecutiveDays) loc.runPlanCustomizeWarnConsecutiveDays,
-      if (full && readiness.baselineZero) loc.runPlanCustomizeWarnZeroBaseline,
-      if (full && readiness.volumeGap)
+    final isPt = Localizations.localeOf(context).languageCode == 'pt';
+    final messages = <String>[];
+    final actions = <(String, VoidCallback)>[];
+    void action(String label, VoidCallback onTap) {
+      if (actions.every((a) => a.$1 != label)) actions.add((label, onTap));
+    }
+
+    if (readiness.consecutiveDays) {
+      messages.add(loc.runPlanCustomizeWarnConsecutiveDays);
+    }
+    if (full && readiness.raceTooSoon) {
+      messages.add(
+        loc.runPlanCustomizeWarnRaceTooSoon(
+          readiness.weeksToRace ?? 0,
+          readiness.minWeeks,
+        ),
+      );
+      action(
+        loc.runPlanCustomizeActionPickDate,
+        () => setState(() => _step = 0),
+      );
+    }
+    if (full && readiness.baselineZero) {
+      messages.add(loc.runPlanCustomizeWarnZeroBaseline);
+      action(
+        loc.runPlanCustomizeActionStartRunning,
+        () => _switchTo(RunPlanTemplates.runWalk),
+      );
+    }
+    if (full && readiness.volumeGap) {
+      messages.add(
         loc.runPlanCustomizeWarnVolumeGap(
           _km(readiness.startWeeklyKm),
           _km(readiness.currentWeeklyKm ?? 0),
         ),
-      if (full && readiness.timeCapDistanceGap)
+      );
+    }
+    if (full && readiness.thinSessions) {
+      messages.add(loc.runPlanCustomizeWarnThinSessions);
+    }
+    if (full && (readiness.volumeGap || readiness.thinSessions)) {
+      if (_sessions > 3 && _template.allowedSessionsPerWeek.contains(3)) {
+        action(
+          loc.runPlanCustomizeActionThreeDays,
+          () => setState(() {
+            _sessions = 3;
+            _seedDefaultDays();
+          }),
+        );
+      }
+      if (readiness.volumeGap && _intensity != RunPlanIntensity.conservative) {
+        action(
+          loc.runPlanCustomizeActionConservative,
+          () => setState(() => _intensity = RunPlanIntensity.conservative),
+        );
+      }
+    }
+    if (full && readiness.timeCapDistanceGap) {
+      messages.add(
         loc.runPlanCustomizeWarnTimeCapGap(
           _km(readiness.longRunCapKm),
           _km(readiness.requiredLongKm),
-        )
-      else if (full && readiness.longRunShort)
+        ),
+      );
+    } else if (full && readiness.longRunShort) {
+      messages.add(
         loc.runPlanCustomizeWarnLongRunShort(
           _km(readiness.peakLongKm),
           _km(readiness.requiredLongKm),
         ),
-      if (full && readiness.optimisticGoal && _fitnessCalibration != null)
-        loc.runPlanCustomizeWarnOptimisticGoal(
-          RunPlanUi.distanceLabel(_fitnessCalibration!.distanceMeters),
-          RunFormatters.duration(_fitnessCalibration!.timeSeconds),
-        ),
-    ];
+      );
+    }
+    if (full && (readiness.longRunShort || readiness.baselineZero)) {
+      final shorter = RunPlanTemplates.shorterGoal(_template);
+      if (shorter != null && shorter.key != RunPlanTemplates.runWalk.key) {
+        action(
+          loc.runPlanCustomizeActionTryPlan(shorter.title(isPt)),
+          () => _switchTo(shorter),
+        );
+      }
+    }
+    if (full && readiness.needsHillAccess) {
+      messages.add(loc.runPlanCustomizeWarnNeedsHills);
+      final threshold = RunPlanTemplates.thresholdBlock;
+      action(
+        loc.runPlanCustomizeActionTryPlan(threshold.title(isPt)),
+        () => _switchTo(threshold),
+      );
+    }
     if (messages.isEmpty) return const SizedBox.shrink();
     final scheme = theme.colorScheme;
     final blocking = full && !readiness.canCreate;
@@ -293,6 +487,24 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
                   ),
                 ),
               ],
+              if (actions.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final (label, onTap) in actions)
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: foreground,
+                          side: BorderSide(color: foreground),
+                        ),
+                        onPressed: onTap,
+                        child: Text(label),
+                      ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -301,14 +513,17 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
   }
 
   Future<void> _create() async {
-    if (_creating || !_daysValid || !(_readiness?.canCreate ?? false)) return;
+    final outline = _outline;
+    if (_creating || !_daysValid || !(outline?.readiness.canCreate ?? false)) {
+      return;
+    }
     setState(() => _creating = true);
     try {
       final isPt = Localizations.localeOf(context).languageCode == 'pt';
       final plan = await RunPlanTemplates.create(
         _repo,
-        widget.template,
-        name: widget.template.title(isPt),
+        _template,
+        name: _template.title(isPt),
         config: _config,
       );
       if (!mounted) return;
@@ -328,11 +543,12 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final isPt = Localizations.localeOf(context).languageCode == 'pt';
+    final outline = _outline;
     final canNext = switch (_step) {
       0 => _daysValid,
       1 => true,
-      2 => _skipPace || _calibration != null,
-      _ => _daysValid && (_readiness?.canCreate ?? false),
+      2 => _paceInputsValid,
+      _ => _daysValid && (outline?.readiness.canCreate ?? false),
     };
 
     return Scaffold(
@@ -351,7 +567,7 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.template.title(isPt),
+                  _template.title(isPt),
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -388,10 +604,10 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                if (_step == 0) _buildDaysStep(loc, theme),
+                if (_step == 0) _buildDaysStep(loc, theme, outline),
                 if (_step == 1) _buildIntentStep(loc, theme),
-                if (_step == 2) _buildPaceStep(loc, theme),
-                if (_step == 3) _buildPreviewStep(loc, theme),
+                if (_step == 2) _buildPaceStep(loc, theme, outline),
+                if (_step == 3) _buildPreviewStep(loc, theme, outline),
               ],
             ),
           ),
@@ -439,16 +655,44 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     );
   }
 
-  Widget _buildDaysStep(AppLocalizations loc, ThemeData theme) {
-    final labels = [
-      loc.runPlanCustomizeWeekdayMon,
-      loc.runPlanCustomizeWeekdayTue,
-      loc.runPlanCustomizeWeekdayWed,
-      loc.runPlanCustomizeWeekdayThu,
-      loc.runPlanCustomizeWeekdayFri,
-      loc.runPlanCustomizeWeekdaySat,
-      loc.runPlanCustomizeWeekdaySun,
-    ];
+  List<String> _weekdayLabels(AppLocalizations loc) => [
+    loc.runPlanCustomizeWeekdayMon,
+    loc.runPlanCustomizeWeekdayTue,
+    loc.runPlanCustomizeWeekdayWed,
+    loc.runPlanCustomizeWeekdayThu,
+    loc.runPlanCustomizeWeekdayFri,
+    loc.runPlanCustomizeWeekdaySat,
+    loc.runPlanCustomizeWeekdaySun,
+  ];
+
+  Widget _buildDaysStep(
+    AppLocalizations loc,
+    ThemeData theme,
+    RunPlanOutline? outline,
+  ) {
+    final labels = _weekdayLabels(loc);
+    final readiness = outline?.readiness;
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    String? raceNote;
+    if (_hasRace && _raceDate != null && readiness != null && outline != null) {
+      final weeksToRace = readiness.weeksToRace;
+      final plannedWeeks = outline.schedule.length;
+      if (readiness.raceTooSoon) {
+        raceNote = loc.runPlanCustomizeWarnRaceTooSoon(
+          weeksToRace ?? 0,
+          readiness.minWeeks,
+        );
+      } else if (weeksToRace != null && weeksToRace < _template.weeks) {
+        raceNote = loc.runPlanCustomizeRaceCompressed(plannedWeeks);
+      } else if (outline.startWeek != null) {
+        raceNote = loc.runPlanCustomizeRaceStartsLater(
+          plannedWeeks,
+          _date(outline.startWeek!),
+        );
+      }
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -465,7 +709,7 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final n in widget.template.allowedSessionsPerWeek)
+            for (final n in _template.allowedSessionsPerWeek)
               ChoiceChip(
                 label: Text(loc.runPlanCustomizeSessions(n)),
                 selected: _sessions == n,
@@ -491,16 +735,26 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
                 label: Text(labels[d - 1]),
                 selected: _days.contains(d),
                 onSelected: (selected) {
+                  if (selected && _days.length >= _sessions) {
+                    // Silently swapping a day the athlete picked earlier was
+                    // confusing; say what to do instead.
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            loc.runPlanCustomizeDaysFull(_sessions),
+                          ),
+                        ),
+                      );
+                    return;
+                  }
                   setState(() {
                     if (selected) {
-                      if (_days.length >= _sessions) {
-                        // Replace oldest selection so the user can re-pick.
-                        final sorted = _days.toList()..sort();
-                        _days.remove(sorted.first);
-                      }
                       _days.add(d);
                     } else {
                       _days.remove(d);
+                      if (_longRunDay == d) _longRunDay = null;
                     }
                   });
                 },
@@ -516,25 +770,45 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
             ),
           ),
         ],
-        if (widget.template.selectableWeeks) ...[
+        if (!_isRunWalk && _daysValid) ...[
           const SizedBox(height: 24),
           Text(
-            loc.runPlanCustomizeWeeksTitle,
+            loc.runPlanCustomizeLongRunDay,
             style: theme.textTheme.titleSmall,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            loc.runPlanCustomizeWeeksHelp,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
           ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final n in widget.template.allowedWeeks)
+              ChoiceChip(
+                label: Text(loc.runPlanCustomizeLongRunAuto),
+                selected: _longRunDay == null,
+                onSelected: (_) => setState(() => _longRunDay = null),
+              ),
+              for (final d in (_days.toList()..sort()))
+                ChoiceChip(
+                  label: Text(labels[d - 1]),
+                  selected: _longRunDay == d,
+                  onSelected: (_) => setState(() => _longRunDay = d),
+                ),
+            ],
+          ),
+        ],
+        if (_template.selectableWeeks) ...[
+          const SizedBox(height: 24),
+          Text(
+            loc.runPlanCustomizeWeeksTitle,
+            style: theme.textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(loc.runPlanCustomizeWeeksHelp, style: muted),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final n in _template.allowedWeeks)
                 ChoiceChip(
                   label: Text(loc.runPlanWeeksValue(n)),
                   selected: _weeks == n,
@@ -543,43 +817,62 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
             ],
           ),
         ],
-        _buildWarnings(loc, theme, full: false),
-        if (!_isMaintain) ...[
+        _buildWarnings(loc, theme, outline, full: false),
+        if (_hasRace) ...[
           const SizedBox(height: 24),
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: Text(loc.runPlanCustomizeRaceDate),
             subtitle: Text(
-              _raceDate == null
-                  ? loc.runPlanRaceDateNone
-                  : MaterialLocalizations.of(
-                      context,
-                    ).formatMediumDate(_raceDate!),
+              _raceDate == null ? loc.runPlanRaceDateNone : _date(_raceDate!),
             ),
-            trailing: IconButton(
-              icon: Icon(
-                _raceDate == null
-                    ? Icons.event_outlined
-                    : Icons.event_available,
-              ),
-              onPressed: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate:
-                      _raceDate ?? DateTime.now().add(const Duration(days: 84)),
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime.now().add(const Duration(days: 800)),
-                );
-                if (picked != null) setState(() => _raceDate = picked);
-              },
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_raceDate != null)
+                  IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () => setState(() => _raceDate = null),
+                  ),
+                IconButton(
+                  icon: Icon(
+                    _raceDate == null
+                        ? Icons.event_outlined
+                        : Icons.event_available,
+                  ),
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate:
+                          _raceDate ??
+                          _today.add(Duration(days: 7 * _template.weeks)),
+                      firstDate: _today,
+                      lastDate: _today.add(const Duration(days: 800)),
+                    );
+                    if (picked != null) setState(() => _raceDate = picked);
+                  },
+                ),
+              ],
             ),
           ),
+          if (raceNote != null)
+            Text(
+              raceNote,
+              style: readiness!.raceTooSoon
+                  ? theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    )
+                  : muted,
+            ),
         ],
       ],
     );
   }
 
   Widget _buildIntentStep(AppLocalizations loc, ThemeData theme) {
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -589,16 +882,18 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
               : loc.runPlanCustomizeIntentTitle,
           style: theme.textTheme.titleLarge,
         ),
-        const SizedBox(height: 8),
-        Text(
-          _isMaintain
-              ? loc.runPlanCustomizeMaintainHelp
-              : loc.runPlanCustomizeIntentHelp,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+        if (_isMaintain || !_pbOnly) ...[
+          const SizedBox(height: 8),
+          Text(
+            _isMaintain
+                ? loc.runPlanCustomizeMaintainHelp
+                : loc.runPlanCustomizeIntentHelp,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
-        ),
-        if (!_isMaintain) ...[
+        ],
+        if (!_isMaintain && !_pbOnly && !_isRunWalk) ...[
           const SizedBox(height: 16),
           _OptionCard(
             selected: _intent == RunPlanIntent.finish,
@@ -636,16 +931,52 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
               ),
           ],
         ),
-        if (widget.template.style == RunPlanTemplateStyle.performance ||
-            _isMaintain) ...[
-          const SizedBox(height: 16),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(loc.runPlanCustomizeIncludeHills),
-            subtitle: Text(loc.runPlanCustomizeIncludeHillsHelp),
-            value: _includeHills,
-            onChanged: (value) => setState(() => _includeHills = value),
+        const SizedBox(height: 8),
+        Text(switch (_intensity) {
+          RunPlanIntensity.conservative =>
+            loc.runPlanCustomizeIntensityConservativeHint,
+          RunPlanIntensity.standard =>
+            loc.runPlanCustomizeIntensityStandardHint,
+          RunPlanIntensity.aggressive =>
+            loc.runPlanCustomizeIntensityAggressiveHint,
+        }, style: muted),
+        if (_canHaveHills) ...[
+          const SizedBox(height: 24),
+          Text(
+            loc.runPlanCustomizeTerrainTitle,
+            style: theme.textTheme.titleSmall,
           ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final terrain in _Terrain.values)
+                ChoiceChip(
+                  avatar: Icon(switch (terrain) {
+                    _Terrain.hill => Icons.landscape_outlined,
+                    _Terrain.stairs => Icons.stairs_outlined,
+                    _Terrain.treadmill => Icons.directions_run,
+                    _Terrain.flat => Icons.horizontal_rule,
+                  }, size: 18),
+                  label: Text(switch (terrain) {
+                    _Terrain.hill => loc.runPlanCustomizeTerrainHill,
+                    _Terrain.stairs => loc.runPlanCustomizeTerrainStairs,
+                    _Terrain.treadmill => loc.runPlanCustomizeTerrainTreadmill,
+                    _Terrain.flat => loc.runPlanCustomizeTerrainFlat,
+                  }),
+                  selected: _terrain == terrain,
+                  onSelected: (_) => setState(() => _terrain = terrain),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(switch (_terrain) {
+            _Terrain.hill => loc.runPlanCustomizeTerrainHillHelp,
+            _Terrain.stairs => loc.runPlanCustomizeTerrainStairsHelp,
+            _Terrain.treadmill => loc.runPlanCustomizeTerrainTreadmillHelp,
+            _Terrain.flat => loc.runPlanCustomizeTerrainFlatHelp,
+          }, style: muted),
         ],
         const SizedBox(height: 24),
         Text(
@@ -657,9 +988,7 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
           _isMaintain
               ? loc.runPlanCustomizeBaselineHelpMaintain
               : loc.runPlanCustomizeBaselineHelp,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+          style: muted,
         ),
         const SizedBox(height: 12),
         TextField(
@@ -678,31 +1007,61 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
           const SizedBox(height: 8),
           Text(
             loc.runPlanCustomizeBaselineFromHistory(_history!.medianWeekCount),
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+            style: muted,
           ),
         ],
       ],
     );
   }
 
-  Widget _buildPaceStep(AppLocalizations loc, ThemeData theme) {
+  Widget _timeField(
+    AppLocalizations loc,
+    TextEditingController controller,
+    int? seconds,
+  ) => TextField(
+    controller: controller,
+    keyboardType: TextInputType.datetime,
+    decoration: InputDecoration(
+      labelText: loc.runPlanCustomizePaceTime,
+      hintText: loc.runPlanCustomizePaceTimeHint,
+      errorText: seconds != null && seconds < 0
+          ? loc.runPlanCustomizeTimeInvalid
+          : null,
+      border: const OutlineInputBorder(),
+    ),
+    onChanged: (_) => setState(() {}),
+  );
+
+  Widget _buildPaceStep(
+    AppLocalizations loc,
+    ThemeData theme,
+    RunPlanOutline? outline,
+  ) {
     final distances = <(String, double)>[
-      ('5 km', RunPaceCalculator.fiveKMeters),
-      ('10 km', RunPaceCalculator.tenKMeters),
-      (loc.runPlanGoalHalf, RunPaceCalculator.halfMeters),
-      (loc.runPlanGoalMarathon, RunPaceCalculator.marathonMeters),
+      for (final meters in _standardDistances)
+        (_distanceName(loc, meters), meters),
     ];
-    final paces = _previewPaces;
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
     final suggested = _history?.suggestedRace;
     final nearest = distances.reduce(
       (a, b) =>
-          (a.$2 - _paceDistanceMeters).abs() <
-              (b.$2 - _paceDistanceMeters).abs()
+          (a.$2 - _currentDistanceMeters).abs() <
+              (b.$2 - _currentDistanceMeters).abs()
           ? a
           : b,
     );
+    final goalDistance = _goalDistance;
+    final ramp = outline?.paceRamp;
+    final start = ramp?.pacesAt(0);
+    final end = ramp?.targetPaces;
+    final plannedWeeks = outline?.schedule.length ?? _template.weeks;
+    final projected = goalDistance == null
+        ? null
+        : ramp?.projectedSeconds(goalDistance);
+    final assessment =
+        outline?.readiness.goalAssessment ?? RunPlanGoalAssessment.none;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -715,149 +1074,119 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        const SizedBox(height: 12),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(loc.runPlanCustomizePaceSkip),
-          value: _skipPace,
-          onChanged: (v) => setState(() => _skipPace = v),
+        const SizedBox(height: 20),
+        Text(
+          loc.runPlanCustomizeCurrentTitle,
+          style: theme.textTheme.titleSmall,
         ),
-        if (!_skipPace) ...[
-          const SizedBox(height: 8),
-          SegmentedButton<RunPlanPaceSource>(
-            segments: [
-              ButtonSegment(
-                value: RunPlanPaceSource.recent,
-                label: Text(loc.runPlanCustomizePaceSourceRecent),
-              ),
-              ButtonSegment(
-                value: RunPlanPaceSource.goal,
-                label: Text(loc.runPlanCustomizePaceSourceGoal),
-              ),
-            ],
-            selected: {_paceSource},
-            onSelectionChanged: (s) {
-              if (s.isEmpty) return;
-              _setPaceSource(s.first);
-            },
-          ),
-          if (_paceSource == RunPlanPaceSource.recent && suggested != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              loc.runPlanCustomizePaceFromRun(
-                RunPlanUi.distanceLabel(suggested.distanceMeters),
-                RunFormatters.duration(suggested.timeSeconds),
-              ),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
+        const SizedBox(height: 4),
+        Text(loc.runPlanCustomizeCurrentHelp, style: muted),
+        if (suggested != null) ...[
+          const SizedBox(height: 4),
           Text(
-            loc.runPlanCustomizePaceDistance,
+            loc.runPlanCustomizePaceFromRun(
+              RunPlanUi.distanceLabel(suggested.distanceMeters),
+              RunFormatters.duration(suggested.timeSeconds),
+            ),
+            style: muted,
+          ),
+        ],
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final entry in distances)
+              ChoiceChip(
+                label: Text(entry.$1),
+                selected: (nearest.$2 - entry.$2).abs() < 1,
+                onSelected: (_) =>
+                    setState(() => _currentDistanceMeters = entry.$2),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _timeField(loc, _currentCtl, _currentSeconds),
+        if (goalDistance != null && !_isMaintain) ...[
+          const SizedBox(height: 24),
+          Text(
+            loc.runPlanCustomizeGoalTitle(_distanceName(loc, goalDistance)),
             style: theme.textTheme.titleSmall,
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final entry in distances)
-                ChoiceChip(
-                  label: Text(entry.$1),
-                  selected: (nearest.$2 - entry.$2).abs() < 1,
-                  onSelected: (_) =>
-                      setState(() => _paceDistanceMeters = entry.$2),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _timeCtl,
-            keyboardType: TextInputType.datetime,
-            decoration: InputDecoration(
-              labelText: loc.runPlanCustomizePaceTime,
-              hintText: loc.runPlanCustomizePaceTimeHint,
-              border: const OutlineInputBorder(),
+          const SizedBox(height: 4),
+          Text(loc.runPlanCustomizeGoalHelp, style: muted),
+          const SizedBox(height: 12),
+          _timeField(loc, _goalCtl, _goalSeconds),
+          if (_goalCalibration != null && _currentCalibration == null) ...[
+            const SizedBox(height: 8),
+            Text(loc.runPlanCustomizeGoalOnlyNote, style: muted),
+          ],
+        ],
+        if (start != null) ...[
+          const SizedBox(height: 20),
+          Text(
+            loc.runPlanCustomizePacePreview(
+              RunPlanUi.paceLabel(start.easySecPerKm),
+              RunPlanUi.paceLabel(start.tempoSecPerKm),
+              RunPlanUi.paceLabel(start.intervalSecPerKm),
             ),
-            onChanged: (_) => setState(() {}),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          if (_config.hasOptimisticGoal && _fitnessCalibration != null) ...[
-            const SizedBox(height: 12),
+          if (end != null &&
+              (end.tempoSecPerKm - start.tempoSecPerKm).abs() >= 1) ...[
+            const SizedBox(height: 4),
             Text(
-              loc.runPlanCustomizeWarnOptimisticGoal(
-                RunPlanUi.distanceLabel(_fitnessCalibration!.distanceMeters),
-                RunFormatters.duration(_fitnessCalibration!.timeSeconds),
+              loc.runPlanCustomizePaceEndPreview(
+                RunPlanUi.paceLabel(end.tempoSecPerKm),
+                RunPlanUi.paceLabel(end.intervalSecPerKm),
               ),
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.tertiary,
-              ),
-            ),
-          ],
-          if (paces != null) ...[
-            const SizedBox(height: 16),
-            Text(
-              loc.runPlanCustomizePacePreview(
-                RunPlanUi.paceLabel(paces.easySecPerKm),
-                RunPlanUi.paceLabel(paces.tempoSecPerKm),
-                RunPlanUi.paceLabel(paces.intervalSecPerKm),
-              ),
-              style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
-            if (_config.hasOptimisticGoal && _config.racePaces != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                loc.runPlanCustomizePacePreviewRace(
-                  RunPlanUi.paceLabel(
-                    _config.racePaces!.racePaceFor(_paceDistanceMeters),
+          ],
+          if (projected != null) ...[
+            const SizedBox(height: 12),
+            _GoalFeedback(
+              assessment: assessment,
+              message: switch (assessment) {
+                RunPlanGoalAssessment.realistic =>
+                  loc.runPlanCustomizeGoalRealistic(plannedWeeks),
+                RunPlanGoalAssessment.ambitious =>
+                  loc.runPlanCustomizeGoalAmbitious(
+                    RunFormatters.duration(projected),
                   ),
+                RunPlanGoalAssessment.unrealistic =>
+                  loc.runPlanCustomizeGoalUnrealistic(
+                    plannedWeeks,
+                    RunFormatters.duration(projected),
+                  ),
+                RunPlanGoalAssessment.none => loc.runPlanCustomizeProjection(
+                  RunFormatters.duration(projected),
                 ),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-            const SizedBox(height: 4),
-            Text(
-              loc.runPlanCustomizePaceEstimateNote,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              },
             ),
           ],
+          const SizedBox(height: 8),
+          Text(loc.runPlanCustomizePaceEstimateNote, style: muted),
         ],
       ],
     );
   }
 
-  void _setPaceSource(RunPlanPaceSource source) {
-    setState(() {
-      if (source == _paceSource) return;
-      if (source == RunPlanPaceSource.recent) {
-        _goalTimeText = _timeCtl.text;
-        _goalDistanceMeters = _paceDistanceMeters;
-        _applySuggestedRace();
-      } else {
-        _paceDistanceMeters = _goalDistanceMeters;
-        _timeCtl.text = _goalTimeText;
-      }
-      _paceSource = source;
-    });
-  }
-
-  void _applySuggestedRace() {
-    final suggested = _history?.suggestedRace;
-    if (suggested == null) return;
-    _paceDistanceMeters = suggested.distanceMeters;
-    _timeCtl.text = _formatDuration(suggested.timeSeconds);
-  }
-
-  Widget _buildPreviewStep(AppLocalizations loc, ThemeData theme) {
-    final outline = _outline;
-    final week = outline?.week1 ?? const [];
+  Widget _buildPreviewStep(
+    AppLocalizations loc,
+    ThemeData theme,
+    RunPlanOutline? outline,
+  ) {
+    final total = outline?.schedule.length ?? 0;
+    final weekIndex = total == 0 ? 0 : _previewWeek.clamp(0, total - 1);
+    final week = [...?(total == 0 ? null : outline!.schedule[weekIndex])]
+      ..sort((a, b) => a.dayOfWeek.compareTo(b.dayOfWeek));
+    final weekOutline = total == 0 ? null : outline!.weeks[weekIndex];
+    final easyPace = outline?.paceRamp.pacesAt(weekIndex)?.easySecPerKm;
     final summary = <String>[
       if (outline != null && outline.peakWeeklyKm > 0)
         loc.runPlanCustomizePreviewPeak(_km(outline.peakWeeklyKm)),
@@ -865,6 +1194,8 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
         loc.runPlanCustomizePreviewLong(_km(outline.peakLongKm)),
       if (outline?.raceWeekNumber != null)
         loc.runPlanCustomizePreviewRaceWeek(outline!.raceWeekNumber!),
+      if (outline?.startWeek != null)
+        loc.runPlanCustomizeStartsOn(_date(outline!.startWeek!)),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -875,27 +1206,58 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          _isMaintain
+          _isRunWalk
+              ? loc.runPlanCustomizePreviewHelpRunWalk
+              : _isMaintain
               ? loc.runPlanCustomizePreviewHelpMaintain
               : loc.runPlanCustomizePreviewHelp,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        _buildWarnings(loc, theme, full: true),
+        _buildWarnings(loc, theme, outline, full: true),
         if (outline != null && outline.hasVolumeCurve) ...[
           const SizedBox(height: 16),
-          RunPlanVolumeSparkline(weeks: outline.weeks),
+          RunPlanVolumeSparkline(
+            weeks: outline.weeks,
+            selected: weekIndex,
+            onSelect: (i) => setState(() => _previewWeek = i),
+          ),
         ],
         if (summary.isNotEmpty) ...[
           const SizedBox(height: 12),
           Text(summary.join(' · '), style: theme.textTheme.titleSmall),
         ],
         if (week.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          Text(
-            loc.runPlanCustomizePreviewWeek1,
-            style: theme.textTheme.titleSmall,
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left),
+                onPressed: weekIndex > 0
+                    ? () => setState(() => _previewWeek = weekIndex - 1)
+                    : null,
+              ),
+              Expanded(
+                child: Text(
+                  [
+                    loc.runPlanCustomizeWeekOf(weekIndex + 1, total),
+                    if (weekOutline != null && !_isRunWalk)
+                      RunPlanVolumeSparkline.phaseLabel(loc, weekOutline.phase),
+                    if (weekOutline != null && weekOutline.weekKm >= 1)
+                      '${_km(weekOutline.weekKm)} km',
+                  ].join(' · '),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right),
+                onPressed: weekIndex < total - 1
+                    ? () => setState(() => _previewWeek = weekIndex + 1)
+                    : null,
+              ),
+            ],
           ),
         ],
         const SizedBox(height: 8),
@@ -914,6 +1276,12 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
                   RunPlanUi.kindLabel(loc, session.kind),
                   if (session.targetDistanceMeters != null)
                     RunPlanUi.distanceLabel(session.targetDistanceMeters!),
+                  if (RunPlanComposer.estimateDurationSeconds(
+                        session,
+                        easySecPerKm: easyPace,
+                      )
+                      case final seconds?)
+                    loc.runPlanCustomizeDuration((seconds / 60).round()),
                   if (session.targetPaceSecPerKm != null)
                     '${RunPlanUi.paceLabel(session.targetPaceSecPerKm)}/km',
                 ].join(' · '),
@@ -921,6 +1289,63 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Colour-coded verdict on the goal time.
+class _GoalFeedback extends StatelessWidget {
+  final RunPlanGoalAssessment assessment;
+  final String message;
+
+  const _GoalFeedback({required this.assessment, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final (background, foreground, icon) = switch (assessment) {
+      RunPlanGoalAssessment.realistic => (
+        scheme.primaryContainer,
+        scheme.onPrimaryContainer,
+        Icons.check_circle_outline,
+      ),
+      RunPlanGoalAssessment.ambitious => (
+        scheme.tertiaryContainer,
+        scheme.onTertiaryContainer,
+        Icons.trending_up,
+      ),
+      RunPlanGoalAssessment.unrealistic => (
+        scheme.errorContainer,
+        scheme.onErrorContainer,
+        Icons.warning_amber_rounded,
+      ),
+      RunPlanGoalAssessment.none => (
+        scheme.surfaceContainerHighest,
+        scheme.onSurfaceVariant,
+        Icons.flag_outlined,
+      ),
+    };
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: foreground, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: foreground),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -983,25 +1408,43 @@ class _OptionCard extends StatelessWidget {
   }
 }
 
-/// Parses `mm:ss` or `h:mm:ss` into total seconds.
-int? _parseDuration(String raw) {
-  final text = raw.trim();
+/// Parses a race time typed by a person, or null when it is not a plausible
+/// time for [distanceMeters].
+///
+/// Accepts `h:mm:ss`, `mm:ss` and a bare number of minutes (`25` is a 25
+/// minute 5K, never 25 seconds). A two-part entry that makes no sense as
+/// minutes:seconds for a long race is read as hours:minutes (`1:55` for a
+/// half marathon).
+int? parseRaceTime(String raw, double distanceMeters) {
+  final text = raw.trim().replaceAll('.', ':').replaceAll(',', ':');
   if (text.isEmpty) return null;
+  bool plausible(int seconds) => RunPaceCalculator.isPlausibleRace(
+    distanceMeters: distanceMeters,
+    timeSeconds: seconds,
+  );
   final parts = text.split(':');
-  if (parts.length == 2) {
-    final m = int.tryParse(parts[0]);
-    final s = int.tryParse(parts[1]);
-    if (m == null || s == null || s >= 60) return null;
-    return m * 60 + s;
+  final numbers = parts.map(int.tryParse).toList();
+  if (numbers.any((n) => n == null || n < 0)) return null;
+  int? result;
+  switch (numbers.length) {
+    case 1:
+      result = numbers[0]! * 60;
+    case 2:
+      final (a, b) = (numbers[0]!, numbers[1]!);
+      if (b >= 60) return null;
+      final asMinutes = a * 60 + b;
+      final asHours = a * 3600 + b * 60;
+      result = plausible(asMinutes) || !plausible(asHours)
+          ? asMinutes
+          : asHours;
+    case 3:
+      final (h, m, s) = (numbers[0]!, numbers[1]!, numbers[2]!);
+      if (m >= 60 || s >= 60) return null;
+      result = h * 3600 + m * 60 + s;
+    default:
+      return null;
   }
-  if (parts.length == 3) {
-    final h = int.tryParse(parts[0]);
-    final m = int.tryParse(parts[1]);
-    final s = int.tryParse(parts[2]);
-    if (h == null || m == null || s == null || m >= 60 || s >= 60) return null;
-    return h * 3600 + m * 60 + s;
-  }
-  return int.tryParse(text);
+  return plausible(result) ? result : null;
 }
 
 String _formatDuration(int seconds) {
