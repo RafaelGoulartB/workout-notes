@@ -567,5 +567,21 @@ abstract final class DatabaseWellnessMigrations {
         } catch (_) {}
       }
     }
+    if (oldVersion < 52) {
+      // Running plans remember the template and wizard inputs they were built
+      // from, so they can be re-planned after missed weeks or a fitness test,
+      // plus a log of those weekly reviews.
+      for (final sql in const [
+        'ALTER TABLE run_plans ADD COLUMN template_key TEXT',
+        'ALTER TABLE run_plans ADD COLUMN config_json TEXT',
+      ]) {
+        try {
+          await db.execute(sql);
+        } catch (_) {}
+      }
+      try {
+        await DatabaseRunPlanSchema.createAdaptations(db);
+      } catch (_) {}
+    }
   }
 }

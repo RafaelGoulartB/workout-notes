@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
@@ -407,6 +408,8 @@ class RunPlanRepository extends BaseRepository {
     RunPlanGoalKind goalKind = RunPlanGoalKind.base,
     DateTime? raceDate,
     int weeks = 4,
+    String? templateKey,
+    Map<String, dynamic>? config,
   }) async {
     final database = await db;
     final now = DateTime.now();
@@ -420,9 +423,41 @@ class RunPlanRepository extends BaseRepository {
       status: RunPlanStatus.active,
       createdAt: now,
       updatedAt: now,
+      templateKey: templateKey,
+      config: config,
     );
-    await database.insert('run_plans', plan.toMap());
+    await database.insert('run_plans', await _planRow(database, plan));
     return plan;
+  }
+
+  /// [plan] as a row, minus columns a device whose v52 upgrade failed does
+  /// not have — the plan still saves, it just cannot be re-planned later.
+  Future<Map<String, dynamic>> _planRow(
+    DatabaseExecutor database,
+    RunPlan plan,
+  ) async {
+    final row = plan.toMap();
+    if (!await _columnExists(database, 'run_plans', 'config_json')) {
+      row
+        ..remove('template_key')
+        ..remove('config_json');
+    }
+    return row;
+  }
+
+  /// Stores the inputs [planId] is (re)built from.
+  Future<void> saveConfig(String planId, Map<String, dynamic> config) async {
+    final database = await db;
+    if (!await _columnExists(database, 'run_plans', 'config_json')) return;
+    await database.update(
+      'run_plans',
+      {
+        'config_json': jsonEncode(config),
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [planId],
+    );
   }
 
   Future<void> updatePlan(
@@ -494,9 +529,12 @@ class RunPlanRepository extends BaseRepository {
       status: RunPlanStatus.active,
       createdAt: now,
       updatedAt: now,
+      templateKey: source.templateKey,
+      config: source.config,
     );
+    final row = await _planRow(database, copy);
     await database.transaction((txn) async {
-      await txn.insert('run_plans', copy.toMap());
+      await txn.insert('run_plans', row);
       for (final workout in source.workouts) {
         await _insertWorkoutCopy(txn, workout, copy.id, workout.weekIndex);
       }
@@ -1061,6 +1099,209 @@ class RunPlanRepository extends BaseRepository {
     );
   }
 
+  // ===================== RE-PLANNING =====================
+
+  /// Every calendar row of [planId], with its session hydrated.
+  Future<List<ScheduledRun>> getScheduledRunsForPlan(String planId) async {
+    final database = await db;
+    if (!await _tableExists(database, 'scheduled_runs')) return const [];
+    final rows = await database.query(
+      'scheduled_runs',
+      where: 'run_plan_id = ?',
+      whereArgs: [planId],
+      orderBy: 'date ASC',
+    );
+    return _hydrateScheduled(database, rows);
+  }
+
+  /// Replaces every session from [fromWeek] on with [weeks] (one list of
+  /// sessions per week), atomically, and re-schedules them when the plan is
+  /// being followed.
+  ///
+  /// Weeks before [fromWeek] — the athlete's history — are untouched. A week
+  /// at or after [fromWeek] that already has a run ticked off is refused: the
+  /// caller must start re-planning after it.
+  Future<void> replaceWeeksFrom(
+    String planId, {
+    required int fromWeek,
+    required List<List<RunPlanSessionDraft>> weeks,
+    Map<String, dynamic>? config,
+  }) async {
+    final database = await db;
+    final touched = Sqflite.firstIntValue(
+      await database.rawQuery(
+        'SELECT COUNT(*) FROM scheduled_runs s '
+        'JOIN run_plan_workouts w ON w.id = s.run_plan_workout_id '
+        'WHERE w.run_plan_id = ? AND w.week_index >= ? AND s.status != ?',
+        [planId, fromWeek, ScheduledRunStatus.planned.value],
+      ),
+    );
+    if ((touched ?? 0) > 0) {
+      throw StateError('run_plan_replan_over_history');
+    }
+    final hasConfig = await _columnExists(database, 'run_plans', 'config_json');
+    final now = DateTime.now();
+    await database.transaction((txn) async {
+      // Planned calendar rows of these sessions go with them (FK cascade).
+      await txn.delete(
+        'run_plan_workouts',
+        where: 'run_plan_id = ? AND week_index >= ?',
+        whereArgs: [planId, fromWeek],
+      );
+      for (var w = 0; w < weeks.length; w++) {
+        for (var order = 0; order < weeks[w].length; order++) {
+          final draft = weeks[w][order];
+          final workoutId = _uuid.v4();
+          await txn.insert('run_plan_workouts', {
+            ...draft.workout,
+            'id': workoutId,
+            'run_plan_id': planId,
+            'week_index': fromWeek + w,
+            'order_index': order,
+            'created_at': now.toIso8601String(),
+          });
+          for (var i = 0; i < draft.steps.length; i++) {
+            await txn.insert('run_workout_steps', {
+              ...draft.steps[i],
+              'id': _uuid.v4(),
+              'run_plan_workout_id': workoutId,
+              'order_index': i,
+            });
+          }
+        }
+      }
+      await txn.update(
+        'run_plans',
+        {
+          'weeks': math.max(1, fromWeek + weeks.length),
+          if (hasConfig && config != null) 'config_json': jsonEncode(config),
+          'updated_at': now.toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [planId],
+      );
+    });
+    final plan = await getPlan(planId);
+    final anchor = plan?.activatedAt;
+    if (plan == null || !plan.isActivated || anchor == null) return;
+    final today = _weekStart(DateTime.now());
+    for (var week = fromWeek; week < plan.weeks; week++) {
+      final start = _weekStart(anchor).add(Duration(days: 7 * week));
+      if (start.isBefore(today)) continue;
+      await materializeWeek(planId: planId, weekIndex: week, weekStart: start);
+    }
+  }
+
+  /// Logs a weekly review for [weekIndex] of [planId]. [status] is
+  /// `applied` or `dismissed`; either way the same week is not proposed
+  /// again.
+  Future<void> recordAdaptation({
+    required String planId,
+    required int weekIndex,
+    required String kind,
+    required String status,
+    Map<String, dynamic>? payload,
+  }) async {
+    final database = await db;
+    if (!await _tableExists(database, 'run_plan_adaptations')) return;
+    await database.insert('run_plan_adaptations', {
+      'id': _uuid.v4(),
+      'run_plan_id': planId,
+      'week_index': weekIndex,
+      'kind': kind,
+      'status': status,
+      'payload_json': payload == null ? null : jsonEncode(payload),
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Weekly reviews of [planId], newest first.
+  Future<List<RunPlanAdaptationRecord>> listAdaptations(String planId) async {
+    final database = await db;
+    if (!await _tableExists(database, 'run_plan_adaptations')) {
+      return const [];
+    }
+    final rows = await database.query(
+      'run_plan_adaptations',
+      where: 'run_plan_id = ?',
+      whereArgs: [planId],
+      orderBy: 'created_at DESC',
+    );
+    return rows.map(RunPlanAdaptationRecord.fromMap).toList();
+  }
+
+  /// Scales the easy volume of week [weekIndex] by [factor] — continuous
+  /// runs and the warm-up, cool-down and steady parts of structured ones.
+  /// Work reps keep their shape: a lighter week is less running, not
+  /// different intervals. Used to adjust plans that cannot be re-composed.
+  Future<void> scaleWeek(String planId, int weekIndex, double factor) async {
+    if (factor <= 0 || factor == 1) return;
+    final plan = await getPlan(planId);
+    if (plan == null) return;
+    final database = await db;
+    int round10(num meters) => ((meters * factor) / 10).round() * 10;
+    await database.transaction((txn) async {
+      for (final workout in plan.workoutsForWeek(weekIndex)) {
+        if (!workout.hasSteps) {
+          final distance = workout.targetDistanceMeters;
+          final duration = workout.targetDurationSeconds;
+          await txn.update(
+            'run_plan_workouts',
+            {
+              if (distance != null) 'target_distance_meters': round10(distance),
+              if (distance == null && duration != null)
+                'target_duration_seconds': (duration * factor).round(),
+            },
+            where: 'id = ?',
+            whereArgs: [workout.id],
+          );
+          continue;
+        }
+        for (final step in workout.steps) {
+          if (step.role == RunStepRole.work ||
+              step.role == RunStepRole.recovery) {
+            continue;
+          }
+          await txn.update(
+            'run_workout_steps',
+            {
+              'value': step.isDistance
+                  ? round10(step.value)
+                  : (step.value * factor).round(),
+            },
+            where: 'id = ?',
+            whereArgs: [step.id],
+          );
+        }
+      }
+    });
+    await _touchPlan(database, planId);
+  }
+
+  /// Moves a session to another weekday and takes its still-planned
+  /// calendar rows along (same week), so the plan and the calendar agree.
+  Future<void> moveWorkoutToDay(String workoutId, int dayOfWeek) async {
+    await updateWorkout(workoutId, dayOfWeek: dayOfWeek);
+    final database = await db;
+    if (!await _tableExists(database, 'scheduled_runs')) return;
+    final rows = await database.query(
+      'scheduled_runs',
+      columns: ['id', 'date'],
+      where: 'run_plan_workout_id = ? AND status = ?',
+      whereArgs: [workoutId, ScheduledRunStatus.planned.value],
+    );
+    for (final row in rows) {
+      final date = DateTime.parse(row['date'] as String);
+      final moved = _weekStart(date).add(Duration(days: dayOfWeek - 1));
+      await database.update(
+        'scheduled_runs',
+        {'date': _date(moved), 'updated_at': DateTime.now().toIso8601String()},
+        where: 'id = ?',
+        whereArgs: [row['id']],
+      );
+    }
+  }
+
   // ===================== HELPERS =====================
 
   /// Sessions of several plans in two queries, grouped by plan id. The plan
@@ -1300,3 +1541,50 @@ Map<String, dynamic> _decodeJson(String raw) {
 String _encodeJson(Map<String, dynamic> value) => jsonEncode(value);
 
 const Object _sentinel = Object();
+
+/// A session to insert while re-planning: `run_plan_workouts` columns (minus
+/// ids, plan, week and order, which the repository assigns) and its steps.
+class RunPlanSessionDraft {
+  final Map<String, Object?> workout;
+  final List<Map<String, Object?>> steps;
+
+  const RunPlanSessionDraft({required this.workout, this.steps = const []});
+}
+
+/// One row of the weekly-review log.
+class RunPlanAdaptationRecord {
+  final String id;
+  final String planId;
+  final int weekIndex;
+  final String kind;
+  final String status;
+  final Map<String, dynamic> payload;
+  final DateTime createdAt;
+
+  const RunPlanAdaptationRecord({
+    required this.id,
+    required this.planId,
+    required this.weekIndex,
+    required this.kind,
+    required this.status,
+    required this.payload,
+    required this.createdAt,
+  });
+
+  bool get applied => status == 'applied';
+
+  factory RunPlanAdaptationRecord.fromMap(Map<String, Object?> map) =>
+      RunPlanAdaptationRecord(
+        id: map['id'] as String,
+        planId: map['run_plan_id'] as String,
+        weekIndex: (map['week_index'] as num?)?.toInt() ?? 0,
+        kind: map['kind'] as String? ?? 'none',
+        status: map['status'] as String? ?? 'applied',
+        payload: map['payload_json'] == null
+            ? const {}
+            : _decodeJson(map['payload_json'] as String),
+        createdAt:
+            DateTime.tryParse(map['created_at'] as String? ?? '') ??
+            DateTime(2000),
+      );
+}

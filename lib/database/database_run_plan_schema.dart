@@ -1,6 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 
-/// Schema for structured running plans (v45, latest additions in v47).
+/// Schema for structured running plans (v45, latest additions in v52).
 ///
 /// Mirrors the strength side (`routines` → `routine_days` → `routine_exercises`)
 /// with a progressive twist: a run plan spans N weeks, each week holds the
@@ -23,6 +23,8 @@ abstract final class DatabaseRunPlanSchema {
         status TEXT NOT NULL DEFAULT 'active',
         activated_at TEXT,
         completion_count INTEGER NOT NULL DEFAULT 0,
+        template_key TEXT,
+        config_json TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         CHECK (weeks >= 1)
@@ -98,6 +100,7 @@ abstract final class DatabaseRunPlanSchema {
         FOREIGN KEY (run_activity_id) REFERENCES run_activities(id) ON DELETE CASCADE
       )
     ''');
+    await createAdaptations(db);
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_run_plan_workouts_plan ON run_plan_workouts(run_plan_id, week_index, order_index)',
     );
@@ -112,6 +115,28 @@ abstract final class DatabaseRunPlanSchema {
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_run_activity_steps_activity ON run_activity_steps(run_activity_id, order_index)',
+    );
+  }
+
+  /// Log of weekly plan reviews (v52): what the app suggested after looking
+  /// at the previous week, and whether the athlete applied or dismissed it.
+  /// One row per plan week reviewed, so a dismissed suggestion does not
+  /// reappear and applied ones can be shown as history.
+  static Future<void> createAdaptations(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS run_plan_adaptations (
+        id TEXT PRIMARY KEY,
+        run_plan_id TEXT NOT NULL,
+        week_index INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        status TEXT NOT NULL,
+        payload_json TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (run_plan_id) REFERENCES run_plans(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_run_plan_adaptations_plan ON run_plan_adaptations(run_plan_id, week_index)',
     );
   }
 }

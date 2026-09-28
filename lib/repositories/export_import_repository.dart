@@ -57,6 +57,7 @@ class ExportImportRepository extends BaseRepository {
     'run_workout_steps',
     'scheduled_runs',
     'run_activity_steps',
+    'run_plan_adaptations',
     'settings',
   ];
 
@@ -122,6 +123,10 @@ class ExportImportRepository extends BaseRepository {
       'run_workout_steps': await _queryIfExists(db, 'run_workout_steps'),
       'scheduled_runs': await _queryIfExists(db, 'scheduled_runs'),
       'run_activity_steps': await _queryIfExists(db, 'run_activity_steps'),
+      'run_plan_adaptations': await _queryIfExists(
+        db,
+        'run_plan_adaptations',
+      ),
       'settings': await db.query('app_settings'),
       // Platform preferences and portable file bytes are filled by
       // ExportService. Empty defaults keep this envelope valid for repository
@@ -183,6 +188,7 @@ class ExportImportRepository extends BaseRepository {
         'scheduled_runs',
         'run_workout_steps',
         'run_plan_workouts',
+        'run_plan_adaptations',
         'run_plans',
         'run_splits',
         'run_route_data',
@@ -286,6 +292,7 @@ class ExportImportRepository extends BaseRepository {
         'run_workout_steps',
         'scheduled_runs',
         'run_activity_steps',
+        'run_plan_adaptations',
       ]) {
         if (await _tableExists(txn, table)) {
           totalRows += await _insertAll(txn, table, data[table]);
@@ -688,6 +695,7 @@ class ExportImportRepository extends BaseRepository {
         'scheduled_runs',
         'run_workout_steps',
         'run_plan_workouts',
+        'run_plan_adaptations',
         'run_plans',
         'run_splits',
         'run_route_data',

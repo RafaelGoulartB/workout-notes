@@ -214,6 +214,46 @@ abstract final class RunPlanTemplates {
     },
   };
 
+  /// What to do once a plan built from [templateKey] is finished — the
+  /// natural next step first. Falls back on [goal] for blank and older
+  /// plans. Never suggests the same plan again (that is what "restart" is
+  /// for) and never jumps more than one level.
+  static List<RunPlanTemplate> nextSteps(
+    String? templateKey,
+    RunPlanGoalKind goal,
+  ) {
+    final keys = switch (templateKey) {
+      'walk_jog' => const ['run_walk'],
+      'run_walk' => const ['first_5k', 'habit_3x'],
+      'return' || 'return_injury' => const ['first_5k', 'base'],
+      'first_5k' => const ['5k', 'first_10k'],
+      '5k' => const ['first_10k', '5k_advanced'],
+      '5k_advanced' => const ['10k', '10k_advanced'],
+      'first_10k' => const ['10k', 'to_half'],
+      '10k' => const ['to_half', '10k_advanced'],
+      '10k_advanced' => const ['half_pb', 'first_half'],
+      'to_half' || 'first_half' => const ['half_pb', 'keep_fit'],
+      'half_pb' => const ['first_marathon', 'keep_fit'],
+      'first_marathon' || 'marathon_pb' => const ['keep_fit', 'marathon_pb'],
+      'base' || 'habit_3x' => const ['first_5k', 'first_10k'],
+      'trail_intro' ||
+      'threshold_block' ||
+      'hills' ||
+      'race_sharpen' => const ['keep_fit', '10k'],
+      _ => switch (goal) {
+        RunPlanGoalKind.fiveK => const ['5k', 'first_10k'],
+        RunPlanGoalKind.tenK => const ['10k', 'to_half'],
+        RunPlanGoalKind.half => const ['half_pb', 'keep_fit'],
+        RunPlanGoalKind.marathon => const ['keep_fit'],
+        _ => const ['first_5k', 'keep_fit'],
+      },
+    };
+    return [
+      for (final key in keys)
+        if (key != templateKey) ?byKey(key),
+    ];
+  }
+
   /// A shorter goal to offer when this template's race is out of reach.
   static RunPlanTemplate? shorterGoal(RunPlanTemplate template) =>
       switch (template.goalKind) {
@@ -788,6 +828,10 @@ abstract final class RunPlanTemplates {
       goalKind: template.goalKind,
       raceDate: config?.raceDate ?? raceDate,
       weeks: schedule.length,
+      // Remembered so the plan can be re-planned after missed weeks or a
+      // fitness test without asking the athlete everything again.
+      templateKey: template.key,
+      config: config?.toJson(),
     );
     for (var week = 0; week < schedule.length; week++) {
       for (final session in schedule[week]) {
