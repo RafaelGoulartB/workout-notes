@@ -5,6 +5,8 @@ import 'package:workout_notes/models/run_activity.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
+import 'package:workout_notes/services/run_week_balance.dart';
+import 'package:workout_notes/widgets/run/run_balance_dialog.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import '../../repositories/run_plan_repository.dart';
 import '../../repositories/run_repository.dart';
@@ -349,6 +351,90 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
+  /// Moves a planned run to another day, keeping hard and easy days apart:
+  /// a move that puts two runs on one day, or two hard days back to back,
+  /// asks first and offers a swap or the nearest balanced day.
+  Future<void> _reschedule(ScheduledRun scheduled) async {
+    final loc = AppLocalizations.of(context)!;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: scheduled.date.isBefore(today) ? today : scheduled.date,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 21)),
+    );
+    if (picked == null || !mounted) return;
+    final monday = picked.subtract(Duration(days: picked.weekday - 1));
+    final rows = await _runPlanRepo.getScheduledRuns(
+      monday,
+      monday.add(const Duration(days: 6)),
+    );
+    RunBalanceSession? toSession(ScheduledRun row) {
+      final workout = row.workout;
+      if (workout == null) return null;
+      return RunBalanceSession(
+        id: row.id,
+        date: row.date,
+        kind: workout.kind,
+        km: workout.plannedDistanceMeters / 1000,
+        fixed: !row.isPlanned,
+      );
+    }
+
+    final week = [
+      for (final row in rows)
+        if (row.id != scheduled.id) ?toSession(row),
+      ?toSession(scheduled),
+    ];
+    final names = {
+      for (final row in [...rows, scheduled]) row.id: row.workout?.name ?? '',
+    };
+    var target = picked;
+    String? swapId;
+    if (week.any((s) => s.id == scheduled.id)) {
+      final advice = RunWeekBalance.adviseMove(
+        week: week,
+        movingId: scheduled.id,
+        to: picked,
+        earliest: today,
+      );
+      if (!advice.ok) {
+        if (!mounted) return;
+        final choice = await showBalanceDialog(
+          context,
+          advice: advice,
+          nameOf: (id) => names[id] ?? '',
+          dayLabel: (date) =>
+              DateFormat('EEE d', Intl.defaultLocale).format(date),
+        );
+        if (choice == null) return;
+        switch (choice) {
+          case BalanceChoice.swap:
+            swapId = advice.swapWith!.id;
+          case BalanceChoice.better:
+            target = advice.betterDate!;
+          case BalanceChoice.anyway:
+            break;
+        }
+      }
+    }
+    await _runPlanRepo.updateScheduledRun(scheduled.id, date: target);
+    if (swapId != null) {
+      await _runPlanRepo.updateScheduledRun(swapId, date: scheduled.date);
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          loc.runScheduleRescheduled(
+            DateFormat('EEE d MMM', Intl.defaultLocale).format(target),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// A planned-but-not-yet-run session. Tapping starts it with the plan loaded.
   Widget _plannedRunCard(ScheduledRun scheduled) {
     final theme = Theme.of(context);
@@ -405,12 +491,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 scheduled.id,
                 status: ScheduledRunStatus.skipped,
               );
+            } else if (value == 'reschedule') {
+              await _reschedule(scheduled);
             } else if (value == 'remove') {
               await _runPlanRepo.deleteScheduledRun(scheduled.id);
             }
             if (mounted) _loadMonth();
           },
           itemBuilder: (ctx) => [
+            if (scheduled.isPlanned)
+              PopupMenuItem(
+                value: 'reschedule',
+                child: Text(loc.runScheduleReschedule),
+              ),
             if (!scheduled.isSkipped)
               PopupMenuItem(
                 value: 'skip',
