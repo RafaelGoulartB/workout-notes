@@ -11,7 +11,7 @@
     <img alt="Maintenance" src="https://img.shields.io/badge/Maintained%3F-yes-0B7285.svg" />
   </a>
   <a href="https://github.com/RafaelGoulartB/workout-notes/blob/main/LICENSE">
-    <img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-0B7285.svg" />
+    <img alt="License: AGPL v3" src="https://img.shields.io/badge/License-AGPL_v3-0B7285.svg" />
   </a>
   <a href="https://github.com/RafaelGoulartB/workout-notes/actions/workflows/release-android.yml">
     <img alt="Android release" src="https://img.shields.io/github/actions/workflow/status/RafaelGoulartB/workout-notes/release-android.yml?branch=main&label=Android%20release&color=0B7285" />
@@ -132,4 +132,6 @@ The Android release workflow validates app changes on `main` before building an 
 
 ## License
 
-[MIT](LICENSE) · [Rafael Goulart](https://www.linkedin.com/in/rafael-goulartb/)
+Copyright (C) 2026 [Rafael Goulart](https://www.linkedin.com/in/rafael-goulartb/)
+
+This program is free software: you can redistribute it and/or modify it under the terms of the [GNU Affero General Public License v3.0](LICENSE) as published by the Free Software Foundation. It is distributed WITHOUT ANY WARRANTY; see the license for details. Any modified version you distribute, or run as a network service, must also be released under the AGPL-3.0 with its complete source code.
