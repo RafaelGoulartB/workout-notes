@@ -5,18 +5,35 @@ import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/services/sleep_stage_engine.dart'
     show SleepStageEngineResult, SleepWindow;
 
-/// Causal audio-only estimate for a phone on a bedside table.
+/// Audio-only estimate for a phone on a bedside table.
 /// Sustained low activity is a fallback when breathing is not audible; quiet
 /// wakefulness cannot be distinguished reliably with these signals alone.
 /// Scores are evidence strength, not calibrated physiological probabilities.
 /// No clock-of-night, terminal wake rule, deep-sleep prior or motion reward.
+///
+/// [SleepWakeCursor] is causal and drives the live UI. A completed session is
+/// replayed through the same cursor and then refined offline (see
+/// [SleepWakeEngine.refine]): a confirmed sleep onset is dated to the middle of
+/// the evidence window that confirmed it instead of its end, and short
+/// ambiguous holes inside sleep are bridged. Neither step crosses human
+/// activity, invalid capture or a recording gap.
 class SleepWakeEngine {
-  static const algorithmVersion = 'sleep-wake-bedside-v4';
+  static const algorithmVersion = 'sleep-wake-bedside-v5';
   static const source = 'bedside_heuristic';
+  static const featureVersions = {'audio-features-v3', 'audio-features-v4'};
   static const sleepConfirmationSeconds = 10 * 60;
   static const quietConfirmationSeconds = 20 * 60;
   static const wakeConfirmationSeconds = 60;
   static const evidenceHoldSeconds = 2 * 60;
+  static const alignmentToleranceMilliseconds = 1000;
+  // Narrowband sound that barely rises above the room floor is ambient
+  // (compressor/HVAC rumble, birdsong, electronics), not a person moving.
+  // Bed movement near the phone is broadband and 50-80 dB above the floor.
+  static const environmentalLowBandFraction = 0.9;
+  static const environmentalHighBandFraction = 0.7;
+  static const maximumEnvironmentalProminenceDb = 30.0;
+  static const maximumBridgeSeconds = quietConfirmationSeconds;
+  static const onsetBackfillFraction = 0.5;
   static const parameters = <String, num>{
     'sleep_confirmation_seconds': sleepConfirmationSeconds,
     'quiet_confirmation_seconds': quietConfirmationSeconds,
@@ -33,22 +50,43 @@ class SleepWakeEngine {
     'minimum_wake_active_fraction': 0.1,
     'stationary_active_fraction': 0.8,
     'minimum_variable_level_stddev_db': 3,
+    'environmental_low_band_fraction': environmentalLowBandFraction,
+    'environmental_high_band_fraction': environmentalHighBandFraction,
+    'maximum_environmental_prominence_db': maximumEnvironmentalProminenceDb,
+    'maximum_bridge_seconds': maximumBridgeSeconds,
+    'onset_backfill_fraction': onsetBackfillFraction,
+    'alignment_tolerance_ms': alignmentToleranceMilliseconds,
+  };
+
+  /// Epoch reasons that carry no evidence of a person being awake. Only these
+  /// may be relabelled by [refine].
+  static const _neutralReasons = {
+    'sleep_pending',
+    'ambiguous_audio',
+    'environmental_sound',
   };
 
   const SleepWakeEngine();
 
   static bool supports(SleepMonitorSession session) =>
-      session.algorithmVersion == 'audio-features-v3';
+      featureVersions.contains(session.algorithmVersion);
 
+  static bool supportsVersion(Object? algorithmVersion) =>
+      featureVersions.contains(algorithmVersion);
+
+  /// [refine] applies the offline pass; `false` returns the causal labels
+  /// exactly as the live cursor emitted them.
   SleepStageEngineResult run({
     required SleepMonitorSession session,
     required List<SleepMonitorSegment> segments,
+    bool refine = true,
   }) {
     final end = session.endedAt;
     if (end == null || !end.isAfter(session.startedAt) || segments.isEmpty) {
       return const SleepStageEngineResult(ran: false, blockers: ['no_data']);
     }
-    final cursor = SleepWakeCursor(sessionId: session.id);
+    // Starting a recording is itself proof the user is awake.
+    final cursor = SleepWakeCursor(sessionId: session.id, startsAwake: true);
     final epochs = <SleepStageEpoch>[];
     final reasons = <String, String>{};
     final ordered = [...segments]
@@ -94,19 +132,35 @@ class SleepWakeEngine {
       final clippedStart = position;
       final seconds = clippedEnd.difference(clippedStart).inSeconds;
       if (seconds <= 0) continue;
+      // Native timestamps are whole seconds while the session start keeps
+      // milliseconds, so the first window routinely starts <1 s early. That
+      // is the same window, not an overlap.
+      final overlapMs = clippedStart
+          .difference(segment.startedAt)
+          .inMilliseconds;
       // Aggregates from an overlapping/oversized window cannot be attributed
       // to its remaining fragment. Preserve that time as unknown.
-      if (segment.startedAt.isBefore(clippedStart) ||
+      if (overlapMs > alignmentToleranceMilliseconds ||
           segment.durationSeconds > 60) {
         gap(clippedEnd);
         continue;
       }
-      final decision = cursor.add(segment, durationSeconds: seconds);
+      final decision = cursor.add(
+        segment,
+        startedAt: clippedStart,
+        durationSeconds: seconds,
+      );
       if (decision.validSignal) validEpochs++;
       append(decision.epoch, decision.reason);
       position = clippedEnd;
     }
     if (position.isBefore(end)) gap(end);
+    if (refine) {
+      final refined = SleepWakeEngine.refine(epochs, reasons);
+      epochs
+        ..clear()
+        ..addAll(refined);
+    }
     final total = end.difference(session.startedAt).inSeconds;
     DateTime? onset;
     for (final epoch in epochs) {
@@ -127,6 +181,99 @@ class SleepWakeEngine {
       decisionReasons: Map.unmodifiable(reasons),
     );
   }
+
+  /// Offline pass over causal labels. Returns new epochs; [reasons] is updated
+  /// for every relabelled epoch.
+  ///
+  /// 1. Onset dating: the cursor only calls sleep after 10-20 min of quiet
+  ///    evidence, so every causal onset is late by the whole window while a
+  ///    wake is late by ~1 min. Sleep began somewhere inside that window; its
+  ///    midpoint is the minimum expected-error estimate, so the latter half of
+  ///    the contiguous neutral run preceding the onset is relabelled asleep.
+  /// 2. Bridging: unknown holes of neutral audio (no human activity, no
+  ///    capture problem) between two sleeping epochs, up to 20 min, are sleep.
+  static List<SleepStageEpoch> refine(
+    List<SleepStageEpoch> causal,
+    Map<String, String> reasons,
+  ) {
+    final out = [...causal];
+    bool neutral(int i) => _neutralReasons.contains(reasons[out[i].id]);
+    bool adjacent(int a, int b) =>
+        out[b].startedAt.difference(out[a].endedAt).inMilliseconds.abs() <=
+        alignmentToleranceMilliseconds;
+    void relabel(int i, String reason) {
+      out[i] = _withStage(out[i], SleepStageType.sleeping, 0.3);
+      reasons[out[i].id] = reason;
+    }
+
+    for (var i = 1; i < out.length; i++) {
+      if (!out[i].isSleep || out[i - 1].isSleep) continue;
+      // Walk back over the contiguous neutral run that confirmed this onset.
+      var first = i;
+      var runSeconds = 0;
+      while (first > 0 &&
+          !out[first - 1].isSleep &&
+          neutral(first - 1) &&
+          adjacent(first - 1, first) &&
+          runSeconds < quietConfirmationSeconds) {
+        first--;
+        runSeconds += out[first].durationSeconds;
+      }
+      var budget = (runSeconds * onsetBackfillFraction).round();
+      for (var k = i - 1; k >= first && budget > 0; k--) {
+        budget -= out[k].durationSeconds;
+        relabel(k, 'onset_within_confirmation');
+      }
+    }
+
+    var i = 0;
+    while (i < out.length) {
+      if (out[i].stage != SleepStageType.unknown) {
+        i++;
+        continue;
+      }
+      var j = i;
+      var seconds = 0;
+      var bridgeable = true;
+      while (j < out.length && out[j].stage == SleepStageType.unknown) {
+        bridgeable = bridgeable && neutral(j) && (j == i || adjacent(j - 1, j));
+        seconds += out[j].durationSeconds;
+        j++;
+      }
+      if (bridgeable &&
+          i > 0 &&
+          j < out.length &&
+          out[i - 1].isSleep &&
+          out[j].isSleep &&
+          adjacent(i - 1, i) &&
+          adjacent(j - 1, j) &&
+          seconds <= maximumBridgeSeconds) {
+        for (var k = i; k < j; k++) {
+          relabel(k, 'bridged_within_sleep');
+        }
+      }
+      i = j;
+    }
+    return out;
+  }
+
+  static SleepStageEpoch _withStage(
+    SleepStageEpoch e,
+    SleepStageType stage,
+    double confidence,
+  ) => SleepStageEpoch(
+    id: e.id,
+    sessionId: e.sessionId,
+    startedAt: e.startedAt,
+    durationSeconds: e.durationSeconds,
+    stage: stage,
+    confidence: confidence,
+    awakeProbability: null,
+    sleepingProbability: null,
+    deepProbability: null,
+    algorithmVersion: e.algorithmVersion,
+    source: e.source,
+  );
 }
 
 class SleepWakeDecision {
@@ -148,7 +295,11 @@ class SleepWakeCursor {
   double _wakeSeconds = 0;
   int _uncertainSeconds = 0;
 
-  SleepWakeCursor({required this.sessionId});
+  /// [startsAwake] seeds the confirmed state for a cursor that begins at the
+  /// moment the user started recording. Gaps still reset to unknown.
+  SleepWakeCursor({required this.sessionId, bool startsAwake = false}) {
+    if (startsAwake) _state = _confirmedState = SleepStageType.awake;
+  }
 
   void reset() {
     _expectedStart = null;
@@ -161,14 +312,20 @@ class SleepWakeCursor {
   SleepStageEpoch unknown(DateTime start, int seconds) =>
       _epoch(start, seconds, SleepStageType.unknown, 0);
 
-  SleepWakeDecision add(SleepMonitorSegment segment, {int? durationSeconds}) {
+  SleepWakeDecision add(
+    SleepMonitorSegment segment, {
+    DateTime? startedAt,
+    int? durationSeconds,
+  }) {
+    final start = startedAt ?? segment.startedAt;
     final seconds = durationSeconds ?? segment.durationSeconds;
     final expected = _expectedStart;
     if (expected != null &&
-        segment.startedAt.difference(expected).inMilliseconds.abs() > 1000) {
+        start.difference(expected).inMilliseconds.abs() >
+            SleepWakeEngine.alignmentToleranceMilliseconds) {
       reset();
     }
-    _expectedStart = segment.startedAt.add(Duration(seconds: seconds));
+    _expectedStart = start.add(Duration(seconds: seconds));
     final noise = segment.noiseScore;
     final bands = [
       segment.spectralBandEnergy0,
@@ -205,7 +362,7 @@ class SleepWakeCursor {
     if (!valid) {
       reset();
       return SleepWakeDecision(
-        unknown(segment.startedAt, seconds.clamp(1, 60)),
+        unknown(start, seconds.clamp(1, 60)),
         'invalid_capture',
         false,
       );
@@ -219,14 +376,23 @@ class SleepWakeCursor {
     final flatness = segment.spectralFlatness;
     // This is evidence from a valid recording, not missing audio or lack of
     // phone motion. A bedside microphone need not resolve periodic breathing.
-    final quietEvidence =
+    final lowQuiet =
         activity != null &&
         activity.isFinite &&
         activity >= 0 &&
         activity / seconds <
             SleepWakeEngine.parameters['maximum_quiet_active_fraction']!;
+    // Activity from narrowband ambient sound hides nothing a person does more
+    // quietly, so it is treated like silence rather than like movement.
+    final environmental =
+        !lowQuiet &&
+        activity != null &&
+        activity.isFinite &&
+        activity >= 0 &&
+        _isEnvironmental(segment, bands, total);
+    final quietEvidence = lowQuiet || environmental;
     final sleepEvidence =
-        quietEvidence &&
+        lowQuiet &&
         regularity != null &&
         regularity.isFinite &&
         regularity >= 0.45 &&
@@ -241,6 +407,7 @@ class SleepWakeCursor {
         flatness >= 0 &&
         flatness < 0.65;
     final wakeEvidence =
+        !environmental &&
         activity != null &&
         activity.isFinite &&
         activity <= seconds + 1 &&
@@ -304,7 +471,9 @@ class SleepWakeCursor {
         _confirmedState = _state;
         _uncertainSeconds = 0;
       }
-      reason = _state == SleepStageType.sleeping
+      reason = environmental
+          ? 'environmental_sound'
+          : _state == SleepStageType.sleeping
           ? (sleepEvidence
                 ? 'sustained_periodic_audio'
                 : 'sustained_low_audio_activity')
@@ -313,9 +482,19 @@ class SleepWakeCursor {
           ? (sleepEvidence ? 0.6 : 0.4)
           : 0.3;
     } else {
+      // A few seconds of sound in an otherwise quiet window only weaken
+      // pending sleep support by that noisy duration, mirroring how wake
+      // support accumulates. Charging the whole window made each short sound
+      // cancel a full quiet window and could stall confirmation for hours.
+      final noisy = (activity != null && activity.isFinite && activity >= 0)
+          ? activity.clamp(0, seconds).ceil()
+          : seconds;
       _wakeSeconds = 0;
-      _sleepSeconds = 0;
-      _quietSeconds = (_quietSeconds - seconds).clamp(
+      _sleepSeconds = (_sleepSeconds - noisy).clamp(
+        0,
+        SleepWakeEngine.sleepConfirmationSeconds,
+      );
+      _quietSeconds = (_quietSeconds - noisy).clamp(
         0,
         SleepWakeEngine.quietConfirmationSeconds,
       );
@@ -332,10 +511,29 @@ class SleepWakeCursor {
     }
     if (_state == SleepStageType.unknown) strength = 0;
     return SleepWakeDecision(
-      _epoch(segment.startedAt, seconds, _state, strength),
+      _epoch(start, seconds, _state, strength),
       reason,
       true,
     );
+  }
+
+  static bool _isEnvironmental(
+    SleepMonitorSegment segment,
+    List<double?> bands,
+    double total,
+  ) {
+    final peak = segment.audioPeakDbfs;
+    final floor = segment.audioBaselineDbfs;
+    if (peak == null || floor == null || !peak.isFinite || !floor.isFinite) {
+      return false;
+    }
+    if (peak - floor >= SleepWakeEngine.maximumEnvironmentalProminenceDb) {
+      return false;
+    }
+    final low = bands[0]! / total;
+    final high = (bands[3]! + bands[4]!) / total;
+    return low >= SleepWakeEngine.environmentalLowBandFraction ||
+        high >= SleepWakeEngine.environmentalHighBandFraction;
   }
 
   SleepStageEpoch _epoch(

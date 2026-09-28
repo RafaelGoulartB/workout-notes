@@ -26,8 +26,11 @@ void main() {
       expect(imported.estimatedSleepMinutes, greaterThan(210));
       expect(imported.estimatedSleepMinutes, lessThan(240));
       expect(imported.sleepOnsetAt, isNotNull);
-      expect(imported.sleepLatencyMinutes, greaterThanOrEqualTo(19));
-      expect(imported.unknownMinutes, 20);
+      // Onset is dated to the middle of the ~20 min quiet confirmation
+      // window; the user is known awake from the moment recording started.
+      expect(imported.sleepLatencyMinutes, inInclusiveRange(9, 11));
+      expect(imported.unknownMinutes, 0);
+      expect(imported.awakeMinutes, inInclusiveRange(9, 11));
       expect(imported.deepSleepMinutes, isNull);
       expect(imported.stageConfidence, isNull);
       expect(imported.sleepEntryId, isNotNull);
@@ -49,7 +52,7 @@ void main() {
         ],
       });
       expect(imported.estimatedSleepMinutes, greaterThan(45));
-      expect(imported.stageAlgorithmVersion, 'sleep-wake-bedside-v4');
+      expect(imported.stageAlgorithmVersion, 'sleep-wake-bedside-v5');
       expect(imported.finalWakeAt, isNull);
       expect(imported.deepSleepMinutes, isNull);
       expect(imported.sleepEntryId, isNotNull);
@@ -113,7 +116,7 @@ void main() {
       );
       final result = await repository.reprocessDiagnostic(archive);
       expect(result!.estimatedSleepMinutes, greaterThan(0));
-      expect(result.stageAlgorithmVersion, 'sleep-wake-bedside-v4');
+      expect(result.stageAlgorithmVersion, 'sleep-wake-bedside-v5');
       expect(result.alarmDismissedAt, dismissedAt);
       expect(await repository.reprocessDiagnostic(archive), isNull);
       expect(await database.query('sleep_entries'), hasLength(1));
@@ -180,7 +183,7 @@ void main() {
         ).map((s) => s.toMap()).toList(),
       };
       final repaired = await repository.reprocessDiagnostic(archive);
-      expect(repaired!.stageAlgorithmVersion, 'sleep-wake-bedside-v4');
+      expect(repaired!.stageAlgorithmVersion, 'sleep-wake-bedside-v5');
       expect(repaired.estimatedSleepMinutes, isNotNull);
       expect(repaired.unknownMinutes, lessThan(369 * 0.2));
       expect(await repository.getUnestimatedSessions(), isEmpty);

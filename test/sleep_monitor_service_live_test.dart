@@ -45,11 +45,13 @@ void main() {
       });
       final service = SleepMonitorService.instance;
       await service.getState();
-      expect(service.liveDecision!.epoch.stage, SleepStageType.unknown);
+      // Replayed from the first window, so the user is known awake until the
+      // 10 min breathing confirmation completes.
+      expect(service.liveDecision!.epoch.stage, SleepStageType.awake);
       for (var i = 0; i < 5; i++) {
         await service.getState();
       }
-      expect(service.liveDecision!.epoch.stage, SleepStageType.unknown);
+      expect(service.liveDecision!.epoch.stage, SleepStageType.awake);
       expect(reads, 1);
       latest = 19;
       await service.getState();

@@ -433,6 +433,7 @@ class SleepMonitorService extends ChangeNotifier {
             'sleep-wake-bedside-v1',
             'sleep-wake-bedside-v2',
             'sleep-wake-bedside-v3',
+            'sleep-wake-bedside-v4',
           }.contains(session.stageAlgorithmVersion)) {
             continue;
           }
@@ -496,7 +497,15 @@ class SleepMonitorService extends ChangeNotifier {
       return;
     }
     if (_liveCursor?.sessionId != segment.sessionId) {
-      _liveCursor = SleepWakeCursor(sessionId: segment.sessionId);
+      final started = _state.startedAt;
+      // Only the window that opens the recording may assume the user is
+      // awake; a cursor joining mid-night must not invent that evidence.
+      _liveCursor = SleepWakeCursor(
+        sessionId: segment.sessionId,
+        startsAwake:
+            started != null &&
+            segment.startedAt.difference(started).inSeconds.abs() <= 1,
+      );
       _lastLiveSegment = null;
     }
     if (_lastLiveSegment != null &&
