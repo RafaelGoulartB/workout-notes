@@ -45,4 +45,16 @@ class SpectralAnalyzerTest {
         val centroid = result.getValue("spectral_centroid_hz")
         assertTrue("expected ~6000Hz centroid, got $centroid", centroid > 5500 && centroid < 6500)
     }
+
+    @Test
+    fun quantizationLevelNoiseKeepsFlatnessWithinUnitRange() {
+        // +/-1 LSB noise is what a quiet bedroom looks like on UNPROCESSED
+        // capture (~-90 dBFS). Bin power there is below the old 1e-12 floor.
+        val analyzer = SpectralAnalyzer()
+        val random = java.util.Random(7)
+        val samples = ShortArray(16_000 * 3) { (random.nextInt(3) - 1).toShort() }
+        analyzer.add(samples, samples.size)
+        val flatness = analyzer.snapshot().getValue("spectral_flatness")
+        assertTrue("expected flatness in [0.3, 1], got $flatness", flatness in 0.3..1.0)
+    }
 }

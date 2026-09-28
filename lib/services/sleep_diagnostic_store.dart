@@ -64,10 +64,11 @@ class SleepDiagnosticStore {
         'schema_version': 1,
         'engine_version':
             resultSummary?['stage_algorithm_version'] ??
-            (session['algorithm_version'] == 'audio-features-v3'
+            (SleepWakeEngine.supportsVersion(session['algorithm_version'])
                 ? SleepWakeEngine.algorithmVersion
                 : SleepStageEngine.algorithmVersion),
-        'parameters': session['algorithm_version'] == 'audio-features-v3'
+        'parameters':
+            SleepWakeEngine.supportsVersion(session['algorithm_version'])
             ? SleepWakeEngine.parameters
             : SleepStageEngine.parameters,
         'result_summary': resultSummary,

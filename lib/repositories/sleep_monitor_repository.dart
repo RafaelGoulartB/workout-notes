@@ -38,9 +38,11 @@ class SleepMonitorRepository extends BaseRepository {
     final rows = await database.query(
       'sleep_monitor_sessions',
       where:
-          'sleep_entry_id IS NULL AND algorithm_version = ? AND status IN (?, ?)',
+          'sleep_entry_id IS NULL AND algorithm_version IN '
+          '(${List.filled(SleepWakeEngine.featureVersions.length, '?').join(', ')}) '
+          'AND status IN (?, ?)',
       whereArgs: [
-        'audio-features-v3',
+        ...SleepWakeEngine.featureVersions,
         SleepMonitorSession.completed,
         SleepMonitorSession.interrupted,
       ],
@@ -450,7 +452,7 @@ class SleepMonitorRepository extends BaseRepository {
     return imported!;
   }
 
-  /// Repairs only incomplete v1/v2/v3 results that still have capture data.
+  /// Repairs only incomplete v1-v4 results that still have capture data.
   /// Database metadata wins over the archive, including later alarm dismissal.
   Future<SleepMonitorSession?> reprocessDiagnostic(
     Map<String, dynamic> archive,
@@ -470,6 +472,7 @@ class SleepMonitorRepository extends BaseRepository {
           'sleep-wake-bedside-v1',
           'sleep-wake-bedside-v2',
           'sleep-wake-bedside-v3',
+          'sleep-wake-bedside-v4',
         }.contains(current.stageAlgorithmVersion) ||
         DateTime.tryParse(raw['started_at']?.toString() ?? '') !=
             current.startedAt ||

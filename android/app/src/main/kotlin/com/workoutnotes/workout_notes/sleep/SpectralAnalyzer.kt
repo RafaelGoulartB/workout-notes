@@ -17,6 +17,7 @@ class SpectralAnalyzer(private val sampleRate: Int = 16_000) {
     companion object {
         const val FFT_SIZE = 1024
         const val MAX_FRAMES_PER_SECOND = 8
+        private const val POWER_FLOOR = 1e-24
         val BANDS = listOf(
             0.0 to 200.0, // snore fundamental, HVAC rumble
             200.0 to 600.0, // snore harmonics, low speech formants
@@ -88,8 +89,10 @@ class SpectralAnalyzer(private val sampleRate: Int = 16_000) {
         }
         val meanLog = if (binCount > 0) flatnessLogSum / binCount else 0.0
         val meanPower = if (binCount > 0) powerSum / binCount else 0.0
+        // Geometric/arithmetic mean ratio is bounded to [0, 1]; the clamp only
+        // absorbs floating-point error.
         result["spectral_flatness"] = if (meanPower > 0.0 && binCount > 0) {
-            exp(meanLog) / meanPower
+            (exp(meanLog) / meanPower).coerceIn(0.0, 1.0)
         } else {
             1.0
         }
@@ -112,7 +115,10 @@ class SpectralAnalyzer(private val sampleRate: Int = 16_000) {
                     bandSum[band] += power
                 }
             }
-            flatnessLogSum += ln(power + 1e-12)
+            // The floor must stay far below real bin power. Quiet 16-bit capture
+            // near 1 LSB yields ~1e-13 per bin; a 1e-12 floor inflated the
+            // geometric mean and produced flatness values above 1.
+            flatnessLogSum += ln(power + POWER_FLOOR)
             powerSum += power
             centroidSum += freq * power
             binCount++
