@@ -11,7 +11,8 @@ bool _isQuality(RunWorkoutKind kind) =>
     kind == RunWorkoutKind.tempo ||
     kind == RunWorkoutKind.fartlek ||
     kind == RunWorkoutKind.hills ||
-    kind == RunWorkoutKind.progression;
+    kind == RunWorkoutKind.progression ||
+    kind == RunWorkoutKind.test;
 
 void main() {
   RunPlanBuildConfig config({

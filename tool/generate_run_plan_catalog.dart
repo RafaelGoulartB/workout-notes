@@ -237,6 +237,7 @@ String _kind(RunWorkoutKind kind) => switch (kind) {
   RunWorkoutKind.progression => 'Progressivo',
   RunWorkoutKind.recovery => 'Regenerativo',
   RunWorkoutKind.race => 'Prova',
+  RunWorkoutKind.test => 'Teste',
 };
 
 String _stepRole(RunStepRole role) => switch (role) {
