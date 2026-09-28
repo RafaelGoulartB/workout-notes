@@ -6,6 +6,7 @@ import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/services/run_pace_calculator.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
+import 'package:workout_notes/services/run_plan_text.dart';
 
 /// How hard the athlete wants to push weekly volume and quality load.
 enum RunPlanIntensity { conservative, standard, aggressive }
@@ -62,7 +63,29 @@ class RunPlanPaceCalibration {
     distanceMeters: distanceMeters,
     timeSeconds: timeSeconds,
   );
+
+  /// A 5 km-equivalent calibration for a fitness index.
+  factory RunPlanPaceCalibration.fromVdot(
+    double vdot,
+  ) => RunPlanPaceCalibration(
+    distanceMeters: RunPaceCalculator.fiveKMeters,
+    timeSeconds:
+        (RunPaceCalculator.racePaceFor(vdot, RunPaceCalculator.fiveKMeters) * 5)
+            .round(),
+  );
+
+  Map<String, dynamic> toJson() => {'m': distanceMeters, 's': timeSeconds};
+
+  static RunPlanPaceCalibration? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final m = (json['m'] as num?)?.toDouble();
+    final s = (json['s'] as num?)?.toInt();
+    if (m == null || s == null || m <= 0 || s <= 0) return null;
+    return RunPlanPaceCalibration(distanceMeters: m, timeSeconds: s);
+  }
 }
+
+const Object _unset = Object();
 
 /// Inputs collected by the customize wizard before materialising a plan.
 class RunPlanBuildConfig {
@@ -112,6 +135,21 @@ class RunPlanBuildConfig {
   /// Ignored for fixed-length templates.
   final int? weeks;
 
+  /// Compose only the last [remainingWeeks] weeks of the template ladder —
+  /// used when an active plan is re-planned mid-way (missed weeks, new
+  /// fitness). More weeks than the ladder has from the current point re-runs
+  /// earlier template weeks; fewer compresses. A race date still wins.
+  final int? remainingWeeks;
+
+  /// Language session names and notes are written in.
+  final RunPlanLanguage language;
+
+  /// Two short runner-specific strength sessions a week.
+  final bool includeStrength;
+
+  /// A mid-plan time trial in the first recovery week, to recalibrate paces.
+  final bool includeTest;
+
   const RunPlanBuildConfig({
     required this.sessionsPerWeek,
     required this.availableDays,
@@ -128,7 +166,131 @@ class RunPlanBuildConfig {
     this.hillSurface = RunPlanHillSurface.hill,
     this.longRunDay,
     this.weeks,
+    this.remainingWeeks,
+    this.language = RunPlanLanguage.pt,
+    this.includeStrength = false,
+    this.includeTest = true,
   });
+
+  RunPlanText get text => RunPlanText.of(language);
+
+  /// Copy with the fields re-planning changes.
+  RunPlanBuildConfig copyWith({
+    RunPlanPaceCalibration? calibration,
+    RunPlanPaceSource? paceSource,
+    Object? goalCalibration = _unset,
+    Object? currentWeeklyKm = _unset,
+    RunPlanIntensity? intensity,
+    Object? startDate = _unset,
+    Object? remainingWeeks = _unset,
+    bool? includeTest,
+  }) => RunPlanBuildConfig(
+    sessionsPerWeek: sessionsPerWeek,
+    availableDays: availableDays,
+    intent: intent,
+    intensity: intensity ?? this.intensity,
+    calibration: calibration ?? this.calibration,
+    paceSource: paceSource ?? this.paceSource,
+    fitnessCalibration: fitnessCalibration,
+    goalCalibration: identical(goalCalibration, _unset)
+        ? this.goalCalibration
+        : goalCalibration as RunPlanPaceCalibration?,
+    raceDate: raceDate,
+    startDate: identical(startDate, _unset)
+        ? this.startDate
+        : startDate as DateTime?,
+    currentWeeklyKm: identical(currentWeeklyKm, _unset)
+        ? this.currentWeeklyKm
+        : currentWeeklyKm as double?,
+    includeHills: includeHills,
+    hillSurface: hillSurface,
+    longRunDay: longRunDay,
+    weeks: weeks,
+    remainingWeeks: identical(remainingWeeks, _unset)
+        ? this.remainingWeeks
+        : remainingWeeks as int?,
+    language: language,
+    includeStrength: includeStrength,
+    includeTest: includeTest ?? this.includeTest,
+  );
+
+  /// Stored on the plan so it can be re-planned later. Transient inputs
+  /// ([startDate], [remainingWeeks]) are not persisted.
+  Map<String, dynamic> toJson() => {
+    'v': 1,
+    'sessionsPerWeek': sessionsPerWeek,
+    'availableDays': availableDays,
+    'intent': intent.name,
+    'intensity': intensity.name,
+    'calibration': calibration?.toJson(),
+    'paceSource': paceSource.name,
+    'fitnessCalibration': fitnessCalibration?.toJson(),
+    'goalCalibration': goalCalibration?.toJson(),
+    'raceDate': raceDate?.toIso8601String().substring(0, 10),
+    'currentWeeklyKm': currentWeeklyKm,
+    'includeHills': includeHills,
+    'hillSurface': hillSurface.name,
+    'longRunDay': longRunDay,
+    'weeks': weeks,
+    'language': language.code,
+    'includeStrength': includeStrength,
+    'includeTest': includeTest,
+  };
+
+  /// Null for anything that does not describe a valid config.
+  static RunPlanBuildConfig? fromJson(Map<String, dynamic>? json) {
+    if (json == null) return null;
+    try {
+      T byName<T extends Enum>(List<T> values, Object? raw, T fallback) =>
+          values.firstWhere((v) => v.name == raw, orElse: () => fallback);
+      final days = (json['availableDays'] as List).cast<num>().map(
+        (d) => d.toInt(),
+      );
+      return RunPlanBuildConfig(
+        sessionsPerWeek: (json['sessionsPerWeek'] as num).toInt(),
+        availableDays: days.toList(),
+        intent: byName(
+          RunPlanIntent.values,
+          json['intent'],
+          RunPlanIntent.finish,
+        ),
+        intensity: byName(
+          RunPlanIntensity.values,
+          json['intensity'],
+          RunPlanIntensity.standard,
+        ),
+        calibration: RunPlanPaceCalibration.fromJson(json['calibration']),
+        paceSource: byName(
+          RunPlanPaceSource.values,
+          json['paceSource'],
+          RunPlanPaceSource.goal,
+        ),
+        fitnessCalibration: RunPlanPaceCalibration.fromJson(
+          json['fitnessCalibration'],
+        ),
+        goalCalibration: RunPlanPaceCalibration.fromJson(
+          json['goalCalibration'],
+        ),
+        raceDate: json['raceDate'] == null
+            ? null
+            : DateTime.tryParse(json['raceDate'] as String),
+        currentWeeklyKm: (json['currentWeeklyKm'] as num?)?.toDouble(),
+        includeHills: json['includeHills'] as bool? ?? true,
+        hillSurface: byName(
+          RunPlanHillSurface.values,
+          json['hillSurface'],
+          RunPlanHillSurface.hill,
+        ),
+        longRunDay: (json['longRunDay'] as num?)?.toInt(),
+        weeks: (json['weeks'] as num?)?.toInt(),
+        language: RunPlanLanguage.fromCode(json['language'] as String?),
+        includeStrength: json['includeStrength'] as bool? ?? false,
+        includeTest: json['includeTest'] as bool? ?? true,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 
   double get volumeFactor => switch (intensity) {
     RunPlanIntensity.conservative => 0.85,
@@ -463,9 +625,13 @@ enum _SessionRole {
   /// Long run carrying goal-pace blocks (half / marathon specificity).
   longRacePace,
   race,
+
+  /// Mid-plan time trial that recalibrates the paces.
+  test,
 }
 
 bool _isQualityRole(_SessionRole role) =>
+    role == _SessionRole.test ||
     role == _SessionRole.interval ||
     role == _SessionRole.tempo ||
     role == _SessionRole.fartlek ||
@@ -490,10 +656,15 @@ class _PaceBook {
   final RunPaces? race;
   final double goalMeters;
 
+  /// Language the sessions built from this book are written in. Every
+  /// session builder already receives the book, so it rides along here.
+  final RunPlanText text;
+
   const _PaceBook({
     required this.training,
     required this.race,
     required this.goalMeters,
+    required this.text,
   });
 
   /// Paces for zero-based [week]: training follows the ramp, race-pace work
@@ -502,10 +673,12 @@ class _PaceBook {
     RunPlanPaceRamp ramp,
     int week,
     double goalMeters,
+    RunPlanText text,
   ) => _PaceBook(
     training: ramp.pacesAt(week),
     race: ramp.targetPaces,
     goalMeters: goalMeters,
+    text: text,
   );
 
   double? get easy => training?.easySecPerKm;
@@ -686,6 +859,7 @@ abstract final class RunPlanComposer {
       ramp,
       0,
       goalMeters ?? RunPaceCalculator.tenKMeters,
+      config.text,
     );
     final training = schedule.where(
       (week) => !week.any((session) => session.kind == RunWorkoutKind.race),
@@ -885,11 +1059,21 @@ abstract final class RunPlanComposer {
       math.max(4, (templateWeeks * 0.6).ceil()),
     );
     final raceDate = config.raceDate;
+    final remaining = config.remainingWeeks;
     if (!hasRace || raceDate == null) {
+      // Re-planning an active plan: the ladder's last [remaining] weeks, so
+      // the plan keeps its end and its race-specific block. Asking for more
+      // weeks than are left re-runs earlier ladder weeks (missed weeks are
+      // rebuilt, not skipped).
+      final weeks = remaining == null
+          ? templateWeeks
+          : template.maintainFitness
+          ? math.max(1, remaining)
+          : remaining.clamp(1, templateWeeks);
       return _Timing(
         templateWeeks: templateWeeks,
-        skip: 0,
-        weeks: templateWeeks,
+        skip: template.maintainFitness ? 0 : templateWeeks - weeks,
+        weeks: weeks,
         hasRace: hasRace,
         minWeeks: minWeeks,
       );
@@ -916,7 +1100,11 @@ abstract final class RunPlanComposer {
         raceWeekday: raceDate.weekday,
       );
     }
-    final weeks = math.max(weeksToRace, minWeeks);
+    // A plan being re-planned mid-way must still end on the race, even when
+    // that leaves less than the usual minimum — the athlete is already in it.
+    final weeks = remaining != null
+        ? math.max(1, math.min(weeksToRace, templateWeeks))
+        : math.max(weeksToRace, minWeeks);
     return _Timing(
       templateWeeks: templateWeeks,
       skip: templateWeeks - weeks,
@@ -924,7 +1112,7 @@ abstract final class RunPlanComposer {
       hasRace: true,
       minWeeks: minWeeks,
       weeksToRace: weeksToRace,
-      startWeek: weeksToRace >= minWeeks
+      startWeek: weeksToRace >= minWeeks || remaining != null
           ? start
           : raceWeek.subtract(Duration(days: 7 * (weeks - 1))),
       raceWeekday: raceDate.weekday,
@@ -985,7 +1173,7 @@ abstract final class RunPlanComposer {
     final weeks = _planWeeks(
       template,
       config,
-      _PaceBook.forWeek(ramp, 0, paceMeters),
+      _PaceBook.forWeek(ramp, 0, paceMeters, config.text),
       goalMeters,
       timing,
     );
@@ -998,7 +1186,7 @@ abstract final class RunPlanComposer {
     List<RunPlanTemplateWorkout> build(_WeekPlan week) => _buildWeek(
       template: template,
       config: config,
-      book: _PaceBook.forWeek(ramp, week.index, paceMeters),
+      book: _PaceBook.forWeek(ramp, week.index, paceMeters, config.text),
       slots: slots,
       week: week,
       raceWeekday: timing.raceWeekday,
@@ -1086,7 +1274,7 @@ abstract final class RunPlanComposer {
     _Timing timing,
   ) {
     if (template.maintainFitness) {
-      return _planMaintainWeeks(template, config, book);
+      return _planMaintainWeeks(template, config, book, timing.weeks);
     }
     final continuous = template.continuousKm;
     // A near race date drops the first template weeks: the plan still ends on
@@ -1130,8 +1318,14 @@ abstract final class RunPlanComposer {
       // A measured baseline *is* week 1, whatever the intensity choice. The
       // prerequisite fallback is only the template's assumption, so the
       // intensity choice still shifts it.
+      // Week 1 is a build week, so it reads the ladder's running maximum
+      // (see below) — the anchor must scale that same value.
+      var ladder0 = 0.0;
+      for (var t = -skip; t <= 0; t++) {
+        ladder0 = math.max(ladder0, templateWeekKm(t));
+      }
       final week0 =
-          templateWeekKm(0) *
+          ladder0 *
           sessionScale *
           (measured != null ? config.volumeFactor : 1.0);
       if (week0 > 0) anchor = (baseline / week0).clamp(0.5, 1.5);
@@ -1144,11 +1338,31 @@ abstract final class RunPlanComposer {
     // fit inside its share of the week. A long run that would need a much
     // bigger week than the template intends is shortened, not accommodated:
     // the week may stretch at most 15% to carry it.
+    //
+    // Build weeks read the ladder's running maximum. The template's own down
+    // weeks line up with this plan's recovery weeks only when nothing is
+    // skipped; once a near race date or a re-plan drops leading weeks, a
+    // template dip would land on a build week and make it smaller than the
+    // one before. Recovery here comes from the phases, not from the ladder.
+    var ladderLong = 0.0, ladderWeek = 0.0;
+    for (var t = 0; t < skip; t++) {
+      ladderLong = math.max(ladderLong, templateLongKm(t - skip));
+      ladderWeek = math.max(ladderWeek, templateWeekKm(t - skip));
+    }
     final rawWeek = <double>[], rawLong = <double>[];
     for (var w = 0; w < total; w++) {
       final scale = config.volumeFactor * anchorAt(w);
-      var long = math.min(templateLongKm(w) * scale, longCap);
-      final templateWeek = templateWeekKm(w) * scale * sessionScale;
+      ladderLong = math.max(ladderLong, templateLongKm(w));
+      ladderWeek = math.max(ladderWeek, templateWeekKm(w));
+      final build =
+          _phaseOf(weekIndex: w, raceWeek: raceWeek, taperCount: taperCount) ==
+          _Phase.build;
+      var long = math.min(
+        (build ? ladderLong : templateLongKm(w)) * scale,
+        longCap,
+      );
+      final templateWeek =
+          (build ? ladderWeek : templateWeekKm(w)) * scale * sessionScale;
       final week = math.min(
         math.max(templateWeek, long / maxLongShare),
         templateWeek * 1.15,
@@ -1234,10 +1448,10 @@ abstract final class RunPlanComposer {
     RunPlanTemplate template,
     RunPlanBuildConfig config,
     _PaceBook book,
+    int total,
   ) {
     final continuous = template.continuousKm!;
     final blueprint = continuous.first;
-    final total = config.weeks ?? template.defaultSelectableWeeks;
     final templateSessions = blueprint.length;
     final sessionScale = math
         .sqrt(config.sessionsPerWeek / templateSessions)
@@ -1498,7 +1712,20 @@ abstract final class RunPlanComposer {
     }
 
     if (phase == _Phase.recovery) {
-      final soft = gentle || weekIndex.isEven
+      // The first down week is the natural checkpoint: legs are fresher, and
+      // a time trial there tells the plan whether its paces still fit before
+      // the heavier half begins.
+      final test =
+          weekIndex == 3 &&
+          totalWeeks >= 8 &&
+          config.includeTest &&
+          !gentle &&
+          !template.aerobicOnly &&
+          !template.maintainFitness &&
+          !template.returnStyle;
+      final soft = test
+          ? _SessionRole.test
+          : gentle || weekIndex.isEven
           ? _SessionRole.fartlek
           : _SessionRole.tempo;
       return [
@@ -1860,6 +2087,7 @@ abstract final class RunPlanComposer {
           switch (role) {
             _SessionRole.recovery => 0.7,
             _SessionRole.sharpen => 0.5,
+            _SessionRole.test => 1.3,
             _SessionRole.easy => 1.0,
             _ => 1.15,
           },
@@ -2046,6 +2274,9 @@ abstract final class RunPlanComposer {
         return _race(day, km, book, template.goalKind);
       case _SessionRole.sharpen:
         return _sharpen(day, km, book);
+      case _SessionRole.test:
+        return _test(day, book, template.goalKind, week.weekKm, week.longKm) ??
+            _fartlek(day, km, book, weekKm: week.weekKm, soft: true);
       case _SessionRole.interval:
         final maxWorkKm = _vo2WorkCapKm(week.weekKm, book);
         // Fewer than three 400 m reps is not a VO2 session; a fartlek gives
@@ -2205,6 +2436,7 @@ abstract final class RunPlanComposer {
     final rest = template.runWalkRest!;
     final reps = template.runWalkReps!;
     final walkJog = template.key == 'walk_jog';
+    final t = config.text;
     // Bone and tendon adaptation lags the cardiovascular system, so a beginner
     // progression spreads its days instead of running the block Mon–Fri.
     final days = _spacedDays(config.availableDays);
@@ -2233,19 +2465,15 @@ abstract final class RunPlanComposer {
       weeks.add([
         for (var s = 0; s < config.sessionsPerWeek; s++)
           if (continuousSeconds != null && s == config.sessionsPerWeek - 1)
-            _continuousRun(days[s], continuousSeconds)
+            _continuousRun(days[s], continuousSeconds, t)
           else
             RunPlanTemplateWorkout(
-              name: walkJog ? 'Trote e caminhada' : 'Corrida e caminhada',
+              name: walkJog ? t.walkJogName : t.runWalkName,
               kind: RunWorkoutKind.easy,
               dayOfWeek: days[s],
               effortZone: 'RPE 3–4',
               targetDurationSeconds: 600 + sessionReps * (work[w] + rest[w]),
-              notes: walkJog
-                  ? 'Trote bem leve; caminhe antes de perder a respiração. '
-                        'Se a semana ficou difícil, repita-a antes de avançar.'
-                  : 'Corra confortável e caminhe antes de perder a forma. '
-                        'Se a semana ficou difícil, repita-a antes de avançar.',
+              notes: walkJog ? t.walkJogNote : t.runWalkNote,
               steps: [
                 const RunPlanTemplateStep(
                   role: RunStepRole.warmup,
@@ -2279,35 +2507,35 @@ abstract final class RunPlanComposer {
   }
 
   /// Time-based continuous run with a walking warm-up and cool-down.
-  static RunPlanTemplateWorkout _continuousRun(int day, int seconds) =>
-      RunPlanTemplateWorkout(
-        name: 'Corrida contínua · ${seconds ~/ 60} min',
-        kind: RunWorkoutKind.easy,
-        dayOfWeek: day,
-        effortZone: 'RPE 3–4',
-        targetDurationSeconds: seconds + 600,
-        notes:
-            'Corra sem parar, devagar o bastante para conseguir conversar. '
-            'Se precisar, caminhe 1 minuto e retome — completar vale mais '
-            'que o ritmo.',
-        steps: [
-          const RunPlanTemplateStep(
-            role: RunStepRole.warmup,
-            metric: RunIntervalMetric.time,
-            value: 300,
-          ),
-          RunPlanTemplateStep(
-            role: RunStepRole.steady,
-            metric: RunIntervalMetric.time,
-            value: seconds,
-          ),
-          const RunPlanTemplateStep(
-            role: RunStepRole.cooldown,
-            metric: RunIntervalMetric.time,
-            value: 300,
-          ),
-        ],
-      );
+  static RunPlanTemplateWorkout _continuousRun(
+    int day,
+    int seconds,
+    RunPlanText t,
+  ) => RunPlanTemplateWorkout(
+    name: t.continuousName(seconds ~/ 60),
+    kind: RunWorkoutKind.easy,
+    dayOfWeek: day,
+    effortZone: 'RPE 3–4',
+    targetDurationSeconds: seconds + 600,
+    notes: t.continuousNote,
+    steps: [
+      const RunPlanTemplateStep(
+        role: RunStepRole.warmup,
+        metric: RunIntervalMetric.time,
+        value: 300,
+      ),
+      RunPlanTemplateStep(
+        role: RunStepRole.steady,
+        metric: RunIntervalMetric.time,
+        value: seconds,
+      ),
+      const RunPlanTemplateStep(
+        role: RunStepRole.cooldown,
+        metric: RunIntervalMetric.time,
+        value: 300,
+      ),
+    ],
+  );
 
   /// Orders the chosen days so back-to-back sessions come last.
   static List<int> _spacedDays(List<int> available) {
@@ -2338,18 +2566,9 @@ abstract final class RunPlanComposer {
 
   static double _meters(double km) => (km * 100).round() * 10;
 
-  /// `800 m`, `2 km`, `1,5 km` — for session names.
-  static String _distanceText(double km) {
-    if (km < 1) return '${(km * 1000).round()} m';
-    final rounded = (km * 10).round() / 10;
-    return rounded == rounded.roundToDouble()
-        ? '${rounded.toStringAsFixed(0)} km'
-        : '${rounded.toStringAsFixed(1).replaceAll('.', ',')} km';
-  }
-
   static String _easyNote(String base, _PaceBook book) {
     final window = book.easyWindowLabel;
-    return window == null ? base : '$base Faixa fácil: $window.';
+    return window == null ? base : book.text.easyWindow(base, window);
   }
 
   static RunPlanTemplateWorkout _easy(
@@ -2361,17 +2580,14 @@ abstract final class RunPlanComposer {
   }) {
     if (strides <= 0) {
       return RunPlanTemplateWorkout(
-        name: recovery ? 'Regenerativo' : 'Rodagem leve',
+        name: recovery ? book.text.recoveryName : book.text.easyName,
         kind: recovery ? RunWorkoutKind.recovery : RunWorkoutKind.easy,
         dayOfWeek: day,
         targetDistanceMeters: _meters(km),
         targetPaceSecPerKm: book.easy,
         effortZone: recovery ? 'Z1 / RPE 2' : 'Z1–Z2 / RPE 2–4',
         notes: _easyNote(
-          recovery
-              ? 'Muito leve. Acelera a recuperação entre estímulos de qualidade.'
-              : 'Ritmo de conversa. Cerca de 80% do volume deve ficar aqui — '
-                    'correr o fácil rápido demais é o erro mais comum.',
+          recovery ? book.text.recoveryNote : book.text.easyNote,
           book,
         ),
       );
@@ -2385,18 +2601,13 @@ abstract final class RunPlanComposer {
         ? RunPaceCalculator.orderedBand(book.easyFast!, book.easySlow!)
         : null;
     return RunPlanTemplateWorkout(
-      name: 'Rodagem leve + $strides educativos',
+      name: book.text.easyStridesName(strides),
       kind: RunWorkoutKind.easy,
       dayOfWeek: day,
       targetDistanceMeters: _meters(steadyKm + strideKm),
       targetPaceSecPerKm: book.easy,
-      effortZone: 'Z1–Z2 / RPE 2–4 + educativos',
-      notes: _easyNote(
-        'Rodagem tranquila e, no fim, $strides tiros soltos de ${strideSec}s '
-        '(não é tiro forçado): melhora economia de corrida e recruta fibras '
-        'rápidas sem custo de recuperação.',
-        book,
-      ),
+      effortZone: book.text.easyStridesZone,
+      notes: _easyNote(book.text.easyStridesNote(strides, strideSec), book),
       steps: [
         RunPlanTemplateStep(
           role: RunStepRole.steady,
@@ -2429,17 +2640,14 @@ abstract final class RunPlanComposer {
     _PaceBook book, {
     required bool taper,
   }) => RunPlanTemplateWorkout(
-    name: 'Longão aeróbico',
+    name: book.text.longName,
     kind: RunWorkoutKind.long,
     dayOfWeek: day,
     targetDistanceMeters: _meters(km),
     targetPaceSecPerKm: book.easy,
     effortZone: 'Z2 / RPE 3–4',
     notes: _easyNote(
-      taper
-          ? 'Volume reduzido para o polimento — corte a distância, não o ritmo.'
-          : 'Ritmo de conversa. Base aeróbica: o volume fácil impulsiona a '
-                'maioria dos ganhos.',
+      taper ? book.text.longTaperNote : book.text.longNote,
       book,
     ),
   );
@@ -2469,18 +2677,15 @@ abstract final class RunPlanComposer {
       0.0,
     );
     return RunPlanTemplateWorkout(
-      name: 'Longão com blocos no ritmo de prova',
+      name: book.text.longRacePaceName,
       kind: RunWorkoutKind.progression,
       dayOfWeek: day,
       targetDistanceMeters: _meters(
         easyKm + blocks * (blockKm + recoveryKm) + cooldownKm,
       ),
       targetPaceSecPerKm: book.easy,
-      effortZone: 'Z2 → ritmo de prova',
-      notes:
-          'A maior parte fácil e $blocks blocos no ritmo-alvo já cansado. '
-          'É o treino que mais transfere para o dia da prova: ensina o corpo a '
-          'poupar glicogênio e a manter a técnica em fadiga.',
+      effortZone: book.text.longRacePaceZone,
+      notes: book.text.longRacePaceNote(blocks),
       steps: [
         RunPlanTemplateStep(
           role: RunStepRole.steady,
@@ -2518,7 +2723,7 @@ abstract final class RunPlanComposer {
     _PaceBook book,
     RunPlanGoalKind goal,
   ) => RunPlanTemplateWorkout(
-    name: 'Corrida-alvo',
+    name: book.text.raceName,
     kind: RunWorkoutKind.race,
     dayOfWeek: day,
     targetDistanceMeters: _meters(km),
@@ -2526,9 +2731,57 @@ abstract final class RunPlanComposer {
     // the calibration race.
     targetPaceSecPerKm: book.goalRace,
     effortZone: goal == RunPlanGoalKind.marathon ? 'RPE 7–8' : 'RPE 8–9',
-    notes:
-        'Prova ou simulado. Saia no ritmo treinado, não no ritmo da largada.',
+    notes: book.text.raceNote,
   );
+
+  /// Time trial: long enough to predict race fitness, short enough to run
+  /// in a down week. 3 km for 5K/10K goals, 5 km for longer races.
+  ///
+  /// Null when even 3 km would be more than a quarter of the week — a
+  /// maximal effort that dominates a down week is not a checkpoint — or when
+  /// the session would outgrow the week's long run.
+  static RunPlanTemplateWorkout? _test(
+    int day,
+    _PaceBook book,
+    RunPlanGoalKind goal,
+    double weekKm,
+    double longKm,
+  ) {
+    final preferred =
+        goal == RunPlanGoalKind.half || goal == RunPlanGoalKind.marathon
+        ? 5.0
+        : 3.0;
+    final testKm = preferred <= weekKm * 0.25 ? preferred : 3.0;
+    if (testKm > weekKm * 0.25) return null;
+    const warmupKm = 1.5, cooldownKm = 1.0;
+    // The long run stays the longest session of the week.
+    if (warmupKm + testKm + cooldownKm > longKm / 1.05) return null;
+    return RunPlanTemplateWorkout(
+      name: book.text.testName(book.text.distance(testKm)),
+      kind: RunWorkoutKind.test,
+      dayOfWeek: day,
+      targetDistanceMeters: _meters(warmupKm + testKm + cooldownKm),
+      // A reference for the athlete, not a step target: a time trial is run
+      // by effort, and a coach cue telling them to slow down would spoil it.
+      targetPaceSecPerKm: book.training?.racePaceFor(testKm * 1000),
+      effortZone: 'RPE 9',
+      notes: book.text.testNote,
+      steps: [
+        RunPlanTemplateStep(
+          role: RunStepRole.warmup,
+          value: _meters(warmupKm).round(),
+        ),
+        RunPlanTemplateStep(
+          role: RunStepRole.work,
+          value: _meters(testKm).round(),
+        ),
+        RunPlanTemplateStep(
+          role: RunStepRole.cooldown,
+          value: _meters(cooldownKm).round(),
+        ),
+      ],
+    );
+  }
 
   /// Race-week sharpener: enough to stay sharp, too little to cost anything.
   static RunPlanTemplateWorkout _sharpen(int day, double km, _PaceBook book) {
@@ -2538,15 +2791,13 @@ abstract final class RunPlanComposer {
     final cooldown = (km * 0.25).clamp(0.8, 1.5);
     const reps = 3;
     return RunPlanTemplateWorkout(
-      name: 'Ativação · $reps×400 m no ritmo de prova',
+      name: book.text.sharpenName(reps),
       kind: RunWorkoutKind.interval,
       dayOfWeek: day,
       targetDistanceMeters: _meters(warmup + reps * 0.6 + cooldown),
       targetPaceSecPerKm: racePace,
       effortZone: 'RPE 6–7',
-      notes:
-          'Semana de prova: o objetivo é lembrar o ritmo, não treinar. '
-          'Tem que terminar com a sensação de que sobrou muito.',
+      notes: book.text.sharpenNote,
       steps: [
         RunPlanTemplateStep(
           role: RunStepRole.warmup,
@@ -2607,16 +2858,13 @@ abstract final class RunPlanComposer {
     final workKm = reps * meters / 1000;
     final restKm = reps * restSec / book.estEasy;
     return RunPlanTemplateWorkout(
-      name: '$reps×$meters m (VO₂)',
+      name: book.text.intervalName(reps, meters),
       kind: RunWorkoutKind.interval,
       dayOfWeek: day,
       targetDistanceMeters: _meters(warmupKm + workKm + restKm + cooldownKm),
       targetPaceSecPerKm: book.interval,
       effortZone: soft ? 'RPE 7–8' : 'RPE 8–9',
-      notes:
-          'Tiros no ritmo de VO₂máx com ${restSec}s de trote — a recuperação '
-          'acompanha a duração do tiro para que todos saiam iguais. Se o '
-          'último tiro sair bem mais lento, pare ali: é sinal de pace alto.',
+      notes: book.text.intervalNote(restSec),
       steps: [
         RunPlanTemplateStep(
           role: RunStepRole.warmup,
@@ -2678,16 +2926,13 @@ abstract final class RunPlanComposer {
       const restSec = 60;
       final restKm = reps * restSec / book.estEasy;
       return RunPlanTemplateWorkout(
-        name: 'Limiar · $reps×${repMinutes.round()} min',
+        name: book.text.tempoCruiseName(reps, repMinutes.round()),
         kind: RunWorkoutKind.tempo,
         dayOfWeek: day,
         targetDistanceMeters: _meters(warmupKm + workKm + restKm + cooldownKm),
         targetPaceSecPerKm: book.tempo,
         effortZone: soft ? 'RPE 6–7' : 'RPE 7',
-        notes:
-            'Blocos de limiar com ${restSec}s de trote entre eles. Fracionar '
-            'acima de 20 min sustenta o ritmo certo por mais tempo: mesmo '
-            'estímulo, menos queda de pace no fim.',
+        notes: book.text.tempoCruiseNote(restSec),
         steps: [
           RunPlanTemplateStep(
             role: RunStepRole.warmup,
@@ -2718,16 +2963,13 @@ abstract final class RunPlanComposer {
     }
 
     return RunPlanTemplateWorkout(
-      name: 'Limiar · $minutes min',
+      name: book.text.tempoName(minutes),
       kind: RunWorkoutKind.tempo,
       dayOfWeek: day,
       targetDistanceMeters: _meters(warmupKm + workKm + cooldownKm),
       targetPaceSecPerKm: book.tempo,
       effortZone: soft ? 'RPE 6–7' : 'RPE 7',
-      notes:
-          'Ritmo de limiar: sustentável, só dá para falar frases curtas. '
-          'Empurra o ponto em que o lactato começa a acumular — o que mais '
-          'melhora o pace que você consegue segurar numa prova.',
+      notes: book.text.tempoNote,
       steps: [
         RunPlanTemplateStep(
           role: RunStepRole.warmup,
@@ -2774,15 +3016,13 @@ abstract final class RunPlanComposer {
     final surgeKm = reps * workSec / book.estTempo;
     final restKm = reps * restSec / book.estEasy;
     return RunPlanTemplateWorkout(
-      name: 'Fartlek · $reps×${workSec}s',
+      name: book.text.fartlekName(reps, workSec),
       kind: RunWorkoutKind.fartlek,
       dayOfWeek: day,
       targetDistanceMeters: _meters(warmup + surgeKm + restKm + cooldown),
       targetPaceSecPerKm: book.tempo,
       effortZone: soft ? 'RPE 6' : 'RPE 7',
-      notes:
-          'Variações de ritmo entre limiar e VO₂. Melhora economia e a troca '
-          'de marcha sem o custo de recuperação de um tiro cronometrado.',
+      notes: book.text.fartlekNote,
       steps: [
         RunPlanTemplateStep(
           role: RunStepRole.warmup,
@@ -2840,24 +3080,19 @@ abstract final class RunPlanComposer {
     // it actually covers rather than the budget it was handed.
     final workKm = reps * workSec / book.estTempo;
     final restKm = reps * restSec / book.estEasy;
+    final t = book.text;
     final (name, notes) = switch (surface) {
       RunPlanHillSurface.hill => (
-        'Morros · $reps×${workSec}s',
-        'Subida forte por ${workSec}s — esforço, não pace: no morro o ritmo '
-            'cai naturalmente. Volte trotando. Força específica e técnica com '
-            'menos impacto que tiros no plano.',
+        t.hillName(reps, workSec),
+        t.hillNote(workSec),
       ),
       RunPlanHillSurface.stairs => (
-        'Escadaria · $reps×${workSec}s',
-        'Suba a escada em ritmo forte por ${workSec}s, degrau a degrau, '
-            'tronco firme e olhar à frente. Desça caminhando, com calma e '
-            'segurando o corrimão se houver — a descida é a recuperação.',
+        t.stairsName(reps, workSec),
+        t.stairsNote(workSec),
       ),
       RunPlanHillSurface.treadmill => (
-        'Esteira inclinada · $reps×${workSec}s',
-        'Na esteira a 5–6% de inclinação, ${workSec}s em esforço forte. '
-            'Volte para 1% e trote leve na recuperação. Esforço, não pace: '
-            'mesma força específica de um morro.',
+        t.treadmillHillName(reps, workSec),
+        t.treadmillHillNote(workSec),
       ),
     };
     return RunPlanTemplateWorkout(
@@ -2916,15 +3151,13 @@ abstract final class RunPlanComposer {
           )
         : null;
     return RunPlanTemplateWorkout(
-      name: 'Progressivo · ${km.toStringAsFixed(0)} km',
+      name: book.text.progressionName(km.round()),
       kind: RunWorkoutKind.progression,
       dayOfWeek: day,
       targetDistanceMeters: _meters(km),
       targetPaceSecPerKm: midPace,
       effortZone: 'RPE 5 → 7',
-      notes:
-          'Comece fácil e feche mais rápido. Treina distribuição de esforço e '
-          'ensina a acelerar já cansado.',
+      notes: book.text.progressionNote,
       steps: [
         RunPlanTemplateStep(
           role: RunStepRole.warmup,
@@ -2979,7 +3212,7 @@ abstract final class RunPlanComposer {
     final restSec = goal == RunPlanGoalKind.fiveK ? 90 : 120;
     final restKm = blocks * restSec / book.estEasy;
     return RunPlanTemplateWorkout(
-      name: 'Ritmo de prova · $blocks×${_distanceText(blockKm)}',
+      name: book.text.racePaceName(blocks, book.text.distance(blockKm)),
       kind: RunWorkoutKind.tempo,
       dayOfWeek: day,
       targetDistanceMeters: _meters(
@@ -2987,9 +3220,7 @@ abstract final class RunPlanComposer {
       ),
       targetPaceSecPerKm: racePace,
       effortZone: goal == RunPlanGoalKind.marathon ? 'RPE 6–7' : 'RPE 7–8',
-      notes:
-          'Blocos exatamente no ritmo-alvo da prova. Especificidade: calibra '
-          'passada, respiração e cabeça no pace que você vai precisar segurar.',
+      notes: book.text.racePaceNote,
       steps: [
         RunPlanTemplateStep(
           role: RunStepRole.warmup,

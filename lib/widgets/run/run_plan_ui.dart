@@ -23,6 +23,7 @@ abstract final class RunPlanUi {
         RunWorkoutKind.progression => loc.runWorkoutKindProgression,
         RunWorkoutKind.recovery => loc.runWorkoutKindRecovery,
         RunWorkoutKind.race => loc.runWorkoutKindRace,
+        RunWorkoutKind.test => loc.runWorkoutKindTest,
       };
 
   static IconData kindIcon(RunWorkoutKind kind) => switch (kind) {
@@ -35,6 +36,7 @@ abstract final class RunPlanUi {
     RunWorkoutKind.progression => Icons.trending_up,
     RunWorkoutKind.recovery => Icons.self_improvement,
     RunWorkoutKind.race => Icons.emoji_events,
+    RunWorkoutKind.test => Icons.timer_outlined,
   };
 
   static Color kindColor(ColorScheme scheme, RunWorkoutKind kind) =>
@@ -48,6 +50,7 @@ abstract final class RunPlanUi {
         RunWorkoutKind.fartlek => scheme.error,
         RunWorkoutKind.progression => scheme.secondary,
         RunWorkoutKind.race => scheme.error,
+        RunWorkoutKind.test => scheme.tertiary,
       };
 
   static String goalLabel(AppLocalizations loc, RunPlanGoalKind goal) =>
