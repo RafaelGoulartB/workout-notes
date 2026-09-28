@@ -1271,6 +1271,7 @@ class _PlanProgressRow extends StatelessWidget {
         plan.isActivated && plan.activatedAt!.isAfter(DateTime.now());
     final detail = <String>[
       if (week != null) loc.runPlanCurrentWeek(week + 1, plan.weeks),
+      if (plan.isFinishedOn(DateTime.now())) loc.runPlanFinishedTitle,
       if (startsLater)
         loc.runPlanStartsOn(
           DateFormat('d MMM', Intl.defaultLocale).format(plan.activatedAt!),

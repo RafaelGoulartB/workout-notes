@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
+import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/services/run_pace_calculator.dart';
 import 'package:workout_notes/services/run_plan_composer.dart';
 import 'package:workout_notes/services/run_plan_history.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
+import 'package:workout_notes/services/run_plan_text.dart';
+import 'package:workout_notes/services/run_strength_planner.dart';
+import 'package:workout_notes/services/runner_strength_routine.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 import 'package:workout_notes/widgets/run/run_plan_volume_sparkline.dart';
@@ -51,6 +55,8 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
   RunPlanIntent _intent = RunPlanIntent.finish;
   RunPlanIntensity _intensity = RunPlanIntensity.standard;
   _Terrain _terrain = _Terrain.hill;
+  bool _includeStrength = true;
+  bool _includeTest = true;
   late double _currentDistanceMeters;
   DateTime? _raceDate;
   bool _creating = false;
@@ -301,8 +307,19 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
           ? _longRunDay
           : null,
       weeks: _template.selectableWeeks ? _weeks : null,
+      language: Localizations.localeOf(context).languageCode == 'pt'
+          ? RunPlanLanguage.pt
+          : RunPlanLanguage.en,
+      includeStrength: _includeStrength,
+      includeTest: _includeTest,
     );
   }
+
+  /// Performance plans long enough for a checkpoint get the mid-plan test.
+  bool get _offersTest =>
+      _template.style == RunPlanTemplateStyle.performance &&
+      _template.weeks >= 8 &&
+      !_isMaintain;
 
   RunPlanOutline? get _outline {
     if (!_daysValid) return null;
@@ -526,6 +543,13 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
         name: _template.title(isPt),
         config: _config,
       );
+      if (_includeStrength) {
+        try {
+          await RunnerStrengthRoutine().ensure(pt: isPt);
+        } catch (_) {
+          // The plan stands on its own; strength can be set up later.
+        }
+      }
       if (!mounted) return;
       Navigator.pop(context, plan);
     } catch (e) {
@@ -978,6 +1002,24 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
             _Terrain.flat => loc.runPlanCustomizeTerrainFlatHelp,
           }, style: muted),
         ],
+        const SizedBox(height: 16),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          secondary: const Icon(Icons.fitness_center_rounded),
+          title: Text(loc.runPlanCustomizeStrengthTitle),
+          subtitle: Text(loc.runPlanCustomizeStrengthHelp),
+          value: _includeStrength,
+          onChanged: (value) => setState(() => _includeStrength = value),
+        ),
+        if (_offersTest)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: const Icon(Icons.timer_outlined),
+            title: Text(loc.runPlanCustomizeTestTitle),
+            subtitle: Text(loc.runPlanCustomizeTestHelp),
+            value: _includeTest,
+            onChanged: (value) => setState(() => _includeTest = value),
+          ),
         const SizedBox(height: 24),
         Text(
           loc.runPlanCustomizeBaselineTitle,
@@ -1186,6 +1228,24 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
     final week = [...?(total == 0 ? null : outline!.schedule[weekIndex])]
       ..sort((a, b) => a.dayOfWeek.compareTo(b.dayOfWeek));
     final weekOutline = total == 0 ? null : outline!.weeks[weekIndex];
+    bool hasRace(int w) =>
+        w >= 0 &&
+        w < total &&
+        outline!.schedule[w].any((s) => s.kind == RunWorkoutKind.race);
+    final strengthDays = !_includeStrength || total == 0
+        ? const <int>[]
+        : RunStrengthPlanner.daysFor(
+            [
+              for (final s in week)
+                (
+                  day: s.dayOfWeek,
+                  kind: s.kind,
+                  km: (s.targetDistanceMeters ?? 0) / 1000,
+                ),
+            ],
+            raceWeek: hasRace(weekIndex),
+            weekBeforeRace: hasRace(weekIndex + 1),
+          );
     final easyPace = outline?.paceRamp.pacesAt(weekIndex)?.easySecPerKm;
     final summary = <String>[
       if (outline != null && outline.peakWeeklyKm > 0)
@@ -1286,6 +1346,24 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
                     '${RunPlanUi.paceLabel(session.targetPaceSecPerKm)}/km',
                 ].join(' · '),
               ),
+            ),
+          ),
+        if (strengthDays.isNotEmpty)
+          Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ListTile(
+              leading: Icon(
+                Icons.fitness_center_rounded,
+                color: theme.colorScheme.secondary,
+              ),
+              title: Text(
+                loc.runPlanCustomizeStrengthDays(
+                  strengthDays
+                      .map((d) => RunPlanUi.weekdayLabel(loc, d))
+                      .join(', '),
+                ),
+              ),
+              subtitle: Text(loc.runPlanCustomizeStrengthHelp),
             ),
           ),
       ],
