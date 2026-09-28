@@ -420,6 +420,11 @@ class _TemplatePickerSheetState extends State<_TemplatePickerSheet> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 16),
+                    _PlanFinder(
+                      loc: widget.loc,
+                      onPick: (template) => Navigator.pop(context, template),
+                    ),
                     const SizedBox(height: 18),
                     Text(
                       widget.loc.runPlanTemplateChooseGoal,
@@ -472,6 +477,136 @@ class _TemplatePickerSheetState extends State<_TemplatePickerSheet> {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Not sure where to start?" — two questions that point a person at a plan
+/// whose prerequisite they already meet, instead of leaving them to compare
+/// twenty-odd templates.
+class _PlanFinder extends StatefulWidget {
+  final AppLocalizations loc;
+  final ValueChanged<RunPlanTemplate> onPick;
+
+  const _PlanFinder({required this.loc, required this.onPick});
+
+  @override
+  State<_PlanFinder> createState() => _PlanFinderState();
+}
+
+class _PlanFinderState extends State<_PlanFinder> {
+  bool _open = false;
+  RunPlanExperience? _experience;
+  RunPlanAim? _aim;
+
+  /// Nothing to ask about the goal of someone who does not run yet.
+  bool get _needsAim =>
+      _experience != null &&
+      _experience != RunPlanExperience.none &&
+      _experience != RunPlanExperience.fewMinutes;
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = widget.loc;
+    final theme = Theme.of(context), scheme = theme.colorScheme;
+    final suggestion = _experience == null || (_needsAim && _aim == null)
+        ? null
+        : RunPlanTemplates.recommend(_experience!, _aim ?? RunPlanAim.habit);
+    Widget chips<T>(List<(T, String)> options, T? value, ValueChanged<T> set) =>
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final (option, label) in options)
+              ChoiceChip(
+                label: Text(label),
+                selected: value == option,
+                onSelected: (_) => setState(() => set(option)),
+              ),
+          ],
+        );
+    return Material(
+      color: scheme.secondaryContainer.withValues(alpha: 0.5),
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.explore_outlined),
+              title: Text(loc.runPlanFinderTitle),
+              subtitle: Text(loc.runPlanFinderSubtitle),
+              trailing: Icon(_open ? Icons.expand_less : Icons.expand_more),
+              onTap: () => setState(() => _open = !_open),
+            ),
+            if (_open)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loc.runPlanFinderRunQuestion,
+                      style: theme.textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    chips<RunPlanExperience>(
+                      [
+                        (RunPlanExperience.none, loc.runPlanFinderRunNone),
+                        (
+                          RunPlanExperience.fewMinutes,
+                          loc.runPlanFinderRunShort,
+                        ),
+                        (
+                          RunPlanExperience.thirtyMinutes,
+                          loc.runPlanFinderRun20,
+                        ),
+                        (RunPlanExperience.fiveK, loc.runPlanFinderRun5k),
+                        (RunPlanExperience.tenK, loc.runPlanFinderRun10k),
+                        (RunPlanExperience.half, loc.runPlanFinderRunHalf),
+                      ],
+                      _experience,
+                      (value) => _experience = value,
+                    ),
+                    if (_needsAim) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        loc.runPlanFinderGoalQuestion,
+                        style: theme.textTheme.labelLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      chips<RunPlanAim>(
+                        [
+                          (RunPlanAim.habit, loc.runPlanFinderGoalHabit),
+                          (RunPlanAim.further, loc.runPlanFinderGoalFurther),
+                          (RunPlanAim.faster, loc.runPlanFinderGoalFaster),
+                        ],
+                        _aim,
+                        (value) => _aim = value,
+                      ),
+                    ],
+                    if (suggestion != null) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        loc.runPlanFinderSuggestion,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _GoalTemplateCard(
+                        option: suggestion,
+                        onTap: () => widget.onPick(suggestion),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -1132,8 +1267,14 @@ class _PlanProgressRow extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final week = plan.activeWeekIndexOn(DateTime.now());
+    final startsLater =
+        plan.isActivated && plan.activatedAt!.isAfter(DateTime.now());
     final detail = <String>[
       if (week != null) loc.runPlanCurrentWeek(week + 1, plan.weeks),
+      if (startsLater)
+        loc.runPlanStartsOn(
+          DateFormat('d MMM', Intl.defaultLocale).format(plan.activatedAt!),
+        ),
       if (viaPlanning && week == null) loc.runPlanActiveVia,
       if (progress.skippedSessions > 0)
         loc.runPlanSkippedCount(progress.skippedSessions),

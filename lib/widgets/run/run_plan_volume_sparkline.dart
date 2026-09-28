@@ -7,7 +7,18 @@ import 'package:workout_notes/services/run_plan_composer.dart';
 class RunPlanVolumeSparkline extends StatelessWidget {
   final List<RunPlanWeekOutline> weeks;
 
-  const RunPlanVolumeSparkline({super.key, required this.weeks});
+  /// Highlighted week (zero-based); the others are dimmed.
+  final int? selected;
+
+  /// Called with the zero-based week when a bar is tapped.
+  final ValueChanged<int>? onSelect;
+
+  const RunPlanVolumeSparkline({
+    super.key,
+    required this.weeks,
+    this.selected,
+    this.onSelect,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +48,7 @@ class RunPlanVolumeSparkline extends StatelessWidget {
                       message:
                           '${loc.runPlanWeeksValue(i + 1)} · '
                           '${weeks[i].weekKm.toStringAsFixed(0)} km · '
-                          '${_phaseLabel(loc, weeks[i].phase)}',
+                          '${phaseLabel(loc, weeks[i].phase)}',
                       child: Align(
                         alignment: Alignment.bottomCenter,
                         child: FractionallySizedBox(
@@ -46,13 +57,22 @@ class RunPlanVolumeSparkline extends StatelessWidget {
                             0.08,
                             1,
                           ),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: phaseColor(
-                                theme.colorScheme,
-                                weeks[i].phase,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: onSelect == null ? null : () => onSelect!(i),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color:
+                                    phaseColor(
+                                      theme.colorScheme,
+                                      weeks[i].phase,
+                                    ).withValues(
+                                      alpha: selected == null || selected == i
+                                          ? 1
+                                          : 0.45,
+                                    ),
+                                borderRadius: BorderRadius.circular(3),
                               ),
-                              borderRadius: BorderRadius.circular(3),
                             ),
                           ),
                         ),
@@ -84,7 +104,7 @@ class RunPlanVolumeSparkline extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      _phaseLabel(loc, phase),
+                      phaseLabel(loc, phase),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -105,7 +125,7 @@ class RunPlanVolumeSparkline extends StatelessWidget {
         RunPlanWeekPhase.race => scheme.error,
       };
 
-  static String _phaseLabel(AppLocalizations loc, RunPlanWeekPhase phase) =>
+  static String phaseLabel(AppLocalizations loc, RunPlanWeekPhase phase) =>
       switch (phase) {
         RunPlanWeekPhase.build => loc.runPlanCustomizePhaseBuild,
         RunPlanWeekPhase.recovery => loc.runPlanCustomizePhaseRecovery,

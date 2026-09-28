@@ -89,11 +89,27 @@ class RunPlanRepository extends BaseRepository {
   /// activation. Returns the number of scheduled rows created for the weeks
   /// from [from] to the end of the plan, so the calendar has planned sessions
   /// to tick off. Safe to call twice: [materializeWeek] skips existing rows.
+  ///
+  /// A plan with an upcoming race date and no explicit [from] is anchored so
+  /// its last week is race week: it may start on a later Monday, or already
+  /// be a few weeks in when activated late (earlier weeks are not
+  /// back-filled).
   Future<int> activatePlan(String id, {DateTime? from}) async {
     final database = await db;
     if (!await _tableExists(database, 'run_plans')) return 0;
     if (!await _columnExists(database, 'run_plans', 'activated_at')) return 0;
-    final start = _day(from ?? DateTime.now());
+    final today = _day(from ?? DateTime.now());
+    var start = today;
+    if (from == null) {
+      final existing = await getPlan(id);
+      final race = existing?.raceDate;
+      if (existing != null && race != null && existing.weeks > 0) {
+        final raceWeek = _weekStart(race);
+        if (!raceWeek.isBefore(_weekStart(today))) {
+          start = raceWeek.subtract(Duration(days: 7 * (existing.weeks - 1)));
+        }
+      }
+    }
     final now = DateTime.now().toIso8601String();
     await database.transaction((txn) async {
       await txn.update(
@@ -115,12 +131,14 @@ class RunPlanRepository extends BaseRepository {
     final anchorWeek = _weekStart(start);
     // Only the weeks from here on: back-filling earlier weeks would invent
     // planned sessions the user never had a chance to run.
-    final firstWeek = plan.activeWeekIndexOn(start) ?? 0;
+    final firstWeek = start.isBefore(today)
+        ? plan.activeWeekIndexOn(today) ?? 0
+        : 0;
     for (var week = firstWeek; week < plan.weeks; week++) {
       created += (await materializeWeek(
         planId: id,
         weekIndex: week,
-        weekStart: anchorWeek.add(Duration(days: 7 * (week - firstWeek))),
+        weekStart: anchorWeek.add(Duration(days: 7 * week)),
       )).length;
     }
     return created;

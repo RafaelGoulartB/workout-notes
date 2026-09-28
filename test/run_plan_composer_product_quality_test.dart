@@ -71,8 +71,13 @@ void main() {
                   scenarios++;
 
                   expect(schedule, hasLength(template.weeks));
+                  // Race week trades some training days for rest.
                   expect(
-                    schedule.every((week) => week.length == sessions),
+                    schedule.every(
+                      (week) => week.any((s) => s.kind == RunWorkoutKind.race)
+                          ? week.length <= sessions
+                          : week.length == sessions,
+                    ),
                     isTrue,
                     reason: '${template.key}/$sessions',
                   );

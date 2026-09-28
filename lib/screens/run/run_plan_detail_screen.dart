@@ -1471,6 +1471,11 @@ class _FollowCard extends StatelessWidget {
       status = loc.runPlanActiveViaHelp;
     } else if (week != null) {
       status = loc.runPlanCurrentWeek(week + 1, plan.weeks);
+    } else if (plan.isActivated && plan.activatedAt!.isAfter(DateTime.now())) {
+      // Anchored to a race date further out than the plan is long.
+      status = loc.runPlanStartsOn(
+        MaterialLocalizations.of(context).formatMediumDate(plan.activatedAt!),
+      );
     } else {
       status = loc.runPlanActivateHint;
     }

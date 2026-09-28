@@ -149,8 +149,7 @@ class RunPlanTemplate {
 
   /// Display / catalog week count. Selectable plans report their default
   /// length; the composed schedule may differ once the athlete picks.
-  int get weeks =>
-      selectableWeeks ? defaultSelectableWeeks : schedule.length;
+  int get weeks => selectableWeeks ? defaultSelectableWeeks : schedule.length;
 
   /// Suggested days/week choices for the customize wizard.
   ///
@@ -177,7 +176,55 @@ class RunPlanTemplate {
   bool get returnStyle => key == 'return' || key == 'return_injury';
 }
 
+/// How much the athlete can run without stopping today — the first question
+/// of the plan finder.
+enum RunPlanExperience { none, fewMinutes, thirtyMinutes, fiveK, tenK, half }
+
+/// What the athlete wants next — the second question of the plan finder.
+enum RunPlanAim { habit, further, faster }
+
 abstract final class RunPlanTemplates {
+  /// The plan the finder suggests. Always a plan whose prerequisite the
+  /// answer already meets: someone who cannot run 30 minutes is never sent to
+  /// a 5K plan, and "faster" only exists once the distance is covered.
+  static RunPlanTemplate recommend(
+    RunPlanExperience experience,
+    RunPlanAim aim,
+  ) => switch (experience) {
+    RunPlanExperience.none => walkJog,
+    RunPlanExperience.fewMinutes => runWalk,
+    RunPlanExperience.thirtyMinutes => switch (aim) {
+      RunPlanAim.habit => habit,
+      _ => firstFiveK,
+    },
+    RunPlanExperience.fiveK => switch (aim) {
+      RunPlanAim.habit => base,
+      RunPlanAim.further => firstTenK,
+      RunPlanAim.faster => fiveK,
+    },
+    RunPlanExperience.tenK => switch (aim) {
+      RunPlanAim.habit => keepFit,
+      RunPlanAim.further => toHalf,
+      RunPlanAim.faster => tenK,
+    },
+    RunPlanExperience.half => switch (aim) {
+      RunPlanAim.habit => keepFit,
+      RunPlanAim.further => marathon,
+      RunPlanAim.faster => halfPerformance,
+    },
+  };
+
+  /// A shorter goal to offer when this template's race is out of reach.
+  static RunPlanTemplate? shorterGoal(RunPlanTemplate template) =>
+      switch (template.goalKind) {
+        RunPlanGoalKind.marathon => half,
+        RunPlanGoalKind.half => firstTenK,
+        RunPlanGoalKind.tenK => firstFiveK,
+        RunPlanGoalKind.fiveK =>
+          template.key == 'first_5k' ? runWalk : firstFiveK,
+        _ => null,
+      };
+
   static final returnToRunning = _continuous(
     key: 'return',
     goal: RunPlanGoalKind.base,

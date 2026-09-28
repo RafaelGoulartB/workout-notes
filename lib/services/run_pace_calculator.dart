@@ -75,11 +75,26 @@ abstract final class RunPaceCalculator {
     if (distanceMeters <= 0 || timeSeconds <= 0) {
       throw ArgumentError('distance and time must be positive');
     }
-    final racePace = timeSeconds / (distanceMeters / 1000);
-    final vdot = vdotFor(
-      distanceMeters: distanceMeters,
-      timeSeconds: timeSeconds,
+    return fromVdot(
+      vdotFor(distanceMeters: distanceMeters, timeSeconds: timeSeconds),
+      raceSecPerKm: timeSeconds / (distanceMeters / 1000),
+      calibrationDistanceMeters: distanceMeters,
     );
+  }
+
+  /// Paces for a fitness index directly — used to move training paces from
+  /// current fitness towards a goal as a plan progresses.
+  ///
+  /// [raceSecPerKm] defaults to the predicted pace at
+  /// [calibrationDistanceMeters].
+  static RunPaces fromVdot(
+    double vdot, {
+    double? raceSecPerKm,
+    double calibrationDistanceMeters = fiveKMeters,
+  }) {
+    if (vdot <= 0) throw ArgumentError('vdot must be positive');
+    final racePace =
+        raceSecPerKm ?? racePaceFor(vdot, calibrationDistanceMeters);
     final interval = _paceAtPercentVo2(vdot, 0.98);
     return RunPaces(
       vdot: vdot,
@@ -94,7 +109,7 @@ abstract final class RunPaceCalculator {
       // Daniels' R pace sits ~6% faster than I pace.
       repetitionSecPerKm: interval * 0.94,
       raceSecPerKm: racePace,
-      calibrationDistanceMeters: distanceMeters,
+      calibrationDistanceMeters: calibrationDistanceMeters,
     );
   }
 
@@ -127,6 +142,21 @@ abstract final class RunPaceCalculator {
     final predictedSeconds =
         fitness.racePaceFor(goalDistanceMeters) * (goalDistanceMeters / 1000);
     return goalTimeSeconds < predictedSeconds * (1 - fasterFraction);
+  }
+
+  /// Fastest and slowest average pace a race entry can plausibly have:
+  /// quicker than the 5K world record or slower than a brisk walk is a typo.
+  static const minPlausibleSecPerKm = 150.0;
+  static const maxPlausibleSecPerKm = 900.0;
+
+  /// False for entries like `25` (read as 25 seconds) on a 5K.
+  static bool isPlausibleRace({
+    required double distanceMeters,
+    required int timeSeconds,
+  }) {
+    if (distanceMeters <= 0 || timeSeconds <= 0) return false;
+    final pace = timeSeconds / (distanceMeters / 1000);
+    return pace >= minPlausibleSecPerKm && pace <= maxPlausibleSecPerKm;
   }
 
   /// ±[pct] band around a target pace for step min/max ranges.
