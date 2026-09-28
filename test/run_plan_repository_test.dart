@@ -953,7 +953,7 @@ void main() {
       expect((await repository.getPlanProgress(plan.id)).completedSessions, 1);
     });
 
-    test('activeWeekIndexOn counts and wraps from the activation week', () {
+    test('activeWeekIndexOn counts from the activation week and ends', () {
       final plan = RunPlan(
         id: 'p',
         name: 'p',
@@ -967,7 +967,9 @@ void main() {
 
       expect(plan.activeWeekIndexOn(DateTime(2026, 8, 5)), 0);
       expect(plan.activeWeekIndexOn(DateTime(2026, 8, 10)), 1);
-      expect(plan.activeWeekIndexOn(DateTime(2026, 8, 31)), 0, reason: 'wraps');
+      // A goal plan is over after its last week; it does not restart.
+      expect(plan.activeWeekIndexOn(DateTime(2026, 8, 31)), isNull);
+      expect(plan.isFinishedOn(DateTime(2026, 8, 31)), isTrue);
       expect(plan.activeWeekIndexOn(DateTime(2026, 7, 27)), isNull);
     });
 

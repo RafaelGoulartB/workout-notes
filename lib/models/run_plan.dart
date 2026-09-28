@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:workout_notes/models/run_plan_workout.dart';
 
 /// Target of a running plan. Drives the suggested templates and the plan card.
@@ -87,6 +89,15 @@ class RunPlan {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// Catalog template the plan was generated from; null for blank plans and
+  /// plans created before v52.
+  final String? templateKey;
+
+  /// The wizard inputs the plan was built with (a `RunPlanBuildConfig` as
+  /// JSON), kept so the plan can be re-planned mid-way. Null for blank and
+  /// pre-v52 plans.
+  final Map<String, dynamic>? config;
+
   /// Sessions across every week. Empty when loaded without detail.
   final List<RunPlanWorkout> workouts;
 
@@ -102,6 +113,8 @@ class RunPlan {
     this.activatedAt,
     required this.createdAt,
     required this.updatedAt,
+    this.templateKey,
+    this.config,
     List<RunPlanWorkout> workouts = const [],
   }) : workouts = List.unmodifiable(workouts);
 
@@ -111,15 +124,33 @@ class RunPlan {
   /// activation date is still stored.
   bool get isActivated => activatedAt != null && !isArchived;
 
+  /// A one-week or maintenance plan is meant to be repeated for as long as it
+  /// is followed. Everything else — a race build, a base block — has an end.
+  bool get repeats => weeks == 1 || goalKind == RunPlanGoalKind.maintenance;
+
   /// Zero-based plan week that [date] falls in, counting from the activation
-  /// week. Null when the plan is not activated. Wraps, so a short plan repeats
-  /// for as long as it stays active.
+  /// week. Null when the plan is not activated, has not started yet, or —
+  /// for plans that do not [repeats] — is already over. Repeating plans
+  /// wrap.
   int? activeWeekIndexOn(DateTime date) {
+    final elapsed = _elapsedWeeks(date);
+    if (elapsed == null || elapsed < 0) return null;
+    if (elapsed < weeks) return elapsed;
+    return repeats ? elapsed % weeks : null;
+  }
+
+  /// The plan ran its full length by [date] (and does not repeat). Used to
+  /// close it out instead of silently starting week 1 again.
+  bool isFinishedOn(DateTime date) {
+    if (!isActivated || repeats) return false;
+    final elapsed = _elapsedWeeks(date);
+    return elapsed != null && elapsed >= weeks;
+  }
+
+  int? _elapsedWeeks(DateTime date) {
     final anchor = activatedAt;
     if (anchor == null || weeks < 1) return null;
-    final elapsed = _weekStart(date).difference(_weekStart(anchor)).inDays ~/ 7;
-    if (elapsed < 0) return null;
-    return elapsed % weeks;
+    return _weekStart(date).difference(_weekStart(anchor)).inDays ~/ 7;
   }
 
   static DateTime _weekStart(DateTime date) {
@@ -167,6 +198,7 @@ class RunPlan {
     int? completionCount,
     Object? activatedAt = _sentinel,
     DateTime? updatedAt,
+    Object? config = _sentinel,
     List<RunPlanWorkout>? workouts,
   }) => RunPlan(
     id: id,
@@ -184,6 +216,10 @@ class RunPlan {
         : activatedAt as DateTime?,
     createdAt: createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
+    templateKey: templateKey,
+    config: identical(config, _sentinel)
+        ? this.config
+        : config as Map<String, dynamic>?,
     workouts: workouts ?? this.workouts,
   );
 
@@ -199,6 +235,8 @@ class RunPlan {
     'activated_at': activatedAt == null ? null : _date(activatedAt!),
     'created_at': createdAt.toIso8601String(),
     'updated_at': updatedAt.toIso8601String(),
+    'template_key': templateKey,
+    'config_json': config == null ? null : jsonEncode(config),
   };
 
   factory RunPlan.fromMap(
@@ -223,8 +261,21 @@ class RunPlan {
         DateTime.tryParse(map['created_at'] as String? ?? '') ?? DateTime(2000),
     updatedAt:
         DateTime.tryParse(map['updated_at'] as String? ?? '') ?? DateTime(2000),
+    // Absent on databases older than v52.
+    templateKey: map['template_key'] as String?,
+    config: _decodeConfig(map['config_json']),
     workouts: workouts,
   );
+
+  static Map<String, dynamic>? _decodeConfig(Object? raw) {
+    if (raw is! String || raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      return decoded is Map ? Map<String, dynamic>.from(decoded) : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   static String _date(DateTime value) => DateTime(
     value.year,
