@@ -214,6 +214,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   }
 
   void _updateElapsedStr() {
+    if (!mounted) return;
     if (_timerStart == null) {
       _elapsed.value = '00:00';
       return;
@@ -342,9 +343,10 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     _timerStart = now;
     _timerEnd = null;
     await _workoutRepo.startWorkoutTimer(_workoutId!);
+    if (!mounted) return;
     _elapsed.value = '00:00';
     _startElapsedTimer();
-    if (mounted) setState(() {});
+    setState(() {});
   }
 
   Future<void> _stopTimer() async {
@@ -387,8 +389,9 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
     // Persist the shifted start time and clear the pause state so the
     // adjustment survives an app reload.
     await _workoutRepo.clearWorkoutPause(_workoutId!, _timerStart!);
+    if (!mounted) return;
     _startElapsedTimer();
-    if (mounted) setState(() {});
+    setState(() {});
   }
 
   Future<void> _resetTimer() async {
