@@ -357,8 +357,6 @@ class WorkoutSetFieldControls extends StatelessWidget {
 
   Widget _buildPaceDisplay(BuildContext context) {
     final pace = timeSeconds / distance;
-    final minutes = pace ~/ 60;
-    final seconds = pace.round() % 60;
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
     return Padding(
@@ -376,9 +374,7 @@ class WorkoutSetFieldControls extends StatelessWidget {
             const Icon(Icons.speed, size: 16, color: Color(0xFFE53935)),
             const SizedBox(width: 6),
             Text(
-              loc.activeWorkoutPaceValue(
-                '$minutes:${seconds.toString().padLeft(2, '0')}',
-              ),
+              loc.activeWorkoutPaceValue(DurationFormat.minSec(pace.round())),
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
                 color: const Color(0xFFE53935),
