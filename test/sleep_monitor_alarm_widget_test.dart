@@ -113,15 +113,15 @@ void main() {
       findsOneWidget,
       reason: 'Rendered text: $renderedText; calls: $calls',
     );
-    expect(find.text('Next alarm'), findsOneWidget);
+    expect(find.text('Planned wake-up'), findsOneWidget);
     expect(find.byIcon(Icons.edit_rounded), findsOneWidget);
     expect(find.text('− 15 min'), findsOneWidget);
     expect(find.text('+ 15 min'), findsOneWidget);
-    expect(find.byIcon(Icons.unfold_more_rounded), findsOneWidget);
     expect(find.text('Start monitoring'), findsOneWidget);
 
     await tester.drag(find.byType(ListView), const Offset(0, -350));
     await tester.pump();
+    expect(find.byIcon(Icons.unfold_more_rounded), findsOneWidget);
     expect(find.text('System alarm sound + vibration'), findsNothing);
     expect(find.text('Prepare your phone'), findsNothing);
 

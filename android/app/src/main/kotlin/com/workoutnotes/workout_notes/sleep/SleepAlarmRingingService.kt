@@ -36,6 +36,7 @@ class SleepAlarmRingingService : Service() {
         private const val EXTRA_METHOD = "dismiss_method"
         const val CHANNEL_ID = "sleep_alarm"
         const val NOTIFICATION_ID = 1203
+        private const val WAKE_LOCK_TIMEOUT_MS = 30L * 60L * 1000L
 
         fun start(context: Context, alarmAt: Long) {
             val intent = Intent(context, SleepAlarmRingingService::class.java).apply {
@@ -497,11 +498,13 @@ class SleepAlarmRingingService : Service() {
     }
 
     private fun acquireWakeLock() {
-        val manager = getSystemService(POWER_SERVICE) as PowerManager
-        wakeLock = manager.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK,
-            "WorkoutNotes:SleepAlarm",
-        ).apply { acquire() }
+        // One non-counted lock, re-armed on every call: repeated acquisitions
+        // extend the timeout instead of leaking extra locks.
+        val lock = wakeLock ?: (getSystemService(POWER_SERVICE) as PowerManager)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WorkoutNotes:SleepAlarm")
+            .apply { setReferenceCounted(false) }
+            .also { wakeLock = it }
+        lock.acquire(WAKE_LOCK_TIMEOUT_MS)
     }
 
     private fun stopRinging() {
