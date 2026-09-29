@@ -3,10 +3,8 @@ package com.workoutnotes.workout_notes.sleep
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.os.Build
 import android.os.SystemClock
 import java.util.UUID
-import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
@@ -17,12 +15,10 @@ class AudioSignalProcessor(
     private val sessionId: String,
     private val onSegment: (Map<String, Any?>) -> Unit,
     private val onError: (Throwable) -> Unit,
-    private val onMotionSnapshot: (() -> Map<String, Any?>)? = null,
 ) {
     companion object {
         const val SAMPLE_RATE = 16_000
         const val WINDOW_SECONDS = 30
-        const val MAX_SESSION_SECONDS = 16 * 60 * 60
         const val INVALID_VALID_FRACTION = 0.5
         const val NOISE_DELTA_DB = 10.0
         const val MAX_CONSECUTIVE_READ_ERRORS = 3
@@ -43,28 +39,9 @@ class AudioSignalProcessor(
             return 20.0 * (ln(rms) / ln(10.0))
         }
 
-        fun peakDbfs(samples: ShortArray, length: Int = samples.size): Double {
-            var peak = 0.0
-            for (index in 0 until length) {
-                peak = max(peak, abs(samples[index].toDouble() / Short.MAX_VALUE))
-            }
-            return dbfs(peak)
-        }
-
         fun classify(validFraction: Double, noiseScore: Double): String {
             if (validFraction < INVALID_VALID_FRACTION) return "invalid"
             return if (noiseScore >= NOISE_DELTA_DB) "noise" else "quiet"
-        }
-
-        fun countEvents(classifications: List<String>): Int {
-            var count = 0
-            var inEvent = false
-            for (classification in classifications) {
-                val noise = classification == "noise"
-                if (noise && !inEvent) count++
-                inEvent = noise
-            }
-            return count
         }
     }
 
@@ -105,9 +82,7 @@ class AudioSignalProcessor(
      */
     private fun openStartedRecorder(): StartedRecorder {
         val candidates = buildList {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                add(MediaRecorder.AudioSource.UNPROCESSED to SAMPLE_RATE)
-            }
+            add(MediaRecorder.AudioSource.UNPROCESSED to SAMPLE_RATE)
             add(MediaRecorder.AudioSource.MIC to SAMPLE_RATE)
             add(MediaRecorder.AudioSource.MIC to 44_100)
         }.distinct()
@@ -219,8 +194,6 @@ class AudioSignalProcessor(
             "valid_fraction" to validFraction,
         )
         segment.putAll(snapshot)
-        val motion = onMotionSnapshot?.invoke()
-        if (motion != null) segment.putAll(motion)
         onSegment(segment)
         windowStartedAt = now
         windowStartedElapsed = elapsed
