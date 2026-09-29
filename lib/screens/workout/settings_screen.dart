@@ -11,6 +11,7 @@ import 'package:workout_notes/widgets/settings/settings.dart';
 import '../../repositories/settings_repository.dart';
 import '../../repositories/export_import_repository.dart';
 import '../../repositories/nutrition_repository.dart';
+import '../../services/backup_exception.dart';
 import '../../services/export_service.dart';
 import '../../dev_tools/test_data/test_data_generator.dart';
 import '../../services/notification_service.dart';
@@ -328,7 +329,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.settingsExportError(e.toString())),
+            content: Text(loc.settingsExportError(describeBackupError(loc, e))),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -355,7 +356,9 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.settingsExportSaveError(e.toString())),
+            content: Text(
+              loc.settingsExportSaveError(describeBackupError(loc, e)),
+            ),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -368,7 +371,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
     final service = ExportService();
 
     // Get path description to show user
-    final backupsPath = await service.getBackupsPathDescription();
+    final backupsPath = await service.getBackupsPathDescription(loc);
     if (!mounted) return;
 
     // ----- Helper: show confirmation dialog + restore from file -----
@@ -424,7 +427,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.settingsImportError(e.toString())),
+            content: Text(loc.settingsImportError(describeBackupError(loc, e))),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -484,7 +487,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.settingsImportError(e.toString())),
+            content: Text(loc.settingsImportError(describeBackupError(loc, e))),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -544,7 +547,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.settingsImportError(e.toString())),
+            content: Text(loc.settingsImportError(describeBackupError(loc, e))),
             behavior: SnackBarBehavior.floating,
           ),
         );
