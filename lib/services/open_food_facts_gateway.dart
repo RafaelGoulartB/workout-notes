@@ -31,7 +31,12 @@ class OpenFoodFactsGateway implements NutritionGateway {
       'code,product_name_pt_br,product_name_en,product_name,brands,'
       'nutriments,url,image_front_small_url,serving_quantity_g,serving_size';
 
+  /// The app-wide gateway shared by the nutrition screens. It lives for the
+  /// process and is never closed; screens must not call [close] on it.
+  static final OpenFoodFactsGateway instance = OpenFoodFactsGateway();
+
   final http.Client _client;
+  final bool _ownsClient;
   final Duration timeout;
   final String _baseUrl;
   final String language;
@@ -46,10 +51,17 @@ class OpenFoodFactsGateway implements NutritionGateway {
     this.country = 'br',
     this.userAgent = 'workout-notes/1.0',
   }) : _client = client ?? http.Client(),
+       _ownsClient = client == null,
        _baseUrl = (baseUrl ?? defaultBaseUrl).trim();
 
   @override
   String? get baseUrl => _baseUrl;
+
+  /// Releases the HTTP client only if this gateway created it; an injected
+  /// client stays with its owner. Never call this on [instance].
+  void close() {
+    if (_ownsClient) _client.close();
+  }
 
   @override
   Future<NutritionGatewayResult<List<FoodSearchResult>>> search(

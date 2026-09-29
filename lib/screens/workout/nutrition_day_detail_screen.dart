@@ -54,7 +54,7 @@ class NutritionDayDetailScreen extends StatefulWidget {
 class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
     with SingleTickerProviderStateMixin {
   final NutritionRepository _repository = NutritionRepository();
-  final NutritionGateway _gateway = OpenFoodFactsGateway();
+  final NutritionGateway _gateway = OpenFoodFactsGateway.instance;
 
   late DateTime _selectedDate;
   List<MealTypeDefinition> _mealTypes = const [];

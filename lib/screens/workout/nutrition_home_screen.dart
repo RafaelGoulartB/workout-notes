@@ -45,7 +45,7 @@ class NutritionHomeScreen extends StatefulWidget {
 
 class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   final NutritionRepository _repository = NutritionRepository();
-  final NutritionGateway _gateway = OpenFoodFactsGateway();
+  final NutritionGateway _gateway = OpenFoodFactsGateway.instance;
   final ScrollController _scrollController = ScrollController();
 
   DailyNutritionSummary _summary = DailyNutritionSummary.empty;

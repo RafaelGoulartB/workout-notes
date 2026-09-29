@@ -197,7 +197,7 @@ class _SavedMealEditorScreenState extends State<SavedMealEditorScreen> {
     final selection = await Navigator.of(context).push<NutritionSelection>(
       MaterialPageRoute(
         builder: (_) => FoodSearchScreen(
-          gateway: OpenFoodFactsGateway(),
+          gateway: OpenFoodFactsGateway.instance,
           repository: widget.repository,
         ),
       ),

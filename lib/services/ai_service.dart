@@ -44,9 +44,19 @@ class AiServiceException implements Exception {
   String toString() => 'AiServiceException($code): $message';
 }
 
-/// OpenAI-compatible HTTP client. Stateless; safe to share.
+/// OpenAI-compatible HTTP client. Safe to share.
+///
+/// Ownership: the app uses one long-lived [AiService.shared] (settings, chat
+/// and food-label analysis all talk to the same provider), which lives for the
+/// process and is never closed. An instance closes its `http.Client` in
+/// [close] only when it created that client itself; a client injected through
+/// the constructor stays with whoever owns it.
 class AiService {
+  /// The app-wide instance. Do not [close] it.
+  static final AiService shared = AiService();
+
   final http.Client _client;
+  final bool _ownsClient;
   final Future<void> Function(Duration) _delay;
   final Duration timeout;
   final Map<String, _ModelCompatibility> _modelCompatibility = {};
@@ -56,7 +66,14 @@ class AiService {
     this.timeout = const Duration(seconds: 180),
     Future<void> Function(Duration)? delay,
   }) : _client = client ?? http.Client(),
+       _ownsClient = client == null,
        _delay = delay ?? ((duration) => Future<void>.delayed(duration));
+
+  /// Releases the HTTP client if this instance created it (see the class
+  /// docs). Instances built with an injected client leave it open.
+  void close() {
+    if (_ownsClient) _client.close();
+  }
 
   /// Normalises a user-provided base URL to end with `/v1`.
   static String normalizeBaseUri(String input) {

@@ -37,6 +37,10 @@ class NutritionGatewayError {
 /// Results are rich: each [FoodSearchResult] carries the food plus its
 /// primary variant (with the nutrition values) and any servings, so
 /// the UI can persist and display provider data without a second call.
+///
+/// Lifecycle: a gateway is handed to screens by its owner (normally the
+/// shared `OpenFoodFactsGateway.instance`). Screens and child routes only use
+/// it; they never close it.
 abstract class NutritionGateway {
   Future<NutritionGatewayResult<List<FoodSearchResult>>> search(
     String query, {

@@ -122,7 +122,7 @@ class AiSettingsNotifier extends ChangeNotifier {
     FlutterSecureStorage? secure,
     AiService? service,
   }) : secure = secure ?? const FlutterSecureStorage(),
-       service = service ?? AiService(),
+       service = service ?? AiService.shared,
        _settings = _loadInitial();
 
   AiSettings get settings => _settings;

@@ -35,7 +35,7 @@ class AiFoodLabelService {
   final AiService service;
 
   AiFoodLabelService({required this.settings, AiService? service})
-      : service = service ?? AiService();
+      : service = service ?? AiService.shared;
 
   static const String _systemPrompt = r'''
 Você é um extrator de tabelas nutricionais. Analise todas as imagens enviadas e extraia os dados delas.

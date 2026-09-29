@@ -109,7 +109,7 @@ class AiChatService extends ChangeNotifier {
   AiChatService._();
 
   final DatabaseHelper _db = DatabaseHelper.instance;
-  AiService _service = AiService();
+  AiService _service = AiService.shared;
   AiToolRegistry _tools = AiToolRegistry();
   AiContextService _context = AiContextService();
   AiRoutineMutationService _routineMutations = AiRoutineMutationService();
