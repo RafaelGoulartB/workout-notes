@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Name (and optional description) typed in [showRoutineDetailsSheet].
 class RoutineDetails {
@@ -180,26 +181,12 @@ Future<bool> confirmRoutineDestructive(
   String? confirmLabel,
 }) async {
   final loc = AppLocalizations.of(context)!;
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(title),
-      content: Text(content),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: Text(loc.commonCancel),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(ctx).colorScheme.error,
-            foregroundColor: Theme.of(ctx).colorScheme.onError,
-          ),
-          onPressed: () => Navigator.pop(ctx, true),
-          child: Text(confirmLabel ?? loc.commonDelete),
-        ),
-      ],
-    ),
+  final result = await showConfirmDialog(
+    context,
+    title: title,
+    message: content,
+    confirmLabel: confirmLabel ?? loc.commonDelete,
+    destructive: true,
   );
   return result == true;
 }

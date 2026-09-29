@@ -395,27 +395,13 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   }
 
   Future<void> _resetTimer() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(AppLocalizations.of(context)!.activeWorkoutResetTimer),
-        content: Text(
-          AppLocalizations.of(context)!.activeWorkoutResetTimerContent,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(AppLocalizations.of(context)!.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              AppLocalizations.of(context)!.activeWorkoutReset,
-              style: TextStyle(color: Theme.of(ctx).colorScheme.error),
-            ),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: AppLocalizations.of(context)!.activeWorkoutResetTimer,
+      message: AppLocalizations.of(context)!.activeWorkoutResetTimerContent,
+      confirmLabel: AppLocalizations.of(context)!.activeWorkoutReset,
+      cancelLabel: AppLocalizations.of(context)!.commonCancel,
+      destructive: true,
     );
     if (confirm == true && _workoutId != null) {
       _timerStart = null;
@@ -798,29 +784,15 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   }
 
   Future<void> _removeExercise(ExerciseWithSets exercise) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(AppLocalizations.of(context)!.activeWorkoutRemoveExercise),
-        content: Text(
-          AppLocalizations.of(context)!.activeWorkoutRemoveExerciseContent(
+    final confirm = await showConfirmDialog(
+      context,
+      title: AppLocalizations.of(context)!.activeWorkoutRemoveExercise,
+      message: AppLocalizations.of(context)!.activeWorkoutRemoveExerciseContent(
             exercise.localizedName(AppLocalizations.of(context)!),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(AppLocalizations.of(context)!.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              AppLocalizations.of(context)!.activeWorkoutRemove,
-              style: TextStyle(color: Theme.of(ctx).colorScheme.error),
-            ),
-          ),
-        ],
-      ),
+      confirmLabel: AppLocalizations.of(context)!.activeWorkoutRemove,
+      cancelLabel: AppLocalizations.of(context)!.commonCancel,
+      destructive: true,
     );
 
     if (confirm == true && _workoutId != null) {

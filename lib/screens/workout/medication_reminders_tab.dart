@@ -103,25 +103,12 @@ class _MedicationRemindersTabState extends State<MedicationRemindersTab> {
   }
 
   Future<void> _delete(Medication medication) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        final loc = AppLocalizations.of(context)!;
-        return AlertDialog(
-          title: Text(loc.medicationDeleteTitle),
-          content: Text(loc.medicationDeleteBody),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(loc.commonCancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(loc.medicationDelete),
-            ),
-          ],
-        );
-      },
+    final loc = AppLocalizations.of(context)!;
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.medicationDeleteTitle,
+      message: loc.medicationDeleteBody,
+      confirmLabel: loc.medicationDelete,
     );
     if (confirmed == true) await _service.delete(medication);
   }

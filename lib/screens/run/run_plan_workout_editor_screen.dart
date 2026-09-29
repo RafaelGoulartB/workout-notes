@@ -73,25 +73,12 @@ class _RunPlanWorkoutEditorScreenState
     final workout = _workout;
     if (workout == null) return;
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.runWorkoutDeleteConfirm(workout.name)),
-        content: Text(loc.commonActionCannotBeUndone),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.runWorkoutDeleteConfirm(workout.name),
+      message: loc.commonActionCannotBeUndone,
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirmed != true) return;
     await _repo.deleteWorkout(workout.id);

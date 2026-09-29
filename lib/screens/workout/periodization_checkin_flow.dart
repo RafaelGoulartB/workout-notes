@@ -9,6 +9,7 @@ import 'package:workout_notes/repositories/periodization_repository.dart';
 
 import 'periodization_checkin_screen.dart';
 import 'periodization_phase_editor_screen.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Weekly review followed by what the decision implies: nothing (keep
 /// going), opening the phase editor (adjust) or ending the phase at the end
@@ -54,22 +55,11 @@ abstract final class PeriodizationCheckinFlow {
           ),
         );
       case PeriodizationDecision.endPhase:
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text(loc.planningEndPhaseTitle),
-            content: Text(loc.planningEndPhaseBody),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(loc.commonCancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(loc.planningEndPhaseConfirm),
-              ),
-            ],
-          ),
+        final confirmed = await showConfirmDialog(
+          context,
+          title: loc.planningEndPhaseTitle,
+          message: loc.planningEndPhaseBody,
+          confirmLabel: loc.planningEndPhaseConfirm,
         );
         if (confirmed == true) {
           await PeriodizationRepository().endPhaseThisWeek(phase.id);

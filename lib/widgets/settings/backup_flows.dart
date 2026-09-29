@@ -5,6 +5,7 @@ import 'package:workout_notes/services/backup_actions.dart';
 import 'package:workout_notes/services/backup_exception.dart';
 import 'package:workout_notes/services/export_service.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Thin UI glue over [BackupActions]: the sheets, dialogs and snack bars of
 /// the JSON backup export and import flows. Every step re-checks
@@ -173,38 +174,13 @@ class BackupFlows {
   Future<void> _confirmAndRestore(BackupSource source) async {
     final loc = _loc;
     if (!context.mounted) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.settingsImportBackup),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              Icons.warning_amber_rounded,
-              size: 48,
-              color: Theme.of(ctx).colorScheme.error,
-            ),
-            const SizedBox(height: 16),
-            Text(loc.settingsImportWarning),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-              foregroundColor: Theme.of(ctx).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.settingsImport),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.settingsImportBackup,
+      message: loc.settingsImportWarning,
+      confirmLabel: loc.settingsImport,
+      destructive: true,
+      icon: Icons.warning_amber_rounded,
     );
 
     if (confirmed != true || !context.mounted) return;

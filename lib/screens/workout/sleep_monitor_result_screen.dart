@@ -201,22 +201,11 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
 
   Future<void> _deleteSession() async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(loc.sleepMonitorDeleteSession),
-        content: Text(loc.sleepMonitorDeleteSessionBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.sleepMonitorDeleteSession,
+      message: loc.sleepMonitorDeleteSessionBody,
+      confirmLabel: loc.commonDelete,
     );
     if (confirmed != true) return;
     await _repository.deleteSession(widget.sessionId);

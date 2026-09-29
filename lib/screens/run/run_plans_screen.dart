@@ -110,25 +110,12 @@ class _RunPlansScreenState extends State<RunPlansScreen> {
 
   Future<void> _delete(RunPlan plan) async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.runPlansDeleteConfirm(plan.name)),
-        content: Text(loc.runPlansDeleteContent),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.runPlansDeleteConfirm(plan.name),
+      message: loc.runPlansDeleteContent,
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirmed != true) return;
     await _repo.deletePlan(plan.id);

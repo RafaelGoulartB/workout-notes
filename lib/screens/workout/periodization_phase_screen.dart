@@ -14,6 +14,7 @@ import 'package:workout_notes/widgets/periodization/planning_widgets.dart';
 
 import 'periodization_checkin_flow.dart';
 import 'periodization_phase_editor_screen.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// A phase at a glance: what it plans (targets and template week) and how
 /// each of its weeks went (planned vs done, weekly review).
@@ -148,22 +149,11 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
 
   Future<void> _endThisWeek() async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(loc.planningEndPhaseTitle),
-        content: Text(loc.planningEndPhaseBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(loc.planningEndPhaseConfirm),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.planningEndPhaseTitle,
+      message: loc.planningEndPhaseBody,
+      confirmLabel: loc.planningEndPhaseConfirm,
     );
     if (confirmed != true) return;
     await _repository.endPhaseThisWeek(_phase.id);
@@ -173,22 +163,11 @@ class _PeriodizationPhaseScreenState extends State<PeriodizationPhaseScreen> {
 
   Future<void> _delete() async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(loc.planningDeletePhaseTitle),
-        content: Text(loc.planningDeletePhaseBody(_phase.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(loc.planningDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.planningDeletePhaseTitle,
+      message: loc.planningDeletePhaseBody(_phase.name),
+      confirmLabel: loc.planningDelete,
     );
     if (confirmed != true) return;
     final remaining = _planPhases.where((p) => p.id != _phase.id).toList();

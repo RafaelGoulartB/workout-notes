@@ -5,6 +5,7 @@ import 'package:workout_notes/models/run_plan.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/run_record_screen.dart';
 import 'package:workout_notes/services/run_plan_week_view.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Starts following [plan], confirming first when another plan is active:
 /// only one plan can drive "which run is due today". Returns true when the
@@ -19,22 +20,12 @@ Future<bool> followRunPlan(
   final current = await repo.getActivatedPlan(hydrate: false);
   if (!context.mounted) return false;
   if (current != null && current.id != plan.id) {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.runPlanReplaceActiveTitle),
-        content: Text(loc.runPlanReplaceActiveBody(current.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.runPlanActivate),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.runPlanReplaceActiveTitle,
+      message: loc.runPlanReplaceActiveBody(current.name),
+      confirmLabel: loc.runPlanActivate,
+      cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );
     if (confirmed != true || !context.mounted) return false;
   }

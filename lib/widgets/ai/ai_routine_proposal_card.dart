@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/ai_routine_proposal.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class AiRoutineProposalCard extends StatefulWidget {
   final AiRoutineProposal proposal;
@@ -32,22 +33,12 @@ class _AiRoutineProposalCardState extends State<AiRoutineProposalCard> {
       final count =
           ((widget.proposal.diff['removed'] as Map?)?['total'] as num? ?? 0)
               .toInt();
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(l10n.aiRoutineProposalConfirmTitle),
-          content: Text(l10n.aiRoutineProposalConfirmBody(count)),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(l10n.commonCancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(l10n.aiRoutineProposalConfirmApply),
-            ),
-          ],
-        ),
+      final confirmed = await showConfirmDialog(
+        context,
+        title: l10n.aiRoutineProposalConfirmTitle,
+        message: l10n.aiRoutineProposalConfirmBody(count),
+        confirmLabel: l10n.aiRoutineProposalConfirmApply,
+        cancelLabel: l10n.commonCancel,
       );
       if (confirmed != true) return;
     }

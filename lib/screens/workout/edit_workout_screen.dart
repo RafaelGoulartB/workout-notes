@@ -330,27 +330,12 @@ class _EditWorkoutScreenState extends State<EditWorkoutScreen> {
 
   Future<void> _removeExercise(ExerciseWithSets ex) async {
     final loc = AppLocalizations.of(context)!;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.activeWorkoutRemoveExercise),
-        content: Text(
-          loc.activeWorkoutRemoveExerciseContent(ex.localizedName(loc)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              loc.commonDelete,
-              style: TextStyle(color: Theme.of(ctx).colorScheme.error),
-            ),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: loc.activeWorkoutRemoveExercise,
+      message: loc.activeWorkoutRemoveExerciseContent(ex.localizedName(loc)),
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirm == true) {
       await _workoutRepo.deleteExerciseEntry(ex.entryId);

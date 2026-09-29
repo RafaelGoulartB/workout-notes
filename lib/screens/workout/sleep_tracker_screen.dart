@@ -632,22 +632,11 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
 
   Future<void> _deleteEntry(SleepEntry entry) async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(loc.sleepDelete),
-        content: Text(loc.sleepDeleteConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.sleepDelete,
+      message: loc.sleepDeleteConfirm,
+      confirmLabel: loc.commonDelete,
     );
     if (confirmed != true) return;
     await _repository.delete(entry.id);

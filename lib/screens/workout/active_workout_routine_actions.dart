@@ -455,25 +455,13 @@ mixin _ActiveWorkoutRoutineActions
   }
 
   Future<void> _deleteWorkout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(AppLocalizations.of(context)!.commonConfirmDelete),
-        content: Text(AppLocalizations.of(context)!.commonActionCannotBeUndone),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(AppLocalizations.of(context)!.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              AppLocalizations.of(context)!.commonDelete,
-              style: TextStyle(color: Theme.of(ctx).colorScheme.error),
-            ),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: AppLocalizations.of(context)!.commonConfirmDelete,
+      message: AppLocalizations.of(context)!.commonActionCannotBeUndone,
+      confirmLabel: AppLocalizations.of(context)!.commonDelete,
+      cancelLabel: AppLocalizations.of(context)!.commonCancel,
+      destructive: true,
     );
 
     if (confirm == true && _workoutId != null) {

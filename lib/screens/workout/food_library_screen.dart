@@ -104,22 +104,11 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
   Future<void> _deleteFood(FoodSearchResultLite entry) async {
     if (!entry.food.isUserCreated) return;
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(loc.nutritionFoodDelete),
-        content: Text(loc.nutritionFoodDeleteConfirm(entry.food.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.nutritionFoodDelete,
+      message: loc.nutritionFoodDeleteConfirm(entry.food.name),
+      confirmLabel: loc.commonDelete,
     );
     if (confirmed != true || !mounted) return;
     try {

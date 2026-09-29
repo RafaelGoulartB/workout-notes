@@ -604,27 +604,12 @@ class _FutureWorkoutPlannerScreenState
 
   Future<void> _removeExercise(ExerciseWithSets ex) async {
     final loc = AppLocalizations.of(context)!;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.activeWorkoutRemoveExercise),
-        content: Text(
-          loc.activeWorkoutRemoveExerciseContent(ex.localizedName(loc)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              loc.commonDelete,
-              style: const TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: loc.activeWorkoutRemoveExercise,
+      message: loc.activeWorkoutRemoveExerciseContent(ex.localizedName(loc)),
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirm == true) {
       await _workoutRepo.deleteExerciseEntry(ex.entryId);
@@ -1136,25 +1121,12 @@ class _FutureWorkoutPlannerScreenState
 
   Future<void> _deleteWorkout() async {
     final loc = AppLocalizations.of(context)!;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.workoutDetailDeleteConfirm),
-        content: Text(loc.commonActionCannotBeUndone),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              loc.commonDelete,
-              style: const TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: loc.workoutDetailDeleteConfirm,
+      message: loc.commonActionCannotBeUndone,
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirm == true) {
       await _workoutRepo.deleteWorkout(widget.workoutId);

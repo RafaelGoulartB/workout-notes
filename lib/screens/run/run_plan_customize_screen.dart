@@ -16,6 +16,7 @@ import 'package:workout_notes/services/runner_strength_routine.dart';
 
 export 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_time.dart'
     show parseRaceTime;
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Coach-style wizard: days → intent/volume → paces → preview → create.
 ///
@@ -98,26 +99,13 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
       return;
     }
     final loc = AppLocalizations.of(context)!;
-    final discard = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.runPlanWizardDiscardTitle),
-        content: Text(loc.runPlanWizardDiscardBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.runPlanWizardKeepEditing),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-              foregroundColor: Theme.of(ctx).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDiscard),
-          ),
-        ],
-      ),
+    final discard = await showConfirmDialog(
+      context,
+      title: loc.runPlanWizardDiscardTitle,
+      message: loc.runPlanWizardDiscardBody,
+      confirmLabel: loc.commonDiscard,
+      cancelLabel: loc.runPlanWizardKeepEditing,
+      destructive: true,
     );
     if (discard == true && mounted) Navigator.pop(context);
   }
@@ -133,22 +121,12 @@ class _RunPlanCustomizeScreenState extends State<RunPlanCustomizeScreen> {
       if (current != null && current.id != plan.id) {
         if (await _repo.isLinkedToPeriodization(current.id)) return null;
         if (!mounted) return null;
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(loc.runPlanReplaceActiveTitle),
-            content: Text(loc.runPlanReplaceActiveBody(current.name)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: Text(loc.runPlanActivate),
-              ),
-            ],
-          ),
+        final confirmed = await showConfirmDialog(
+          context,
+          title: loc.runPlanReplaceActiveTitle,
+          message: loc.runPlanReplaceActiveBody(current.name),
+          confirmLabel: loc.runPlanActivate,
+          cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
         );
         if (confirmed != true) return null;
       }

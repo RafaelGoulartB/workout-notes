@@ -90,23 +90,12 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
 
   Future<void> _delete() async {
     final loc = AppLocalizations.of(context)!;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.goalDeleteConfirm),
-        content: Text(loc.goalDeleteMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton.tonal(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: loc.goalDeleteConfirm,
+      message: loc.goalDeleteMessage,
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirm != true) return;
     await widget.db.goalRepo.delete(_goal.id);

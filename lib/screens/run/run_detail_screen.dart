@@ -212,34 +212,18 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final activity = _activity;
     if (activity == null) return;
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          activity.isStationaryBike
+    final confirmed = await showConfirmDialog(
+      context,
+      title: activity.isStationaryBike
               ? loc.stationaryBikeDeleteConfirm
               : loc.runDetailDeleteConfirm,
-        ),
-        content: Text(
-          activity.isStationaryBike
+      message: activity.isStationaryBike
               ? loc.stationaryBikeDeleteConfirmBody
               : loc.runDetailDeleteConfirmBody,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              activity.isStationaryBike
+      confirmLabel: activity.isStationaryBike
                   ? loc.stationaryBikeDelete
                   : loc.runDetailDelete,
-            ),
-          ),
-        ],
-      ),
+      cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );
     if (confirmed != true || !mounted) return;
     await _repo.deleteActivity(widget.activityId);

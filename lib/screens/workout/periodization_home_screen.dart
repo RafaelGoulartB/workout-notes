@@ -34,6 +34,7 @@ import 'periodization_plan_editor_screen.dart';
 import 'periodization_plan_screen.dart';
 import 'periodization_plans_screen.dart';
 import 'settings_screen.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Progress tab: body weight, then the active plan — what today asks for,
 /// how this week is going, and the plan's phases on a roadmap.
@@ -256,22 +257,11 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
     final plan = _overview?.plan;
     if (plan == null) return;
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(loc.planningFinishPlanTitle),
-        content: Text(loc.planningFinishPlanBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(loc.planningFinishPlan),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.planningFinishPlanTitle,
+      message: loc.planningFinishPlanBody,
+      confirmLabel: loc.planningFinishPlan,
     );
     if (confirmed != true) return;
     await _repository.setPlanStatus(plan.id, PeriodizationPlanStatus.completed);

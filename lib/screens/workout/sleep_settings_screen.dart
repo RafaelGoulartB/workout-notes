@@ -250,22 +250,11 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
 
   Future<void> _remove() async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(loc.sleepMissionRemove),
-        content: Text(loc.sleepMissionRemoveConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(loc.sleepMissionRemove),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.sleepMissionRemove,
+      message: loc.sleepMissionRemoveConfirm,
+      confirmLabel: loc.sleepMissionRemove,
     );
     if (confirmed == true) {
       await _missions.clear();

@@ -30,6 +30,7 @@ import 'nutrition_progress_screen.dart';
 import 'nutrition_settings_screen.dart';
 import 'settings_screen.dart';
 import 'saved_meals_screen.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Nutrition dashboard. Shows the day's totals at a glance, a tools
 /// grid (progress, saved meals, food library, settings) and a
@@ -385,26 +386,13 @@ class _NutritionHomeScreenState extends State<NutritionHomeScreen> {
   Future<void> _deleteItem(MealLogItem item) async {
     if (!mounted) return;
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(loc.nutritionDeleteItem),
-        content: Text(loc.nutritionDeleteItemConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(loc.nutritionCancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(dialogContext).colorScheme.error,
-              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
-            ),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.nutritionDeleteItem,
+      message: loc.nutritionDeleteItemConfirm,
+      confirmLabel: loc.commonDelete,
+      cancelLabel: loc.nutritionCancel,
+      destructive: true,
     );
     if (confirmed != true || !mounted) return;
     try {

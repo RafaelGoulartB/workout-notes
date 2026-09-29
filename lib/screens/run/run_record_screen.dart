@@ -32,6 +32,7 @@ import 'package:workout_notes/widgets/run/record/run_record_map.dart';
 import 'package:workout_notes/widgets/run/record/run_record_sheet.dart';
 import 'package:workout_notes/widgets/run/record/run_record_top_bar.dart';
 import 'package:workout_notes/widgets/run/run_permission_onboarding_sheet.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 class RunRecordScreen extends StatefulWidget {
   /// Structured session to execute. When set, the step engine drives the cues
@@ -436,22 +437,12 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
 
   Future<bool> _confirmStartWithoutGps() async {
     final loc = AppLocalizations.of(context)!;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.runRecordGpsNotReadyTitle),
-        content: Text(loc.runRecordGpsNotReadyBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.runRecordWaitForGps),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.runRecordStartAnyway),
-          ),
-        ],
-      ),
+    final result = await showConfirmDialog(
+      context,
+      title: loc.runRecordGpsNotReadyTitle,
+      message: loc.runRecordGpsNotReadyBody,
+      confirmLabel: loc.runRecordStartAnyway,
+      cancelLabel: loc.runRecordWaitForGps,
     );
     return result == true;
   }
@@ -641,22 +632,12 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
 
   Future<void> _finish() async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(_finishTitle(loc)),
-        content: Text(_finishBody(loc)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.runRecordFinish),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: _finishTitle(loc),
+      message: _finishBody(loc),
+      confirmLabel: loc.runRecordFinish,
+      cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );
     if (confirmed != true || !mounted) return;
 
@@ -694,31 +675,17 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final bike = _activityType == CardioActivityType.stationaryBike;
     final confirmed = !confirm
         ? true
-        : await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: Text(
-                bike
+        : await showConfirmDialog(
+          context,
+          title: bike
                     ? loc.stationaryBikeReviewDiscardTitle
                     : loc.runRecordDiscardConfirm,
-              ),
-              content: Text(
-                _isIndoor
+          message: _isIndoor
                     ? loc.stationaryBikeReviewDiscardBody
                     : loc.runRecordDiscardConfirmBody,
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: Text(loc.runRecordDiscard),
-                ),
-              ],
-            ),
-          );
+          confirmLabel: loc.runRecordDiscard,
+          cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
+        );
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
     try {

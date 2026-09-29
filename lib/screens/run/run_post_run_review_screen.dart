@@ -300,30 +300,16 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
 
   Future<bool> _confirmDiscard() async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          _isStationaryBike
+    final confirmed = await showConfirmDialog(
+      context,
+      title: _isStationaryBike
               ? loc.stationaryBikeReviewDiscardTitle
               : loc.runReviewDiscardTitle,
-        ),
-        content: Text(
-          _isStationaryBike
+      message: _isStationaryBike
               ? loc.stationaryBikeReviewDiscardBody
               : loc.runReviewDiscardBody,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(loc.runReviewDiscard),
-          ),
-        ],
-      ),
+      confirmLabel: loc.runReviewDiscard,
+      cancelLabel: MaterialLocalizations.of(context).cancelButtonLabel,
     );
     return confirmed == true;
   }

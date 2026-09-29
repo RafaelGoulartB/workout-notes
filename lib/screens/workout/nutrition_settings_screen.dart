@@ -108,26 +108,13 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
 
   Future<void> _clearGoal() async {
     final loc = AppLocalizations.of(context)!;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.nutritionSettingsClear),
-        content: Text(loc.nutritionSettingsClear),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.nutritionCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-              foregroundColor: Theme.of(ctx).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: loc.nutritionSettingsClear,
+      message: loc.nutritionSettingsClear,
+      confirmLabel: loc.commonDelete,
+      cancelLabel: loc.nutritionCancel,
+      destructive: true,
     );
     if (confirm != true) return;
     await _controller.clearGoal();
@@ -288,28 +275,13 @@ class _NutritionSettingsScreenState extends State<NutritionSettingsScreen> {
 
   Future<void> _deleteMealType(MealTypeDefinition type) async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.nutritionDeleteMeal),
-        content: Text(
-          loc.nutritionMealTypeDeleteConfirm(type.displayName(loc)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.nutritionCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-              foregroundColor: Theme.of(ctx).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.nutritionDeleteMeal,
+      message: loc.nutritionMealTypeDeleteConfirm(type.displayName(loc)),
+      confirmLabel: loc.commonDelete,
+      cancelLabel: loc.nutritionCancel,
+      destructive: true,
     );
     if (confirmed != true) return;
     if (!mounted) return;

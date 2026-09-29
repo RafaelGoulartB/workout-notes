@@ -308,27 +308,12 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
 
   Future<void> _deleteWorkout() async {
     final loc = AppLocalizations.of(context)!;
-    final colors = Theme.of(context).colorScheme;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.workoutDetailDeleteConfirm),
-        content: Text(loc.workoutDetailDeleteContent),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.commonCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: colors.error,
-              foregroundColor: colors.onError,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: loc.workoutDetailDeleteConfirm,
+      message: loc.workoutDetailDeleteContent,
+      confirmLabel: loc.commonDelete,
+      destructive: true,
     );
     if (confirm != true) return;
     await _workoutRepo.deleteWorkout(widget.workoutId);

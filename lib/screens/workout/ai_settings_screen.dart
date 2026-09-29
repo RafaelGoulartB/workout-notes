@@ -393,12 +393,13 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
 
   Future<void> _confirmRemove(AiProvider p) async {
     final l10n = AppLocalizations.of(context)!;
-    final ok = await SettingsConfirmDialog.show(
-      context: context,
+    final ok = await showConfirmDialog(
+      context,
       title: l10n.aiSettingsRemoveConfirmTitle(p.name),
       message: l10n.aiSettingsRemoveConfirmBody,
       confirmLabel: l10n.aiSettingsRemove,
-      cancelLabel: l10n.commonCancel,
+      destructive: true,
+      icon: Icons.warning_amber_rounded,
     );
     if (ok == true) {
       await _notifier.deleteProvider(p.id);

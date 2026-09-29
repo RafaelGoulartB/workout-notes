@@ -292,26 +292,13 @@ class _NutritionDayDetailScreenState extends State<NutritionDayDetailScreen>
 
   Future<void> _deleteItem(MealLogItem item) async {
     final loc = AppLocalizations.of(context)!;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.nutritionDeleteItem),
-        content: Text(loc.nutritionDeleteItemConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.nutritionCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-              foregroundColor: Theme.of(ctx).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirm = await showConfirmDialog(
+      context,
+      title: loc.nutritionDeleteItem,
+      message: loc.nutritionDeleteItemConfirm,
+      confirmLabel: loc.commonDelete,
+      cancelLabel: loc.nutritionCancel,
+      destructive: true,
     );
     if (confirm != true) return;
     if (!mounted) return;

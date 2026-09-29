@@ -10,6 +10,7 @@ import 'package:workout_notes/widgets/periodization/phase_editor/phase_identity_
 import 'package:workout_notes/widgets/periodization/phase_editor/phase_nutrition_card.dart';
 import 'package:workout_notes/widgets/periodization/phase_editor/phase_target_cards.dart';
 import 'package:workout_notes/widgets/periodization/phase_editor/phase_weeks_card.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Everything a phase plans, on one screen: what it is and how long it
 /// lasts, its template week, nutrition (training vs rest days), training,
@@ -74,24 +75,14 @@ class _PeriodizationPhaseEditorScreenState
   Future<bool> _confirmDiscard() async {
     if (!_controller.dirty) return true;
     final loc = AppLocalizations.of(context)!;
-    final discard = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(loc.planningDiscardTitle),
-        content: Text(loc.planningDiscardBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(loc.planningKeepEditing),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(loc.planningDiscard),
-          ),
-        ],
-      ),
+    final discard = await showConfirmDialog(
+      context,
+      title: loc.planningDiscardTitle,
+      message: loc.planningDiscardBody,
+      confirmLabel: loc.planningDiscard,
+      cancelLabel: loc.planningKeepEditing,
     );
-    return discard ?? false;
+    return discard;
   }
 
   @override

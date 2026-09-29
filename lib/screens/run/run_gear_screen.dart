@@ -83,21 +83,10 @@ class _RunGearScreenState extends State<RunGearScreen> {
         await _repo.setRetired(gear.id, !gear.isRetired);
         await _load();
       case 'delete':
-        final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            content: Text(loc.runGearDeleteConfirm),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(loc.commonCancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(loc.runGearDelete),
-              ),
-            ],
-          ),
+        final confirmed = await showConfirmDialog(
+          context,
+          message: loc.runGearDeleteConfirm,
+          confirmLabel: loc.runGearDelete,
         );
         if (confirmed == true) {
           await _repo.deleteGear(gear.id);

@@ -10,6 +10,7 @@ import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/nutrition/nutrition_day_ui.dart';
 
 import 'saved_meal_editor_screen.dart';
+import 'package:workout_notes/widgets/ui/ui.dart';
 
 /// Lists the user's saved meal templates and lets them log a template
 /// into today with a single tap.
@@ -93,26 +94,13 @@ class _SavedMealsScreenState extends State<SavedMealsScreen> {
 
   Future<void> _deleteMeal(SavedMealWithItems meal) async {
     final loc = AppLocalizations.of(context)!;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.nutritionSavedMealDelete),
-        content: Text(loc.nutritionSavedMealDeleteConfirm(meal.meal.name)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.nutritionCancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-              foregroundColor: Theme.of(ctx).colorScheme.onError,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.commonDelete),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: loc.nutritionSavedMealDelete,
+      message: loc.nutritionSavedMealDeleteConfirm(meal.meal.name),
+      confirmLabel: loc.commonDelete,
+      cancelLabel: loc.nutritionCancel,
+      destructive: true,
     );
     if (confirmed != true) return;
     await widget.repository.deleteSavedMeal(meal.meal.id);
