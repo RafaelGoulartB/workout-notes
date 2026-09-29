@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -210,7 +209,7 @@ class _SportRing extends StatelessWidget {
               width: 50,
               height: 50,
               child: CustomPaint(
-                painter: _RingPainter(
+                painter: RingPainter(
                   progress: progress.clamp(0.0, 1.0),
                   color: color,
                   track: color.withAlpha(40),
@@ -263,50 +262,6 @@ class _SportRing extends StatelessWidget {
       ),
     );
   }
-}
-
-class _RingPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-  final Color track;
-
-  const _RingPainter({
-    required this.progress,
-    required this.color,
-    required this.track,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const stroke = 5.0;
-    final rect = Rect.fromLTWH(
-      stroke / 2,
-      stroke / 2,
-      size.width - stroke,
-      size.height - stroke,
-    );
-    final base = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..color = track;
-    canvas.drawArc(rect, 0, math.pi * 2, false, base);
-    if (progress <= 0) return;
-    canvas.drawArc(
-      rect,
-      -math.pi / 2,
-      math.pi * 2 * progress,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke
-        ..strokeCap = StrokeCap.round
-        ..color = color,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_RingPainter old) =>
-      old.progress != progress || old.color != color || old.track != track;
 }
 
 /// Monday–Sunday, one column per day with a sport icon per activity: full

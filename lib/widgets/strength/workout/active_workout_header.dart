@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -258,7 +257,8 @@ class _SetsRing extends StatelessWidget {
       width: 46,
       height: 46,
       child: CustomPaint(
-        painter: _SetsRingPainter(
+        painter: RingPainter(
+          strokeWidth: 4,
           progress: progress,
           color: colors.primary,
           track: colors.surfaceContainerHighest,
@@ -280,55 +280,6 @@ class _SetsRing extends StatelessWidget {
       ),
     );
   }
-}
-
-class _SetsRingPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-  final Color track;
-
-  const _SetsRingPainter({
-    required this.progress,
-    required this.color,
-    required this.track,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const stroke = 4.0;
-    final rect = Rect.fromLTWH(
-      stroke / 2,
-      stroke / 2,
-      size.width - stroke,
-      size.height - stroke,
-    );
-    canvas.drawArc(
-      rect,
-      0,
-      math.pi * 2,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke
-        ..color = track,
-    );
-    if (progress <= 0) return;
-    canvas.drawArc(
-      rect,
-      -math.pi / 2,
-      math.pi * 2 * progress,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke
-        ..strokeCap = StrokeCap.round
-        ..color = color,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_SetsRingPainter old) =>
-      old.progress != progress || old.color != color || old.track != track;
 }
 
 /// Current vs last-session volume per muscle group.
