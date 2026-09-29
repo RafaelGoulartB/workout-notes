@@ -431,21 +431,6 @@ class RunPlanRepository extends BaseRepository {
     return row;
   }
 
-  /// Stores the inputs [planId] is (re)built from.
-  Future<void> saveConfig(String planId, Map<String, dynamic> config) async {
-    final database = await db;
-    if (!await _columnExists(database, 'run_plans', 'config_json')) return;
-    await database.update(
-      'run_plans',
-      {
-        'config_json': jsonEncode(config),
-        'updated_at': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [planId],
-    );
-  }
-
   Future<void> updatePlan(
     String id, {
     String? name,
@@ -715,26 +700,6 @@ class RunPlanRepository extends BaseRepository {
     if (planId != null) await _touchPlan(database, planId);
   }
 
-  /// Persists a new ordering for the sessions of one week.
-  Future<void> reorderWorkouts(
-    String planId,
-    int weekIndex,
-    List<String> orderedIds,
-  ) async {
-    final database = await db;
-    final batch = database.batch();
-    for (var i = 0; i < orderedIds.length; i++) {
-      batch.update(
-        'run_plan_workouts',
-        {'order_index': i},
-        where: 'id = ? AND run_plan_id = ? AND week_index = ?',
-        whereArgs: [orderedIds[i], planId, weekIndex],
-      );
-    }
-    await batch.commit(noResult: true);
-    await _touchPlan(database, planId);
-  }
-
   // ===================== STEPS =====================
 
   Future<List<RunWorkoutStep>> getSteps(String workoutId) async {
@@ -832,31 +797,6 @@ class RunPlanRepository extends BaseRepository {
     await _touchPlanForWorkout(database, workoutId);
   }
 
-  /// Replaces every step of [workoutId] with [steps], renumbering order.
-  /// Used by the editor's "salvar bloco de tiros" flow.
-  Future<void> replaceSteps(
-    String workoutId,
-    List<RunWorkoutStep> steps,
-  ) async {
-    final database = await db;
-    await database.transaction((txn) async {
-      await txn.delete(
-        'run_workout_steps',
-        where: 'run_plan_workout_id = ?',
-        whereArgs: [workoutId],
-      );
-      for (var i = 0; i < steps.length; i++) {
-        final step = steps[i].copyWith(orderIndex: i);
-        await txn.insert('run_workout_steps', {
-          ...step.toMap(),
-          'id': step.id.isEmpty ? _uuid.v4() : step.id,
-          'run_plan_workout_id': workoutId,
-        });
-      }
-    });
-    await _touchPlanForWorkout(database, workoutId);
-  }
-
   // ===================== SCHEDULE =====================
 
   Future<List<ScheduledRun>> getScheduledRuns(
@@ -898,28 +838,6 @@ class RunPlanRepository extends BaseRepository {
     if (rows.isEmpty) return null;
     final hydrated = await _hydrateScheduled(database, rows);
     return hydrated.first;
-  }
-
-  Future<ScheduledRun> scheduleRun({
-    required DateTime date,
-    String? runPlanId,
-    String? runPlanWorkoutId,
-    String? notes,
-  }) async {
-    final database = await db;
-    final now = DateTime.now();
-    final scheduled = ScheduledRun(
-      id: _uuid.v4(),
-      date: DateTime(date.year, date.month, date.day),
-      runPlanId: runPlanId,
-      runPlanWorkoutId: runPlanWorkoutId,
-      status: ScheduledRunStatus.planned,
-      notes: _optional(notes),
-      createdAt: now,
-      updatedAt: now,
-    );
-    await database.insert('scheduled_runs', scheduled.toMap());
-    return scheduled;
   }
 
   /// Materialises the sessions of [weekIndex] onto the calendar week starting
@@ -975,18 +893,6 @@ class RunPlanRepository extends BaseRepository {
       }
     });
     return created;
-  }
-
-  /// Removes scheduled rows by id. Used to undo a bulk materialisation.
-  Future<int> deleteScheduledRuns(List<String> ids) async {
-    if (ids.isEmpty) return 0;
-    final database = await db;
-    if (!await _tableExists(database, 'scheduled_runs')) return 0;
-    return database.delete(
-      'scheduled_runs',
-      where: 'id IN (${List.filled(ids.length, '?').join(', ')})',
-      whereArgs: ids,
-    );
   }
 
   Future<void> updateScheduledRun(

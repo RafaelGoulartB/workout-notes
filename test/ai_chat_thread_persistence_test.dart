@@ -28,13 +28,13 @@ void main() {
     final older = DateTime.utc(2026, 1, 1);
     final newer = DateTime.utc(2026, 1, 2);
 
-    await helper.upsertAiChatThread(
+    await helper.aiChatRepo.upsertAiChatThread(
       id: 'recent',
       title: 'Recent',
       createdAt: older,
       updatedAt: newer,
     );
-    await helper.upsertAiChatThread(
+    await helper.aiChatRepo.upsertAiChatThread(
       id: 'pinned',
       title: 'Pinned',
       createdAt: older,
@@ -42,17 +42,17 @@ void main() {
       isPinned: true,
     );
 
-    var threads = await helper.getAiChatThreads();
+    var threads = await helper.aiChatRepo.getAiChatThreadsPage(limit: 100);
     expect(threads.map((thread) => thread['id']), ['pinned', 'recent']);
 
-    await helper.upsertAiChatThread(
+    await helper.aiChatRepo.upsertAiChatThread(
       id: 'pinned',
       title: 'Pinned updated',
       createdAt: older,
       updatedAt: newer,
       isPinned: true,
     );
-    threads = await helper.getAiChatThreads();
+    threads = await helper.aiChatRepo.getAiChatThreadsPage(limit: 100);
     expect(threads.first['is_pinned'], 1);
   });
 
@@ -62,7 +62,7 @@ void main() {
       final helper = DatabaseHelper.instance;
       final database = await helper.database;
       final timestamp = DateTime.utc(2026, 1, 2);
-      await helper.upsertAiChatThread(
+      await helper.aiChatRepo.upsertAiChatThread(
         id: 'proposal-thread',
         title: 'Before',
         createdAt: timestamp,
@@ -79,29 +79,29 @@ void main() {
         'created_at': timestamp.toIso8601String(),
       });
 
-      await helper.upsertAiChatThread(
+      await helper.aiChatRepo.upsertAiChatThread(
         id: 'proposal-thread',
         title: 'After',
         createdAt: timestamp,
         updatedAt: timestamp.add(const Duration(minutes: 1)),
       );
 
-      expect(await helper.getAiRoutineProposal('proposal'), isNotNull);
+      expect(await helper.aiChatRepo.getAiRoutineProposal('proposal'), isNotNull);
     },
   );
 
   test('renaming preserves the conversation activity timestamp', () async {
     final helper = DatabaseHelper.instance;
     final timestamp = DateTime.utc(2026, 1, 3, 12);
-    await helper.upsertAiChatThread(
+    await helper.aiChatRepo.upsertAiChatThread(
       id: 'thread',
       title: 'Before',
       createdAt: timestamp,
       updatedAt: timestamp,
     );
 
-    await helper.renameAiChatThread('thread', 'After');
-    final thread = (await helper.getAiChatThreads()).single;
+    await helper.aiChatRepo.renameAiChatThread('thread', 'After');
+    final thread = (await helper.aiChatRepo.getAiChatThreadsPage(limit: 100)).single;
     expect(thread['title'], 'After');
     expect(thread['updated_at'], timestamp.toIso8601String());
   });
@@ -109,7 +109,7 @@ void main() {
   test('message image metadata survives SQLite persistence', () async {
     final helper = DatabaseHelper.instance;
     final timestamp = DateTime.utc(2026, 1, 3, 12);
-    await helper.upsertAiChatThread(
+    await helper.aiChatRepo.upsertAiChatThread(
       id: 'thread-images',
       title: 'Images',
       createdAt: timestamp,
@@ -132,9 +132,9 @@ void main() {
       createdAt: timestamp,
     );
 
-    await helper.replaceAiChatMessages('thread-images', [message.toRow()]);
+    await helper.aiChatRepo.upsertAiChatMessages('thread-images', [message.toRow()]);
     final restored = AiChatMessage.fromRow(
-      (await helper.getAiChatMessagesThread('thread-images')).single,
+      (await helper.aiChatRepo.getAiChatMessagesThread('thread-images')).single,
     );
     expect(restored.attachments.single.fileName, 'image.jpg');
     expect(restored.attachments.single.sizeBytes, 42);

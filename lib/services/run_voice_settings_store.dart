@@ -15,7 +15,7 @@ class RunVoiceSettingsStore {
     if (_cache != null) return _cache!;
     try {
       final raw =
-          await DatabaseHelper.instance.getSetting(RunVoiceSettings.storageKey);
+          await DatabaseHelper.instance.settingsRepo.getSetting(RunVoiceSettings.storageKey);
       if (raw == null || raw.isEmpty) {
         _cache = const RunVoiceSettings.defaults();
         return _cache!;
@@ -35,7 +35,7 @@ class RunVoiceSettingsStore {
   Future<void> save(RunVoiceSettings settings) async {
     _cache = settings;
     final encoded = jsonEncode(settings.toJson());
-    await DatabaseHelper.instance.setSetting(
+    await DatabaseHelper.instance.settingsRepo.setSetting(
       RunVoiceSettings.storageKey,
       encoded,
     );

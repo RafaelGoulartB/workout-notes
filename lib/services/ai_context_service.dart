@@ -33,7 +33,7 @@ class AiContextService {
     required DateTime now,
   }) async {
     final parts = await Future.wait<Map<String, dynamic>>([
-      _safeMap(() => db.getWorkoutOverviewStats()),
+      _safeMap(() => db.analyticsRepo.getWorkoutOverviewStats()),
       _loadBaseCounts(),
       if (mode != AiContextMode.minimal) _loadDataAvailability(now),
     ]);

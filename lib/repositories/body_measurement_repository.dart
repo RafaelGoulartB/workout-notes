@@ -121,57 +121,6 @@ class BodyMeasurementRepository extends BaseRepository {
     ''');
   }
 
-  /// Returns the previous measurement for a given type (before the latest).
-  Future<Map<String, dynamic>?> getPreviousBodyMeasurement(
-    String type, {
-    String? beforeDate,
-  }) async {
-    final db = await this.db;
-    return db
-        .rawQuery(
-          'SELECT * FROM body_measurements WHERE type = ? ORDER BY date DESC, created_at DESC LIMIT 1',
-          [type],
-        )
-        .then((r) => r.isEmpty ? null : r.first);
-  }
-
-  /// Returns body measurements grouped by month for trend analysis.
-  Future<List<Map<String, dynamic>>> getBodyMeasurementsTrend(
-    String type, {
-    int months = 6,
-  }) async {
-    final db = await this.db;
-    final start = DateTime.now()
-        .subtract(Duration(days: months * 30))
-        .toIso8601String()
-        .substring(0, 10);
-    return db.rawQuery(
-      '''
-      SELECT date, value, unit, comment, time_of_day, is_fasted,
-        (SELECT value FROM body_measurements bm2
-         WHERE bm2.type = bm.type AND bm2.date < bm.date
-         ORDER BY bm2.date DESC LIMIT 1) as prev_value
-      FROM body_measurements bm
-      WHERE type = ? AND date >= ?
-      ORDER BY date ASC
-    ''',
-      [type, start],
-    );
-  }
-
-  /// Returns all measurements for a specific date.
-  Future<List<Map<String, dynamic>>> getBodyMeasurementsByDate(
-    String date,
-  ) async {
-    final db = await this.db;
-    return db.query(
-      'body_measurements',
-      where: 'date = ?',
-      whereArgs: [date],
-      orderBy: 'type ASC',
-    );
-  }
-
   /// Returns body composition data (weight + body fat) for trend analysis.
   Future<List<Map<String, dynamic>>> getBodyCompositionTrend({
     int months = 6,
@@ -193,42 +142,6 @@ class BodyMeasurementRepository extends BaseRepository {
       ORDER BY w.date ASC
     ''',
       [start],
-    );
-  }
-
-  /// Returns measurement count per month for consistency tracking.
-  Future<Map<String, int>> getBodyMeasurementFrequency({int months = 6}) async {
-    final db = await this.db;
-    final start = DateTime.now()
-        .subtract(Duration(days: months * 30))
-        .toIso8601String()
-        .substring(0, 10);
-    final rows = await db.rawQuery(
-      '''
-      SELECT date, COUNT(*) as count
-      FROM body_measurements
-      WHERE date >= ?
-      GROUP BY date
-      ORDER BY date ASC
-    ''',
-      [start],
-    );
-    final Map<String, int> result = {};
-    for (final row in rows) {
-      result[row['date'] as String] = row['count'] as int;
-    }
-    return result;
-  }
-
-  /// Returns all measurements for a given type with their photo paths.
-  Future<List<Map<String, dynamic>>> getBodyMeasurementsWithPhotos(
-    String type, {
-    int limit = 50,
-  }) async {
-    final db = await this.db;
-    return db.rawQuery(
-      'SELECT * FROM body_measurements WHERE type = ? AND photos_paths IS NOT NULL ORDER BY date DESC LIMIT ?',
-      [type, limit],
     );
   }
 }

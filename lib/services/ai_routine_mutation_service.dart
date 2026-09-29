@@ -89,7 +89,7 @@ class AiRoutineMutationService {
         status: AiRoutineProposalStatus.awaitingApproval,
         createdAt: DateTime.now(),
       );
-      await db.insertAiRoutineProposal(proposal.toRow());
+      await db.aiChatRepo.insertAiRoutineProposal(proposal.toRow());
       return _proposalResult(proposal);
     } catch (e) {
       return AiToolResult(
@@ -101,18 +101,18 @@ class AiRoutineMutationService {
   }
 
   Future<AiRoutineProposal?> getProposal(String id) async {
-    final row = await db.getAiRoutineProposal(id);
+    final row = await db.aiChatRepo.getAiRoutineProposal(id);
     return row == null ? null : AiRoutineProposal.fromRow(row);
   }
 
   Future<void> restorePendingProposal(AiRoutineProposal proposal) async {
     if (proposal.status != AiRoutineProposalStatus.awaitingApproval) return;
     if (await getProposal(proposal.id) != null) return;
-    await db.insertAiRoutineProposal(proposal.toRow());
+    await db.aiChatRepo.insertAiRoutineProposal(proposal.toRow());
   }
 
   Future<List<AiRoutineProposal>> getThreadProposals(String threadId) async =>
-      (await db.getAiRoutineProposalsThread(
+      (await db.aiChatRepo.getAiRoutineProposalsThread(
         threadId,
       )).map(AiRoutineProposal.fromRow).toList();
 

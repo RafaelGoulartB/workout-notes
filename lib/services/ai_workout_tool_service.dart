@@ -94,7 +94,7 @@ class AiWorkoutToolService {
   }
 
   Future<Map<String, dynamic>?> workoutDetail(String id) async {
-    final workout = await db.getWorkout(id);
+    final workout = await db.workoutRepo.getWorkout(id);
     if (workout == null) return null;
     final rawDb = await db.database;
     final rows = await rawDb.rawQuery(
@@ -208,7 +208,7 @@ class AiWorkoutToolService {
     bool? favorites,
     int limit = 20,
   }) async {
-    final rows = await db.getExercises(
+    final rows = await db.exerciseRepo.getExercises(
       categoryId: categoryId,
       search: search,
       favorites: favorites,
@@ -217,7 +217,7 @@ class AiWorkoutToolService {
   }
 
   Future<Map<String, dynamic>?> exerciseDetail(String id) async {
-    final exercise = await db.getExercise(id);
+    final exercise = await db.exerciseRepo.getExercise(id);
     if (exercise == null) return null;
     final rawDb = await db.database;
     final usage = await rawDb.rawQuery(
@@ -296,7 +296,7 @@ class AiWorkoutToolService {
 
   Future<Map<String, dynamic>> exerciseRecords(String exerciseId) async {
     final rawDb = await db.database;
-    final exercise = await db.getExercise(exerciseId);
+    final exercise = await db.exerciseRepo.getExercise(exerciseId);
     final rows = await rawDb.rawQuery(
       '''
       SELECT w.id AS workout_id, w.date, s.weight, s.reps, s.distance,

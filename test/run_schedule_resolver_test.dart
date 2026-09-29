@@ -4,6 +4,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/database/database_periodization_schema.dart';
 import 'package:workout_notes/database/database_run_plan_schema.dart';
+import 'package:workout_notes/models/periodization_phase_draft.dart';
 import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/models/run_plan.dart';
@@ -13,6 +14,8 @@ import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
+import 'support/periodization_fixtures.dart';
+import 'support/run_plan_fixtures.dart';
 
 /// Covers how the periodization plan resolves "which run is due today" and how
 /// the running targets feed phase adherence.
@@ -100,7 +103,7 @@ void main() {
       startDate: phaseStart,
       endDate: phaseEnd,
     );
-    final phase = await periodization.addPhase(
+    final phase = await addPhaseFixture(periodization, 
       planId: plan.id,
       name: 'Acumulação',
       color: 0xFF00FF00,
@@ -304,7 +307,7 @@ void main() {
       );
       await seedPhase(runPlanIds: [plan.id]);
       // Moved from Tuesday to Wednesday.
-      final scheduled = await runPlans.scheduleRun(
+      final scheduled = await scheduleRunFixture(runPlans, 
         date: DateTime(2026, 1, 7),
         runPlanId: plan.id,
         runPlanWorkoutId: session.id,
@@ -454,7 +457,7 @@ void main() {
   });
 
   group('run targets persistence', () {
-    test('saveTargetVersion keeps the routine and running links', () async {
+    test('a saved target keeps the routine and running links', () async {
       final routine = 'routine-1';
       await database.insert('routines', {
         'id': routine,
@@ -462,32 +465,30 @@ void main() {
         'created_at': phaseStart.toIso8601String(),
       });
       final phaseId = await seedPhase();
-      final saved = await periodization.saveTargetVersion(
+      await periodization.savePhaseSetup(
         phaseId,
-        PeriodizationTarget(
-          id: '',
-          phaseId: phaseId,
-          version: 0,
-          validFrom: phaseStart,
-          calories: 2400,
-          routineIds: [routine],
-          runPlanIds: ['plan-y'],
-          runSessionsPerWeek: 4,
-          runWeeklyDistanceMeters: 40000,
-          longRunDistanceMeters: 16000,
-          qualitySessionsPerWeek: 2,
-          runPlanStartWeek: 3,
-          createdAt: phaseStart,
-        ),
-        validFrom: phaseStart,
+        name: 'Acumulação',
+        templateKey: 'accumulation',
+        color: 0xFF00FF00,
+        fromWeek: 0,
+        weeks: [
+          PeriodizationTarget(
+            id: '',
+            phaseId: phaseId,
+            version: 0,
+            validFrom: phaseStart,
+            calories: 2400,
+            routineIds: [routine],
+            runPlanIds: ['plan-y'],
+            runSessionsPerWeek: 4,
+            runWeeklyDistanceMeters: 40000,
+            longRunDistanceMeters: 16000,
+            qualitySessionsPerWeek: 2,
+            runPlanStartWeek: 3,
+            createdAt: phaseStart,
+          ),
+        ],
       );
-
-      // A new version used to be written with only the nutrition/strength
-      // numbers, silently unlinking the routine and the running plan.
-      expect(saved.routineIds, [routine]);
-      expect(saved.runPlanIds, ['plan-y']);
-      expect(saved.runSessionsPerWeek, 4);
-      expect(saved.runPlanStartWeek, 3);
 
       final reread = await periodization.getEffectiveTarget(
         phaseId,
@@ -526,8 +527,28 @@ void main() {
     });
 
     test('rejects more quality sessions than total runs', () async {
-      expect(
-        () => seedPhase(runSessionsPerWeek: 2, qualitySessionsPerWeek: 4),
+      await expectLater(
+        periodization.createPlanWithPhases(
+          name: 'Base',
+          startDate: phaseStart,
+          phases: [
+            PeriodizationPhaseDraft(
+              name: 'Acumulação',
+              color: 0xFF00FF00,
+              startDate: phaseStart,
+              endDate: phaseEnd,
+              target: PeriodizationTarget(
+                id: '',
+                phaseId: '',
+                version: 0,
+                validFrom: phaseStart,
+                runSessionsPerWeek: 2,
+                qualitySessionsPerWeek: 4,
+                createdAt: phaseStart,
+              ),
+            ),
+          ],
+        ),
         throwsA(isA<PeriodizationValidationException>()),
       );
     });

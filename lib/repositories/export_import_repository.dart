@@ -164,8 +164,6 @@ class ExportImportRepository extends BaseRepository {
         'api_tokens',
         'runtime_permissions',
         'active_background_sessions',
-        'sleep_monitor_segments',
-        'sleep_stage_epochs',
         'ai_chat_threads',
         'ai_chat_messages',
         'ai_chat_thread_summaries',
@@ -241,10 +239,6 @@ class ExportImportRepository extends BaseRepository {
       if (await _tableExists(txn, 'user_goals')) {
         await txn.delete('user_goals');
       }
-      if (await _tableExists(txn, 'sleep_stage_epochs')) {
-        await txn.delete('sleep_stage_epochs');
-      }
-      await txn.delete('sleep_monitor_segments');
       await txn.delete('sleep_monitor_sessions');
       await txn.delete('sleep_entries');
       // Nutrition tables exist only on databases migrated past the
@@ -714,47 +708,6 @@ class ExportImportRepository extends BaseRepository {
   }
 
   // ------------------------------------------------------------------
-  // CSV export (read-only query, unchanged)
-  // ------------------------------------------------------------------
-
-  Future<List<Map<String, dynamic>>> exportWorkoutsCsvData({
-    String? exerciseId,
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    final db = await this.db;
-    var query = '''
-      SELECT w.date, e.name as exercise, ec.name as category,
-        s.weight, s.reps, s.distance, s.time_seconds,
-        s.is_warmup, s.rpe, s.comment as set_comment,
-        w.comment as workout_comment
-      FROM sets s
-      JOIN exercise_entries ee ON s.exercise_entry_id = ee.id
-      JOIN exercises e ON ee.exercise_id = e.id
-      LEFT JOIN exercise_categories ec ON e.category_id = ec.id
-      JOIN workouts w ON ee.workout_id = w.id
-      WHERE 1=1
-    ''';
-    final args = <dynamic>[];
-
-    if (exerciseId != null) {
-      query += ' AND e.id = ?';
-      args.add(exerciseId);
-    }
-    if (startDate != null) {
-      query += ' AND w.date >= ?';
-      args.add(startDate.toIso8601String().substring(0, 10));
-    }
-    if (endDate != null) {
-      query += ' AND w.date <= ?';
-      args.add(endDate.toIso8601String().substring(0, 10));
-    }
-
-    query += ' ORDER BY w.date DESC, s.order_index ASC';
-    return db.rawQuery(query, args);
-  }
-
-  // ------------------------------------------------------------------
   // Delete all user data (keeps seed categories & exercises)
   // ------------------------------------------------------------------
 
@@ -794,10 +747,6 @@ class ExportImportRepository extends BaseRepository {
       await txn.delete('exercise_entries');
       await txn.delete('workouts');
       await txn.delete('body_measurements');
-      if (await _tableExists(txn, 'sleep_stage_epochs')) {
-        await txn.delete('sleep_stage_epochs');
-      }
-      await txn.delete('sleep_monitor_segments');
       await txn.delete('sleep_monitor_sessions');
       await txn.delete('sleep_entries');
       if (await _tableExists(txn, 'traditional_alarms')) {

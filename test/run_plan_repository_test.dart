@@ -13,6 +13,7 @@ import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
+import 'support/run_plan_fixtures.dart';
 
 void main() {
   late Database database;
@@ -341,26 +342,6 @@ void main() {
       expect(steps.last.role, RunStepRole.warmup);
     });
 
-    test('replaceSteps swaps the whole block and renumbers', () async {
-      final plan = await seedPlan();
-      final session = await seedIntervalSession(plan.id);
-      await repository.replaceSteps(session.id, [
-        RunWorkoutStep(
-          id: '',
-          runPlanWorkoutId: session.id,
-          orderIndex: 9,
-          role: RunStepRole.steady,
-          metric: RunIntervalMetric.time,
-          value: 1800,
-        ),
-      ]);
-
-      final steps = await repository.getSteps(session.id);
-      expect(steps.length, 1);
-      expect(steps.single.orderIndex, 0);
-      expect(steps.single.value, 1800);
-    });
-
     test('deleting a step leaves the rest intact', () async {
       final plan = await seedPlan();
       final session = await seedIntervalSession(plan.id);
@@ -425,7 +406,7 @@ void main() {
     test('attaching an activity marks the scheduled run completed', () async {
       final plan = await seedPlan();
       final session = await seedIntervalSession(plan.id);
-      final scheduled = await repository.scheduleRun(
+      final scheduled = await scheduleRunFixture(repository, 
         date: DateTime(2026, 1, 6),
         runPlanId: plan.id,
         runPlanWorkoutId: session.id,
@@ -454,7 +435,7 @@ void main() {
       'deleting the activity clears the link but keeps the schedule',
       () async {
         final plan = await seedPlan();
-        final scheduled = await repository.scheduleRun(
+        final scheduled = await scheduleRunFixture(repository, 
           date: DateTime(2026, 1, 6),
           runPlanId: plan.id,
         );
@@ -484,7 +465,7 @@ void main() {
 
     test('a skipped run keeps its status', () async {
       final plan = await seedPlan();
-      final scheduled = await repository.scheduleRun(
+      final scheduled = await scheduleRunFixture(repository, 
         date: DateTime(2026, 1, 6),
         runPlanId: plan.id,
       );
@@ -501,7 +482,7 @@ void main() {
     test('deleting a plan cascades its scheduled runs', () async {
       final plan = await seedPlan();
       final session = await seedIntervalSession(plan.id);
-      await repository.scheduleRun(
+      await scheduleRunFixture(repository, 
         date: DateTime(2026, 1, 6),
         runPlanId: plan.id,
         runPlanWorkoutId: session.id,
@@ -716,7 +697,7 @@ void main() {
           dayOfWeek: 2,
         );
         // Planned three weeks out: running today is a different session.
-        await repository.scheduleRun(
+        await scheduleRunFixture(repository, 
           date: DateTime.now().add(const Duration(days: 21)),
           runPlanId: plan.id,
           runPlanWorkoutId: session.id,

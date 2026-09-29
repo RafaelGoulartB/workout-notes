@@ -16,7 +16,7 @@ extension _AiChatPersistence on AiChatService {
     final preview = firstUserText.length > 96
         ? '${firstUserText.substring(0, 93)}…'
         : firstUserText;
-    await _db.upsertAiChatThread(
+    await _db.aiChatRepo.upsertAiChatThread(
       id: id,
       title: resolvedTitle,
       createdAt: now,
@@ -47,7 +47,7 @@ extension _AiChatPersistence on AiChatService {
     if (id == null) return;
     try {
       final preview = _lastUserOrAssistantPreview();
-      await _db.upsertAiChatThread(
+      await _db.aiChatRepo.upsertAiChatThread(
         id: id,
         title: _state.activeThread?.title ?? 'Conversa',
         createdAt: _state.activeThread?.createdAt ?? DateTime.now(),
@@ -65,7 +65,7 @@ extension _AiChatPersistence on AiChatService {
             return _persistedMessageSignatures[messageId] != jsonEncode(row);
           })
           .toList(growable: false);
-      await _db.upsertAiChatMessages(id, rows);
+      await _db.aiChatRepo.upsertAiChatMessages(id, rows);
       for (final row in rows) {
         _persistedMessageSignatures[row['id'] as String] = jsonEncode(row);
       }
@@ -138,7 +138,7 @@ extension _AiChatPersistence on AiChatService {
         phase: AiTurnPhase.idle,
         phaseMessage: null,
       );
-      await _db.updateAiRoutineProposal(proposal.id, {
+      await _db.aiChatRepo.updateAiRoutineProposal(proposal.id, {
         'error_code': null,
         'error_message': null,
       });
@@ -149,7 +149,7 @@ extension _AiChatPersistence on AiChatService {
     } catch (_) {
       // The routine is already committed. Keep it applied and expose a retry
       // on the proposal card instead of risking a second mutation.
-      await _db.updateAiRoutineProposal(proposal.id, {
+      await _db.aiChatRepo.updateAiRoutineProposal(proposal.id, {
         'error_code': 'summary_pending',
         'error_message': 'Resumo da IA pendente.',
       });

@@ -295,39 +295,6 @@ class WorkoutRepository extends BaseRepository {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getWorkouts({
-    DateTime? startDate,
-    DateTime? endDate,
-    int? limit,
-    int? offset,
-  }) async {
-    final db = await this.db;
-    var query = 'SELECT * FROM workouts WHERE 1=1';
-    final args = <dynamic>[];
-
-    if (startDate != null) {
-      query += ' AND date >= ?';
-      args.add(startDate.toIso8601String().substring(0, 10));
-    }
-    if (endDate != null) {
-      query += ' AND date <= ?';
-      args.add(endDate.toIso8601String().substring(0, 10));
-    }
-
-    query += ' ORDER BY date DESC, start_time DESC';
-
-    if (limit != null) {
-      query += ' LIMIT ?';
-      args.add(limit);
-    }
-    if (offset != null) {
-      query += ' OFFSET ?';
-      args.add(offset);
-    }
-
-    return db.rawQuery(query, args);
-  }
-
   Future<List<Map<String, dynamic>>> getWorkoutsByMonth(
     int year,
     int month,
@@ -338,45 +305,6 @@ class WorkoutRepository extends BaseRepository {
       "SELECT * FROM workouts WHERE date LIKE ? ORDER BY date DESC",
       ['$year-$monthStr%'],
     );
-  }
-
-  /// Headline values of a month in one indexed range query. Only finished
-  /// workouts count (planned or abandoned sessions are ignored) and only
-  /// their completed, non-warm-up sets; volume is limited to strength
-  /// (anaerobic) exercises. Workouts without any completed set are still
-  /// counted as sessions.
-  Future<Map<String, dynamic>> getMonthlySummary(DateTime month) async {
-    final database = await db;
-    final start = DateTime(month.year, month.month, 1);
-    final end = DateTime(month.year, month.month + 1, 1);
-    final rows = await database.rawQuery(
-      '''
-      SELECT
-        COUNT(DISTINCT w.id) AS workout_count,
-        COALESCE(SUM(CASE
-          WHEN s.is_complete = 1 AND IFNULL(s.is_warmup, 0) = 0
-            AND IFNULL(c.energy_system, 'anaerobic') = 'anaerobic'
-          THEN COALESCE(s.weight, 0) * COALESCE(s.reps, 0) ELSE 0 END), 0)
-          AS total_volume,
-        COALESCE(SUM(CASE
-          WHEN s.is_complete = 1 AND IFNULL(s.is_warmup, 0) = 0
-          THEN COALESCE(s.distance, 0) ELSE 0 END), 0) AS cardio_distance,
-        COALESCE(SUM(CASE
-          WHEN s.is_complete = 1 AND IFNULL(s.is_warmup, 0) = 0
-          THEN COALESCE(s.time_seconds, 0) ELSE 0 END), 0) AS cardio_time
-      FROM workouts w
-      LEFT JOIN exercise_entries ee ON ee.workout_id = w.id
-      LEFT JOIN exercises e ON e.id = ee.exercise_id
-      LEFT JOIN exercise_categories c ON c.id = e.category_id
-      LEFT JOIN sets s ON s.exercise_entry_id = ee.id
-      WHERE w.end_time IS NOT NULL AND w.date >= ? AND w.date < ?
-      ''',
-      [
-        start.toIso8601String().substring(0, 10),
-        end.toIso8601String().substring(0, 10),
-      ],
-    );
-    return rows.first;
   }
 
   Future<Map<String, List<Map<String, dynamic>>>> getWorkoutCategoriesByDate(
@@ -451,9 +379,6 @@ class WorkoutRepository extends BaseRepository {
       final sets = await getExerciseSets(entry['id'] as String);
       inputs.add(
         WorkoutStatsExerciseInput(
-          exerciseId: entry['exercise_id'] as String? ?? '',
-          name: entry['exercise_name'] as String? ?? '',
-          localeKey: entry['exercise_locale_key'] as String?,
           categoryId: entry['category_id'] as String?,
           categoryName: entry['category_name'] as String? ?? '',
           categoryColor: Color(entry['category_color'] as int? ?? 0xFF757575),
@@ -479,27 +404,6 @@ class WorkoutRepository extends BaseRepository {
       exercises: inputs,
     );
   }
-
-  Future<WorkoutStatsComparison?> getWorkoutStatsComparison(
-    String workoutId,
-  ) async {
-    final db = await this.db;
-    final current = await getWorkoutStats(workoutId);
-    if (current == null) return null;
-
-    final comparableWorkoutId = await _findComparableWorkoutId(db, workoutId);
-    if (comparableWorkoutId == null) return null;
-
-    final previous = await getWorkoutStats(comparableWorkoutId);
-    if (previous == null) return null;
-
-    return WorkoutStatsComparison(current: current, previous: previous);
-  }
-
-  Future<String?> _findComparableWorkoutId(
-    Database db,
-    String workoutId,
-  ) async => (await _findComparableWorkout(db, workoutId))?.id;
 
   /// The previous finished session to compare [workoutId] against: the same
   /// routine day when known, else the same routine, else the finished workout

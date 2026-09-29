@@ -18,7 +18,6 @@ import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_history_row.dart';
 import 'package:workout_notes/widgets/sleep/sleep_last_night_card.dart';
-import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_trend_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_week_card.dart';
@@ -113,7 +112,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   Future<void> _load() async {
     if (mounted) setState(() => _isLoading = true);
     try {
-      await _monitorRepository.repairSleepEntriesFromSessions();
       final today = _dateOnly(DateTime.now());
       final results = await Future.wait<Object>([
         _repository.getEntries(limit: _historyPageSize + 1),
@@ -284,14 +282,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
             goalMinutes: _sleepGoalMinutes,
             onTap: () => _showDetails(latest),
           ),
-          if (_latestNight?.stages.isNotEmpty ?? false) ...[
-            const SizedBox(height: 12),
-            SleepStageCard(
-              session: latestSession!,
-              stages: _latestNight!.stages,
-              compact: true,
-            ),
-          ],
         ],
         RunSectionHeader(
           '${loc.sleepWeekTitle} · ${SleepUi.dayMonth(weeklyDays.first)} – '

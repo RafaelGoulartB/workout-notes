@@ -35,9 +35,6 @@ class AiSleepToolService {
 
     final entry = entries.first;
     final session = await _sessionForEntry(entry['id'] as String);
-    final epochSummary = session == null
-        ? null
-        : await _stageEpochSummary(session['id'] as String);
     final duration = _duration(entry, session);
     final timeInBed =
         (entry['time_in_bed_minutes'] ?? session?['time_in_bed_minutes'])
@@ -85,7 +82,6 @@ class AiSleepToolService {
             : null,
         'confidence': session?['stage_confidence'],
         'algorithmVersion': session?['stage_algorithm_version'],
-        'epochSummary': epochSummary,
       },
       'monitoring': session == null
           ? null
@@ -196,45 +192,6 @@ class AiSleepToolService {
       limit: 1,
     );
     return rows.isEmpty ? null : rows.first;
-  }
-
-  Future<Map<String, dynamic>> _stageEpochSummary(String sessionId) async {
-    final database = await db.database;
-    final rows = await database.rawQuery(
-      '''
-      SELECT
-        COUNT(*) epoch_count,
-        SUM(CASE WHEN stage != 'unknown' THEN 1 ELSE 0 END) known_epoch_count,
-        SUM(CASE WHEN stage = 'awake' THEN duration_seconds ELSE 0 END) awake_seconds,
-        SUM(CASE WHEN stage = 'sleeping' THEN duration_seconds ELSE 0 END) sleeping_seconds,
-        SUM(CASE WHEN stage = 'deep' THEN duration_seconds ELSE 0 END) deep_seconds,
-        SUM(CASE WHEN stage = 'unknown' THEN duration_seconds ELSE 0 END) unknown_seconds,
-        AVG(CASE WHEN stage != 'unknown' THEN confidence END) average_confidence
-      FROM sleep_stage_epochs
-      WHERE session_id = ?
-      ''',
-      [sessionId],
-    );
-    final row = rows.first;
-    final total = (row['epoch_count'] as num?)?.toInt() ?? 0;
-    final known = (row['known_epoch_count'] as num?)?.toInt() ?? 0;
-    double? minutes(String key) {
-      final seconds = (row[key] as num?)?.toDouble();
-      return seconds == null ? null : _round(seconds / 60);
-    }
-
-    return {
-      'epochCount': total,
-      'knownEpochCount': known,
-      'coveragePct': total == 0 ? 0.0 : _round(known / total * 100),
-      'awakeMinutes': minutes('awake_seconds'),
-      'sleepingMinutes': minutes('sleeping_seconds'),
-      'deepSleepMinutes': minutes('deep_seconds'),
-      'unknownMinutes': minutes('unknown_seconds'),
-      'averageConfidence': _roundOrNull(
-        (row['average_confidence'] as num?)?.toDouble(),
-      ),
-    };
   }
 
   Map<String, dynamic> _historyNight(

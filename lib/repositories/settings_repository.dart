@@ -34,8 +34,4 @@ class SettingsRepository extends BaseRepository {
     final val = await getSetting('distance_unit');
     return val != 'mi';
   }
-
-  Future<void> setDistanceUnitKm(bool isKm) async {
-    await setSetting('distance_unit', isKm ? 'km' : 'mi');
-  }
 }

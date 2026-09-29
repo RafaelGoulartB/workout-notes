@@ -801,7 +801,7 @@ class AiChatService extends ChangeNotifier {
     if (threadId == null) return null;
     Map<String, dynamic>? existing;
     try {
-      existing = await _db.getAiChatThreadSummary(threadId);
+      existing = await _db.aiChatRepo.getAiChatThreadSummary(threadId);
     } catch (_) {}
     final existingSummary = existing?['summary'] as String?;
     final existingThrough = existing?['through_message_id'] as String?;
@@ -848,7 +848,7 @@ class AiChatService extends ChangeNotifier {
       if (text == null || text.isEmpty) return existingSummary;
       final summary = TextSanitizer.sanitize(text).trim();
       if (summary.isEmpty) return existingSummary;
-      await _db.upsertAiChatThreadSummary(
+      await _db.aiChatRepo.upsertAiChatThreadSummary(
         threadId: threadId,
         summary: summary,
         throughMessageId: dropped.last.id,

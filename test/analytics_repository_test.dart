@@ -113,7 +113,7 @@ void main() {
   });
 
   test(
-    'volume aggregates count finished workouts and completed sets only',
+    'overview counts finished workouts and completed sets only',
     () async {
       await _sets(db, 'w1', 'bench', [
         _set(100, 10),
@@ -121,51 +121,10 @@ void main() {
       ]);
       await _sets(db, 'w2', 'bench', [_set(100, 10)]);
 
-      final start = DateTime(2026, 9, 1);
-      final end = DateTime(2026, 9, 30);
-      final byCategory = await repo.getAnaerobicVolumeByCategory(
-        start,
-        end,
-        bySets: false,
-      );
-      expect(byCategory.single['volume'], 1000);
-      expect(byCategory.single['sets_count'], 1);
-
-      final top = await repo.getAnaerobicTopExercises(start, end, bySets: true);
-      expect(top.single['volume'], 1);
-
-      final report = await repo.getMonthlyReport(2026, 9);
-      expect(report['workout_count'], 1);
-      expect(report['total_sets'], 1);
-      expect(report['total_volume'], 1000.0);
-
-      final trend = await repo.getAnaerobicVolumeTrend(
-        end,
-        AnaerobicTrendBucket.month,
-        bySets: false,
-      );
-      expect(trend.last['volume'], 1000.0);
-
-      final heat = await repo.getYearlyHeatmapData(2026);
-      expect(heat.keys, ['2026-09-01']);
-      final dates = await repo.getWorkoutDatesInRange(DateTime(2026, 1, 1));
-      expect(dates, hasLength(1));
-
       final overview = await DatabaseHelper.instance.analyticsRepo
           .getWorkoutOverviewStats();
       expect(overview['total_workouts'], 1);
       expect(overview['total_sets'], 1);
-    },
-  );
-
-  test(
-    'personal records use only completed sets of finished workouts',
-    () async {
-      await _sets(db, 'w1', 'bench', [_set(100, 5), _set(140, 3, done: false)]);
-      await _sets(db, 'w2', 'bench', [_set(150, 1)]);
-      final records = await repo.getPersonalRecords();
-      expect(records.single['best_weight'], 100.0);
-      expect(records.single['best_reps'], 5);
     },
   );
 }

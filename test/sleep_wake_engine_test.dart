@@ -2,13 +2,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:workout_notes/models/sleep_monitor_segment.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_type.dart';
-import 'package:workout_notes/services/sleep_stage_engine.dart';
 import 'package:workout_notes/services/sleep_stage_analysis_service.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
 import 'support/sleep_bedside_fixture.dart';
 
 void main() {
-  const engine = SleepStageEngine();
+  const engine = SleepWakeEngine();
 
   SleepMonitorSegment ambiguous(int index) => SleepMonitorSegment.fromMap({
     ...bedsideSegment(index).toMap(),
