@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import com.workoutnotes.workout_notes.MainActivity
+import com.workoutnotes.workout_notes.common.PendingIntentFlags
 
 object SleepAlarmScheduler {
     const val ACTION_FIRE = "com.workoutnotes.workout_notes.sleep.ALARM_FIRE"
@@ -131,7 +132,7 @@ object SleepAlarmScheduler {
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             },
-            PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
+            PendingIntentFlags.UPDATE_IMMUTABLE,
         )
         manager.setAlarmClock(
             AlarmManager.AlarmClockInfo(alarmAtMillis, showIntent),
@@ -436,12 +437,8 @@ object SleepAlarmScheduler {
     }
 
     private fun preferences(context: Context) =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            context.createDeviceProtectedStorageContext()
-                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        } else {
-            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        }
+        context.createDeviceProtectedStorageContext()
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private fun fireIntent(
         context: Context,
@@ -465,13 +462,6 @@ object SleepAlarmScheduler {
             putExtra(EXTRA_MISSION_SALT, missionSalt)
             putExtra(EXTRA_MISSION_FORMAT, missionFormat)
         },
-        PendingIntent.FLAG_UPDATE_CURRENT or immutableFlag(),
+        PendingIntentFlags.UPDATE_IMMUTABLE,
     )
-
-    private fun immutableFlag(): Int =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_IMMUTABLE
-        } else {
-            0
-        }
 }

@@ -4,17 +4,12 @@ import android.app.Notification
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.MediaPlayer
-import android.media.RingtoneManager
 import android.os.Build
 import android.os.IBinder
-import android.os.VibrationEffect
-import android.os.Vibrator
-import android.os.VibratorManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.workoutnotes.workout_notes.R
+import com.workoutnotes.workout_notes.common.AlarmRinger
 
 /**
  * Rings (sound + vibration) for a medication dose that was not confirmed in
@@ -52,8 +47,7 @@ class MedicationAlarmService : Service() {
         }
     }
 
-    private var player: MediaPlayer? = null
-    private var vibrator: Vibrator? = null
+    private val ringer by lazy { AlarmRinger(this) }
     private var ringingSlotId: String? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -76,10 +70,7 @@ class MedicationAlarmService : Service() {
         }
         ringingSlotId = slot.id
         startForeground(NOTIFICATION_ID, notification(slot))
-        if (player == null) {
-            startSound()
-            startVibration()
-        }
+        if (!ringer.hasPlayer) ringer.start()
         return START_STICKY
     }
 
@@ -118,52 +109,8 @@ class MedicationAlarmService : Service() {
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .build()
 
-    private fun startSound() {
-        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-            ?: return
-        try {
-            player = MediaPlayer().apply {
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build(),
-                )
-                setDataSource(this@MedicationAlarmService, uri)
-                isLooping = true
-                prepare()
-                start()
-            }
-        } catch (_: Throwable) {
-            player?.release()
-            player = null
-        }
-    }
-
-    @Suppress("DEPRECATION")
-    private fun startVibration() {
-        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            getSystemService(VibratorManager::class.java).defaultVibrator
-        } else {
-            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-        }
-        val pattern = longArrayOf(0, 700, 300, 700, 1200)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
-        } else {
-            vibrator?.vibrate(pattern, 0)
-        }
-    }
-
     private fun stopRinging() {
-        try {
-            player?.stop()
-        } catch (_: Throwable) { }
-        player?.release()
-        player = null
-        vibrator?.cancel()
-        vibrator = null
+        ringer.stop()
         ringingSlotId = null
         stopForeground(STOP_FOREGROUND_REMOVE)
     }
