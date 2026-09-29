@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/services/sleep_wake_engine.dart';
-import 'package:workout_notes/services/sleep_stage_engine.dart';
 
 /// Opt-in local aggregate archive. Runs after import, never in the capture loop.
 class SleepDiagnosticStore {
@@ -64,13 +63,8 @@ class SleepDiagnosticStore {
         'schema_version': 1,
         'engine_version':
             resultSummary?['stage_algorithm_version'] ??
-            (SleepWakeEngine.supportsVersion(session['algorithm_version'])
-                ? SleepWakeEngine.algorithmVersion
-                : SleepStageEngine.algorithmVersion),
-        'parameters':
-            SleepWakeEngine.supportsVersion(session['algorithm_version'])
-            ? SleepWakeEngine.parameters
-            : SleepStageEngine.parameters,
+            SleepWakeEngine.algorithmVersion,
+        'parameters': SleepWakeEngine.parameters,
         'result_summary': resultSummary,
         'session': session,
         'segments': spool['segments'] ?? [],

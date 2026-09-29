@@ -164,8 +164,6 @@ class ExportImportRepository extends BaseRepository {
         'api_tokens',
         'runtime_permissions',
         'active_background_sessions',
-        'sleep_monitor_segments',
-        'sleep_stage_epochs',
         'ai_chat_threads',
         'ai_chat_messages',
         'ai_chat_thread_summaries',
@@ -241,10 +239,6 @@ class ExportImportRepository extends BaseRepository {
       if (await _tableExists(txn, 'user_goals')) {
         await txn.delete('user_goals');
       }
-      if (await _tableExists(txn, 'sleep_stage_epochs')) {
-        await txn.delete('sleep_stage_epochs');
-      }
-      await txn.delete('sleep_monitor_segments');
       await txn.delete('sleep_monitor_sessions');
       await txn.delete('sleep_entries');
       // Nutrition tables exist only on databases migrated past the
@@ -753,10 +747,6 @@ class ExportImportRepository extends BaseRepository {
       await txn.delete('exercise_entries');
       await txn.delete('workouts');
       await txn.delete('body_measurements');
-      if (await _tableExists(txn, 'sleep_stage_epochs')) {
-        await txn.delete('sleep_stage_epochs');
-      }
-      await txn.delete('sleep_monitor_segments');
       await txn.delete('sleep_monitor_sessions');
       await txn.delete('sleep_entries');
       if (await _tableExists(txn, 'traditional_alarms')) {

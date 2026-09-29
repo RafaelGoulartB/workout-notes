@@ -88,7 +88,6 @@ class TestDataGenerator {
     for (final table in <String>[
       // Periodization children -> parent
       'periodization_checkins',
-      'phase_routine_links',
       'phase_targets',
       'periodization_phases',
       'periodization_plans',
@@ -108,10 +107,8 @@ class TestDataGenerator {
       'run_plans',
       'run_track_points',
       'run_activities',
-      // Sleep monitor tree (sessions/epochs/segments cascade from sleep_entries,
-      // but delete explicitly for FK-off safety)
-      'sleep_stage_epochs',
-      'sleep_monitor_segments',
+      // Sleep monitor tree (sessions cascade from sleep_entries, but delete
+      // explicitly for FK-off safety)
       'sleep_monitor_sessions',
       'sleep_entries',
       // Nutrition diary

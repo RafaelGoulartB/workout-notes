@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
-import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
@@ -25,7 +24,6 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
   final _repository = SleepMonitorRepository();
   SleepMonitorSession? _session;
   SleepEntry? _entry;
-  List<SleepStageEpoch> _stages = const [];
   bool _isLoading = true;
 
   @override
@@ -37,23 +35,16 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
   Future<void> _load() async {
     final session = await _repository.getSession(widget.sessionId);
     SleepEntry? entry;
-    var stages = const <SleepStageEpoch>[];
-    if (session != null) {
-      // Both are extras: older databases may lack the tables.
+    if (session != null && session.sleepEntryId != null) {
+      // The entry is an extra: a failed read must not hide the session.
       try {
-        stages = await _repository.getStageEpochs(session.id);
+        entry = await _repository.getSleepEntry(session.sleepEntryId!);
       } catch (_) {}
-      if (session.sleepEntryId != null) {
-        try {
-          entry = await _repository.getSleepEntry(session.sleepEntryId!);
-        } catch (_) {}
-      }
     }
     if (!mounted) return;
     setState(() {
       _session = session;
       _entry = entry;
-      _stages = stages;
       _isLoading = false;
     });
   }
@@ -165,11 +156,7 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
           const SizedBox(height: 12),
           RunMetricGrid(children: metrics),
           const SizedBox(height: 12),
-          SleepStageCard(
-            session: session,
-            stages: _stages,
-            showNightMetrics: false,
-          ),
+          SleepStageCard(session: session, showNightMetrics: false),
           if (comment != null && comment.isNotEmpty) ...[
             const SizedBox(height: 12),
             RunSectionCard(
