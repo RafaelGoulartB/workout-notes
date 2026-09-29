@@ -14,6 +14,9 @@ import 'package:workout_notes/repositories/run_repository.dart';
 /// GPS dependency. Elapsed values are derived from timestamps so they remain
 /// correct when Flutter pauses periodic timers while the app is backgrounded.
 /// The distance is typed on the review screen.
+///
+/// The name predates the treadmill: it started as the bike timer and now
+/// serves every indoor activity (`CardioActivityType.isIndoor`).
 class StationaryBikeTrackingService extends ChangeNotifier {
   static final StationaryBikeTrackingService instance =
       StationaryBikeTrackingService._();

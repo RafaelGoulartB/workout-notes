@@ -39,10 +39,6 @@ class RunPlanProgress {
     this.plannedSessions = 0,
   });
 
-  /// Sessions settled one way or the other — the denominator users think in is
-  /// still [totalSessions], but skipping should not stall the bar forever.
-  int get resolvedSessions => completedSessions + skippedSessions;
-
   /// 0..1 completion against the whole plan. 0 when the plan has no sessions.
   double get fraction => totalSessions < 1
       ? 0

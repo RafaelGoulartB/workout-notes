@@ -100,20 +100,6 @@ class RunVoiceController(
         return defaults
     }
 
-    fun configure(
-        settings: RunVoiceSettings,
-        goal: RunSessionGoal,
-        intervalsOn: Boolean,
-        planSteps: List<RunWorkoutStepNative> = emptyList(),
-    ) {
-        this.settings = settings
-        refreshVoiceLanguage()
-        this.goal = goal
-        this.intervalsOn = intervalsOn
-        intervalEngine.configure(settings.interval)
-        setPlanSteps(planSteps)
-    }
-
     /** Loads a structured session. Empty clears it and falls back to presets. */
     fun setPlanSteps(steps: List<RunWorkoutStepNative>) {
         planSteps = steps

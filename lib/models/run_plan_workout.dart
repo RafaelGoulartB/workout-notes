@@ -296,8 +296,6 @@ class RunExpandedStep {
     required this.repTotal,
     required this.sequence,
   });
-
-  bool get isRepeated => repTotal > 1;
 }
 
 const Object _sentinel = Object();
