@@ -16,6 +16,7 @@ import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'support/periodization_fixtures.dart';
 import 'support/run_plan_fixtures.dart';
+import 'support/test_db.dart';
 
 /// Covers how the periodization plan resolves "which run is due today" and how
 /// the running targets feed phase adherence.
@@ -28,10 +29,7 @@ void main() {
   final phaseStart = DateTime(2026, 1, 5);
   final phaseEnd = DateTime(2026, 2, 1);
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

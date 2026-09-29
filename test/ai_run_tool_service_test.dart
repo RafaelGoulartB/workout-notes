@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:workout_notes/models/run_track_point.dart';
 import 'package:workout_notes/services/ai_tool_registry.dart';
 
 import 'support/ai_test_db.dart';
+import 'support/run_route_fixture.dart';
 
 void main() {
   late Database db;
@@ -70,24 +72,30 @@ void main() {
         movingSeconds: 300,
         planWorkoutId: 'session-1',
       );
-      await db.insert('run_track_points', {
-        'id': 'point-1',
-        'activity_id': 'run-detail',
-        'seq': 0,
-        'lat': -23.0,
-        'lng': -46.0,
-        'altitude': 100.0,
-        'recorded_at': now.toIso8601String(),
-      });
-      await db.insert('run_track_points', {
-        'id': 'point-2',
-        'activity_id': 'run-detail',
-        'seq': 1,
-        'lat': -23.001,
-        'lng': -46.001,
-        'altitude': 112.0,
-        'recorded_at': now.add(const Duration(minutes: 5)).toIso8601String(),
-      });
+      await insertCompactRoute(db, 'run-detail', [
+        RunTrackPoint(
+          id: 'point-1',
+          activityId: 'run-detail',
+          seq: 0,
+          lat: -23.0,
+          lng: -46.0,
+          altitude: 100.0,
+          accuracy: null,
+          speed: null,
+          recordedAt: now,
+        ),
+        RunTrackPoint(
+          id: 'point-2',
+          activityId: 'run-detail',
+          seq: 1,
+          lat: -23.001,
+          lng: -46.001,
+          altitude: 112.0,
+          accuracy: null,
+          speed: null,
+          recordedAt: now.add(const Duration(minutes: 5)),
+        ),
+      ]);
       await _insertPlanTree(db, now);
       await db.insert('scheduled_runs', {
         'id': 'scheduled-1',

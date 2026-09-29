@@ -8,16 +8,14 @@ import 'package:workout_notes/models/periodization_target.dart';
 import 'package:workout_notes/repositories/nutrition_repository.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'support/test_db.dart';
 
 void main() {
   late Database database;
   late PeriodizationRepository periodization;
   late NutritionRepository nutrition;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

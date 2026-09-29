@@ -10,15 +10,13 @@ import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_post_run_review_screen.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
+import 'support/test_db.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

@@ -4,12 +4,10 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:workout_notes/database/database_schema.dart';
 import 'package:workout_notes/models/body_measurement_types.dart';
 import 'package:workout_notes/utils/body_tracker_utils.dart';
+import 'support/test_db.dart';
 
 void main() {
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   test('v42 adds the diastolic column to existing body measurements', () async {
     final db = await databaseFactoryFfi.openDatabase(

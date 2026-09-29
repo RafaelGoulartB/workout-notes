@@ -12,6 +12,7 @@ import 'package:workout_notes/models/run_workout_step.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/run_plan_workout_editor_screen.dart';
 import 'package:workout_notes/widgets/run/run_plan_ui.dart';
+import 'support/test_db.dart';
 
 Widget _app(Widget child) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -24,10 +25,7 @@ void main() {
   late Database database;
   late RunPlanRepository repo;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

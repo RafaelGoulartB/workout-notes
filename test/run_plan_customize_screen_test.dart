@@ -12,6 +12,7 @@ import 'package:workout_notes/screens/run/run_plan_customize_screen.dart';
 import 'package:workout_notes/services/run_plan_history.dart';
 import 'package:workout_notes/services/run_plan_templates.dart';
 import 'package:workout_notes/widgets/run/run_plan_volume_sparkline.dart';
+import 'support/test_db.dart';
 
 Widget _app({RunPlanTemplate? template, RunPlanHistoryInsights? history}) =>
     MaterialApp(
@@ -319,10 +320,7 @@ void main() {
     late Database database;
     late RunPlanRepository repo;
 
-    setUpAll(() {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
-    });
+    setUpAll(initSqfliteFfiForTests);
 
     setUp(() async {
       database = await databaseFactory.openDatabase(

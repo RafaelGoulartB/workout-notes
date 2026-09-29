@@ -12,6 +12,7 @@ import 'package:workout_notes/periodization/phase_seed.dart';
 import 'package:workout_notes/periodization/phase_week_plan.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/services/effective_nutrition_goal_service.dart';
+import 'support/test_db.dart';
 
 /// The planning redesign: chained phases, template week (training vs rest
 /// days), per-week adjustments and the editor controller.
@@ -22,10 +23,7 @@ void main() {
   // A Monday, so phase weeks line up with calendar weeks.
   final start = DateTime(2026, 1, 5);
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

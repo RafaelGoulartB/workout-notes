@@ -9,6 +9,7 @@ import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/services/run_today_service.dart';
+import 'support/test_db.dart';
 
 // 2026-08-19 is a Wednesday.
 final _wednesday = DateTime(2026, 8, 19);
@@ -297,10 +298,7 @@ void main() {
     late RunPlanRepository plans;
     late RunTodayService service;
 
-    setUpAll(() {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
-    });
+    setUpAll(initSqfliteFfiForTests);
 
     setUp(() async {
       database = await databaseFactory.openDatabase(

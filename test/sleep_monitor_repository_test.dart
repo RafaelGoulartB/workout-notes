@@ -7,6 +7,7 @@ import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
 import 'package:workout_notes/repositories/sleep_repository.dart';
 import 'support/sleep_bedside_fixture.dart';
+import 'support/test_db.dart';
 
 void main() {
   late Database database;
@@ -190,10 +191,7 @@ void main() {
     },
   );
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

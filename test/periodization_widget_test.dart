@@ -12,6 +12,7 @@ import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/screens/workout/periodization_home_screen.dart';
 import 'package:workout_notes/screens/workout/periodization_phase_editor_screen.dart';
 import 'package:workout_notes/screens/workout/periodization_plan_editor_screen.dart';
+import 'support/test_db.dart';
 
 Widget _app(Widget home) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -23,10 +24,7 @@ Widget _app(Widget home) => MaterialApp(
 void main() {
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

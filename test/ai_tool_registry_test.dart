@@ -403,6 +403,12 @@ void main() {
 
   test('get_workout_detail returns exercise with sets', () async {
     final now = DateTime.now().toIso8601String();
+    await db.insert('exercise_categories', {
+      'id': 'legs',
+      'name': 'Legs',
+      'color': 0xFF2196F3,
+      'order_index': 0,
+    });
     await db.insert('exercises', {
       'id': 'sq',
       'name': 'Agachamento',

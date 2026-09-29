@@ -24,6 +24,7 @@ import 'package:workout_notes/screens/workout/nutrition_progress_screen.dart';
 import 'package:workout_notes/screens/workout/nutrition_replicate_day_dialog.dart';
 import 'package:workout_notes/services/nutrition_gateway.dart';
 import 'package:workout_notes/utils/nutrition_conversion.dart';
+import 'support/test_db.dart';
 
 Widget _app(Widget child) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -266,10 +267,7 @@ void main() {
   late Database database;
   late NutritionRepository repository;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

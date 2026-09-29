@@ -3,14 +3,12 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/services/sleep_goal_service.dart';
+import 'support/test_db.dart';
 
 void main() {
   late Database database;
 
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   setUp(() async {
     database = await databaseFactory.openDatabase(

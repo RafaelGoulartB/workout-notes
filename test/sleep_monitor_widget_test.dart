@@ -9,6 +9,7 @@ import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_monitor_state.dart';
 import 'package:workout_notes/screens/workout/sleep_monitor_result_screen.dart';
 import 'package:workout_notes/screens/workout/sleep_monitor_screen.dart';
+import 'support/test_db.dart';
 
 Widget _localized(Widget child) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -17,10 +18,7 @@ Widget _localized(Widget child) => MaterialApp(
 );
 
 void main() {
-  setUpAll(() {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  });
+  setUpAll(initSqfliteFfiForTests);
 
   test('active elapsed time keeps advancing after the last native event', () {
     final now = DateTime.now();
