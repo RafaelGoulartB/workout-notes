@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_plan.dart';
+import 'package:workout_notes/models/run_plan_template.dart';
 import 'package:workout_notes/repositories/run_plan_repository.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_controller.dart';
 import 'package:workout_notes/screens/run/plan_wizard/run_plan_wizard_days_step.dart';

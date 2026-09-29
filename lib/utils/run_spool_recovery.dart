@@ -1,3 +1,5 @@
+import 'package:workout_notes/utils/run_formatters.dart';
+
 /// Helpers to finalize interrupted native run spools before SQLite import.
 class RunSpoolRecovery {
   /// Marks an in-progress spool as completed and reconciles duration fields.
@@ -56,7 +58,10 @@ class RunSpoolRecovery {
     final distance = (activity['distance_meters'] as num?)?.toDouble() ?? 0;
     final movingFinal = (activity['moving_time_seconds'] as num?)?.toInt() ?? 0;
     if (distance >= 1 && movingFinal > 0) {
-      activity['avg_pace_sec_per_km'] = movingFinal / (distance / 1000.0);
+      activity['avg_pace_sec_per_km'] = RunFormatters.paceSecondsPerKm(
+        distance,
+        movingFinal,
+      );
     }
     _closeLastLap(activity, distance: distance, movingSeconds: movingFinal);
   }
@@ -85,9 +90,7 @@ class RunSpoolRecovery {
         'start_distance_meters': startDistance,
         'distance_meters': lapDistance,
         'duration_seconds': lapSeconds,
-        'pace_sec_per_km': lapDistance < 1 || lapSeconds <= 0
-            ? null
-            : lapSeconds / (lapDistance / 1000.0),
+        'pace_sec_per_km': RunFormatters.paceOrNull(lapDistance, lapSeconds),
       },
     ];
     activity['lap_start_distance_meters'] = distance;

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/utils/run_fitness_analytics.dart';
+import 'package:workout_notes/utils/heat_levels.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 
 /// GitHub-style year calendar: one square per day, shaded by the distance run
@@ -68,7 +68,7 @@ class _RunHeatmapState extends State<RunHeatmap> {
     final dec31 = DateTime(widget.year, 12, 31);
     final gridEnd = dec31.add(Duration(days: 7 - dec31.weekday));
     _weeks = (gridEnd.difference(_gridStart).inDays + 1) ~/ 7;
-    _thresholds = RunFitnessAnalytics.heatThresholds(widget.daily.values);
+    _thresholds = heatThresholds(widget.daily.values);
   }
 
   void _scrollToToday() {
@@ -306,7 +306,7 @@ class _HeatmapPainter extends CustomPainter {
           radius,
         );
         final meters = daily[date] ?? 0;
-        final level = RunFitnessAnalytics.heatLevel(meters, thresholds);
+        final level = heatLevel(meters, thresholds);
         canvas.drawRRect(rect, Paint()..color = levelColors[level]);
         if (date.isAfter(todayOnly)) {
           canvas.drawRRect(

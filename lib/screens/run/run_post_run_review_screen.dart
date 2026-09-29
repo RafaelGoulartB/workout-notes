@@ -114,11 +114,16 @@ class _RunPostRunReviewScreenState extends State<RunPostRunReviewScreen> {
     _completePlannedWorkout = _hasPlannedWorkout && !_isTooShort;
     _route = RunRouteSketch.parse(activity.polylineSummary);
     _points = activity.isRun ? _draft.trackPoints : const [];
+    final profile = RunTrackProfile.fromPoints(_points);
     _analytics = RunPaceAnalytics.fromTrackPoints(
       _points,
       activityAvgPaceSecPerKm: activity.avgPaceSecPerKm,
+      profile: profile,
     );
-    _elevation = RunElevationProfile.fromTrackPoints(_points);
+    _elevation = RunElevationProfile.fromTrackPoints(
+      _points,
+      profile: profile,
+    );
     _loadContext();
   }
 

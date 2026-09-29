@@ -4,7 +4,8 @@ import 'package:uuid/uuid.dart';
 import 'package:workout_notes/models/run_lap.dart';
 import 'package:workout_notes/models/run_split.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
-import 'package:workout_notes/utils/run_lap_log.dart';
+import 'package:workout_notes/dev_tools/run_lap_log.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// Pure debug GPS path generator. Not used in release builds.
 class RunDebugSimulator {
@@ -134,7 +135,7 @@ class RunDebugSimulator {
     if (partialMeters < 0.5 && distanceMeters >= 1000) return null;
     final duration = math.max(0, movingSeconds - _lastSplitMovingSeconds);
     final pace = partialMeters >= 1
-        ? duration / (partialMeters / 1000.0)
+        ? RunFormatters.paceSecondsPerKm(partialMeters, duration)
         : null;
     return RunSplit(
       km: completedSplits.length + 1,
@@ -148,14 +149,11 @@ class RunDebugSimulator {
   double? get currentPaceSecPerKm {
     // Prefer the latest second so the live sheet reflects variance.
     if (_instantPaceSecPerKm != null) return _instantPaceSecPerKm;
-    if (distanceMeters < 1 || movingSeconds <= 0) return null;
-    return movingSeconds / (distanceMeters / 1000.0);
+    return RunFormatters.paceOrNull(distanceMeters, movingSeconds);
   }
 
-  double? get avgPaceSecPerKm {
-    if (distanceMeters < 1 || movingSeconds <= 0) return null;
-    return movingSeconds / (distanceMeters / 1000.0);
-  }
+  double? get avgPaceSecPerKm =>
+      RunFormatters.paceOrNull(distanceMeters, movingSeconds);
 
   /// Marks a manual lap at the simulated distance / moving time.
   RunLap? markLap() =>

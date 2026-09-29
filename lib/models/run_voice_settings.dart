@@ -11,13 +11,6 @@ enum RunVoiceLanguage {
     RunVoiceLanguage.english => 'en',
   };
 
-  String get localeTag => switch (this) {
-    RunVoiceLanguage.portuguese => 'pt-BR',
-    RunVoiceLanguage.app || RunVoiceLanguage.english => 'en-US',
-  };
-
-  bool get isPortuguese => this == RunVoiceLanguage.portuguese;
-
   RunVoiceLanguage resolve(String? appLocale) {
     if (this != RunVoiceLanguage.app) return this;
     return appLocale?.toLowerCase().startsWith('pt') == true

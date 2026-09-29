@@ -7,7 +7,9 @@ import 'package:workout_notes/repositories/run_insights_repository.dart';
 import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/run/run_gear_screen.dart';
+import 'package:workout_notes/utils/run_calendar_stats.dart';
 import 'package:workout_notes/utils/run_fitness_analytics.dart';
+import 'package:workout_notes/utils/run_training_load_analytics.dart';
 import 'package:workout_notes/widgets/empty_state_placeholder.dart';
 import 'package:workout_notes/widgets/run/insights/run_insights_fitness_sections.dart';
 import 'package:workout_notes/widgets/run/insights/run_insights_year_sections.dart';
@@ -92,23 +94,23 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
     }
     if (!mounted) return;
 
-    final years = RunFitnessAnalytics.availableYears(rows, now: now);
+    final years = RunCalendarStats.availableYears(rows, now: now);
     setState(() {
       _today = now;
       _activities = rows;
       _estimate = estimate;
       _evolution = RunFitnessAnalytics.vdotByMonth(rows, now: now);
-      _load = RunFitnessAnalytics.trainingLoad(rows, now: now, zones: zones);
+      _load = RunTrainingLoadAnalytics.trainingLoad(rows, now: now, zones: zones);
       _intensity = zones == null
           ? null
-          : RunFitnessAnalytics.intensityDistribution(
+          : RunTrainingLoadAnalytics.intensityDistribution(
               rows,
               zones: zones,
               splits: splits,
               now: now,
             );
-      _consistency = RunFitnessAnalytics.consistency(rows, now: now);
-      _effort = RunFitnessAnalytics.weeklyEffort(rows, now: now);
+      _consistency = RunCalendarStats.consistency(rows, now: now);
+      _effort = RunTrainingLoadAnalytics.weeklyEffort(rows, now: now);
       _shoes = shoes;
       _years = years;
       if (!years.contains(_year)) _year = years.first;
@@ -120,22 +122,22 @@ class _RunInsightsScreenState extends State<RunInsightsScreen> {
   void _computeYear(int year) {
     _year = year;
     final rows = _activities;
-    _daily = RunFitnessAnalytics.dailyDistance(rows, year: year);
-    _months = RunFitnessAnalytics.monthlyTotals(
+    _daily = RunCalendarStats.dailyDistance(rows, year: year);
+    _months = RunCalendarStats.monthlyTotals(
       rows,
       now: year == _today.year ? _today : DateTime(year, 12, 31),
     );
-    _thisYearCumulative = RunFitnessAnalytics.cumulativeMonthly(
+    _thisYearCumulative = RunCalendarStats.cumulativeMonthly(
       rows,
       year,
       now: _today,
     );
-    _lastYearCumulative = RunFitnessAnalytics.cumulativeMonthly(
+    _lastYearCumulative = RunCalendarStats.cumulativeMonthly(
       rows,
       year - 1,
       now: _today,
     );
-    _review = RunFitnessAnalytics.yearReview(rows, year);
+    _review = RunCalendarStats.yearReview(rows, year);
   }
 
   Future<void> _openRun(String id) async {

@@ -110,9 +110,11 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
     final laps = results[3] as List<RunLap>;
     final gear = results[4] as RunGearUsage?;
 
+    final profile = RunTrackProfile.fromPoints(points);
     final derived = RunPaceAnalytics.fromTrackPoints(
       points,
       activityAvgPaceSecPerKm: activity.avgPaceSecPerKm,
+      profile: profile,
     );
     final analytics = storedSplits.isEmpty
         ? derived
@@ -138,7 +140,7 @@ class _RunDetailScreenState extends State<RunDetailScreen> {
       _gear = gear;
       _analytics = analytics;
       _elevation = activity.isRun
-          ? RunElevationProfile.fromTrackPoints(points)
+          ? RunElevationProfile.fromTrackPoints(points, profile: profile)
           : RunElevationProfile.empty;
       _medals = medals;
       _loading = false;

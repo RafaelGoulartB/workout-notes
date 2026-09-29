@@ -17,6 +17,7 @@ import 'package:workout_notes/services/run_today_service.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_fitness_analytics.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
+import 'package:workout_notes/utils/run_training_load_analytics.dart';
 import 'package:workout_notes/widgets/run/home/run_home_fitness_card.dart';
 import 'package:workout_notes/widgets/run/home/run_home_hero.dart';
 import 'package:workout_notes/widgets/run/home/run_home_plan_card.dart';
@@ -76,7 +77,7 @@ class _RunStatsScreenState extends State<RunStatsScreen> {
       _board = RunAchievementEngine.build(rows);
       _snapshot = snapshot;
       _fitness = fitness;
-      _load = RunFitnessAnalytics.trainingLoad(rows, zones: fitness?.zones);
+      _load = RunTrainingLoadAnalytics.trainingLoad(rows, zones: fitness?.zones);
       _analytics = RunProgressAnalytics.fromActivities(rows, period: _period);
       _bannerRefresh++;
       _loading = false;

@@ -313,7 +313,8 @@ class RunBestEffort {
     required this.seconds,
   });
 
-  double get paceSecPerKm => seconds / (distanceMeters / 1000);
+  double get paceSecPerKm =>
+      RunFormatters.paceSecondsPerKm(distanceMeters, seconds);
 
   /// The efforts this run itself contains, shortest first.
   static List<RunBestEffort> fromActivity(RunActivity activity) {

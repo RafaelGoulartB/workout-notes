@@ -79,12 +79,16 @@ class _RunReplayScreenState extends State<RunReplayScreen>
       ..sort((a, b) => a.seq.compareTo(b.seq));
     _trail = [for (final p in _points) LatLng(p.lat, p.lng)];
     _timeline = _buildTimeline(_points);
-    _geometry = RunRouteGeometry.fromPoints(_points);
+    final profile = RunTrackProfile.fromPoints(_points);
+    _geometry = RunRouteGeometry.fromPoints(_points, profile: profile);
     _hasAltitude = _points.any((p) => p.altitude != null);
     _movingSeconds = widget.activity.movingTimeSeconds > 0
         ? widget.activity.movingTimeSeconds
         : widget.activity.durationSeconds;
-    _paceSamples = RunPaceAnalytics.fromTrackPoints(_points).samples;
+    _paceSamples = RunPaceAnalytics.fromTrackPoints(
+      _points,
+      profile: profile,
+    ).samples;
 
     final average = widget.activity.avgPaceSecPerKm;
     final paces = RunRoutePaceStyle.segmentPaces(

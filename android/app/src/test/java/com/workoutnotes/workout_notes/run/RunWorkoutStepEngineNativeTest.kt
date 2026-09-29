@@ -7,9 +7,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Mirror of test/run_workout_step_engine_test.dart. The Dart and Kotlin engines
- * must produce the same sequence for the same steps — a divergence would make
- * the app cue one thing on screen and another through the headphones.
+ * Behaviour of the structured-session engine. Its repeat expansion must match
+ * `RunPlanWorkout.expand` in Dart (test/run_workout_steps_test.dart) — a
+ * divergence would show one plan on screen and cue another through the
+ * headphones.
  */
 class RunWorkoutStepEngineNativeTest {
 

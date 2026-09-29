@@ -11,6 +11,8 @@ class RunFormatters {
     return format.format(value);
   }
 
+  static String _two(int value) => value.toString().padLeft(2, '0');
+
   /// Locale-aware number with a fixed number of decimals (no grouping for
   /// values below 10 000 so charts and tiles stay compact).
   static String decimal(double value, [int digits = 1]) {
@@ -32,32 +34,46 @@ class RunFormatters {
     return _fixed(km, 0);
   }
 
-  static String duration(int totalSeconds) {
-    final hours = totalSeconds ~/ 3600;
-    final minutes = (totalSeconds % 3600) ~/ 60;
-    final seconds = totalSeconds % 60;
-    if (hours > 0) {
-      return '$hours:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-    }
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
+  /// Seconds per km for [seconds] covered over [meters]. No guard: callers
+  /// decide what counts as "not enough distance" (see [paceOrNull]).
+  static double paceSecondsPerKm(double meters, num seconds) =>
+      seconds / (meters / 1000);
+
+  /// [paceSecondsPerKm], or null when there is under a metre or no time.
+  static double? paceOrNull(double meters, num seconds) =>
+      meters < 1 || seconds <= 0 ? null : paceSecondsPerKm(meters, seconds);
+
+  /// `m:ss` with the minutes unpadded: `5:42`, `95:05`. The base of paces and
+  /// short durations.
+  static String minSec(int totalSeconds) =>
+      '${totalSeconds ~/ 60}:${_two(totalSeconds % 60)}';
+
+  /// `mm:ss` with padded minutes: `05:42`.
+  static String mmss(int totalSeconds) =>
+      '${_two(totalSeconds ~/ 60)}:${_two(totalSeconds % 60)}';
+
+  /// `h:mm:ss`: `1:05:09`.
+  static String hms(int totalSeconds) =>
+      '${totalSeconds ~/ 3600}:${_two((totalSeconds % 3600) ~/ 60)}:'
+      '${_two(totalSeconds % 60)}';
+
+  /// Clock-style duration: `05:42`, or `1:05:09` from one hour up.
+  static String duration(int totalSeconds) =>
+      totalSeconds >= 3600 ? hms(totalSeconds) : mmss(totalSeconds);
 
   /// Long durations for totals: `12h 05min`, `45min`.
   static String durationHoursMinutes(int totalSeconds) {
     final hours = totalSeconds ~/ 3600;
     final minutes = (totalSeconds % 3600) ~/ 60;
     if (hours == 0) return '${minutes}min';
-    return '${hours}h ${minutes.toString().padLeft(2, '0')}min';
+    return '${hours}h ${_two(minutes)}min';
   }
 
   static String pace(double? secPerKm) {
     if (secPerKm == null || secPerKm <= 0 || !secPerKm.isFinite) {
       return '--:--';
     }
-    final total = secPerKm.round().clamp(0, 99 * 60 + 59);
-    final minutes = total ~/ 60;
-    final seconds = total % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    return mmss(secPerKm.round().clamp(0, 99 * 60 + 59));
   }
 
   /// Pace for axes and compact labels: `5:42` (no leading zero).
@@ -65,8 +81,7 @@ class RunFormatters {
     if (secPerKm == null || secPerKm <= 0 || !secPerKm.isFinite) {
       return '--:--';
     }
-    final total = secPerKm.round().clamp(0, 99 * 60 + 59);
-    return '${total ~/ 60}:${(total % 60).toString().padLeft(2, '0')}';
+    return minSec(secPerKm.round().clamp(0, 99 * 60 + 59));
   }
 
   /// Signed pace difference: `+0:12`, `-0:05`, `0:00`.
@@ -77,8 +92,7 @@ class RunFormatters {
         : total < 0
         ? '-'
         : '';
-    final abs = total.abs();
-    return '$sign${abs ~/ 60}:${(abs % 60).toString().padLeft(2, '0')}';
+    return '$sign${minSec(total.abs())}';
   }
 
   static String speedKmh(double? kmh) {

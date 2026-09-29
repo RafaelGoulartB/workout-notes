@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/run_voice_settings.dart';
 import 'package:workout_notes/services/run_voice_settings_store.dart';
-import 'package:workout_notes/services/run_voice_coach.dart';
+import 'package:workout_notes/services/run_native_voice_service.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/widgets/settings/settings.dart';
 
@@ -77,9 +77,7 @@ class _RunVoiceSettingsScreenState extends State<RunVoiceSettingsScreen> {
       ).showSnackBar(SnackBar(content: Text(loc.runVoiceTestDisabled)));
       return;
     }
-    final coach = RunVoiceCoach();
-    coach.settingsOverride = _settings;
-    final ok = await coach.speakTestAnnouncement();
+    final ok = await RunNativeVoiceService.instance.speakTest(_settings);
     if (!mounted) return;
     if (!ok) {
       ScaffoldMessenger.of(

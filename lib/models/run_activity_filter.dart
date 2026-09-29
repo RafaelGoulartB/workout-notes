@@ -114,13 +114,6 @@ class RunHistoryFilter {
       onlyPlan ||
       query.trim().isNotEmpty;
 
-  /// Number of narrowing options excluding the free-text search.
-  int get activeOptionCount =>
-      (type != RunHistoryType.all ? 1 : 0) +
-      (period != RunHistoryPeriod.all ? 1 : 0) +
-      (distance != RunHistoryDistance.any ? 1 : 0) +
-      (onlyPlan ? 1 : 0);
-
   RunHistoryFilter copyWith({
     RunHistoryType? type,
     RunHistoryPeriod? period,

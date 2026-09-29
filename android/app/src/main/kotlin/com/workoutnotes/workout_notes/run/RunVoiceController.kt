@@ -15,12 +15,14 @@ private data class RunVoicePacePoint(
 )
 
 /**
- * Native voice coach — mirrors Dart RunVoiceCoach logic but runs inside
+ * The run voice coach. It is the only voice engine: it runs inside
  * RunTrackingService so announcements survive screen-off / Flutter engine death.
  */
-class RunVoiceController(private val context: Context) {
+class RunVoiceController(
+    private val context: Context,
+    private val tts: RunSpeechOutput = RunTtsService(context),
+) {
 
-    private val tts = RunTtsService(context)
     private var phrases = RunVoicePhrases(RunVoiceLanguage.en)
     private val intervalEngine = RunIntervalEngineNative()
 
@@ -30,7 +32,6 @@ class RunVoiceController(private val context: Context) {
     private var settings: RunVoiceSettings = RunVoiceSettings.defaults()
     private var goal: RunSessionGoal = RunSessionGoal.disabled()
     private var intervalsOn: Boolean = false
-    private var bypassHeadphonesGate: Boolean = false
     private var active: Boolean = false
     private var goalCompleted: Boolean = false
 
@@ -99,22 +100,6 @@ class RunVoiceController(private val context: Context) {
         return defaults
     }
 
-    fun configure(
-        settings: RunVoiceSettings,
-        goal: RunSessionGoal,
-        intervalsOn: Boolean,
-        bypassHeadphonesGate: Boolean = false,
-        planSteps: List<RunWorkoutStepNative> = emptyList(),
-    ) {
-        this.settings = settings
-        refreshVoiceLanguage()
-        this.goal = goal
-        this.intervalsOn = intervalsOn
-        this.bypassHeadphonesGate = bypassHeadphonesGate
-        intervalEngine.configure(settings.interval)
-        setPlanSteps(planSteps)
-    }
-
     /** Loads a structured session. Empty clears it and falls back to presets. */
     fun setPlanSteps(steps: List<RunWorkoutStepNative>) {
         planSteps = steps
@@ -131,6 +116,12 @@ class RunVoiceController(private val context: Context) {
     /** Durable execution snapshot mirrored into the run spool. */
     fun engineSnapshotJson(): String? =
         if (stepEngine.hasPlan) stepEngine.stateJson() else null
+
+    /** Live quick-interval progress, or null while no interval set is running. */
+    fun intervalSnapshotMap(): Map<String, Any?>? =
+        if (intervalsOn && !stepEngine.hasPlan && intervalEngine.snapshot.phase != RunIntervalPhase.idle) {
+            intervalEngine.snapshot.toMap()
+        } else null
 
     /** Live structured-workout progress for a reattached Flutter screen. */
     fun stepSnapshotMap(): Map<String, Any?>? =
@@ -158,7 +149,6 @@ class RunVoiceController(private val context: Context) {
         settingsMap: Map<String, Any?>?,
         goalMap: Map<String, Any?>?,
         intervalsOn: Boolean?,
-        bypassGate: Boolean?,
         plan: Any? = null,
     ) {
         if (plan != null) setPlanSteps(RunWorkoutStepNative.listFromAny(plan))
@@ -172,7 +162,6 @@ class RunVoiceController(private val context: Context) {
             this.goal = RunSessionGoal.fromMap(goalMap)
         }
         if (intervalsOn != null) this.intervalsOn = intervalsOn
-        if (bypassGate != null) this.bypassHeadphonesGate = bypassGate
         Log.i("RunVoice", "sync intervalsOn=$intervalsOn goal=${goal.enabled} enabled=${settings.enabled}")
     }
 
@@ -180,7 +169,6 @@ class RunVoiceController(private val context: Context) {
         settingsMap: Map<String, Any?>?,
         goalMap: Map<String, Any?>?,
         intervalsOn: Boolean?,
-        bypassGate: Boolean?,
         plan: Any? = null,
     ) {
         // If flutter didn't push settings, load from storage
@@ -195,7 +183,6 @@ class RunVoiceController(private val context: Context) {
         if (goalMap != null) goal = RunSessionGoal.fromMap(goalMap)
         // If caller didn't specify intervalsOn, respect default
         this.intervalsOn = intervalsOn ?: settings.intervalsEnabledByDefault
-        this.bypassHeadphonesGate = bypassGate ?: false
         active = true
         goalCompleted = false
         lastAnnouncedKm = 0
@@ -267,6 +254,13 @@ class RunVoiceController(private val context: Context) {
         val duration = (lap["duration_seconds"] as? Number)?.toInt() ?: 0
         val pace = (lap["pace_sec_per_km"] as? Number)?.toDouble()
         speakIfAllowed(phrases.lapSummary(index, distance.toInt(), duration, pace))
+    }
+
+    /** Short acknowledgement after a free run was stopped (planned sessions announce their own end). */
+    fun speakWorkoutComplete() {
+        if (!settings.enabled) return
+        tts.ensureReady(effectiveLanguage())
+        speakIfAllowed(phrases.workoutComplete())
     }
 
     fun speakTest() {
@@ -582,7 +576,7 @@ class RunVoiceController(private val context: Context) {
             Log.d("RunVoice", "skipped in call")
             return false
         }
-        if (settings.headphonesOnly && !bypassHeadphonesGate && !isHeadsetConnected()) {
+        if (settings.headphonesOnly && !isHeadsetConnected()) {
             Log.d("RunVoice", "skipped no headset")
             return false
         }

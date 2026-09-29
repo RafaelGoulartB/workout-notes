@@ -81,8 +81,10 @@ class RunDataFieldValues {
   }
 
   static double? _averagePace(RunTrackingState state) {
-    if (state.distanceMeters < 1 || state.movingTimeSeconds <= 0) return null;
-    return state.movingTimeSeconds / (state.distanceMeters / 1000.0);
+    return RunFormatters.paceOrNull(
+      state.distanceMeters,
+      state.movingTimeSeconds,
+    );
   }
 
   /// Pace of the kilometer in progress, falling back to the last completed km

@@ -7,10 +7,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/run_data_field.dart';
+import 'package:workout_notes/models/run_interval_snapshot.dart';
 import 'package:workout_notes/models/run_plan_workout.dart';
 import 'package:workout_notes/models/run_review_draft.dart';
 import 'package:workout_notes/models/run_session_context.dart';
 import 'package:workout_notes/models/run_session_goal.dart';
+import 'package:workout_notes/models/run_step_snapshot.dart';
 import 'package:workout_notes/models/run_tracking_state.dart';
 import 'package:workout_notes/models/scheduled_run.dart';
 import 'package:workout_notes/repositories/body_measurement_repository.dart';
@@ -19,9 +21,8 @@ import 'package:workout_notes/screens/run/run_post_run_review_screen.dart';
 import 'package:workout_notes/screens/run/run_voice_settings_screen.dart';
 import 'package:workout_notes/services/run_audio_gate_service.dart';
 import 'package:workout_notes/services/run_data_fields_store.dart';
+import 'package:workout_notes/services/run_session_coach.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
-import 'package:workout_notes/services/run_voice_coach.dart';
-import 'package:workout_notes/services/run_workout_step_engine.dart';
 import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
 import 'package:workout_notes/widgets/run/record/run_data_fields_grid.dart';
 import 'package:workout_notes/widgets/run/record/run_goal_sheet.dart';
@@ -62,7 +63,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
   final _service = RunTrackingService.instance;
   final _indoorService = StationaryBikeTrackingService.instance;
   final _mapController = MapController();
-  final _coach = RunVoiceCoach();
+  final _coach = RunSessionCoach();
   final _planRepo = RunPlanRepository();
 
   bool _busy = false;
@@ -315,7 +316,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       intervalsOn: _intervalsOn,
       goal: _goal,
       planWorkout: _planWorkout,
-      bypassHeadphonesGate: debugSim,
+      nativeVoice: !debugSim,
     );
   }
 
@@ -519,7 +520,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
       );
       if (ok) {
         await _beginVoiceSession(debugSim: true);
-        await _coach.onTrackingUpdate(_service.state);
+        _coach.onTrackingUpdate(_service.state);
         if (mounted) {
           final loc = AppLocalizations.of(context)!;
           ScaffoldMessenger.of(
@@ -575,7 +576,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
         ).showSnackBar(SnackBar(content: Text(msg)));
       } else if (ok) {
         await _beginVoiceSession();
-        await _coach.onTrackingUpdate(_service.state);
+        _coach.onTrackingUpdate(_service.state);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -613,7 +614,6 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
     final lap = await _service.lap();
     if (lap == null || !mounted) return;
     HapticFeedback.mediumImpact();
-    // Confirm on screen right away; the spoken summary can take a while.
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -623,7 +623,6 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
           content: Text(loc.runLapMarked(lap.index)),
         ),
       );
-    await _coach.announceLap(lap);
   }
 
   Future<void> _skipStep() async {
@@ -878,7 +877,8 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
           onCustomizeFields: _customizeFields,
           onFieldLongPress: _replaceField,
           intervalsOn: !_isIndoor && _intervalsOn,
-          intervalSnapshot: _coach.intervalSnapshot,
+          intervalSnapshot:
+              state.intervalSnapshot ?? const RunIntervalSnapshot.idle(),
           intervalPreset: _coach.settings.interval,
           planWorkout: _planWorkout,
           onDetachPlan: _attachedFromSuggestion ? _detachPlan : null,
@@ -923,10 +923,7 @@ class _RunRecordScreenState extends State<RunRecordScreen> {
         .map((p) => LatLng(p.lat, p.lng))
         .toList(growable: false);
     final goalSnapshot = _coach.goalSnapshotFor(state);
-    final nativeStep = state.nativeStepSnapshot;
-    final stepSnapshot = nativeStep == null
-        ? _coach.stepSnapshot
-        : RunStepSnapshot.fromMap(nativeStep);
+    final stepSnapshot = state.stepSnapshot ?? const RunStepSnapshot.idle();
 
     return PopScope(
       canPop: !state.isActive || _allowPop,
