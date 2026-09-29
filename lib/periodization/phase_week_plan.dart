@@ -102,26 +102,6 @@ abstract final class PhaseWeekPlan {
     );
   }
 
-  /// Whether [weekday] is a training day, or null when the target has no
-  /// template week (no strength days, run days or linked plan sessions) — in
-  /// that case every day uses the training-day values.
-  static bool? isTrainingDay({
-    required PeriodizationTarget? target,
-    required int weekday,
-    RunPlan? runPlan,
-    int? runPlanWeek,
-  }) {
-    if (target == null) return null;
-    final week = build(
-      target: target,
-      runPlan: runPlan,
-      runPlanWeek: runPlanWeek,
-    );
-    final scheduled = week.any((day) => day.trainingDay);
-    if (!scheduled) return null;
-    return week[weekday - 1].trainingDay;
-  }
-
   /// Average daily calories over the template week (training and rest days
   /// weighted by how many of each the week has).
   static double? averageCalories(List<PlannedWeekday> week) {

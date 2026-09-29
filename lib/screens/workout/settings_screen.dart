@@ -15,7 +15,6 @@ import '../../services/export_service.dart';
 import '../../dev_tools/test_data/test_data_generator.dart';
 import '../../services/notification_service.dart';
 import '../../main.dart';
-import '../../navigation/ai_coach_navigation.dart';
 import 'ai_chat_screen.dart';
 import 'ai_settings_screen.dart';
 import 'nutrition_settings_screen.dart';
@@ -135,15 +134,6 @@ class AppSettingsScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Direct route kept for callers that specifically need workout preferences.
-class WorkoutSettingsScreen extends StatelessWidget {
-  const WorkoutSettingsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) =>
-      const _SettingsDetailScreen(category: _SettingsCategory.workout);
 }
 
 class _SettingsDetailScreen extends StatefulWidget {
@@ -1009,20 +999,14 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
           duration: Duration(seconds: 2),
         ),
       );
-      Navigator.of(context).push(
-        AiCoachNavigation.route(
-          kind: AiCoachRouteKind.aiFlow,
-          builder: (_) => const AiSettingsScreen(),
-        ),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const AiSettingsScreen()));
       return;
     }
-    Navigator.of(context).push(
-      AiCoachNavigation.route(
-        kind: AiCoachRouteKind.aiFlow,
-        builder: (_) => const AiChatScreen(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const AiChatScreen()));
   }
 
   void _showAbout() {
@@ -1464,8 +1448,7 @@ class _SettingsDetailScreenState extends State<_SettingsDetailScreen> {
                         subtitle: loc.aiCoachConfigureEntrySubtitle,
                         onTap: () {
                           Navigator.of(context).push(
-                            AiCoachNavigation.route(
-                              kind: AiCoachRouteKind.aiFlow,
+                            MaterialPageRoute(
                               builder: (_) => const AiSettingsScreen(),
                             ),
                           );

@@ -34,15 +34,6 @@ String formatVolume(double v) {
   return v.toStringAsFixed(0);
 }
 
-String monthLabel(String isoMonth) {
-  try {
-    return DateFormat('MMM', Intl.defaultLocale)
-        .format(DateTime.parse(isoMonth));
-  } catch (_) {
-    return isoMonth.length >= 7 ? isoMonth.substring(5) : isoMonth;
-  }
-}
-
 String weekLabel(DateTime date, String prefix) {
   final week = DateFormat('w', Intl.defaultLocale).format(date);
   return '$prefix$week';

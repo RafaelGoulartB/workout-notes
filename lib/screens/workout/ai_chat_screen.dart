@@ -8,7 +8,6 @@ import 'package:image_picker/image_picker.dart';
 import '../../database/database_helper.dart';
 import '../../l10n/app_localizations.dart';
 import '../../main.dart';
-import '../../navigation/ai_coach_navigation.dart';
 import '../../models/ai_chat_message.dart';
 import '../../models/ai_chat_error_details.dart';
 import '../../models/ai_image_attachment.dart';
@@ -78,7 +77,9 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final state = AiChatService.instance.state;
     final activeThreadId = state.activeThreadId;
     final openedThread = activeThreadId != _lastActiveThreadId;
-    final lastMessageId = state.messages.isEmpty ? null : state.messages.last.id;
+    final lastMessageId = state.messages.isEmpty
+        ? null
+        : state.messages.last.id;
     final shouldScroll = openedThread || lastMessageId != _lastMessageId;
     _lastActiveThreadId = activeThreadId;
     _lastMessageId = lastMessageId;
@@ -144,9 +145,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               subtitle: Text(l10n.aiChatImageLimitHelp),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
-            if (!kIsWeb &&
-                (defaultTargetPlatform == TargetPlatform.android ||
-                    defaultTargetPlatform == TargetPlatform.iOS))
+            if (defaultTargetPlatform == TargetPlatform.android)
               ListTile(
                 leading: const Icon(Icons.photo_camera_outlined),
                 title: Text(l10n.aiChatTakePhoto),
@@ -281,18 +280,16 @@ class _AiChatScreenState extends State<AiChatScreen> {
           IconButton(
             tooltip: l10n.aiChatNewChat,
             icon: const Icon(Icons.add_comment_rounded),
-            onPressed:
-                state.isSending ? null : () => AiChatService.instance.newChat(),
+            onPressed: state.isSending
+                ? null
+                : () => AiChatService.instance.newChat(),
           ),
           IconButton(
             tooltip: l10n.aiChatHistory,
             icon: const Icon(Icons.history_rounded),
             onPressed: () {
               Navigator.of(context).push(
-                AiCoachNavigation.route(
-                  kind: AiCoachRouteKind.aiFlow,
-                  builder: (_) => const AiChatHistoryScreen(),
-                ),
+                MaterialPageRoute(builder: (_) => const AiChatHistoryScreen()),
               );
             },
           ),
@@ -302,10 +299,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
               switch (v) {
                 case 'settings':
                   Navigator.of(context).push(
-                    AiCoachNavigation.route(
-                      kind: AiCoachRouteKind.aiFlow,
-                      builder: (_) => const AiSettingsScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const AiSettingsScreen()),
                   );
                   break;
               }
@@ -338,14 +332,16 @@ class _AiChatScreenState extends State<AiChatScreen> {
                           keyboardDismissBehavior:
                               ScrollViewKeyboardDismissBehavior.onDrag,
                           padding: const EdgeInsets.fromLTRB(0, 6, 0, 14),
-                          itemCount: state.messages.length +
+                          itemCount:
+                              state.messages.length +
                               (state.hasOlderMessages ||
                                       state.isLoadingOlderMessages
                                   ? 1
                                   : 0) +
                               (_showActivity(state) ? 1 : 0),
                           itemBuilder: (_, i) {
-                            final hasHistoryHeader = state.hasOlderMessages ||
+                            final hasHistoryHeader =
+                                state.hasOlderMessages ||
                                 state.isLoadingOlderMessages;
                             if (hasHistoryHeader && i == 0) {
                               return Center(
@@ -353,7 +349,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                   onPressed: state.isLoadingOlderMessages
                                       ? null
                                       : AiChatService
-                                          .instance.loadOlderMessages,
+                                            .instance
+                                            .loadOlderMessages,
                                   icon: state.isLoadingOlderMessages
                                       ? const SizedBox.square(
                                           dimension: 16,
@@ -446,8 +443,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                   active == null
                       ? l10n.aiChatNotConfigured
                       : model.isEmpty
-                          ? active.name
-                          : model,
+                      ? active.name
+                      : model,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelSmall?.copyWith(
@@ -739,14 +736,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
               onPressed: AiChatService.instance.state.isSending
                   ? null
                   : failedProposalId != null
-                      ? () => AiChatService.instance.approveRoutineProposal(
-                            failedProposalId,
-                          )
-                      : !AiChatService.instance.state.messages.any(
-                          (message) => message.isUser,
-                        )
-                          ? null
-                          : AiChatService.instance.retryLastTurn,
+                  ? () => AiChatService.instance.approveRoutineProposal(
+                      failedProposalId,
+                    )
+                  : !AiChatService.instance.state.messages.any(
+                      (message) => message.isUser,
+                    )
+                  ? null
+                  : AiChatService.instance.retryLastTurn,
               icon: const Icon(Icons.refresh_rounded, size: 20),
             ),
           ],
@@ -845,8 +842,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     AiChatService.instance.rejectRoutineProposal(proposal.id),
                 onRetrySummary: proposal.errorCode == 'summary_pending'
                     ? () => AiChatService.instance.retryAppliedProposalSummary(
-                          proposal.id,
-                        )
+                        proposal.id,
+                      )
                     : null,
                 onViewRoutine: proposal.appliedRoutineId == null
                     ? null

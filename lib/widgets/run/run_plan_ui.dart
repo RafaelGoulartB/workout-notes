@@ -353,17 +353,9 @@ class RunStepBlock {
 /// of week chips hides it completely.
 class RunPlanVolumeBars extends StatelessWidget {
   final RunPlan plan;
-  final int? selectedWeek;
-  final ValueChanged<int>? onWeekSelected;
   final double height;
 
-  const RunPlanVolumeBars({
-    super.key,
-    required this.plan,
-    this.selectedWeek,
-    this.onWeekSelected,
-    this.height = 44,
-  });
+  const RunPlanVolumeBars({super.key, required this.plan, this.height = 44});
 
   @override
   Widget build(BuildContext context) {
@@ -384,32 +376,24 @@ class RunPlanVolumeBars extends StatelessWidget {
         children: [
           for (var week = 0; week < volumes.length; week++)
             Expanded(
-              child: GestureDetector(
-                onTap: onWeekSelected == null
-                    ? null
-                    : () => onWeekSelected!(week),
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: DecoratedBox(
-                    // A faint track behind every bar: a plan with equal weeks
-                    // would otherwise render as one solid rectangle.
-                    decoration: BoxDecoration(
-                      color: scheme.onSurfaceVariant.withAlpha(28),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        height: peak <= 0
-                            ? 3
-                            : (3 + (height - 3) * (volumes[week] / peak)),
-                        decoration: BoxDecoration(
-                          color: week == selectedWeek
-                              ? scheme.primary
-                              : scheme.primary.withAlpha(120),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: DecoratedBox(
+                  // A faint track behind every bar: a plan with equal weeks
+                  // would otherwise render as one solid rectangle.
+                  decoration: BoxDecoration(
+                    color: scheme.onSurfaceVariant.withAlpha(28),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      height: peak <= 0
+                          ? 3
+                          : (3 + (height - 3) * (volumes[week] / peak)),
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withAlpha(120),
+                        borderRadius: BorderRadius.circular(3),
                       ),
                     ),
                   ),
@@ -474,39 +458,6 @@ class RunWorkoutProfileBar extends StatelessWidget {
                 ),
               ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Compact chip describing a step inside the session editor.
-class RunStepChip extends StatelessWidget {
-  final RunWorkoutStep step;
-  final int? repeats;
-
-  const RunStepChip({super.key, required this.step, this.repeats});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = AppLocalizations.of(context)!;
-    final color = RunPlanUi.roleColor(theme.colorScheme, step.role);
-    final amount = RunPlanUi.stepAmountLabel(step);
-    final label = repeats != null && repeats! > 1
-        ? '${repeats}x $amount'
-        : amount;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withAlpha(28),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        '${RunPlanUi.roleLabel(loc, step.role)} · $label',
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
         ),
       ),
     );

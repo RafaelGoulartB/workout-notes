@@ -33,7 +33,7 @@ class BarcodeScannerService {
 
   const BarcodeScannerService();
 
-  bool get isSupported => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get isSupported => defaultTargetPlatform == TargetPlatform.android;
 
   Future<BarcodeScanResult?> scan() async {
     if (!isSupported) {

@@ -166,13 +166,6 @@ void main() {
         expect(PhaseWeekPlan.averageCalories(week), closeTo(2228.6, 0.1));
       },
     );
-
-    test('no template week means no training/rest distinction', () {
-      expect(
-        PhaseWeekPlan.isTrainingDay(target: target(rest: 2000), weekday: 2),
-        isNull,
-      );
-    });
   });
 
   group('chained plans', () {

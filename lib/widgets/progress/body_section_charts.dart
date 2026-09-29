@@ -4,7 +4,6 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/progress_helpers.dart';
 import 'package:workout_notes/screens/workout/body_tracker_screen.dart';
-import 'package:workout_notes/navigation/ai_coach_navigation.dart';
 
 /// Displays body measurement section: summary grid, composition chart,
 /// weight-vs-volume chart, and link to body tracker.
@@ -648,10 +647,7 @@ class _BodyTrackerLink extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            AiCoachNavigation.route(
-              kind: AiCoachRouteKind.normalWithFab,
-              builder: (_) => const BodyTrackerScreen(),
-            ),
+            MaterialPageRoute(builder: (_) => const BodyTrackerScreen()),
           );
         },
         child: Padding(

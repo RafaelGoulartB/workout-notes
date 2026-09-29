@@ -15,7 +15,6 @@ class RunPaceChart extends StatelessWidget {
   final double? avgPaceSecPerKm;
   final String emptyLabel;
   final ValueNotifier<double?>? selectedDistance;
-  final double height;
 
   const RunPaceChart({
     super.key,
@@ -23,7 +22,6 @@ class RunPaceChart extends StatelessWidget {
     required this.avgPaceSecPerKm,
     required this.emptyLabel,
     this.selectedDistance,
-    this.height = 220,
   });
 
   @override
@@ -65,7 +63,7 @@ class RunPaceChart extends StatelessWidget {
     final muted = theme.colorScheme.onSurfaceVariant;
 
     return SizedBox(
-      height: height,
+      height: 220,
       child: LineChart(
         LineChartData(
           minX: 0,

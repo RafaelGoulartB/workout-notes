@@ -222,13 +222,6 @@ class RunProgressAnalytics {
   double get avgRunsPerWeek =>
       periodWeekCount <= 0 ? 0 : runCount / periodWeekCount;
 
-  /// Average moving time per calendar week, in seconds.
-  double get avgWeeklyMovingSeconds =>
-      periodWeekCount <= 0 ? 0 : totalMovingTimeSeconds / periodWeekCount;
-
-  double? get avgDistancePerRunMeters =>
-      runCount == 0 ? null : totalDistanceMeters / runCount;
-
   /// True when [trendBuckets] are months instead of weeks.
   bool get trendIsMonthly => trendBuckets.any((b) => b.isMonthly);
 

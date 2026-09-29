@@ -44,10 +44,6 @@ class RunVoiceSettingsStore {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(RunVoiceSettings.storageKey, encoded);
-      await prefs.setString(
-        'flutter.${RunVoiceSettings.storageKey}',
-        encoded,
-      );
     } catch (e) {
       if (kDebugMode) debugPrint('RunVoiceSettingsStore mirror failed: $e');
     }

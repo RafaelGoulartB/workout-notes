@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 
 /// Returns a localized label for a workout set field.
@@ -59,17 +58,3 @@ String formatFieldValue(Map<String, dynamic> set, String key) {
   }
   return '-';
 }
-
-/// Colors to use for exercise categories.
-final List<Color> categoryColors = [
-  Colors.red,
-  Colors.blue,
-  Colors.green,
-  Colors.orange,
-  Colors.purple,
-  Colors.teal,
-  Colors.cyan,
-  Colors.pink,
-  Colors.indigo,
-  Colors.amber,
-];

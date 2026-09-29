@@ -1204,12 +1204,8 @@ class _WeekDayCell extends StatelessWidget {
 }
 
 const Color _deficitColor = Color(0xFF2BB673);
-final Color _surplusColor = const Color(0xFF000000) == const Color(0xFF000000)
-    ? const Color(0xFFE0524A)
-    : const Color(0xFFE0524A);
-final Color _onTargetColor = const Color(0xFF000000) == const Color(0xFF000000)
-    ? const Color(0xFF4A90E2)
-    : const Color(0xFF4A90E2);
+const Color _surplusColor = Color(0xFFE0524A);
+const Color _onTargetColor = Color(0xFF4A90E2);
 
 enum _DayStatus { onTarget, deficit, surplus, unknown }
 

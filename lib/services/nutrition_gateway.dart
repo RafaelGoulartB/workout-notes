@@ -15,7 +15,6 @@ class NutritionGatewayResult<T> {
   const NutritionGatewayResult._(this.data, this.error);
 
   bool get ok => error == null;
-  bool get notConfigured => error?.code == 'not_configured';
 
   factory NutritionGatewayResult.ok(T data) =>
       NutritionGatewayResult<T>._(data, null);

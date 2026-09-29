@@ -25,7 +25,6 @@ import 'nutrition_gateway.dart';
 ///   GET /api/v2/product/{code}.json                 (barcode lookup)
 class OpenFoodFactsGateway implements NutritionGateway {
   static const String defaultBaseUrl = 'https://world.openfoodfacts.org';
-  static const String sourceName = FoodSource.openFoodFacts;
 
   /// Fields requested from OFF so the payload stays small.
   static const String _fields =

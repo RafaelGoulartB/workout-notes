@@ -218,7 +218,6 @@ class StrengthTrendChart extends StatelessWidget {
   final List<StrengthTrendPoint> points;
   final String unit;
   final String emptyLabel;
-  final Color? color;
   final String? pointsLabel;
   final String? trendLabel;
 
@@ -237,7 +236,6 @@ class StrengthTrendChart extends StatelessWidget {
     required this.points,
     required this.unit,
     required this.emptyLabel,
-    this.color,
     this.pointsLabel,
     this.trendLabel,
     this.showTrend = false,
@@ -254,7 +252,7 @@ class StrengthTrendChart extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final locale = Localizations.localeOf(context).toString();
-    final lineColor = color ?? colors.primary;
+    final lineColor = colors.primary;
     final trendColor = colors.tertiary;
 
     final originMs = points.first.date.millisecondsSinceEpoch.toDouble();
@@ -451,23 +449,15 @@ class StrengthTrendChart extends StatelessWidget {
 class StrengthSparkline extends StatelessWidget {
   final List<double> values;
   final Color? color;
-  final double width;
-  final double height;
 
-  const StrengthSparkline({
-    super.key,
-    required this.values,
-    this.color,
-    this.width = 64,
-    this.height = 28,
-  });
+  const StrengthSparkline({super.key, required this.values, this.color});
 
   @override
   Widget build(BuildContext context) {
     final tint = color ?? Theme.of(context).colorScheme.primary;
     return SizedBox(
-      width: width,
-      height: height,
+      width: 64,
+      height: 28,
       child: CustomPaint(
         painter: _SparklinePainter(values, tint, Theme.of(context).colorScheme),
       ),

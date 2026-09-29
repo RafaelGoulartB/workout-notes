@@ -13,8 +13,7 @@ import 'package:workout_notes/repositories/run_repository.dart';
 /// Unlike outdoor running, this tracker deliberately has no location or native
 /// GPS dependency. Elapsed values are derived from timestamps so they remain
 /// correct when Flutter pauses periodic timers while the app is backgrounded.
-/// The distance is typed on the review screen. (The class keeps its original
-/// name; see [IndoorTrackingService].)
+/// The distance is typed on the review screen.
 class StationaryBikeTrackingService extends ChangeNotifier {
   static final StationaryBikeTrackingService instance =
       StationaryBikeTrackingService._();
@@ -184,6 +183,3 @@ class StationaryBikeTrackingService extends ChangeNotifier {
     super.dispose();
   }
 }
-
-/// The tracker handles every indoor (no-GPS) activity, not just the bike.
-typedef IndoorTrackingService = StationaryBikeTrackingService;

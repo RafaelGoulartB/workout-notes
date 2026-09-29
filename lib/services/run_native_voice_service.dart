@@ -7,8 +7,7 @@ class RunNativeVoiceService {
 
   static const _methods = MethodChannel('workout_notes/run_voice/methods');
 
-  bool get _isAndroid =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
 
   bool get isSupported => _isAndroid;
 

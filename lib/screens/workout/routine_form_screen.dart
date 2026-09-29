@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/navigation/ai_coach_navigation.dart';
 import 'package:workout_notes/repositories/periodization_repository.dart';
 import 'package:workout_notes/repositories/routine_repository.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
@@ -119,8 +118,7 @@ class _RoutineFormScreenState extends State<RoutineFormScreen> {
     final loc = AppLocalizations.of(context)!;
     await Navigator.push(
       context,
-      AiCoachNavigation.route(
-        kind: AiCoachRouteKind.normalWithFab,
+      MaterialPageRoute(
         builder: (_) => RoutineDayEditorScreen(
           routineDayId: day.id,
           routineId: widget.routineId,

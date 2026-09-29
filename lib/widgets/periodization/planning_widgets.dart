@@ -192,14 +192,12 @@ class PlanningPill extends StatelessWidget {
 class PlanRoadmap extends StatelessWidget {
   final List<PeriodizationPhase> phases;
   final DateTime today;
-  final bool showLabels;
   final ValueChanged<PeriodizationPhase>? onPhaseTap;
 
   const PlanRoadmap({
     super.key,
     required this.phases,
     required this.today,
-    this.showLabels = true,
     this.onPhaseTap,
   });
 
@@ -265,33 +263,31 @@ class PlanRoadmap extends StatelessWidget {
                 ],
               ),
             ),
-            if (showLabels) ...[
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  for (var i = 0; i < phases.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 3),
-                    Expanded(
-                      flex: phases[i].totalDays,
-                      child: Text(
-                        phases[i].name,
-                        maxLines: 1,
-                        overflow: TextOverflow.clip,
-                        softWrap: false,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: phases[i].contains(day)
-                              ? Color(phases[i].color)
-                              : scheme.onSurfaceVariant,
-                          fontWeight: phases[i].contains(day)
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                        ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                for (var i = 0; i < phases.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 3),
+                  Expanded(
+                    flex: phases[i].totalDays,
+                    child: Text(
+                      phases[i].name,
+                      maxLines: 1,
+                      overflow: TextOverflow.clip,
+                      softWrap: false,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: phases[i].contains(day)
+                            ? Color(phases[i].color)
+                            : scheme.onSurfaceVariant,
+                        fontWeight: phases[i].contains(day)
+                            ? FontWeight.w800
+                            : FontWeight.w600,
                       ),
                     ),
-                  ],
+                  ),
                 ],
-              ),
-            ],
+              ],
+            ),
           ],
         );
       },

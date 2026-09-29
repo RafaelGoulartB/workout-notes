@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/utils/pace_calculator.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 
@@ -125,25 +125,6 @@ class CardioBests {
     required this.name,
     required this.distance,
     required this.timeSeconds,
-  });
-
-  double get paceSeconds => distance > 0 ? timeSeconds / distance : 0;
-}
-
-/// Exercise bests data class.
-class ExerciseBests {
-  final String name;
-  final double maxWeight;
-  final int bestReps;
-  final double volume;
-  final int completedSets;
-
-  const ExerciseBests({
-    required this.name,
-    required this.maxWeight,
-    required this.bestReps,
-    required this.volume,
-    required this.completedSets,
   });
 }
 
@@ -326,9 +307,8 @@ class _FinishWorkoutSheetState extends State<FinishWorkoutSheet> {
                     RunMetricBox(
                       icon: Icons.speed_rounded,
                       label: loc.commonPace,
-                      value: PaceCalculator.formatPace(
-                        s.totalCardioTime / s.totalDistance,
-                      ),
+                      value:
+                          '${RunFormatters.paceShort(s.totalCardioTime / s.totalDistance)} /km',
                     ),
                 ],
               ),

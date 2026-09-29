@@ -10,25 +10,19 @@ import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
 class StrengthMusclesCard extends StatelessWidget {
   final List<StrengthMuscleLoad> muscles;
   final VoidCallback? onTap;
-  final int rangeMin;
-  final int rangeMax;
-  final int maxRows;
 
-  const StrengthMusclesCard({
-    super.key,
-    required this.muscles,
-    this.onTap,
-    this.rangeMin = 10,
-    this.rangeMax = 20,
-    this.maxRows = 8,
-  });
+  static const _rangeMin = 10;
+  static const _rangeMax = 20;
+  static const _maxRows = 8;
+
+  const StrengthMusclesCard({super.key, required this.muscles, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final rows = muscles.where((m) => m.sets > 0).take(maxRows).toList();
+    final rows = muscles.where((m) => m.sets > 0).take(_maxRows).toList();
 
     if (rows.isEmpty) {
       return RunSectionCard(
@@ -43,7 +37,7 @@ class StrengthMusclesCard extends StatelessWidget {
     }
 
     final maxSets = rows.map((m) => m.sets).reduce((a, b) => a > b ? a : b);
-    final scale = (maxSets > rangeMax ? maxSets : rangeMax) * 1.1;
+    final scale = (maxSets > _rangeMax ? maxSets : _rangeMax) * 1.1;
 
     return RunSectionCard(
       onTap: onTap,
@@ -54,8 +48,8 @@ class StrengthMusclesCard extends StatelessWidget {
             _MuscleRow(
               muscle: muscle,
               scale: scale,
-              rangeMin: rangeMin,
-              rangeMax: rangeMax,
+              rangeMin: _rangeMin,
+              rangeMax: _rangeMax,
             ),
             const SizedBox(height: 10),
           ],
@@ -72,7 +66,7 @@ class StrengthMusclesCard extends StatelessWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  loc.strengthHomeMusclesRange('$rangeMin–$rangeMax'),
+                  loc.strengthHomeMusclesRange('$_rangeMin–$_rangeMax'),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: colors.onSurfaceVariant,
                   ),

@@ -24,7 +24,6 @@ import 'package:workout_notes/screens/run/run_detail_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
 import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
 import 'package:workout_notes/widgets/strength/home/workout_home_widgets.dart';
-import '../../navigation/ai_coach_navigation.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/run_repository.dart';
 import '../../services/rest_timer_service.dart';
@@ -248,8 +247,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   Future<void> _startWorkout() async {
     await Navigator.push(
       context,
-      AiCoachNavigation.route(
-        kind: AiCoachRouteKind.activeWorkout,
+      MaterialPageRoute(
         builder: (_) => ActiveWorkoutScreen(
           suggestedDay: _strengthSnapshot?.today.startDay,
         ),
@@ -267,8 +265,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     final day = _strengthSnapshot?.today.startDay;
     await Navigator.push(
       context,
-      AiCoachNavigation.route(
-        kind: AiCoachRouteKind.activeWorkout,
+      MaterialPageRoute(
         builder: (_) => ActiveWorkoutScreen(
           routineId: day?.routineId,
           routineDayId: day?.routineDayId,
@@ -297,8 +294,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   Future<void> _openActiveWorkout(Map<String, dynamic> workout) async {
     await Navigator.push(
       context,
-      AiCoachNavigation.route(
-        kind: AiCoachRouteKind.activeWorkout,
+      MaterialPageRoute(
         builder: (_) =>
             ActiveWorkoutScreen(workoutId: workout['id'] as String?),
       ),

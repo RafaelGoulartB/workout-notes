@@ -11,8 +11,6 @@ class RunTtsService {
   bool _speaking = false;
   String _languageTag = 'en-US';
 
-  bool get isSpeaking => _speaking;
-
   Future<void> ensureReady({String? languageTag}) async {
     final requestedLanguage = languageTag ?? _languageTag;
     if (_ready && requestedLanguage == _languageTag) return;
