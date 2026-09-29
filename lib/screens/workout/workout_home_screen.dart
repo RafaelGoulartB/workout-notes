@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
+import 'package:workout_notes/l10n/exercise_locale_helper.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
 import 'package:workout_notes/repositories/strength_repository.dart';
@@ -18,7 +19,11 @@ import 'package:workout_notes/utils/strength_week_analytics.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/run/run_pending_review_banner.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
-import 'package:workout_notes/widgets/strength/home/workout_home_overview.dart';
+import 'package:workout_notes/models/run_activity.dart';
+import 'package:workout_notes/screens/run/run_detail_screen.dart';
+import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
+import 'package:workout_notes/widgets/strength/home/strength_home_format.dart';
+import 'package:workout_notes/widgets/strength/home/workout_home_widgets.dart';
 import '../../navigation/ai_coach_navigation.dart';
 import '../../repositories/workout_repository.dart';
 import '../../repositories/run_repository.dart';
@@ -55,8 +60,12 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   WorkoutWeekOverview _overview = WorkoutWeekOverview.empty;
   StrengthHomeSnapshot? _strengthSnapshot;
   RunHomeSnapshot? _runSnapshot;
-  double _weekRunMeters = 0;
   bool _hasHistory = false;
+  List<WorkoutDayMark> _weekDays = const [];
+  List<StrengthWorkoutSummary> _recentGym = const [];
+  List<RunActivity> _recentCardio = const [];
+  Map<String, StrengthCategoryInfo> _categories = const {};
+  double _strengthAverageSessions = 0;
 
   // Bumped on every reload so the unsaved-run banner re-reads its list.
   int _pendingReviewRefresh = 0;
@@ -144,6 +153,38 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
       final runs = cardio.where((a) => a.isRunning).toList();
       final strengthSnapshot = await _safe(_strengthToday.load(now: now));
       final runSnapshot = await _safe(RunTodayService().load(activities: runs));
+      final recentGym =
+          await _safe(_strengthRepo.loadFinishedWorkouts(limit: 3)) ??
+          const <StrengthWorkoutSummary>[];
+      final categories =
+          await _safe(_strengthRepo.loadCategories()) ??
+          const <String, StrengthCategoryInfo>{};
+
+      // Monday–Sunday marks: what was done and what the plans expect.
+      final plannedStrengthDays =
+          strengthSnapshot?.plannedStrengthDays ?? const <int>[];
+      final weekDays = [
+        for (var i = 0; i < 7; i++)
+          () {
+            final date = monday.add(Duration(days: i));
+            return WorkoutDayMark(
+              date: date,
+              strengthDone: stamps.any(
+                (g) => DateUtils.isSameDay(g.date, date),
+              ),
+              // Sub-minute sessions are aborted starts, not runs.
+              runDone: runs.any(
+                (a) =>
+                    (a.durationSeconds >= 60 || a.distanceMeters >= 100) &&
+                    DateUtils.isSameDay(a.startedAt.toLocal(), date),
+              ),
+              strengthPlanned: plannedStrengthDays.contains(date.weekday),
+              runPlanned: (runSnapshot?.weekPlan ?? const []).any(
+                (d) => DateUtils.isSameDay(d.date, date),
+              ),
+            );
+          }(),
+      ];
 
       final overview = WorkoutWeekOverview.compute(
         gym: stamps,
@@ -166,7 +207,15 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         _overview = overview;
         _strengthSnapshot = strengthSnapshot;
         _runSnapshot = runSnapshot;
-        _weekRunMeters = overview.runMeters;
+        _weekDays = weekDays;
+        _recentGym = recentGym;
+        // Sub-minute sessions are aborted starts, not activities to revisit.
+        _recentCardio = cardio
+            .where((a) => a.durationSeconds >= 60 || a.distanceMeters >= 100)
+            .take(3)
+            .toList();
+        _strengthAverageSessions = _averageWeeklySessions(stamps, monday);
+        _categories = categories;
         _hasHistory = stamps.isNotEmpty || cardio.isNotEmpty;
         _isLoading = false;
       });
@@ -182,6 +231,18 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   }
 
   static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// Sessions per week over the last 12 calendar weeks (this one
+  /// included) — the same default period the gym hub averages over, so both
+  /// screens show the same goal.
+  static double _averageWeeklySessions(
+    List<StrengthWorkoutStamp> stamps,
+    DateTime monday,
+  ) {
+    const weeks = 12;
+    final from = monday.subtract(const Duration(days: 7 * (weeks - 1)));
+    return stamps.where((s) => !s.date.isBefore(from)).length / weeks;
+  }
 
   // ===================== ACTIONS =====================
   Future<void> _startWorkout() async {
@@ -340,6 +401,12 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
+                  // The week hero leads; live sessions sit right below it.
+                  if (_hasAnyHistory)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      sliver: SliverToBoxAdapter(child: _buildWeekHero()),
+                    ),
                   if (_activeWorkouts.isNotEmpty)
                     SliverToBoxAdapter(
                       child: _buildActiveBanner(
@@ -366,16 +433,20 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
-                        if (!_hasAnyHistory)
-                          _buildFirstTimeEmpty(theme, loc)
-                        else ...[
-                          RunSectionHeader(loc.workoutHomeOverviewTitle),
-                          WorkoutWeekOverviewCard(overview: _overview),
+                        if (!_hasAnyHistory) ...[
+                          _buildFirstTimeEmpty(theme, loc),
+                          const SizedBox(height: 20),
+                          _buildAreas(loc),
+                        ] else ...[
+                          RunSectionHeader(loc.workoutHomeTodayTitle),
+                          _buildToday(loc),
+                          RunSectionHeader(loc.workoutHomeAreasTitle),
+                          _buildAreas(loc),
+                          if (_recentItems(loc).isNotEmpty) ...[
+                            RunSectionHeader(loc.workoutHomeRecentTitle),
+                            WorkoutRecentList(items: _recentItems(loc)),
+                          ],
                         ],
-                        const SizedBox(height: 20),
-                        _buildStrengthHub(loc),
-                        const SizedBox(height: 12),
-                        _buildRunHub(loc),
                       ]),
                     ),
                   ),
@@ -385,71 +456,278 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     );
   }
 
-  // ===================== HUB CARDS =====================
-  Widget _buildStrengthHub(AppLocalizations loc) {
+  // ===================== WEEK / TODAY / AREAS / RECENT =====================
+  Widget _buildWeekHero() {
+    final strength = _strengthSnapshot;
+    final strengthGoal = StrengthWeekGoal.resolve(
+      planSessions: strength?.planSessionsPerWeek,
+      userSessions: strength?.userWeeklyGoalSessions,
+      averageSessions: _strengthAverageSessions,
+    )?.sessions;
+    final run = _runSnapshot;
+    final runGoal = run?.plan?.weekPlannedMeters ?? run?.userWeeklyGoalMeters;
+    final now = DateTime.now();
+
+    return WorkoutWeekHero(
+      strengthDone: _overview.strengthSessions,
+      strengthGoal: strengthGoal,
+      runMeters: _overview.runMeters,
+      runGoalMeters: runGoal != null && runGoal > 0 ? runGoal : null,
+      activeSeconds: _overview.activeSeconds,
+      streakWeeks: _overview.streakWeeks,
+      days: _weekDays,
+      today: DateTime(now.year, now.month, now.day),
+      onOpenStrength: _openStrengthHub,
+      onOpenRun: _openRunHub,
+    ).animate().fadeIn(duration: 300.ms);
+  }
+
+  String _dayName(StrengthRoutineDayInfo day) =>
+      day.dayName.trim().isNotEmpty ? day.dayName : day.routineName;
+
+  Widget _buildToday(AppLocalizations loc) {
     final colors = Theme.of(context).colorScheme;
-    final snapshot = _strengthSnapshot;
-    final today = snapshot?.today;
+    final strength = _strengthSnapshot?.today;
+    final run = _runSnapshot?.today;
+    final items = <WorkoutTodayItem>[];
 
-    String nameOf(StrengthRoutineDayInfo day) =>
-        day.dayName.trim().isNotEmpty ? day.dayName : day.routineName;
+    if (strength?.status == StrengthTodayStatus.planned &&
+        strength?.day != null) {
+      final day = strength!.day!;
+      final details = [
+        loc.strengthHomeExercisesCount(day.exerciseCount),
+        if (day.estimatedSeconds > 0)
+          '~${RunFormatters.durationHoursMinutes(day.estimatedSeconds)}',
+      ].join(' · ');
+      items.add(
+        WorkoutTodayItem(
+          key: const Key('workout-home-train'),
+          icon: Icons.fitness_center,
+          color: colors.primary,
+          title: _dayName(day),
+          subtitle: loc.workoutHomeTodayStrengthSubtitle(details),
+          startTooltip: loc.workoutHomeQuickStrength,
+          onStart: _trainStrength,
+          onOpen: _openStrengthHub,
+        ),
+      );
+    } else if (strength?.status == StrengthTodayStatus.done) {
+      final done = strength!.doneWorkout;
+      items.add(
+        WorkoutTodayItem(
+          icon: Icons.fitness_center,
+          color: colors.primary,
+          title: done?.routineLabel ?? loc.workoutHomeRecentFree,
+          subtitle: loc.workoutHomeTodayStrengthSubtitle(
+            done == null
+                ? loc.workoutHomeTodayDone
+                : '${RunFormatters.durationHoursMinutes(done.durationSeconds)}'
+                      ' · ${loc.strengthHomeSetsCount(done.workingSets)}',
+          ),
+          done: true,
+          startTooltip: loc.workoutHomeQuickStrength,
+          onStart: _trainStrength,
+          onOpen: done == null
+              ? _openStrengthHub
+              : () => _openWorkoutDetail(done.id),
+        ),
+      );
+    }
 
-    final subtitle = switch (today?.status) {
-      StrengthTodayStatus.planned => loc.workoutHomeHubStrengthToday(
-        nameOf(today!.day!),
-        loc.strengthHomeExercisesCount(today.day!.exerciseCount),
-      ),
-      StrengthTodayStatus.done => loc.workoutHomeHubStrengthDone,
-      StrengthTodayStatus.rest =>
-        today!.next == null
-            ? loc.workoutHomeHubStrengthRest
-            : '${loc.workoutHomeHubStrengthRest} · '
-                  '${loc.workoutHomeHubStrengthNext(nameOf(today.next!))}',
-      _ => loc.workoutHomeHubStrengthNone,
-    };
+    if (run?.status == RunTodayStatus.planned && run?.session != null) {
+      final workout = run!.session!.workout;
+      final distance = workout.plannedDistanceMeters;
+      final seconds = workout.plannedDurationSeconds;
+      final details = [
+        if (distance > 0) RunFormatters.distanceWithUnit(distance),
+        if (seconds > 0) '~${RunFormatters.durationHoursMinutes(seconds)}',
+      ].join(' · ');
+      items.add(
+        WorkoutTodayItem(
+          key: const Key('workout-home-run'),
+          icon: Icons.directions_run,
+          color: colors.tertiary,
+          title: workout.name,
+          subtitle: details.isEmpty
+              ? loc.workoutHomeTodayRunPlain
+              : loc.workoutHomeTodayRunSubtitle(details),
+          startTooltip: loc.workoutHomeQuickRun,
+          onStart: _startRun,
+          onOpen: _openRunHub,
+        ),
+      );
+    } else if (run?.status == RunTodayStatus.done) {
+      final done = run!.doneActivity;
+      items.add(
+        WorkoutTodayItem(
+          icon: Icons.directions_run,
+          color: colors.tertiary,
+          title: done?.title?.trim().isNotEmpty == true
+              ? done!.title!
+              : loc.workoutHomeRecentRun,
+          subtitle: done == null
+              ? loc.workoutHomeTodayRunPlain
+              : loc.workoutHomeTodayRunSubtitle(
+                  RunFormatters.distanceWithUnit(done.distanceMeters),
+                ),
+          done: true,
+          startTooltip: loc.workoutHomeQuickRun,
+          onStart: _startRun,
+          onOpen: done == null ? _openRunHub : () => _openRunDetail(done.id),
+        ),
+      );
+    }
 
-    return WorkoutHubCard(
-      actionKey: const Key('workout-home-train'),
-      icon: Icons.fitness_center,
-      color: colors.primary,
-      title: loc.workoutHomeHubStrengthTitle,
-      subtitle: subtitle,
-      detail: loc.workoutHomeHubStrengthWeek(_overview.strengthSessions),
-      actionLabel: loc.strengthHomeTrain,
-      actionIcon: Icons.play_arrow_rounded,
-      onOpen: _openStrengthHub,
-      onAction: _trainStrength,
+    final rest =
+        strength?.status == StrengthTodayStatus.rest ||
+        run?.status == RunTodayStatus.rest;
+    final next = strength?.next;
+    return WorkoutTodayCard(
+      items: items,
+      emptyIcon: rest
+          ? Icons.self_improvement_rounded
+          : Icons.wb_sunny_outlined,
+      emptyTitle: rest
+          ? loc.workoutHomeTodayRestTitle
+          : loc.workoutHomeTodayFreeTitle,
+      emptySubtitle: next != null
+          ? loc.workoutHomeTodayNextStrength(_dayName(next))
+          : loc.workoutHomeTodayFreeSubtitle,
+      onQuickStrength: _trainStrength,
+      onQuickRun: _startRun,
     ).animate().fadeIn(duration: 300.ms, delay: 60.ms);
   }
 
-  Widget _buildRunHub(AppLocalizations loc) {
+  Widget _buildAreas(AppLocalizations loc) {
     final colors = Theme.of(context).colorScheme;
-    final today = _runSnapshot?.today;
-    final subtitle = switch (today?.status) {
-      RunTodayStatus.planned => loc.workoutHomeHubRunToday(
-        today!.session!.workout.name,
-      ),
-      RunTodayStatus.done => loc.workoutHomeHubRunDone,
-      RunTodayStatus.rest => loc.workoutHomeHubRunRest,
-      _ => loc.workoutHomeHubRunNone,
-    };
+    final locale = Localizations.localeOf(context).toString();
+    String? last(DateTime? date) => date == null
+        ? null
+        : loc.workoutHomeAreaStrengthLast(DateFormat.MMMd(locale).format(date));
+    final lastGym = _recentGym.isEmpty ? null : _recentGym.first.date;
+    final runs = _recentCardio.where((a) => a.isRunning);
+    final lastRun = runs.isEmpty ? null : runs.first.startedAt.toLocal();
 
-    return WorkoutHubCard(
-      actionKey: const Key('workout-home-run'),
-      icon: Icons.directions_run,
-      color: colors.tertiary,
-      title: loc.workoutHomeHubRunTitle,
-      subtitle: subtitle,
-      detail: _weekRunMeters > 0
-          ? loc.workoutHomeHubRunWeek(
-              RunFormatters.distanceWithUnit(_weekRunMeters),
-            )
-          : null,
-      actionLabel: loc.workoutHomeHubRunAction,
-      actionIcon: Icons.play_arrow_rounded,
-      onOpen: _openRunHub,
-      onAction: _startRun,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: WorkoutAreaTile(
+              tileKey: const Key('workout-home-strength-hub'),
+              icon: Icons.fitness_center,
+              color: colors.primary,
+              title: loc.workoutHomeHubStrengthTitle,
+              line1: loc.workoutHomeHubStrengthWeek(_overview.strengthSessions),
+              line2: last(lastGym),
+              onTap: _openStrengthHub,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: WorkoutAreaTile(
+              tileKey: const Key('workout-home-run-hub'),
+              icon: Icons.directions_run,
+              color: colors.tertiary,
+              title: loc.workoutHomeHubRunTitle,
+              line1: loc.workoutHomeHubRunWeek(
+                RunFormatters.distanceWithUnit(_overview.runMeters),
+              ),
+              line2: last(lastRun),
+              onTap: _openRunHub,
+            ),
+          ),
+        ],
+      ),
     ).animate().fadeIn(duration: 300.ms, delay: 120.ms);
+  }
+
+  /// The latest gym workouts and cardio sessions, newest first.
+  List<WorkoutRecentItem> _recentItems(AppLocalizations loc) {
+    final colors = Theme.of(context).colorScheme;
+    final items = <(DateTime, WorkoutRecentItem)>[];
+    for (final w in _recentGym) {
+      final category = w.dominantCategoryId == null
+          ? null
+          : _categories[w.dominantCategoryId];
+      items.add((
+        w.startTime ?? w.date,
+        WorkoutRecentItem(
+          icon: Icons.fitness_center,
+          color: category == null ? colors.primary : Color(category.color),
+          title:
+              w.routineLabel ??
+              _muscleLabel(loc, w) ??
+              loc.workoutHomeRecentFree,
+          date: w.date,
+          duration: w.durationSeconds > 0
+              ? RunFormatters.durationHoursMinutes(w.durationSeconds)
+              : null,
+          value: StrengthHomeFormat.volume(w.volumeKg),
+          valueCaption: loc.strengthHomeSetsCount(w.workingSets),
+          onTap: () => _openWorkoutDetail(w.id),
+        ),
+      ));
+    }
+    for (final a in _recentCardio) {
+      final started = a.startedAt.toLocal();
+      final title = a.title?.trim().isNotEmpty == true
+          ? a.title!
+          : switch (a.activityType) {
+              CardioActivityType.running => loc.workoutHomeRecentRun,
+              CardioActivityType.treadmill => loc.workoutHomeRecentTreadmill,
+              CardioActivityType.stationaryBike => loc.workoutHomeRecentBike,
+            };
+      items.add((
+        started,
+        WorkoutRecentItem(
+          icon: a.isStationaryBike
+              ? Icons.pedal_bike_rounded
+              : Icons.directions_run,
+          color: colors.tertiary,
+          title: title,
+          date: started,
+          duration: RunFormatters.durationHoursMinutes(
+            a.movingTimeSeconds > 0 ? a.movingTimeSeconds : a.durationSeconds,
+          ),
+          value: a.distanceMeters > 0
+              ? RunFormatters.distanceWithUnit(a.distanceMeters)
+              : RunFormatters.durationHoursMinutes(a.durationSeconds),
+          valueCaption: a.isRunning && a.avgPaceSecPerKm != null
+              ? RunFormatters.paceWithUnit(a.avgPaceSecPerKm)
+              : null,
+          onTap: () => _openRunDetail(a.id),
+        ),
+      ));
+    }
+    items.sort((a, b) => b.$1.compareTo(a.$1));
+    return [for (final i in items.take(4)) i.$2];
+  }
+
+  /// "Costas · Bíceps" for a workout without a routine day.
+  String? _muscleLabel(AppLocalizations loc, StrengthWorkoutSummary w) {
+    final names = [
+      for (final id in w.categoryIds.take(2))
+        if (_categories[id] != null)
+          ExerciseLocaleHelper.categoryName(loc, _categories[id]!.row),
+    ];
+    return names.isEmpty ? null : names.join(' · ');
+  }
+
+  Future<void> _openWorkoutDetail(String id) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => WorkoutDetailScreen(workoutId: id)),
+    );
+    _loadData();
+  }
+
+  Future<void> _openRunDetail(String id) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => RunDetailScreen(activityId: id)),
+    );
+    _loadData();
   }
 
   // ===================== APP BAR =====================
@@ -498,7 +776,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     final elapsed = _activeElapsed(workout);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Material(
         color: theme.colorScheme.primary,
         borderRadius: BorderRadius.circular(20),
@@ -583,7 +861,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Material(
         color: theme.colorScheme.secondaryContainer,
         borderRadius: BorderRadius.circular(20),
@@ -645,7 +923,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         : '$time · ${loc.cardioActivityStationaryBikeSubtitle}';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Material(
         color: theme.colorScheme.secondaryContainer,
         borderRadius: BorderRadius.circular(20),
@@ -699,7 +977,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   // ===================== FIRST-TIME EMPTY =====================
   Widget _buildFirstTimeEmpty(ThemeData theme, AppLocalizations loc) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(

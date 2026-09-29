@@ -275,13 +275,6 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_active.isNotEmpty) ...[
-          StrengthActiveBanner(
-            workout: _active.first,
-            onTap: _continueActive,
-          ).animate().fadeIn(duration: 300.ms),
-          const SizedBox(height: 12),
-        ],
         if (snapshot != null)
           StrengthTodayCard(
             info: snapshot.today,
@@ -290,6 +283,14 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
             onOpenRoutines: () => _push(const RoutinesScreen()),
             onOpenWorkout: (id) => _push(WorkoutDetailScreen(workoutId: id)),
           ).animate().fadeIn(duration: 300.ms),
+        // The unfinished workout sits right under today's card.
+        if (_active.isNotEmpty) ...[
+          if (snapshot != null) const SizedBox(height: 12),
+          StrengthActiveBanner(
+            workout: _active.first,
+            onTap: _continueActive,
+          ).animate().fadeIn(duration: 300.ms),
+        ],
         if (!hasWorkouts) ...[
           const SizedBox(height: 22),
           StrengthHomeEmpty(

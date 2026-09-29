@@ -73,10 +73,8 @@ void main() {
     await _pumpHome(tester);
 
     expect(find.text('Nenhum treino ainda'), findsOneWidget);
-    expect(find.text('Musculação'), findsOneWidget);
-    expect(find.text('Corrida'), findsOneWidget);
-    expect(find.byKey(const Key('workout-home-train')), findsOneWidget);
-    expect(find.byKey(const Key('workout-home-run')), findsOneWidget);
+    expect(find.byKey(const Key('workout-home-strength-hub')), findsOneWidget);
+    expect(find.byKey(const Key('workout-home-run-hub')), findsOneWidget);
     // The old tools grid, quick actions and long lists moved to the hubs.
     expect(find.text('FERRAMENTAS'), findsNothing);
     expect(find.text('AÇÕES RÁPIDAS'), findsNothing);
@@ -128,9 +126,13 @@ void main() {
 
     await _pumpHome(tester);
 
-    expect(find.text('ESTA SEMANA'), findsOneWidget);
-    expect(find.text('Musculação'), findsWidgets);
-    expect(find.text('Treino de hoje concluído'), findsOneWidget);
+    // Week rings, today's agenda (done), training areas and recents.
+    expect(find.byKey(const Key('workout-home-ring-strength')), findsOneWidget);
+    expect(find.text('HOJE'), findsOneWidget);
+    // Legend + the done badge in today's agenda.
+    expect(find.text('Feito'), findsNWidgets(2));
+    expect(find.text('SEUS TREINOS'), findsOneWidget);
+    // Only the finished workout counts (the planned one does not).
     expect(find.text('1 treino esta semana'), findsOneWidget);
     expect(find.text('Nenhum treino ainda'), findsNothing);
     _expectOnlyMissingPlugins(tester);
