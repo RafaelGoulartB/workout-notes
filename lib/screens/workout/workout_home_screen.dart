@@ -3,32 +3,35 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
+import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/cardio_activity_type.dart';
-import 'package:workout_notes/models/run_activity.dart';
-import 'package:workout_notes/screens/run/run_detail_screen.dart';
+import 'package:workout_notes/models/strength_workout_summary.dart';
+import 'package:workout_notes/repositories/strength_repository.dart';
+import 'package:workout_notes/screens/strength/strength_home_screen.dart';
 import 'package:workout_notes/services/run_today_service.dart';
 import 'package:workout_notes/services/run_tracking_service.dart';
 import 'package:workout_notes/services/stationary_bike_tracking_service.dart';
+import 'package:workout_notes/services/strength_today_service.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
+import 'package:workout_notes/utils/strength_week_analytics.dart';
 import 'package:workout_notes/widgets/ai/ai_coach_header_button.dart';
 import 'package:workout_notes/widgets/run/run_pending_review_banner.dart';
+import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/widgets/strength/home/workout_home_overview.dart';
 import '../../navigation/ai_coach_navigation.dart';
 import '../../repositories/workout_repository.dart';
-import '../../repositories/analytics_repository.dart';
 import '../../repositories/run_repository.dart';
 import '../../services/rest_timer_service.dart';
 import 'active_workout_screen.dart';
 import '../run/run_record_screen.dart';
 import '../run/run_stats_screen.dart';
 import 'calendar_screen.dart';
-import 'exercise_library_screen.dart';
-import 'routines_screen.dart';
-import 'progress_screen.dart';
 import 'settings_screen.dart';
 import 'rest_timer_screen.dart';
-import 'workout_detail_screen.dart';
 
+/// The Treino tab: live banners, this week across gym and running, and the
+/// two hub entries (Musculação and Corrida) with a start button each.
 class WorkoutHomeScreen extends StatefulWidget {
   final ValueListenable<int>? selectedTab;
 
@@ -40,24 +43,20 @@ class WorkoutHomeScreen extends StatefulWidget {
 
 class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   final _workoutRepo = WorkoutRepository();
-  final _analyticsRepo = AnalyticsRepository();
+  final _strengthRepo = StrengthRepository();
+  final _strengthToday = StrengthTodayService();
   final _runRepo = RunRepository();
   final _timerService = RestTimerService.instance;
   final _runTrackingService = RunTrackingService.instance;
   final _bikeTrackingService = StationaryBikeTrackingService.instance;
   bool _isLoading = true;
   List<Map<String, dynamic>> _activeWorkouts = [];
-  List<Map<String, dynamic>> _upcomingWorkouts = [];
-  List<_CompletedActivity> _completedActivities = [];
-  bool _showCompleted = true;
-  bool _showUpcoming = true;
 
-  // Stats for header card
-  int _monthWorkouts = 0;
-  double _monthVolume = 0;
-  double _monthCardioDistance = 0;
-  int _monthCardioTime = 0;
-  int _currentStreak = 0;
+  WorkoutWeekOverview _overview = WorkoutWeekOverview.empty;
+  StrengthHomeSnapshot? _strengthSnapshot;
+  RunHomeSnapshot? _runSnapshot;
+  double _weekRunMeters = 0;
+  bool _hasHistory = false;
 
   // Bumped on every reload so the unsaved-run banner re-reads its list.
   int _pendingReviewRefresh = 0;
@@ -113,6 +112,14 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     _elapsedTimer = null;
   }
 
+  Future<T?> _safe<T>(Future<T> future) async {
+    try {
+      return await future;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
@@ -120,66 +127,61 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     });
     try {
       final now = DateTime.now();
-      final tomorrow = DateTime(now.year, now.month, now.day + 1);
-      final results = await Future.wait<Object>([
-        _workoutRepo.getWorkouts(limit: 50),
-        _workoutRepo.getWorkouts(startDate: tomorrow, limit: 20),
-        _workoutRepo.getMonthlySummary(now),
-        _analyticsRepo.getCurrentWorkoutStreak(),
-        _workoutRepo.getActiveWorkouts(),
-        _runRepo.getMonthlyRunSummary(now, activityType: null),
-        _runRepo.listActivities(limit: 50, activityType: null),
-      ]);
-      final allWorkouts = results[0] as List<Map<String, dynamic>>;
-      final futureWorkouts = results[1] as List<Map<String, dynamic>>;
-      final monthly = results[2] as Map<String, dynamic>;
-      final currentStreak = results[3] as int;
-      final active = results[4] as List<Map<String, dynamic>>;
-      final runMonthly = results[5] as Map<String, dynamic>;
-      final recentRuns = results[6] as List<RunActivity>;
-      final completed = <Map<String, dynamic>>[];
-      for (final w in allWorkouts) {
-        if ((w['end_time'] as String?) != null) {
-          completed.add(w);
-        }
-      }
-      final completedActivities = <_CompletedActivity>[
-        for (final workout in completed)
-          _CompletedActivity.fromWorkout(workout),
-        for (final run in recentRuns) _CompletedActivity.fromRun(run),
-      ]..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+      await StrengthRoutineDayInference.runOnce();
+      final today = DateTime(now.year, now.month, now.day);
+      final monday = StrengthWeekAnalytics.mondayOf(today);
+      // A year of history is enough for a week streak and keeps the reads
+      // cheap; older weeks never change the number shown.
+      final since = monday.subtract(const Duration(days: 7 * 52));
 
-      if (mounted) {
-        setState(() {
-          _activeWorkouts = active;
-          _upcomingWorkouts = futureWorkouts.take(5).toList();
-          _completedActivities = completedActivities.take(8).toList();
-          _currentStreak = currentStreak;
-          _monthWorkouts = (monthly['workout_count'] as num?)?.toInt() ?? 0;
-          _monthVolume = (monthly['total_volume'] as num?)?.toDouble() ?? 0;
-          // Cardio metrics now come from corrida (run_activities), not
-          // exercise sets with distance/time.
-          final runDistanceMeters =
-              (runMonthly['total_distance_meters'] as num?)?.toDouble() ?? 0;
-          final runMovingTime =
-              (runMonthly['total_moving_time'] as num?)?.toInt() ?? 0;
-          final runDuration =
-              (runMonthly['total_duration'] as num?)?.toInt() ?? 0;
-          _monthCardioDistance = runDistanceMeters / 1000.0;
-          _monthCardioTime = runMovingTime > 0 ? runMovingTime : runDuration;
-          _isLoading = false;
-        });
-        // Keep the elapsed time live when there is an active workout
-        if (active.isNotEmpty && (widget.selectedTab?.value ?? 0) == 0) {
-          _startElapsedTimer();
-        } else {
-          _stopElapsedTimer();
-        }
+      final active = await _workoutRepo.getActiveWorkouts();
+      final stamps = await _strengthRepo.loadWorkoutStamps(from: since);
+      final cardio = await _runRepo.listActivities(
+        limit: null,
+        activityType: null,
+        startedFrom: since,
+      );
+      final runs = cardio.where((a) => a.isRunning).toList();
+      final strengthSnapshot = await _safe(_strengthToday.load(now: now));
+      final runSnapshot = await _safe(RunTodayService().load(activities: runs));
+
+      final overview = WorkoutWeekOverview.compute(
+        gym: stamps,
+        cardio: [
+          for (final a in cardio)
+            WorkoutCardioStamp(
+              date: _dateOnly(a.startedAt.toLocal()),
+              durationSeconds: a.movingTimeSeconds > 0
+                  ? a.movingTimeSeconds
+                  : a.durationSeconds,
+              runDistanceMeters: a.isRunning ? a.distanceMeters : 0,
+            ),
+        ],
+        now: now,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _activeWorkouts = active;
+        _overview = overview;
+        _strengthSnapshot = strengthSnapshot;
+        _runSnapshot = runSnapshot;
+        _weekRunMeters = overview.runMeters;
+        _hasHistory = stamps.isNotEmpty || cardio.isNotEmpty;
+        _isLoading = false;
+      });
+      // Keep the elapsed time live when there is an active workout
+      if (active.isNotEmpty && (widget.selectedTab?.value ?? 0) == 0) {
+        _startElapsedTimer();
+      } else {
+        _stopElapsedTimer();
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
+  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
   // ===================== ACTIONS =====================
   Future<void> _startWorkout() async {
@@ -189,6 +191,42 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         kind: AiCoachRouteKind.activeWorkout,
         builder: (_) => const ActiveWorkoutScreen(),
       ),
+    );
+    _loadData();
+  }
+
+  /// Starts today's suggested routine day (or a blank workout); resumes the
+  /// unfinished workout of the day when there is one.
+  Future<void> _trainStrength() async {
+    if (_activeWorkouts.isNotEmpty) {
+      return _openActiveWorkout(_activeWorkouts.first);
+    }
+    final day = _strengthSnapshot?.today.startDay;
+    await Navigator.push(
+      context,
+      AiCoachNavigation.route(
+        kind: AiCoachRouteKind.activeWorkout,
+        builder: (_) => ActiveWorkoutScreen(
+          routineId: day?.routineId,
+          routineDayId: day?.routineDayId,
+        ),
+      ),
+    );
+    _loadData();
+  }
+
+  Future<void> _openStrengthHub() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const StrengthHomeScreen()),
+    );
+    _loadData();
+  }
+
+  Future<void> _openRunHub() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RunStatsScreen()),
     );
     _loadData();
   }
@@ -246,46 +284,11 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   }
 
   // ===================== HELPERS =====================
-  String _formatVolume(double v) {
-    if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
-    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
-    return v.toStringAsFixed(0);
-  }
-
-  String _formatDistance(double km) {
-    if (km >= 100) return '${km.toStringAsFixed(0)}k';
-    return km.toStringAsFixed(1);
-  }
-
-  String _formatMinutes(int seconds) {
-    if (seconds <= 0) return '0';
-    final min = seconds ~/ 60;
-    if (min >= 60) return '${min ~/ 60}h${min % 60}';
-    return '${min}min';
-  }
-
   String _formatHeaderDate(AppLocalizations loc) {
     return DateFormat(
       'EEEE, d MMMM',
       Intl.defaultLocale,
     ).format(DateTime.now());
-  }
-
-  /// Returns a friendly "Last workout: `<when>`" string. Empty when there is
-  /// no completed workout yet.
-  String _lastWorkoutLabel(AppLocalizations loc) {
-    if (_completedActivities.isEmpty) return '';
-    final workoutDate = _completedActivities.first.occurredAt.toLocal();
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final wd = DateTime(workoutDate.year, workoutDate.month, workoutDate.day);
-    final diff = today.difference(wd).inDays;
-    if (diff == 0) return loc.workoutHomeLastWorkoutToday;
-    if (diff == 1) return loc.workoutHomeLastWorkoutYesterday;
-    if (diff < 7) {
-      return loc.workoutHomeLastWorkoutAgo('$diff ${loc.workoutHomeDays}');
-    }
-    return DateFormat.MMMd(Intl.defaultLocale).format(workoutDate);
   }
 
   /// Pretty-prints the elapsed time of the active workout (e.g. "23 min",
@@ -305,8 +308,8 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
   }
 
   bool get _hasAnyHistory =>
+      _hasHistory ||
       _activeWorkouts.isNotEmpty ||
-      _completedActivities.isNotEmpty ||
       _runTrackingService.state.isActive ||
       _bikeTrackingService.state.isActive;
 
@@ -337,13 +340,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  // First-time empty state replaces the stats card.
-                  if (!_hasAnyHistory)
-                    SliverToBoxAdapter(child: _buildFirstTimeEmpty(theme, loc))
-                  else
-                    SliverToBoxAdapter(child: _buildHeaderStats(theme, loc)),
-                  // Active workout banner — shown right after the stats
-                  // card so the high-level summary still leads the page.
                   if (_activeWorkouts.isNotEmpty)
                     SliverToBoxAdapter(
                       child: _buildActiveBanner(
@@ -366,33 +362,94 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                     SliverToBoxAdapter(
                       child: _buildActiveBikeBanner(theme, loc),
                     ),
-                  SliverToBoxAdapter(
-                    child: _buildSectionHeader(
-                      loc.workoutHomeSectionQuickActions,
-                      theme,
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        if (!_hasAnyHistory)
+                          _buildFirstTimeEmpty(theme, loc)
+                        else ...[
+                          RunSectionHeader(loc.workoutHomeOverviewTitle),
+                          WorkoutWeekOverviewCard(overview: _overview),
+                        ],
+                        const SizedBox(height: 20),
+                        _buildStrengthHub(loc),
+                        const SizedBox(height: 12),
+                        _buildRunHub(loc),
+                      ]),
                     ),
                   ),
-                  SliverToBoxAdapter(child: _buildQuickActions(theme, loc)),
-                  SliverToBoxAdapter(
-                    child: _buildSectionHeader(
-                      loc.workoutHomeSectionTools,
-                      theme,
-                    ),
-                  ),
-                  SliverToBoxAdapter(child: _buildNavGrid(theme, loc)),
-                  if (_upcomingWorkouts.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: _buildUpcomingSection(theme, loc),
-                    ),
-                  if (_completedActivities.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: _buildCompletedSection(theme, loc),
-                    ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
               ),
             ),
     );
+  }
+
+  // ===================== HUB CARDS =====================
+  Widget _buildStrengthHub(AppLocalizations loc) {
+    final colors = Theme.of(context).colorScheme;
+    final snapshot = _strengthSnapshot;
+    final today = snapshot?.today;
+
+    String nameOf(StrengthRoutineDayInfo day) =>
+        day.dayName.trim().isNotEmpty ? day.dayName : day.routineName;
+
+    final subtitle = switch (today?.status) {
+      StrengthTodayStatus.planned => loc.workoutHomeHubStrengthToday(
+        nameOf(today!.day!),
+        loc.strengthHomeExercisesCount(today.day!.exerciseCount),
+      ),
+      StrengthTodayStatus.done => loc.workoutHomeHubStrengthDone,
+      StrengthTodayStatus.rest =>
+        today!.next == null
+            ? loc.workoutHomeHubStrengthRest
+            : '${loc.workoutHomeHubStrengthRest} · '
+                  '${loc.workoutHomeHubStrengthNext(nameOf(today.next!))}',
+      _ => loc.workoutHomeHubStrengthNone,
+    };
+
+    return WorkoutHubCard(
+      actionKey: const Key('workout-home-train'),
+      icon: Icons.fitness_center,
+      color: colors.primary,
+      title: loc.workoutHomeHubStrengthTitle,
+      subtitle: subtitle,
+      detail: loc.workoutHomeHubStrengthWeek(_overview.strengthSessions),
+      actionLabel: loc.strengthHomeTrain,
+      actionIcon: Icons.play_arrow_rounded,
+      onOpen: _openStrengthHub,
+      onAction: _trainStrength,
+    ).animate().fadeIn(duration: 300.ms, delay: 60.ms);
+  }
+
+  Widget _buildRunHub(AppLocalizations loc) {
+    final colors = Theme.of(context).colorScheme;
+    final today = _runSnapshot?.today;
+    final subtitle = switch (today?.status) {
+      RunTodayStatus.planned => loc.workoutHomeHubRunToday(
+        today!.session!.workout.name,
+      ),
+      RunTodayStatus.done => loc.workoutHomeHubRunDone,
+      RunTodayStatus.rest => loc.workoutHomeHubRunRest,
+      _ => loc.workoutHomeHubRunNone,
+    };
+
+    return WorkoutHubCard(
+      actionKey: const Key('workout-home-run'),
+      icon: Icons.directions_run,
+      color: colors.tertiary,
+      title: loc.workoutHomeHubRunTitle,
+      subtitle: subtitle,
+      detail: _weekRunMeters > 0
+          ? loc.workoutHomeHubRunWeek(
+              RunFormatters.distanceWithUnit(_weekRunMeters),
+            )
+          : null,
+      actionLabel: loc.workoutHomeHubRunAction,
+      actionIcon: Icons.play_arrow_rounded,
+      onOpen: _openRunHub,
+      onAction: _startRun,
+    ).animate().fadeIn(duration: 300.ms, delay: 120.ms);
   }
 
   // ===================== APP BAR =====================
@@ -438,7 +495,7 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     AppLocalizations loc,
     Map<String, dynamic> workout,
   ) {
-    final elapsed = _activeElapsed(workout) ?? '--';
+    final elapsed = _activeElapsed(workout);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -469,7 +526,9 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        loc.workoutHomeActiveBannerSubtitle(elapsed),
+                        elapsed == null
+                            ? loc.workoutHomeActiveNotStarted
+                            : loc.workoutHomeActiveBannerSubtitle(elapsed),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onPrimary.withAlpha(220),
                         ),
@@ -637,335 +696,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
     ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05);
   }
 
-  // ===================== STATS =====================
-  Widget _buildHeaderStats(ThemeData theme, AppLocalizations loc) {
-    final lastWorkout = _lastWorkoutLabel(loc);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              theme.colorScheme.surfaceContainerHighest.withAlpha(200),
-              theme.colorScheme.surfaceContainerLow,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _StatItem(
-                    label: loc.workoutHomeMonthWorkouts,
-                    value: '$_monthWorkouts',
-                    icon: Icons.fitness_center,
-                    color: theme.colorScheme.primary,
-                    theme: theme,
-                  ),
-                ),
-                _StatDivider(theme: theme),
-                Expanded(
-                  child: _StatItem(
-                    label: loc.workoutHomeVolume,
-                    value: _formatVolume(_monthVolume),
-                    unit: 'kg',
-                    icon: Icons.auto_graph,
-                    color: theme.colorScheme.secondary,
-                    theme: theme,
-                  ),
-                ),
-                _StatDivider(theme: theme),
-                Expanded(
-                  child: _StatItem(
-                    label: loc.workoutHomeStreak,
-                    value: '$_currentStreak',
-                    unit: _currentStreak == 1
-                        ? loc.workoutHomeDay
-                        : loc.workoutHomeDays,
-                    icon: Icons.local_fire_department,
-                    color: Colors.orange,
-                    theme: theme,
-                  ),
-                ),
-              ],
-            ),
-            if (_monthCardioDistance > 0 || _monthCardioTime > 0) ...[
-              const SizedBox(height: 10),
-              Container(
-                height: 1,
-                color: theme.colorScheme.outlineVariant.withAlpha(60),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _StatItem(
-                      label: loc.workoutHomeCardioDistance,
-                      value: _formatDistance(_monthCardioDistance),
-                      icon: Icons.map,
-                      color: const Color(0xFFE53935),
-                      theme: theme,
-                    ),
-                  ),
-                  _StatDivider(theme: theme),
-                  Expanded(
-                    child: _StatItem(
-                      label: loc.workoutHomeCardioTime,
-                      value: _formatMinutes(_monthCardioTime),
-                      icon: Icons.timer_outlined,
-                      color: Colors.deepOrange,
-                      theme: theme,
-                    ),
-                  ),
-                  _StatDivider(theme: theme),
-                  Expanded(
-                    child: _StatItem(
-                      label: loc.runHomeAvgPace,
-                      // Seconds of moving time per km of the month, shown as
-                      // a pace (mm:ss) rather than a bare number of seconds.
-                      value: _monthCardioDistance > 0 && _monthCardioTime > 0
-                          ? RunFormatters.pace(
-                              _monthCardioTime / _monthCardioDistance,
-                            )
-                          : '--',
-                      unit: _monthCardioDistance > 0 && _monthCardioTime > 0
-                          ? '/km'
-                          : null,
-                      icon: Icons.speed,
-                      color: Colors.brown,
-                      theme: theme,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            if (lastWorkout.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Container(
-                height: 1,
-                color: theme.colorScheme.outlineVariant.withAlpha(80),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(
-                    Icons.history,
-                    size: 14,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${loc.workoutHomeLastWorkout}: ',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  Text(
-                    lastWorkout,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-    ).animate().fadeIn(duration: 300.ms, delay: 120.ms).slideY(begin: 0.05);
-  }
-
-  // ===================== SECTION HEADER =====================
-  Widget _buildSectionHeader(String text, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-      child: Text(
-        text,
-        style: theme.textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.5,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-
-  // ===================== QUICK ACTIONS =====================
-  Widget _buildQuickActions(ThemeData theme, AppLocalizations loc) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: _ActionCard(
-              icon: Icons.fitness_center,
-              label: loc.workoutHomeNewWorkout,
-              subtitle: loc.workoutHomeStartNow,
-              color: theme.colorScheme.primary,
-              onTap: _startWorkout,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _ActionCard(
-              icon: Icons.directions_run,
-              label: loc.workoutHomeStartRun,
-              subtitle: loc.workoutHomeStartRunSubtitle,
-              color: theme.colorScheme.secondary,
-              onTap: _startRun,
-            ),
-          ),
-        ],
-      ),
-    ).animate().fadeIn(duration: 350.ms, delay: 200.ms);
-  }
-
-  // ===================== NAV GRID (2x2) =====================
-  Widget _buildNavGrid(ThemeData theme, AppLocalizations loc) {
-    final items = [
-      _NavItemData(
-        Icons.repeat,
-        loc.workoutHomeRoutines,
-        () => Navigator.push(
-          context,
-          AiCoachNavigation.route(
-            kind: AiCoachRouteKind.normalWithFab,
-            builder: (_) => const RoutinesScreen(),
-          ),
-        ),
-      ),
-      _NavItemData(
-        Icons.fitness_center,
-        loc.workoutHomeExercises,
-        () => Navigator.push(
-          context,
-          AiCoachNavigation.route(
-            kind: AiCoachRouteKind.normalWithFab,
-            builder: (_) => const ExerciseLibraryScreen(),
-          ),
-        ),
-      ),
-      _NavItemData(
-        Icons.directions_run,
-        loc.workoutHomeRuns,
-        () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const RunStatsScreen()),
-        ),
-      ),
-      _NavItemData(
-        Icons.bar_chart,
-        loc.workoutHomeProgress,
-        () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ProgressScreen()),
-        ),
-      ),
-    ];
-
-    // Tools grid (2x2): Routines, Exercises, Runs, Progress.
-    const crossAxisCount = 2;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80),
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          shrinkWrap: true,
-          padding: EdgeInsets.zero,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            childAspectRatio: 1.65,
-            mainAxisSpacing: 0,
-            crossAxisSpacing: 0,
-          ),
-          itemCount: items.length,
-          itemBuilder: (ctx, i) {
-            final item = items[i];
-            final isLeft = i % 2 == 0;
-            final isTopRow = i < crossAxisCount;
-            return _NavTile(
-              icon: item.icon,
-              label: item.label,
-              onTap: item.onTap,
-              showLeftBorder: !isLeft,
-              showTopBorder: !isTopRow,
-            );
-          },
-        ),
-      ),
-    ).animate().fadeIn(duration: 350.ms, delay: 280.ms);
-  }
-
-  // ===================== UPCOMING =====================
-  Widget _buildUpcomingSection(ThemeData theme, AppLocalizations loc) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _CollapsibleSectionHeader(
-            icon: Icons.schedule,
-            iconBg: theme.colorScheme.secondaryContainer,
-            iconFg: theme.colorScheme.onSecondaryContainer,
-            title: loc.workoutHomeUpcoming,
-            count: _upcomingWorkouts.length,
-            expanded: _showUpcoming,
-            onTap: () => setState(() => _showUpcoming = !_showUpcoming),
-          ),
-          if (_showUpcoming) ...[
-            const SizedBox(height: 8),
-            ...(_upcomingWorkouts.map(
-              (w) => _buildWorkoutCard(w, theme, isActive: false),
-            )),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ===================== COMPLETED =====================
-  Widget _buildCompletedSection(ThemeData theme, AppLocalizations loc) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _CollapsibleSectionHeader(
-            icon: Icons.check_circle_outline,
-            iconBg: theme.colorScheme.primaryContainer,
-            iconFg: theme.colorScheme.onPrimaryContainer,
-            title: loc.workoutHomeCompleted,
-            count: _completedActivities.length,
-            expanded: _showCompleted,
-            onTap: () => setState(() => _showCompleted = !_showCompleted),
-          ),
-          if (_showCompleted) ...[
-            const SizedBox(height: 8),
-            ...(_completedActivities.map(
-              (activity) => _buildCompletedActivityCard(activity, theme),
-            )),
-          ],
-        ],
-      ),
-    );
-  }
-
   // ===================== FIRST-TIME EMPTY =====================
   Widget _buildFirstTimeEmpty(ThemeData theme, AppLocalizations loc) {
     return Padding(
@@ -1016,279 +746,6 @@ class _WorkoutHomeScreenState extends State<WorkoutHomeScreen> {
         ),
       ),
     ).animate().fadeIn(duration: 300.ms, delay: 120.ms).slideY(begin: 0.05);
-  }
-
-  // ===================== WORKOUT CARD =====================
-  Widget _buildCompletedActivityCard(
-    _CompletedActivity activity,
-    ThemeData theme,
-  ) {
-    final formatted = DateFormat(
-      Intl.defaultLocale?.startsWith('pt') == true
-          ? "d 'de' MMMM yyyy"
-          : 'MMMM d, yyyy',
-      Intl.defaultLocale,
-    ).format(activity.occurredAt.toLocal());
-    final duration = activity.durationSeconds;
-    final durationLabel = duration > 0
-        ? AppLocalizations.of(
-            context,
-          )!.workoutDetailDuration(duration ~/ 60, duration % 60)
-        : '--';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: theme.colorScheme.outlineVariant.withAlpha(80),
-          ),
-        ),
-        child: InkWell(
-          key: ValueKey('completed-${activity.kind.name}-${activity.id}'),
-          borderRadius: BorderRadius.circular(12),
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => activity.kind == _CompletedActivityKind.run
-                    ? RunDetailScreen(activityId: activity.id)
-                    : WorkoutDetailScreen(workoutId: activity.id),
-              ),
-            );
-            _loadData();
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    activity.kind == _CompletedActivityKind.run
-                        ? activity.activityType ==
-                                  CardioActivityType.stationaryBike
-                              ? Icons.pedal_bike_rounded
-                              : Icons.directions_run_rounded
-                        : Icons.fitness_center,
-                    color: theme.colorScheme.onSurfaceVariant,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        formatted,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        durationLabel,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (activity.feelingRating > 0)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(
-                      5,
-                      (index) => Icon(
-                        index < activity.feelingRating
-                            ? Icons.star
-                            : Icons.star_border,
-                        size: 14,
-                        color: Colors.amber,
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.chevron_right,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  size: 20,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWorkoutCard(
-    Map<String, dynamic> workout,
-    ThemeData theme, {
-    required bool isActive,
-  }) {
-    final date = (workout['date'] as String?) ?? '';
-    final formatted = date.isNotEmpty
-        ? DateFormat(
-            Intl.defaultLocale?.startsWith('pt') == true
-                ? "d 'de' MMMM yyyy"
-                : 'MMMM d, yyyy',
-            Intl.defaultLocale,
-          ).format(DateTime.parse(date))
-        : '';
-    final duration = (workout['duration_seconds'] as int?) ?? 0;
-    final durStr = isActive
-        ? AppLocalizations.of(context)!.workoutHomeOngoing
-        : duration > 0
-        ? AppLocalizations.of(
-            context,
-          )!.workoutDetailDuration(duration ~/ 60, duration % 60)
-        : '--';
-    final feeling = (workout['feeling_rating'] as int?) ?? 0;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: isActive
-                ? theme.colorScheme.primary.withAlpha(100)
-                : theme.colorScheme.outlineVariant.withAlpha(80),
-          ),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    WorkoutDetailScreen(workoutId: workout['id'] as String),
-              ),
-            );
-            _loadData();
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? theme.colorScheme.primary.withAlpha(25)
-                        : theme.colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    isActive ? Icons.play_circle_fill : Icons.fitness_center,
-                    color: isActive
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurfaceVariant,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        formatted,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        durStr,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (feeling > 0)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(
-                      5,
-                      (i) => Icon(
-                        i < feeling ? Icons.star : Icons.star_border,
-                        size: 14,
-                        color: Colors.amber,
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.chevron_right,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  size: 20,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-enum _CompletedActivityKind { workout, run }
-
-class _CompletedActivity {
-  final String id;
-  final _CompletedActivityKind kind;
-  final DateTime occurredAt;
-  final int durationSeconds;
-  final int feelingRating;
-  final CardioActivityType? activityType;
-
-  const _CompletedActivity({
-    required this.id,
-    required this.kind,
-    required this.occurredAt,
-    required this.durationSeconds,
-    required this.feelingRating,
-    this.activityType,
-  });
-
-  factory _CompletedActivity.fromWorkout(Map<String, dynamic> workout) {
-    final endTime = DateTime.tryParse(workout['end_time'] as String? ?? '');
-    final date = DateTime.tryParse(workout['date'] as String? ?? '');
-    return _CompletedActivity(
-      id: workout['id'] as String,
-      kind: _CompletedActivityKind.workout,
-      occurredAt: endTime ?? date ?? DateTime.fromMillisecondsSinceEpoch(0),
-      durationSeconds: (workout['duration_seconds'] as num?)?.toInt() ?? 0,
-      feelingRating: (workout['feeling_rating'] as num?)?.toInt() ?? 0,
-      activityType: null,
-    );
-  }
-
-  factory _CompletedActivity.fromRun(RunActivity run) {
-    return _CompletedActivity(
-      id: run.id,
-      kind: _CompletedActivityKind.run,
-      occurredAt: run.endedAt ?? run.startedAt,
-      durationSeconds: run.movingTimeSeconds > 0
-          ? run.movingTimeSeconds
-          : run.durationSeconds,
-      feelingRating: run.feelingRating ?? 0,
-      activityType: run.activityType,
-    );
   }
 }
 
@@ -1378,299 +835,6 @@ class _PulsingDot extends StatelessWidget {
   }
 }
 
-class _StatDivider extends StatelessWidget {
-  final ThemeData theme;
-  const _StatDivider({required this.theme});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 40,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      color: theme.colorScheme.outlineVariant.withAlpha(80),
-    );
-  }
-}
-
-class _StatItem extends StatelessWidget {
-  final String label;
-  final String value;
-  final String? unit;
-  final IconData icon;
-  final Color color;
-  final ThemeData theme;
-
-  const _StatItem({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.theme,
-    this.unit,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 4),
-            Text(
-              value,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-                height: 1.1,
-              ),
-            ),
-            if (unit != null) ...[
-              const SizedBox(width: 2),
-              Text(
-                unit!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          height: 28,
-          child: Center(
-            child: Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontSize: 11,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ActionCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ActionCard({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: theme.colorScheme.outlineVariant.withAlpha(80)),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withAlpha(25),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                label,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool showLeftBorder;
-  final bool showTopBorder;
-
-  const _NavTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    required this.showLeftBorder,
-    required this.showTopBorder,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final borderColor = theme.colorScheme.outlineVariant.withAlpha(80);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border(
-              left: showLeftBorder
-                  ? BorderSide(color: borderColor)
-                  : BorderSide.none,
-              top: showTopBorder
-                  ? BorderSide(color: borderColor)
-                  : BorderSide.none,
-            ),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withAlpha(120),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, size: 20, color: theme.colorScheme.primary),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: false,
-                ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                size: 18,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CollapsibleSectionHeader extends StatelessWidget {
-  final IconData icon;
-  final Color iconBg;
-  final Color iconFg;
-  final String title;
-  final int count;
-  final bool expanded;
-  final VoidCallback onTap;
-
-  const _CollapsibleSectionHeader({
-    required this.icon,
-    required this.iconBg,
-    required this.iconFg,
-    required this.title,
-    required this.count,
-    required this.expanded,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(icon, size: 18, color: iconFg),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.5,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-            const Spacer(),
-            if (count > 0) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '$count',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-            ],
-            Icon(
-              expanded ? Icons.expand_less : Icons.expand_more,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _TimerPill extends StatelessWidget {
   final int remainingSeconds;
   final bool isRunning;
@@ -1723,11 +887,4 @@ class _TimerPill extends StatelessWidget {
       ),
     );
   }
-}
-
-class _NavItemData {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  _NavItemData(this.icon, this.label, this.onTap);
 }
