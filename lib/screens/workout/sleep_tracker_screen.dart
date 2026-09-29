@@ -30,6 +30,7 @@ import 'sleep_monitor_screen.dart';
 import 'traditional_alarms_screen.dart';
 import 'settings_screen.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 
 class SleepTrackerScreen extends StatefulWidget {
   const SleepTrackerScreen({super.key});
@@ -370,7 +371,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
     if (defaultTargetPlatform != TargetPlatform.android) return null;
     final isActive = _monitorService.isMonitoring;
     final loc = AppLocalizations.of(context)!;
-    final elapsed = _formatElapsed(_monitorService.state.elapsed);
+    final elapsed = DurationFormat.clock(_monitorService.state.elapsed);
     return FloatingActionButton.extended(
       heroTag: 'sleep-monitor-fab',
       onPressed: _openMonitor,
@@ -412,13 +413,6 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
         ),
       ),
   ];
-
-  static String _formatElapsed(Duration duration) {
-    final hours = duration.inHours.toString().padLeft(2, '0');
-    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
-    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
-    return '$hours:$minutes:$seconds';
-  }
 
   Future<void> _openTraditionalAlarms() async {
     await Navigator.push(

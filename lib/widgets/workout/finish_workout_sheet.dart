@@ -3,6 +3,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/run_formatters.dart';
 import 'package:workout_notes/utils/strength_workout_format.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 
 /// Summary data class for finished workout.
 class WorkoutSummary {
@@ -29,17 +30,12 @@ class WorkoutSummary {
   String get formattedDuration {
     if (durationSeconds <= 0) return '--';
     final h = durationSeconds ~/ 3600;
-    final m = (durationSeconds % 3600) ~/ 60;
-    final s = durationSeconds % 60;
     if (h >= 24) {
       final d = h ~/ 24;
       final restH = h % 24;
       return restH > 0 ? '${d}d ${restH}h' : '${d}d';
     }
-    if (h > 0) {
-      return '${h}h${m.toString().padLeft(2, '0')}min';
-    }
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    return DurationFormat.elapsed(durationSeconds);
   }
 
   String get formattedVolume {

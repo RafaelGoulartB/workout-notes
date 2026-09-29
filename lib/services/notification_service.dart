@@ -5,6 +5,7 @@ import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/app_localizations_en.dart';
 import 'package:workout_notes/l10n/app_localizations_pt.dart';
 import '../repositories/settings_repository.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 
 /// Centralized notification service for timer notifications.
 ///
@@ -329,11 +330,7 @@ class NotificationService {
 
   // Helpers
 
-  String _formatCountdown(int seconds) {
-    final min = seconds ~/ 60;
-    final sec = seconds % 60;
-    return '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
-  }
+  String _formatCountdown(int seconds) => DurationFormat.mmss(seconds);
 
   @override
   String toString() => 'NotificationService(initialized: $_initialized)';

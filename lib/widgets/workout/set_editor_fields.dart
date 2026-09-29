@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/utils/workout_card_helpers.dart';
 import 'package:workout_notes/widgets/workout/stepper_button.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 
 /// Shared, purpose-built controls for editing the values of a workout set.
 ///
@@ -598,15 +599,8 @@ class WorkoutSetFieldControls extends StatelessWidget {
 
   static String _formatDuration(int seconds) {
     if (seconds <= 0) return '0 s';
-    final hours = seconds ~/ 3600;
-    final minutes = (seconds % 3600) ~/ 60;
-    final remainingSeconds = seconds % 60;
-    if (hours > 0) {
-      return '$hours:${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
-    }
-    if (minutes > 0) {
-      return '$minutes:${remainingSeconds.toString().padLeft(2, '0')}';
-    }
+    if (seconds >= 3600) return DurationFormat.hms(seconds);
+    if (seconds >= 60) return DurationFormat.minSec(seconds);
     return '$seconds s';
   }
 }

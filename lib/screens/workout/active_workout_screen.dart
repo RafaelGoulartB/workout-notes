@@ -22,6 +22,7 @@ import 'package:workout_notes/services/workout_summary_service.dart';
 import 'package:workout_notes/utils/workout_volume_comparison.dart';
 import 'package:workout_notes/widgets/strength/workout/active_workout_header.dart';
 import 'rest_timer_screen.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 
 part 'active_workout_controller.dart';
 part 'active_workout_routine_actions.dart';

@@ -15,6 +15,7 @@ import 'package:workout_notes/utils/run_effort_analytics.dart';
 import 'package:workout_notes/utils/run_elevation_analytics.dart';
 import 'package:workout_notes/utils/run_pace_analytics.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 class RunRepository extends BaseRepository {
   static const _uuid = Uuid();
@@ -303,6 +304,7 @@ class RunRepository extends BaseRepository {
     final pace = RunPaceAnalytics.fromTrackPoints(
       points,
       activityAvgPaceSecPerKm: activity.avgPaceSecPerKm,
+      profile: decoded.profile,
     );
     final summary = _RouteSummary.fromPoints(points);
 
@@ -384,8 +386,12 @@ class RunRepository extends BaseRepository {
       } on FormatException {
         continue;
       }
-      final pace = RunPaceAnalytics.fromTrackPoints(points);
-      final efforts = RunEffortAnalytics.fromTrackPoints(points);
+      final profile = RunTrackProfile.fromPoints(points);
+      final pace = RunPaceAnalytics.fromTrackPoints(points, profile: profile);
+      final efforts = RunEffortAnalytics.fromTrackPoints(
+        points,
+        profile: profile,
+      );
       await _storeCompactRoute(
         executor,
         activityId: activityId,
@@ -655,7 +661,12 @@ class RunRepository extends BaseRepository {
     ).activity;
   }
 
-  ({RunActivity activity, List<RunTrackPoint> points}) _decodeNativeSpool(
+  ({
+    RunActivity activity,
+    List<RunTrackPoint> points,
+    RunTrackProfile profile,
+  })
+  _decodeNativeSpool(
     Map<String, dynamic> spool, {
     required String id,
     double bodyWeightKg = 70,
@@ -737,8 +748,9 @@ class RunRepository extends BaseRepository {
       );
     }
 
+    final profile = RunTrackProfile.fromPoints(points);
     final efforts = activityType.usesGps
-        ? RunEffortAnalytics.fromTrackPoints(points)
+        ? RunEffortAnalytics.fromTrackPoints(points, profile: profile)
         : const RunEffortMetrics();
 
     final activity = RunActivity(
@@ -752,7 +764,8 @@ class RunRepository extends BaseRepository {
       // Treadmill runs get a pace once the distance typed on the review
       // screen is known; the bike never has one.
       avgPaceSecPerKm: activityType.isRunning
-          ? avgPace ?? _avgPace(distanceMeters, movingTimeSeconds)
+          ? avgPace ??
+                RunFormatters.paceOrNull(distanceMeters, movingTimeSeconds)
           : null,
       maxPaceSecPerKm: activityType.usesGps ? maxPace : null,
       calories: calories,
@@ -774,7 +787,7 @@ class RunRepository extends BaseRepository {
       effortsComputed: true,
     );
 
-    return (activity: activity, points: points);
+    return (activity: activity, points: points, profile: profile);
   }
 
   Future<double> _latestBodyWeightKg() async {
@@ -829,11 +842,6 @@ class RunRepository extends BaseRepository {
     // Running costs approximately 1 kcal per kg per kilometer.
     final km = distanceMeters / 1000.0;
     return (km * bodyWeightKg).round().clamp(0, 100000);
-  }
-
-  static double? _avgPace(double distanceMeters, int movingTimeSeconds) {
-    if (distanceMeters < 1 || movingTimeSeconds <= 0) return null;
-    return movingTimeSeconds / (distanceMeters / 1000.0);
   }
 
   static String? _buildPolylineSummary(List<Map<String, dynamic>> points) {

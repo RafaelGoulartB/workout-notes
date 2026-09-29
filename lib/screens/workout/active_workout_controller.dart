@@ -127,7 +127,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
   void _refreshElapsed() {
     final start = _timerStart;
     if (!mounted || start == null || _timerEnd != null) return;
-    _elapsed.value = _formatDuration(DateTime.now().difference(start));
+    _elapsed.value = DurationFormat.elapsed(DateTime.now().difference(start).inSeconds);
   }
 
   Future<void> _initialize() async {
@@ -220,16 +220,7 @@ mixin _ActiveWorkoutController on State<ActiveWorkoutScreen> {
       return;
     }
     final end = _timerEnd ?? DateTime.now();
-    _elapsed.value = _formatDuration(end.difference(_timerStart!));
-  }
-
-  String _formatDuration(Duration d) {
-    if (d.inHours > 0) {
-      return '${d.inHours}h${d.inMinutes.remainder(60).toString().padLeft(2, '0')}min';
-    }
-    final minutes = d.inMinutes.remainder(60);
-    final seconds = d.inSeconds.remainder(60);
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    _elapsed.value = DurationFormat.elapsed(end.difference(_timerStart!).inSeconds);
   }
 
   Future<void> _createFromRoutine() async {

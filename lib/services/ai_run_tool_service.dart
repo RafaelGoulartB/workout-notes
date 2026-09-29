@@ -12,6 +12,7 @@ import 'package:workout_notes/repositories/run_repository.dart';
 import 'package:workout_notes/utils/run_achievement_engine.dart';
 import 'package:workout_notes/utils/run_progress_analytics.dart';
 import 'package:workout_notes/utils/date_utils.dart';
+import 'package:workout_notes/utils/run_formatters.dart';
 
 /// Read-only, AI-facing access to recorded cardio activities and running plans.
 ///
@@ -490,7 +491,7 @@ class AiRunToolService {
       'movingTimeSeconds': moving,
       'calories': calories,
       'averagePaceSecPerKm': type == 'running' && distance > 0 && moving > 0
-          ? moving / (distance / 1000)
+          ? RunFormatters.paceSecondsPerKm(distance, moving)
           : null,
       'averageSpeedKmh': distance > 0 && moving > 0
           ? (distance / 1000) / (moving / 3600)

@@ -1,4 +1,5 @@
 import 'package:intl/intl.dart';
+import 'package:workout_notes/utils/duration_format.dart';
 
 /// Shared formatting for running screens. Decimals follow the app locale
 /// (`Intl.defaultLocale`), so Portuguese shows `3,27 km` and English `3.27 km`.
@@ -10,8 +11,6 @@ class RunFormatters {
     );
     return format.format(value);
   }
-
-  static String _two(int value) => value.toString().padLeft(2, '0');
 
   /// Locale-aware number with a fixed number of decimals (no grouping for
   /// values below 10 000 so charts and tiles stay compact).
@@ -45,17 +44,13 @@ class RunFormatters {
 
   /// `m:ss` with the minutes unpadded: `5:42`, `95:05`. The base of paces and
   /// short durations.
-  static String minSec(int totalSeconds) =>
-      '${totalSeconds ~/ 60}:${_two(totalSeconds % 60)}';
+  static String minSec(int totalSeconds) => DurationFormat.minSec(totalSeconds);
 
   /// `mm:ss` with padded minutes: `05:42`.
-  static String mmss(int totalSeconds) =>
-      '${_two(totalSeconds ~/ 60)}:${_two(totalSeconds % 60)}';
+  static String mmss(int totalSeconds) => DurationFormat.mmss(totalSeconds);
 
   /// `h:mm:ss`: `1:05:09`.
-  static String hms(int totalSeconds) =>
-      '${totalSeconds ~/ 3600}:${_two((totalSeconds % 3600) ~/ 60)}:'
-      '${_two(totalSeconds % 60)}';
+  static String hms(int totalSeconds) => DurationFormat.hms(totalSeconds);
 
   /// Clock-style duration: `05:42`, or `1:05:09` from one hour up.
   static String duration(int totalSeconds) =>
@@ -66,7 +61,7 @@ class RunFormatters {
     final hours = totalSeconds ~/ 3600;
     final minutes = (totalSeconds % 3600) ~/ 60;
     if (hours == 0) return '${minutes}min';
-    return '${hours}h ${_two(minutes)}min';
+    return '${hours}h ${minutes.toString().padLeft(2, '0')}min';
   }
 
   static String pace(double? secPerKm) {
