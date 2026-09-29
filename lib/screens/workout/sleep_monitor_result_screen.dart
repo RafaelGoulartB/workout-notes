@@ -5,7 +5,6 @@ import 'package:workout_notes/models/sleep_entry.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
 import 'package:workout_notes/models/sleep_stage_epoch.dart';
 import 'package:workout_notes/repositories/sleep_monitor_repository.dart';
-import 'package:workout_notes/widgets/goals/goal_progress_ring.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_stage_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
@@ -238,7 +237,9 @@ class _SleepMonitorResultScreenState extends State<SleepMonitorResultScreen> {
   }
 }
 
-/// Estimated sleep and efficiency ring for the night, with its time window.
+/// Estimated sleep and efficiency for the night, laid out like the nutrition
+/// day summary: big duration, efficiency on the right, time window and an
+/// efficiency bar.
 class _NightHero extends StatelessWidget {
   final SleepMonitorSession session;
   final String window;
@@ -251,83 +252,57 @@ class _NightHero extends StatelessWidget {
     final colors = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
     final efficiency = session.sleepEfficiency;
-    final accent = SleepUi.efficiencyColor(colors, efficiency);
-    return RunHeroCard(
-      child: Row(
+    return SleepCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          GoalProgressRing(
-            percent: (efficiency ?? 0) / 100,
-            color: accent,
-            trackColor: accent.withAlpha(35),
-            size: 88,
-            strokeWidth: 8,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  efficiency == null ? '--' : '${efficiency.round()}%',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    fontFeatures: RunUi.tabular,
-                  ),
-                ),
-                Text(
-                  loc.sleepEfficiencyShort,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    fontSize: 10,
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-              ],
+          SleepCardHeader(
+            icon: Icons.bedtime_rounded,
+            title: loc.sleepEstimatedAsleep,
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: SleepBigDuration(minutes: session.estimatedSleepMinutes),
+              ),
+              const SizedBox(width: 8),
+              SleepHeadlinePercent(
+                value: efficiency == null ? '--' : '${efficiency.round()}%',
+                caption: loc.sleepEfficiencyShort,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${loc.sleepInBedShort} '
+            '${SleepUi.duration(loc, session.timeInBedMinutes)}',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
             ),
           ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  loc.sleepEstimatedAsleep,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    SleepUi.duration(loc, session.estimatedSleepMinutes),
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                      fontFeatures: RunUi.tabular,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.bedtime_outlined,
-                      size: 15,
-                      color: colors.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      window,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colors.onSurfaceVariant,
-                        fontFeatures: RunUi.tabular,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                RunPill(
-                  icon: Icons.mic_none_rounded,
-                  label: loc.sleepMonitorSource,
-                ),
-              ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              SleepBadge(icon: Icons.nightlight_round, label: window),
+              SleepBadge(
+                icon: Icons.mic_none_rounded,
+                label: loc.sleepMonitorSource,
+                color: colors.secondary,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: ((efficiency ?? 0) / 100).clamp(0.0, 1.0),
+              minHeight: 8,
+              backgroundColor: colors.surfaceContainerHighest,
+              color: colors.primary,
             ),
           ),
         ],

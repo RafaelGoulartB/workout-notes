@@ -9,6 +9,7 @@ import 'package:workout_notes/widgets/sleep/sleep_history_row.dart';
 import 'package:workout_notes/widgets/sleep/sleep_last_night_card.dart';
 import 'package:workout_notes/widgets/sleep/sleep_schedule_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_trend_card.dart';
+import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 import 'package:workout_notes/widgets/sleep/sleep_week_card.dart';
 
 Widget _localized(Widget child, {ThemeData? theme}) => MaterialApp(
@@ -45,15 +46,20 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 1));
 
-    expect(find.text('LAST NIGHT'), findsOneWidget);
-    expect(find.text('7h 0min'), findsOneWidget);
+    expect(find.text('Last night'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is SleepBigDuration && widget.minutes == 420,
+      ),
+      findsOneWidget,
+    );
     expect(find.text('88%'), findsWidgets);
     expect(find.text('23:00 → 07:00'), findsOneWidget);
     expect(find.text('1h 0min short'), findsOneWidget);
     // No time in bed recorded: the tile keeps the missing value visible.
     expect(find.text('--'), findsOneWidget);
 
-    await tester.tap(find.text('LAST NIGHT'));
+    await tester.tap(find.text('Last night'));
     expect(tapped, isTrue);
     expect(tester.takeException(), isNull);
   });
@@ -111,12 +117,13 @@ void main() {
     expect(find.text('92%'), findsOneWidget);
     expect(find.text('88%'), findsOneWidget);
     expect(find.text('6/7'), findsOneWidget);
-    expect(find.byType(SleepDurationChart), findsOneWidget);
-
-    await tester.tap(find.text('Schedule'));
-    await tester.pump();
+    // The schedule is the default view.
     expect(find.byType(SleepScheduleChart), findsOneWidget);
     expect(find.byKey(const Key('sleep-schedule-chart')), findsOneWidget);
+
+    await tester.tap(find.text('Duration'));
+    await tester.pump();
+    expect(find.byType(SleepDurationChart), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

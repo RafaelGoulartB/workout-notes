@@ -142,3 +142,318 @@ class SleepDateBadge extends StatelessWidget {
     );
   }
 }
+
+/// Card surface used across the sleep screens. It matches the nutrition
+/// "day summary" card: soft diagonal gradient, no border, 20 px radius.
+class SleepCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
+
+  const SleepCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.fromLTRB(20, 18, 16, 16),
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final body = Padding(padding: padding, child: child);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: Ink(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              colors.surfaceContainerHighest.withAlpha(200),
+              colors.surfaceContainerLow,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: onTap == null ? body : InkWell(onTap: onTap, child: body),
+      ),
+    );
+  }
+}
+
+/// Card title row: tinted icon, bold title and an optional trailing widget
+/// (a chevron on tappable cards).
+class SleepCardHeader extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+
+  const SleepCardHeader({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: colors.primary),
+        const SizedBox(width: 8),
+        if (subtitle == null) Expanded(child: _title(theme)) else _title(theme),
+        if (subtitle != null) ...[
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              subtitle!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+        ?trailing,
+      ],
+    );
+  }
+
+  Widget _title(ThemeData theme) => Text(
+    title,
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+  );
+}
+
+/// Left-aligned stat (value, label, optional thin progress bar) laid out in
+/// a row separated by [SleepStatDivider]s, as in the nutrition macro row.
+class SleepStat extends StatelessWidget {
+  final String value;
+  final String label;
+  final double? progress;
+  final Color? color;
+
+  const SleepStat({
+    super.key,
+    required this.value,
+    required this.label,
+    this.progress,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final tint = color ?? colors.primary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              height: 1.0,
+              fontFeatures: RunUi.tabular,
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+        if (progress != null) ...[
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progress!.clamp(0.0, 1.0),
+              minHeight: 3,
+              backgroundColor: tint.withAlpha(35),
+              color: tint,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class SleepStatDivider extends StatelessWidget {
+  const SleepStatDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 36,
+      margin: const EdgeInsets.symmetric(horizontal: 6),
+      color: Theme.of(context).colorScheme.outlineVariant.withAlpha(70),
+    );
+  }
+}
+
+/// Row of [SleepStat]s with thin dividers between them.
+class SleepStatRow extends StatelessWidget {
+  final List<Widget> children;
+
+  const SleepStatRow({super.key, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          if (i > 0) const SleepStatDivider(),
+          Expanded(child: children[i]),
+        ],
+      ],
+    );
+  }
+}
+
+/// Large duration ("7h 30min") with the unit letters set smaller, like the
+/// kcal headline of the nutrition summary.
+class SleepBigDuration extends StatelessWidget {
+  final int? minutes;
+
+  const SleepBigDuration({super.key, required this.minutes});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final big = theme.textTheme.headlineLarge?.copyWith(
+      fontWeight: FontWeight.bold,
+      fontSize: 38,
+      height: 1.0,
+      fontFeatures: RunUi.tabular,
+    );
+    final unit = theme.textTheme.titleSmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+    );
+    final value = minutes;
+    final spans = <InlineSpan>[];
+    if (value == null) {
+      spans.add(TextSpan(text: '--', style: big));
+    } else {
+      final safe = value < 0 ? 0 : value;
+      if (safe >= 60) {
+        spans
+          ..add(TextSpan(text: '${safe ~/ 60}', style: big))
+          ..add(TextSpan(text: '\u2009h\u2002', style: unit));
+      }
+      spans
+        ..add(TextSpan(text: '${safe % 60}', style: big))
+        ..add(TextSpan(text: '\u2009min', style: unit));
+    }
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Text.rich(TextSpan(children: spans)),
+    );
+  }
+}
+
+/// Tinted pill used under the sleep headlines (time window, source).
+class SleepBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color? color;
+
+  const SleepBadge({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final tint = color ?? theme.colorScheme.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: tint.withAlpha(38),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: tint),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: tint,
+                fontWeight: FontWeight.w700,
+                fontFeatures: RunUi.tabular,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Right-aligned percentage with a small caption under it, next to the big
+/// headline duration.
+class SleepHeadlinePercent extends StatelessWidget {
+  final String value;
+  final String caption;
+
+  const SleepHeadlinePercent({
+    super.key,
+    required this.value,
+    required this.caption,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: theme.textTheme.titleMedium?.copyWith(
+            color: colors.primary,
+            fontWeight: FontWeight.w800,
+            height: 1.1,
+          ),
+        ),
+        Text(
+          caption,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+}

@@ -7,7 +7,7 @@ import 'package:workout_notes/widgets/sleep/sleep_duration_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_schedule_chart.dart';
 import 'package:workout_notes/widgets/sleep/sleep_ui.dart';
 
-enum SleepWeekView { duration, schedule }
+enum SleepWeekView { schedule, duration }
 
 /// One card for the selected week: average, regularity, efficiency and
 /// nights recorded, then a duration or schedule chart behind a tab switch.
@@ -30,7 +30,7 @@ class SleepWeekCard extends StatefulWidget {
 }
 
 class _SleepWeekCardState extends State<SleepWeekCard> {
-  SleepWeekView _view = SleepWeekView.duration;
+  SleepWeekView _view = SleepWeekView.schedule;
 
   @override
   Widget build(BuildContext context) {
