@@ -226,6 +226,5 @@ class TraditionalAlarmService extends ChangeNotifier {
     }
   }
 
-  bool get _isAndroid =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
 }

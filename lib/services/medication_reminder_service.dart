@@ -316,6 +316,5 @@ class MedicationReminderService extends ChangeNotifier {
     return DateTime(now.year, now.month, now.day);
   }
 
-  bool get _isAndroid =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
 }

@@ -26,7 +26,7 @@ class SleepMonitorService extends ChangeNotifier {
 
   final SleepMonitorRepository _repository = SleepMonitorRepository();
   SleepMonitorState _state = SleepMonitorState.initial(
-    supported: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+    supported: defaultTargetPlatform == TargetPlatform.android,
   );
   StreamSubscription<dynamic>? _eventSubscription;
   bool _initialized = false;
@@ -308,33 +308,6 @@ class SleepMonitorService extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, bool>> getMissionCapabilities() async {
-    if (!_isAndroid) return {'cameraGranted': false};
-    try {
-      final result = await methods.invokeMapMethod<String, dynamic>(
-        'getMissionCapabilities',
-      );
-      return {'cameraGranted': result?['camera_granted'] as bool? ?? false};
-    } catch (error) {
-      _setError('mission_capabilities', error.toString());
-      return {'cameraGranted': false};
-    }
-  }
-
-  Future<bool> requestCameraPermission() async {
-    if (!_isAndroid) return false;
-    try {
-      return await methods.invokeMethod<bool>('requestCameraPermission') ??
-          false;
-    } on PlatformException catch (error) {
-      _setError(error.code, error.message ?? error.toString());
-      return false;
-    } catch (error) {
-      _setError('camera_permission', error.toString());
-      return false;
-    }
-  }
-
   Future<bool> openCameraSettings() async {
     if (!_isAndroid) return false;
     try {
@@ -556,8 +529,7 @@ class SleepMonitorService extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool get _isAndroid =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
 
   @override
   void dispose() {

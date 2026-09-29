@@ -41,9 +41,6 @@ class NotificationService {
   bool _workoutSound = true;
   bool _workoutVibration = true;
 
-  /// Whether the plugin has been initialized.
-  bool get isInitialized => _initialized;
-
   AppLocalizations get _loc =>
       _localeCode == 'pt' ? AppLocalizationsPt() : AppLocalizationsEn();
 
@@ -263,12 +260,6 @@ class NotificationService {
 
   /// Cancel the workout timer notification.
   Future<void> cancelWorkoutTimer() async {
-    await _plugin.cancel(id: _workoutTimerId);
-  }
-
-  /// Cancel all timer notifications.
-  Future<void> cancelAll() async {
-    await _plugin.cancel(id: _restTimerId);
     await _plugin.cancel(id: _workoutTimerId);
   }
 

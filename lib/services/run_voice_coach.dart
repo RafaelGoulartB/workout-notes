@@ -122,11 +122,7 @@ class RunVoiceCoach extends ChangeNotifier {
     if (_bypassHeadphonesGate) {
       return false; // Debug sim uses Dart TTS (emulator, no headset)
     }
-    return !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
-  }
-
-  void setBypassHeadphonesGate(bool value) {
-    _bypassHeadphonesGate = value;
+    return defaultTargetPlatform == TargetPlatform.android;
   }
 
   Future<void> prepare() async {

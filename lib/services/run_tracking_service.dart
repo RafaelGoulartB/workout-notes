@@ -52,7 +52,7 @@ class RunTrackingService extends ChangeNotifier {
   final RunRepository _repository = RunRepository();
   final RunPlanRepository _planRepository = RunPlanRepository();
   RunTrackingState _state = RunTrackingState.initial(
-    supported: !kIsWeb && defaultTargetPlatform == TargetPlatform.android,
+    supported: defaultTargetPlatform == TargetPlatform.android,
   );
   StreamSubscription<dynamic>? _eventSubscription;
   bool _initialized = false;
@@ -83,8 +83,7 @@ class RunTrackingService extends ChangeNotifier {
     notificationsPermissionRequired: _notificationsPermissionRequired,
   );
 
-  bool get _isAndroid =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
 
   Future<void> initialize() async {
     if (!_isAndroid) {
@@ -571,13 +570,6 @@ class RunTrackingService extends ChangeNotifier {
     ).copyWith(locationGranted: _state.locationGranted);
     notifyListeners();
     return draft;
-  }
-
-  /// Backward-compatible immediate save for non-UI callers.
-  Future<RunActivity?> stop() async {
-    final draft = await stopForReview();
-    if (draft == null) return null;
-    return saveReviewedRun(draft: draft, completePlannedWorkout: true);
   }
 
   Future<List<RunReviewDraft>> listPendingReviews() async {

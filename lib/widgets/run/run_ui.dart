@@ -405,9 +405,8 @@ class RunMetricBox extends StatelessWidget {
 /// Two-column grid of [RunMetricBox]es (or any widgets).
 class RunMetricGrid extends StatelessWidget {
   final List<Widget> children;
-  final double spacing;
 
-  const RunMetricGrid({super.key, required this.children, this.spacing = 8});
+  const RunMetricGrid({super.key, required this.children});
 
   @override
   Widget build(BuildContext context) {
@@ -419,7 +418,7 @@ class RunMetricGrid extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(child: children[i]),
-              SizedBox(width: spacing),
+              const SizedBox(width: 8),
               Expanded(
                 child: i + 1 < children.length
                     ? children[i + 1]
@@ -433,7 +432,7 @@ class RunMetricGrid extends StatelessWidget {
     return Column(
       children: [
         for (var i = 0; i < rows.length; i++) ...[
-          if (i > 0) SizedBox(height: spacing),
+          if (i > 0) const SizedBox(height: 8),
           rows[i],
         ],
       ],
@@ -739,20 +738,12 @@ class RunLegendItem extends StatelessWidget {
 /// subtle neutral diagonal gradient, no border and a 20 px radius.
 class RunSoftCard extends StatelessWidget {
   final Widget child;
-  final EdgeInsetsGeometry padding;
-  final VoidCallback? onTap;
 
-  const RunSoftCard({
-    super.key,
-    required this.child,
-    this.padding = const EdgeInsets.fromLTRB(18, 16, 16, 16),
-    this.onTap,
-  });
+  const RunSoftCard({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final body = Padding(padding: padding, child: child);
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(RunUi.heroRadius),
@@ -769,7 +760,10 @@ class RunSoftCard extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(RunUi.heroRadius),
         ),
-        child: onTap == null ? body : InkWell(onTap: onTap, child: body),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
+          child: child,
+        ),
       ),
     );
   }

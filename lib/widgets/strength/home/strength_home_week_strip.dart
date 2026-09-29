@@ -16,7 +16,6 @@ class StrengthWeekStrip extends StatelessWidget {
   /// ISO weekdays (1 = Monday) with a planned strength session.
   final List<int> plannedWeekdays;
   final Map<String, StrengthCategoryInfo> categories;
-  final double trackHeight;
 
   const StrengthWeekStrip({
     super.key,
@@ -24,7 +23,6 @@ class StrengthWeekStrip extends StatelessWidget {
     required this.today,
     this.plannedWeekdays = const [],
     this.categories = const {},
-    this.trackHeight = 56,
   });
 
   @override
@@ -63,7 +61,6 @@ class StrengthWeekStrip extends StatelessWidget {
                   .format(days[i].date)
                   .replaceAll('.', '')
                   .toUpperCase(),
-              trackHeight: trackHeight,
               loc: loc,
               theme: theme,
             ),
@@ -82,7 +79,6 @@ class _DayColumn extends StatelessWidget {
   final int maxSets;
   final Color tint;
   final String label;
-  final double trackHeight;
   final AppLocalizations loc;
   final ThemeData theme;
 
@@ -94,7 +90,6 @@ class _DayColumn extends StatelessWidget {
     required this.maxSets,
     required this.tint,
     required this.label,
-    required this.trackHeight,
     required this.loc,
     required this.theme,
   });
@@ -139,7 +134,7 @@ class _DayColumn extends StatelessWidget {
                 : null,
           ),
           Container(
-            height: trackHeight,
+            height: 56,
             decoration: BoxDecoration(
               color: isFuture
                   ? colors.surfaceContainerHighest.withValues(alpha: 0.3)

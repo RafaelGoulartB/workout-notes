@@ -323,17 +323,6 @@ class RunPlanBuildConfig {
     }
   }
 
-  /// Week-1 easy / tempo / interval prescriptions, or null when uncalibrated.
-  /// Later weeks move towards the goal — see [RunPlanComposer.paceRamp].
-  RunPaces? get trainingPaces {
-    final fitness = currentFitness;
-    if (fitness != null) return fitness.paces;
-    return goalTime?.paces;
-  }
-
-  /// Race-pace work follows the entered time (goal or recent).
-  RunPaces? get racePaces => (goalTime ?? currentFitness)?.paces;
-
   /// Quality load multiplier (reps / tempo minutes). Finish is still quality,
   /// just gentler — matching polarized training, not junk mileage.
   double get qualityFactor => switch ((intent, intensity)) {

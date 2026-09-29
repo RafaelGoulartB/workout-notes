@@ -355,9 +355,7 @@ class _SleepTrackerScreenState extends State<SleepTrackerScreen> {
   }
 
   Widget? _buildMonitorFab() {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
-      return null;
-    }
+    if (defaultTargetPlatform != TargetPlatform.android) return null;
     final isActive = _monitorService.isMonitoring;
     final loc = AppLocalizations.of(context)!;
     final elapsed = _formatElapsed(_monitorService.state.elapsed);

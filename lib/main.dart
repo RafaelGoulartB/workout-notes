@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'l10n/app_localizations.dart';
-import 'navigation/ai_coach_navigation.dart';
 import 'services/notification_service.dart';
 import 'services/sleep_monitor_service.dart';
 import 'services/traditional_alarm_service.dart';
@@ -277,7 +276,6 @@ class _WorkoutNotesAppState extends State<WorkoutNotesApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      navigatorKey: AiCoachNavigation.navigatorKey,
       theme: _buildTheme(_seedColor, Brightness.light),
       darkTheme: _buildTheme(_seedColor, Brightness.dark),
       themeMode: _themeMode,

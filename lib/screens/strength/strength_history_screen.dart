@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:workout_notes/services/strength_routine_day_inference.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/l10n/exercise_locale_helper.dart';
-import 'package:workout_notes/navigation/ai_coach_navigation.dart';
 import 'package:workout_notes/repositories/strength_history_repository.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
 import 'package:workout_notes/screens/workout/workout_detail_screen.dart';
@@ -190,10 +189,7 @@ class _StrengthHistoryScreenState extends State<StrengthHistoryScreen> {
   Future<void> _startWorkout() async {
     await Navigator.push(
       context,
-      AiCoachNavigation.route(
-        kind: AiCoachRouteKind.activeWorkout,
-        builder: (_) => const ActiveWorkoutScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const ActiveWorkoutScreen()),
     );
     if (mounted) _load(showSpinner: false);
   }

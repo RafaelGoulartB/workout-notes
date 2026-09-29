@@ -16,14 +16,12 @@ import 'package:workout_notes/widgets/run/run_plan_ui.dart';
 class RunWeekStrip extends StatelessWidget {
   final List<RunDayBucket> days;
   final DateTime today;
-  final double trackHeight;
   final List<RunPlannedDay> planned;
 
   const RunWeekStrip({
     super.key,
     required this.days,
     required this.today,
-    this.trackHeight = 56,
     this.planned = const [],
   });
 
@@ -65,7 +63,6 @@ class RunWeekStrip extends StatelessWidget {
                   .format(days[i].date)
                   .replaceAll('.', '')
                   .toUpperCase(),
-              trackHeight: trackHeight,
               loc: loc,
               colors: colors,
               theme: theme,
@@ -87,7 +84,6 @@ class _DayColumn extends StatelessWidget {
   final bool isFuture;
   final double maxDistance;
   final String label;
-  final double trackHeight;
   final AppLocalizations loc;
   final ColorScheme colors;
   final ThemeData theme;
@@ -99,7 +95,6 @@ class _DayColumn extends StatelessWidget {
     required this.isFuture,
     required this.maxDistance,
     required this.label,
-    required this.trackHeight,
     required this.loc,
     required this.colors,
     required this.theme,
@@ -177,7 +172,7 @@ class _DayColumn extends StatelessWidget {
                   ),
           ),
           Container(
-            height: trackHeight,
+            height: 56,
             decoration: BoxDecoration(
               color: isFuture
                   ? colors.surfaceContainerHighest.withValues(alpha: 0.3)

@@ -5,7 +5,6 @@ import 'package:workout_notes/database/database_helper.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/goal.dart';
 import 'package:workout_notes/models/strength_workout_summary.dart';
-import 'package:workout_notes/navigation/ai_coach_navigation.dart';
 import 'package:workout_notes/repositories/strength_records_repository.dart';
 import 'package:workout_notes/repositories/strength_repository.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
@@ -127,8 +126,7 @@ class _StrengthHomeScreenState extends State<StrengthHomeScreen> {
   }) async {
     await Navigator.push(
       context,
-      AiCoachNavigation.route(
-        kind: AiCoachRouteKind.activeWorkout,
+      MaterialPageRoute(
         builder: (_) => ActiveWorkoutScreen(
           workoutId: workoutId,
           routineId: routineId,

@@ -46,10 +46,6 @@ class RunPaceAnalytics {
   static const double minPaceSecPerKm = 60.0; // 1:00 /km
   static const double maxPaceSecPerKm = 1800.0; // 30:00 /km
 
-  /// Cap a single segment's Δt so a long pause between points does not
-  /// create an absurdly slow spike (points usually pause with the session).
-  static const int maxSegmentSeconds = 45;
-
   static double haversineMeters({
     required double lat1,
     required double lng1,

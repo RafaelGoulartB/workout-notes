@@ -72,17 +72,6 @@ class RunPlanWeekResolver {
     final available = planWeeks - startWeek;
     return available > phaseWeeks ? available - phaseWeeks : 0;
   }
-
-  /// How many times the plan restarts inside the phase. 0 when it never wraps.
-  int repeatsWithin({
-    required int phaseWeeks,
-    required int planWeeks,
-    int startWeek = 0,
-  }) {
-    if (planWeeks < 1) return 0;
-    final lastRaw = startWeek + phaseWeeks - 1;
-    return lastRaw < planWeeks ? 0 : lastRaw ~/ planWeeks;
-  }
 }
 
 enum RunPlanCoverage {

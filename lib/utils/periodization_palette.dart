@@ -16,6 +16,3 @@ const List<int> kPeriodizationColors = [
   kPhaseColorRed,
   kPhaseColorTeal,
 ];
-
-/// Default phase color, also used as the fallback when none is chosen.
-const int kDefaultPhaseColor = kPhaseColorBlue;

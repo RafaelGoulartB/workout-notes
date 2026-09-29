@@ -22,7 +22,6 @@ class RunRouteMap extends StatefulWidget {
   /// When false the map is a static preview: pans/zooms are ignored so it
   /// can sit inside a scroll view and react to [onTap] instead.
   final bool interactive;
-  final bool showLegend;
   final bool showKmMarkers;
   final bool showMapTiles;
   final VoidCallback? onTap;
@@ -34,7 +33,6 @@ class RunRouteMap extends StatefulWidget {
     required this.averagePaceSecPerKm,
     this.selectedDistance,
     this.interactive = false,
-    this.showLegend = true,
     this.showKmMarkers = false,
     this.showMapTiles = true,
     this.onTap,
@@ -256,7 +254,7 @@ class _RunRouteMapState extends State<RunRouteMap> {
               onTap: widget.onTap,
             ),
           ),
-        if (widget.showLegend && _polylines.isNotEmpty)
+        if (_polylines.isNotEmpty)
           Positioned(
             left: 10,
             bottom: 10,

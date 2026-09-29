@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 
 import 'package:workout_notes/l10n/app_localizations.dart';
 import 'package:workout_notes/models/sleep_monitor_session.dart';
-import 'package:workout_notes/models/sleep_stage_type.dart';
 import 'package:workout_notes/widgets/run/run_ui.dart';
 
 /// Formatting and colours shared by the sleep screens.
@@ -12,13 +11,6 @@ abstract final class SleepUi {
   static const Color sleeping = Colors.lightBlue;
   static const Color deep = Colors.indigo;
   static const Color unknown = Colors.grey;
-
-  static Color stageColor(SleepStageType stage) => switch (stage) {
-    SleepStageType.awake => awake,
-    SleepStageType.sleeping => sleeping,
-    SleepStageType.deep => deep,
-    SleepStageType.unknown => unknown,
-  };
 
   /// "7h 30min", "25min" under an hour, or "--" when unknown.
   static String duration(AppLocalizations loc, int? minutes) {
@@ -147,20 +139,17 @@ class SleepDateBadge extends StatelessWidget {
 /// "day summary" card: soft diagonal gradient, no border, 20 px radius.
 class SleepCard extends StatelessWidget {
   final Widget child;
-  final EdgeInsetsGeometry padding;
   final VoidCallback? onTap;
 
-  const SleepCard({
-    super.key,
-    required this.child,
-    this.padding = const EdgeInsets.fromLTRB(20, 18, 16, 16),
-    this.onTap,
-  });
+  const SleepCard({super.key, required this.child, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final body = Padding(padding: padding, child: child);
+    final body = Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 16, 16),
+      child: child,
+    );
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(20),

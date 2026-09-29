@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:workout_notes/l10n/app_localizations.dart';
-import 'package:workout_notes/navigation/ai_coach_navigation.dart';
 import 'package:workout_notes/repositories/strength_history_repository.dart';
 import 'package:workout_notes/repositories/workout_repository.dart';
 import 'package:workout_notes/screens/workout/active_workout_screen.dart';
@@ -213,8 +212,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   Future<void> _resumeActive() async {
     final result = await Navigator.pushReplacement(
       context,
-      AiCoachNavigation.route(
-        kind: AiCoachRouteKind.activeWorkout,
+      MaterialPageRoute(
         builder: (_) => ActiveWorkoutScreen(workoutId: widget.workoutId),
       ),
     );
@@ -301,8 +299,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     if (!mounted) return;
     final result = await Navigator.pushReplacement(
       context,
-      AiCoachNavigation.route(
-        kind: AiCoachRouteKind.activeWorkout,
+      MaterialPageRoute(
         builder: (_) => ActiveWorkoutScreen(workoutId: widget.workoutId),
       ),
     );

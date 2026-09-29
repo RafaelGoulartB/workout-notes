@@ -109,15 +109,9 @@ class RoutineSummary {
     return (total / withSets.length).round();
   }
 
-  int get totalEstimatedSeconds =>
-      days.fold(0, (sum, d) => sum + d.estimatedSeconds);
-
   /// Sets per muscle group over the whole routine, most sets first.
   List<RoutineMuscleSets> get muscles =>
       StrengthRoutineSummaryBuilder.mergeMuscles(days.expand((d) => d.muscles));
-
-  /// Whether the routine has at least one planned exercise.
-  bool get hasExercises => exerciseCount > 0;
 }
 
 /// Pure aggregation of the flat rows returned by

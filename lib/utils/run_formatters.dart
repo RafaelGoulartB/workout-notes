@@ -94,7 +94,4 @@ class RunFormatters {
   static String distanceWithUnit(double meters) => '${distanceKm(meters)} km';
 
   static String paceWithUnit(double? secPerKm) => '${pace(secPerKm)} /km';
-
-  static String caloriesWithUnit(int? kcal) =>
-      kcal == null || kcal <= 0 ? '--' : '$kcal kcal';
 }

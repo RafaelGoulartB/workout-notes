@@ -9,7 +9,6 @@ import 'package:workout_notes/models/periodization_plan.dart';
 import 'package:workout_notes/models/periodization_routine_suggestion.dart';
 import 'package:workout_notes/models/periodization_run_suggestion.dart';
 import 'package:workout_notes/models/periodization_schedule.dart';
-import 'package:workout_notes/navigation/ai_coach_navigation.dart';
 import 'package:workout_notes/periodization/phase_kind.dart';
 import 'package:workout_notes/periodization/phase_seed.dart';
 import 'package:workout_notes/periodization/week_progress.dart';
@@ -166,10 +165,7 @@ class _PeriodizationHomeScreenState extends State<PeriodizationHomeScreen> {
   Future<void> _openBodyTracker() async {
     await Navigator.push(
       context,
-      AiCoachNavigation.route(
-        kind: AiCoachRouteKind.normalWithFab,
-        builder: (_) => const BodyTrackerScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const BodyTrackerScreen()),
     );
     if (!mounted) return;
     await _loadWeight();
