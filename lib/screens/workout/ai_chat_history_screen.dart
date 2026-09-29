@@ -16,8 +16,24 @@ class AiChatHistoryScreen extends StatefulWidget {
 }
 
 class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
+  static const _searchDebounce = Duration(milliseconds: 300);
+  static const _searchPageSize = 50;
+
   final _searchController = TextEditingController();
+  Timer? _debounce;
+
+  /// What the user typed (trimmed) and the query the shown results belong to.
   String _query = '';
+  String _activeQuery = '';
+
+  /// SQLite search results for [_activeQuery]; the loaded thread pages are
+  /// only used while the search box is empty.
+  List<AiChatThread> _results = const [];
+  bool _resultsHaveMore = false;
+  int? _resultsTotal;
+  bool _searching = false;
+  bool _loadingMoreResults = false;
+  int _searchGeneration = 0;
 
   @override
   void initState() {
@@ -28,6 +44,7 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     AiChatService.instance.removeListener(_onChange);
     _searchController.dispose();
     super.dispose();
@@ -41,23 +58,19 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final allThreads = AiChatService.instance.state.threads;
-    final threads = _filterThreads(allThreads);
-    final pinned = threads.where((thread) => thread.isPinned).toList();
-    final today = threads
-        .where(
-          (thread) => !thread.isPinned && _ageInDays(thread.updatedAt) == 0,
-        )
-        .toList();
-    final previous = threads.where((thread) {
-      final age = _ageInDays(thread.updatedAt);
-      return !thread.isPinned && age >= 1 && age < 7;
-    }).toList();
-    final older = threads
-        .where(
-          (thread) => !thread.isPinned && _ageInDays(thread.updatedAt) >= 7,
-        )
-        .toList();
+    final service = AiChatService.instance;
+    final searchActive = _activeQuery.isNotEmpty;
+    final threads = searchActive ? _results : service.state.threads;
+    final count = searchActive
+        ? (_resultsTotal ?? _results.length)
+        : (service.state.totalThreadCount ?? threads.length);
+    final hasMore = searchActive
+        ? _resultsHaveMore
+        : service.state.hasOlderThreads;
+    final loadingMore = searchActive
+        ? _loadingMoreResults
+        : service.state.isLoadingOlderThreads;
+    final rows = _buildRows(threads, l10n);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -97,7 +110,7 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
                     ),
                   ),
                   Text(
-                    l10n.aiHistoryConversationCount(allThreads.length),
+                    l10n.aiHistoryConversationCount(count),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -129,7 +142,7 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
             child: TextField(
               controller: _searchController,
               textInputAction: TextInputAction.search,
-              onChanged: (value) => setState(() => _query = value.trim()),
+              onChanged: _onQueryChanged,
               decoration: InputDecoration(
                 hintText: l10n.aiHistorySearchHint,
                 prefixIcon: const Icon(Icons.search_rounded),
@@ -159,46 +172,29 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
             ),
           ),
           Expanded(
-            child: allThreads.isEmpty
-                ? _buildEmptyState(theme, l10n, searchEmpty: false)
-                : threads.isEmpty
-                ? _buildEmptyState(theme, l10n, searchEmpty: true)
-                : ListView(
+            child: threads.isEmpty
+                ? (_query.isNotEmpty && (_searching || _activeQuery != _query))
+                      ? const Center(child: CircularProgressIndicator())
+                      : _buildEmptyState(
+                          theme,
+                          l10n,
+                          searchEmpty: _query.isNotEmpty,
+                        )
+                : ListView.builder(
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
-                    children: [
-                      if (pinned.isNotEmpty) ...[
-                        _sectionHeader(theme, l10n.aiHistoryPinned),
-                        for (final thread in pinned) _threadItem(thread, l10n),
-                      ],
-                      if (today.isNotEmpty) ...[
-                        _sectionHeader(theme, l10n.aiHistoryToday),
-                        for (final thread in today) _threadItem(thread, l10n),
-                      ],
-                      if (previous.isNotEmpty) ...[
-                        _sectionHeader(theme, l10n.aiHistoryPrevious7Days),
-                        for (final thread in previous)
-                          _threadItem(thread, l10n),
-                      ],
-                      if (older.isNotEmpty) ...[
-                        _sectionHeader(theme, l10n.aiHistoryOlder),
-                        for (final thread in older) _threadItem(thread, l10n),
-                      ],
-                      if (AiChatService.instance.state.hasOlderThreads ||
-                          AiChatService.instance.state.isLoadingOlderThreads)
-                        Center(
+                    itemCount: rows.length + (hasMore || loadingMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == rows.length) {
+                        return Center(
                           child: TextButton.icon(
-                            onPressed: AiChatService
-                                    .instance
-                                    .state
-                                    .isLoadingOlderThreads
+                            onPressed: loadingMore
                                 ? null
-                                : AiChatService.instance.loadOlderThreads,
-                            icon: AiChatService
-                                    .instance
-                                    .state
-                                    .isLoadingOlderThreads
+                                : searchActive
+                                ? _loadMoreResults
+                                : service.loadOlderThreads,
+                            icon: loadingMore
                                 ? const SizedBox.square(
                                     dimension: 16,
                                     child: CircularProgressIndicator(
@@ -208,13 +204,50 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
                                 : const Icon(Icons.history, size: 18),
                             label: Text(l10n.aiChatLoadOlder),
                           ),
-                        ),
-                    ],
+                        );
+                      }
+                      final row = rows[index];
+                      return row.thread == null
+                          ? _sectionHeader(theme, row.header!)
+                          : _threadItem(row.thread!, l10n);
+                    },
                   ),
           ),
         ],
       ),
     );
+  }
+
+  /// Flattens the pinned / today / previous 7 days / older groups into
+  /// headers and threads so a lazy list can build only what is visible.
+  List<_HistoryRow> _buildRows(
+    List<AiChatThread> threads,
+    AppLocalizations l10n,
+  ) {
+    final pinned = <AiChatThread>[];
+    final today = <AiChatThread>[];
+    final previous = <AiChatThread>[];
+    final older = <AiChatThread>[];
+    for (final thread in threads) {
+      if (thread.isPinned) {
+        pinned.add(thread);
+        continue;
+      }
+      final age = _ageInDays(thread.updatedAt);
+      (age == 0 ? today : (age < 7 ? previous : older)).add(thread);
+    }
+    return [
+      for (final group in [
+        (l10n.aiHistoryPinned, pinned),
+        (l10n.aiHistoryToday, today),
+        (l10n.aiHistoryPrevious7Days, previous),
+        (l10n.aiHistoryOlder, older),
+      ])
+        if (group.$2.isNotEmpty) ...[
+          _HistoryRow.header(group.$1),
+          for (final thread in group.$2) _HistoryRow.thread(thread),
+        ],
+    ];
   }
 
   Widget _sectionHeader(ThemeData theme, String text) {
@@ -233,14 +266,14 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
 
   Widget _threadItem(AiChatThread thread, AppLocalizations l10n) {
     final theme = Theme.of(context);
-    final displayThread = thread.copyWith(title: _displayTitle(thread));
+    final displayThread = thread.copyWith(title: _displayTitle(thread, l10n));
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Dismissible(
         key: ValueKey(thread.id),
         direction: DismissDirection.endToStart,
         confirmDismiss: (_) => _confirmDelete(thread, l10n),
-        onDismissed: (_) => AiChatService.instance.deleteThread(thread.id),
+        onDismissed: (_) => _removeThread(thread),
         background: Container(
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.symmetric(horizontal: 22),
@@ -322,26 +355,13 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
     );
   }
 
-  List<AiChatThread> _filterThreads(List<AiChatThread> threads) {
-    if (_query.isEmpty) return threads;
-    final query = _query.toLowerCase();
-    return threads.where((thread) {
-      return thread.title.toLowerCase().contains(query) ||
-          (thread.lastMessagePreview?.toLowerCase().contains(query) ?? false);
-    }).toList();
-  }
-
-  String _displayTitle(AiChatThread thread) {
-    final title = thread.title.trim();
-    final generic = {
-      'conversa',
-      'conversation',
-      'nova conversa',
-      'new conversation',
-    }.contains(title.toLowerCase());
-    if (!generic) return title;
+  /// Untitled threads (empty marker or a legacy generic title) show their
+  /// first message, or the localized "new conversation" label. Titles the user
+  /// wrote are shown untouched.
+  String _displayTitle(AiChatThread thread, AppLocalizations l10n) {
+    if (!thread.hasGenericTitle) return thread.title.trim();
     final preview = _cleanPreview(thread.lastMessagePreview);
-    if (preview == null || preview.isEmpty) return title;
+    if (preview == null || preview.isEmpty) return l10n.aiChatNewChat;
     return preview.length > 56 ? '${preview.substring(0, 53)}…' : preview;
   }
 
@@ -361,9 +381,112 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
     return today.difference(date).inDays.clamp(0, 999999);
   }
 
+  void _onQueryChanged(String value) {
+    final query = value.trim();
+    if (query == _query) return;
+    _debounce?.cancel();
+    if (query.isEmpty) {
+      _searchGeneration++;
+      setState(() {
+        _query = '';
+        _activeQuery = '';
+        _results = const [];
+        _resultsHaveMore = false;
+        _resultsTotal = null;
+        _searching = false;
+        _loadingMoreResults = false;
+      });
+      return;
+    }
+    setState(() => _query = query);
+    _debounce = Timer(_searchDebounce, () => unawaited(_runSearch()));
+  }
+
   void _clearSearch() {
     _searchController.clear();
-    setState(() => _query = '');
+    _onQueryChanged('');
+  }
+
+  /// Runs the SQLite search for the current query. [keepLoaded] reloads at
+  /// least as many rows as are already shown, so a rename, pin or delete
+  /// refreshes the list without collapsing pages the user already loaded.
+  Future<void> _runSearch({bool keepLoaded = false}) async {
+    final query = _query;
+    if (query.isEmpty) return;
+    final generation = ++_searchGeneration;
+    setState(() {
+      _searching = true;
+      _activeQuery = query;
+    });
+    try {
+      final page = await AiChatService.instance.searchThreads(
+        query,
+        limit: keepLoaded && _results.length > _searchPageSize
+            ? _results.length
+            : _searchPageSize,
+      );
+      if (!mounted || generation != _searchGeneration) return;
+      setState(() {
+        _results = page.threads;
+        _resultsHaveMore = page.hasMore;
+        _resultsTotal = page.total;
+        _searching = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _searchGeneration) return;
+      setState(() {
+        _results = const [];
+        _resultsHaveMore = false;
+        _resultsTotal = 0;
+        _searching = false;
+      });
+    }
+  }
+
+  Future<void> _loadMoreResults() async {
+    if (_loadingMoreResults || !_resultsHaveMore) return;
+    final generation = _searchGeneration;
+    setState(() => _loadingMoreResults = true);
+    try {
+      final page = await AiChatService.instance.searchThreads(
+        _activeQuery,
+        offset: _results.length,
+        limit: _searchPageSize,
+      );
+      if (!mounted || generation != _searchGeneration) return;
+      final known = {for (final thread in _results) thread.id};
+      setState(() {
+        _results = [
+          ..._results,
+          ...page.threads.where((thread) => !known.contains(thread.id)),
+        ];
+        _resultsHaveMore = page.hasMore;
+        _loadingMoreResults = false;
+      });
+    } catch (_) {
+      if (mounted && generation == _searchGeneration) {
+        setState(() => _loadingMoreResults = false);
+      }
+    }
+  }
+
+  /// Re-reads search results after a thread changed (no-op without a query).
+  Future<void> _refreshResults() async {
+    if (_activeQuery.isNotEmpty) await _runSearch(keepLoaded: true);
+  }
+
+  /// Swipe-to-delete: the tile must leave the tree synchronously.
+  Future<void> _removeThread(AiChatThread thread) async {
+    if (_activeQuery.isNotEmpty) {
+      setState(() {
+        _results = [
+          for (final item in _results)
+            if (item.id != thread.id) item,
+        ];
+        if (_resultsTotal != null) _resultsTotal = _resultsTotal! - 1;
+      });
+    }
+    await AiChatService.instance.deleteThread(thread.id);
   }
 
   Future<void> _startNewChat() async {
@@ -379,18 +502,25 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
 
   Future<void> _deleteThread(AiChatThread thread, AppLocalizations l10n) async {
     if (await _confirmDelete(thread, l10n)) {
-      await AiChatService.instance.deleteThread(thread.id);
+      await _removeThread(thread);
     }
   }
 
   Future<void> _renameThread(AiChatThread thread, AppLocalizations l10n) async {
     final title = await showDialog<String>(
       context: context,
-      builder: (_) => _RenameDialog(initialTitle: thread.title),
+      builder: (_) => _RenameDialog(
+        initialTitle: thread.hasGenericTitle ? '' : thread.title,
+      ),
     );
     if (title == null) return;
     final success = await AiChatService.instance.renameThread(thread.id, title);
-    if (!success && mounted) _showOperationError(l10n);
+    if (!mounted) return;
+    if (!success) {
+      _showOperationError(l10n);
+      return;
+    }
+    await _refreshResults();
   }
 
   Future<void> _setPinned(
@@ -402,7 +532,12 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
       thread.id,
       isPinned,
     );
-    if (!success && mounted) _showOperationError(l10n);
+    if (!mounted) return;
+    if (!success) {
+      _showOperationError(l10n);
+      return;
+    }
+    await _refreshResults();
   }
 
   Future<bool> _confirmDelete(
@@ -412,7 +547,7 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
     final ok = await SettingsConfirmDialog.show(
       context: context,
       title: l10n.aiHistoryDeleteTitle,
-      message: l10n.aiHistoryDeleteBody(thread.title),
+      message: l10n.aiHistoryDeleteBody(_displayTitle(thread, l10n)),
       confirmLabel: l10n.commonDelete,
       cancelLabel: l10n.commonCancel,
     );
@@ -434,6 +569,15 @@ class _AiChatHistoryScreenState extends State<AiChatHistoryScreen> {
     if (age < 7) return '${age}d';
     return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}';
   }
+}
+
+/// A group header or a thread in the flattened history list.
+class _HistoryRow {
+  final String? header;
+  final AiChatThread? thread;
+
+  const _HistoryRow.header(String this.header) : thread = null;
+  const _HistoryRow.thread(AiChatThread this.thread) : header = null;
 }
 
 class _RenameDialog extends StatefulWidget {
