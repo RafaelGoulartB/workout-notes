@@ -339,23 +339,11 @@ class TestDataPeriodizationGenerator {
     PeriodizationTarget seed, {
     required int version,
     DateTime? validFrom,
-  }) => PeriodizationTarget(
+  }) => seed.copyWith(
     id: context.id('periodization_target', '${phase.id}:$version'),
     phaseId: phase.id,
     version: version,
     validFrom: validFrom ?? phase.startDate,
-    calories: seed.calories,
-    proteinG: seed.proteinG,
-    carbsG: seed.carbsG,
-    fatG: seed.fatG,
-    workoutsPerWeek: seed.workoutsPerWeek,
-    minSetsPerWeek: seed.minSetsPerWeek,
-    maxSetsPerWeek: seed.maxSetsPerWeek,
-    minRpe: seed.minRpe,
-    maxRpe: seed.maxRpe,
-    targetWeightKg: seed.targetWeightKg,
-    weeklyWeightChangePercent: seed.weeklyWeightChangePercent,
-    sleepHours: seed.sleepHours,
     createdAt: (validFrom ?? phase.startDate).add(const Duration(hours: 8)),
   );
 
@@ -552,6 +540,21 @@ class TestDataPeriodizationGenerator {
     targetWeightKg: weight,
     weeklyWeightChangePercent: weeklyWeightChange,
     sleepHours: sleep,
+    // Template week: strength days spread over the week, lighter rest days.
+    strengthDays: switch (workouts) {
+      null || 0 => const [],
+      1 => const [3],
+      2 => const [1, 4],
+      3 => const [1, 3, 5],
+      4 => const [1, 2, 4, 5],
+      _ => const [1, 2, 3, 5, 6],
+    },
+    restCalories: calories == null || workouts == null ? null : calories - 250,
+    restProteinG: calories == null || workouts == null ? null : protein,
+    restFatG: calories == null || workouts == null ? null : fat,
+    restCarbsG: calories == null || workouts == null || carbs == null
+        ? null
+        : (carbs - 250 / 4).clamp(0, double.infinity).roundToDouble(),
     createdAt: DateTime(2000),
   );
 }
