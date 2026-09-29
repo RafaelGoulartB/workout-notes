@@ -277,7 +277,12 @@ class StrengthTrendChart extends StatelessWidget {
         if (v > hi) hi = v;
       }
     }
-    final span = (hi - lo).abs();
+    // Rounding noise (22.8 vs 22.799999999999997, or the trend line of a
+    // flat series) is not a spread: an interval below the precision of the
+    // axis values would never advance and fl_chart would loop until it runs
+    // out of memory.
+    final rawSpan = (hi - lo).abs();
+    final span = rawSpan <= hi.abs() * 1e-9 ? 0.0 : rawSpan;
     final pad = span == 0 ? (hi.abs() * 0.1).clamp(1.0, 50.0) : span * 0.18;
     var minY = fixedMin ?? (zeroBased ? 0.0 : (lo - pad).clamp(0.0, hi));
     var maxY = fixedMax ?? hi + pad;
